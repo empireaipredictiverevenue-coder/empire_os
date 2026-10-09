@@ -15,6 +15,7 @@ from empire_os.canonical_data_gateway import DataGatewayUnavailable
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.factory_hybrid_worker_guard_v1 import guard_department_bridge
 from empire_os.department_budget_ledger import DepartmentBudgetLedger
 from empire_os.execution_plane_dispatcher import (
     ExecutionRequest,
@@ -555,6 +556,36 @@ def run_one_department_work(
     if item.target_component == "agent_tool_execution_plane":
         try:
             result = _execution_plane_bridge(root, item)
+            # EMPIRE_HYBRID_FACTORY_PHASE3_BEGIN
+            # EMPIRE_HYBRID_FACTORY_PHASE4_REVIEW
+            if os.environ.get('EMPIRE_HYBRID_FACTORY_ENFORCE_V1') == '1':
+                factory_hold = guard_department_bridge(
+                    work_id=item.id,
+                    target_component='agent_tool_execution_plane',
+                    intelligence_request=item.intelligence_request,
+                    result=result,
+                )
+                if factory_hold.enforced:
+                    hold_result = {**result, 'hybrid_factory': factory_hold.as_dict()}
+                    if factory_hold.disposition == 'READY_FOR_INDEPENDENT_REVIEW':
+                        held = queue.submit_for_review(item, hold_result)
+                    else:
+                        held = queue.block(
+                            item,
+                            'hybrid_factory_' + factory_hold.disposition.lower(),
+                            hold_result,
+                        )
+                    return {
+                        'ok': True,
+                        'state': 'REVIEW' if factory_hold.disposition == 'READY_FOR_INDEPENDENT_REVIEW' else 'BLOCKED',
+                        'work_id': held.id,
+                        'target_component': held.target_component,
+                        'blocker': held.error,
+                        'hybrid_factory': factory_hold.as_dict(),
+                        'queue_counts': queue.counts(),
+                        'execution_authority': 'none',
+                    }
+            # EMPIRE_HYBRID_FACTORY_PHASE3_END
             dispatch = result.get("dispatch") or {}
             dispatch_status = str(
                 dispatch.get("status") or ""
@@ -615,6 +646,36 @@ def run_one_department_work(
     if item.target_component == "empire_coder":
         try:
             result = _coder_bridge(root, item)
+            # EMPIRE_HYBRID_FACTORY_PHASE3_BEGIN
+            # EMPIRE_HYBRID_FACTORY_PHASE4_REVIEW
+            if os.environ.get('EMPIRE_HYBRID_FACTORY_ENFORCE_V1') == '1':
+                factory_hold = guard_department_bridge(
+                    work_id=item.id,
+                    target_component='empire_coder',
+                    intelligence_request=item.intelligence_request,
+                    result=result,
+                )
+                if factory_hold.enforced:
+                    hold_result = {**result, 'hybrid_factory': factory_hold.as_dict()}
+                    if factory_hold.disposition == 'READY_FOR_INDEPENDENT_REVIEW':
+                        held = queue.submit_for_review(item, hold_result)
+                    else:
+                        held = queue.block(
+                            item,
+                            'hybrid_factory_' + factory_hold.disposition.lower(),
+                            hold_result,
+                        )
+                    return {
+                        'ok': True,
+                        'state': 'REVIEW' if factory_hold.disposition == 'READY_FOR_INDEPENDENT_REVIEW' else 'BLOCKED',
+                        'work_id': held.id,
+                        'target_component': held.target_component,
+                        'blocker': held.error,
+                        'hybrid_factory': factory_hold.as_dict(),
+                        'queue_counts': queue.counts(),
+                        'execution_authority': 'none',
+                    }
+            # EMPIRE_HYBRID_FACTORY_PHASE3_END
             done = queue.complete(
                 item,
                 result,
@@ -727,6 +788,7 @@ def run_one_department_work(
         item,
         result,
         evidence_refs=(evidence_ref,),
+        execution_completed=True,
     )
     return {
         "ok": True,

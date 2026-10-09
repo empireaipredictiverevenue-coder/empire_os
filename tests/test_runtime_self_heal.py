@@ -316,3 +316,57 @@ def test_agentic_revenue_owner_is_auto_repairable_but_retired_timers_are_not():
         "empire-revenue-exchange-snapshot.timer",
     ):
         assert runtime_self_heal.unit_is_auto_repairable(unit) is False
+
+
+def test_failed_nonallowlisted_service_is_visible_but_not_restarted(
+    monkeypatch, tmp_path,
+):
+    _clear_runtime(monkeypatch)
+    monkeypatch.setenv("EMPIRE_AUTONOMOUS_MODE", "OBSERVE")
+    payload = runtime_self_heal.run_runtime_self_heal(
+        observe_only=False,
+        unit_inventory=lambda: [{
+            "unit": "empire-opportunity-loop.service",
+            "unit_file_state": "static",
+            "load_state": "loaded",
+            "active_state": "failed",
+            "sub_state": "failed",
+            "policy": "OBSERVE_ONLY",
+        }],
+        repair=lambda *_args: (_ for _ in ()).throw(
+            AssertionError("failed worker must not be restarted")
+        ),
+        latest_path=tmp_path / "latest.json",
+        state_path=tmp_path / "state.json",
+    )
+    assert payload["status"] == "DEGRADED"
+    assert payload["inventory_finding_count"] == 1
+    assert payload["inventory_findings"][0]["code"] == "system_service_failed"
+    assert payload["inventory_findings"][0]["unit"] == (
+        "empire-opportunity-loop.service"
+    )
+    assert payload["inventory_findings"][0]["repair_executed"] is False
+    assert payload["repair_count"] == 0
+    assert payload["actual_revenue"] is False
+
+
+def test_systemctl_bullet_failed_unit_is_not_lost_by_inventory(monkeypatch):
+    from subprocess import CompletedProcess
+    calls = []
+
+    def fake_run(argv, **kwargs):
+        calls.append(argv)
+        if "list-unit-files" in argv:
+            return CompletedProcess(argv, 0,
+                "empire-opportunity-loop.service disabled -\n", "")
+        return CompletedProcess(argv, 0,
+            "● empire-opportunity-loop.service loaded failed failed "
+            "EmpireOS canonical Predictive Cloud Opportunity Loop\n", "")
+
+    monkeypatch.setattr(runtime_self_heal.subprocess, "run", fake_run)
+    rows = runtime_self_heal._discover_empire_units()
+    assert len(calls) == 2
+    row = next(r for r in rows if r["unit"] == "empire-opportunity-loop.service")
+    assert row["active_state"] == "failed"
+    assert row["sub_state"] == "failed"
+    assert row["policy"] == "OBSERVE_ONLY"

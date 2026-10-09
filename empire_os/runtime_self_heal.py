@@ -231,7 +231,11 @@ def _discover_empire_units() -> list[dict[str, Any]]:
 
     active_map: dict[str, dict[str, str]] = {}
     for raw in (active.stdout or "").splitlines():
-        parts = raw.split(None, 4)
+        parts = raw.split(None, 5)
+        # systemctl prefixes failed units with a bullet glyph. Without
+        # stripping it, the inventory silently loses those failed services.
+        if parts and parts[0] in {"●", "×", "*"}:
+            parts = parts[1:]
         if len(parts) < 4:
             continue
         unit, load_state, active_state, sub_state = parts[:4]
@@ -546,10 +550,24 @@ def run_runtime_self_heal(
     inventory_findings: list[dict[str, Any]] = []
     for row in inventory:
         unit = str(row.get("unit") or "")
-        if not unit.endswith(".timer") or unit in explicitly_checked_units:
-            continue
         file_state = str(row.get("unit_file_state") or "")
         active_state = str(row.get("active_state") or "")
+        if unit.endswith(".service") and active_state == "failed":
+            # Observe failed non-allowlisted services without granting
+            # restart authority. This catches production jobs whose timers
+            # are healthy but whose worker executions fail.
+            if unit not in explicitly_checked_units:
+                inventory_findings.append({
+                    "code": "system_service_failed",
+                    "unit": unit,
+                    "policy": row.get("policy") or "OBSERVE_ONLY",
+                    "unit_file_state": file_state,
+                    "active_state": active_state,
+                    "repair_executed": False,
+                })
+            continue
+        if not unit.endswith(".timer") or unit in explicitly_checked_units:
+            continue
         if file_state.startswith("enabled") and active_state != "active":
             inventory_findings.append({
                 "code": "enabled_timer_inactive",

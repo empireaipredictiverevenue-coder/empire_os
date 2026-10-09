@@ -41,6 +41,9 @@ _CODE_MAP = {
     "buyer_review_worker_failed": ("workflow_stall", "queue_recovery"),
     "critical_service_down": ("dependency_failure", "escalate"),
     "critical_timer_down": ("workflow_stall", "escalate"),
+    "engineering_regression_failed": ("dependency_failure", "escalate"),
+    "regression_evidence_missing": ("data_freshness", "escalate"),
+    "regression_evidence_incomplete": ("data_freshness", "escalate"),
 }
 
 

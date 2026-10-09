@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Retired legacy supervisor. Never start outbound, reply, or inbound units here.
+# Canonical operations observation is owned by empire-ops-control.service.
+exit 0
 set -u
 
 GUARD_STATE="${EMPIRE_SUPABASE_EGRESS_GUARD_STATE:-/srv/empire_os/runtime/control/supabase_egress_guard.json}"

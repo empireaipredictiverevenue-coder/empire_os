@@ -443,6 +443,57 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
             blueprint_refs=(),
         ),
         DepartmentSpec(
+            key="outbound",
+            name="Outbound",
+            mission=(
+                "Turn verified prospects into trusted commercial conversations "
+                "through evidence-backed rapport, value-led nurture and governed handoff."
+            ),
+            components=(
+                "buyer_review",
+                "outbound_governor",
+                "conversation_os",
+                "conversion_intelligence",
+            ),
+            agent_roles=(
+                "outbound_director",
+                "account_research",
+                "rapport_messaging",
+                "nurture",
+                "deliverability_review",
+                "reply_intelligence",
+                "conversation_handoff",
+                "outreach_learning",
+                "governance",
+            ),
+            kpis=(
+                "verified_prospects_nurtured",
+                "substantive_reply_rate",
+                "qualified_conversations",
+                "commercial_opportunities",
+                "recognized_revenue",
+                "realized_gross_profit",
+            ),
+            inputs=(
+                "verified_prospects",
+                "buyer_review",
+                "company_person_evidence",
+                "conversation_history",
+                "market_intelligence",
+                "suppression_state",
+            ),
+            outputs=(
+                "rapport_strategy",
+                "governed_drafts",
+                "nurture_next_actions",
+                "qualified_conversations",
+                "closer_handoffs",
+                "outreach_learning_metadata",
+            ),
+            authority="governed_external",
+            blueprint_refs=("docs/architecture/outbound_department_v1.md",),
+        ),
+        DepartmentSpec(
             key="risk_compliance",
             name="Risk, Legal & Compliance",
             mission=(

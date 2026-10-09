@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any, Mapping
 from uuid import uuid4
 
+from empire_os.decision_identity import build_decision_identity, bind_execution_evidence
+
 
 class DepartmentWorkStatus(str, Enum):
     READY = "READY"
@@ -53,6 +55,9 @@ class DepartmentWorkItem:
     lease_expires_at: str | None = None
     created_at: str = ""
     updated_at: str = ""
+    commercial_decision_provenance: dict[str, Any] | None = None
+    decision_identity: dict[str, Any] | None = None
+    tenant_id: str | None = None
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -182,11 +187,24 @@ class DepartmentWorkQueue:
             created_at=now,
             updated_at=now,
         )
+        provenance = step.get("commercial_decision_provenance")
+        if provenance is not None:
+            if not isinstance(provenance, Mapping) or provenance.get("execution_authority") != "none":
+                raise DepartmentWorkQueueError("invalid commercial decision provenance")
+            fields = ("tenant_id", "opportunity_key", "opportunity_id", "candidate_id", "prediction_ref", "state_ref", "source_ref",
+                      "shadow_only", "selection_authority_ref", "execution_authority")
+            item.commercial_decision_provenance = {key: provenance[key] for key in fields if key in provenance}
+            item.tenant_id = provenance.get("tenant_id")
+            item.decision_identity = self._selection_identity(item)
 
         with self._locked():
             existing = self._find_path(work_id)
             if existing is not None:
                 current = self._load(existing)
+                if (current.decision_identity != item.decision_identity
+                        or current.tenant_id != item.tenant_id
+                        or current.commercial_decision_provenance != item.commercial_decision_provenance):
+                    raise DepartmentWorkQueueError("conflicting decision identity for existing work")
                 reopen = (
                     existing.parent == self.blocked
                     and str(current.error or "")
@@ -248,12 +266,31 @@ class DepartmentWorkQueue:
                 return item
         return None
 
+    # EMPIRE_HYBRID_FACTORY_PHASE4_REVIEW: only a leased RUNNING item can enter REVIEW.
+    def submit_for_review(
+        self,
+        item: DepartmentWorkItem,
+        result: Mapping[str, Any],
+    ) -> DepartmentWorkItem:
+        from empire_os.factory_hybrid_review_intake_v1 import validate_review_intake
+        validate_review_intake(item, result)
+        return self._finish(
+            item, DepartmentWorkStatus.REVIEW, dict(result), (), None,
+            execution_completed=False,
+        )
+
+    # EMPIRE_HYBRID_FACTORY_PHASE4B_FINALIZER: root-attested, explicit only.
+    def finalize_hybrid_review(self, work_id: str) -> DepartmentWorkItem:
+        from empire_os.factory_hybrid_review_finalizer_v1 import finalize_review_locked
+        return finalize_review_locked(self, work_id)
+
     def complete(
         self,
         item: DepartmentWorkItem,
         result: Mapping[str, Any] | None = None,
         *,
         evidence_refs: tuple[str, ...] = (),
+        execution_completed: bool = False,
     ) -> DepartmentWorkItem:
         return self._finish(
             item,
@@ -261,6 +298,7 @@ class DepartmentWorkQueue:
             dict(result or {}),
             tuple(evidence_refs),
             None,
+            execution_completed=execution_completed,
         )
 
     def block(
@@ -299,6 +337,7 @@ class DepartmentWorkQueue:
         result: dict[str, Any],
         evidence_refs: tuple[str, ...],
         error: str | None,
+        *, execution_completed: bool = False,
     ) -> DepartmentWorkItem:
         current = self.running / f"{self._safe(item.id)}.json"
         with self._locked():
@@ -310,8 +349,25 @@ class DepartmentWorkQueue:
                     "work item is not currently running"
                 )
             active = self._load(current)
+            if execution_completed and (not item.lease_id or active.lease_id != item.lease_id):
+                raise DepartmentWorkQueueError("execution binding requires active work lease")
             if item.lease_id and active.lease_id != item.lease_id:
                 raise DepartmentWorkQueueError("work lease mismatch")
+            if active.decision_identity is not None:
+                identity = active.decision_identity
+                if execution_completed:
+                    if status is not DepartmentWorkStatus.DONE or not evidence_refs:
+                        raise DepartmentWorkQueueError("completed execution evidence required")
+                    result_status = str(result.get("status") or "").upper()
+                    if (result_status and result_status not in {"DONE", "COMPLETED", "EXECUTED"}
+                            or any(result.get(key) is True for key in ("simulated", "shadow_only", "proposed", "queued"))
+                            or result.get("returncode", 0) != 0):
+                        raise DepartmentWorkQueueError("non-completed work cannot bind execution")
+                    if identity["shadow_only"] is not True:
+                        identity = bind_execution_evidence(identity, execution_ref=f"department_work:{active.id}")
+                result["decision_identity"] = identity
+            elif "decision_identity" in result:
+                raise DepartmentWorkQueueError("result cannot introduce a decision identity")
             active.status = status
             active.result = result
             active.result_evidence_refs = tuple(evidence_refs)
@@ -431,6 +487,40 @@ class DepartmentWorkQueue:
         os.chmod(path, 0o600)
 
     @staticmethod
+    def _selection_identity(item: DepartmentWorkItem) -> dict[str, Any]:
+        provenance = item.commercial_decision_provenance or {}
+        if type(provenance.get("shadow_only")) is not bool:
+            raise DepartmentWorkQueueError("explicit shadow_only required")
+        if provenance.get("execution_authority") != "none":
+            raise DepartmentWorkQueueError("decision provenance cannot grant execution authority")
+        for key in ("tenant_id", "opportunity_key", "opportunity_id", "candidate_id", "prediction_ref", "state_ref", "source_ref", "selection_authority_ref"):
+            value = provenance.get(key)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise DepartmentWorkQueueError("invalid structured decision reference")
+        opportunity = provenance.get("opportunity_key")
+        if item.tenant_id != provenance.get("tenant_id"):
+            raise DepartmentWorkQueueError("work tenant provenance mismatch")
+        candidate = provenance.get("candidate_id")
+        if opportunity and candidate and opportunity != candidate:
+            raise DepartmentWorkQueueError("commercial candidate identity mismatch")
+        return build_decision_identity(
+            decision_kind=item.action, task_key=item.id,
+            state_ref=provenance.get("state_ref"), source_ref=provenance.get("source_ref"),
+            candidate_id=opportunity or candidate, prediction_ref=provenance.get("prediction_ref"),
+            shadow_only=provenance["shadow_only"],
+            selection_authority_ref=provenance.get("selection_authority_ref"),
+        )
+
+    @staticmethod
+    def read_completed_work(repo_root: str | Path, work_id: str) -> dict[str, Any]:
+        """Read an explicitly linked persisted work item without creating a queue."""
+        path = Path(repo_root).resolve() / "runtime/departments/work/done" / f"{DepartmentWorkQueue._safe(work_id)}.json"
+        item = DepartmentWorkQueue._load(path)
+        if item.id != work_id or item.status is not DepartmentWorkStatus.DONE:
+            raise DepartmentWorkQueueError("canonical completed work required")
+        return item.as_dict()
+
+    @staticmethod
     def _load(path: Path) -> DepartmentWorkItem:
         raw = json.loads(path.read_text(encoding="utf-8"))
         raw["status"] = DepartmentWorkStatus(raw["status"])
@@ -439,4 +529,11 @@ class DepartmentWorkQueue:
         raw["result_evidence_refs"] = tuple(
             raw.get("result_evidence_refs") or ()
         )
-        return DepartmentWorkItem(**raw)
+        item = DepartmentWorkItem(**raw)
+        if item.commercial_decision_provenance is not None:
+            expected = DepartmentWorkQueue._selection_identity(item)
+            if item.decision_identity != expected:
+                raise DepartmentWorkQueueError("work selection identity mismatch")
+        elif item.decision_identity is not None:
+            raise DepartmentWorkQueueError("decision identity requires selection provenance")
+        return item
