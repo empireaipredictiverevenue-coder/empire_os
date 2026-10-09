@@ -128,6 +128,8 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             tasks.append("RESOLVE_THIRD_PARTY_IDENTITY_CONFLICT_DO_NOT_CONTACT")
         if independent_state == "THIRD_PARTY_PROFILE_DOMAIN_MATCH":
             tasks.append("CONFIRM_OFFICIAL_REGISTRATION_AND_DOMAIN_CONTROL_BEFORE_OUTREACH")
+            if independent_record and independent_record.get("business_management_research"):
+                tasks.append("VERIFY_DIRECTORY_LISTED_PRINCIPAL_IS_CURRENT_AUTHORISED_BUYER")
         tasks = sorted(set(tasks))
         packets.append({
             "entity_id": r["entity_id"],

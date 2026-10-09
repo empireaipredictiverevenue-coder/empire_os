@@ -120,3 +120,53 @@ def test_third_party_not_hard_requirement_for_existing_review_api():
     result=build_contractor_review(a,b,c,as_of=TODAY)
     assert result["summary"]["third_party_directory_domain_matches"] == 0
     assert result["summary"]["independently_verified_purchase_intent"] == 0
+
+
+def test_three_public_directory_principals_added_as_unverified_work_leads():
+    rows=_review(_loaded())["packets"]
+    expected={
+        "maxexteriors.com":("Pedro Torres","Owner/Director"),
+        "180roofing.com":("Sebastian L. Ventura","Owner/Manager"),
+        "spcroofs.com":("Jonathan Shaw","President"),
+    }
+    for domain,(name,role) in expected.items():
+        company=next(p for p in rows if p["company_domain"]==domain)
+        manager=company["independent_business_research"]["business_management_research"]
+        assert manager["name"]==name
+        assert manager["role_as_listed"]==role
+        assert manager["status"]=="PUBLIC_DIRECTORY_LISTED_UNCONFIRMED"
+        assert manager["real_person_identity_verified"] is False
+        assert manager["decision_or_budget_authority_verified"] is False
+        assert manager["business_contact_route_verified"] is False
+        assert manager["recipient_suppression_verified"] is False
+        assert manager["outbound_authorized"] is False
+        assert company["founder_review_ready"] is False
+        assert "VERIFY_DIRECTORY_LISTED_PRINCIPAL_IS_CURRENT_AUTHORISED_BUYER" in company["review_tasks"]
+
+
+def test_directory_principal_cannot_claim_recipient_or_buyer_authority():
+    a,b,c,d=_loaded()
+    d["records"][0]["business_principal"]["recipient_suppression_clear"]=True
+    with pytest.raises(ValueError,match="PRINCIPAL_AUTHORITY_UNVERIFIED"):
+        build_contractor_review(a,b,c,as_of=TODAY,independent_evidence=d)
+
+
+def test_directory_principal_cannot_claim_verified_decision_authority():
+    a,b,c,d=_loaded()
+    d["records"][0]["business_principal"]["decision_making_or_budget_authority_verified"]=True
+    with pytest.raises(ValueError,match="PRINCIPAL_AUTHORITY_UNVERIFIED"):
+        build_contractor_review(a,b,c,as_of=TODAY,independent_evidence=d)
+
+
+def test_directory_principal_source_must_be_exactly_its_profile():
+    a,b,c,d=_loaded()
+    d["records"][0]["business_principal"]["source_url"]="https://www.bbb.org/us/tx/different-profile"
+    with pytest.raises(ValueError,match="PRINCIPAL_AUTHORITY_UNVERIFIED"):
+        build_contractor_review(a,b,c,as_of=TODAY,independent_evidence=d)
+
+
+def test_directory_principal_cannot_inject_contact_or_email():
+    a,b,c,d=_loaded()
+    d["records"][0]["business_principal"]["email"]="not-verified@example.com"
+    with pytest.raises(ValueError,match="PRINCIPAL_SCHEMA_INVALID"):
+        build_contractor_review(a,b,c,as_of=TODAY,independent_evidence=d)

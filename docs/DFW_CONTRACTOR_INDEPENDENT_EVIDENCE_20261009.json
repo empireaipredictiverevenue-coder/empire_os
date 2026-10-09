@@ -1,62 +1,92 @@
 {
-  "schema": "empire.revenue_strike.dfw_company_corrob.v1",
-  "observed_at": "2026-10-09",
   "description": "Third-party publicly accessible BBB profiles manually reviewed for research, not a state registration or legal identity, not direct buyer intent, and not outbound authorization.",
+  "observed_at": "2026-10-09",
   "records": [
     {
+      "business_principal": {
+        "contact_route_verified": false,
+        "decision_making_or_budget_authority_verified": false,
+        "evidence_class": "DIRECTORY_LISTED_BUSINESS_MANAGEMENT_ONLY",
+        "name": "Pedro Torres",
+        "person_identity_independently_verified": false,
+        "recipient_suppression_clear": false,
+        "role": "Owner/Director",
+        "source_url": "https://www.bbb.org/us/tx/desoto/profile/roofing-contractors/max-exteriors-llc-0875-91051523"
+      },
       "company_domain": "maxexteriors.com",
+      "discrepancy_codes": [],
+      "fact": "BBB profile identifies a roofing business named Max Exteriors LLC and directly links maxexteriors.com.",
       "listed_business_name": "Max Exteriors, LLC",
-      "source_url": "https://www.bbb.org/us/tx/desoto/profile/roofing-contractors/max-exteriors-llc-0875-91051523",
       "listing_website_url": "https://maxexteriors.com/",
       "observed_at": "2026-10-09",
       "source_type": "BBB_BUSINESS_PROFILE",
-      "discrepancy_codes": [],
-      "fact": "BBB profile identifies a roofing business named Max Exteriors LLC and directly links maxexteriors.com."
+      "source_url": "https://www.bbb.org/us/tx/desoto/profile/roofing-contractors/max-exteriors-llc-0875-91051523"
     },
     {
+      "business_principal": {
+        "contact_route_verified": false,
+        "decision_making_or_budget_authority_verified": false,
+        "evidence_class": "DIRECTORY_LISTED_BUSINESS_MANAGEMENT_ONLY",
+        "name": "Sebastian L. Ventura",
+        "person_identity_independently_verified": false,
+        "recipient_suppression_clear": false,
+        "role": "Owner/Manager",
+        "source_url": "https://www.bbb.org/us/tx/mesquite/profile/roofing-contractors/180-roofing-contracting-llc-0875-90938685"
+      },
       "company_domain": "180roofing.com",
+      "discrepancy_codes": [],
+      "fact": "BBB roofing profile directly links 180roofing.com for 180 Roofing and Contracting LLC.",
       "listed_business_name": "180 Roofing & Contracting, LLC",
-      "source_url": "https://www.bbb.org/us/tx/mesquite/profile/roofing-contractors/180-roofing-contracting-llc-0875-90938685",
       "listing_website_url": "https://180roofing.com/",
       "observed_at": "2026-10-09",
       "source_type": "BBB_BUSINESS_PROFILE",
-      "discrepancy_codes": [],
-      "fact": "BBB roofing profile directly links 180roofing.com for 180 Roofing and Contracting LLC."
+      "source_url": "https://www.bbb.org/us/tx/mesquite/profile/roofing-contractors/180-roofing-contracting-llc-0875-90938685"
     },
     {
+      "business_principal": {
+        "contact_route_verified": false,
+        "decision_making_or_budget_authority_verified": false,
+        "evidence_class": "DIRECTORY_LISTED_BUSINESS_MANAGEMENT_ONLY",
+        "name": "Jonathan Shaw",
+        "person_identity_independently_verified": false,
+        "recipient_suppression_clear": false,
+        "role": "President",
+        "source_url": "https://www.bbb.org/us/tx/euless/profile/roofing-contractors/spc-construction-roofing-inc-0825-155405122"
+      },
       "company_domain": "spcroofs.com",
+      "discrepancy_codes": [],
+      "fact": "BBB roofing business profile provides an Euless office and website link to spcroofs.com.",
       "listed_business_name": "SPC Construction & Roofing, Inc.",
-      "source_url": "https://www.bbb.org/us/tx/euless/profile/roofing-contractors/spc-construction-roofing-inc-0825-155405122",
       "listing_website_url": "https://www.spcroofs.com/",
       "observed_at": "2026-10-09",
       "source_type": "BBB_BUSINESS_PROFILE",
-      "discrepancy_codes": [],
-      "fact": "BBB roofing business profile provides an Euless office and website link to spcroofs.com."
+      "source_url": "https://www.bbb.org/us/tx/euless/profile/roofing-contractors/spc-construction-roofing-inc-0825-155405122"
     },
     {
       "company_domain": "riseroofingconstruction.com",
-      "listed_business_name": "Rise Roofing & Construction",
-      "source_url": "https://www.bbb.org/us/tx/southlake/profile/roof-structure/rise-roofing-construction-0825-1000215721",
-      "listing_website_url": "https://stormforceroof.com/",
-      "observed_at": "2026-10-09",
-      "source_type": "BBB_BUSINESS_PROFILE",
       "discrepancy_codes": [
         "LISTING_LINK_POINTS_TO_OTHER_DOMAIN"
       ],
-      "fact": "A similar-name BBB profile links a different domain stormforceroof.com; no assumption that this is the same business."
+      "fact": "A similar-name BBB profile links a different domain stormforceroof.com; no assumption that this is the same business.",
+      "listed_business_name": "Rise Roofing & Construction",
+      "listing_website_url": "https://stormforceroof.com/",
+      "observed_at": "2026-10-09",
+      "source_type": "BBB_BUSINESS_PROFILE",
+      "source_url": "https://www.bbb.org/us/tx/southlake/profile/roof-structure/rise-roofing-construction-0825-1000215721"
     },
     {
       "company_domain": "topnotchroofingrr.com",
-      "listed_business_name": "Top Notch Roofing & Restoration",
-      "source_url": "https://www.bbb.org/us/tx/wylie/profile/residential-roofing/top-notch-roofing-restoration-0875-91348579",
-      "listing_website_url": null,
-      "observed_at": "2026-10-09",
-      "source_type": "BBB_BUSINESS_PROFILE",
       "discrepancy_codes": [
         "UNCONFIRMED_SAME_ENTITY",
         "BUSINESS_AGE_CLAIM_DISAGREEMENT"
       ],
-      "fact": "Same-name BBB profile reports 2024 start and A rating, whereas candidate site claims DFW operations since 2013 and BBB A+; cannot link entities or validate longevity."
+      "fact": "Same-name BBB profile reports 2024 start and A rating, whereas candidate site claims DFW operations since 2013 and BBB A+; cannot link entities or validate longevity.",
+      "listed_business_name": "Top Notch Roofing & Restoration",
+      "listing_website_url": null,
+      "observed_at": "2026-10-09",
+      "source_type": "BBB_BUSINESS_PROFILE",
+      "source_url": "https://www.bbb.org/us/tx/wylie/profile/residential-roofing/top-notch-roofing-restoration-0875-91348579"
     }
-  ]
+  ],
+  "schema": "empire.revenue_strike.dfw_company_corrob.v1"
 }

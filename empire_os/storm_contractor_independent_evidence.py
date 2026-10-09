@@ -72,6 +72,22 @@ def review_independent_evidence(data: Mapping | None, *, cohort_names: Mapping[s
         fact = record.get("fact")
         if not isinstance(fact, str) or not 20 <= len(fact) <= 400:
             raise ValueError("THIRD_PARTY_EVIDENCE_FACT_INVALID")
+        principal = record.get("business_principal")
+        if principal is not None:
+            if not isinstance(principal, Mapping) or len(principal) != 8:
+                raise ValueError("THIRD_PARTY_PRINCIPAL_SCHEMA_INVALID")
+            name, role = principal.get("name"), principal.get("role")
+            if (not isinstance(name, str) or not re.fullmatch(r"[A-Za-z][A-Za-z .'-]{2,100}", name)
+                    or role not in {"Owner/Director", "Owner/Manager", "President"}):
+                raise ValueError("THIRD_PARTY_PRINCIPAL_IDENTITY_INVALID")
+            if (principal.get("source_url") != src
+                    or principal.get("evidence_class") != "DIRECTORY_LISTED_BUSINESS_MANAGEMENT_ONLY"
+                    or any(principal.get(k) is not False for k in (
+                        "person_identity_independently_verified",
+                        "decision_making_or_budget_authority_verified",
+                        "contact_route_verified", "recipient_suppression_clear",
+                    ))):
+                raise ValueError("THIRD_PARTY_PRINCIPAL_AUTHORITY_UNVERIFIED")
         mismatch = bool(reasons) or bool(observed_domain and observed_domain != domain)
         if mismatch:
             state = "INDEPENDENT_SOURCE_IDENTITY_CONFLICT_HOLD"
@@ -88,6 +104,17 @@ def review_independent_evidence(data: Mapping | None, *, cohort_names: Mapping[s
             "listed_website_domain": observed_domain,
             "discrepancy_codes": sorted(reasons),
             "observation": fact,
+            "business_management_research": {
+                "name": principal["name"],
+                "role_as_listed": principal["role"],
+                "directory_source_url": src,
+                "status": "PUBLIC_DIRECTORY_LISTED_UNCONFIRMED",
+                "real_person_identity_verified": False,
+                "decision_or_budget_authority_verified": False,
+                "business_contact_route_verified": False,
+                "recipient_suppression_verified": False,
+                "outbound_authorized": False,
+            } if principal is not None and not mismatch else None,
             "state_registry_identity_verified": False,
             "domain_ownership_verified": False,
             "marketing_buyer_intent_verified": False,

@@ -140,3 +140,44 @@ registration and authorised buyer-contact evidence. PowerEdge remains a
 research lead based on first-party hiring/context. No verified decision-maker
 conversation, no approved send, no Documenso envelope, no paid order, and
 no realised revenue from this cohort.
+
+## Publicly listed company principals and bounded identity gate — 2026-10-10
+
+This is a refinement to the **existing** independent-source records, not
+CRM contact creation and not permission to send or sign:
+
+| Research company | Directory-listed person | Listed business capacity | Source |
+| --- | --- | --- | --- |
+| Max Exteriors LLC | Pedro Torres | Owner/Director | https://www.bbb.org/us/tx/desoto/profile/roofing-contractors/max-exteriors-llc-0875-91051523 |
+| 180 Roofing & Contracting LLC | Sebastian L. Ventura | Owner/Manager | https://www.bbb.org/us/tx/mesquite/profile/roofing-contractors/180-roofing-contracting-llc-0875-90938685 |
+| SPC Construction & Roofing Inc | Jonathan Shaw | President | https://www.bbb.org/us/tx/euless/profile/roofing-contractors/spc-construction-roofing-inc-0825-155405122 |
+
+These are professional name/role *directory statements*, not independently
+verified identity, current spending authority, correct point of contact,
+public email-route verification, or buyer interest. The existing
+`storm_contractor_independent_evidence` parser checks that any listed
+business principal is bound to the EXACT same source page and cannot
+smuggle contact, budget, identity, suppression or outbound approvals.
+
+Account-specific research question for founder-approved discovery:
+- **Max:** What can Empire improve beyond the company's already visible
+  digital customer funnel? Never claim a missing funnel or unverified ROI.
+- **180:** Is the company seeking incremental commercial roofing or
+  restoration opportunity in a territory it currently serves? No capacity
+  claim absent a conversation. Investigate an alternate website mentioned
+  on a similar-name social profile before treating it as canonical identity.
+- **SPC:** Can its existing residential/commercial portfolio benefit from
+  independently verified territory/permit/storm intelligence? This is an
+  offer hypothesis, not a qualified buying need.
+
+The direct `psql` checks from the ordinary Ubuntu runtime were blocked:
+the local socket does not recognize the `ubuntu` database role and the
+read-only CRM network role requires a password. This is expected role
+separation, **not proof the EmpireDB guard ran**. The read-only command
+`scripts/refresh_contractor_revenue_review.py --check-contact-history`
+remains blocked until an existing authorized operational runner supplies
+the canonical DB connection. Never copy credentials to a public endpoint
+or Git repository and never disable suppression to get these leads sent.
+
+Formal entity registration and named-recipient suppression are still
+mandatory to progress these prospects beyond `CORROBORATION_PENDING`.
