@@ -85,3 +85,47 @@ def test_legacy_writer_successful_isolated_promotion(tmp_path, name, lane, contr
     for control in controls:
         assert row['controls'][control]['status'] == 'VERIFIED_RUNTIME'
     assert not list(target.parent.glob('*.tmp*'))
+
+
+def test_campaign_final_success_on_disposable_full_canonical(tmp_path):
+    import json
+    target = tmp_path / BINDINGS
+    target.parent.mkdir(parents=True)
+    data = json.loads((ROOT / BINDINGS).read_text())
+    campaign = next(row for row in data['lanes'] if row['lane'] == 'campaigns')
+    for row in campaign['controls'].values():
+        row['status'] = 'VERIFIED_RUNTIME'
+    target.write_text(json.dumps(data))
+    proof = tmp_path / 'runtime/campaigns_control/campaign_output_outcome_latest.json'
+    proof.parent.mkdir(parents=True)
+    proof.write_text(json.dumps({'runtime_verified_controls': ['output_quality', 'outcome_linkage']}))
+    source = (ROOT / 'scripts/promote_campaign_final_bindings.py').read_text()
+    staged = tmp_path / 'promote_campaign_final_bindings.py'
+    staged.write_text(source.replace('ROOT = Path("/srv/empire_os")', f'ROOT = Path({str(tmp_path)!r})', 1))
+    result = subprocess.run([sys.executable, str(staged)], cwd=tmp_path,
+                            env={**os.environ, 'PYTHONPATH': str(ROOT)},
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert 'CANONICAL_VERIFIED_COUNT:' in result.stdout
+    assert len([row for row in json.loads(target.read_text())['lanes'] if row['lane'] == 'campaigns'][0]['controls']) == 11
+
+
+def test_reconciler_rejects_materialized_founder_authority(tmp_path):
+    import json
+    target = tmp_path / BINDINGS
+    target.parent.mkdir(parents=True)
+    data = json.loads((ROOT / BINDINGS).read_text())
+    target.write_text(json.dumps(data))
+    fabric = {'lanes': [{'lane': 'consent_suppression', 'runtime_verified_control_count': 11,
+                         'runtime_unverified_controls': []}]}
+    f = tmp_path / 'runtime/control_plane/detection_fabric_latest.json'
+    f.write_text(json.dumps(fabric))
+    source = (ROOT / 'scripts/reconcile_materialized_runtime_bindings.py').read_text()
+    staged = tmp_path / 'reconcile_materialized_runtime_bindings.py'
+    staged.write_text(source.replace('ROOT = Path("/srv/empire_os")', f'ROOT = Path({str(tmp_path)!r})', 1))
+    before = target.read_bytes()
+    result = subprocess.run([sys.executable, str(staged)], cwd=tmp_path,
+                            env={**os.environ, 'PYTHONPATH': str(ROOT)},
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode != 0
+    assert target.read_bytes() == before
