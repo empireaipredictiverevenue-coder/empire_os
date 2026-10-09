@@ -213,3 +213,59 @@ def test_tenant_mismatch_is_blocked_before_crm_query(pg):
     wrong = PostgresRevenueCrmRepository(dsn, tenant_id=B)
     with pytest.raises(RevenueCrmTransportError, match="tenant scope unverified"):
         wrong.prospects(limit=10)
+
+
+def test_catalog_probe_checks_actual_restricted_pg18_catalog(pg):
+    from importlib.util import spec_from_file_location, module_from_spec
+    from pathlib import Path
+    import psycopg
+    root = Path(__file__).resolve().parents[1]
+    spec = spec_from_file_location(
+        "crm_catalog_real_pg_test",
+        root / "scripts/verify_revenue_crm_live_contract.py",
+    )
+    assert spec and spec.loader
+    probe = module_from_spec(spec)
+    spec.loader.exec_module(probe)
+    _, sock, port = pg
+    dsn = f"host={sock} port={port} dbname=crm_fixture user=ubuntu"
+    with psycopg.connect(dsn) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION READ ONLY")
+            report = probe.inspect_crm_catalog(cursor)
+    assert report["status"] == "CATALOG_PRECONDITIONS_VERIFIED", report["blockers"]
+    assert report["role_safe"] is True
+    assert report["trusted_tenant_function_present"] is True
+    for name in ("prospects", "buyers"):
+        assert report["views"][name] == {
+            "present": True, "columns_complete": True,
+            "security_invoker": True,
+            "base_rls_verified": True,
+            "role_select_only": True,
+        }
+    assert report["actual_cross_tenant_read_verified"] is False
+    assert report["public_api_activation_authorized"] is False
+
+
+def test_catalog_probe_rejects_removed_tenant_policy_on_pg18(pg):
+    from importlib.util import spec_from_file_location, module_from_spec
+    from pathlib import Path
+    import psycopg
+    root = Path(__file__).resolve().parents[1]
+    spec = spec_from_file_location(
+        "crm_catalog_pg_removed_policy",
+        root / "scripts/verify_revenue_crm_live_contract.py",
+    )
+    assert spec and spec.loader
+    probe = module_from_spec(spec)
+    spec.loader.exec_module(probe)
+    run, sock, port = pg
+    run("crm_fixture", "DROP POLICY crm_prospect_tenant ON public.prospects;")
+    dsn = f"host={sock} port={port} dbname=crm_fixture user=ubuntu"
+    with psycopg.connect(dsn) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION READ ONLY")
+            report = probe.inspect_crm_catalog(cursor)
+    assert report["status"] == "BLOCKED"
+    assert "PROSPECTS_BASE_RLS_NOT_VERIFIED" in report["blockers"]
+    assert report["public_api_activation_authorized"] is False
