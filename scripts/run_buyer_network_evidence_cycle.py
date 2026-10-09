@@ -14,6 +14,8 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+from empire_os.buyer_network_research_rotation import make_research_summary
+
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime/buyer_network_intelligence/research_cycle_latest.json"
 STEPS = (
@@ -64,6 +66,40 @@ def run(
         results.append(result)
         if result["status"] != "PASS":
             break
+    if not plan_only and all(r["status"] == "PASS" for r in results):
+        source = root / "runtime/buyer_network_intelligence"
+        # Recompute progress after the queue/backlog have been refreshed,
+        # otherwise telemetry reports outdated totals after every run.
+        try:
+            backlog = json.loads(
+                (source / "verification_backlog_latest.json").read_text()
+            )
+            ledger = json.loads((source / "research_ledger_latest.json").read_text())
+            direct = json.loads(
+                (source / "direct_site_verification_latest.json").read_text()
+            )
+            previous_progress = json.loads(
+                (source / "research_progress_latest.json").read_text()
+            )
+            refreshed = make_research_summary(
+                backlog, ledger, direct.get("results") or [],
+            )
+            refreshed["latest_batch_domains"] = previous_progress.get(
+                "latest_batch_domains", []
+            )
+            refreshed["latest_batch_count"] = previous_progress.get(
+                "latest_batch_count", 0
+            )
+            path = source / "research_progress_latest.json"
+            temp = path.with_suffix(".tmp")
+            temp.write_text(json.dumps(refreshed, indent=2, sort_keys=True)+"\n")
+            temp.replace(path)
+        except (OSError, ValueError, TypeError, KeyError):
+            # Count reporting is required to call this run successful.
+            results.append({
+                "script": "research_progress_reconciliation",
+                "status": "FAILED", "exit_code": 1,
+            })
     payload = {
         "schema_version": "empire.buyer_network_research_cycle.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),

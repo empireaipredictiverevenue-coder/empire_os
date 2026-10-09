@@ -6,21 +6,42 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Mapping
+import re
 
 INVALID_DOMAINS = frozenset({
     "empire-ai.co.uk", "empire-ai.com", "empire-ai.co",
     "yourdomain.com", "example.com", "example.org", "example.net",
     "localhost", "test.com",
 })
+ALLOWED_TLDS = frozenset({
+    "com", "co", "uk", "io", "ai", "net", "org", "us", "ca",
+    "biz", "info", "pro", "media", "marketing", "agency",
+    "digital", "group", "company", "services", "solutions",
+})
+NON_BUYER_DOMAINS = frozenset({
+    "ahrefs.com", "semrush.com", "serpapi.com",
+    "localfalcon.com", "aol.com",
+})
+
 COOLDOWN_SECONDS = 24 * 3600
 RESULT_TTL_SECONDS = 7 * 24 * 3600
 
 
 def accepted_domain(domain: str) -> bool:
     d = (domain or "").strip().lower().rstrip(".")
-    return bool(d) and d not in INVALID_DOMAINS and not d.endswith(
-        (".local", ".internal", ".test", ".example", ".localhost")
-    ) and not d.startswith(("127.", "10.", "192.168.", "172.16."))
+    if (not d or d in INVALID_DOMAINS or d in NON_BUYER_DOMAINS
+            or d.startswith(("empire.", "localhost."))):
+        return False
+    if d.endswith((".local", ".internal", ".test", ".example", ".localhost")):
+        return False
+    labels = d.split(".")
+    if len(labels) < 2 or labels[-1] not in ALLOWED_TLDS:
+        return False
+    return all(
+        len(label) <= 63
+        and re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label) is not None
+        for label in labels
+    )
 
 
 def choose_research_batch(

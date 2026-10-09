@@ -73,6 +73,8 @@ def test_exclude_placeholder_owned_and_reserved_domains():
     for domain in (
         "yourdomain.com", "empire-ai.co.uk", "example.com",
         "example.net", "company.local", "test.com", "127.0.0.1",
+        "empire.buyer", "empire.predictive", "latest.json",
+        "semrush.com", "ahrefs.com", "serpapi.com", "localfalcon.com",
     ):
         assert not accepted_domain(domain)
     for domain in ("px.com", "leadsmartinc.com", "callflowmarket.com"):

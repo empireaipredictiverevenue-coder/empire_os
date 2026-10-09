@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import subprocess
 
 from scripts import run_buyer_network_evidence_cycle as task
@@ -16,6 +17,17 @@ def test_bounded_cycle_reuses_existing_stages_without_outbound(tmp_path):
         called.append((args, kwargs))
         return FakeDone()
 
+    source = tmp_path / "runtime/buyer_network_intelligence"
+    source.mkdir(parents=True)
+    for file, data in (
+        ("verification_backlog_latest.json", {
+            "generated_at": "2026-10-09T20:00:00Z", "candidates": []
+        }),
+        ("research_ledger_latest.json", {"domains": {}}),
+        ("direct_site_verification_latest.json", {"results": []}),
+        ("research_progress_latest.json", {"latest_batch_domains": [], "latest_batch_count": 0}),
+    ):
+        (source / file).write_text(json.dumps(data))
     result = task.run(root=tmp_path, call=call)
     assert result["status"] == "PASS"
     assert result["execution_authority"] == "NONE"

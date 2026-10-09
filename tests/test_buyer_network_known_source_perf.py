@@ -23,4 +23,7 @@ def test_known_identity_lookup_does_not_scan_unrelated_runtime(tmp_path, monkeyp
 def test_queue_rejects_own_and_placeholder_domains():
     assert not queue.accepted_domain("yourdomain.com")
     assert not queue.accepted_domain("empire-ai.co.uk")
+    assert not queue.accepted_domain("empire.buyer")
+    assert not queue.accepted_domain("latest.json")
+    assert not queue.accepted_domain("semrush.com")
     assert queue.accepted_domain("buythecalls.com")
