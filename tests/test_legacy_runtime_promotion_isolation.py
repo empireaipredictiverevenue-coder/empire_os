@@ -129,3 +129,32 @@ def test_reconciler_rejects_materialized_founder_authority(tmp_path):
                             capture_output=True, text=True, timeout=15)
     assert result.returncode != 0
     assert target.read_bytes() == before
+
+
+def test_reconciler_success_with_consistent_disposable_fabric(tmp_path):
+    """Reconcile one lane with exact matching materialized and canonical truth."""
+    import json
+    target = tmp_path / BINDINGS
+    target.parent.mkdir(parents=True)
+    baseline = json.loads((ROOT / BINDINGS).read_text())
+    lane = next(row for row in baseline['lanes'] if row['lane'] == 'leads')
+    verified = {key for key, value in lane['controls'].items() if value.get('status') == 'VERIFIED_RUNTIME'}
+    remaining = sorted(set(lane['controls']) - verified)
+    target.write_text(json.dumps(baseline))
+    fabric = {'lanes': [{'lane': 'leads', 'runtime_verified_control_count': len(verified),
+                         'runtime_unverified_controls': remaining}]}
+    f = tmp_path / 'runtime/control_plane/detection_fabric_latest.json'
+    f.write_text(json.dumps(fabric))
+    source = (ROOT / 'scripts/reconcile_materialized_runtime_bindings.py').read_text()
+    assert 'ROOT = Path("/srv/empire_os")' in source
+    staged = tmp_path / 'reconcile_materialized_runtime_bindings.py'
+    staged.write_text(source.replace('ROOT = Path("/srv/empire_os")', f'ROOT = Path({str(tmp_path)!r})', 1))
+    result = subprocess.run([sys.executable, str(staged)], cwd=tmp_path,
+                            env={**os.environ, 'PYTHONPATH': str(ROOT)},
+                            capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr + result.stdout
+    updated = json.loads(target.read_text())
+    assert updated['materialized_runtime_reconciled_at']
+    updated_lane = next(row for row in updated['lanes'] if row['lane'] == 'leads')
+    assert {key for key, value in updated_lane['controls'].items() if value.get('status') == 'VERIFIED_RUNTIME'} == verified
+    assert not list(target.parent.glob('*.tmp*'))
