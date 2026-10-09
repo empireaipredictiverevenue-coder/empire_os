@@ -142,6 +142,8 @@ def main() -> int:
     parser.add_argument("--results-per-query", type=int, default=8)
     parser.add_argument("--max-domains", type=int, default=40)
     parser.add_argument("--max-probes", type=int, default=20)
+    parser.add_argument("--low-yield-canonical-limit", type=int, default=3,
+                        help="Allow up to 3 canonical research seeds when public search yields 1-2 domains")
     parser.add_argument("--intent-seed-limit", type=int, default=12)
     args = parser.parse_args()
 
@@ -186,6 +188,7 @@ def main() -> int:
         max_probes=args.max_probes,
         canonical_seed_records=seed_records,
         research_seed_records=research_seeds,
+        low_yield_canonical_limit=args.low_yield_canonical_limit,
     )
     print(json.dumps({
         "ok": True,
@@ -197,6 +200,9 @@ def main() -> int:
         ],
         "canonical_seed_fallback_used": payload[
             "canonical_seed_fallback_used"
+        ],
+        "low_yield_canonical_supplement_count": payload[
+            "low_yield_canonical_supplement_count"
         ],
         "intent_seed_input_count": len(intent_seeds),
         "verified_identity_seed_input_count": len(

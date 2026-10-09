@@ -23,6 +23,7 @@ from empire_os.buyer_acquisition_team import (
 )
 from empire_os.buyer_claim_provenance import classify_buyer_source_pages
 from empire_os.buyer_flow_recovery import NON_PROSPECT_DISCOVERY_HOSTS
+from empire_os.scout_low_yield_recovery import select_low_yield_canonical_domains
 from empire_os.buyer_discovery import (
     classify_decision_role,
     looks_like_person_name,
@@ -338,6 +339,7 @@ def run_buyer_scout(
     canonical_seed_records: list[Mapping[str, Any]] | None = None,
     research_seed_records: list[Mapping[str, Any]] | None = None,
     search_enabled: bool = True,
+    low_yield_canonical_limit: int = 0,
 ) -> dict[str, Any]:
     queries = collect_research_queries(
         plan,
@@ -380,8 +382,16 @@ def run_buyer_scout(
                 ),
             })
 
-    search_domain_count = len(provenance)
+    primary_search_domains = set(provenance)
+    search_domain_count = len(primary_search_domains)
     search_has_domains = search_domain_count > 0
+    low_yield_canonical_domains = set(select_low_yield_canonical_domains(
+        canonical_seed_records,
+        search_domains=set(provenance),
+        query_count=len(query_text),
+        search_enabled=search_enabled,
+        limit=low_yield_canonical_limit,
+    ))
     seed_domain_count = 0
     opportunity_seed_domain_count = 0
     intent_seed_domain_count = 0
@@ -416,7 +426,7 @@ def run_buyer_scout(
             intent_seed_domains.add(host)
         elif opportunity_key:
             opportunity_seed_domains.add(host)
-        elif search_has_domains:
+        elif search_has_domains and host not in low_yield_canonical_domains:
             continue
         elif profile_key not in CONTINUOUS_COMMERCIAL_LANE_BY_ICP:
             continue
@@ -543,7 +553,11 @@ def run_buyer_scout(
         provenance,
         key=lambda domain: (
             0 if domain in opportunity_seed_domains else (
-                1 if domain in research_seed_domains else 2
+                1 if domain in low_yield_canonical_domains else (
+                    2 if domain in primary_search_domains else (
+                        3 if domain in research_seed_domains else 4
+                    )
+                )
             ),
             -len(provenance[domain]),
             domain,
@@ -1104,6 +1118,12 @@ def run_buyer_scout(
             rejected_search_infrastructure
         ),
         "canonical_seed_domain_count": seed_domain_count,
+        "low_yield_canonical_supplement_count": len(
+            low_yield_canonical_domains & set(canonical_seed_by_domain)
+        ),
+        "low_yield_canonical_supplement_used": bool(
+            low_yield_canonical_domains & set(canonical_seed_by_domain)
+        ),
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
         "intent_seed_domain_count": intent_seed_domain_count,
         "public_research_seed_domain_count": research_seed_domain_count,

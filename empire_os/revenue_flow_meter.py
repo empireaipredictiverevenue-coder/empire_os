@@ -249,6 +249,14 @@ def build_flow_meter(
 
     stages = {
         "discovered": _metric("scout", scout_count, "scout_run", health),
+        "primary_search_domains": _metric(
+            "scout", _amount(scout.get("search_domain_count")),
+            "scout_primary_search_discovery_not_buyer_proof", health,
+        ),
+        "low_yield_canonical_research_seeds": _metric(
+            "scout", _amount(scout.get("low_yield_canonical_supplement_count")),
+            "scout_canonical_research_not_verification", health,
+        ),
         "sites_probed": _metric(
             "scout", _amount(scout.get("probed_domain_count")),
             "scout_run", health,
