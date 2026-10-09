@@ -11,6 +11,7 @@ from empire_os.buyer_scout_review_readiness import (
     write_review_readiness,
 )
 from empire_os.sb import request_json
+from empire_os.buyer_evidence_quality_scorecard import refresh_evidence_quality_scorecard
 
 
 def _audit_stale_ready(*, limit: int, observe_only: bool) -> dict:
@@ -85,7 +86,32 @@ def main() -> int:
     )
     write_review_readiness(args.repo_root, payload)
 
+    # Existing scheduled worker now emits a read-only, cohort-safe quality
+    # receipt. Failure of optional reporting must never bypass policy gates,
+    # change database state or interrupt buyer review processing.
+    quality_status = "unavailable"
+    quality_summary = {}
+    try:
+        quality = refresh_evidence_quality_scorecard(args.repo_root)
+        quality_status = (
+            "current" if quality["stage_receipts_time_aligned"]
+            and quality["scout_receipt_fresh"] else "stale_or_mismatched_snapshots"
+        )
+        quality_summary = {
+            "scout_candidate_count": quality["scout_candidate_count"],
+            "verified_direct_purchase_receipt_count": quality[
+                "candidate_with_valid_direct_purchase_receipt"
+            ],
+            "strict_named_person_email_binding_count": quality[
+                "candidate_with_strict_named_person_email_binding"
+            ],
+        }
+    except Exception as exc:
+        print("EVIDENCE_QUALITY_SCORECARD_UNAVAILABLE:" + type(exc).__name__ + ":" + str(exc)[:180])
+
     print(json.dumps({
+        "evidence_quality_status": quality_status,
+        "evidence_quality_summary": quality_summary,
         "ok": True,
         "candidate_count": payload["candidate_count"],
         "review_ready_count": payload["review_ready_count"],
