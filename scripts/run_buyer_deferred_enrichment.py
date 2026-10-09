@@ -232,6 +232,9 @@ def _direct_public_contact_recovery(
         }
 
     enriched = {
+        # The shared evidence binder must know which company owns the
+        # contact, not just trust a caller-supplied "official_site" label.
+        "candidate": {"website": str(candidate.website or "")},
         "decision_maker": dict(decision),
         "decision_reconciliation": (
             dict(reconciliation)
@@ -264,6 +267,9 @@ def _direct_public_contact_recovery(
         "person_bound": bool(contact.get("person_bound")),
         "review_ready": bool(contact.get("review_ready")),
         "outreach_ready": bool(contact.get("outreach_ready")),
+        "public_contact_evidence_rejected_reasons": (
+            merged.get("public_web_evidence_rejected_reasons") or {}
+        ),
         "public_person_contact_evidence": observed,
     }
 

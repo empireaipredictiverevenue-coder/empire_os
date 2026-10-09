@@ -19,6 +19,7 @@ from empire_os.buyer_discovery import (
     validate_email_candidates,
     verify_contact_plan,
 )
+from empire_os.first_party_evidence_contract import first_party_contact_decision
 from empire_os.hunter.domain_intelligence import analyze_domain
 from empire_os.hunter.models import VerificationState
 from empire_os.hunter.verification_mesh import VerificationMesh
@@ -103,6 +104,8 @@ def _smtp_verified_generated_contacts(
 def _promote_confirmed_first_party_buyer(
     enriched: dict,
     contacts: list[dict],
+    *,
+    website: str | None = None,
 ) -> dict:
     """Promote only confirmed first-party economic/functional buyers.
 
@@ -124,6 +127,14 @@ def _promote_confirmed_first_party_buyer(
         if not (name and title and email and source_url):
             continue
         if not looks_like_person_name(name):
+            continue
+        # The Hunter "first_party" label alone must not let another
+        # company's website or email replace the canonical decision-maker.
+        valid, _reason = first_party_contact_decision(
+            website=website, source_url=source_url, email=email,
+            direct_publication=item.get("direct_publication"),
+        )
+        if item.get("source_kind") not in {None, "official_site"} or not valid:
             continue
         role, score = classify_decision_role(title)
         if role not in {"economic_buyer", "functional_buyer"} or score < 0.7:
@@ -323,7 +334,9 @@ def run(
             "name": item.person_name,
             "title": item.person_title,
             "email": item.email,
-            "source_url": item.source_url or candidate.website,
+            # A missing publication URL cannot be silently replaced
+            # with the company homepage and called direct publication.
+            "source_url": item.source_url,
             "source_kind": "official_site",
             "role_corroborated": True,
             "direct_publication": True,
@@ -332,6 +345,7 @@ def run(
         if item.state is VerificationState.CONFIRMED
         and item.first_party
         and item.person_bound
+        and item.source_url
         and item.person_name
         and item.person_title
     ]
@@ -339,6 +353,7 @@ def run(
         enriched = _promote_confirmed_first_party_buyer(
             enriched,
             hunter_first_party,
+            website=candidate.website,
         )
         enriched = merge_public_web_contact_evidence(
             enriched,
@@ -436,6 +451,9 @@ def run(
             if item.state is VerificationState.PROBABLE
         ],
         "public_person_contact_evidence": public_person_contact,
+        "public_contact_evidence_rejected_reasons": (
+            enriched.get("public_web_evidence_rejected_reasons") or {}
+        ),
         "generated_smtp_contacts": generated_validated,
         "generated_smtp_probe": generated_probe,
         "mode": "OBSERVE",

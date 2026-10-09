@@ -12,6 +12,7 @@ from typing import Any, Iterable, Mapping
 from uuid import UUID
 from urllib.parse import urlparse
 
+from empire_os.first_party_evidence_contract import first_party_contact_decision
 from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.locale_intelligence import resolve_locale
 from empire_os.market_pricing import (
@@ -846,7 +847,20 @@ def merge_public_web_contact_evidence(
     decision = result.get("decision_maker") or {}
     decision_name = _text(decision.get("name"))
     contacts = [dict(item) for item in (result.get("contact_candidates") or [])]
+    candidate = result.get("candidate")
+    site = result.get("site_evidence")
+    candidate_domain = (
+        _host(candidate.get("website") or candidate.get("domain"))
+        if isinstance(candidate, Mapping) else ""
+    )
+    site_domain = (
+        _host(site.get("expected_domain"))
+        if isinstance(site, Mapping) and site.get("domain_match") is True
+        else ""
+    )
+    company_domain = candidate_domain or site_domain
     accepted = []
+    rejected_reasons: dict[str, int] = {}
     for item in evidence or []:
         name = _text(item.get("name"))
         email = _text(item.get("email")).lower()
@@ -862,9 +876,47 @@ def merge_public_web_contact_evidence(
         }
         if source_kind not in allowed_sources:
             continue
+        # A source_kind label is not proof of ownership. Verify the
+        # publication URL and the exact company's email-domain alignment
+        # before treating a named email as first-party published evidence.
+        parsed_url = urlparse(source_url)
+        if parsed_url.scheme not in {"http", "https"} or not parsed_url.hostname:
+            continue
+        if source_kind == "official_site":
+            valid, reason = first_party_contact_decision(
+                website=company_domain, source_url=source_url, email=email,
+                direct_publication=item.get("direct_publication"),
+            )
+            if not valid:
+                rejected_reasons[reason] = rejected_reasons.get(reason, 0) + 1
+                continue
+        # Secondary sources must prove their category too; caller labels
+        # cannot turn arbitrary websites into public registries/directories.
+        if source_kind == "public_business_directory" and not is_directory_url(source_url):
+            rejected_reasons["unrecognised_directory_host"] = (
+                rejected_reasons.get("unrecognised_directory_host", 0) + 1
+            )
+            continue
+        if source_kind == "public_government_record":
+            source_host = _host(source_url)
+            if not (
+                source_host.endswith(".gov")
+                or source_host.endswith(".gov.uk")
+                or source_host in {"gov.uk", "gov"}
+            ):
+                rejected_reasons["government_source_host_mismatch"] = (
+                    rejected_reasons.get("government_source_host_mismatch", 0) + 1
+                )
+                continue
         role_corroborated = bool(item.get("role_corroborated"))
         published_at = _text(item.get("published_at"))
-        if source_kind != "official_site" and not role_corroborated:
+        if source_kind != "official_site" and (
+            not role_corroborated
+            or item.get("business_identity_correlated") is not True
+        ):
+            rejected_reasons["secondary_source_identity_unconfirmed"] = (
+                rejected_reasons.get("secondary_source_identity_unconfirmed", 0) + 1
+            )
             continue
         if source_kind in {"public_government_record", "company_press_release"} and not _publication_is_recent(published_at):
             continue
@@ -889,6 +941,7 @@ def merge_public_web_contact_evidence(
     result["contact_candidates"] = list(dedup.values())
     result["contact_email_candidates"] = list(dedup.keys())
     result["public_web_evidence_accepted"] = len(accepted)
+    result["public_web_evidence_rejected_reasons"] = dict(sorted(rejected_reasons.items()))
     return result
 
 

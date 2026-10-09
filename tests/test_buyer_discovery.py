@@ -545,6 +545,90 @@ def test_current_official_equivalent_authority_confirms_candidate():
     assert rec["decision_maker"]["decision_role"] == "economic_buyer"
 
 
+def test_official_contact_claim_requires_website_domain_and_email_alignment():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    enriched = {
+        "candidate": {"website": "https://buyer.example/"},
+        "decision_maker": {
+            "name": "Jane Smith", "title": "Founder", "decision_score": 1.0,
+        },
+        "contact_candidates": [],
+    }
+    forged = merge_public_web_contact_evidence(enriched, [{
+        "name": "Jane Smith", "email": "jane@unrelated.test",
+        "source_url": "https://unrelated.test/team/jane/",
+        "source_kind": "official_site", "role_corroborated": True,
+        "direct_publication": True,
+    }])
+    assert forged["public_web_evidence_accepted"] == 0
+    assert forged["contact_candidates"] == []
+
+    cross_email = merge_public_web_contact_evidence(enriched, [{
+        "name": "Jane Smith", "email": "jane@unrelated.test",
+        "source_url": "https://buyer.example/team/jane/",
+        "source_kind": "official_site", "role_corroborated": True,
+        "direct_publication": True,
+    }])
+    assert cross_email["public_web_evidence_accepted"] == 0
+
+    accepted = merge_public_web_contact_evidence(enriched, [{
+        "name": "Jane Smith", "email": "jane@buyer.example",
+        "source_url": "https://buyer.example/team/jane/",
+        "source_kind": "official_site", "role_corroborated": True,
+        "direct_publication": True,
+    }])
+    assert accepted["public_web_evidence_accepted"] == 1
+    assert accepted["contact_candidates"][0]["bound_to_decision_maker"] is True
+
+
+def test_first_party_claim_without_company_website_fails_closed():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    enriched = {
+        "decision_maker": {"name": "Jane Smith", "title": "Founder"},
+        "contact_candidates": [],
+    }
+    result = merge_public_web_contact_evidence(enriched, [{
+        "name": "Jane Smith", "email": "jane@buyer.example",
+        "source_url": "https://buyer.example/team/jane",
+        "source_kind": "official_site", "direct_publication": True,
+    }])
+    assert result["public_web_evidence_accepted"] == 0
+    assert result["public_web_evidence_rejected_reasons"] == {
+        "company_domain_unavailable": 1,
+    }
+
+
+def test_directory_and_government_source_labels_do_not_override_host():
+    from empire_os.buyer_discovery import merge_public_web_contact_evidence
+    base = {
+        "candidate": {"website": "https://buyer.example/"},
+        "decision_maker": {"name": "Jane Smith", "title": "CEO"},
+        "contact_candidates": [],
+    }
+    rows = [
+        {
+            "name": "Jane Smith", "email": "jane@buyer.example",
+            "source_url": "https://unrelated.test/jane",
+            "source_kind": "public_business_directory",
+            "role_corroborated": True,
+        },
+        {
+            "name": "Jane Smith", "email": "jane@buyer.example",
+            "source_url": "https://unrelated.test/jane",
+            "source_kind": "public_government_record",
+            "role_corroborated": True,
+            "published_at": "2026-10-01",
+        },
+    ]
+    got = merge_public_web_contact_evidence(base, rows)
+    assert got["public_web_evidence_accepted"] == 0
+    assert got["contact_candidates"] == []
+    assert got["public_web_evidence_rejected_reasons"] == {
+        "government_source_host_mismatch": 1,
+        "unrecognised_directory_host": 1,
+    }
+
+
 def test_public_web_contact_binding_requires_explicit_identity_and_role_corroboration():
     from empire_os.buyer_discovery import merge_public_web_contact_evidence
     enriched={
@@ -553,8 +637,8 @@ def test_public_web_contact_binding_requires_explicit_identity_and_role_corrobor
     }
     accepted=merge_public_web_contact_evidence(enriched,[{
         "name":"Hugo Guerra","email":"hugo@example.com",
-        "source_url":"https://directory.example/hugo","source_kind":"public_business_directory",
-        "role_corroborated":True,
+        "source_url":"https://www.bbb.org/hugo","source_kind":"public_business_directory",
+        "role_corroborated":True,"business_identity_correlated":True,
     }])
     assert accepted["public_web_evidence_accepted"] == 1
     assert accepted["contact_candidates"][0]["bound_to_decision_maker"] is True
@@ -611,7 +695,8 @@ def test_recent_exact_public_record_can_support_outreach_without_smtp():
     enriched = merge_public_web_contact_evidence(enriched,[{
         "name":"Jake Montgomery","email":"jake@silveradoconstruct.com",
         "source_url":"https://example.gov/permit-record","source_kind":"public_government_record",
-        "role_corroborated":True,"direct_publication":True,"published_at":"2025-01-06",
+        "role_corroborated":True,"business_identity_correlated":True,
+        "direct_publication":True,"published_at":"2025-01-06",
     }])
     class Validator:
         def validate(self,email):

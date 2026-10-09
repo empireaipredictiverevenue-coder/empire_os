@@ -67,6 +67,40 @@ def test_trusted_persisted_identity_uses_direct_contact_recovery(monkeypatch):
     assert result["preferred_email"] == "chris@eliteaustinac.com"
 
 
+def test_direct_recovery_rejects_other_company_first_party_email(monkeypatch):
+    monkeypatch.setattr(
+        worker, "collect_public_person_contact_evidence",
+        lambda **_kwargs: {
+            "attempted": True,
+            "evidence": [{
+                "name": "Chris Shaffer", "title": "Co-Founder",
+                "email": "chris@unrelated.test",
+                "source_url": "https://unrelated.test/about/",
+                "source_kind": "official_site",
+                "role_corroborated": True,
+                "direct_publication": True,
+            }],
+        },
+    )
+    def verify(enriched, **_kwargs):
+        assert enriched["candidate"]["website"] == "https://eliteaustinac.com/"
+        assert enriched["contact_candidates"] == []
+        return {
+            "decision_maker": enriched["decision_maker"],
+            "verified_contacts": [],
+            "person_bound": False,
+            "review_ready": False,
+            "outreach_ready": False,
+        }
+    monkeypatch.setattr(worker, "verify_contact_plan", verify)
+    result = worker._direct_public_contact_recovery(
+        _candidate(),
+        {"review_ready": False, "contacts": [], "decision_maker": None},
+    )
+    assert result["review_ready"] is False
+    assert result["contacts"] == []
+
+
 def test_untrusted_persisted_identity_cannot_search(monkeypatch):
     monkeypatch.setattr(
         worker,

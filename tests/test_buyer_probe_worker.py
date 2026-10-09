@@ -258,6 +258,50 @@ def test_probe_options_default_to_worker_defaults_when_absent():
     assert worker._probe_options_from_row(row) == {}
 
 
+def test_first_party_buyer_promotion_rejects_cross_company_contact():
+    import empire_os.buyer_probe_worker as worker
+
+    enriched = {
+        "decision_maker": None,
+        "contact_candidates": [],
+    }
+    attacker = [{
+        "name": "Jane Smith",
+        "title": "Chief Executive Officer",
+        "email": "jane@unrelated.test",
+        "source_url": "https://unrelated.test/team/jane/",
+        "source_kind": "official_site",
+        "direct_publication": True,
+    }]
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched, attacker, website="https://buyer.example/"
+    )
+    assert result["decision_maker"] is None
+
+    mismatched_email = [{
+        "name": "Jane Smith",
+        "title": "Chief Executive Officer",
+        "email": "jane@unrelated.test",
+        "source_url": "https://buyer.example/team/jane/",
+        "source_kind": "official_site",
+        "direct_publication": True,
+    }]
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched, mismatched_email, website="https://buyer.example/"
+    )
+    assert result["decision_maker"] is None
+
+    valid = [{
+        **attacker[0],
+        "email": "jane@buyer.example",
+        "source_url": "https://buyer.example/team/jane/",
+    }]
+    result = worker._promote_confirmed_first_party_buyer(
+        enriched, valid, website="https://buyer.example/"
+    )
+    assert result["decision_maker"]["name"] == "Jane Smith"
+
+
 def test_confirmed_first_party_economic_buyer_can_replace_unbound_decision_maker():
     import empire_os.buyer_probe_worker as worker
 
@@ -280,7 +324,9 @@ def test_confirmed_first_party_economic_buyer_can_replace_unbound_decision_maker
             "email": "kathy@acme.test",
             "source_url": "https://acme.test/about",
             "source_kind": "official_site",
+            "direct_publication": True,
         }],
+        website="https://acme.test",
     )
     assert result["decision_maker"]["name"] == "Kathy Thomas"
     assert result["decision_maker"]["decision_role"] == "economic_buyer"
@@ -367,7 +413,9 @@ def test_confirmed_first_party_buyer_replaces_off_domain_bound_contact():
             "email": "richard@redwoodservices.com",
             "source_url": "https://redwoodservices.com/leadership/",
             "source_kind": "official_site",
+            "direct_publication": True,
         }],
+        website="https://redwoodservices.com/",
     )
     assert result["decision_maker"]["name"] == "Richard Lewis"
     assert result["decision_maker"]["email"] == "richard@redwoodservices.com"
