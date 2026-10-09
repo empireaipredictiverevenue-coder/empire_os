@@ -25,6 +25,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTex
 from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
+from empire_os.lead_smart_public_coverage_api import router as roofing_coverage_router
 from empire_os.a2a_discovery import commerce_discovery_manifest
 from empire_os.a2a_runtime import load_a2a_runtime
 from empire_os.aeo_release import released_file as released_aeo_file, released_paths as released_aeo_paths
@@ -69,6 +70,7 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 ).rstrip("/")
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
+app.include_router(roofing_coverage_router)
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 

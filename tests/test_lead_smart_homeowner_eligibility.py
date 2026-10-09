@@ -10,7 +10,6 @@ from empire_os.lead_smart_homeowner_eligibility import (
     generate_from_files,
     make_public_zip_preview,
 )
-from scripts import materialize_lead_smart_roofing_preview as materializer
 
 
 NOW = datetime(2026, 10, 9, 17, 50, tzinfo=timezone.utc)
@@ -122,46 +121,6 @@ def test_generate_from_files_validates_actual_hashes(tmp_path):
     s.write_text(s.read_text() + " ")
     with pytest.raises(PreviewEvidenceError, match="does not match"):
         generate_from_files(s, a, i, now=NOW)
-
-
-def test_materializer_default_is_check_only(tmp_path, monkeypatch, capsys):
-    snapshot, gate = example()
-    root = tmp_path / "runtime"
-    (root / "coverage").mkdir(parents=True)
-    s = root / "coverage/latest.json"
-    a = root / "coverage/activation/latest.json"
-    i = root / "coverage/intelligence/latest.json"
-    a.parent.mkdir()
-    i.parent.mkdir()
-    s.write_text(json.dumps(snapshot))
-    i.write_text("{}")
-    gate["evidence_refs"] = {
-        "coverage_snapshot": "sha256:" + sha256(s.read_bytes()).hexdigest(),
-        "coverage_intelligence": "sha256:" + sha256(i.read_bytes()).hexdigest(),
-    }
-    a.write_text(json.dumps(gate))
-    monkeypatch.setattr(materializer, "ROOT", root)
-    monkeypatch.setattr(
-        "sys.argv", ["script", "--out", str(tmp_path / "public" / "roofing-coverage.json")]
-    )
-    # Avoid depending on wall clock for fixture expiration.
-    original = materializer.generate_from_files
-    monkeypatch.setattr(materializer, "generate_from_files",
-                        lambda s, a, i: original(s, a, i, now=NOW))
-    assert materializer.main() == 0
-    assert not (tmp_path / "public" / "roofing-coverage.json").exists()
-    info = json.loads(capsys.readouterr().out)
-    assert info["website_deployed"] is False
-    assert info["call_authorized"] is False
-
-    monkeypatch.setattr(
-        "sys.argv", ["script", "--write", "--out",
-                     str(tmp_path / "public" / "roofing-coverage.json")]
-    )
-    assert materializer.main() == 0
-    path = tmp_path / "public" / "roofing-coverage.json"
-    assert json.loads(path.read_text())["count"] == 2
-    assert json.loads(capsys.readouterr().out)["execution_authority"] == "NONE"
 
 
 @pytest.mark.parametrize(("when", "expected"), [

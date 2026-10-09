@@ -1,8 +1,9 @@
-"""Prelaunch ZIP guidance: static public preview, never call authority.
+"""Prelaunch ZIP guidance: internally verified coverage index, never call authority.
 
-The public site is exported to static HTML. Its coverage preview is a read-only
-summary of an independently verified, fresh buyer-provided targeting snapshot.
-It is NOT a live Ringba bid, call-routing response, or payable-call guarantee.
+The Empire public gateway validates the full buyer snapshot, then returns a
+read-only single-ZIP result. The complete list and payouts must never be
+exposed by the public lookup route. The index does not prove a live Ringba bid,
+call routing, or a payable call.
 """
 from __future__ import annotations
 

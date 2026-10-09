@@ -153,9 +153,10 @@ def test_roofing_page_mounts_read_only_zip_preview():
     ).read_text()
     assert 'import RoofingCoverageCheck from "./coverage-check";' in page
     assert "<RoofingCoverageCheck />" in page
-    assert "roofing-coverage.json" in client
+    assert 'fetch("/roofing/coverage-check"' in client
+    assert 'method: "POST"' in client
     assert 'cache: "no-store"' in client
-    assert "Date.parse(item.expires_at)" in client
+    assert "Date.parse(item.source_expires_at)" in client
     assert 'item.call_authorized !== false' in client
     assert 'item.execution_authority !== "NONE"' in client
     assert "a listed zip does not guarantee" in client.lower()

@@ -2,14 +2,14 @@
 
 import { useState, type FormEvent } from "react";
 
-type CoveragePreview = {
+type CoverageResponse = {
   schema_version: string;
-  mode: string;
-  purpose: string;
-  expires_at: string;
-  covered_zips: string[];
+  status: string;
+  coverage_guidance: string;
+  source_expires_at: string;
   call_authorized: boolean;
   execution_authority: string;
+  buyer_route_verified: boolean;
 };
 
 type CheckResult =
@@ -19,20 +19,19 @@ type CheckResult =
   | { kind: "covered"; zip: string }
   | { kind: "not-listed"; zip: string };
 
-function validPreview(value: unknown): value is CoveragePreview {
+function validPreview(value: unknown): value is CoverageResponse {
   if (!value || typeof value !== "object") return false;
-  const item = value as Partial<CoveragePreview>;
+  const item = value as Partial<CoverageResponse>;
   if (
-    item.schema_version !== "empire.lead_smart.public_zip_preview.v1" ||
-    item.mode !== "PREACTIVATION" ||
-    item.purpose !== "COVERAGE_GUIDANCE_ONLY" ||
+    item.schema_version !== "empire.lead_smart.zip_check_response.v1" ||
+    item.status !== "GUIDANCE_ONLY" ||
     item.call_authorized !== false ||
     item.execution_authority !== "NONE" ||
-    !Array.isArray(item.covered_zips) ||
-    item.covered_zips.some((zip) => typeof zip !== "string" || !/^[0-9]{5}$/.test(zip)) ||
-    typeof item.expires_at !== "string"
+    item.buyer_route_verified !== false ||
+    !["LISTED_IN_RECENT_COVERAGE", "NOT_LISTED_IN_RECENT_COVERAGE"].includes(item.coverage_guidance ?? "") ||
+    typeof item.source_expires_at !== "string"
   ) return false;
-  const expiry = Date.parse(item.expires_at);
+  const expiry = Date.parse(item.source_expires_at);
   return Number.isFinite(expiry) && expiry > Date.now() && expiry <= Date.now() + 60 * 60 * 1000;
 }
 
@@ -50,13 +49,17 @@ export default function RoofingCoverageCheck() {
     }
     setBusy(true);
     try {
-      const response = await fetch("/roofing-coverage.json", { cache: "no-store" });
+      const response = await fetch("/roofing/coverage-check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zip: submitted }),
+        cache: "no-store",
+      });
       if (!response.ok) throw new Error("coverage unavailable");
       const data: unknown = await response.json();
       if (!validPreview(data)) throw new Error("unverified or expired coverage");
-      const snapshot = data as CoveragePreview;
       setResult(
-        snapshot.covered_zips.includes(submitted)
+        data.coverage_guidance === "LISTED_IN_RECENT_COVERAGE"
           ? { kind: "covered", zip: submitted }
           : { kind: "not-listed", zip: submitted }
       );
@@ -117,7 +120,7 @@ export default function RoofingCoverageCheck() {
               `ZIP ${result.zip} was not listed in the current guidance snapshot. No call route is enabled.`}
             {result.kind === "idle" && "No phone number will be enabled by this preview."}
           </div>
-          <p className="mt-3 text-xs text-[#547092]">No personal details are submitted. The preview downloads a static ZIP reference file only.</p>
+          <p className="mt-3 text-xs text-[#547092]">Your property ZIP is sent to Empire AI for an immediate read-only coverage check. This form does not request your name, telephone number, or contact details.</p>
         </div>
       </div>
     </section>
