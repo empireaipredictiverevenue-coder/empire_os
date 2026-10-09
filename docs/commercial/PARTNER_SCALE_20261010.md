@@ -238,3 +238,30 @@ publicly advertised financial ranges are **not** receivables; public
 programme descriptions do not grant traffic, number, signature, payout
 or cost authority. Continue through existing founder-gated Documenso
 and partner-specific compliance routes after reviewing actual documents.
+
+
+## 10 October: next-tier publisher channels (no repeat cold outreach)
+
+Current buyer scout already ranks several companies for evidence recovery.
+This section records independent first-party programme-page checks **and
+existing connected-Gmail history** so agents cannot treat old contact as
+a novel prospect or infer live demand from public promotional copy.
+
+| Company | First-party source/offer mode | Existing email history | Next bounded action |
+|---|---|---|---|
+| PX (px.com) | https://support.px.com/hc/en-us/articles/360020558754-Publisher-account-types-API-call-common-and-branded documents a call-publisher workflow distinct from API lead publishing; https://support.px.com/hc/en-us/articles/360059437934-PX-calls explains call offers and publisher-specific promo numbers | Existing thread `1a0cfb35857a9b6b`; sends on 23 and 25 September 2026, no substantive buyer reply seen during 10 October review | Verify current publisher acceptance, active roofing buyer geography and exact CALL vs lead API mode; do not issue another identical introduction |
+| Astoria (astoriacompany.com) | https://astoriacompany.com/publishers/sell-calls and https://astoriacompany.com/publishers/call-tracking describe pay-per-call publishers and attribution from organic/search | Existing thread `1a0ddac268f75e4b`; initial publisher email 26 September 2026, no reply seen | Review publisher offer acceptance/terms, attributable source and partner-specific routing; no unapproved recontact |
+| Callflowmarket (callflowmarket.com) | https://callflowmarket.com/verticals/home-services and https://callflowmarket.com/sellers describe homeowner-qualified roofing/HVAC calls, geo-matching, accepted organic SEO publisher supply and programme-specific call-duration conditions | Two outbound threads `1a0ddd79562db739` and `1a0d9de8ea416ddb`, sent 26 and 25 September, no reply seen | **Deduplicate the company**; verify publisher acceptance and live buy-box, then founder-review a single reply or application route only if justified |
+| RVNU (rvnu.com) | https://rvnu.com/ and https://rvnu.com/about list roofing/solar home-service lead supplier partnerships and Everflow brand promotion | No Gmail thread located in current account for domain as of 10 October | Determine whether there is an actual call-buying offer rather than an affiliate lead/API campaign, find verified publisher onboarding path and review source terms before any new email |
+
+These are independent first-party programme descriptions and email history,
+**not accepted buyers, source approvals, signable agreements, observed
+payouts or realised revenue**. Do not copy Lead Smart number/terms, create
+portal accounts, send an email, accept a programme or activate traffic
+without the normal founder gates.
+
+Revenue priority remains **warm counterparties with actual replies first**:
+LeadBank (onboarding promised), Validated (specific buyer requirements
+requested), Connexis (live programme requested). Next-tier companies
+stay in the existing evidence-recovery queue; no new platform, collector
+or timer is required.
