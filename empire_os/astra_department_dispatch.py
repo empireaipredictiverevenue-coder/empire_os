@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from empire_os.department_work_queue import DepartmentWorkQueue
 from empire_os.skill_exchange import recommend_work_item_skills
+from empire_os.okf_adapter import list_private_research
 
 
 ASTRA_EXECUTIVE = Path("runtime/astra/executive_latest.json")
@@ -22,11 +23,37 @@ def _read(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
-def dispatch_executive_plan(repo_root: str | Path) -> dict[str, Any]:
+def dispatch_executive_plan(
+    repo_root: str | Path, *, okf_bundle_path: str | Path | None = None,
+) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     snapshot = _read(root / ASTRA_EXECUTIVE)
     plan_id = str(snapshot.get("plan_id") or "").strip()
     queue = DepartmentWorkQueue(root)
+
+    # Advisory-only: the OKF catalogue is inspected separately from Astra's
+    # existing plan/queue path. It cannot modify step eligibility,
+    # existing approvals, job lists or DepartmentWorkQueue inputs.
+    okf_advisory = None
+    if okf_bundle_path is not None:
+        try:
+            allowed_root = (root / 'runtime/knowledge/okf_private').resolve()
+            requested = Path(okf_bundle_path).resolve()
+            if requested.parent != allowed_root or not requested.name.startswith('run-'):
+                raise ValueError('okf_bundle_outside_private_runtime')
+            bundle = list_private_research(
+                requested, now=datetime.now(timezone.utc), max_results=10,
+            )
+            okf_advisory = {
+                **bundle, 'mode': 'OBSERVE', 'research_only': True,
+                'queue_mutated': False, 'execution_authority': 'none',
+            }
+        except Exception as exc:
+            okf_advisory = {
+                'status': 'unavailable', 'reason': type(exc).__name__,
+                'research_only': True, 'queue_mutated': False,
+                'execution_authority': 'none',
+            }
 
     queued = 0
     existing = 0
@@ -94,6 +121,7 @@ def dispatch_executive_plan(repo_root: str | Path) -> dict[str, Any]:
         "unowned_count": unowned,
         "queue_counts": queue.counts(),
         "items": items,
+        "okf_research_advisory": okf_advisory,
         "external_execution_performed": False,
         "commercial_authority": "none",
         "payment_authority": "none",

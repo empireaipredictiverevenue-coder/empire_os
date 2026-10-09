@@ -281,9 +281,15 @@ def list_private_research(
                 raise ValueError("untrusted_source")
             safe_sources.append(url)
         expiry = moment(meta.get("stale_after"))
+        role = str(meta.get("empire_observed_relationship") or "unknown")
+        if role not in {
+            "unknown", "direct_inventory_buyer", "intermediary_or_marketplace",
+            "lead_supplier_or_publisher", "mixed_role_requires_review",
+        }:
+            raise ValueError("untrusted_relationship_label")
         items.append({
             "concept_id": f"buyers/{host}",
-            "relationship": str(meta.get("empire_observed_relationship") or "unknown"),
+            "relationship": role,
             "trust": "unverified",
             "fresh": expiry is not None and now < expiry,
             "sources": safe_sources,
