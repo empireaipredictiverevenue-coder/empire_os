@@ -535,6 +535,182 @@ def test_sitemap_people_candidates_find_hidden_team_pages(monkeypatch):
     assert rows == ["https://acme.test/about/leadership"]
 
 
+def test_external_canonical_cannot_rebase_people_sitemap_origin(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+    from types import SimpleNamespace
+    root = "https://acme.test/"
+    seen = []
+    def make_doc(url, *, canonical):
+        return SimpleNamespace(
+            url=url, canonical_url=canonical, text="<h1>Acme</h1>",
+            format="html", title="Acme", description="", emails=[],
+            phones=[], socials=[], structured_data=[],
+        )
+    def fetch(_session, url, **_kwargs):
+        seen.append(url)
+        if url == root:
+            return make_doc(root, canonical="https://unrelated.test/")
+        return None
+    monkeypatch.setattr(sp, "_fetch", fetch)
+    monkeypatch.setattr(sp.time, "sleep", lambda _duration: None)
+    result = sp.probe_site(
+        root, max_pages=2, request_timeout=1, time_budget_seconds=8,
+        page_priority="people", public_only=True,
+    )
+    assert result["ok"] is True
+    assert result["domain"] == "acme.test"
+    assert result["canonical_url"] is None
+    assert all(p["canonical_url"] is None for p in result["pages_checked"])
+    assert all("unrelated.test" not in url for url in seen)
+    assert all(url.startswith(root) for url in seen)
+
+
+def test_sitemap_index_uses_remaining_fetch_on_nested_people_map(monkeypatch):
+    import time
+    import empire_os.search_fabric.site_probe as sp
+    seen = []
+    class Doc:
+        def __init__(self, text, url):
+            self.text = text
+            self.url = url
+
+    root = "https://acme.test/"
+    maps = {
+        root + "sitemap.xml": (
+            "<sitemapindex>"
+            "<sitemap><loc>https://other.test/team.xml</loc></sitemap>"
+            "<sitemap><loc>https://acme.test/team-sitemap.xml</loc></sitemap>"
+            "</sitemapindex>"
+        ),
+        root + "team-sitemap.xml": (
+            "<urlset xmlns:ns='urn:test'>"
+            "<url><ns:loc>https://acme.test/people/jane-smith/</ns:loc></url>"
+            "<url><ns:loc>https://other.test/people/anyone/</ns:loc></url>"
+            "</urlset>"
+        ),
+    }
+    def fetch(_session, url, **_kwargs):
+        seen.append(url)
+        return Doc(maps[url], url) if url in maps else None
+
+    monkeypatch.setattr(sp, "_fetch", fetch)
+    urls = sp._sitemap_people_candidates(
+        object(), root,
+        timeout=1.0,
+        deadline=time.monotonic() + 5,
+        max_urls=2,
+        max_fetches=2,
+        public_only=True,
+    )
+    assert urls == [root + "people/jane-smith/"]
+    assert seen == [root + "sitemap.xml", root + "team-sitemap.xml"]
+
+
+def test_short_people_probe_uses_one_sitemap_to_find_hidden_profile(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+    from types import SimpleNamespace
+
+    root = "https://acme.test/"
+    seen = []
+    def doc(url, text, *, fmt="html", emails=()):
+        return SimpleNamespace(
+            url=url, canonical_url=url, text=text, format=fmt,
+            title="Acme", description="", emails=list(emails),
+            structured_data=[], phones=[], socials=[],
+        )
+    pages = {
+        root: doc(root, "<h1>Acme</h1><a href='/locations/'>Locations</a>"),
+        root + "sitemap.xml": doc(
+            root + "sitemap.xml",
+            "<urlset><url><loc>https://unrelated.test/team/</loc></url>"
+            "<url><loc>https://acme.test/leadership/jane-smith/</loc></url></urlset>",
+            fmt="xml",
+        ),
+        root + "leadership/jane-smith/": doc(
+            root + "leadership/jane-smith/",
+            "<h2>Jane Smith</h2><p>Chief Executive Officer</p>",
+            emails=["jane@acme.test"],
+        ),
+    }
+    def fetch(_session, url, **_kw):
+        seen.append(url)
+        return pages.get(url)
+    monkeypatch.setattr(sp, "_fetch", fetch)
+    monkeypatch.setattr(sp.time, "sleep", lambda _seconds: None)
+    result = sp.probe_site(
+        root, max_pages=2, request_timeout=1,
+        time_budget_seconds=8, page_priority="people", public_only=True,
+    )
+    assert result["ok"] is True
+    assert result["sitemap_people_candidates"] == 1
+    assert result["sitemap_people_pages_fetched"] == 1
+    assert [p["url"] for p in result["pages_checked"]] == [
+        root, root + "leadership/jane-smith/",
+    ]
+    assert any(p["name"] == "Jane Smith" and p["email"] == "jane@acme.test"
+               for p in result["people"])
+    assert seen == [root, root + "sitemap.xml", root + "leadership/jane-smith/"]
+
+
+def test_short_people_probe_uses_direct_team_link_without_sitemap(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+    from types import SimpleNamespace
+    root = "https://acme.test/"
+    seen = []
+    def doc(url, text, emails=()):
+        return SimpleNamespace(
+            url=url, canonical_url=url, text=text, format="html",
+            title="Acme", description="", emails=list(emails),
+            phones=[], socials=[], structured_data=[],
+        )
+    docs = {
+        root: doc(root, '<a href="/team/">Meet the team</a>'),
+        root + "team/": doc(
+            root + "team/",
+            "<h2>Jane Smith</h2><p>Chief Executive Officer</p>",
+            emails=("jane@acme.test",),
+        ),
+    }
+    monkeypatch.setattr(sp, "_fetch",
+                        lambda _session, url, **_kwargs:
+                        (seen.append(url) or docs.get(url)))
+    monkeypatch.setattr(sp.time, "sleep", lambda _duration: None)
+    result = sp.probe_site(
+        root, max_pages=2, request_timeout=1,
+        time_budget_seconds=8, page_priority="people", public_only=True,
+    )
+    assert result["ok"] is True
+    assert result["sitemap_people_candidates"] == 0
+    assert seen == [root, root + "team/"]
+    assert any(x["name"] == "Jane Smith" for x in result["people"])
+
+
+def test_short_people_profile_probe_does_not_fetch_sitemap(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+    from types import SimpleNamespace
+    root = "https://acme.test/leadership/jane-smith/"
+    seen = []
+    def fetch(_session, url, **_kw):
+        seen.append(url)
+        if url != root:
+            return None
+        return SimpleNamespace(
+            url=root, canonical_url=root, text="<h2>Jane Smith</h2><p>CEO</p>",
+            format="html", title="Jane Smith", description="",
+            emails=["jane@acme.test"], phones=[], socials=[], structured_data=[],
+        )
+    monkeypatch.setattr(sp, "_fetch", fetch)
+    monkeypatch.setattr(sp.time, "sleep", lambda _seconds: None)
+    result = sp.probe_site(
+        root, max_pages=2, request_timeout=1,
+        time_budget_seconds=8, page_priority="people", public_only=True,
+    )
+    assert result["ok"] is True
+    assert result["sitemap_people_candidates"] == 0
+    assert result["sitemap_people_pages_fetched"] == 0
+    assert all("sitemap" not in url for url in seen)
+
+
 def test_visible_people_preserves_current_vp_corporate_development_title():
     people = _visible_people_from_html(
         "<section><h3>Kyle Martin</h3>"

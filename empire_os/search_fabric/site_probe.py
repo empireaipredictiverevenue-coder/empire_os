@@ -750,6 +750,7 @@ def _sitemap_people_candidates(
     timeout: float,
     deadline: float,
     max_urls: int = 12,
+    max_fetches: int = 4,
     public_only: bool = False,
 ) -> List[str]:
     """Discover hidden first-party people pages from bounded sitemap reads."""
@@ -760,12 +761,14 @@ def _sitemap_people_candidates(
     ]
     discovered: List[str] = []
     nested: List[str] = []
+    reads = 0
+    read_cap = max(0, min(int(max_fetches), 4))
 
     def locs(text: str) -> List[str]:
         return [
             html_lib.unescape(value.strip())
             for value in re.findall(
-                r"<loc>\s*(.*?)\s*</loc>",
+                r"<(?:[a-z0-9_.-]+:)?loc\b[^>]*>\s*(.*?)\s*</(?:[a-z0-9_.-]+:)?loc\s*>",
                 text or "",
                 flags=re.I | re.S,
             )
@@ -773,15 +776,18 @@ def _sitemap_people_candidates(
         ]
 
     for sitemap_url in sitemap_urls:
-        if time.monotonic() >= deadline:
+        if reads >= read_cap or time.monotonic() >= deadline:
             break
+        reads += 1
         doc = _fetch(
             session,
             sitemap_url,
-            timeout=min(timeout, 4.0),
+            timeout=min(timeout, 4.0, max(1.0, deadline - time.monotonic())),
             public_only=public_only,
         )
-        if doc is None:
+        if doc is None or not _same_site(
+            str(getattr(doc, "url", sitemap_url)), origin,
+        ):
             continue
         for value in locs(doc.text):
             if not _same_site(value, origin):
@@ -796,19 +802,24 @@ def _sitemap_people_candidates(
                 continue
             if any(term in lower for term in _SITEMAP_PEOPLE_TERMS):
                 discovered.append(value.split("#", 1)[0])
-        if discovered:
+        if discovered or (nested and reads >= read_cap - 1):
+            # Reserve the remaining fetch for an actual nested people map,
+            # rather than requesting a second root sitemap index.
             break
 
     for nested_url in list(dict.fromkeys(nested))[:2]:
-        if time.monotonic() >= deadline:
+        if reads >= read_cap or time.monotonic() >= deadline:
             break
+        reads += 1
         doc = _fetch(
             session,
             nested_url,
-            timeout=min(timeout, 4.0),
+            timeout=min(timeout, 4.0, max(1.0, deadline - time.monotonic())),
             public_only=public_only,
         )
-        if doc is None:
+        if doc is None or not _same_site(
+            str(getattr(doc, "url", nested_url)), origin,
+        ):
             continue
         for value in locs(doc.text):
             if (
@@ -981,10 +992,18 @@ def probe_site(
             "error": "homepage_fetch_failed",
         }
 
-    origin = homepage.canonical_url or homepage.url
+    # Canonical metadata is a claim made by the page, not permission to
+    # switch the verified company or scan a third-party site.
+    trusted_canonical = (
+        homepage.canonical_url
+        if _same_site(homepage.canonical_url or "", homepage.url)
+        else None
+    )
+    origin = trusted_canonical or homepage.url
     origin_host = _host(origin)
 
     queue = [homepage.url]
+    sitemap_people_urls: List[str] = []
 
     if homepage.format == "html":
         internal = _internal_candidates(
@@ -994,17 +1013,47 @@ def probe_site(
         )
         if page_priority == "people" and max_pages >= 12:
             queue.extend(internal[:6])
-            queue.extend(
-                _sitemap_people_candidates(
+            sitemap_people_urls = _sitemap_people_candidates(
+                session,
+                origin,
+                timeout=request_timeout,
+                deadline=deadline,
+                max_urls=12,
+                public_only=public_only,
+            )
+            queue.extend(sitemap_people_urls)
+            queue.extend(internal[6:])
+        elif (
+            page_priority == "people"
+            and max_pages >= 2
+            and urlparse(homepage.url).path in {"", "/"}
+        ):
+            # Small exact-person recovery probes previously skipped the
+            # sitemap entirely. Consult ONE same-site sitemap only when
+            # navigation has no obvious person/team page; leave the second
+            # crawl slot for an observed profile, never for sitemap XML.
+            person_paths = (
+                "/team", "/people", "/leadership", "/staff",
+                "/management", "/founder", "/meet-the-", "/owner",
+            )
+            has_person_link = any(
+                any(term in urlparse(link).path.lower() for term in person_paths)
+                for link in internal
+            )
+            if has_person_link:
+                queue.extend(internal)
+            else:
+                sitemap_people_urls = _sitemap_people_candidates(
                     session,
                     origin,
-                    timeout=request_timeout,
+                    timeout=min(request_timeout, 2.0),
                     deadline=deadline,
-                    max_urls=12,
+                    max_urls=min(max_pages - 1, 3),
+                    max_fetches=2,
                     public_only=public_only,
                 )
-            )
-            queue.extend(internal[6:])
+                queue.extend(sitemap_people_urls)
+                queue.extend(internal)
         elif page_priority == "commercial":
             # Reserve limited crawl slots for first-party contact/about proof
             # even when navigation supplies many low-value links.
@@ -1165,7 +1214,11 @@ def probe_site(
         )
         pages.append({
             "url": document.url,
-            "canonical_url": document.canonical_url,
+            "canonical_url": (
+                document.canonical_url
+                if _same_site(document.canonical_url or "", document.url)
+                else None
+            ),
             "title": document.title,
             "format": document.format,
             "emails_found": len(document.emails),
@@ -1234,7 +1287,7 @@ def probe_site(
         "ok": True,
         "requested_url": url,
         "final_url": homepage.url,
-        "canonical_url": homepage.canonical_url,
+        "canonical_url": trusted_canonical,
         "domain": origin_host,
         "title": best_title,
         "description": best_description,
@@ -1246,6 +1299,11 @@ def probe_site(
         "schema_types": schema_types,
         "people": people,
         "pages_checked": pages,
+        # Retrieval diagnostics only; not qualification or outreach authority.
+        "sitemap_people_candidates": len(sitemap_people_urls),
+        "sitemap_people_pages_fetched": sum(
+            1 for page in pages if page["url"] in sitemap_people_urls
+        ),
         "evidence_score": round(evidence_score, 4),
         "time_budget_seconds": round(time_budget_seconds, 2),
         "budget_exhausted": time.monotonic() >= deadline,
