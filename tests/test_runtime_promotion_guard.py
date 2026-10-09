@@ -171,3 +171,20 @@ def test_legacy_writers_share_canonical_lock_and_atomic_write(name):
     assert any(isinstance(node.func, ast.Name) and node.func.id == 'binding_writer_lock' for node in calls)
     assert any(isinstance(node.func, ast.Name) and node.func.id == 'atomic_binding_write' for node in calls)
     assert not any(isinstance(node.func, ast.Attribute) and node.func.attr == 'replace' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'tmp' for node in calls)
+
+
+def test_canonical_binding_write_emits_status_audit(tmp_path, monkeypatch):
+    import json
+    from empire_os.runtime_promotion_guard import atomic_binding_write
+    target = tmp_path / 'runtime_control_bindings_latest.json'
+    before = {'lanes': [{'lane': 'campaigns', 'controls': {'output_quality': {'status': 'UNVERIFIED'}}}]}
+    after = {'lanes': [{'lane': 'campaigns', 'controls': {'output_quality': {'status': 'VERIFIED_RUNTIME'}}}]}
+    target.write_text(json.dumps(before))
+    atomic_binding_write(target, json.dumps(after), expected_bytes=target.read_bytes())
+    audit = tmp_path / 'runtime_control_binding_writes.jsonl'
+    record = json.loads(audit.read_text().strip())
+    assert record['schema_version'] == 'empire.canonical_binding_write_audit.v1'
+    assert record['control_status_changes'] == [{'lane': 'campaigns', 'control': 'output_quality',
+                                                 'before': 'UNVERIFIED', 'after': 'VERIFIED_RUNTIME'}]
+    assert record['before_sha256'] != record['after_sha256']
+    assert audit.stat().st_mode & 0o777 == 0o600

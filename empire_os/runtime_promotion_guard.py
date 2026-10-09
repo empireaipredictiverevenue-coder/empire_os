@@ -71,6 +71,45 @@ def atomic_binding_write(path, payload: str, *, expected_bytes: bytes) -> None:
         if os.path.exists(name):
             os.unlink(name)
 
+    if target.name == 'runtime_control_bindings_latest.json':
+        _record_canonical_binding_write(target, expected_bytes, payload)
+
+
+def _record_canonical_binding_write(target, before: bytes, after: str) -> None:
+    """Append a durable, metadata-only audit entry for a successful canonical write."""
+    import hashlib
+    import json
+    import os
+    import sys
+    from datetime import datetime, timezone
+
+    def statuses(blob):
+        document = json.loads(blob)
+        return {(lane['lane'], control): row.get('status')
+                for lane in document['lanes']
+                for control, row in lane['controls'].items()}
+
+    previous = statuses(before)
+    current = statuses(after)
+    changes = [{'lane': lane, 'control': control,
+                'before': previous.get((lane, control)),
+                'after': current.get((lane, control))}
+               for lane, control in sorted(previous.keys() | current.keys())
+               if previous.get((lane, control)) != current.get((lane, control))]
+    record = {'schema_version': 'empire.canonical_binding_write_audit.v1',
+              'timestamp': datetime.now(timezone.utc).isoformat(),
+              'writer': os.path.basename(sys.argv[0]), 'pid': os.getpid(),
+              'before_sha256': hashlib.sha256(before).hexdigest(),
+              'after_sha256': hashlib.sha256(after.encode('utf-8')).hexdigest(),
+              'control_status_changes': changes}
+    audit = target.with_name('runtime_control_binding_writes.jsonl')
+    fd = os.open(audit, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600)
+    try:
+        os.write(fd, (json.dumps(record, sort_keys=True) + '\n').encode('utf-8'))
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
 
 def binding_writer_lock(path):
     """Advisory lock for cooperating promotion writers, held across read/modify/write."""
