@@ -82,6 +82,9 @@ def main() -> int:
         "linked_gmail_thread_count": result["linked_gmail_thread_count"],
         "gmail_snapshot_fresh": result["gmail_snapshot_fresh"],
         "stage_counts": result["stage_counts"],
+        "founder_review_required_count": result['founder_review_required_count'],
+        "warm_business_relationship_count": result['warm_business_relationship_count'],
+        "founder_action_queue_truncated": result['founder_action_queue_truncated'],
         "new_inbound_relationships_since_prior_snapshot":
             result["new_inbound_relationships_since_prior_snapshot"],
         "automatic_live_gmail_ingest_configured": False,

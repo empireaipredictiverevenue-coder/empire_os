@@ -31,6 +31,45 @@ ALLOWED_HINTS = {
     "REVIEW_ONLY",
 }
 MAX_AGE_SECONDS = 96 * 3600
+FOUNDER_FOLLOWUP_REVIEW_SECONDS = 7 * 24 * 3600
+
+
+def founder_review_action(
+    *, stage: str, hints: set[str], last_outbound: datetime | None,
+    now: datetime, gmail_snapshot_fresh: bool,
+    linked_gmail: bool,
+) -> tuple[str, bool, str]:
+    """Triage already-known relationships without proposing automatic sends.
+
+    The 7-day threshold is only a reminder to *review*, never a trigger to
+    contact someone, and cannot be trusted when the email snapshot is stale.
+    """
+    if linked_gmail and not gmail_snapshot_fresh:
+        return 'REFRESH_MAILBOX_EVIDENCE', True, 'SOURCE_STALE'
+    if stage == 'EVIDENCE_HOLD':
+        return 'REVIEW_EVIDENCE_HOLD_NO_CONTACT', True, 'EVIDENCE_BLOCKED'
+    if stage == 'DELIVERY_HOLD':
+        return 'VERIFY_DELIVERY_CHANNEL_NO_RETRY', True, 'DELIVERY_BLOCKED'
+    if stage == 'INBOUND_REVIEW_REQUIRED':
+        if 'LANDING_APPROVAL_AND_ROUTE_PROOF' in hints:
+            return 'REVIEW_BUYER_LANDING_APPROVAL_AND_ROUTE', True, 'BUYER_RESPONSE'
+        return 'REVIEW_NEW_INBOUND_NO_AUTOSEND', True, 'BUYER_RESPONSE'
+    overdue = bool(last_outbound is not None and
+                   (now-last_outbound).total_seconds() >= FOUNDER_FOLLOWUP_REVIEW_SECONDS)
+    if stage == 'AWAITING_BUYER':
+        if overdue:
+            return 'REVIEW_PENDING_BUYER_REQUEST', True, 'FOLLOWUP_REVIEW_DUE'
+        if 'ONBOARDING_BUYBOX' in hints:
+            return 'WAIT_BUYER_ONBOARDING_AND_MARKETS', False, 'WAITING_PARTNER'
+        if 'WAITING_MARKET_DETAILS' in hints or 'REQUEST_BUYER_MARKETS' in hints:
+            return 'WAIT_BUYER_MARKET_REQUIREMENTS', False, 'WAITING_PARTNER'
+        return 'WAIT_BUYER_RESPONSE', False, 'WAITING_PARTNER'
+    if stage == 'CONTACTED_AWAITING_RESPONSE':
+        return ('REVIEW_FOLLOWUP_ELIGIBILITY' if overdue else 'WAIT_BUYER_RESPONSE',
+                overdue, 'FOLLOWUP_REVIEW_DUE' if overdue else 'WAITING_PARTNER')
+    if stage == 'RESEARCH_ONLY':
+        return 'CONTINUE_AUTOMATED_FIRST_PARTY_QUALIFICATION', False, 'RESEARCH'
+    raise RelationshipEvidenceError('unexpected_relationship_stage')
 
 
 def when(value: str | None) -> datetime | None:
@@ -234,6 +273,11 @@ def reconcile(
             and key in old and record["last_inbound_message_id"] != old[key].get("last_inbound_message_id")
         )
         newly_received += bool(new_reply)
+        founder_action, needs_review, action_reason = founder_review_action(
+            stage=stage, hints=record['next_action_codes'], last_outbound=out,
+            now=now, gmail_snapshot_fresh=fresh,
+            linked_gmail=bool(record['gmail_thread_ids']),
+        )
         result.append({
             "entity_key": key, "company": record["company"],
             "identity_domains": sorted(record["identity_domains"]),
@@ -250,6 +294,10 @@ def reconcile(
             "bounced_addresses": sorted(record["bounced_addresses"]),
             "stage": stage,
             "next_action_codes": sorted(record["next_action_codes"]),
+            "next_founder_action": founder_action,
+            "founder_review_required": needs_review,
+            "founder_action_reason": action_reason,
+            "auto_send_authorized": False,
             "new_inbound_since_last_snapshot": bool(new_reply),
             "discovery_status": record["discovery_status"],
             "qualification_tier": record["qualification_tier"],
@@ -266,6 +314,38 @@ def reconcile(
     result.sort(key=lambda r: (rank[r["stage"]], -r["founder_priority"], r["company"]))
     raw = json.dumps(source, sort_keys=True, separators=(",", ":")).encode()
     counts = {stage: sum(r["stage"] == stage for r in result) for stage in rank}
+    # Warm two-way correspondence is a separate, compact founder signal.
+    # Do not bury live partnerships beneath dozens of bounced/cold records.
+    warm = [
+        {
+            "entity_key": item['entity_key'], "company": item['company'],
+            "stage": item['stage'], "next_founder_action": item['next_founder_action'],
+            "gmail_url": item['gmail_url'],
+            "last_inbound_at": item['last_inbound_at'],
+            "last_outbound_at": item['last_outbound_at'],
+            "founder_priority": item['founder_priority'],
+            "gmail_snapshot_fresh": item['gmail_snapshot_fresh'],
+            "partner_commercial_terms_verified": False,
+            "outbound_authorized": False,
+        }
+        for item in result
+        if item['last_inbound_at'] is not None
+        and item['gmail_thread_ids']
+        and item['stage'] in ('INBOUND_REVIEW_REQUIRED','AWAITING_BUYER')
+    ]
+    review_queue = [
+        {
+            "entity_key": item["entity_key"], "company": item["company"],
+            "stage": item["stage"], "next_founder_action": item["next_founder_action"],
+            "reason": item["founder_action_reason"],
+            "last_inbound_at": item["last_inbound_at"],
+            "last_outbound_at": item["last_outbound_at"],
+            "gmail_url": item["gmail_url"],
+            "founder_priority": item["founder_priority"],
+            "outbound_authorized": False,
+        }
+        for item in result if item["founder_review_required"]
+    ]
     return {
         "schema_version": OUTPUT_SCHEMA,
         "generated_at": now.isoformat(),
@@ -279,6 +359,14 @@ def reconcile(
         "relationship_count": len(result),
         "linked_gmail_thread_count": sum(len(r["gmail_thread_ids"]) for r in result),
         "stage_counts": counts,
+        "founder_review_required_count": len(review_queue),
+        "warm_business_relationship_count": len(warm),
+        "warm_business_action_queue": warm[:8],
+        "warm_business_queue_truncated": len(warm)>8,
+        "founder_action_queue": review_queue[:25],
+        "founder_action_queue_truncated": len(review_queue)>25,
+        "founder_actions_are_draft_only": True,
+        "next_actions_automatic_sends": False,
         "new_inbound_relationships_since_prior_snapshot": newly_received,
         "outbound_sent": False,
         "outbound_authorized": False,

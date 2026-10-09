@@ -180,3 +180,74 @@ def test_no_raw_message_body_or_email_send_keys():
     for forbidden in ('"body":','"message_body":','"password":',
                       '"smtp_password":','"execution_authority": "send"'):
         assert forbidden not in s
+
+
+def test_founder_action_classifies_inbound_without_sending_or_fake_approval():
+    src,queue,qual=sources()
+    src['threads'][0]['next_action_code']='LANDING_APPROVAL_AND_ROUTE_PROOF'
+    report=reconcile(src,queue,qual,now=NOW)
+    row=next(x for x in report['relationships'] if x['entity_key']=='lead-smart')
+    assert row['stage']=='INBOUND_REVIEW_REQUIRED'
+    assert row['next_founder_action']=='REVIEW_BUYER_LANDING_APPROVAL_AND_ROUTE'
+    assert row['founder_review_required'] is True
+    assert row['auto_send_authorized'] is False
+    assert report['founder_action_queue'][0]['entity_key']=='lead-smart'
+    assert report['founder_action_queue'][0]['outbound_authorized'] is False
+    assert report['next_actions_automatic_sends'] is False
+    assert report['founder_actions_are_draft_only'] is True
+
+
+def test_partner_waiting_no_repeat_auto_followup_and_overdue_is_review_only():
+    src,queue,qual=sources()
+    first=reconcile(src,queue,qual,now=NOW)
+    pending=next(x for x in first['relationships'] if x['entity_key']=='validated')
+    assert pending['next_founder_action']=='WAIT_BUYER_RESPONSE'
+    assert pending['founder_review_required'] is False
+    later=reconcile(src,queue,qual,now=NOW+timedelta(days=8))
+    later_item=next(x for x in later['relationships'] if x['entity_key']=='validated')
+    # Once the Gmail snapshot is stale, source freshness takes precedence
+    # over a potentially outdated last-sent timestamp.
+    assert later['gmail_snapshot_fresh'] is False
+    assert later_item['next_founder_action']=='REFRESH_MAILBOX_EVIDENCE'
+    assert later_item['auto_send_authorized'] is False
+
+
+def test_seven_day_review_due_not_automatic_email():
+    src,queue,qual=sources()
+    # Refresh the imported snapshot timestamp so old emails remain current
+    # evidence for this focused test of the review threshold.
+    now=NOW+timedelta(days=8)
+    src['captured_at']=now.isoformat()
+    result=reconcile(src,queue,qual,now=now)
+    validated=next(x for x in result['relationships'] if x['entity_key']=='validated')
+    assert validated['stage']=='AWAITING_BUYER'
+    assert validated['next_founder_action']=='REVIEW_PENDING_BUYER_REQUEST'
+    assert validated['founder_action_reason']=='FOLLOWUP_REVIEW_DUE'
+    assert validated['founder_review_required'] is True
+    assert validated['outbound_authorized'] is False
+    assert result['outbound_sent'] is False
+
+
+def test_registry_action_queue_respects_holds_and_deliverability():
+    report=reconcile(*sources(),now=NOW)
+    by_key={x['entity_key']:x for x in report['relationships']}
+    assert by_key['bad-recipient']['next_founder_action']=='VERIFY_DELIVERY_CHANNEL_NO_RETRY'
+    assert by_key['bad-recipient']['founder_review_required'] is True
+    src,queue,qual=sources()
+    qual['targets']=[{'domain':'leadsmartinc.com','tier':'AUTOMATED_EVIDENCE_HOLD','founder_priority':95}]
+    held=reconcile(src,queue,qual,now=NOW)
+    lead=next(x for x in held['relationships'] if x['entity_key']=='lead-smart')
+    assert lead['next_founder_action']=='REVIEW_EVIDENCE_HOLD_NO_CONTACT'
+    assert lead['outbound_authorized'] is False
+
+
+def test_warm_relationships_always_visible_separately_from_cold_delivery_backlog():
+    report=reconcile(*sources(),now=NOW)
+    warm=report['warm_business_action_queue']
+    assert report['warm_business_relationship_count']==2
+    assert [x['entity_key'] for x in warm]==['lead-smart','validated']
+    assert all(x['outbound_authorized'] is False for x in warm)
+    assert all(x['partner_commercial_terms_verified'] is False for x in warm)
+    assert all(x['gmail_snapshot_fresh'] is True for x in warm)
+    assert all(x['entity_key']!='bad-recipient' for x in warm)
+    assert report['warm_business_queue_truncated'] is False
