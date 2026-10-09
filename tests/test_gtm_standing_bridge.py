@@ -21,6 +21,11 @@ class FakeRequest:
                 "id": REVIEW_ID,
                 "status": "pending",
                 "offer_key": "managed_service",
+                "proposed_at": datetime.now(timezone.utc).isoformat(),
+                "evidence": {
+                    "contact_personhood_valid": True,
+                    "has_named_contact": True,
+                },
             }]
 
         if path.endswith("/auto_review_buyer_candidate"):
@@ -53,6 +58,105 @@ class FakeRequest:
             }
 
         raise AssertionError((method, path, payload))
+
+
+def test_stale_review_is_blocked_without_autoreview_rpc():
+    from datetime import timedelta
+    request = FakeRequest()
+    class StaleRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID, "status": "pending", "offer_key": "managed_service",
+                    "proposed_at": (datetime.now(timezone.utc) - timedelta(days=8)).isoformat(),
+                    "evidence": {"contact_personhood_valid": True, "has_named_contact": True},
+                }]
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+    request = StaleRequest()
+    result = run_standing_bridge(request)
+    assert result.auto_reviewed == 0
+    assert result.review_errors == ()
+    assert result.review_blockers == (f"{REVIEW_ID}:expired_review",)
+    assert not any(p.endswith("/auto_review_buyer_candidate") for _, p, _ in request.calls)
+
+
+def test_missing_verified_personhood_is_not_sent_to_auto_review():
+    class NoPersonRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID, "status": "pending", "offer_key": "managed_service",
+                    "proposed_at": datetime.now(timezone.utc).isoformat(),
+                    "evidence": {"contact_personhood_valid": False, "has_named_contact": False},
+                }]
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+    request = NoPersonRequest()
+    result = run_standing_bridge(request)
+    assert result.review_errors == ()
+    assert result.review_blockers == (f"{REVIEW_ID}:personhood_not_verified",)
+    assert result.outbound_proposed == 0
+    assert not any(p.endswith("/auto_review_buyer_candidate") for _, p, _ in request.calls)
+
+
+def test_prior_outbound_requires_manual_review_without_spurious_runtime_error():
+    class PriorHistoryRequest(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if path.endswith("/auto_review_buyer_candidate"):
+                raise ValueError("existing outbound history requires explicit review")
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+    request = PriorHistoryRequest()
+    result = run_standing_bridge(request)
+    assert result.review_errors == ()
+    assert result.review_blockers == (f"{REVIEW_ID}:prior_outbound_requires_manual_review",)
+    assert result.auto_reviewed == 0
+    assert result.outbound_proposed == 0
+
+
+def test_unexpected_database_failure_is_not_silently_classified_as_policy():
+    class UnexpectedFailure(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if path.endswith("/auto_review_buyer_candidate"):
+                raise RuntimeError("database connector unavailable")
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+    result = run_standing_bridge(UnexpectedFailure())
+    assert result.review_blockers == ()
+    assert len(result.review_errors) == 1
+    assert "database connector unavailable" in result.review_errors[0]
+    assert result.outbound_proposed == 0
+
+
+def test_missing_timestamp_review_fails_closed_without_rpc():
+    class UndatedReview(FakeRequest):
+        def __call__(self, method, path, payload=None, **kwargs):
+            if method == "GET" and path.startswith("/rest/v1/buyer_candidate_reviews?"):
+                self.calls.append((method, path, payload))
+                return [{
+                    "id": REVIEW_ID, "status": "pending", "offer_key": "managed_service",
+                    "evidence": {"contact_personhood_valid": True, "has_named_contact": True},
+                }]
+            if path.endswith("/list_buyer_reviews_for_outbound"):
+                self.calls.append((method, path, payload))
+                return []
+            return super().__call__(method, path, payload=payload, **kwargs)
+    request = UndatedReview()
+    result = run_standing_bridge(request)
+    assert result.review_blockers == (f"{REVIEW_ID}:missing_proposed_at",)
+    assert result.as_dict()["review_blockers"] == [f"{REVIEW_ID}:missing_proposed_at"]
+    assert not any(p.endswith("/auto_review_buyer_candidate") for _, p, _ in request.calls)
 
 
 def test_bridge_reviews_then_proposes_governed_outbound():

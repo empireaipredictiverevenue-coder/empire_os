@@ -34,6 +34,7 @@ class StandingBridgeResult:
     pending_seen: int
     auto_reviewed: int
     review_errors: tuple[str, ...]
+    review_blockers: tuple[str, ...]
     approved_ready: int
     outbound_proposed: int
     skipped_invalid_person: int
@@ -46,6 +47,7 @@ class StandingBridgeResult:
             "pending_seen": self.pending_seen,
             "auto_reviewed": self.auto_reviewed,
             "review_errors": list(self.review_errors),
+            "review_blockers": list(self.review_blockers),
             "approved_ready": self.approved_ready,
             "outbound_proposed": self.outbound_proposed,
             "skipped_invalid_person": self.skipped_invalid_person,
@@ -150,6 +152,44 @@ def _message(review: Mapping[str, Any]) -> tuple[str, str]:
     return subject, body
 
 
+def _preflight_standing_review(
+    review: Mapping[str, Any], now: datetime,
+) -> str | None:
+    """Conservative, read-only filter; database remains the approval authority."""
+    raw = review.get("proposed_at")
+    if not raw:
+        return "missing_proposed_at"
+    try:
+        timestamp = datetime.fromisoformat(str(raw).replace("Z", "+00:00"))
+        if timestamp.tzinfo is None:
+            return "invalid_proposed_at"
+        timestamp = timestamp.astimezone(timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        return "invalid_proposed_at"
+    if timestamp < now - timedelta(days=7):
+        return "expired_review"
+    evidence = review.get("evidence")
+    if not isinstance(evidence, Mapping):
+        return "personhood_not_verified"
+    if (
+        str(evidence.get("contact_personhood_valid") or "").casefold() != "true"
+        or str(evidence.get("has_named_contact") or "").casefold() != "true"
+    ):
+        return "personhood_not_verified"
+    return None
+
+
+def _expected_db_review_blocker(exc: Exception) -> str | None:
+    text = str(exc).casefold()
+    reasons = (
+        ("existing outbound history requires explicit review",
+         "prior_outbound_requires_manual_review"),
+        ("verified contact personhood required", "personhood_not_verified"),
+        ("buyer candidate review expired", "expired_review"),
+    )
+    return next((code for match, code in reasons if match in text), None)
+
+
 def run_standing_bridge(
     request: Request | None = None,
     *,
@@ -168,6 +208,7 @@ def run_standing_bridge(
     auto_reviewed = 0
     skipped_company_routed_pending = 0
     review_errors: list[str] = []
+    review_blockers: list[str] = []
 
     for row in pending:
         if _is_company_routed(row):
@@ -175,6 +216,10 @@ def run_standing_bridge(
             continue
         review_id = str(row.get("id") or "").strip()
         if not review_id:
+            continue
+        blocker = _preflight_standing_review(row, current)
+        if blocker:
+            review_blockers.append(f"{review_id}:{blocker}")
             continue
         try:
             result = store.auto_review(
@@ -187,9 +232,13 @@ def run_standing_bridge(
             ):
                 auto_reviewed += 1
         except Exception as exc:
-            review_errors.append(
-                f"{review_id}:{type(exc).__name__}:{str(exc)[:180]}"
-            )
+            known = _expected_db_review_blocker(exc)
+            if known is not None:
+                review_blockers.append(f"{review_id}:{known}")
+            else:
+                review_errors.append(
+                    f"{review_id}:{type(exc).__name__}:{str(exc)[:180]}"
+                )
 
     ready = store.approved_for_outbound(
         limit=outbound_limit,
@@ -253,6 +302,7 @@ def run_standing_bridge(
         pending_seen=len(pending),
         auto_reviewed=auto_reviewed,
         review_errors=tuple(review_errors),
+        review_blockers=tuple(review_blockers),
         approved_ready=len(ready),
         outbound_proposed=outbound_proposed,
         skipped_invalid_person=skipped_invalid_person,
