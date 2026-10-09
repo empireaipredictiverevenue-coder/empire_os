@@ -109,6 +109,18 @@ def run_buyer_scout(
                 "description": snippet,
                 "category": query_row["pool"],
             })
+            # Search snippets are discovery hints, not fetched first-party
+            # demand claims. Keep the heuristic for research prioritisation
+            # but never embed it as an established direct buyer identity.
+            profile = {
+                **profile,
+                "search_snippet_buyer_hint_type": profile["buyer_type"],
+                "search_snippet_buyer_hint_score": profile["direct_buyer_score"],
+                "buyer_type": "unknown",
+                "direct_buyer_score": 0,
+                "explicit_direct_buyer_evidence": False,
+                "claim_evidence_state": "unverified_search_snippet",
+            }
 
             observations.append({
                 "domain": host,

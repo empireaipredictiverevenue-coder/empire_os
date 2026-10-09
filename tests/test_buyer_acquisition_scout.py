@@ -116,11 +116,20 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     )
 
     assert result["candidate_count"] == 1
+    assert result["buyer_relationship_counts"] == {"direct_inventory_buyer": 1}
+    assert result["observed_first_party_buyer_claim_receipt_count"] == 1
+    assert result["buyer_role_conflict_count"] == 0
     assert result["icp_assessed_candidate_count"] == 1
     assert result["verified_budget_candidate_count"] == 0
     row = result["candidates"][0]
     assert row["domain"] == "buyer.example"
     assert row["explicit_direct_buyer_evidence"] is True
+    assert row["buyer_relationship"] == "direct_inventory_buyer"
+    claim = row["buyer_claim_provenance"]["claim_receipts"][0]
+    assert claim["source_url"] == "https://buyer.example/advertisers/"
+    assert claim["claim_excerpt"] == "We buy leads from verified publishers."
+    assert len(claim["content_sha256"]) == 64
+    assert claim["grants_outbound_authority"] is False
     assert row["first_party_buyer_evidence_pages"] == [{
         "url": "https://buyer.example/advertisers/",
         "buyer_side_signal_hits": ["buy leads", "we buy leads"],
@@ -517,7 +526,11 @@ def test_public_research_seed_supplements_weak_search_without_bypassing_gates(
     row = result["candidates"][0]
     assert row["domain"] == "buyer.example"
     assert row["discovery_source"] == "public_research_seed"
-    assert row["explicit_direct_buyer_evidence"] is True
+    # A homepage description and search query are discovery hints; this
+    # mocked probe returned no fetched first-party purchasing page.
+    assert row["explicit_direct_buyer_evidence"] is False
+    assert row["buyer_relationship"] == "unknown"
+    assert row["buyer_claim_provenance"]["claim_receipts"] == []
     assert row["canonical_identity_verified"] is False
     assert row["commercial_terms_verified"] is False
     assert row["budget_verified"] is False

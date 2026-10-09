@@ -49,7 +49,11 @@ def test_buyer_scout_materializes_internal_observations_only():
     assert result["query_count"] == 2
     assert result["observation_count"] == 1
     obs = result["observations"][0]
-    assert obs["buyer_profile"]["buyer_type"] == "direct_lead_buyer"
+    assert obs["buyer_profile"]["buyer_type"] == "unknown"
+    assert obs["buyer_profile"]["search_snippet_buyer_hint_type"] == "direct_lead_buyer"
+    assert obs["buyer_profile"]["claim_evidence_state"] == "unverified_search_snippet"
+    assert obs["buyer_profile"]["explicit_direct_buyer_evidence"] is False
+    assert obs["buyer_profile"]["direct_buyer_score"] == 0
     assert obs["candidate_state"] == "RESEARCH_OBSERVATION"
     assert obs["identity_verified"] is False
     assert obs["outbound_ready"] is False

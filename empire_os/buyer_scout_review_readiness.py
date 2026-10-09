@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
+from empire_os.buyer_claim_provenance import verified_direct_purchase_receipt
 import re
 import urllib.parse
 
@@ -246,6 +247,13 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
         if str(value).strip()
     }
     direct_pool = "direct_demand_buyers" in pools
+    if (
+        row.get("explicit_direct_buyer_evidence") is True
+        and not verified_direct_purchase_receipt(
+            site, company_website=website,
+        )
+    ):
+        return False, "first_party_buying_claim_receipt_missing_or_invalid"
     if direct_pool and row.get("explicit_direct_buyer_evidence") is not True:
         # Independently sourced product research can qualify the organisation
         # for holding review. It cannot qualify it as a direct inventory buyer.

@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 from empire_os.buyer_acquisition_team import (
     commercial_research_profile, direct_buyer_profile,
 )
+from empire_os.buyer_claim_provenance import classify_buyer_source_pages
 from empire_os.buyer_discovery import (
     classify_decision_role,
     looks_like_person_name,
@@ -696,11 +697,21 @@ def run_buyer_scout(
             ).strip(),
         }
         profile = direct_buyer_profile({
-            # The organisation's name, seeded niche and inferred query intent
-            # are not proof that it purchases third-party leads or calls.
+            # These heuristic phrases are research hints only. The direct
+            # purchasing claim below requires a fetched first-party page.
             "description": record["description"],
             "notes": first_party_site_notes,
         })
+        buyer_claims = classify_buyer_source_pages(
+            observed_pages,
+            company_website=str(record.get("website") or ""),
+        )
+        verified_direct_buyer = buyer_claims["explicit_direct_purchase_observed"]
+        provisional_type = str(profile.get("buyer_type") or "unknown")
+        if not verified_direct_buyer and provisional_type in {
+            "direct_lead_buyer", "call_buyer", "appointment_buyer",
+        }:
+            provisional_type = "unknown"
 
         pools = sorted({
             str(item.get("buyer_pool") or "")
@@ -991,11 +1002,13 @@ def run_buyer_scout(
                 evidence.get("phones") or []
             )[:10],
             "first_party_people": credible_people,
-            "buyer_type": profile["buyer_type"],
-            "direct_buyer_score": profile["direct_buyer_score"],
-            "explicit_direct_buyer_evidence": profile[
-                "explicit_direct_buyer_evidence"
-            ],
+            "buyer_type": provisional_type,
+            "buyer_relationship": buyer_claims["buyer_relationship"],
+            "buyer_claim_provenance": buyer_claims,
+            "direct_buyer_score": (
+                profile["direct_buyer_score"] if verified_direct_buyer else 0
+            ),
+            "explicit_direct_buyer_evidence": verified_direct_buyer,
             "first_party_buyer_evidence_pages": buyer_evidence_pages,
             "direct_signal_hits": profile["direct_signal_hits"],
             "reseller_signal_hits": profile["reseller_signal_hits"],
@@ -1100,6 +1113,18 @@ def run_buyer_scout(
         },
         "explicit_direct_buyer_candidate_count": sum(
             row["explicit_direct_buyer_evidence"]
+            for row in candidates
+        ),
+        "buyer_relationship_counts": dict(sorted(Counter(
+            str(row.get("buyer_relationship") or "unknown")
+            for row in candidates
+        ).items())),
+        "observed_first_party_buyer_claim_receipt_count": sum(
+            len((row.get("buyer_claim_provenance") or {}).get("claim_receipts") or [])
+            for row in candidates
+        ),
+        "buyer_role_conflict_count": sum(
+            row.get("buyer_relationship") == "mixed_role_requires_review"
             for row in candidates
         ),
         "icp_assessed_candidate_count": sum(

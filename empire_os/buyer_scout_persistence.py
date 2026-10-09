@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
 from empire_os.buyer_acquisition_team import commercial_research_profile
+from empire_os.buyer_claim_provenance import verified_direct_purchase_receipt
 
 
 OUTPUT = Path("runtime/buyer_acquisition/persistence_latest.json")
@@ -73,6 +74,26 @@ def persist_new_external_candidates(
             skipped += 1
             continue
 
+        claim_packet = candidate.get("buyer_claim_provenance")
+        receipt_ready = bool(
+            candidate.get("explicit_direct_buyer_evidence")
+            and verified_direct_purchase_receipt(
+                {"buyer_claim_provenance": claim_packet},
+                company_website=website,
+            )
+        )
+        buyer_type = str(candidate.get("buyer_type") or "unknown")
+        claim_relationship = (
+            str(claim_packet.get("buyer_relationship") or "unknown")
+            if isinstance(claim_packet, Mapping) else "unknown"
+        )
+        if not receipt_ready and claim_relationship == "direct_inventory_buyer":
+            claim_relationship = "unknown"
+        if not receipt_ready and buyer_type in {
+            "direct_lead_buyer", "call_buyer", "appointment_buyer",
+        }:
+            buyer_type = "unknown"
+
         site_evidence = {
             "business_name_source": candidate.get(
                 "business_name_source"
@@ -117,6 +138,14 @@ def persist_new_external_candidates(
                 )[:5]
                 if isinstance(page, Mapping)
             ],
+            "buyer_claim_provenance": (
+                dict(candidate.get("buyer_claim_provenance"))
+                if isinstance(candidate.get("buyer_claim_provenance"), Mapping)
+                else {}
+            ),
+            "buyer_relationship": (
+                "direct_inventory_buyer" if receipt_ready else claim_relationship
+            ),
             "direct_signal_hits": list(
                 candidate.get("direct_signal_hits") or []
             ),
@@ -249,13 +278,12 @@ def persist_new_external_candidates(
             "p_business_name": candidate.get("business_name"),
             "p_website": website,
             "p_description": candidate.get("description"),
-            "p_buyer_type": candidate.get("buyer_type") or "unknown",
-            "p_direct_buyer_score": int(
-                candidate.get("direct_buyer_score") or 0
+            "p_buyer_type": buyer_type,
+            "p_direct_buyer_score": (
+                int(candidate.get("direct_buyer_score") or 0)
+                if receipt_ready else 0
             ),
-            "p_explicit_direct_buyer_evidence": bool(
-                candidate.get("explicit_direct_buyer_evidence")
-            ),
+            "p_explicit_direct_buyer_evidence": receipt_ready,
             "p_target_buyer_pools": list(
                 candidate.get("target_buyer_pools") or []
             ),

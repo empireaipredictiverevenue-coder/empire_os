@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+from empire_os.buyer_claim_provenance import unverified_direct_purchase_claim
 
 
 OUTPUT = Path(
@@ -31,6 +32,7 @@ def _eligible(
             row.get("review_state") == "review_ready"
             and row.get("reconciliation_state") == "REVIEW_READY"
             and str(row.get("id") or "").strip()
+            and not unverified_direct_purchase_claim(row)
             and _official_source_identity_matches(
                 row.get("query_evidence") or [],
                 row.get("site_evidence") or {},

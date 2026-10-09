@@ -13,6 +13,45 @@ def candidate(**overrides):
     return row
 
 
+def test_historical_false_direct_buyer_row_is_ineligible_for_manual_and_acp():
+    from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+    from scripts.promote_buyer_scout_raw_prospects import _identity_safe_rows
+    from empire_os.buyer_scout_raw_prospect_promotion import run_raw_prospect_promotion
+    from empire_os.buyer_scout_acp_adapter import eligible_for_acp_admission
+    row = candidate(
+        id="historical-direct", website="https://buyer.example",
+        business_name="Buyer Company", domain="buyer.example",
+        target_buyer_pools=["direct_demand_buyers"],
+        target_product_codes=["managed_service"],
+        explicit_direct_buyer_evidence=True,
+        site_evidence={"first_party_people": [{
+            "name": "Jane Smith", "title": "CEO",
+            "email": "jane@buyer.example", "source": "first_party_site",
+            "source_url": "https://buyer.example/team",
+            "mx_verified": True, "person_explicitly_named": True,
+            "email_directly_bound_to_person": True,
+        }]},
+    )
+    assert _identity_safe_rows([row]) == []
+    calls = []
+    result = run_raw_prospect_promotion(
+        [row], rpc_call=lambda *args: calls.append(args),
+        execute=True, actor="founder-approved",
+    )
+    assert result["promoted_count"] == 0
+    assert calls == []
+    assert eligible_for_acp_admission(row) is False
+
+    claim = classify_buyer_source_pages(
+        [{"url": "https://buyer.example/buyers/",
+          "visible_text": "We buy qualified leads."}],
+        company_website="https://buyer.example",
+    )
+    row["site_evidence"]["buyer_claim_provenance"] = claim
+    assert len(_identity_safe_rows([row])) == 1
+    assert eligible_for_acp_admission(row) is True
+
+
 def test_manual_promotion_filters_historical_official_identity_mismatch():
     from scripts.promote_buyer_scout_raw_prospects import _identity_safe_rows
 

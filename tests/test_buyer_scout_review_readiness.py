@@ -41,6 +41,49 @@ def test_direct_demand_candidate_requires_explicit_buying_evidence():
     )
 
 
+def test_direct_pool_fake_purchase_flag_requires_source_receipt():
+    row = candidate(
+        target_buyer_pools=["direct_demand_buyers"],
+        explicit_direct_buyer_evidence=True,
+    )
+    assert review_readiness(row) == (
+        False, "first_party_buying_claim_receipt_missing_or_invalid",
+    )
+
+
+def test_direct_pool_source_receipt_allows_holding_review_not_outreach():
+    from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+    row = candidate(
+        target_buyer_pools=["direct_demand_buyers"],
+        explicit_direct_buyer_evidence=True,
+    )
+    claim = classify_buyer_source_pages(
+        [{"url": "https://buyer.example/buyers/", "visible_text":
+          "We buy leads from verified sources."}],
+        company_website="https://buyer.example",
+    )
+    row["site_evidence"]["buyer_claim_provenance"] = claim
+    assert review_readiness(row) == (True, "review_ready")
+    assert row.get("outreach_authorized") is None
+
+
+def test_direct_pool_intermediary_receipt_cannot_claim_direct_purchase():
+    from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+    row = candidate(
+        target_buyer_pools=["direct_demand_buyers"],
+        explicit_direct_buyer_evidence=True,
+    )
+    claim = classify_buyer_source_pages(
+        [{"url": "https://buyer.example/network", "visible_text":
+          "We connect publishers with advertisers via our lead marketplace."}],
+        company_website="https://buyer.example",
+    )
+    row["site_evidence"]["buyer_claim_provenance"] = claim
+    assert review_readiness(row) == (
+        False, "first_party_buying_claim_receipt_missing_or_invalid",
+    )
+
+
 def test_official_registry_search_must_match_first_party_company_identity():
     row = candidate(
         business_name="Harvey",

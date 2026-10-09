@@ -12,12 +12,14 @@ from empire_os.buyer_scout_raw_prospect_promotion import (
 )
 from empire_os.sb import request_json
 from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+from empire_os.buyer_claim_provenance import unverified_direct_purchase_claim
 
 
 def _identity_safe_rows(rows):
     return [
         row for row in rows
         if isinstance(row, dict)
+        and not unverified_direct_purchase_claim(row)
         and _official_source_identity_matches(
             row.get("query_evidence") or [],
             row.get("site_evidence") or {},
@@ -39,7 +41,8 @@ def main() -> int:
         "select": (
             "id,domain,business_name,website,review_state,"
             "reconciliation_state,canonical_buyer_id,"
-            "canonical_prospect_id,site_evidence,query_evidence"
+            "canonical_prospect_id,site_evidence,query_evidence,"
+            "target_buyer_pools,explicit_direct_buyer_evidence"
         ),
         "review_state": "eq.review_ready",
         "reconciliation_state": "eq.REVIEW_READY",

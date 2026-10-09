@@ -29,6 +29,7 @@ from empire_os.buyer_scout_raw_prospect_promotion import (
 )
 from empire_os.sb import request_json
 from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+from empire_os.buyer_claim_provenance import unverified_direct_purchase_claim
 from empire_os.autonomous_commercial_progression import (
     ExecutionAuthority, authority_state, authority_blocker,
 )
@@ -172,6 +173,10 @@ def eligible_for_acp_admission(
         row.get("target_product_codes")
         or []
     ):
+        return False
+
+    # Historical direct-buyer claims require new first-party purchase receipts.
+    if unverified_direct_purchase_claim(row):
         return False
 
     # Historical REVIEW_READY rows must not bypass newer identity checks.

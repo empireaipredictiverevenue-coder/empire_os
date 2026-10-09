@@ -3,6 +3,37 @@ from empire_os.buyer_scout_persistence import (
 )
 
 
+def test_persistence_requires_current_first_party_purchase_receipt():
+    from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+    calls = []
+    def rpc(method, path, payload):
+        calls.append(payload)
+        return {"decision": "candidate_recorded", "candidate_id": "id-1",
+                "domain": "buyer.example", "outreach_authorized": False}
+    buyer = {
+        "domain": "buyer.example", "website": "https://buyer.example",
+        "business_name": "Buyer Company", "buyer_type": "direct_lead_buyer",
+        "direct_buyer_score": 90, "explicit_direct_buyer_evidence": True,
+        "target_buyer_pools": ["direct_demand_buyers"],
+    }
+    rec = {"results": [{"domain": "buyer.example",
+                        "reconciliation_state": "NEW_EXTERNAL_BUYER_CANDIDATE"}]}
+    claim = classify_buyer_source_pages(
+        [{"url": "https://buyer.example/partners",
+          "visible_text": "We buy calls from publishers."}],
+        company_website="https://buyer.example",
+    )
+    buyer["buyer_claim_provenance"] = claim
+    result = persist_new_external_candidates(
+        {"candidates": [buyer]}, rec, rpc_call=rpc,
+    )
+    assert result["persisted_candidate_count"] == 1
+    assert calls[0]["p_explicit_direct_buyer_evidence"] is True
+    assert calls[0]["p_site_evidence"]["buyer_claim_provenance"] == claim
+    assert calls[0]["p_site_evidence"]["buyer_relationship"] == "direct_inventory_buyer"
+    assert calls[0]["p_provenance"]["outreach_authorized"] is False
+
+
 def test_only_new_external_candidates_are_persisted():
     calls = []
 
@@ -124,8 +155,12 @@ def test_only_new_external_candidates_are_persisted():
     assert method == "POST"
     assert path.endswith("propose_buyer_scout_candidate")
     assert payload["p_domain"] == "new.example"
-    assert payload["p_direct_buyer_score"] == 90
-    assert payload["p_explicit_direct_buyer_evidence"] is True
+    assert payload["p_direct_buyer_score"] == 0
+    assert payload["p_buyer_type"] == "unknown"
+    assert payload["p_site_evidence"]["buyer_relationship"] == "unknown"
+    # A bare direct-buyer boolean is not sufficient without an observed
+    # first-party claim receipt. The holding row remains research only.
+    assert payload["p_explicit_direct_buyer_evidence"] is False
     assert payload["p_site_evidence"]["business_name_source"] == (
         "first_party_business_name"
     )
