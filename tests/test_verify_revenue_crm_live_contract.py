@@ -25,7 +25,8 @@ class Catalog:
         invoker=True,
         grants=(True,False,False,False),
         base_rls=True,
-        policy=("r", "tenant_id = public.empire_current_tenant_id()"),
+        policy=("r", "tenant_id = public.empire_current_tenant_id()", True, True),
+        helper=(True, "s", "empiredb_migrator"),
     ):
         self.role = role
         self.tenant_function = tenant_function
@@ -35,6 +36,7 @@ class Catalog:
         self.grants = grants
         self.base_rls = base_rls
         self.policy = policy
+        self.helper = helper
         self.calls = []
         self.last = ""
         self.params = ()
@@ -44,10 +46,10 @@ class Catalog:
         self.calls.append((sql,params))
     def fetchone(self):
         q = self.last
+        if "pg_catalog.pg_proc" in q:
+            return self.helper if "empire_crm_prospect_authorized" in q else self.tenant_function
         if "pg_catalog.pg_roles" in q:
             return self.role
-        if "pg_catalog.pg_proc" in q:
-            return self.tenant_function
         if "pg_catalog.pg_class c" in q:
             if self.view_missing:
                 return None
@@ -65,7 +67,12 @@ class Catalog:
         if "pg_catalog.pg_rewrite" in q:
             return [(10, "r", self.base_rls, [])]
         if "pg_catalog.pg_policy" in q:
-            return [self.policy] if self.policy is not None else []
+            if self.policy is None:
+                return []
+            return (
+                self.policy if isinstance(self.policy, list)
+                else [self.policy]
+            )
         raise AssertionError(q)
 
 
@@ -94,14 +101,21 @@ def test_catalog_healthy_fixture_is_only_precondition_not_activation():
     ("grants", (True,True,False,False), "BUYERS_ROLE_READ_GRANTS_NOT_SAFE"),
     ("base_rls", False, "PROSPECTS_BASE_RLS_NOT_VERIFIED"),
     ("policy", None, "BUYERS_BASE_RLS_NOT_VERIFIED"),
-    ("policy", ("r", "true"), "PROSPECTS_BASE_RLS_NOT_VERIFIED"),
-    ("policy", ("r", "tenant_id = public.empire_current_tenant_id() OR true"),
+    ("policy", ("r", "true", True, True), "PROSPECTS_BASE_RLS_NOT_VERIFIED"),
+    ("policy", ("r", "tenant_id = public.empire_current_tenant_id() OR true", True, True),
      "BUYERS_BASE_RLS_NOT_VERIFIED"),
-    ("policy", ("r", "NOT tenant_id = public.empire_current_tenant_id()"),
+    ("policy", ("r", "NOT tenant_id = public.empire_current_tenant_id()", True, True),
      "PROSPECTS_BASE_RLS_NOT_VERIFIED"),
+    ("helper", None, "GUARDED_PROSPECT_SCOPE_FUNCTION_NOT_VERIFIED"),
+    ("helper", (True, "v", "empiredb_migrator"), "GUARDED_PROSPECT_SCOPE_FUNCTION_NOT_VERIFIED"),
 ])
 def test_unproven_catalog_item_is_explicit_blocker(key, wrong, reason):
-    value = module().inspect_crm_catalog(Catalog(**{key:wrong}))
+    scenario = {key:wrong}
+    if key=="helper":
+        scenario["policy"]=(
+            "r","empire_crm_prospect_authorized(id)",True,True,
+        )
+    value = module().inspect_crm_catalog(Catalog(**scenario))
     assert value["status"] == "BLOCKED"
     assert reason in value["blockers"]
     assert value["public_api_activation_authorized"] is False
@@ -138,3 +152,24 @@ def test_catalog_probe_only_uses_static_catalog_queries():
         assert "SELECT *" not in sql
         assert "FROM public.revenue_crm_prospects" not in sql
         assert "FROM public.revenue_crm_buyers" not in sql
+
+
+def test_extra_public_permissive_policy_cannot_override_tenant_gate():
+    allowed = ("r", "tenant_id = public.empire_current_tenant_id()", True, True)
+    public_bypass = ("r", "true", True, True)
+    result = module().inspect_crm_catalog(
+        Catalog(policy=[allowed,public_bypass])
+    )
+    assert result["status"] == "BLOCKED"
+    assert "BUYERS_BASE_RLS_NOT_VERIFIED" in result["blockers"]
+    assert result["public_api_activation_authorized"] is False
+
+
+def test_policy_for_unrelated_non_member_role_is_not_tenant_bypass():
+    allowed = ("r", "tenant_id = public.empire_current_tenant_id()", True, True)
+    not_applicable = ("r", "true", True, False)
+    result = module().inspect_crm_catalog(
+        Catalog(policy=[allowed,not_applicable])
+    )
+    assert result["status"] == "CATALOG_PRECONDITIONS_VERIFIED"
+    assert result["actual_cross_tenant_read_verified"] is False

@@ -80,6 +80,19 @@ def inspect_crm_catalog(cursor: Any) -> dict[str, Any]:
         issues, function is not None and function[0] is True,
         "TRUSTED_TENANT_FUNCTION_NOT_VERIFIED",
     )
+    cursor.execute(
+        "SELECT p.prosecdef,p.provolatile,owner.rolname "
+        "FROM pg_catalog.pg_proc p "
+        "JOIN pg_catalog.pg_namespace n ON n.oid=p.pronamespace "
+        "JOIN pg_catalog.pg_roles owner ON owner.oid=p.proowner "
+        "WHERE n.nspname='public' AND p.proname='empire_crm_prospect_authorized' "
+        "AND pg_catalog.pg_get_function_identity_arguments(p.oid)='p_prospect_id uuid'"
+    )
+    helper = cursor.fetchone()
+    helper_safe = (
+        isinstance(helper,(tuple,list))
+        and len(helper)==3 and helper==(True,"s","empiredb_migrator")
+    )
     details = {}
     for label, (name, cols) in VIEWS.items():
         cursor.execute(
@@ -126,25 +139,51 @@ def inspect_crm_catalog(cursor: Any) -> dict[str, Any]:
                 all_bases_safe = False
                 continue
             cursor.execute(
-                "SELECT polcmd, pg_catalog.pg_get_expr(polqual,polrelid) "
-                "FROM pg_catalog.pg_policy WHERE polrelid=%s", (base_oid,)
+                "SELECT polcmd,pg_catalog.pg_get_expr(polqual,polrelid),"
+                " polpermissive,"
+                " EXISTS (SELECT 1 FROM unnest(polroles) AS r(oid)"
+                " WHERE r.oid=0 OR r.oid=("
+                " SELECT oid FROM pg_catalog.pg_roles WHERE rolname=%s)"
+                " OR pg_catalog.pg_has_role("
+                " (SELECT oid FROM pg_catalog.pg_roles WHERE rolname=%s),"
+                " r.oid,'MEMBER'))"
+                " FROM pg_catalog.pg_policy WHERE polrelid=%s",
+                (ROLE,ROLE,base_oid),
             )
-            # Additional permissive policies can widen access: catalog
-            # preflight rejects any SELECT/ALL policy lacking tenant scope.
-            policies = [
-                expression for command, expression in cursor.fetchall()
-                if command in ("r", "*")
+            # Deny any other permissive policy applicable to the CRM role,
+            # including PUBLIC. A policy for another non-member role does
+            # not extend this reader's access.
+            active = [
+                (expression, permissive)
+                for command,expression,permissive,applies in cursor.fetchall()
+                if command in ("r","*") and applies
             ]
-            if not policies or any(
-                not isinstance(expression, str)
-                or "empire_current_tenant_id" not in expression
-                # A permissive SELECT policy with an OR arm might
-                # bypass tenant ownership despite referencing the
-                # tenant function somewhere in its expression.
-                or re.search(r"\bOR\b|\bNOT\b", expression, re.I)
-                for expression in policies
-            ):
+            if not active or not any(permissive for _,permissive in active):
                 all_bases_safe = False
+            for expression, permissive in active:
+                if not permissive:
+                    continue
+                allowed_buyer = re.search(
+                    r"\b(?:tenant_id|org_id)\s*=\s*(?:public\.)?"
+                    r"empire_current_tenant_id\s*\(\s*\)", expression or "", re.I,
+                )
+                if label=="prospects" and "empire_crm_prospect_authorized" in (expression or ""):
+                    _block(
+                        issues,helper_safe,
+                        "GUARDED_PROSPECT_SCOPE_FUNCTION_NOT_VERIFIED",
+                    )
+                allowed_prospect = (
+                    helper_safe and label=="prospects" and re.search(
+                        r"(?:public\.)?empire_crm_prospect_authorized\s*"
+                        r"\(\s*id\s*\)",expression or "",re.I
+                    )
+                )
+                if (
+                    not isinstance(expression,str)
+                    or re.search(r"\bOR\b|(?<!IS )\bNOT\b",expression,re.I)
+                    or not (allowed_buyer or allowed_prospect)
+                ):
+                    all_bases_safe = False
         _block(issues, all_bases_safe, f"{label.upper()}_BASE_RLS_NOT_VERIFIED")
         details[label] = {
             "present": True, "columns_complete": complete,

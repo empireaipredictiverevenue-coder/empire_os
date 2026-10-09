@@ -273,3 +273,173 @@ def test_catalog_probe_rejects_removed_tenant_policy_on_pg18(pg):
     assert report["status"] == "BLOCKED"
     assert "PROSPECTS_BASE_RLS_NOT_VERIFIED" in report["blockers"]
     assert report["public_api_activation_authorized"] is False
+
+
+def test_prepared_crm040_migration_enforces_real_source_ownership(pg):
+    """Disposable DB with the real prospect->entity->tenant ownership chain."""
+    from pathlib import Path
+    from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
+    from empire_os.revenue_crm_transport import RevenueCrmTransportError
+    run, sock, port = pg
+    a = A
+    b = B
+    sql_file = Path(__file__).resolve().parents[1] / (
+        "migrations/empiredb/040_revenue_crm_tenant_reader_views.sql"
+    )
+    assert sql_file.is_file()
+    sql = sql_file.read_text()
+    # no new login, no public API activation and no mutation of existing tenants
+    assert "GRANT empire_revenue_crm_reader TO" not in sql
+    assert "REVOKE ALL ON public.tenant_business_entity_bindings" not in sql
+    assert "ALTER TABLE public.tenant_business_entity_bindings" not in sql
+
+    run("postgres", "CREATE DATABASE crm_release_fixture;")
+    run("crm_release_fixture", """
+        CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT;
+        GRANT empiredb_migrator TO ubuntu;
+        GRANT CREATE ON SCHEMA public TO empiredb_migrator;
+        SET ROLE empiredb_migrator;
+        CREATE TABLE public.empire_tenant_role_bindings(
+          role_name name PRIMARY KEY, tenant_id uuid, active boolean);
+        CREATE FUNCTION public.empire_current_tenant_id()
+        RETURNS uuid LANGUAGE sql STABLE SECURITY DEFINER
+        SET search_path=pg_catalog,public AS $fn$
+          SELECT tenant_id FROM public.empire_tenant_role_bindings
+          WHERE role_name=session_user AND active LIMIT 1
+        $fn$;
+        REVOKE ALL ON FUNCTION public.empire_current_tenant_id() FROM PUBLIC;
+        CREATE TABLE public.prospects(
+          id uuid PRIMARY KEY, business_name text,niche text,metro text,status text);
+        CREATE TABLE public.buyers(
+          id uuid PRIMARY KEY,org_id uuid,buyer_name text,niche text,metro text,
+          status text,is_active boolean,commercial_activation_state text,
+          daily_cap integer,calls_today integer,per_lead_rate numeric,
+          capacity_verified_at timestamptz,delivery_verified_at timestamptz,
+          commercial_terms_verified_at timestamptz);
+        CREATE TABLE public.prospect_entity_links(
+          prospect_id uuid,entity_id uuid,active boolean,evidence jsonb);
+        CREATE TABLE public.tenant_business_entity_bindings(
+          tenant_id uuid,entity_id uuid,binding_kind text,active boolean,
+          evidence_ref text,valid_from timestamptz,valid_until timestamptz);
+        ALTER TABLE public.prospects ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE public.buyers ENABLE ROW LEVEL SECURITY;
+        RESET ROLE;
+    """)
+    e1 = "00000000-0000-0000-0000-000000010001"
+    e2 = "00000000-0000-0000-0000-000000010002"
+    e3 = "00000000-0000-0000-0000-000000010003"
+    p3 = "00000000-0000-0000-0000-000000000005"
+    p4 = "00000000-0000-0000-0000-000000000006"
+    run("crm_release_fixture", f"""
+        INSERT INTO public.empire_tenant_role_bindings VALUES
+          ('crm_login_a','{a}',true),('crm_login_b','{b}',true);
+        INSERT INTO public.prospects VALUES
+          ('{PA}','FIXTURE_TENANT_A','roofing','NY','new'),
+          ('{PB}','FIXTURE_TENANT_B','solar','TX','new'),
+          ('{p3}','FIXTURE_AMBIGUOUS','hvac','LA','new'),
+          ('{p4}','FIXTURE_UNLINKED','other','OR','new');
+        INSERT INTO public.buyers(id,org_id,buyer_name,niche,metro,status,is_active)
+        VALUES
+          ('00000000-0000-0000-0000-000000000003','{a}','FIXTURE_BUYER_A',
+             'roofing','NY','ACTIVE',true),
+          ('00000000-0000-0000-0000-000000000004','{b}','FIXTURE_BUYER_B',
+             'solar','TX','ACTIVE',true);
+        INSERT INTO public.prospect_entity_links VALUES
+          ('{PA}','{e1}',true,'{{"verified":"fixture"}}'),
+          ('{PB}','{e2}',true,'{{"verified":"fixture"}}'),
+          ('{p3}','{e3}',true,'{{"verified":"fixture"}}');
+        INSERT INTO public.tenant_business_entity_bindings VALUES
+          ('{a}','{e1}','prospect',true,'fixture-a',now()-interval '1 day',NULL),
+          ('{b}','{e2}','prospect',true,'fixture-b',now()-interval '1 day',NULL),
+          ('{a}','{e3}','managed',true,'fixture-c',now()-interval '1 day',NULL),
+          ('{a}','{e3}','prospect',true,'fixture-d',now()-interval '1 day',NULL);
+    """)
+
+    run("crm_release_fixture", sql)
+    from importlib.util import spec_from_file_location, module_from_spec
+    import psycopg
+    location=Path(__file__).resolve().parents[1]/"scripts/verify_revenue_crm_live_contract.py"
+    spec=spec_from_file_location("crm40_release_catalog",location)
+    assert spec and spec.loader
+    probe=module_from_spec(spec)
+    spec.loader.exec_module(probe)
+    dsn_admin=f"host={sock} port={port} dbname=crm_release_fixture user=ubuntu"
+    with psycopg.connect(dsn_admin) as admin:
+        with admin.cursor() as cursor:
+            cursor.execute("SET TRANSACTION READ ONLY")
+            report=probe.inspect_crm_catalog(cursor)
+    assert report["status"]=="CATALOG_PRECONDITIONS_VERIFIED",report["blockers"]
+    assert report["public_api_activation_authorized"] is False
+    assert report["application_login_tenant_authority_verified"] is False
+    assert report["source_schema"]["status"]=="SOURCE_SCHEMA_PRESENT_EVIDENCE_PENDING"
+    assert report["source_schema"]["tenant_binding_rows_verified"] is False
+    # Default public roles cannot read the view directly.
+    run("crm_release_fixture",
+        "SELECT prospect_id FROM public.revenue_crm_prospects;",
+        user="crm_login_a", expect_error=True)
+
+    for login, scope, mine, foreign in (
+        ("crm_login_a", a, "FIXTURE_TENANT_A", "FIXTURE_TENANT_B"),
+        ("crm_login_b", b, "FIXTURE_TENANT_B", "FIXTURE_TENANT_A"),
+    ):
+        dsn=f"host={sock} port={port} dbname=crm_release_fixture user={login}"
+        repo=PostgresRevenueCrmRepository(dsn,tenant_id=scope)
+        rows=repo.prospects(limit=50)
+        assert [row["business_name"] for row in rows]==[mine],rows
+        assert foreign not in repr(rows)
+        assert "FIXTURE_AMBIGUOUS" not in repr(rows)
+        assert "FIXTURE_UNLINKED" not in repr(rows)
+        buyers=repo.buyers(limit=30)
+        assert len(buyers)==1
+        assert buyers[0]["tenant_id"] == scope or str(buyers[0]["tenant_id"])==scope
+        assert buyers[0]["available_capacity"] is None
+        assert rows[0]["conversation_id"] is None
+        assert rows[0]["closer_case_id"] is None
+        assert rows[0]["deal_probability"] is None
+
+    # Role without session tenant binding cannot read even with capability.
+    unbound = run("crm_release_fixture", """
+      BEGIN READ ONLY;
+      SET LOCAL ROLE empire_revenue_crm_reader;
+      SELECT business_name FROM public.revenue_crm_prospects;
+      SELECT buyer_name FROM public.revenue_crm_buyers;
+      ROLLBACK;
+    """, user="crm_login_unbound")
+    assert "FIXTURE_" not in unbound
+
+    wrong=PostgresRevenueCrmRepository(
+        f"host={sock} port={port} dbname=crm_release_fixture user=crm_login_a",
+        tenant_id=b,
+    )
+    with pytest.raises(RevenueCrmTransportError):
+        wrong.prospects(limit=20)
+
+    # Revoked, expired, observation-only or unsupported lineage must not
+    # leave a prospect in the tenant-scoped CRM projection.
+    dsn_a=f"host={sock} port={port} dbname=crm_release_fixture user=crm_login_a"
+    own=PostgresRevenueCrmRepository(dsn_a,tenant_id=a)
+    for edit in (
+        f"UPDATE public.tenant_business_entity_bindings SET active=false "
+        f"WHERE entity_id='{e1}'::uuid;",
+        f"UPDATE public.tenant_business_entity_bindings SET binding_kind='observed' "
+        f"WHERE entity_id='{e1}'::uuid;",
+        f"UPDATE public.tenant_business_entity_bindings "
+        f"SET valid_until=now()-interval '1 minute' "
+        f"WHERE entity_id='{e1}'::uuid;",
+        f"UPDATE public.prospect_entity_links SET evidence='{{}}'::jsonb "
+        f"WHERE entity_id='{e1}'::uuid;",
+    ):
+        run("crm_release_fixture",edit)
+        assert own.prospects(limit=20)==[]
+        # Roll back fixture-only changes by restoring the expected evidence.
+        run("crm_release_fixture",f"""
+           UPDATE public.tenant_business_entity_bindings SET
+              active=true, binding_kind='prospect',valid_until=NULL
+           WHERE entity_id='{e1}'::uuid;
+           UPDATE public.prospect_entity_links SET evidence='{{"verified":"fixture"}}'
+           WHERE entity_id='{e1}'::uuid;
+        """)
+        assert len(own.prospects(limit=20))==1
+
+    # Can only be installed once: pre-existing objects fail closed.
+    run("crm_release_fixture",sql,expect_error=True)
