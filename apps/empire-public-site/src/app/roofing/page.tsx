@@ -19,15 +19,27 @@ const TRACKING_NUMBER_DISPLAY = "(888) 357-9305";
  * Neither this source nor its materialized worker copy can activate
  * calls until the separately evidenced gates are changed.
  */
+// Compile-time defence in depth: all approvals must be independently
+// evidenced. Changing one flag cannot enable customer calls. A future
+// launch must additionally enforce live buyer hours and ZIP eligibility
+// at call time, rather than treating this static page as authority.
 const TRACKING_VERIFIED = false;
 const ZIP_COVERAGE_VERIFIED = false;
 const ROUTING_VERIFIED = false;
+const OPERATING_HOURS_VERIFIED = false;
+const CALLER_ID_PASS_THROUGH_VERIFIED = false;
+const BUYER_LANDING_PAGE_APPROVED = false;
+const LANDING_PUBLICATION_AUTHORIZED = false;
 const FOUNDER_LIVE_TRAFFIC_AUTHORIZED = false;
 
 const CALL_ROUTE_ENABLED =
   TRACKING_VERIFIED &&
   ZIP_COVERAGE_VERIFIED &&
   ROUTING_VERIFIED &&
+  OPERATING_HOURS_VERIFIED &&
+  CALLER_ID_PASS_THROUGH_VERIFIED &&
+  BUYER_LANDING_PAGE_APPROVED &&
+  LANDING_PUBLICATION_AUTHORIZED &&
   FOUNDER_LIVE_TRAFFIC_AUTHORIZED;
 
 const roofingNeeds = [
@@ -127,7 +139,7 @@ export default function RoofingServicePage() {
               </a>
             </div>
             <p className="mt-5 max-w-[570px] text-xs leading-6 text-[#435c82]">
-              Calling remains unavailable until current service-area eligibility and the assigned call route have been verified.
+              Calling is not yet available. Service-area eligibility, current buyer hours, routing and caller-ID handling must be verified, and the buyer must approve this page before activation.
             </p>
           </div>
 

@@ -110,41 +110,47 @@ def test_roofing_page_is_consumer_initiated_and_zip_gated():
 
 
 
-def test_roofing_cta_requires_tracking_zip_routing_and_founder_authority():
+def test_roofing_cta_mirrors_every_production_launch_gate_and_fails_closed():
+    from empire_os.lead_smart_launch_readiness import build_launch_readiness
+
     text = source()
+    all_flags = {
+        "tracking_verified": "TRACKING_VERIFIED",
+        "zip_targeting_verified": "ZIP_COVERAGE_VERIFIED",
+        "routing_runtime_verified": "ROUTING_VERIFIED",
+        "operating_hours_verified": "OPERATING_HOURS_VERIFIED",
+        "caller_id_pass_through_verified": "CALLER_ID_PASS_THROUGH_VERIFIED",
+        "buyer_landing_page_approved": "BUYER_LANDING_PAGE_APPROVED",
+        "landing_publication_authorized": "LANDING_PUBLICATION_AUTHORIZED",
+        "founder_live_traffic_authorized": "FOUNDER_LIVE_TRAFFIC_AUTHORIZED",
+    }
+    readiness = build_launch_readiness(tracking={}, zip_gate={}, routing={})
+    assert set(readiness["gates"]) == set(all_flags)
 
-    assert (
-        'const TRACKING_VERIFIED = false;'
-        in text
-    )
+    compact = normalized(text)
+    for flag in all_flags.values():
+        assert f"const {flag} = false;" in text
 
-    assert (
-        'const ZIP_COVERAGE_VERIFIED = false;'
-        in text
-    )
-
-    assert (
-        'const ROUTING_VERIFIED = false;'
-        in text
-    )
-
-    assert (
-        'const FOUNDER_LIVE_TRAFFIC_AUTHORIZED = false;'
-        in text
-    )
-
-    compact = " ".join(
-        text.split()
-    )
-
-    assert (
+    required_expression = (
         "const CALL_ROUTE_ENABLED = "
-        "TRACKING_VERIFIED && "
-        "ZIP_COVERAGE_VERIFIED && "
-        "ROUTING_VERIFIED && "
-        "FOUNDER_LIVE_TRAFFIC_AUTHORIZED;"
-        in compact
+        + " && ".join([
+            "TRACKING_VERIFIED",
+            "ZIP_COVERAGE_VERIFIED",
+            "ROUTING_VERIFIED",
+            "OPERATING_HOURS_VERIFIED",
+            "CALLER_ID_PASS_THROUGH_VERIFIED",
+            "BUYER_LANDING_PAGE_APPROVED",
+            "LANDING_PUBLICATION_AUTHORIZED",
+            "FOUNDER_LIVE_TRAFFIC_AUTHORIZED",
+        ])
+        + ";"
     )
+    assert required_expression in compact
+    assert "{CALL_ROUTE_ENABLED ? (" in text
+    assert "Call route pending verification" in text
+    assert 'href="tel:' not in text
+
+
 
 def test_roofing_page_mounts_read_only_zip_preview():
     page = source()
@@ -160,6 +166,7 @@ def test_roofing_page_mounts_read_only_zip_preview():
     assert 'item.call_authorized !== false' in client
     assert 'item.execution_authority !== "NONE"' in client
     assert "a listed zip does not guarantee" in client.lower()
+    assert "daylight saving applies" in client.lower()
     assert 'href="tel:' not in client
     assert "No phone number will be enabled by this preview" in client
 

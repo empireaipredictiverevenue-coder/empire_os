@@ -83,8 +83,8 @@ export default function RoofingCoverageCheck() {
             a listed ZIP does not guarantee a contractor, available buyer, or payable call.
           </p>
           <p className="mt-3 text-xs leading-5 text-[#405b7e]">
-            Buyer-reported operating hours: Monday–Friday 8 AM–6 PM, weekends 10 AM–4 PM Central Time.
-            Availability and seasonal time interpretation remain subject to confirmation.
+            Buyer-confirmed operating hours: Monday–Friday 8 AM–6 PM, weekends 10 AM–4 PM, America/Chicago time (daylight saving applies).
+            Hours are guidance only and do not guarantee contractor or buyer availability.
           </p>
         </div>
         <div className="rounded-2xl border border-[#c7def3] bg-white p-5 shadow-[0_12px_35px_rgba(5,58,113,.08)] sm:p-6">
