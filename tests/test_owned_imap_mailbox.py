@@ -49,7 +49,7 @@ class FakeIMAP:
         if verb == 'SEARCH':
             return 'OK',[b'12 13']
         if verb == 'FETCH':
-            assert arguments[1]=='(BODY.PEEK[]<0.32768>)'
+            assert arguments[1]=='(INTERNALDATE BODY.PEEK[]<0.32768>)'
             return 'OK',[(b'13 (BODY[] {100}',wire_message(sent=self.sent)),b')']
         raise AssertionError('IMAP mutation or unsupported command')
 

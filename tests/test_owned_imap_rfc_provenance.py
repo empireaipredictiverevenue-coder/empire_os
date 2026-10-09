@@ -54,3 +54,45 @@ def test_missing_rfc_headers_never_synthesizes_identity():
     assert row["references"] is None
     assert row["canonical_thread_identity_verified"] is False
     assert row["received_at"] is None
+
+
+def test_imap_server_internaldate_is_separate_from_sender_header_date():
+    from empire_os.owned_imap_mailbox import MAX_BYTES
+    class Source:
+        def uid(self, command, uid, query):
+            assert (command, uid) == ("FETCH", "42")
+            assert "INTERNALDATE" in query
+            assert "BODY.PEEK" in query
+            return "OK", [
+                (b'42 (INTERNALDATE "09-Oct-2026 12:34:56 +0000" BODY[] {350}',
+                 sample()),
+                b')',
+            ]
+    own = OwnedIMAPMailboxProvider(
+        host="mail.example.org", username="owner@example.org",
+        password="fake-test-password",
+    )
+    result = own._fetch(Source(), folder_role="inbox", validity="77", uid="42")
+    assert result["mailbox_internal_date"] == "2026-10-09T12:34:56+00:00"
+    assert result["mailbox_internal_date_observed"] is True
+    assert result["message_date"] == "2020-01-01T00:00:00+00:00"
+    # Internaldate may be set on IMAP APPEND; not SMTP receipt proof.
+    assert result["received_at"] is None
+    assert result["source_received_at_verified"] is False
+    assert result["message_id"] == "<received-42@buyer.example>"
+
+
+def test_missing_or_malformed_internaldate_never_becomes_delivery_evidence():
+    own = OwnedIMAPMailboxProvider(
+        host="mail.example.org", username="owner@example.org",
+        password="fake-test-password",
+    )
+    for raw in (
+        b"42 (BODY[] {100}",
+        b'42 (INTERNALDATE "malicious 3000-10-05" BODY[] {100}',
+        b'42 (INTERNALDATE "99-Oct-2026 12:34:56 +0000" BODY[] {100}',
+    ):
+        assert own._imap_internaldate(raw) is None
+    assert own._imap_internaldate(
+        b'42 (INTERNALDATE "09-Oct-2026 23:35:42 +0100" BODY[] {100}'
+    ) == "2026-10-09T22:35:42+00:00"

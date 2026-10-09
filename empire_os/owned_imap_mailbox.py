@@ -7,7 +7,7 @@ verified cross-system conversation or commercial contact identity.
 """
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import datetime, timezone
 from email import policy
 from email.parser import BytesParser
 from email.utils import parsedate_to_datetime
@@ -87,7 +87,26 @@ class OwnedIMAPMailboxProvider:
         return valid
 
     @staticmethod
-    def _extract(raw: Any, *, identity: str, direction: str) -> dict[str, Any]:
+    def _imap_internaldate(metadata: bytes) -> str | None:
+        # IMAP INTERNALDATE is server-reported folder metadata; it is not
+        # signed proof of original SMTP delivery (APPEND can set this date).
+        match = re.search(
+            rb'\bINTERNALDATE\s+"([0-9]{1,2}-[A-Za-z]{3}-[0-9]{4} '
+            rb'[0-9]{2}:[0-9]{2}:[0-9]{2} [+-][0-9]{4})"',
+            metadata, re.IGNORECASE,
+        )
+        if not match:
+            return None
+        try:
+            return datetime.strptime(
+                match.group(1).decode("ascii"), "%d-%b-%Y %H:%M:%S %z"
+            ).astimezone(timezone.utc).isoformat()
+        except (ValueError, UnicodeDecodeError):
+            return None
+
+    @staticmethod
+    def _extract(raw: Any, *, identity: str, direction: str,
+                 server_internal_date: str | None = None) -> dict[str, Any]:
         try:
             parsed = BytesParser(policy=policy.default).parsebytes(raw)
             plain = parsed.get_body(preferencelist=('plain',)) if parsed.is_multipart() else parsed
@@ -117,6 +136,8 @@ class OwnedIMAPMailboxProvider:
                 'text': body,
                 # RFC Date is sender-controlled, not the receiving IMAP server clock.
                 'message_date': time,
+                'mailbox_internal_date': server_internal_date,
+                'mailbox_internal_date_observed': server_internal_date is not None,
                 'received_at': None,
                 'created_at': time if direction == 'sent' else None,
                 'source_received_at_verified': False,
@@ -135,7 +156,7 @@ class OwnedIMAPMailboxProvider:
         # BODY.PEEK with partial fetch must not change SEEN flags. No attachments
         # downloaded beyond the bounded first message bytes.
         try:
-            state, data = connection.uid('FETCH', uid, f'(BODY.PEEK[]<0.{MAX_BYTES}>)')
+            state, data = connection.uid('FETCH', uid, f'(INTERNALDATE BODY.PEEK[]<0.{MAX_BYTES}>)')
             if state != 'OK' or not isinstance(data, list):
                 raise ValueError('invalid_fetch')
             raw_parts = [item[1] for item in data
@@ -145,8 +166,20 @@ class OwnedIMAPMailboxProvider:
                 raise ValueError('invalid_fetch_parts')
         except Exception:
             raise MailboxReadUnavailable('OWN_IMAP_BOUNDED_FETCH_FAILED') from None
+        # Only the server FETCH response can supply INTERNALDATE, never the
+        # sender's MIME Date or a value copied from message body content.
+        metadata = next(
+            (item[0] for item in data
+             if isinstance(item, tuple) and len(item) == 2
+             and isinstance(item[0], bytes) and item[1] == raw_parts[0]),
+            b"",
+        )
+        internal_date = self._imap_internaldate(metadata)
         identity = f'imap:{folder_role}:{validity}:{uid}'
-        return self._extract(raw_parts[0], identity=identity, direction=folder_role)
+        return self._extract(
+            raw_parts[0], identity=identity, direction=folder_role,
+            server_internal_date=internal_date,
+        )
 
     def _read(self, role: str, *, limit: int, only: str | None = None):
         if type(limit) is not int or not 1 <= limit <= MAX_LIST:
