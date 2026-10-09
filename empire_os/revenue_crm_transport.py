@@ -12,7 +12,7 @@ class RevenueCrmTransportError(RuntimeError):
 ROLE = "empire_revenue_crm_reader"
 
 PROSPECT_COLUMNS = (
-    "prospect_id,business_name,niche,metro,prospect_status,"
+    "tenant_id,prospect_id,business_name,niche,metro,prospect_status,"
     "conversation_id,conversation_channel,conversation_state,"
     "conversation_updated_at,closer_case_id,closer_state,"
     "closer_updated_at,fulfilment_order_id,fulfilment_state,"
@@ -22,7 +22,7 @@ PROSPECT_COLUMNS = (
 )
 
 BUYER_COLUMNS = (
-    "buyer_id,buyer_name,niche,metro,buyer_status,is_active,"
+    "tenant_id,buyer_id,buyer_name,niche,metro,buyer_status,is_active,"
     "commercial_activation_state,daily_cap,calls_today,"
     "available_capacity,per_lead_rate,capacity_verified_at,"
     "delivery_verified_at,commercial_terms_verified_at"
@@ -31,19 +31,19 @@ BUYER_COLUMNS = (
 PROSPECT_LIST_SQL = (
     "SELECT " + PROSPECT_COLUMNS
     + " FROM public.revenue_crm_prospects "
-    "ORDER BY prospect_id LIMIT %s"
+    "WHERE tenant_id = %s ORDER BY prospect_id LIMIT %s"
 )
 
 PROSPECT_ONE_SQL = (
     "SELECT " + PROSPECT_COLUMNS
     + " FROM public.revenue_crm_prospects "
-    "WHERE prospect_id=%s LIMIT 1"
+    "WHERE tenant_id = %s AND prospect_id = %s LIMIT 1"
 )
 
 BUYER_LIST_SQL = (
     "SELECT " + BUYER_COLUMNS
     + " FROM public.revenue_crm_buyers "
-    "ORDER BY buyer_id LIMIT %s"
+    "WHERE tenant_id = %s ORDER BY buyer_id LIMIT %s"
 )
 
 
@@ -73,9 +73,11 @@ class PostgresRevenueCrmRepository:
         self,
         dsn: str,
         *,
+        tenant_id: str,
         connect_factory: Callable | None = None,
     ) -> None:
         self.dsn = str(dsn or "").strip()
+        self.tenant_id = _uuid(tenant_id, field="tenant_id")
         if not self.dsn:
             raise RevenueCrmTransportError(
                 "dedicated Revenue CRM database DSN required"
@@ -98,34 +100,62 @@ class PostgresRevenueCrmRepository:
         try:
             with self._connect(self.dsn) as connection:
                 with connection.cursor() as cursor:
+                    cursor.execute("SET TRANSACTION READ ONLY")
                     cursor.execute("SET LOCAL ROLE " + ROLE)
+                    cursor.execute("SET LOCAL statement_timeout = '4000ms'")
+                    # Trusted tenant foundation resolves session_user, never
+                    # a caller-supplied GUC or email/domain relationship.
+                    cursor.execute("SELECT public.empire_current_tenant_id()")
+                    resolved = cursor.fetchone()
+                    if (
+                        not isinstance(resolved, (tuple, list))
+                        or len(resolved) != 1
+                        or not resolved[0]
+                        or str(resolved[0]) != self.tenant_id
+                    ):
+                        raise RevenueCrmTransportError(
+                            "authenticated CRM tenant scope missing or mismatched"
+                        )
                     cursor.execute(sql, params)
                     columns = [
                         description.name
                         for description in cursor.description
                     ]
+                    if "tenant_id" not in columns or len(columns) != len(set(columns)):
+                        raise RevenueCrmTransportError(
+                            "canonical CRM view lacks unique tenant projection"
+                        )
                     rows = cursor.fetchall()
-        except Exception as exc:
+                    result = [
+                        dict(zip(columns, row, strict=True))
+                        for row in rows
+                    ]
+                    if any(
+                        str(row.get("tenant_id") or "") != self.tenant_id
+                        for row in result
+                    ):
+                        raise RevenueCrmTransportError(
+                            "cross-tenant CRM row rejected"
+                        )
+                    return result
+        except Exception:
+            # Do not expose credentials, identifiers or driver diagnostics.
             raise RevenueCrmTransportError(
-                "dedicated Revenue CRM database read failed"
-            ) from exc
-        return [
-            dict(zip(columns, row, strict=True))
-            for row in rows
-        ]
+                "dedicated CRM read unavailable or tenant scope unverified"
+            ) from None
 
     def prospects(self, *, limit: int):
         bounded = _bounded_limit(limit)
-        return self._fetch_all(PROSPECT_LIST_SQL, (bounded,))
+        return self._fetch_all(PROSPECT_LIST_SQL, (self.tenant_id, bounded))
 
     def buyers(self, *, limit: int):
         bounded = _bounded_limit(limit)
-        return self._fetch_all(BUYER_LIST_SQL, (bounded,))
+        return self._fetch_all(BUYER_LIST_SQL, (self.tenant_id, bounded))
 
     def prospect(self, prospect_id: str):
         canonical_id = _uuid(prospect_id, field="prospect_id")
         rows = self._fetch_all(
             PROSPECT_ONE_SQL,
-            (canonical_id,),
+            (self.tenant_id, canonical_id),
         )
         return rows[0] if rows else None
