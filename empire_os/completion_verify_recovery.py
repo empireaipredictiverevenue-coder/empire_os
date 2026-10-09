@@ -101,11 +101,36 @@ def recover_failed_completion_verifications(
     queue = LocalJobQueue(root)
     existing_keys = _existing_keys(queue)
     candidates: list[dict[str, Any]] = []
-
-    for path in queue.failed.glob("*.json"):
+    # A VERIFY worker marks a job COMPLETED even when its deterministic
+    # verification verdict is FAIL. The old recovery scanned only /failed,
+    # leaving such completion items stuck forever on stale failure evidence.
+    # Only revive the latest referenced failed verification for each still
+    # unresolved item, not every historical completed job.
+    latest_failure_job_ids = {
+        str(row.get("verification_job_id") or "").strip()
+        for row in (recon.get("items") or ())
+        if isinstance(row, Mapping)
+        and row.get("state") == "NEEDS_WIRING_OR_TEST_FIX"
+        and str(row.get("verification_job_id") or "").strip()
+    }
+    source_paths = [
+        *sorted(queue.failed.glob("*.json")),
+        *sorted(queue.completed.glob("*.json")),
+    ]
+    for path in source_paths:
         job = _read(path)
         if job is None or job.get("kind") != "VERIFY":
             continue
+        if path.parent == queue.completed:
+            if str(job.get("id") or "") not in latest_failure_job_ids:
+                continue
+            verification = (job.get("result") or {}).get("verification")
+            verdict = (
+                str(verification.get("verdict") or "").upper()
+                if isinstance(verification, Mapping) else ""
+            )
+            if job.get("status") != "COMPLETED" or verdict != "FAIL":
+                continue
         source = dict(job.get("payload") or {})
         item_ids = [
             str(value).strip()
