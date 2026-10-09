@@ -26,6 +26,7 @@ SITES = ROOT / "docs/DFW_SITE_OBSERVATIONS_20261009.json"
 SIGNALS = ROOT / "docs/DFW_CONTRACTOR_PUBLIC_SIGNALS_20261009.json"
 INDEPENDENT = ROOT / "docs/DFW_CONTRACTOR_INDEPENDENT_EVIDENCE_20261009.json"
 STATE_REGISTRY = ROOT / "docs/DFW_CONTRACTOR_TEXAS_PUBLIC_ENTITY_RESEARCH_20261010.json"
+BUSINESS_CONTACT_RESEARCH = ROOT / "docs/DFW_CONTRACTOR_BUSINESS_CONTACT_RESEARCH_20261010.json"
 OUTPUT = ROOT / "runtime/revenue_strike/contractor_founder_review_latest.json"
 EXISTING_RELATIONSHIPS = ROOT / "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json"
 MAX_BYTES = 1024 * 1024
@@ -45,6 +46,7 @@ def run(*, as_of: date, now: datetime | None = None) -> dict:
         _load(COHORT), _load(SITES), _load(SIGNALS), as_of=as_of,
         independent_evidence=_load(INDEPENDENT),
         state_registry_evidence=_load(STATE_REGISTRY),
+        business_contact_research=_load(BUSINESS_CONTACT_RESEARCH),
     )
     try:
         relationships = _load(EXISTING_RELATIONSHIPS)

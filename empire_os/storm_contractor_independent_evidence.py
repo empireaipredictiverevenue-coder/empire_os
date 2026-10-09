@@ -233,3 +233,98 @@ def review_official_state_dataset(
             "outbound_authorized": False,
         }
     return found
+
+
+
+CONTACT_SOURCE_SCHEMA = "empire.revenue_strike.dfw_contractor_public_business_contact_research.v1"
+CITY_BEDFORD_PDF = (
+    "https://bedfordtx.gov/DocumentCenter/View/9744/"
+    "2024-Registered-General-Contractors-Sorted-Alphabetically"
+)
+BUSINESS_EMAIL_PATTERN = re.compile(
+    r"^[a-z0-9][a-z0-9._+%-]{0,63}@[a-z0-9-]+(?:\.[a-z0-9-]+)+$"
+)
+
+
+def review_public_business_contact(
+    data: Mapping | None, *, cohort_domains: set[str], as_of: date,
+) -> dict[str, dict]:
+    """Bounded business-only first-party + historical municipal research.
+
+    No email validation/consent, person verification, offer or send permissions.
+    Municipality's expired 2024 listing is NEVER treated as a current route.
+    """
+    if data is None:
+        return {}
+    reject_sensitive_input(data)
+    if (not isinstance(data, Mapping) or data.get("schema") != CONTACT_SOURCE_SCHEMA
+            or not isinstance(data.get("records"), list) or len(data["records"]) > 20):
+        raise ValueError("BUSINESS_CONTACT_SOURCE_CONTRACT_INVALID")
+    observed = parse_date(data.get("researched_at"))
+    if not observed or observed > as_of or (as_of-observed).days > 30:
+        raise ValueError("BUSINESS_CONTACT_RESEARCH_TIME_INVALID")
+    found = {}
+    for row in data["records"]:
+        if not isinstance(row, Mapping):
+            raise ValueError("BUSINESS_CONTACT_RECORD_INVALID")
+        domain = normalized_domain(row.get("company_domain"))
+        if not domain or domain not in cohort_domains or domain in found:
+            raise ValueError("BUSINESS_CONTACT_OUTSIDE_COHORT_OR_DUPLICATE")
+        first = row.get("first_party_site_contact")
+        historic = row.get("official_historical_registry_contact")
+        if not isinstance(first, Mapping) or not isinstance(historic, Mapping):
+            raise ValueError("MISSING_CONTACT_SOURCE_PROVENANCE")
+        src = first.get("source_url")
+        if not safe_https_source(src) or normalized_domain(urlparse(src).hostname) != domain:
+            raise ValueError("BUSINESS_CONTACT_NOT_FROM_FIRST_PARTY")
+        if (parse_date(first.get("listed_at_review_date")) != observed
+                or first.get("purpose") != "general_company_enquiries"
+                or first.get("inbox_acceptance_tested") is not False
+                or first.get("authorises_vendor_solicitation") is not False):
+            raise ValueError("FIRST_PARTY_CONTACT_AUTHORITY_UNVERIFIED")
+        generic = first.get("email")
+        historic_email = historic.get("printed_contact_email")
+        if (not isinstance(generic, str) or not BUSINESS_EMAIL_PATTERN.fullmatch(generic)
+                or not isinstance(historic_email, str)
+                or not BUSINESS_EMAIL_PATTERN.fullmatch(historic_email)):
+            raise ValueError("CONTACT_EMAIL_NOT_WELL_FORMED")
+        contact_domain = generic.rsplit("@", 1)[-1]
+        if (contact_domain != historic_email.rsplit("@", 1)[-1]
+                or row.get("alias_domain_supported_by_first_party") is not True):
+            raise ValueError("HISTORICAL_CONTACT_DOMAIN_NOT_FIRST_PARTY_ATTESTED")
+        if (historic.get("source_url") != CITY_BEDFORD_PDF
+                or historic.get("government_source_as_of") != "2024-05-29"
+                or historic.get("printed_registration") != "GCR-23-120"
+                or historic.get("printed_registration_expires") != "2025-04-04"
+                or historic.get("printed_company_name") != "SPC Construction and Roofing"
+                or historic.get("printed_company_address")
+                    != "1107 S Airport Circle Suite B, Euless TX 76040"):
+            raise ValueError("HISTORICAL_MUNICIPAL_RECORD_NOT_RECONCILED")
+        if (observed <= date(2025, 4, 4)
+                or any(historic.get(k) is not False for k in (
+                    "current_registration_verified",
+                    "recipient_still_uses_email_verified",
+                    "person_to_mailbox_match_independently_verified",
+                    "current_business_contact_authority_verified",
+                ))
+                or row.get("marketing_buyer_intent_verified") is not False
+                or row.get("do_not_contact_unless_governed_cleared") is not True
+                or row.get("outbound_authorized") is not False):
+            raise ValueError("HISTORICAL_CONTACT_NOT_VALID_FOR_OUTBOUND")
+        found[domain] = {
+            "state": "PUBLIC_GENERAL_COMPANY_ROUTE_HISTORICAL_PERSON_HOLD",
+            "first_party_business_contact_email": generic,
+            "first_party_business_contact_source": src,
+            "associated_public_business_email_domain": contact_domain,
+            "historical_person_candidate_email": historic_email,
+            "historical_registry_source": CITY_BEDFORD_PDF,
+            "historical_registry_as_of": "2024-05-29",
+            "historical_registration_expired": True,
+            "person_candidate_current_route_verified": False,
+            "named_person_to_email_attribution_verified": False,
+            "exact_recipient_suppression_clear": False,
+            "recipient_level_contact_history_complete": False,
+            "marketing_buyer_intent_verified": False,
+            "outbound_authorized": False,
+        }
+    return found

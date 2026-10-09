@@ -17,7 +17,9 @@ from empire_os.claims_exchange.controls import parse_date, reject_sensitive_inpu
 from empire_os.claims_exchange.dossier import build_dossiers
 from empire_os.storm_contractor_independent_evidence import (
     review_independent_evidence, review_official_state_dataset,
+    review_public_business_contact,
 )
+from empire_os.outbound_department import plan_outbound_account
 
 SCHEMA = "empire.revenue_strike.contractor_founder_review.v1"
 SOURCE_SCHEMA = "empire.revenue_strike.dfw_public_signals.v1"
@@ -42,7 +44,8 @@ def _safe_signal_source(url: object, expected_domain: str) -> bool:
 def build_contractor_review(cohort: Mapping, sites: Mapping,
                             signals: Mapping, *, as_of: date,
                             independent_evidence: Mapping | None = None,
-                            state_registry_evidence: Mapping | None = None) -> dict:
+                            state_registry_evidence: Mapping | None = None,
+                            business_contact_research: Mapping | None = None) -> dict:
     for source in (cohort, sites, signals):
         reject_sensitive_input(source)
     dossiers = build_dossiers(cohort, sites, as_of=as_of)
@@ -59,6 +62,11 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             for domain, record in independent.items()
             if record["state"] == "THIRD_PARTY_PROFILE_DOMAIN_MATCH"
         },
+        as_of=as_of,
+    )
+    contact_research = review_public_business_contact(
+        business_contact_research,
+        cohort_domains={row["original_domain"] for row in dossiers["dossiers"]},
         as_of=as_of,
     )
     if (not isinstance(signals, Mapping)
@@ -154,7 +162,28 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             tasks.append("CONFIRM_OFFICIAL_REGISTRATION_AND_DOMAIN_CONTROL_BEFORE_OUTREACH")
             if independent_record and independent_record.get("business_management_research"):
                 tasks.append("VERIFY_DIRECTORY_LISTED_PRINCIPAL_IS_CURRENT_AUTHORISED_BUYER")
+        if domain in contact_research:
+            tasks.append("VERIFY_EXACT_BUSINESS_EMAIL_RECIPIENT_CURRENT_USE_AND_SUPPRESSION")
+            tasks.append("DO_NOT_INFER_PERSONAL_CONSENT_FROM_HISTORICAL_MUNICIPAL_DIRECTORY")
         tasks = sorted(set(tasks))
+        # Reuse the canonical Outbound Department, rather than implement an
+        # independent rapport/CTA/pricing gate for this specific corridor.
+        # No identity, prospect, person-bound route or buyer permission has
+        # been demonstrated by public profile research.
+        rapport = plan_outbound_account({
+            "company_name": r["company_name"],
+            "company_name_verified": False,
+            "decision_maker": None,
+            "contact_route": None,
+            "person_bound": False,
+            "buyer_review_status": "research_only",
+            "verified_prospect": False,
+        })
+        if (rapport["action_type"] != "RESEARCH"
+                or rapport["cta_allowed"] is not False
+                or rapport["price_allowed"] is not False
+                or rapport["execution_authority"] != "none"):
+            raise ValueError("CONTRACTOR_RAPPORT_GUARDRAIL_REJECTED")
         packets.append({
             "entity_id": r["entity_id"],
             "company_name": r["company_name"],
@@ -175,6 +204,20 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
                 "live_official_account_status_verified": False,
                 "website_entity_control_verified": False,
                 "outbound_authorized": False,
+            },
+            "business_contact_research": contact_research.get(domain) or {
+                "state": "NO_CORROBORATED_BUSINESS_EMAIL_ROUTE",
+                "outbound_authorized": False,
+            },
+            "existing_outbound_rapport_policy": {
+                "policy": "rapport_first_human_specific_v1",
+                "source": "empire_os.outbound_department.plan_outbound_account",
+                "relationship_stage": rapport["relationship_stage"],
+                "next_action": rapport["action_type"],
+                "missing_evidence": rapport["missing_evidence"],
+                "first_touch_cta_allowed": rapport["cta_allowed"],
+                "commercial_pricing_allowed": rapport["price_allowed"],
+                "execution_authority": rapport["execution_authority"],
             },
             "research_priority_score": score,
             "source_evidence": signals_for_company,
@@ -219,6 +262,11 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         "official_state_code_review_holds": sum(
             p["qualification"] == "OFFICIAL_STATE_CODE_REVIEW_HOLD" for p in packets),
         "official_live_account_status_verified": 0,
+        "public_business_email_research_count": len(contact_research),
+        "rapport_gate_research_count": sum(
+            p["existing_outbound_rapport_policy"]["next_action"] == "RESEARCH"
+            for p in packets
+        ),
         "verified_company_legal_registrations": 0,
         "independently_verified_purchase_intent": 0,
         "approved_outbound_count": 0,
@@ -270,6 +318,7 @@ def attach_existing_canonical_contact_history(
             raise ValueError("CANONICAL_HISTORY_INPUT_UNBOUNDED")
     from empire_os.claims_exchange.adapters import normalized_domain
     prior = {normalized_domain(d) for d in prior_contact_domains if normalized_domain(d)}
+    normalized_suppressed_emails = {str(x).lower() for x in suppressed_emails}
     suppressed = {
         normalized_domain(s.partition("@")[2]) for s in suppressed_emails
         if "@" in s and normalized_domain(s.partition("@")[2])
@@ -278,11 +327,29 @@ def attach_existing_canonical_contact_history(
     previous = suppressed_count = 0
     for p in checked["packets"]:
         domain = p["company_domain"]
-        has_prior = domain in prior
-        has_suppression = domain in suppressed
+        source = p.get("business_contact_research") or {}
+        alias = source.get("associated_public_business_email_domain")
+        domains_to_check = {domain}
+        if (source.get("state") ==
+                "PUBLIC_GENERAL_COMPANY_ROUTE_HISTORICAL_PERSON_HOLD"
+                and isinstance(alias, str) and normalized_domain(alias) == alias):
+            domains_to_check.add(alias)
+        has_prior = bool(domains_to_check & prior)
+        has_suppression = bool(domains_to_check & suppressed)
+        known_business_email = source.get("first_party_business_contact_email")
+        historical_email = source.get("historical_person_candidate_email")
         previous += int(has_prior)
         suppressed_count += int(has_suppression)
         p["domain_contact_history_checked"] = True
+        p["source_confirmed_company_domains_checked"] = sorted(domains_to_check)
+        p["first_party_business_email_suppression_match"] = (
+            isinstance(known_business_email, str)
+            and known_business_email.lower() in normalized_suppressed_emails
+        )
+        p["historical_person_email_suppression_match"] = (
+            isinstance(historical_email, str)
+            and historical_email.lower() in normalized_suppressed_emails
+        )
         p["previous_contact_domain_hold"] = has_prior
         p["domain_has_suppressed_contact"] = has_suppression
         p["recipient_level_suppression_verified"] = False

@@ -2387,3 +2387,24 @@ def test_founder_reports_research_duplicate_and_official_status_holds_separately
     assert d["outbound_authorized"] is False
     assert "PRIVATE_NAME" not in str(d)
     assert "person@" not in str(d)
+
+
+
+def test_founder_contractors_reports_rapport_no_pitch_guardrail_in_overview(tmp_path):
+    root=make_root(tmp_path)
+    write_json(root/"runtime/revenue_strike/contractor_founder_review_latest.json",{
+        "schema":"empire.revenue_strike.contractor_founder_review.v1",
+        "as_of":"2026-10-10","mode":"OBSERVE",
+        "outbound_authorized":False,
+        "summary":{"historical_contractor_companies":8,
+                   "rapport_gate_research_count":8,
+                   "public_business_email_research_count":1},
+        "packets":[{"company":"PRIVATE_SOURCE","email":"secret@example.org"}],
+    })
+    result=build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert result["rapport_gate_research_count"]==8
+    assert result["public_business_email_research_count"]==1
+    assert "Rapport-first" in result["founder_next_action"]
+    assert "no commercial pitch" in result["founder_next_action"]
+    assert "secret@" not in str(result)
+    assert result["outbound_authorized"] is False

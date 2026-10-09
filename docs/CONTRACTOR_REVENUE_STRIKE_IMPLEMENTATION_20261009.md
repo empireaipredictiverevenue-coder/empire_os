@@ -274,3 +274,61 @@ recipient-level suppression clearance and are never an instruction to send.
 
 **Revenue stage remains zero verified buyer conversations and zero
 recognised revenue from the DFW contractor cohort.**
+
+## Existing rapport-first outbound guardrail reused — 10 Oct 2026
+
+Per founder instruction, **building rapport comes first**. The existing
+`empire_os.outbound_department.plan_outbound_account`, implementing
+`rapport_first_human_specific_v1`, remains the **only source of outbound
+relationship-stage policy**. No duplicate contractor-specific copy-policy
+engine, new customer table or mailbox has been introduced.
+
+The DFW contractor review now invokes that existing planner only with the
+facts it actually has: an as-yet-unverified company-bound identity,
+no established person-bound decision-maker contact, no confirmed buyer
+review and no outbound evidence. The bounded read-only review of all
+eight contractors therefore returns `RESEARCH`, with
+`first_touch_cta_allowed=false`, `commercial_pricing_allowed=false`,
+and `execution_authority=none`.
+
+That policy's actual progression is from verified identity and an
+evidence-backed first **rapport** draft, to value and nurturing, to an
+appropriate soft conversation opener only after sufficient observed
+value-touch history, and to a closer only with a canonical qualifying
+commercial reply or commercial-ready state. Unclassified, negative,
+later, wrong-person and unsubscribe replies have distinct holds.
+
+A product being commercially approved in the existing catalog does
+**not** authorize a first-touch pitch. The existing catalog contains
+`managed_service` — Empire Opportunity Intelligence Pilot — at
+$1,500 flat, active, founder-approved, and binding-terms-ready
+(according to the catalog snapshot). This is a possible product
+**only if** a properly qualified contractor later opts into reviewing
+commercial terms. The DFW $1,500/14-day scope is still an internal
+pilot hypothesis, **not** a binding quote or guarantee.
+
+### SPC company alias and historical contact caveat
+
+The public business contact observations are captured in
+`docs/DFW_CONTRACTOR_BUSINESS_CONTACT_RESEARCH_20261010.json`.
+SPC's own website publicly lists `info@spcgc.com`; a City of Bedford
+historic contractor register also lists `jshaw@spcgc.com` with
+registration expiry 2025-04-04. That register does not verify that
+the named business person still uses that email or that the business's
+registration is currently active. Neither email has been validated
+by sending or marked approved. The public general inbox is
+**company-routed, never person-bound**.
+
+The existing canonical read-only history evaluator now includes
+`spcgc.com` as an additional company-associated domain for
+`spcroofs.com`, and conservatively blocks for any historical
+outbound or suppression match on **either** domain. It separately
+reports exact suppression matches for the first-party public generic
+business email and historically printed person email, but a
+*negative match* does not clear an address. There is still no
+`recipient_suppression_verified` or `outbound_authorized` state.
+
+**No outbound copy, send, scheduling, contract or payment is generated
+by this new research evidence.** Any draft must eventually go
+through the **existing** Outbound Department copy validator and
+independent send-authority checks.

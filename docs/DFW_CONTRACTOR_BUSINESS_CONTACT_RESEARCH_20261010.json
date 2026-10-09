@@ -1,0 +1,34 @@
+{
+  "schema": "empire.revenue_strike.dfw_contractor_public_business_contact_research.v1",
+  "researched_at": "2026-10-10",
+  "records": [
+    {
+      "company_domain": "spcroofs.com",
+      "first_party_site_contact": {
+        "source_url": "https://www.spcroofs.com/contact",
+        "listed_at_review_date": "2026-10-10",
+        "email": "info@spcgc.com",
+        "purpose": "general_company_enquiries",
+        "inbox_acceptance_tested": false,
+        "authorises_vendor_solicitation": false
+      },
+      "official_historical_registry_contact": {
+        "source_url": "https://bedfordtx.gov/DocumentCenter/View/9744/2024-Registered-General-Contractors-Sorted-Alphabetically",
+        "government_source_as_of": "2024-05-29",
+        "printed_company_name": "SPC Construction and Roofing",
+        "printed_company_address": "1107 S Airport Circle Suite B, Euless TX 76040",
+        "printed_contact_email": "jshaw@spcgc.com",
+        "printed_registration": "GCR-23-120",
+        "printed_registration_expires": "2025-04-04",
+        "current_registration_verified": false,
+        "recipient_still_uses_email_verified": false,
+        "person_to_mailbox_match_independently_verified": false,
+        "current_business_contact_authority_verified": false
+      },
+      "alias_domain_supported_by_first_party": true,
+      "marketing_buyer_intent_verified": false,
+      "do_not_contact_unless_governed_cleared": true,
+      "outbound_authorized": false
+    }
+  ]
+}
