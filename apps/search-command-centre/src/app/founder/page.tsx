@@ -894,6 +894,66 @@ export default async function FounderPage() {
                     value={show(ops?.business_blocker)}
                   />
                 </div>
+                <div className="mt-5 rounded-xl border border-white/8 bg-white/[0.025] p-4">
+                  <p className="text-sm font-semibold text-slate-200">
+                    Lead-to-revenue evidence
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    OBSERVE only · verified signals, not projected revenue
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <Evidence
+                      label="Readiness"
+                      value={show(ops?.leadgen_truth?.status)}
+                    />
+                    <Evidence
+                      label="Open prerequisites"
+                      value={int(ops?.leadgen_truth?.readiness_blocker_count)}
+                    />
+                    <Evidence
+                      label="Evidence conflicts"
+                      value={int(ops?.leadgen_truth?.integrity_finding_count)}
+                    />
+                    <Evidence
+                      label="Measured outcome"
+                      value={truth(ops?.leadgen_truth?.campaign_outcome_proved)}
+                    />
+                    <Evidence
+                      label="Founder reviews waiting"
+                      value={int(ops?.leadgen_truth?.gtm_founder_reviews_pending)}
+                    />
+                    <Evidence
+                      label="Failed user workers"
+                      value={int(ops?.user_worker_health?.failed_worker_count)}
+                    />
+                    <Evidence
+                      label="Worker inspection"
+                      value={show(ops?.user_worker_health?.status)}
+                    />
+                  </div>
+                  {(ops?.user_worker_health?.failed_workers?.length ?? 0) > 0 ? (
+                    <div className="mt-3 space-y-1 border-t border-white/8 pt-3">
+                      {(ops?.user_worker_health?.failed_workers ?? []).slice(0, 6).map((unit) => (
+                        <p key={unit} className="text-xs text-rose-200">
+                          {unit}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                  {(ops?.leadgen_truth?.integrity_findings?.length ||
+                    ops?.leadgen_truth?.readiness_blockers?.length) ? (
+                    <div className="mt-3 space-y-1 border-t border-white/8 pt-3">
+                      {[
+                        ...(ops?.leadgen_truth?.integrity_findings ?? []),
+                        ...(ops?.leadgen_truth?.readiness_blockers ?? []),
+                      ].slice(0, 6).map((code) => (
+                        <p key={code} className="text-xs text-amber-200">
+                          {code.toLowerCase().replaceAll("_", " ")}
+                        </p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 <div className="mt-5 space-y-2 border-t border-white/8 pt-4">
                   {incidents.length ? (
                     incidents.slice(0, 4).map((incident, index) => (

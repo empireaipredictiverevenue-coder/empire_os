@@ -268,6 +268,28 @@ export type FounderOps = {
   observed_at?: string;
   healthy?: boolean | null;
   business_blocker?: string | null;
+  leadgen_preflight_checks_clear?: boolean;
+  user_worker_health?: {
+    status?: "HEALTHY" | "DEGRADED" | "UNKNOWN";
+    failed_worker_count?: number | null;
+    confirmed_failed_worker_count?: number;
+    user_manager_unavailable_count?: number;
+    failed_workers?: string[];
+  };
+  leadgen_truth?: {
+    status?: "READY" | "BLOCKED" | "INCONSISTENT";
+    integrity_finding_count?: number;
+    readiness_blocker_count?: number;
+    integrity_findings?: string[];
+    readiness_blockers?: string[];
+    campaign_outcome_proved?: boolean;
+    campaign_measured_matches?: number | null;
+    gtm_founder_reviews_pending?: number | null;
+    owned_mailbox_configured?: boolean;
+    lead_smart_launch_ready?: boolean;
+    qualification_timer_boot_enabled?: boolean;
+    execution_authority?: string;
+  };
   sentinel?: {
     findings?: Array<Record<string, unknown>>;
     repair_plan?: Array<Record<string, unknown>>;
