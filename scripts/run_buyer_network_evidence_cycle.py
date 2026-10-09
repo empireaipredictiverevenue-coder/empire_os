@@ -18,12 +18,11 @@ from empire_os.buyer_network_research_rotation import make_research_summary
 
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime/buyer_network_intelligence/research_cycle_latest.json"
-STEPS = (
-    "probe_buyer_network_direct_sites.py",
-    "materialize_buyer_network_candidate_queue.py",
-    "materialize_buyer_network_founder_shortlist.py",
-    "materialize_buyer_network_founder_review_packets.py",
-)
+# The existing canonical buyer pipeline owns candidate classification,
+# identity and founder shortlist refreshes. Do not duplicate those writers:
+# doing so briefly exposed unfiltered intermediate queues (881 vs 143).
+STEPS = ("probe_buyer_network_direct_sites.py",)
+
 
 
 def run(
@@ -109,6 +108,8 @@ def run(
         "steps": results,
         "outbound_sent": False,
         "db_write": False,
+        "canonical_queue_rebuild_performed": False,
+        "canonical_queue_owner": "existing_buyer_intelligence_pipeline",
         "traffic_activation": False,
         "founder_review_automatic_approval": False,
         "execution_authority": "NONE",
