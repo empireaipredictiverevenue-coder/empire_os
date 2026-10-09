@@ -205,6 +205,29 @@ def run_opportunity_loop(
         "research_observation_count": int(
             research.get("observation_count") or 0
         ),
+        "research_new_observation_count": int(
+            research.get("new_observation_count")
+            if research.get("new_observation_count") is not None
+            else (research.get("observation_count") or 0)
+        ),
+        "research_covered_candidate_count": int(
+            research.get("covered_candidate_count") or 0
+        ),
+        "research_cached_candidate_count": int(
+            research.get("cached_candidate_count") or 0
+        ),
+        "research_rotation_enabled": (
+            research.get("research_rotation_enabled") is True
+        ),
+        "research_degraded_query_count": int(
+            research.get("degraded_query_count") or 0
+        ),
+        "research_zero_result_query_count": int(
+            research.get("zero_result_query_count") or 0
+        ),
+        "research_resilient_query_count": int(
+            research.get("resilient_query_count") or 0
+        ),
         "candidates_with_any_normalized_score": int(
             normalized.get("candidates_with_any_normalized_score") or 0
         ),

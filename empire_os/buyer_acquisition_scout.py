@@ -25,7 +25,9 @@ from empire_os.buyer_discovery import (
     classify_decision_role,
     looks_like_person_name,
 )
-from empire_os.buyer_scout_review_readiness import reliable_business_name
+from empire_os.buyer_scout_review_readiness import (
+    reliable_business_name, _official_source_identity_matches,
+)
 from empire_os.icp_buyer_trigger_intelligence import (
     assess_icp_candidate,
 )
@@ -508,6 +510,7 @@ def run_buyer_scout(
                         provenance.setdefault(host, []).append({
                             "source": "public_research_seed",
                             "source_refs": source_refs,
+                            "registry_business_name": row.get("registry_business_name"),
                             "query": query,
                             "buyer_pool": pool,
                             "target_kind": "public_research_seed",
@@ -544,9 +547,11 @@ def run_buyer_scout(
     def _probe(domain: str) -> tuple[str, dict[str, Any]]:
         return domain, probe_site(
             "https://" + domain,
-            max_pages=4,
+            max_pages=5,
             request_timeout=5.0,
-            time_budget_seconds=12.0,
+            time_budget_seconds=16.0,
+            page_priority="commercial",
+            public_only=True,
         )
 
     probe_results: dict[str, dict[str, Any]] = {}
@@ -607,9 +612,63 @@ def run_buyer_scout(
                 seed_name=seed_name,
             )
 
+        # An official registry result may discover an unrelated search hit.
+        # Validate that registry identity against first-party company identity
+        # BEFORE that source can produce a holding candidate.
+        validated_sources = []
+        invalid_official_sources = 0
+        for research_source in provenance[domain]:
+            refs = research_source.get("source_refs") or []
+            if (
+                any(str(ref).startswith("official:") for ref in refs)
+                and not _official_source_identity_matches(
+                    [research_source],
+                    {
+                        "site_business_names": business_names,
+                        "business_name_source": business_name_source,
+                    },
+                    business_name,
+                )
+            ):
+                invalid_official_sources += 1
+                continue
+            validated_sources.append(research_source)
+        if invalid_official_sources:
+            probe_failures["official_registry_identity_mismatch"] += 1
+        if not validated_sources:
+            continue
+        provenance[domain] = validated_sources
+
         nyc_territory, nyc_territory_hits = _nyc_territory_evidence(
             evidence
         )
+        # Buyer purchase claims must come from fetched first-party pages,
+        # not inferred query text or a canonical seed's intent summary.
+        observed_pages = [
+            page for page in (evidence.get("pages_checked") or [])[:5]
+            if isinstance(page, Mapping)
+            and (
+                not page.get("url") or _host(str(page.get("url"))) == domain
+            )
+        ]
+        first_party_site_notes = " ".join(
+            str(page.get("visible_text") or "")[:1500]
+            for page in observed_pages
+        ).strip()
+        buyer_evidence_pages = []
+        for page in observed_pages:
+            page_url = str(page.get("url") or "").strip()
+            if not page_url or _host(page_url) != domain:
+                continue
+            page_profile = direct_buyer_profile({
+                "notes": str(page.get("visible_text") or "")[:1500],
+            })
+            hits = page_profile.get("buyer_side_signal_hits") or []
+            if hits:
+                buyer_evidence_pages.append({
+                    "url": page_url,
+                    "buyer_side_signal_hits": list(hits),
+                })
         record = {
             "business_name": business_name,
             "business_name_source": business_name_source,
@@ -619,13 +678,7 @@ def run_buyer_scout(
             "description": evidence.get("description"),
             "notes": " ".join(
                 [
-                    *[
-                        str(page.get("visible_text") or "")[:1500]
-                        for page in (
-                            evidence.get("pages_checked") or []
-                        )[:2]
-                        if isinstance(page, Mapping)
-                    ],
+                    first_party_site_notes,
                     (
                         (
                             "canonical prospect niche: "
@@ -642,7 +695,12 @@ def run_buyer_scout(
                 ]
             ).strip(),
         }
-        profile = direct_buyer_profile(record)
+        profile = direct_buyer_profile({
+            # The organisation's name, seeded niche and inferred query intent
+            # are not proof that it purchases third-party leads or calls.
+            "description": record["description"],
+            "notes": first_party_site_notes,
+        })
 
         pools = sorted({
             str(item.get("buyer_pool") or "")
@@ -938,6 +996,7 @@ def run_buyer_scout(
             "explicit_direct_buyer_evidence": profile[
                 "explicit_direct_buyer_evidence"
             ],
+            "first_party_buyer_evidence_pages": buyer_evidence_pages,
             "direct_signal_hits": profile["direct_signal_hits"],
             "reseller_signal_hits": profile["reseller_signal_hits"],
             "target_buyer_pools": pools,

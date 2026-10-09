@@ -13,7 +13,10 @@ def test_opportunity_loop_service_is_least_privilege_observe_runtime():
     assert '--min-interval-seconds 900' in text
     assert 'NoNewPrivileges=true' in text
     assert 'ProtectSystem=strict' in text
-    assert 'ReadWritePaths=/srv/empire_os/runtime/opportunity_radar /srv/empire_os/runtime/opportunity_factory' in text
+    # The planner's existing canonical Coder queue is a required internal sink.
+    # Permit precisely that writable directory, not the whole repo/runtime tree.
+    assert 'ReadWritePaths=/srv/empire_os/runtime/opportunity_radar /srv/empire_os/runtime/opportunity_factory /srv/empire_os/runtime/coder' in text
+    assert 'ReadWritePaths=/srv/empire_os/runtime\n' not in text
     assert 'TimeoutStartSec=10min' in text
 
 

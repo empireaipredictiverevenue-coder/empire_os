@@ -15,6 +15,13 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
         return {
             "researched_candidate_count": 2,
             "observation_count": 5,
+            "new_observation_count": 2,
+            "covered_candidate_count": 3,
+            "cached_candidate_count": 1,
+            "research_rotation_enabled": True,
+            "degraded_query_count": 1,
+            "zero_result_query_count": 2,
+            "resilient_query_count": 1,
             "error_count": 0,
         }
 
@@ -89,6 +96,13 @@ def test_opportunity_loop_runs_in_order_and_stays_noncommercial(tmp_path):
     assert calls[-1][2] == 3
     assert result["ok"] is True
     assert result["research_observation_count"] == 5
+    assert result["research_new_observation_count"] == 2
+    assert result["research_covered_candidate_count"] == 3
+    assert result["research_cached_candidate_count"] == 1
+    assert result["research_rotation_enabled"] is True
+    assert result["research_degraded_query_count"] == 1
+    assert result["research_zero_result_query_count"] == 2
+    assert result["research_resilient_query_count"] == 1
     assert result["candidates_with_any_normalized_score"] == 2
     assert result["total_normalized_scores"] == 7
     assert result["factory_blocked_count"] == 3

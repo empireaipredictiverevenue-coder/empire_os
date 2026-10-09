@@ -8,9 +8,11 @@ from pathlib import Path
 import subprocess
 from typing import Any
 
+from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+
 
 SAFE_SYSTEM_UNITS = (
-    "empire-qualification-booster.timer",
+    "empire-qualification.timer",
     "empire-buyer-review-materializer.timer",
     "empire-buyer-deferred-enrichment.timer",
     "empire-buyer-capacity-readiness.timer",
@@ -71,6 +73,36 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _review_receipt_identity_mismatches(receipt: dict[str, Any]) -> list[str]:
+    """Detect stale false-ready rows from the latest materializer receipt.
+
+    This is a snapshot audit, not a claim to have re-read every DB record.
+    It never mutates buyer holding, canonical prospects or sending state.
+    """
+    mismatches: list[str] = []
+    for update in receipt.get("updates") or []:
+        if not isinstance(update, dict):
+            continue
+        response = update.get("response")
+        records = response if isinstance(response, list) else [response]
+        for row in records:
+            if not isinstance(row, dict):
+                continue
+            if (
+                row.get("review_state") != "review_ready"
+                or row.get("reconciliation_state") != "REVIEW_READY"
+            ):
+                continue
+            if not _official_source_identity_matches(
+                row.get("query_evidence") or [],
+                row.get("site_evidence") or {},
+                str(row.get("business_name") or ""),
+            ):
+                identifier = str(row.get("id") or update.get("candidate_id") or "")
+                mismatches.append(identifier or "unknown")
+    return sorted(set(mismatches))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
@@ -96,6 +128,17 @@ def main() -> int:
     )
     review_readiness = _read_json(
         root / "runtime/buyer_acquisition/review_readiness_latest.json"
+    )
+    identity_mismatches = _review_receipt_identity_mismatches(review_readiness)
+    historical_audit = review_readiness.get("historical_official_identity_quarantine")
+    historical_audit_present = isinstance(historical_audit, dict)
+    historical_audit = historical_audit if historical_audit_present else {}
+    audited_mismatches = list(historical_audit.get("mismatch_ids") or [])
+    quarantined_count = int(historical_audit.get("quarantined_count") or 0)
+    identity_integrity_passed = (
+        historical_audit_present
+        and not identity_mismatches
+        and quarantined_count == len(audited_mismatches)
     )
     promotion_plan = _read_json(
         root / "runtime/buyer_acquisition/promotion_plan_latest.json"
@@ -177,6 +220,7 @@ def main() -> int:
         reconciliation_safe,
         persistence_safe,
         review_readiness_safe,
+        identity_integrity_passed,
         promotion_plan_safe,
         pricing_safe,
         exchange_safe,
@@ -192,6 +236,12 @@ def main() -> int:
         "buyer_scout_reconciliation_safe": reconciliation_safe,
         "buyer_scout_persistence_safe": persistence_safe,
         "buyer_scout_review_readiness_safe": review_readiness_safe,
+        "buyer_scout_receipt_identity_integrity_passed": identity_integrity_passed,
+        "buyer_scout_historical_quarantine_audit_present": historical_audit_present,
+        "buyer_scout_historical_mismatches_detected": len(audited_mismatches),
+        "buyer_scout_historical_mismatches_quarantined": quarantined_count,
+        "buyer_scout_receipt_identity_mismatch_ids": identity_mismatches,
+        "buyer_scout_receipt_integrity_scope": "latest_materializer_updates_only",
         "buyer_scout_promotion_plan_safe": promotion_plan_safe,
         "pricing_policy_safe": pricing_safe,
         "commercial_exchange_safe": exchange_safe,

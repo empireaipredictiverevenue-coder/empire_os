@@ -16,7 +16,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/srv/empire_os/runtime/opportunity_radar /srv/empire_os/runtime/opportunity_factory
+ReadWritePaths=/srv/empire_os/runtime/opportunity_radar /srv/empire_os/runtime/opportunity_factory /srv/empire_os/runtime/coder
 TimeoutStartSec=10min
 
 [Install]

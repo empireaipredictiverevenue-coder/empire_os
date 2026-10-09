@@ -124,6 +124,35 @@ def test_opportunity_seeds_supplement_nonempty_search(monkeypatch):
     )
 
 
+def test_official_registry_search_cannot_attach_unrelated_first_party_domain(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "business_names": ["Harvey", "Harvey AI"],
+            "canonical_url": "https://harvey.ai/",
+            "final_url": "https://harvey.ai/",
+            "title": "Harvey AI", "description": "Legal AI platform",
+            "emails": ["lawschools@harvey.ai"], "phones": [], "people": [],
+            "pages_checked": [], "evidence_score": 0.8,
+        },
+    )
+    result = run_buyer_scout(
+        {}, search_enabled=False, max_domains=1, max_probes=1,
+        research_seed_records=[{
+            "domain": "harvey.ai",
+            "registry_business_name": "HARVEY HVAC SERVICES LLC",
+            "source_refs": ["official:texas_tdlr_ac:118954"],
+            "source_queries": ['"HARVEY HVAC SERVICES LLC" TX'],
+            "target_buyer_pools": ["local_and_smb_buyers"],
+            "target_product_codes": ["managed_service"],
+        }],
+    )
+    assert result["candidate_count"] == 0
+    assert result["probe_failure_counts"]["official_registry_identity_mismatch"] == 1
+    assert result["database_write_performed"] is False
+
+
 def test_search_disabled_never_calls_search_fabric(monkeypatch):
     monkeypatch.setattr(
         "empire_os.buyer_acquisition_scout.search_domains_parallel",

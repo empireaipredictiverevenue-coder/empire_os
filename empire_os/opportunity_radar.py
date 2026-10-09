@@ -29,6 +29,7 @@ COMPETITOR_MARKET = Path(
     "competitor_market_opportunity_latest.json"
 )
 TAM_MARKET = Path("runtime/tam_market_intelligence/latest.json")
+STORM_OPPORTUNITY = Path("runtime/storm_opportunity/latest.json")
 OUTPUT = Path("runtime/opportunity_radar/latest.json")
 
 
@@ -306,12 +307,210 @@ def _tam_candidates(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     return output
 
 
+
+def _storm_candidates(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Consume only fail-closed tenant-scoped Storm opportunity evidence."""
+    if payload.get("schema_version") != "empire.storm_opportunity_snapshot.v1":
+        return []
+    if payload.get("mode") != "OBSERVE":
+        return []
+    if payload.get("automatic_external_execution_allowed") is not False:
+        return []
+
+    raw_rows = payload.get("candidates")
+    rows = raw_rows if isinstance(raw_rows, list) else []
+
+    output: list[dict[str, Any]] = []
+
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            continue
+
+        row = dict(raw)
+        key = _clean(row.get("opportunity_key"))
+        tenant_id = _clean(row.get("tenant_id"))
+
+        raw_refs = row.get("evidence_refs")
+        raw_refs = raw_refs if isinstance(raw_refs, list) else []
+
+        refs = _unique([
+            _clean(value)
+            for value in raw_refs
+        ])
+
+        if not key or not tenant_id or not refs:
+            continue
+
+        row["opportunity_key"] = key
+        row["tenant_id"] = tenant_id
+        row["evidence_refs"] = refs
+        row["source"] = "storm_product_integration"
+
+        if "decision_provenance" in row:
+            from empire_os.storm_opportunity_bridge import decision_opportunity_provenance
+            try:
+                row["decision_provenance"] = decision_opportunity_provenance(
+                    row["decision_provenance"]["snapshot"], tenant_id=tenant_id,
+                    event_id=row.get("event_id"), subject_id=row.get("subject_id"),
+                    as_of=datetime.now(timezone.utc),
+                )
+            except (ValueError, TypeError, KeyError, AttributeError, OverflowError, RecursionError):
+                continue
+
+        # Radar is intelligence only. Upstream data cannot grant authority.
+        row["commercial_ready"] = False
+        row["revenue_inferred"] = False
+        row["execution_authority"] = "none"
+        row["outreach_authority"] = "none"
+        row["calls_authority"] = "none"
+        row["traffic_authority"] = "none"
+        row["commercial_authority"] = "none"
+        row["payment_authority"] = "none"
+        row["revenue_recognition_authority"] = "none"
+
+        output.append(row)
+
+    return output
+
+
+def _economic_signal_candidates(
+    payload: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    """Consume normalized Economic Signal Fabric opportunity candidates.
+
+    Radar does not reinterpret raw economic observations. Revenue leaks, idle
+    assets, market gaps and waste must first pass Economic Signal Fabric and
+    Opportunity Source Convergence.
+    """
+
+    if payload.get("schema_version") != "empire.economic-opportunity-snapshot.v1":
+        return []
+    if payload.get("mode") != "OBSERVE":
+        return []
+    if payload.get("execution_authority") != "none":
+        return []
+    if payload.get("automatic_external_execution_allowed") is not False:
+        return []
+
+    rows = payload.get("candidates")
+    rows = rows if isinstance(rows, list) else []
+
+    output: list[dict[str, Any]] = []
+    seen: set[str] = set()
+
+    for raw in rows:
+        if not isinstance(raw, Mapping):
+            continue
+
+        row = dict(raw)
+
+        if row.get("schema_version") != "empire.opportunity-source.v1":
+            continue
+        if row.get("source_family") != "economic_signal_fabric":
+            continue
+
+        candidate_key = _clean(row.get("candidate_key"))
+        tenant_id = _clean(row.get("tenant_id"))
+        entity_id = _clean(row.get("entity_id"))
+        source_signal_id = _clean(row.get("source_signal_id"))
+        opportunity_type = _clean(row.get("opportunity_type"))
+
+        refs = row.get("evidence_refs")
+        refs = refs if isinstance(refs, list) else []
+        refs = _unique([_clean(value) for value in refs])
+
+        if not (
+            candidate_key
+            and tenant_id
+            and entity_id
+            and source_signal_id.startswith("economic_signal_")
+            and opportunity_type
+            and refs
+        ):
+            continue
+
+        # Upstream evidence can never grant Radar authority.
+        if any(
+            row.get(field) != "none"
+            for field in (
+                "execution_authority",
+                "outreach_authority",
+                "calls_authority",
+                "traffic_authority",
+                "commercial_authority",
+                "payment_authority",
+                "revenue_recognition_authority",
+            )
+        ):
+            continue
+
+        opportunity_key = candidate_key
+        if opportunity_key in seen:
+            continue
+        seen.add(opportunity_key)
+
+        row["opportunity_key"] = opportunity_key
+        row["opportunity_class"] = opportunity_type
+        row["source"] = "economic_signal_fabric"
+        row["trigger"] = "canonical_observed_economic_signal"
+        row["evidence_refs"] = refs
+
+        # Economic Signal Fabric confidence is [0,1]. Radar ranking uses
+        # [0,100], but this remains an observed evidence priority only.
+        confidence = row.get("confidence")
+        if type(confidence) in (int, float):
+            confidence = float(confidence)
+            if 0.0 <= confidence <= 1.0:
+                row["observed_priority_score"] = round(
+                    confidence * 100.0,
+                    2,
+                )
+            else:
+                row["observed_priority_score"] = None
+        else:
+            row["observed_priority_score"] = None
+
+        row["title"] = (
+            opportunity_type.replace("_", " ").title()
+        )
+        row["niche"] = None
+        row["metro"] = None
+        row["offer_key"] = None
+        row["products"] = []
+        row["recommended_next_actions"] = [
+            "review_canonical_economic_evidence"
+        ]
+
+        row["buyer_intent_inferred"] = False
+        row["willingness_to_pay_inferred"] = False
+        row["revenue_inferred"] = False
+        row["commercial_ready"] = False
+
+        # Preserve the upstream review-only posture. Factory readiness is
+        # recalculated below by the existing Radar readiness evaluator.
+        row["opportunity_factory_ready"] = False
+
+        row["execution_authority"] = "none"
+        row["outreach_authority"] = "none"
+        row["calls_authority"] = "none"
+        row["traffic_authority"] = "none"
+        row["commercial_authority"] = "none"
+        row["payment_authority"] = "none"
+        row["revenue_recognition_authority"] = "none"
+
+        output.append(row)
+
+    return output
+
+
 def build_opportunity_radar(
     *,
     market_gps: Mapping[str, Any] | None,
     community_intent: Mapping[str, Any] | None,
     competitor_market: Mapping[str, Any] | None,
     tam_market: Mapping[str, Any] | None = None,
+    storm_opportunity: Mapping[str, Any] | None = None,
+    economic_signals: Mapping[str, Any] | None = None,
     generated_at: str | None = None,
     decay_evidence_by_opportunity: Mapping[
         str, Mapping[str, Any]
@@ -332,6 +531,8 @@ def build_opportunity_radar(
         ("community_intent", community_intent, _community_candidates),
         ("competitor_market", competitor_market, _competitor_candidates),
         ("tam_market", tam_market, _tam_candidates),
+        ("storm_opportunity", storm_opportunity, _storm_candidates),
+        ("economic_signals", economic_signals, _economic_signal_candidates),
     ):
         if isinstance(payload, Mapping):
             rows = builder(payload)
@@ -440,6 +641,7 @@ def refresh_opportunity_radar(repo_root: Path) -> dict[str, Any]:
         community_intent=_read_json(repo_root / COMMUNITY_INTENT),
         competitor_market=_read_json(repo_root / COMPETITOR_MARKET),
         tam_market=_read_json(repo_root / TAM_MARKET),
+        storm_opportunity=_read_json(repo_root / STORM_OPPORTUNITY),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)

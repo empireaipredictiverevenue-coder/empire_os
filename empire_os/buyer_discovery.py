@@ -271,6 +271,15 @@ def _bounded(value: Any, low: float = 0.0, high: float = 100.0) -> float:
 
 def choose_offer(record: Mapping[str, Any], decision_role: str) -> str:
     niche = _text(record.get("niche")).lower()
+
+    # Canonical Buyer Scout promotions carry the target
+    # commercial product code as niche. Preserve that
+    # identity instead of degrading to a generic offer.
+    if niche in {
+        "private_capital_rollup",
+        "permit_intelligence",
+    }:
+        return niche
     name = _text(record.get("business_name")).lower()
     text = f"{niche} {name} {_text(record.get('notes')).lower()}"
     if "solar" in niche:

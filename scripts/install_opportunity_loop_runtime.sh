@@ -17,6 +17,21 @@ install -d -o ubuntu -g ubuntu -m 0755 \
   "$ROOT/runtime/opportunity_radar" \
   "$ROOT/runtime/opportunity_factory"
 
+# The Opportunity AI planner writes into the existing canonical Coder queue.
+# Do not create a new queue or weaken its owner-only directory permissions.
+test -d "$ROOT/runtime/coder" || {
+  echo "ERROR: canonical coder runtime directory missing" >&2
+  exit 3
+}
+test "$(stat -c %U "$ROOT/runtime/coder")" = ubuntu || {
+  echo "ERROR: canonical coder queue owner mismatch" >&2
+  exit 3
+}
+grep -Fq "/srv/empire_os/runtime/coder" "deploy/systemd/$SERVICE" || {
+  echo "ERROR: service sandbox omits planner Coder queue" >&2
+  exit 3
+}
+
 install -m 0644 deploy/systemd/$SERVICE /etc/systemd/system/$SERVICE
 install -m 0644 deploy/systemd/$TIMER /etc/systemd/system/$TIMER
 systemctl daemon-reload

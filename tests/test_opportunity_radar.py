@@ -229,3 +229,76 @@ def test_missing_tam_source_stays_unavailable():
     )
     assert payload["source_status"]["tam_market"]["available"] is False
     assert payload["candidate_count"] == 0
+
+
+def test_radar_accepts_storm_snapshot_without_granting_authority():
+    payload = build_opportunity_radar(
+        generated_at="2026-10-05T09:00:00+00:00",
+        market_gps=None,
+        community_intent=None,
+        competitor_market=None,
+        tam_market=None,
+        storm_opportunity={
+            "schema_version": "empire.storm_opportunity_snapshot.v1",
+            "mode": "OBSERVE",
+            "generated_at": "2026-10-05T08:59:00+00:00",
+            "available": True,
+            "automatic_external_execution_allowed": False,
+            "candidates": [{
+                "opportunity_key": "storm:test",
+                "opportunity_class": "storm_commercial_signal",
+                "tenant_id": "tenant-1",
+                "event_id": "storm-1",
+                "subject_id": "property-1",
+                "buyer_id": "buyer-1",
+                "product_id": "product-1",
+                "niche": "roofing",
+                "territory_id": "denver",
+                "observed_priority_score": 42.0,
+                "evidence_refs": ["storm:event:1", "storm:subject:1"],
+                "products": [],
+                "opportunity_factory_ready": False,
+                "commercial_ready": True,
+                "revenue_inferred": True,
+                "execution_authority": "execute",
+                "outreach_authority": "send",
+                "traffic_authority": "activate",
+                "commercial_authority": "bind",
+                "payment_authority": "move_funds",
+            }],
+        },
+    )
+
+    assert payload["candidate_count"] == 1
+    assert payload["source_status"]["storm_opportunity"]["available"] is True
+
+    row = payload["candidates"][0]
+
+    assert row["source"] == "storm_product_integration"
+    assert row["tenant_id"] == "tenant-1"
+    assert row["opportunity_factory_ready"] is False
+    assert row["commercial_ready"] is False
+    assert row["revenue_inferred"] is False
+
+    assert row["execution_authority"] == "none"
+    assert row["outreach_authority"] == "none"
+    assert row["traffic_authority"] == "none"
+    assert row["commercial_authority"] == "none"
+    assert row["payment_authority"] == "none"
+
+    assert payload["automatic_external_execution_allowed"] is False
+    assert payload["execution_authority"] == "none"
+    assert payload["commercial_authority"] == "none"
+
+
+def test_missing_storm_source_stays_unavailable():
+    payload = build_opportunity_radar(
+        market_gps=None,
+        community_intent=None,
+        competitor_market=None,
+        tam_market=None,
+        storm_opportunity=None,
+    )
+
+    assert payload["source_status"]["storm_opportunity"]["available"] is False
+    assert payload["candidate_count"] == 0

@@ -100,7 +100,10 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
             "emails": ["jane@buyer.example"],
             "phones": ["+15125550123"],
             "people": [{"name": "Jane Smith", "title": "CEO"}],
-            "pages_checked": [],
+            "pages_checked": [{
+                "url": "https://buyer.example/advertisers/",
+                "visible_text": "We buy leads from verified publishers.",
+            }],
             "evidence_score": 0.95,
         },
     )
@@ -118,6 +121,10 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     row = result["candidates"][0]
     assert row["domain"] == "buyer.example"
     assert row["explicit_direct_buyer_evidence"] is True
+    assert row["first_party_buyer_evidence_pages"] == [{
+        "url": "https://buyer.example/advertisers/",
+        "buyer_side_signal_hits": ["buy leads", "we buy leads"],
+    }]
     assert row["first_party_emails"] == ["jane@buyer.example"]
     assert row["first_party_phones"] == ["+15125550123"]
     assert row["first_party_people"][0]["name"] == "Jane Smith"
@@ -139,6 +146,62 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     assert result["database_write_performed"] is False
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_cross_domain_buyer_claim_never_qualifies_scout(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: ["buyer.example"] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://buyer.example/",
+            "final_url": "https://buyer.example/",
+            "business_names": ["Buyer Example"],
+            "description": "Software company",
+            "emails": [], "phones": [], "people": [],
+            "pages_checked": [{
+                "url": "https://unrelated.test/advertisers/",
+                "visible_text": "We buy leads from publishers",
+            }],
+            "evidence_score": 0.2,
+        },
+    )
+    output = run_buyer_scout(plan(), max_queries=1, max_domains=1, max_probes=1)
+    assert len(output["candidates"]) == 1
+    row = output["candidates"][0]
+    assert row["explicit_direct_buyer_evidence"] is False
+    assert row["first_party_buyer_evidence_pages"] == []
+    assert row["outreach_authorized"] is False
+    assert output["database_write_performed"] is False
+
+
+def test_buyer_named_business_without_first_party_purchase_claim_is_not_verified(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: ["buyer.example"] for query in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "canonical_url": "https://buyer.example/",
+            "final_url": "https://buyer.example/",
+            "business_names": ["We Buy Leads Ltd"],
+            "description": "Digital marketing and analytics solutions",
+            "emails": [], "phones": [], "people": [],
+            "pages_checked": [],
+            "evidence_score": 0.2,
+        },
+    )
+    result = run_buyer_scout(plan(), max_queries=1, max_domains=1, max_probes=1)
+    assert len(result["candidates"]) == 1
+    row = result["candidates"][0]
+    assert row["explicit_direct_buyer_evidence"] is False
+    assert row["first_party_buyer_evidence_pages"] == []
+    assert row["outreach_authorized"] is False
 
 
 def test_scout_uses_bounded_parallel_probe_workers(monkeypatch):
@@ -185,7 +248,10 @@ def test_scout_uses_bounded_parallel_probe_workers(monkeypatch):
     assert result["probed_domain_count"] == 3
     assert len(seen) == 3
     assert all(
-        kwargs["time_budget_seconds"] == 12.0
+        kwargs["time_budget_seconds"] == 16.0
+        and kwargs["max_pages"] == 5
+        and kwargs["page_priority"] == "commercial"
+        and kwargs["public_only"] is True
         for _, kwargs in seen
     )
 

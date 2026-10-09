@@ -4,13 +4,44 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_doctor_flags_false_registry_company_from_existing_receipt():
+    import importlib.util
+    filename = ROOT / "scripts/verify_buyer_acquisition_automation.py"
+    spec = importlib.util.spec_from_file_location("buyer_plumbing_doctor", filename)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    sample = {
+        "updates": [{
+            "candidate_id": "bad-registry-join",
+            "response": [{
+                "id": "bad-registry-join",
+                "review_state": "review_ready",
+                "reconciliation_state": "REVIEW_READY",
+                "business_name": "Harvey",
+                "query_evidence": [{
+                    "query": '"HARVEY HVAC SERVICES LLC" TX',
+                    "source_refs": ["official:texas_tdlr_ac:118954"],
+                }],
+                "site_evidence": {
+                    "business_name_source": "first_party_site_identity",
+                    "site_business_names": ["Harvey AI"],
+                },
+            }],
+        }],
+    }
+    assert module._review_receipt_identity_mismatches(sample) == [
+        "bad-registry-join"
+    ]
+    assert module._review_receipt_identity_mismatches({"updates": []}) == []
+
+
 def test_buyer_acquisition_verifier_requires_safe_internal_team():
     text = (
         ROOT / "scripts/verify_buyer_acquisition_automation.py"
     ).read_text()
 
     for unit in (
-        "empire-qualification-booster.timer",
+        "empire-qualification.timer",
         "empire-buyer-review-materializer.timer",
         "empire-buyer-deferred-enrichment.timer",
         "empire-buyer-capacity-readiness.timer",
