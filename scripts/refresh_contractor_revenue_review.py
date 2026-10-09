@@ -53,6 +53,33 @@ def run(*, as_of: date, now: datetime | None = None) -> dict:
     )
 
 
+def write_review_snapshot(payload: dict) -> None:
+    """Atomic private OBSERVE snapshot, never a CRM/database or outbound write."""
+    if (payload.get("schema") != "empire.revenue_strike.contractor_founder_review.v1"
+            or payload.get("mode") != "OBSERVE"
+            or payload.get("outbound_authorized") is not False
+            or payload.get("contract_sent") is not False
+            or payload.get("execution_authority") != "none"):
+        raise ValueError("UNSAFE_CONTRACTOR_SNAPSHOT_AUTHORITY")
+    if OUTPUT.is_symlink() or OUTPUT.parent.is_symlink():
+        raise ValueError("UNSAFE_CONTRACTOR_SNAPSHOT_LOCATION")
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    filehandle, name = tempfile.mkstemp(
+        prefix=".contractor_founder_", suffix=".json.tmp", dir=OUTPUT.parent,
+    )
+    try:
+        with os.fdopen(filehandle, "w", encoding="utf-8") as f:
+            os.fchmod(f.fileno(), 0o600)
+            json.dump(payload, f, sort_keys=True, indent=2)
+            f.write("\n")
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(name, OUTPUT)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
 def main(argv=None) -> int:
     parser = ArgumentParser()
     parser.add_argument("--as-of", default=date.today().isoformat())
@@ -73,19 +100,7 @@ def main(argv=None) -> int:
                 suppressed_emails=suppressions,
             )
         if args.write:
-            OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-            filehandle, name = tempfile.mkstemp(prefix=".contractor_founder_", suffix=".json.tmp", dir=OUTPUT.parent)
-            try:
-                with os.fdopen(filehandle, "w", encoding="utf-8") as f:
-                    os.fchmod(f.fileno(), 0o600)
-                    json.dump(payload, f, sort_keys=True, indent=2)
-                    f.write("\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-                os.replace(name, OUTPUT)
-            finally:
-                if os.path.exists(name):
-                    os.unlink(name)
+            write_review_snapshot(payload)
         print(json.dumps({
             "schema": payload["schema"],
             "mode": "OBSERVE",

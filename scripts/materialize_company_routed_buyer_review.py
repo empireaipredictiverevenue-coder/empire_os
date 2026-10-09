@@ -69,6 +69,47 @@ def _canonical_contact_history() -> tuple[set[str], set[str], set[str]]:
     return prior_prospects, prior_domains, suppressed_emails
 
 
+def refresh_existing_contractor_history(
+    *, prior_contact_domains: set[str], suppressed_emails: set[str],
+) -> dict:
+    """Use this authorised one-shot DB reader for the existing Revenue Strike.
+
+    The caller already obtained these sets under SET TRANSACTION READ ONLY.
+    No new DB login, secret reading, service, timer, outbound or CRM write.
+    A negative domain search never clears a named recipient.
+    """
+    from datetime import date, datetime, timezone
+    from empire_os.storm_contractor_review import attach_existing_canonical_contact_history
+    from scripts.refresh_contractor_revenue_review import run, write_review_snapshot
+
+    today = datetime.now(timezone.utc)
+    review = run(as_of=today.date(), now=today)
+    checked = attach_existing_canonical_contact_history(
+        review,
+        prior_contact_domains=prior_contact_domains,
+        suppressed_emails=suppressed_emails,
+    )
+    if (checked.get("mode") != "OBSERVE"
+            or checked.get("outbound_authorized") is not False
+            or checked.get("contract_sent") is not False
+            or checked.get("execution_authority") != "none"
+            or checked["summary"].get("approved_outbound_count") != 0
+            or checked["summary"].get("verified_payments") != 0
+            or checked.get("canonical_domain_history_observed") is not True
+            or checked.get("individual_recipient_suppression_cleared") is not False):
+        raise ValueError("UNSAFE_CONTRACTOR_CANONICAL_HISTORY_RESULT")
+    checked["canonical_domain_history_read_at"] = today.isoformat()
+    write_review_snapshot(checked)
+    return {
+        "contractor_history_state": "CANONICAL_DOMAIN_HISTORY_OBSERVED",
+        "contractor_company_count": checked["summary"]["historical_contractor_companies"],
+        "contractor_prior_contact_domain_holds": checked["summary"]["prior_outbound_domain_review_holds"],
+        "contractor_suppressed_contact_domain_holds": checked["summary"]["suppressed_domain_contact_holds"],
+        "contractor_named_recipients_cleared": 0,
+        "contractor_outbound_authorized": False,
+    }
+
+
 def main() -> int:
     data = json.loads(SOURCE.read_text(encoding="utf-8"))
     rows = [
@@ -113,6 +154,23 @@ def main() -> int:
         encoding="utf-8",
     )
     tmp.replace(OUTPUT)
+    contractor_result = {
+        "contractor_history_state": "BLOCKED_CANONICAL_HISTORY_UNAVAILABLE",
+        "contractor_outbound_authorized": False,
+        "contractor_named_recipients_cleared": 0,
+    }
+    if payload.get("history_guard_ok") is True:
+        try:
+            contractor_result = refresh_existing_contractor_history(
+                prior_contact_domains=prior_domains,
+                suppressed_emails=suppressed_emails,
+            )
+        except Exception as exc:
+            # Do not leak DB/recipient details; preserve the successful buyer
+            # review. Never claim a new contractor history check succeeded.
+            contractor_result["contractor_history_state"] = (
+                "BLOCKED_" + type(exc).__name__
+            )
     print(json.dumps({
         "ok": True,
         "candidate_count": payload["candidate_count"],
@@ -126,6 +184,7 @@ def main() -> int:
         ),
         "suppressed_route_count": payload.get("suppressed_route_count", 0),
         "output": str(OUTPUT),
+        **contractor_result,
     }, indent=2, sort_keys=True))
     return 0
 

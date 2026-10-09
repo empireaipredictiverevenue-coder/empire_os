@@ -181,3 +181,39 @@ or Git repository and never disable suppression to get these leads sent.
 
 Formal entity registration and named-recipient suppression are still
 mandatory to progress these prospects beyond `CORROBORATION_PENDING`.
+
+## Existing authorised EmpireDB reader reuse — 10 October 2026
+
+The already-installed `empire-company-routed-buyer-review.service` (an
+existing **oneshot** service, not a new timer or agent) has
+`EnvironmentFile=/etc/empiredb.env`, `NoNewPrivileges=true`,
+`ProtectSystem=strict`, and `ReadWritePaths=/srv/empire_os/runtime`.
+Its last observed run used the canonical contact-history read successfully
+(`history_guard_ok=true` in the separate company-routed review snapshot).
+Ordinary shells cannot read the same DB credentials, which is expected and
+does not justify exposing or copying them.
+
+The service-owned script
+`scripts/materialize_company_routed_buyer_review.py` now reuses **the
+already-read, read-only** EmpireDB `prior_contact_domains` and
+`suppressed_emails` sets once, after its existing buyer-review result is
+safely written. It calls the existing Revenue Strike's deterministic
+`run()` review and `attach_existing_canonical_contact_history()`
+function and persists with that lane's **existing atomic private snapshot
+writer**. No additional query, privileged role, service, cron timer,
+SMTP call, Documenso API, CRM mutation, network send, or payment.
+The contractor record receives a timestamp
+`canonical_domain_history_read_at` only on successful canonical
+readback. It includes *domain-level holds* and **never** marks a recipient
+or outbound route as cleared.
+
+A failed DB read prevents contractor evaluation; a failed contractor
+review preserves the existing buyer-review result but reports a blocked
+contractor status rather than fabricated success. Existing consumer
+suppression, consent and human/founder approvals remain mandatory at the
+actual recipient level before any send.
+
+Runtime activation proof requires an actual authorised run of the
+*existing* `empire-company-routed-buyer-review.service`; passing tests
+alone does **not** prove the new snapshot has been refreshed with canonical
+history. No unit file modifications or service restart are required.
