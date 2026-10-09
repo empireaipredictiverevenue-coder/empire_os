@@ -208,6 +208,27 @@ def test_lead_smart_confirmed_policy_preserves_runtime_gates():
     }
 
 
+def test_lead_smart_buyer_attestation_does_not_grant_live_routing():
+    from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
+
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    routing = policy["routing"]
+    report = routing["buyer_route_report"]
+    assert report["source_ref"] == "gmail:1a121bc6211d60b7"
+    assert report["status"] == "EXPECTED_ACTIVE_BUYER_REPORTED"
+    assert report["independently_verified"] is False
+    assert routing["routing_verified"] is False
+    assert routing["rtb_enabled"] is False
+    requirements = routing["rtb_transport_requirements"]
+    assert requirements["zipcode_required"] is True
+    assert requirements["caller_id_required"] is True
+    assert requirements["expose_caller_id"] == "yes"
+    assert requirements["caller_id_must_match_live_call"] is True
+    assert requirements["transport_implemented"] is False
+
+
 def test_lead_smart_confirmed_policy_records_no_execution_authority():
     from empire_os.buyer_supply_policy import (
         lead_smart_confirmed_roofing_policy,

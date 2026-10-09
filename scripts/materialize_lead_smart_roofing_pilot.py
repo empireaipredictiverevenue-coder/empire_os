@@ -113,6 +113,10 @@ def build_review() -> dict[str, Any]:
         "observed_payout_max": routing.get("observed_payout_max"),
         "revshare_percentage": routing.get("revshare_percentage"),
         "rtb_enabled": routing.get("rtb_enabled"),
+        "buyer_route_report": dict(routing.get("buyer_route_report") or {}),
+        "rtb_transport_requirements": dict(
+            routing.get("rtb_transport_requirements") or {}
+        ),
         "payout_value_authority": routing.get("payout_value_authority"),
         "max_tracking_numbers_without_prior_discussion": routing.get(
             "max_tracking_numbers_without_prior_discussion"

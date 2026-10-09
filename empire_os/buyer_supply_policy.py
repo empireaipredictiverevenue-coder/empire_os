@@ -227,6 +227,23 @@ def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
             "observed_payout_max": 150,
             "revshare_percentage": None,
             "rtb_enabled": False,
+            # 2026-10-09: Seth reported everything *should* be active.
+            # Buyer assertion is not equivalent to a connected-call proof.
+            "buyer_route_report": {
+                "status": "EXPECTED_ACTIVE_BUYER_REPORTED",
+                "source_ref": "gmail:1a121bc6211d60b7",
+                "observed_at": "2026-10-09T17:35:52Z",
+                "independently_verified": False,
+            },
+            # Seth explicitly requires ZIP + exposed CID for RTB.
+            # These are requirements, not evidence of an RTB integration.
+            "rtb_transport_requirements": {
+                "zipcode_required": True,
+                "caller_id_required": True,
+                "expose_caller_id": "yes",
+                "caller_id_must_match_live_call": True,
+                "transport_implemented": False,
+            },
             "payout_value_authority": "RINGBA_REALISED_EVENT",
             "qualification_route_dependent": True,
             "appointment_cpl_possible": True,

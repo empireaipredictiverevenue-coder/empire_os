@@ -69,6 +69,19 @@ def test_materializer_preserves_ringba_runtime_blockers():
     assert result["routing_enabled"] is False
 
 
+def test_materializer_exposes_buyer_rtb_requirements_without_promoting_routing():
+    result = review()
+    truth = result["commercial_truth"]
+    assert truth["buyer_route_report"]["source_ref"] == "gmail:1a121bc6211d60b7"
+    assert truth["buyer_route_report"]["independently_verified"] is False
+    assert truth["rtb_transport_requirements"]["zipcode_required"] is True
+    assert truth["rtb_transport_requirements"]["expose_caller_id"] == "yes"
+    assert truth["rtb_transport_requirements"]["transport_implemented"] is False
+    assert truth["rtb_enabled"] is False
+    assert truth["routing_verified"] is False
+    assert result["traffic_enabled"] is False
+
+
 def test_materializer_never_authorizes_traffic():
     result = review()
 
