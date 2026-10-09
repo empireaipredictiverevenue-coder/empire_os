@@ -21,6 +21,7 @@ from empire_os.decision_judge import (
     ACTION_HUMAN_HANDOFF,
     ACTION_STOP,
     INTENT_OPT_OUT,
+    INTENT_PRICING,
     EmpireDecisionJudge,
     TranscriptCandidate,
 )
@@ -55,8 +56,10 @@ class VoiceLabConfig:
     num_threads: int = 4
     input_rate: int = 16000
     output_rate: int = 16000
-    silence_ms: int = 650
-    min_speech_ms: int = 280
+    # Low-latency telephone endpointing defaults.
+    # Environment overrides remain authoritative.
+    silence_ms: int = 420
+    min_speech_ms: int = 240
     rms_threshold: int = 420
 
     @classmethod
@@ -104,10 +107,10 @@ class VoiceLabConfig:
                 int(os.getenv("EMPIRE_VOICE_NUM_THREADS", "4")),
             ),
             silence_ms=int(
-                os.getenv("EMPIRE_VOICE_SILENCE_MS", "650")
+                os.getenv("EMPIRE_VOICE_SILENCE_MS", "420")
             ),
             min_speech_ms=int(
-                os.getenv("EMPIRE_VOICE_MIN_SPEECH_MS", "280")
+                os.getenv("EMPIRE_VOICE_MIN_SPEECH_MS", "240")
             ),
             rms_threshold=int(
                 os.getenv("EMPIRE_VOICE_RMS_THRESHOLD", "420")
@@ -293,6 +296,52 @@ class SherpaZipformerVerifierSTT:
             provider=self.config.provider,
         )
         return self._recognizer
+
+    def create_stream(self):
+        """Create one persistent online ASR stream for an active utterance."""
+        return self._load().create_stream()
+
+    def accept_pcm(self, stream, pcm16: bytes) -> str:
+        """Feed PCM16 into an existing stream and return latest partial text."""
+        if not pcm16:
+            return self.partial_result(stream)
+
+        try:
+            import numpy as np
+        except ImportError as exc:
+            raise VoiceLabRuntimeError(
+                "numpy is required for verifier STT"
+            ) from exc
+
+        audio = (
+            np.frombuffer(pcm16, dtype="<i2")
+            .astype(np.float32)
+            / 32768.0
+        )
+        if audio.size == 0:
+            return self.partial_result(stream)
+
+        recognizer = self._load()
+        stream.accept_waveform(self.config.input_rate, audio)
+
+        while recognizer.is_ready(stream):
+            recognizer.decode_stream(stream)
+
+        return self.partial_result(stream)
+
+    def partial_result(self, stream) -> str:
+        """Return the current non-binding partial recognition result."""
+        return str(self._load().get_result(stream) or "").strip()
+
+    def finish_stream(self, stream) -> str:
+        """Finalize an utterance and return its fast Zipformer transcript."""
+        recognizer = self._load()
+        stream.input_finished()
+
+        while recognizer.is_ready(stream):
+            recognizer.decode_stream(stream)
+
+        return str(recognizer.get_result(stream) or "").strip()
 
     def transcribe(self, pcm16: bytes) -> str:
         try:
@@ -685,6 +734,171 @@ class EmpireVoiceLab:
             "models": models,
             "configured": configured,
             "execution_allowed": configured,
+        }
+
+    @staticmethod
+    def _streaming_requires_verification(
+        transcript: str,
+        decision: Any,
+    ) -> bool:
+        """Bound fast path: verify commercially sensitive speech with Whisper."""
+        import re
+
+        text = str(transcript or "").strip()
+        if not text:
+            return True
+
+        intent = str(getattr(decision, "intent", "") or "")
+        action = str(getattr(decision, "action", "") or "")
+        risk_level = str(getattr(decision, "risk_level", "") or "")
+
+        # Terminal safety decisions do not need slower ASR verification.
+        # In particular, explicit opt-out must stop immediately.
+        if action == ACTION_STOP:
+            return False
+
+        # Ambiguous or authority-sensitive speech requires verification.
+        if action in {ACTION_CLARIFY, ACTION_HUMAN_HANDOFF}:
+            return True
+        if risk_level in {"high", "critical"}:
+            return True
+
+        # Pricing is non-binding but commercially sensitive.
+        if intent == INTENT_PRICING:
+            return True
+
+        # Verify explicit numeric, money and date-like language before allowing
+        # the closer to reason from it.
+        if re.search(r"(?<!\w)\d+(?:[.,]\d+)?(?!\w)", text):
+            return True
+        if re.search(r"[$£€]", text):
+            return True
+        if re.search(
+            r"\b(?:pounds?|dollars?|euros?|usd|gbp|usdt)\b",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            return True
+        if re.search(
+            r"\b(?:today|tomorrow|yesterday|monday|tuesday|wednesday|"
+            r"thursday|friday|saturday|sunday|january|february|march|"
+            r"april|may|june|july|august|september|october|november|"
+            r"december)\b",
+            text,
+            flags=re.IGNORECASE,
+        ):
+            return True
+
+        return False
+
+    def respond_streaming_final(
+        self,
+        transcript: str,
+        *,
+        pcm16: bytes | None = None,
+        business_name: str = "",
+        niche: str = "",
+        metro: str = "",
+        history: list[dict[str, str]] | None = None,
+    ) -> dict[str, Any]:
+        """
+        Fast Call Bot path.
+
+        Finalized Zipformer text is judged first. Whisper is only brought onto
+        the critical path when the utterance is commercially sensitive,
+        ambiguous or otherwise requires verification.
+        """
+        transcript = str(transcript or "").strip()
+        if not transcript:
+            return {
+                "transcript": "",
+                "response_text": "",
+                "decision": None,
+                "asr_candidates": [],
+                "asr_mode": "streaming_empty",
+            }
+
+        zip_candidate = TranscriptCandidate(
+            source="sherpa_zipformer",
+            text=transcript,
+        )
+        decision = self.judge.judge_candidates([zip_candidate])
+
+        asr_candidates: list[dict[str, str]] = [{
+            "source": "sherpa_zipformer",
+            "text": transcript,
+        }]
+        canonical_transcript = transcript
+        asr_mode = "zipformer_fast"
+
+        needs_verification = self._streaming_requires_verification(
+            transcript,
+            decision,
+        )
+
+        if needs_verification and pcm16:
+            whisper_transcript = str(
+                self.stt.transcribe(pcm16) or ""
+            ).strip()
+
+            if whisper_transcript:
+                asr_candidates.append({
+                    "source": self.config.stt_backend,
+                    "text": whisper_transcript,
+                })
+                decision = self.judge.judge_candidates([
+                    zip_candidate,
+                    TranscriptCandidate(
+                        source=self.config.stt_backend,
+                        text=whisper_transcript,
+                    ),
+                ])
+                # Prefer Whisper as canonical only after it has participated
+                # in the dual-ASR Decision Judge.
+                canonical_transcript = whisper_transcript
+                asr_mode = "dual_verified"
+            else:
+                # Verification was required but unavailable: fail closed.
+                decision = self.judge.judge_candidates([])
+                asr_mode = "verification_failed"
+
+        elif needs_verification and not pcm16:
+            # Required verifier audio is absent: fail closed.
+            decision = self.judge.judge_candidates([])
+            asr_mode = "verification_required"
+
+        decision_payload = decision.to_dict()
+
+        if decision.action == ACTION_STOP:
+            if decision.intent == INTENT_OPT_OUT:
+                response_text = "Understood. I'll end the call now."
+            else:
+                response_text = "Understood. Thanks for your time."
+        elif decision.action == ACTION_CLARIFY:
+            response_text = (
+                "I want to make sure I heard you correctly. "
+                "Could you repeat that?"
+            )
+        elif decision.action == ACTION_HUMAN_HANDOFF:
+            response_text = (
+                "Thanks. I don't want to make a binding commitment "
+                "on this call. A human can handle that."
+            )
+        else:
+            response_text = self.brain.reply(
+                canonical_transcript,
+                business_name=business_name,
+                niche=niche,
+                metro=metro,
+                history=history,
+            )
+
+        return {
+            "transcript": canonical_transcript,
+            "response_text": response_text,
+            "decision": decision_payload,
+            "asr_candidates": asr_candidates,
+            "asr_mode": asr_mode,
         }
 
     def respond_text(

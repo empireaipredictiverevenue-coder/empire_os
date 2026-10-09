@@ -241,3 +241,258 @@ def test_voice_lab_dual_asr_preserves_both_candidates_when_safe():
     assert result["decision"]["candidate_count"] == 2
     assert len(result["asr_candidates"]) == 2
     assert result["transcript"] == "Yes, send me the brief by email."
+
+
+def test_voice_low_latency_endpoint_defaults():
+    """Call Bot V2 keeps endpointing responsive without requiring runtime env."""
+    from empire_os.voice_lab import VoiceLabConfig
+
+    cfg = VoiceLabConfig()
+
+    assert cfg.silence_ms == 420
+    assert cfg.min_speech_ms == 240
+    assert cfg.silence_ms < 650
+
+
+def test_voice_endpoint_env_override_remains_authoritative(monkeypatch):
+    """Production can tune endpointing without source changes."""
+    from empire_os.voice_lab import VoiceLabConfig
+
+    monkeypatch.setenv("EMPIRE_VOICE_SILENCE_MS", "500")
+    monkeypatch.setenv("EMPIRE_VOICE_MIN_SPEECH_MS", "300")
+
+    cfg = VoiceLabConfig.from_env()
+
+    assert cfg.silence_ms == 500
+    assert cfg.min_speech_ms == 300
+
+
+def test_zipformer_streaming_session_reuses_one_online_stream(monkeypatch):
+    from empire_os.voice_lab import (
+        SherpaZipformerVerifierSTT,
+        VoiceLabConfig,
+    )
+
+    config = VoiceLabConfig(input_rate=16000)
+    stt = SherpaZipformerVerifierSTT(config)
+
+    class FakeStream:
+        def __init__(self):
+            self.frames = []
+            self.finished = False
+
+        def accept_waveform(self, sample_rate, audio):
+            assert sample_rate == 16000
+            self.frames.append(audio.copy())
+
+        def input_finished(self):
+            self.finished = True
+
+    class FakeRecognizer:
+        def __init__(self):
+            self.stream = FakeStream()
+            self.decode_calls = 0
+
+        def create_stream(self):
+            return self.stream
+
+        def is_ready(self, stream):
+            # Decode once for each newly accepted frame.
+            return self.decode_calls < len(stream.frames)
+
+        def decode_stream(self, stream):
+            self.decode_calls += 1
+
+        def get_result(self, stream):
+            if stream.finished:
+                return "final transcript"
+            if stream.frames:
+                return "partial transcript"
+            return ""
+
+    recognizer = FakeRecognizer()
+    monkeypatch.setattr(stt, "_load", lambda: recognizer)
+
+    stream = stt.create_stream()
+
+    first = stt.accept_pcm(stream, frame(1200))
+    second = stt.accept_pcm(stream, frame(1300))
+    final = stt.finish_stream(stream)
+
+    assert stream is recognizer.stream
+    assert len(stream.frames) == 2
+    assert first == "partial transcript"
+    assert second == "partial transcript"
+    assert final == "final transcript"
+    assert stream.finished is True
+
+
+def test_zipformer_streaming_empty_pcm_does_not_mutate_stream(monkeypatch):
+    from empire_os.voice_lab import (
+        SherpaZipformerVerifierSTT,
+        VoiceLabConfig,
+    )
+
+    stt = SherpaZipformerVerifierSTT(VoiceLabConfig())
+
+    class FakeRecognizer:
+        def get_result(self, _stream):
+            return "existing partial"
+
+    recognizer = FakeRecognizer()
+    monkeypatch.setattr(stt, "_load", lambda: recognizer)
+
+    stream = object()
+
+    assert stt.accept_pcm(stream, b"") == "existing partial"
+
+
+def test_zipformer_streaming_partial_is_not_a_commercial_decision(monkeypatch):
+    """
+    Streaming partials are observation only.
+    They must not invoke the closer or Decision Judge by themselves.
+    """
+    from empire_os.voice_lab import (
+        SherpaZipformerVerifierSTT,
+        VoiceLabConfig,
+    )
+
+    stt = SherpaZipformerVerifierSTT(VoiceLabConfig())
+
+    class FakeStream:
+        def accept_waveform(self, _rate, _audio):
+            pass
+
+    class FakeRecognizer:
+        def create_stream(self):
+            return FakeStream()
+
+        def is_ready(self, _stream):
+            return False
+
+        def get_result(self, _stream):
+            return "I agree to fifteen"
+
+    recognizer = FakeRecognizer()
+    monkeypatch.setattr(stt, "_load", lambda: recognizer)
+
+    stream = stt.create_stream()
+    partial = stt.accept_pcm(stream, frame(1200))
+
+    assert partial == "I agree to fifteen"
+    # Contract: this API returns text only. It cannot execute or authorize.
+    assert isinstance(partial, str)
+
+
+def test_streaming_fast_path_skips_whisper_for_safe_follow_up():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+
+    def whisper_must_not_run(_pcm):
+        raise AssertionError("Whisper must stay off safe fast path")
+
+    lab.stt.transcribe = whisper_must_not_run
+    lab.brain.reply = lambda *_args, **_kwargs: "Absolutely."
+
+    result = lab.respond_streaming_final(
+        "Yes, send me the brief by email.",
+        pcm16=b"audio",
+    )
+
+    assert result["asr_mode"] == "zipformer_fast"
+    assert result["decision"]["action"] == "continue"
+    assert result["response_text"] == "Absolutely."
+    assert [x["source"] for x in result["asr_candidates"]] == [
+        "sherpa_zipformer"
+    ]
+
+
+def test_streaming_pricing_path_requires_whisper_verification():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    calls = []
+
+    def whisper(_pcm):
+        calls.append(True)
+        return "What does the pilot cost?"
+
+    lab.stt.transcribe = whisper
+    lab.brain.reply = lambda *_args, **_kwargs: "I can explain the pricing."
+
+    result = lab.respond_streaming_final(
+        "What does the pilot cost?",
+        pcm16=b"audio",
+    )
+
+    assert calls == [True]
+    assert result["asr_mode"] == "dual_verified"
+    assert result["decision"]["action"] == "continue"
+    assert result["decision"]["intent"] == "pricing_or_terms"
+    assert len(result["asr_candidates"]) == 2
+
+
+def test_streaming_numeric_disagreement_fails_to_clarify():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: "The pilot is 500 pounds."
+
+    def closer_must_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not run on money disagreement")
+
+    lab.brain.reply = closer_must_not_run
+
+    result = lab.respond_streaming_final(
+        "The pilot is 1500 pounds.",
+        pcm16=b"audio",
+    )
+
+    assert result["asr_mode"] == "dual_verified"
+    assert result["decision"]["action"] == "clarify"
+    assert "asr_disagreement:numbers" in result["decision"]["risk_flags"]
+    assert "asr_disagreement:money" in result["decision"]["risk_flags"]
+
+
+def test_streaming_payment_language_never_reaches_closer():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+    lab.stt.transcribe = lambda _pcm: (
+        "I accept the terms and I will pay now."
+    )
+
+    def closer_must_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not receive binding commitment")
+
+    lab.brain.reply = closer_must_not_run
+
+    result = lab.respond_streaming_final(
+        "I accept the terms and I'll pay now.",
+        pcm16=b"audio",
+    )
+
+    assert result["asr_mode"] == "dual_verified"
+    assert result["decision"]["action"] == "human_handoff"
+    assert result["decision"]["commercial_authority"] is False
+
+
+def test_streaming_opt_out_stops_without_closer():
+    from empire_os.voice_lab import EmpireVoiceLab
+
+    lab = EmpireVoiceLab()
+
+    def closer_must_not_run(*_args, **_kwargs):
+        raise AssertionError("closer must not run for opt-out")
+
+    lab.brain.reply = closer_must_not_run
+
+    result = lab.respond_streaming_final(
+        "Please do not call me again.",
+        pcm16=b"audio",
+    )
+
+    assert result["decision"]["action"] == "stop"
+    assert result["decision"]["suppression_requested"] is True
+    assert "end the call" in result["response_text"].lower()

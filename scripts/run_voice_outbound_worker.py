@@ -12,7 +12,7 @@ from typing import Any
 from empire_os.buyer_deferred_enrichment import BuyerDeferredEnrichmentQueue
 from empire_os.call_manager import build_call_work
 from empire_os.locale_intelligence import contact_window_status, resolve_locale
-from empire_os.outbound_role_transport import SupabaseOutboundRpc
+from empire_os.outbound_role_transport import PostgresOutboundRpc
 from empire_os.sb import request_json
 from empire_os.voice_lab import EmpireVoiceLab
 from empire_os.vonage_call_transport import (
@@ -117,7 +117,10 @@ def main(argv=None) -> int:
     )
 
     work = build_call_work(limit=limit)
-    sender_rpc = SupabaseOutboundRpc("empire_outbound_sender")
+    sender_rpc = PostgresOutboundRpc(
+        os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip(),
+        "empire_outbound_sender",
+    )
     queue = BuyerDeferredEnrichmentQueue()
     results: list[dict[str, Any]] = []
 

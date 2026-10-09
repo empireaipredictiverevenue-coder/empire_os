@@ -363,11 +363,21 @@ async def vonage_socket(websocket: WebSocket):
     opening_played = False
     playback: asyncio.Task | None = None
     playback_stop: threading.Event | None = None
+    playback_may_be_buffered = False
     response_task: asyncio.Task | None = None
+    turn_generation = 0
+
+    # Streaming Zipformer supplies the fast finalized transcript.
+    # Partial transcripts MUST NOT authorize commercial actions.
+    streaming_asr = lab.verifier_stt
+    streaming_asr_stream = None
+    streaming_partial = ""
+    streaming_final = ""
 
     async def start_playback(text: str) -> None:
-        nonlocal playback, playback_stop
+        nonlocal playback, playback_stop, playback_may_be_buffered
         playback_stop = threading.Event()
+        playback_may_be_buffered = True
         playback = asyncio.create_task(
             _stream_tts(
                 websocket,
@@ -378,38 +388,50 @@ async def vonage_socket(websocket: WebSocket):
         )
 
     async def stop_playback() -> None:
-        nonlocal playback, playback_stop
+        nonlocal playback, playback_stop, playback_may_be_buffered
+
         if playback_stop is not None:
             playback_stop.set()
+
         if playback and not playback.done():
             playback.cancel()
             try:
                 await playback
             except asyncio.CancelledError:
                 pass
+
+        # Provider-side audio can remain buffered after our local playback
+        # coroutine has completed. Barge-in must clear that buffer as well.
+        if playback_may_be_buffered:
             await websocket.send_text(json.dumps({"action": "clear"}))
+
         playback = None
         playback_stop = None
+        playback_may_be_buffered = False
 
-    async def respond(audio: bytes, index: int) -> None:
-        result = await asyncio.to_thread(
-            lab.respond_text,
-            audio,
-            business_name=context.get("business_name", ""),
-            niche=context.get("niche", ""),
-            metro=context.get("metro", ""),
-            history=list(history),
-        )
+    async def consume_result(
+        result: dict[str, Any],
+        index: int,
+        generation: int,
+    ) -> None:
+        # Worker cancellation does not guarantee underlying thread
+        # cancellation. Stale generations cannot mutate any call state.
+        if generation != turn_generation:
+            return
+
         transcript = str(result.get("transcript") or "").strip()
         response_text = str(
             result.get("response_text") or ""
         ).strip()
         decision = result.get("decision")
         asr_candidates = result.get("asr_candidates")
+        asr_mode = str(result.get("asr_mode") or "").strip()
+
         if not transcript:
             return
 
         history.append({"role": "user", "content": transcript})
+
         if intent_id and call_id:
             await asyncio.to_thread(
                 _record_turn,
@@ -421,17 +443,23 @@ async def vonage_socket(websocket: WebSocket):
                 {
                     "decision_judge": decision,
                     "asr_candidates": asr_candidates,
+                    "asr_mode": asr_mode,
                 }
                 if isinstance(decision, dict)
                 else None,
             )
 
+        if generation != turn_generation:
+            return
+
         if not response_text:
             return
+
         history.append({
             "role": "assistant",
             "content": response_text,
         })
+
         if intent_id and call_id:
             await asyncio.to_thread(
                 _record_turn,
@@ -440,8 +468,50 @@ async def vonage_socket(websocket: WebSocket):
                 index,
                 "outbound",
                 response_text,
+                {"asr_mode": asr_mode},
             )
+
+        if generation != turn_generation:
+            return
+
         await start_playback(response_text)
+
+    async def respond_fast(
+        audio: bytes,
+        index: int,
+        generation: int,
+        fast_transcript: str,
+    ) -> None:
+        result = await asyncio.to_thread(
+            lab.respond_streaming_final,
+            fast_transcript,
+            pcm16=audio,
+            business_name=context.get("business_name", ""),
+            niche=context.get("niche", ""),
+            metro=context.get("metro", ""),
+            history=list(history),
+        )
+        await consume_result(result, index, generation)
+
+    async def respond_fallback(
+        audio: bytes,
+        index: int,
+        generation: int,
+    ) -> None:
+        result = await asyncio.to_thread(
+            lab.respond_text,
+            audio,
+            business_name=context.get("business_name", ""),
+            niche=context.get("niche", ""),
+            metro=context.get("metro", ""),
+            history=list(history),
+        )
+
+        if isinstance(result, dict):
+            result = dict(result)
+            result.setdefault("asr_mode", "dual_fallback")
+
+        await consume_result(result, index, generation)
 
     try:
         while True:
@@ -486,15 +556,67 @@ async def vonage_socket(websocket: WebSocket):
                 continue
 
             event, utterance = detector.feed(frame)
+
             if event == "speech_start":
+                turn_generation += 1
                 await stop_playback()
+
                 if response_task and not response_task.done():
                     response_task.cancel()
-            if event == "utterance" and utterance:
-                turn_index += 1
-                response_task = asyncio.create_task(
-                    respond(utterance, turn_index)
+
+                streaming_partial = ""
+                streaming_final = ""
+                streaming_asr_stream = (
+                    streaming_asr.create_stream()
+                    if streaming_asr is not None
+                    else None
                 )
+
+            # Feed every frame belonging to the active utterance into the
+            # persistent online recognizer. This is observation only.
+            if (
+                streaming_asr is not None
+                and streaming_asr_stream is not None
+                and event in {"speech_start", "speech", "utterance"}
+            ):
+                streaming_partial = streaming_asr.accept_pcm(
+                    streaming_asr_stream,
+                    frame,
+                )
+
+            if event == "utterance" and utterance:
+                if (
+                    streaming_asr is not None
+                    and streaming_asr_stream is not None
+                ):
+                    streaming_final = streaming_asr.finish_stream(
+                        streaming_asr_stream
+                    )
+                    streaming_asr_stream = None
+
+                turn_index += 1
+                generation = turn_generation
+
+                if streaming_final:
+                    response_task = asyncio.create_task(
+                        respond_fast(
+                            utterance,
+                            turn_index,
+                            generation,
+                            streaming_final,
+                        )
+                    )
+                else:
+                    # Empty streaming final falls back to the proven dual-ASR
+                    # path, but still passes through the same stale guard,
+                    # persistence and playback machinery.
+                    response_task = asyncio.create_task(
+                        respond_fallback(
+                            utterance,
+                            turn_index,
+                            generation,
+                        )
+                    )
 
     except WebSocketDisconnect:
         pass
