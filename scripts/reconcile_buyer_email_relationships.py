@@ -17,6 +17,8 @@ from empire_os.commercial_relationship_registry import (
     RelationshipEvidenceError, reconcile,
 )
 
+from empire_os.commercial_social_intent import build_social_intent_review
+
 ROOT = Path("/srv/empire_os")
 RELATIVE = Path("runtime/buyer_network_intelligence")
 SOURCE_NAME = "gmail_relationship_evidence_latest.json"
@@ -43,7 +45,36 @@ def build(root: Path = ROOT) -> dict:
     qualification = _read_private(base / "founder_qualification_actions_latest.json")
     prior_path = base / OUTPUT_NAME
     previous = _read_private(prior_path) if prior_path.exists() else {}
-    return reconcile(src, queue, qualification, previous=previous)
+    result = reconcile(src, queue, qualification, previous=previous)
+    # This is evidence-only enrichment. A missing collector must not block
+    # an already valid Gmail/relationship registry.
+    try:
+        inbox = _read_private(
+            root / "runtime/acquisition/signal_inbox.json",
+            limit=45_000_000,
+        )
+        community = _read_private(
+            root / "runtime/community_intent/latest.json", limit=2_000_000
+        )
+        linkedin = _read_private(
+            root / "runtime/buyer_acquisition/linkedin_revenue_department_latest.json",
+            limit=2_000_000,
+        )
+        result["social_intent_review"] = build_social_intent_review(
+            inbox, result["relationships"],
+            community=community, linkedin=linkedin,
+        )
+    except (OSError, ValueError, TypeError):
+        result["social_intent_review"] = {
+            "schema_version": "empire.commercial_social_intent_review.v1",
+            "status": "UNAVAILABLE",
+            "reason": "INTENT_EVIDENCE_MISSING_OR_INVALID",
+            "verified_poster_to_company_identity_count": 0,
+            "verified_commercial_buying_intent_count": 0,
+            "outbound_sent": False,
+            "execution_authority": "NONE",
+        }
+    return result
 
 
 def atomic_private_write(path: Path, result: dict) -> None:
@@ -88,6 +119,15 @@ def main() -> int:
         "new_inbound_relationships_since_prior_snapshot":
             result["new_inbound_relationships_since_prior_snapshot"],
         "automatic_live_gmail_ingest_configured": False,
+        "social_intent_review_status": (
+            result.get("social_intent_review", {}).get("status", "OBSERVE")
+        ),
+        "social_intent_linked_company_candidates": (
+            result.get("social_intent_review", {}).get(
+                "signals_with_potential_company_link_count", 0
+            )
+        ),
+        "social_intent_verified_buyers": 0,
         "outbound_authorized": False, "execution_authority": "NONE",
     }, sort_keys=True))
     return 0

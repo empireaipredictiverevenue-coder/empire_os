@@ -251,3 +251,66 @@ def test_warm_relationships_always_visible_separately_from_cold_delivery_backlog
     assert all(x['gmail_snapshot_fresh'] is True for x in warm)
     assert all(x['entity_key']!='bad-recipient' for x in warm)
     assert report['warm_business_queue_truncated'] is False
+
+
+def test_existing_registry_builder_reads_social_signal_evidence_without_contact_upgrade(tmp_path):
+    from datetime import datetime, timezone
+
+    root = tmp_path
+    base = root / "runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    src, queue, qual = sources()
+    src["captured_at"] = datetime.now(timezone.utc).isoformat()
+    for name, data in (
+        ("gmail_relationship_evidence_latest.json", src),
+        ("candidate_queue_latest.json", queue),
+        ("founder_qualification_actions_latest.json", qual),
+    ):
+        path = base / name
+        path.write_text(json.dumps(data))
+        if name.startswith("gmail_"):
+            path.chmod(0o600)
+    stamp = datetime.now(timezone.utc).isoformat()
+    social = root / "runtime/acquisition/signal_inbox.json"
+    social.parent.mkdir(parents=True)
+    social.write_text(json.dumps({
+        "s1": {
+            "source": "reddit_intent",
+            "status": "unresolved",
+            "lead_score": 92,
+            "url": "https://www.reddit.com/r/roofing/comments/123/needleads",
+            "raw": {
+                "community_intent": {
+                    "observed_at": stamp,
+                    "url": "https://www.reddit.com/r/roofing/comments/123/needleads",
+                    "intent_score": 92,
+                    "niche": "roofing",
+                    "evidence_urls": ["https://roofingpros.com"],
+                }
+            },
+        }
+    }))
+    community = root/"runtime/community_intent/latest.json"
+    community.parent.mkdir(parents=True)
+    community.write_text(json.dumps({
+        "observed_at":stamp,
+        "source_status":{
+            "reddit":{"ok":True,"accepted_observations":1},
+            "linkedin":{"ok":False,"accepted_observations":0},
+        }
+    }))
+    linkedin = root/"runtime/buyer_acquisition/linkedin_revenue_department_latest.json"
+    linkedin.parent.mkdir(parents=True)
+    linkedin.write_text(json.dumps({
+        "generated_at":stamp,
+        "candidate_count":9,
+        "human_review_ready_count":0,
+        "verified_contact_count":0,
+    }))
+    result = build(root)
+    assert result["relationship_count"]==5
+    assert result["social_intent_review"]["sources"]["reddit_intent"]==1
+    assert result["social_intent_review"]["evidence_bearing_recent_signal_count"]==1
+    assert result["social_intent_review"]["verified_commercial_buying_intent_count"]==0
+    assert result["outbound_authorized"] is False
+    assert not any(x["outbound_authorized"] for x in result["relationships"])
