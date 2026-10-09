@@ -377,8 +377,8 @@ reserved for genuine consequential gates.
 - [ ] Freshness/expiry
 - [ ] Changed-page detection
 - [ ] Research-on-change
-- [ ] Automatic Founder snapshot refresh
-- [ ] Service/timer health
+- [x] Automatic Founder snapshot refresh
+- [x] Service/timer health
 - [ ] Bounded retry/provider fallback
 - [ ] Search Fabric provider reliability improvement
 
