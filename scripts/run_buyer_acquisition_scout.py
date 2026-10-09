@@ -167,6 +167,9 @@ def research_network_after_scout(
             "EMPIRE_OUTBOUND_ENABLED": "0",
             "LIVE_OUTBOUND": "0",
         })
+        # These are independent read-only stages. If the existing buyer
+        # due-diligence pipeline hits a concurrent snapshot change, preserve
+        # that failure but still reconcile the last consistent Gmail/CRM view.
         try:
             proc = runner(
                 [
@@ -176,14 +179,9 @@ def research_network_after_scout(
                 cwd=root, env=env, capture_output=True,
                 text=True, timeout=300, check=False,
             )
+            research_code = proc.returncode
         except subprocess.TimeoutExpired:
-            return {"status": "TIMEOUT", "mode": "OBSERVE"}
-        if proc.returncode != 0:
-            return {
-                "status": "FAILED", "mode": "OBSERVE",
-                "exit_code": proc.returncode,
-                "relationship_registry": "NOT_REFRESHED",
-            }
+            research_code = 124
         try:
             linked = runner(
                 [
@@ -194,16 +192,22 @@ def research_network_after_scout(
                 cwd=root, env=env, capture_output=True,
                 text=True, timeout=35, check=False,
             )
+            registry_code = linked.returncode
         except subprocess.TimeoutExpired:
-            return {
-                "status": "PARTIAL", "mode": "OBSERVE", "exit_code": 0,
-                "relationship_registry": "TIMEOUT",
-            }
+            registry_code = 124
+        successes = int(research_code == 0) + int(registry_code == 0)
         return {
-            "status": "PASS" if linked.returncode == 0 else "PARTIAL",
-            "mode": "OBSERVE", "exit_code": 0,
+            "status": ("PASS" if successes == 2 else
+                       "PARTIAL" if successes == 1 else "FAILED"),
+            "mode": "OBSERVE",
+            "exit_code": research_code,
+            "buyer_network_research": (
+                "PASS" if research_code == 0 else
+                "TIMEOUT" if research_code == 124 else "FAILED"
+            ),
             "relationship_registry": (
-                "PASS" if linked.returncode == 0 else "BLOCKED"
+                "PASS" if registry_code == 0 else
+                "TIMEOUT" if registry_code == 124 else "BLOCKED"
             ),
             "mailbox_ingest_in_this_cycle": False,
             "outbound_sent": False,

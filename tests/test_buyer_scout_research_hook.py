@@ -64,6 +64,26 @@ def test_missing_or_unsafe_gmail_evidence_blocks_registry_only(tmp_path):
     assert "secret content" not in str(result)
 
 
+def test_research_snapshot_race_does_not_block_gmail_relationship_refresh(tmp_path):
+    class ResearchFailed:
+        returncode = 2
+        stdout = "due_diligence_shortlist_changed_during_probe"
+        stderr = ""
+    seen = []
+    def runner(args, **kwargs):
+        seen.append(args)
+        return ResearchFailed() if len(seen) == 1 else Done()
+
+    result = scout.research_network_after_scout(str(tmp_path), runner=runner)
+    assert len(seen) == 2
+    assert result["status"] == "PARTIAL"
+    assert result["buyer_network_research"] == "FAILED"
+    assert result["relationship_registry"] == "PASS"
+    assert result["exit_code"] == 2
+    assert result["outbound_sent"] is False
+    assert "due_diligence_shortlist_changed" not in str(result)
+
+
 def test_existing_systemd_timer_is_reused_without_new_unit():
     root = Path(__file__).resolve().parents[1]
     unit = (root / "deploy/systemd/empire-buyer-acquisition-scout.service").read_text()
