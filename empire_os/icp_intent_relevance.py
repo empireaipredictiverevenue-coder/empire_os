@@ -26,6 +26,9 @@ NON_PURCHASE = (
     re.compile(r"\b(?:my (?:sales )?career|career growth|career advice|which role should i|where should i take my career|looking for (?:my )?next role|what would you do: stay|need to find a new job)\b", re.I),
 )
 SELF_PROMOTION = (
+    # Recruiting multiple content practitioners as experiment participants
+    # is not a request to purchase an SEO service.
+    re.compile(r"\blooking for (?:seo )?content editors\b.{0,95}\b(?:agency practitioners|freelancers)\b", re.I),
     re.compile(r"\b(?:i|we) (?:built|launched|created|developed)\b.{0,95}\b(?:saas|tool|platform|product|app|service)\b", re.I),
     re.compile(r"^\s*(?:built|launched|created)\b.{0,95}\b(?:saas|tool|platform|product|app|service)\b", re.I),
     re.compile(r"\b(?:my|our) (?:new )?(?:product|lead service|agency|platform|tool)\b.{0,55}\b(?:offers?|provides?|generates?|customers?|leads?)\b", re.I),

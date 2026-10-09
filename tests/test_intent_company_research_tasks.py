@@ -31,6 +31,8 @@ def test_hiring_career_product_promotion_are_not_hot_buying_signals():
          "NON_COMMERCIAL_HIRING_OR_CAREER"),
         ("Built a B2B SaaS last year. Turned out better than expected",
          "SELLER_PITCH"),
+        ("Looking for SEO content editors, agency practitioners, and freelancers who work on inbound",
+         "SELLER_PITCH"),
         ("We run a roofing company and need more qualified appointments",
          "EXPLICIT_REQUEST_UNVERIFIED"),
     ]
