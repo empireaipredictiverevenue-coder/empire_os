@@ -36,6 +36,8 @@ NWS_PAYLOAD = {
             "properties": {
                 "event": "Severe Thunderstorm Warning",
                 "areaDesc": "Miami, FL",
+                "sent": "2026-07-13T00:00:00Z",
+                "expires": "2026-07-13T01:00:00Z",
                 "urgency": "Expected",
                 "certainty": "Likely",
             },

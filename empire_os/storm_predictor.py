@@ -52,6 +52,7 @@ class StormEvent:
     occurred_at: str = ""
     expires_at: str = ""
     raw: dict = field(default_factory=dict)
+    retrieved_at: str = ""
 
 
 @dataclass
@@ -85,6 +86,7 @@ class StormPredictor:
         self.last_scan_at: Optional[str] = None
         self.strikes_found: int = 0
         self.events: list = []
+        self.rejections: list = []
 
     # ── NWS scan ────────────────────────────────────────────────────
 
@@ -104,28 +106,45 @@ class StormPredictor:
 
         features = data.get("features", [])
         events = []
-        for f in features:
-            props = f.get("properties", {})
+        self.rejections = []
+        from empire_os.spatial_physical_adapters import event_evidence_from_storm_event
+        for index, f in enumerate(features):
+            if not isinstance(f, dict) or not isinstance(f.get("properties"), dict):
+                self.rejections.append({"index": index, "reason": "source_record_invalid"})
+                continue
+            props = f["properties"]
             event_type = props.get("event", "")
+            if not isinstance(event_type, str):
+                self.rejections.append({"index": index, "reason": "source_field_invalid"})
+                continue
             if event_type not in ROOF_DAMAGING_EVENTS:
                 continue
 
-            event = StormEvent(
-                event_id=f.get("id", ""),
-                event_type=event_type,
-                area_description=props.get("areaDesc", "Unknown Zone"),
-                headline=props.get("headline", ""),
-                occurred_at=props.get("sent", ""),
-                expires_at=props.get("expires", ""),
-                severity=self._severity(props),
-                raw=props,
-            )
+            try:
+                event = StormEvent(
+                    event_id=f.get("id", ""),
+                    event_type=event_type,
+                    area_description=props.get("areaDesc", ""),
+                    headline=props.get("headline", ""),
+                    occurred_at=props.get("sent", ""),
+                    expires_at=props.get("expires", ""),
+                    severity=self._severity(props),
+                    raw={**props, "geometry": f.get("geometry")},
+                    retrieved_at=datetime.now(timezone.utc).isoformat(),
+                )
+                event_evidence_from_storm_event(event)
+            except (ValueError, TypeError, AttributeError) as exc:
+                reason = str(exc)
+                self.rejections.append({"index": index, "reason": reason if reason.startswith("source_") else "source_record_invalid"})
+                continue
             events.append(event)
             self._notify(event)
 
         self.last_scan_at = datetime.now(timezone.utc).isoformat()
         self.strikes_found += len(events)
         self.events.extend(events)
+        self.events[:] = self.events[-100:]
+        self.rejections[:] = self.rejections[:100]
         logger.info("Scan complete: %d strikes found", len(events))
         return events
 
