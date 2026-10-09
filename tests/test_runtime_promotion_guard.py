@@ -68,3 +68,40 @@ def test_binding_writer_lock_is_reentrant_across_sequential_calls(tmp_path):
     with binding_writer_lock(path):
         path.write_text('second')
     assert path.read_text() == 'second'
+
+
+def test_binding_writer_lock_serializes_two_processes(tmp_path):
+    import os
+    import subprocess
+    import sys
+    import time
+    from pathlib import Path
+    path = tmp_path / 'bindings.json'
+    ready = tmp_path / 'ready'
+    worker = '''import sys,time
+from pathlib import Path
+from empire_os.runtime_promotion_guard import binding_writer_lock
+path,ready=map(Path,sys.argv[1:])
+with binding_writer_lock(path):
+    ready.write_text('locked')
+    time.sleep(1)
+'''
+    env = {**os.environ, 'PYTHONPATH': str(Path(__file__).resolve().parents[1])}
+    proc = subprocess.Popen([sys.executable, '-c', worker, str(path), str(ready)], env=env)
+    try:
+        for _ in range(100):
+            if ready.exists():
+                break
+            time.sleep(.01)
+        assert ready.exists(), 'first writer never acquired lock'
+        contender = '''import sys
+from empire_os.runtime_promotion_guard import binding_writer_lock
+with binding_writer_lock(sys.argv[1]): print('acquired')
+'''
+        start = time.monotonic()
+        result = subprocess.run([sys.executable, '-c', contender, str(path)], env=env, capture_output=True, text=True, timeout=5)
+        assert result.returncode == 0
+        assert result.stdout.strip() == 'acquired'
+        assert time.monotonic() - start >= .65
+    finally:
+        proc.wait(timeout=5)

@@ -5,7 +5,7 @@ import copy
 import json
 from pathlib import Path
 
-from empire_os.runtime_promotion_guard import validate_control_proof
+from empire_os.runtime_promotion_guard import validate_control_proof, atomic_binding_write, binding_writer_lock
 
 ROOT = Path("/srv/empire_os")
 
@@ -109,193 +109,184 @@ if proof.get(
 
 proved = validate_control_proof(proof, lane="agent_tasks", allowed=ALLOWED)
 
-data = json.loads(
-    BINDINGS.read_text()
-)
+with binding_writer_lock(BINDINGS):
+    original_bindings = BINDINGS.read_bytes()
+    data = json.loads(
+        original_bindings.decode("utf-8")
+    )
 
-agent_lane = next(
-    x
-    for x in data["lanes"]
-    if x["lane"] == "agent_tasks"
-)
+    agent_lane = next(
+        x
+        for x in data["lanes"]
+        if x["lane"] == "agent_tasks"
+    )
 
-conversation_lane = next(
-    x
-    for x in data["lanes"]
-    if x["lane"]
-        == "conversations_replies"
-)
+    conversation_lane = next(
+        x
+        for x in data["lanes"]
+        if x["lane"]
+            == "conversations_replies"
+    )
 
-controls = (
-    agent_lane["controls"]
-)
+    controls = (
+        agent_lane["controls"]
+    )
 
-templates = (
-    conversation_lane["controls"]
-)
+    templates = (
+        conversation_lane["controls"]
+    )
 
-promoted = []
+    promoted = []
 
-for control in sorted(
-    proved
-):
-    current = controls[
-        control
-    ]
-
-    if (
-        isinstance(current, dict)
-        and current.get("status")
-            == "VERIFIED_RUNTIME"
+    for control in sorted(
+        proved
     ):
-        continue
-
-    template = copy.deepcopy(
-        templates[control]
-    )
-
-    template["lane"] = (
-        "agent_tasks"
-    )
-
-    template["control"] = (
-        control
-    )
-
-    template["status"] = (
-        "VERIFIED_RUNTIME"
-    )
-
-    if "artifact_paths" in template:
-        template[
-            "artifact_paths"
-        ] = shaped(
-            template[
-                "artifact_paths"
-            ],
-            PROOF_REL,
-            [PROOF_REL],
-        )
-
-    if "active_units" in template:
-        template[
-            "active_units"
-        ] = shaped(
-            template[
-                "active_units"
-            ],
-            "agent_tasks_runtime_observer",
-            [
-                "agent_tasks_runtime_observer",
-                "department_work_runtime",
-            ],
-        )
-
-    if "matched_keys" in template:
-        template[
-            "matched_keys"
-        ] = shaped(
-            template[
-                "matched_keys"
-            ],
-            ",".join(
-                MATCHED[control]
-            ),
-            MATCHED[control],
-        )
-
-    if "reason" in template:
-        template["reason"] = (
-            "094B verified this control "
-            "against the real "
-            "runtime/departments/work "
-            "production task store. "
-            "OBSERVE only; no task mutation."
-        )
-
-    if "confidence" in template:
-        value = template[
-            "confidence"
+        current = controls[
+            control
         ]
 
-        if isinstance(
-            value,
-            (int, float),
+        if (
+            isinstance(current, dict)
+            and current.get("status")
+                == "VERIFIED_RUNTIME"
         ):
+            continue
+
+        template = copy.deepcopy(
+            templates[control]
+        )
+
+        template["lane"] = (
+            "agent_tasks"
+        )
+
+        template["control"] = (
+            control
+        )
+
+        template["status"] = (
+            "VERIFIED_RUNTIME"
+        )
+
+        if "artifact_paths" in template:
             template[
-                "confidence"
-            ] = max(
-                float(value),
-                0.90,
+                "artifact_paths"
+            ] = shaped(
+                template[
+                    "artifact_paths"
+                ],
+                PROOF_REL,
+                [PROOF_REL],
             )
 
-        elif isinstance(
-            value,
-            str,
-        ):
+        if "active_units" in template:
             template[
+                "active_units"
+            ] = shaped(
+                template[
+                    "active_units"
+                ],
+                "agent_tasks_runtime_observer",
+                [
+                    "agent_tasks_runtime_observer",
+                    "department_work_runtime",
+                ],
+            )
+
+        if "matched_keys" in template:
+            template[
+                "matched_keys"
+            ] = shaped(
+                template[
+                    "matched_keys"
+                ],
+                ",".join(
+                    MATCHED[control]
+                ),
+                MATCHED[control],
+            )
+
+        if "reason" in template:
+            template["reason"] = (
+                "094B verified this control "
+                "against the real "
+                "runtime/departments/work "
+                "production task store. "
+                "OBSERVE only; no task mutation."
+            )
+
+        if "confidence" in template:
+            value = template[
                 "confidence"
-            ] = "HIGH"
+            ]
 
-    controls[
-        control
-    ] = template
+            if isinstance(
+                value,
+                (int, float),
+            ):
+                template[
+                    "confidence"
+                ] = max(
+                    float(value),
+                    0.90,
+                )
 
-    promoted.append(
-        control
-    )
+            elif isinstance(
+                value,
+                str,
+            ):
+                template[
+                    "confidence"
+                ] = "HIGH"
+
+        controls[
+            control
+        ] = template
+
+        promoted.append(
+            control
+        )
 
 
-verified = sorted(
-    name
-    for name, row
-    in controls.items()
-    if isinstance(row, dict)
-    and row.get("status")
-        == "VERIFIED_RUNTIME"
-)
-
-remaining = sorted(
-    name
-    for name, row
-    in controls.items()
-    if not (
-        isinstance(row, dict)
+    verified = sorted(
+        name
+        for name, row
+        in controls.items()
+        if isinstance(row, dict)
         and row.get("status")
             == "VERIFIED_RUNTIME"
     )
-)
 
-tmp = BINDINGS.with_suffix(
-    ".json.tmp094b"
-)
+    remaining = sorted(
+        name
+        for name, row
+        in controls.items()
+        if not (
+            isinstance(row, dict)
+            and row.get("status")
+                == "VERIFIED_RUNTIME"
+        )
+    )
 
-tmp.write_text(
-    json.dumps(
-        data,
-        indent=2,
-        sort_keys=True,
-    ) + "\n",
-    encoding="utf-8",
-)
+    atomic_binding_write(
+        BINDINGS,
+        json.dumps(data, indent=2, sort_keys=True) + "\n",
+        expected_bytes=original_bindings,
+    )
 
-tmp.replace(
-    BINDINGS
-)
+    print(
+        "PROMOTED:",
+        ",".join(promoted)
+        or "none",
+    )
 
-print(
-    "PROMOTED:",
-    ",".join(promoted)
-    or "none",
-)
+    print(
+        "CANONICAL_VERIFIED_COUNT:",
+        len(verified),
+    )
 
-print(
-    "CANONICAL_VERIFIED_COUNT:",
-    len(verified),
-)
-
-print(
-    "CANONICAL_REMAINING:",
-    ",".join(remaining)
-    or "none",
-)
+    print(
+        "CANONICAL_REMAINING:",
+        ",".join(remaining)
+        or "none",
+    )

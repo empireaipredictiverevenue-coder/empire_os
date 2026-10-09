@@ -8,7 +8,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from empire_os.runtime_promotion_guard import validate_control_proof, PromotionProofError
+from empire_os.runtime_promotion_guard import validate_control_proof, PromotionProofError, atomic_binding_write, binding_writer_lock
 
 ROOT = Path("/srv/empire_os")
 
@@ -160,479 +160,470 @@ def shaped(
     return scalar
 
 
-bindings = json.loads(
-    BINDINGS.read_text()
-)
-
-observer = json.loads(
-    OBSERVER.read_text()
-)
-
-# Campaign observer also reports action_authority as a control; it is
-# not execution permission. Validate it but never promote it here.
-try:
-    verified = validate_control_proof(
-        observer, lane="campaigns", allowed=TARGETS | {"action_authority"}
-    )
-except PromotionProofError as exc:
-    raise SystemExit(f"FAIL: campaign proof rejected: {exc}") from exc
-
-missing_proof = TARGETS - verified
-if missing_proof:
-    raise SystemExit("FAIL: observer does not prove: " + ",".join(sorted(missing_proof)))
-
-proved = verified & TARGETS
-
-records = collect_rows(
-    bindings
-)
-
-campaign_records = [
-    x
-    for x in records
-    if x["row"].get("lane") == "campaigns"
-    and x["row"].get("control")
-]
-
-verified_campaign_records = [
-    x
-    for x in campaign_records
-    if x["row"].get("status")
-        == "VERIFIED_RUNTIME"
-]
-
-conversation_records = [
-    x
-    for x in records
-    if x["row"].get("lane")
-        == "conversations_replies"
-    and x["row"].get("status")
-        == "VERIFIED_RUNTIME"
-    and x["row"].get("control")
-]
-
-print(
-    "EXISTING_CAMPAIGN_ROWS:",
-    len(verified_campaign_records),
-)
-
-print(
-    "CONVERSATION_TEMPLATE_ROWS:",
-    len(conversation_records),
-)
-
-if not verified_campaign_records:
-    raise SystemExit(
-        "FAIL: no existing canonical campaign bindings"
+with binding_writer_lock(BINDINGS):
+    original_bindings = BINDINGS.read_bytes()
+    bindings = json.loads(
+        original_bindings.decode("utf-8")
     )
 
-if not conversation_records:
-    raise SystemExit(
-        "FAIL: no accepted conversation templates"
+    observer = json.loads(
+        OBSERVER.read_text()
     )
 
+    # Campaign observer also reports action_authority as a control; it is
+    # not execution permission. Validate it but never promote it here.
+    try:
+        verified = validate_control_proof(
+            observer, lane="campaigns", allowed=TARGETS | {"action_authority"}
+        )
+    except PromotionProofError as exc:
+        raise SystemExit(f"FAIL: campaign proof rejected: {exc}") from exc
 
-# Find the actual container holding the existing
-# canonical campaign rows.
-groups = defaultdict(list)
+    missing_proof = TARGETS - verified
+    if missing_proof:
+        raise SystemExit("FAIL: observer does not prove: " + ",".join(sorted(missing_proof)))
 
-for rec in verified_campaign_records:
-    groups[id(rec["parent"])].append(
-        rec
+    proved = verified & TARGETS
+
+    records = collect_rows(
+        bindings
     )
 
-selected_group = max(
-    groups.values(),
-    key=len,
-)
+    campaign_records = [
+        x
+        for x in records
+        if x["row"].get("lane") == "campaigns"
+        and x["row"].get("control")
+    ]
 
-parent = selected_group[0][
-    "parent"
-]
+    verified_campaign_records = [
+        x
+        for x in campaign_records
+        if x["row"].get("status")
+            == "VERIFIED_RUNTIME"
+    ]
 
-if parent is None:
-    raise SystemExit(
-        "FAIL: campaign binding parent unresolved"
+    conversation_records = [
+        x
+        for x in records
+        if x["row"].get("lane")
+            == "conversations_replies"
+        and x["row"].get("status")
+            == "VERIFIED_RUNTIME"
+        and x["row"].get("control")
+    ]
+
+    print(
+        "EXISTING_CAMPAIGN_ROWS:",
+        len(verified_campaign_records),
     )
 
-# All canonical Campaign bindings should resolve to
-# the same parent container.
-if len(selected_group) != len(
-    verified_campaign_records
-):
-    raise SystemExit(
-        "FAIL: campaign bindings span multiple "
-        "containers; refusing ambiguous write"
+    print(
+        "CONVERSATION_TEMPLATE_ROWS:",
+        len(conversation_records),
     )
 
-parent_path = (
-    selected_group[0]["path"]
-    .rsplit(".", 1)[0]
-)
-
-print(
-    "CANONICAL_PARENT_TYPE:",
-    type(parent).__name__,
-)
-
-print(
-    "CANONICAL_PARENT_PATH:",
-    parent_path,
-)
-
-
-conversation_templates = {
-    rec["row"]["control"]: rec
-    for rec in conversation_records
-}
-
-existing_campaign = {
-    rec["row"]["control"]: rec
-    for rec in verified_campaign_records
-}
-
-for control in TARGETS:
-    if control not in conversation_templates:
+    if not verified_campaign_records:
         raise SystemExit(
-            "FAIL: missing accepted template: "
-            + control
+            "FAIL: no existing canonical campaign bindings"
+        )
+
+    if not conversation_records:
+        raise SystemExit(
+            "FAIL: no accepted conversation templates"
         )
 
 
-def insert_dict_row(
-    container,
-    row,
-    control,
-):
-    # Best case: existing campaign bindings are
-    # keyed directly by control name.
-    if any(
-        rec["key"]
-        == rec["row"].get("control")
-        for rec in selected_group
+    # Find the actual container holding the existing
+    # canonical campaign rows.
+    groups = defaultdict(list)
+
+    for rec in verified_campaign_records:
+        groups[id(rec["parent"])].append(
+            rec
+        )
+
+    selected_group = max(
+        groups.values(),
+        key=len,
+    )
+
+    parent = selected_group[0][
+        "parent"
+    ]
+
+    if parent is None:
+        raise SystemExit(
+            "FAIL: campaign binding parent unresolved"
+        )
+
+    # All canonical Campaign bindings should resolve to
+    # the same parent container.
+    if len(selected_group) != len(
+        verified_campaign_records
     ):
-        if control in container:
-            existing = container[control]
+        raise SystemExit(
+            "FAIL: campaign bindings span multiple "
+            "containers; refusing ambiguous write"
+        )
 
-            if not isinstance(existing, dict):
-                raise RuntimeError(
-                    f"existing slot is not a dict: {control}"
-                )
+    parent_path = (
+        selected_group[0]["path"]
+        .rsplit(".", 1)[0]
+    )
 
-            existing_control = existing.get(
-                "control"
+    print(
+        "CANONICAL_PARENT_TYPE:",
+        type(parent).__name__,
+    )
+
+    print(
+        "CANONICAL_PARENT_PATH:",
+        parent_path,
+    )
+
+
+    conversation_templates = {
+        rec["row"]["control"]: rec
+        for rec in conversation_records
+    }
+
+    existing_campaign = {
+        rec["row"]["control"]: rec
+        for rec in verified_campaign_records
+    }
+
+    for control in TARGETS:
+        if control not in conversation_templates:
+            raise SystemExit(
+                "FAIL: missing accepted template: "
+                + control
             )
 
-            if existing_control not in (
-                None,
-                control,
-            ):
-                raise RuntimeError(
-                    f"existing slot control mismatch: "
-                    f"{control} != {existing_control}"
+
+    def insert_dict_row(
+        container,
+        row,
+        control,
+    ):
+        # Best case: existing campaign bindings are
+        # keyed directly by control name.
+        if any(
+            rec["key"]
+            == rec["row"].get("control")
+            for rec in selected_group
+        ):
+            if control in container:
+                existing = container[control]
+
+                if not isinstance(existing, dict):
+                    raise RuntimeError(
+                        f"existing slot is not a dict: {control}"
+                    )
+
+                existing_control = existing.get(
+                    "control"
                 )
 
-            existing_lane = existing.get(
-                "lane"
-            )
+                if existing_control not in (
+                    None,
+                    control,
+                ):
+                    raise RuntimeError(
+                        f"existing slot control mismatch: "
+                        f"{control} != {existing_control}"
+                    )
 
-            if existing_lane not in (
-                None,
-                "campaigns",
-            ):
-                raise RuntimeError(
-                    f"existing slot lane mismatch: "
-                    f"{control} -> {existing_lane}"
+                existing_lane = existing.get(
+                    "lane"
                 )
 
-            # Preserve already-verified canonical truth.
-            if (
-                existing.get("status")
-                == "VERIFIED_RUNTIME"
-            ):
+                if existing_lane not in (
+                    None,
+                    "campaigns",
+                ):
+                    raise RuntimeError(
+                        f"existing slot lane mismatch: "
+                        f"{control} -> {existing_lane}"
+                    )
+
+                # Preserve already-verified canonical truth.
+                if (
+                    existing.get("status")
+                    == "VERIFIED_RUNTIME"
+                ):
+                    return control
+
+                # This is the normal case: the canonical
+                # Campaign control slot already exists but
+                # is not yet runtime-verified.
+                container[control] = row
                 return control
 
-            # This is the normal case: the canonical
-            # Campaign control slot already exists but
-            # is not yet runtime-verified.
             container[control] = row
             return control
 
-        container[control] = row
-        return control
+        # Otherwise derive the canonical key format from
+        # an existing Campaign binding.
+        sample = selected_group[0]
 
-    # Otherwise derive the canonical key format from
-    # an existing Campaign binding.
-    sample = selected_group[0]
-
-    sample_key = str(
-        sample["key"]
-    )
-
-    sample_control = str(
-        sample["row"]["control"]
-    )
-
-    if sample_control in sample_key:
-        new_key = sample_key.replace(
-            sample_control,
-            control,
-            1,
+        sample_key = str(
+            sample["key"]
         )
 
-        if new_key in container:
-            raise RuntimeError(
-                f"key collision: {new_key}"
+        sample_control = str(
+            sample["row"]["control"]
+        )
+
+        if sample_control in sample_key:
+            new_key = sample_key.replace(
+                sample_control,
+                control,
+                1,
             )
 
-        container[new_key] = row
-        return new_key
+            if new_key in container:
+                raise RuntimeError(
+                    f"key collision: {new_key}"
+                )
 
-    # Or derive from the same-control conversation
-    # template key when lanes form part of the key.
-    conv = conversation_templates[
-        control
-    ]
+            container[new_key] = row
+            return new_key
 
-    conv_key = str(
-        conv["key"]
-    )
-
-    if (
-        conv["parent"] is parent
-        and "conversations_replies"
-        in conv_key
-    ):
-        new_key = conv_key.replace(
-            "conversations_replies",
-            "campaigns",
-            1,
-        )
-
-        if new_key in container:
-            raise RuntimeError(
-                f"key collision: {new_key}"
-            )
-
-        container[new_key] = row
-        return new_key
-
-    raise RuntimeError(
-        "unable to derive canonical dict key "
-        f"for {control}"
-    )
-
-
-added = []
-
-for control in sorted(TARGETS):
-
-    if (
-        control in existing_campaign
-        and existing_campaign[
+        # Or derive from the same-control conversation
+        # template key when lanes form part of the key.
+        conv = conversation_templates[
             control
-        ]["row"].get("status")
-            == "VERIFIED_RUNTIME"
-    ):
-        continue
-
-    template = copy.deepcopy(
-        conversation_templates[
-            control
-        ]["row"]
-    )
-
-    template["lane"] = (
-        "campaigns"
-    )
-
-    template["control"] = (
-        control
-    )
-
-    template["status"] = (
-        "VERIFIED_RUNTIME"
-    )
-
-    if "artifact_paths" in template:
-        template[
-            "artifact_paths"
-        ] = shaped(
-            template[
-                "artifact_paths"
-            ],
-            scalar=OBSERVER_REL,
-            sequence=[
-                OBSERVER_REL,
-                DEPLOYED_REL,
-            ],
-        )
-
-    if "active_units" in template:
-        template[
-            "active_units"
-        ] = shaped(
-            template[
-                "active_units"
-            ],
-            scalar=(
-                "campaign_runtime_observer"
-            ),
-            sequence=[
-                "campaign_runtime_observer",
-                "owned_campaign_deployed_release",
-            ],
-        )
-
-    if "matched_keys" in template:
-        template[
-            "matched_keys"
-        ] = shaped(
-            template[
-                "matched_keys"
-            ],
-            scalar=",".join(
-                MATCHED[control]
-            ),
-            sequence=MATCHED[
-                control
-            ],
-        )
-
-    if "reason" in template:
-        template["reason"] = (
-            "093B real deployed Campaign runtime "
-            "artifact proved this control; "
-            "093D-R1 promotes that existing proof "
-            "into the canonical binding schema. "
-            "OBSERVE only; no send or mutation."
-        )
-
-    if "confidence" in template:
-
-        old = template[
-            "confidence"
         ]
 
-        if isinstance(
-            old,
-            (int, float),
+        conv_key = str(
+            conv["key"]
+        )
+
+        if (
+            conv["parent"] is parent
+            and "conversations_replies"
+            in conv_key
         ):
+            new_key = conv_key.replace(
+                "conversations_replies",
+                "campaigns",
+                1,
+            )
+
+            if new_key in container:
+                raise RuntimeError(
+                    f"key collision: {new_key}"
+                )
+
+            container[new_key] = row
+            return new_key
+
+        raise RuntimeError(
+            "unable to derive canonical dict key "
+            f"for {control}"
+        )
+
+
+    added = []
+
+    for control in sorted(TARGETS):
+
+        if (
+            control in existing_campaign
+            and existing_campaign[
+                control
+            ]["row"].get("status")
+                == "VERIFIED_RUNTIME"
+        ):
+            continue
+
+        template = copy.deepcopy(
+            conversation_templates[
+                control
+            ]["row"]
+        )
+
+        template["lane"] = (
+            "campaigns"
+        )
+
+        template["control"] = (
+            control
+        )
+
+        template["status"] = (
+            "VERIFIED_RUNTIME"
+        )
+
+        if "artifact_paths" in template:
             template[
+                "artifact_paths"
+            ] = shaped(
+                template[
+                    "artifact_paths"
+                ],
+                scalar=OBSERVER_REL,
+                sequence=[
+                    OBSERVER_REL,
+                    DEPLOYED_REL,
+                ],
+            )
+
+        if "active_units" in template:
+            template[
+                "active_units"
+            ] = shaped(
+                template[
+                    "active_units"
+                ],
+                scalar=(
+                    "campaign_runtime_observer"
+                ),
+                sequence=[
+                    "campaign_runtime_observer",
+                    "owned_campaign_deployed_release",
+                ],
+            )
+
+        if "matched_keys" in template:
+            template[
+                "matched_keys"
+            ] = shaped(
+                template[
+                    "matched_keys"
+                ],
+                scalar=",".join(
+                    MATCHED[control]
+                ),
+                sequence=MATCHED[
+                    control
+                ],
+            )
+
+        if "reason" in template:
+            template["reason"] = (
+                "093B real deployed Campaign runtime "
+                "artifact proved this control; "
+                "093D-R1 promotes that existing proof "
+                "into the canonical binding schema. "
+                "OBSERVE only; no send or mutation."
+            )
+
+        if "confidence" in template:
+
+            old = template[
                 "confidence"
-            ] = max(
-                float(old),
-                0.90,
+            ]
+
+            if isinstance(
+                old,
+                (int, float),
+            ):
+                template[
+                    "confidence"
+                ] = max(
+                    float(old),
+                    0.90,
+                )
+
+            elif isinstance(
+                old,
+                str,
+            ):
+                template[
+                    "confidence"
+                ] = "HIGH"
+
+        if isinstance(
+            parent,
+            list,
+        ):
+            parent.append(
+                template
             )
 
         elif isinstance(
-            old,
-            str,
-        ):
-            template[
-                "confidence"
-            ] = "HIGH"
-
-    if isinstance(
-        parent,
-        list,
-    ):
-        parent.append(
-            template
-        )
-
-    elif isinstance(
-        parent,
-        dict,
-    ):
-        insert_dict_row(
             parent,
-            template,
-            control,
+            dict,
+        ):
+            insert_dict_row(
+                parent,
+                template,
+                control,
+            )
+
+        else:
+            raise SystemExit(
+                "FAIL: unsupported canonical parent type"
+            )
+
+        added.append(
+            control
         )
 
-    else:
+
+    # Re-scan the in-memory result.
+    after = collect_rows(
+        bindings
+    )
+
+    campaign_verified = sorted({
+        rec["row"]["control"]
+        for rec in after
+        if rec["row"].get("lane")
+            == "campaigns"
+        and rec["row"].get("status")
+            == "VERIFIED_RUNTIME"
+        and rec["row"].get("control")
+    })
+
+    # Require the observer-proven controls plus the previously
+    # verified action-authority and freshness bindings.
+    # Output-quality/outcome-linkage have separate evidence gates.
+    expected = {
+        "action_authority",
+        "freshness",
+    } | TARGETS
+
+    missing = (
+        expected
+        - set(campaign_verified)
+    )
+
+    if missing:
         raise SystemExit(
-            "FAIL: unsupported canonical parent type"
+            "FAIL: promotion incomplete: "
+            + ",".join(
+                sorted(missing)
+            )
         )
 
-    added.append(
-        control
+
+    atomic_binding_write(
+        BINDINGS,
+        json.dumps(bindings, indent=2, sort_keys=True) + "\n",
+        expected_bytes=original_bindings,
     )
 
-
-# Re-scan the in-memory result.
-after = collect_rows(
-    bindings
-)
-
-campaign_verified = sorted({
-    rec["row"]["control"]
-    for rec in after
-    if rec["row"].get("lane")
-        == "campaigns"
-    and rec["row"].get("status")
-        == "VERIFIED_RUNTIME"
-    and rec["row"].get("control")
-})
-
-# Require the observer-proven controls plus the previously
-# verified action-authority and freshness bindings.
-# Output-quality/outcome-linkage have separate evidence gates.
-expected = {
-    "action_authority",
-    "freshness",
-} | TARGETS
-
-missing = (
-    expected
-    - set(campaign_verified)
-)
-
-if missing:
-    raise SystemExit(
-        "FAIL: promotion incomplete: "
-        + ",".join(
-            sorted(missing)
-        )
+    print(
+        "ADDED:",
+        ",".join(added)
+        or "none",
     )
 
+    print(
+        "CANONICAL_VERIFIED_COUNT:",
+        len(campaign_verified),
+    )
 
-tmp = BINDINGS.with_suffix(
-    ".json.tmp093d_r1"
-)
+    print(
+        "CANONICAL_VERIFIED:",
+        ",".join(
+            campaign_verified
+        ),
+    )
 
-tmp.write_text(
-    json.dumps(
-        bindings,
-        indent=2,
-        sort_keys=True,
-    ) + "\n",
-    encoding="utf-8",
-)
-
-tmp.replace(
-    BINDINGS
-)
-
-print(
-    "ADDED:",
-    ",".join(added)
-    or "none",
-)
-
-print(
-    "CANONICAL_VERIFIED_COUNT:",
-    len(campaign_verified),
-)
-
-print(
-    "CANONICAL_VERIFIED:",
-    ",".join(
-        campaign_verified
-    ),
-)
-
-print(
-    "CANONICAL_BINDING_WRITE: PASS"
-)
+    print(
+        "CANONICAL_BINDING_WRITE: PASS"
+    )

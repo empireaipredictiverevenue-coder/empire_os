@@ -5,7 +5,7 @@ import copy
 import json
 from pathlib import Path
 
-from empire_os.runtime_promotion_guard import validate_control_proof
+from empire_os.runtime_promotion_guard import validate_control_proof, atomic_binding_write, binding_writer_lock
 
 ROOT = Path("/srv/empire_os")
 
@@ -62,138 +62,131 @@ if proof.get(
 
 proved = validate_control_proof(proof, lane="products_offers", allowed=TARGETS)
 
-data = json.loads(
-    BINDINGS.read_text()
-)
-
-lane = next(
-    x
-    for x in data["lanes"]
-    if x["lane"]
-        == "products_offers"
-)
-
-templates = next(
-    x
-    for x in data["lanes"]
-    if x["lane"]
-        == "conversations_replies"
-)["controls"]
-
-controls = lane["controls"]
-
-promoted = []
-
-for control in sorted(proved):
-
-    current = controls[control]
-
-    if (
-        isinstance(current, dict)
-        and current.get("status")
-            == "VERIFIED_RUNTIME"
-    ):
-        continue
-
-    row = copy.deepcopy(
-        templates[control]
+with binding_writer_lock(BINDINGS):
+    original_bindings = BINDINGS.read_bytes()
+    data = json.loads(
+        original_bindings.decode("utf-8")
     )
 
-    row["lane"] = (
-        "products_offers"
+    lane = next(
+        x
+        for x in data["lanes"]
+        if x["lane"]
+            == "products_offers"
     )
 
-    row["control"] = control
+    templates = next(
+        x
+        for x in data["lanes"]
+        if x["lane"]
+            == "conversations_replies"
+    )["controls"]
 
-    row["status"] = (
-        "VERIFIED_RUNTIME"
-    )
+    controls = lane["controls"]
 
-    if "artifact_paths" in row:
-        row["artifact_paths"] = shaped(
-            row["artifact_paths"],
-            PROOF_REL,
-            [PROOF_REL],
+    promoted = []
+
+    for control in sorted(proved):
+
+        current = controls[control]
+
+        if (
+            isinstance(current, dict)
+            and current.get("status")
+                == "VERIFIED_RUNTIME"
+        ):
+            continue
+
+        row = copy.deepcopy(
+            templates[control]
         )
 
-    if "active_units" in row:
-        row["active_units"] = shaped(
-            row["active_units"],
-            "products_offers_runtime_observer",
-            [
+        row["lane"] = (
+            "products_offers"
+        )
+
+        row["control"] = control
+
+        row["status"] = (
+            "VERIFIED_RUNTIME"
+        )
+
+        if "artifact_paths" in row:
+            row["artifact_paths"] = shaped(
+                row["artifact_paths"],
+                PROOF_REL,
+                [PROOF_REL],
+            )
+
+        if "active_units" in row:
+            row["active_units"] = shaped(
+                row["active_units"],
                 "products_offers_runtime_observer",
-                "empiredb.commercial_products",
-                "empiredb.commercial_product_versions",
-                "empiredb.commercial_product_catalog_events",
-            ],
-        )
+                [
+                    "products_offers_runtime_observer",
+                    "empiredb.commercial_products",
+                    "empiredb.commercial_product_versions",
+                    "empiredb.commercial_product_catalog_events",
+                ],
+            )
 
-    if "matched_keys" in row:
-        row["matched_keys"] = shaped(
-            row["matched_keys"],
-            control,
-            [
+        if "matched_keys" in row:
+            row["matched_keys"] = shaped(
+                row["matched_keys"],
                 control,
-                "VERIFIED_RUNTIME",
-            ],
-        )
+                [
+                    control,
+                    "VERIFIED_RUNTIME",
+                ],
+            )
 
-    if "reason" in row:
-        row["reason"] = (
-            "099B verified this Products/Offers "
-            "control against the canonical EmpireDB "
-            "commercial product/version/event catalog. "
-            "OBSERVE only; no commercial mutation."
-        )
+        if "reason" in row:
+            row["reason"] = (
+                "099B verified this Products/Offers "
+                "control against the canonical EmpireDB "
+                "commercial product/version/event catalog. "
+                "OBSERVE only; no commercial mutation."
+            )
 
-    controls[control] = row
-    promoted.append(control)
+        controls[control] = row
+        promoted.append(control)
 
 
-verified = sorted(
-    name
-    for name, row
-    in controls.items()
-    if row.get("status")
-        == "VERIFIED_RUNTIME"
-)
+    verified = sorted(
+        name
+        for name, row
+        in controls.items()
+        if row.get("status")
+            == "VERIFIED_RUNTIME"
+    )
 
-remaining = sorted(
-    name
-    for name, row
-    in controls.items()
-    if row.get("status")
-        != "VERIFIED_RUNTIME"
-)
+    remaining = sorted(
+        name
+        for name, row
+        in controls.items()
+        if row.get("status")
+            != "VERIFIED_RUNTIME"
+    )
 
-tmp = BINDINGS.with_suffix(
-    ".json.tmp099b"
-)
+    atomic_binding_write(
+        BINDINGS,
+        json.dumps(data, indent=2, sort_keys=True) + "\n",
+        expected_bytes=original_bindings,
+    )
 
-tmp.write_text(
-    json.dumps(
-        data,
-        indent=2,
-        sort_keys=True,
-    ) + "\n",
-    encoding="utf-8",
-)
+    print(
+        "PROMOTED:",
+        ",".join(promoted)
+        or "none",
+    )
 
-tmp.replace(BINDINGS)
+    print(
+        "CANONICAL_VERIFIED_COUNT:",
+        len(verified),
+    )
 
-print(
-    "PROMOTED:",
-    ",".join(promoted)
-    or "none",
-)
-
-print(
-    "CANONICAL_VERIFIED_COUNT:",
-    len(verified),
-)
-
-print(
-    "CANONICAL_REMAINING:",
-    ",".join(remaining)
-    or "none",
-)
+    print(
+        "CANONICAL_REMAINING:",
+        ",".join(remaining)
+        or "none",
+    )

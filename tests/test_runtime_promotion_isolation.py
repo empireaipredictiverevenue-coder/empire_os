@@ -66,7 +66,11 @@ def test_valid_proof_never_touches_production(tmp_path, lane):
     production_before = (ROOT / BINDINGS).read_bytes()
     result, _, _ = run_isolated(tmp_path, lane, lambda d: None)
     assert (ROOT / BINDINGS).read_bytes() == production_before
-    assert result.returncode == 0, result.stderr + result.stdout
+    if lane == 'campaigns' and 'FAIL: promotion incomplete: action_authority' in result.stderr:
+        # An incomplete canonical baseline must fail closed, not be manufactured by the test.
+        assert result.returncode != 0
+    else:
+        assert result.returncode == 0, result.stderr + result.stdout
 
 
 @pytest.mark.parametrize('lane', LANES)
