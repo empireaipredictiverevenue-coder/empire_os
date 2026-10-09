@@ -302,6 +302,60 @@ def _new_recovery_evidence(
     )
 
 
+def _merge_target_people(
+    existing: list[Any],
+    incoming: list[dict[str, Any]],
+    *,
+    website: str,
+) -> list[dict[str, Any]]:
+    """Keep bounded distinct identity leads without losing stronger evidence."""
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    for raw in [*existing, *incoming]:
+        if not isinstance(raw, Mapping):
+            continue
+        name = str(raw.get("name") or "").strip()
+        title = str(raw.get("title") or "").strip()
+        if not looks_like_person_name(name) or not title:
+            continue
+        key = (name.casefold(), title.casefold())
+        person = {
+            "name": name, "title": title,
+            "source": str(raw.get("source") or "").strip() or None,
+            "evidence_url": str(raw.get("evidence_url") or "").strip() or None,
+        }
+        prior = merged.get(key)
+        if prior is None:
+            merged[key] = person
+        elif (
+            _first_party_evidence_url(person["evidence_url"], website)
+            and not _first_party_evidence_url(prior.get("evidence_url"), website)
+        ):
+            merged[key] = person
+    return sorted(
+        merged.values(),
+        key=lambda p: not _first_party_evidence_url(p.get("evidence_url"), website),
+    )[:6]
+
+
+def _merge_verified_routes(
+    existing: list[Any],
+    incoming: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Retain distinct verified contact routes, capped at eight."""
+    merged: dict[tuple[str, str], dict[str, Any]] = {}
+    for raw in [*existing, *incoming]:
+        if not isinstance(raw, Mapping) or raw.get("verified") is not True:
+            continue
+        channel = str(raw.get("channel") or "").strip()
+        value = str(raw.get("value") or "").strip()
+        if not channel or not value:
+            continue
+        key = (channel.casefold(), value.casefold())
+        if key not in merged:
+            merged[key] = dict(raw)
+    return list(merged.values())[:8]
+
+
 class BuyerDeferredEnrichmentQueue:
     def __init__(
         self,
@@ -327,6 +381,16 @@ class BuyerDeferredEnrichmentQueue:
                     "created_at": now,
                     "attempts": 0,
                 }
+            old_website = str(existing.get("website") or "").strip()
+            new_website = str(item.get("website") or "").strip()
+            if (
+                old_website and new_website
+                and not _first_party_evidence_url(new_website, old_website)
+            ):
+                # Do not mix contacts from unrelated companies into one ID.
+                # A legitimate website change needs identity review upstream.
+                return False
+            website = old_website or new_website
             target_people = [
                 {
                     "name": str(person.get("name") or "").strip(),
@@ -355,6 +419,18 @@ class BuyerDeferredEnrichmentQueue:
                 and route.get("verified") is True
                 and str(route.get("value") or "").strip()
             ][:8]
+            target_people = _merge_target_people(
+                list(existing.get("target_people") or []),
+                target_people, website=website,
+            )
+            company_contact_routes = _merge_verified_routes(
+                list(existing.get("company_contact_routes") or []),
+                company_contact_routes,
+            )
+            target_product_codes = list(dict.fromkeys([
+                *[str(v) for v in existing.get("target_product_codes") or []],
+                *target_product_codes,
+            ]))[:6]
 
             # Materially new person evidence can move an existing
             # deferred prospect into hot contact recovery. Its previous
@@ -374,22 +450,24 @@ class BuyerDeferredEnrichmentQueue:
                 ),
             })
 
+            material_new_evidence = _new_recovery_evidence(
+                existing, target_people, company_contact_routes,
+                website=website,
+            )
+            if existing.get("status") == "resolved" and not material_new_evidence:
+                # Repeated enterprise/scout sync must not reopen an already
+                # proposed review solely because its record was rediscovered.
+                return False
+
             previous_lane = _recovery_lane(existing)
             next_lane = _recovery_lane(preview)
             # Re-ingestion must not unclaim active work or dispatch it twice.
             # An expired running lease is recovered by claim_due itself.
             preserve_running_lease = existing.get("status") == "running"
-            website = (
-                str(item.get("website") or "").strip()
-                or str(existing.get("website") or "").strip()
-            )
             new_evidence = (
                 previous_lane == "hot_contact_recovery"
                 and next_lane == "hot_contact_recovery"
-                and _new_recovery_evidence(
-                    existing, target_people, company_contact_routes,
-                    website=website,
-                )
+                and material_new_evidence
             )
             last_wake = _parse(existing.get("last_evidence_acceleration_at"))
             current_time = _parse(now) or _now()

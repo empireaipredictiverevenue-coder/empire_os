@@ -253,6 +253,141 @@ def test_new_evidence_wake_is_rate_limited_against_repeated_refreshes(tmp_path):
             assert timedelta(hours=5) < delay <= timedelta(hours=6)
 
 
+def test_new_hot_evidence_merges_without_dropping_existing_people(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    old = {
+        "prospect_id": "merged", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "source": "first_party_site",
+            "evidence_url": "https://buyer.example/about/",
+        }],
+        "company_contact_routes": [{
+            "channel": "email", "value": "info@buyer.example",
+            "verified": True,
+        }],
+    }
+    assert q.enqueue(old)
+    newer = {
+        **old,
+        "target_people": [{
+            "name": "John Buyer", "title": "CEO",
+            "source": "first_party_site",
+            "evidence_url": "https://buyer.example/leadership/",
+        }],
+        "company_contact_routes": [{
+            "channel": "email", "value": "partners@buyer.example",
+            "verified": True,
+        }],
+    }
+    assert q.enqueue(newer)
+    row = json.loads((tmp_path / "deferred.json").read_text())["merged"]
+    assert {p["name"] for p in row["target_people"]} == {"Jane Buyer", "John Buyer"}
+    assert {r["value"] for r in row["company_contact_routes"]} == {
+        "info@buyer.example", "partners@buyer.example"
+    }
+    assert q.enqueue(newer)
+    row = json.loads((tmp_path / "deferred.json").read_text())["merged"]
+    assert len(row["target_people"]) == 2
+    assert len(row["company_contact_routes"]) == 2
+
+
+def test_weak_repeat_never_overwrites_strong_first_party_person(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "source": "first_party_site",
+            "evidence_url": "https://buyer.example/team/",
+        }],
+    })
+    q.enqueue({
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "source": "search_summary", "evidence_url": "https://unrelated.test/",
+        }],
+    })
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert len(row["target_people"]) == 1
+    assert row["target_people"][0]["evidence_url"] == "https://buyer.example/team/"
+
+
+def test_mismatched_company_website_cannot_replace_existing_identity(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "evidence_url": "https://buyer.example/team/",
+        }],
+    })
+    assert q.enqueue({
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://unrelated.test/",
+        "target_people": [{
+            "name": "Other Buyer", "title": "CEO",
+            "evidence_url": "https://unrelated.test/leadership/",
+        }],
+    }) is False
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["website"] == "https://buyer.example/"
+    assert [p["name"] for p in row["target_people"]] == ["Jane Buyer"]
+
+
+def test_resolved_review_is_not_reopened_by_identical_recurring_sync(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    original = {
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "evidence_url": "https://buyer.example/team/",
+        }],
+    }
+    q.enqueue(original)
+    q.resolve("p1", outcome="buyer_review_proposed")
+    assert q.enqueue(original) is False
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["status"] == "resolved"
+    assert q.due(limit=1) == []
+
+
+def test_resolved_review_can_reopen_for_new_same_company_evidence(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    original = {
+        "prospect_id": "p1", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{
+            "name": "Jane Buyer", "title": "Founder",
+            "evidence_url": "https://buyer.example/team/",
+        }],
+    }
+    q.enqueue(original)
+    q.resolve("p1", outcome="buyer_review_proposed")
+    changed = dict(original, target_people=[{
+        "name": "John Buyer", "title": "CEO",
+        "evidence_url": "https://buyer.example/leadership/",
+    }])
+    assert q.enqueue(changed) is True
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["status"] == "pending"
+    assert {p["name"] for p in row["target_people"]} == {
+        "Jane Buyer", "John Buyer",
+    }
+    assert q.due(limit=1)[0]["prospect_id"] == "p1"
+
+
 def test_expired_lease_is_counted_as_due(tmp_path):
     q = _queue(tmp_path)
     q.enqueue({"prospect_id": "p1", "reason": "no_contact_evidence"})
