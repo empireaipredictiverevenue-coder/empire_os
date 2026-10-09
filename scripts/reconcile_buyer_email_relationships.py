@@ -60,9 +60,14 @@ def build(root: Path = ROOT) -> dict:
             root / "runtime/buyer_acquisition/linkedin_revenue_department_latest.json",
             limit=2_000_000,
         )
+        previous_social = previous.get("social_intent_review") or {}
+        previous_research = previous_social.get("company_identity_research") or {}
         result["social_intent_review"] = build_social_intent_review(
             inbox, result["relationships"],
             community=community, linkedin=linkedin,
+            previous_research_tasks=previous_research.get(
+                "identity_review_tasks", []
+            ),
         )
     except (OSError, ValueError, TypeError):
         result["social_intent_review"] = {

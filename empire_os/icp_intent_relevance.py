@@ -15,8 +15,23 @@ PITCH = (
     re.compile(r"\b(?:our (?:agency|clients|service|solution)|free consultation)\b", re.I),
 )
 DIRECT_REQUEST = (
-    re.compile(r"\b(?:looking for|can anyone recommend|seeking|need help (?:with|getting)|want to buy|need to buy)\b", re.I),
+    # "Looking for advice about my career" is not a purchase request.
+    re.compile(r"\b(?:looking for|seeking|can anyone recommend|want to buy|need to buy|need help (?:with|getting))\b.{0,95}\b(?:qualified leads?|appointments?|customers?|marketing (?:help|agency|services?)|crm|sales automation|lead gen(?:eration)?|software|seo|intake)\b", re.I),
     re.compile(r"\b(?:need|looking for).{0,70}\b(?:roofing leads?|appointments?|agency|clients?|customers?|crm|marketing help|software|automation)\b", re.I),
+)
+NON_PURCHASE = (
+    re.compile(r"\[\s*hiring\s*\]", re.I),
+    re.compile(r"\b(?:\[hiring\]|hiring (?:client|sales|marketing|account)|territory account manager|fractional cmo|head of marketing|field sales engineer|looking for (?:an?|our) (?:account|sales|marketing|territory) manager|looking for (?:a|an) (?:client acquisition|business development|sales) partner)\b", re.I),
+    re.compile(r"\b(?:we(?:'re| are) hiring|job posting|job opportunity|apply now|send (?:your|a) (?:cv|resume)|careers?@|join our team|vacancy|recruiting)\b", re.I),
+    re.compile(r"\b(?:my (?:sales )?career|career growth|career advice|which role should i|where should i take my career|looking for (?:my )?next role|what would you do: stay|need to find a new job)\b", re.I),
+)
+SELF_PROMOTION = (
+    re.compile(r"\b(?:i|we) (?:built|launched|created|developed)\b.{0,95}\b(?:saas|tool|platform|product|app|service)\b", re.I),
+    re.compile(r"^\s*(?:built|launched|created)\b.{0,95}\b(?:saas|tool|platform|product|app|service)\b", re.I),
+    re.compile(r"\b(?:my|our) (?:new )?(?:product|lead service|agency|platform|tool)\b.{0,55}\b(?:offers?|provides?|generates?|customers?|leads?)\b", re.I),
+    re.compile(r"\b(?:anyone|are you|who(?:\'s| is)) looking for\b.{0,85}\b(?:seo|marketing|growth|automation|leads?|agency|services?|expert)\b", re.I),
+    re.compile(r"\b(?:for free|free trial)\b.{0,70}\b(?:try (?:my|our)|lead finder|mailer|product|tool)\b", re.I),
+    re.compile(r"\b(?:we helped|how we helped|we deployed|our clients?|i now get to help)\b.{0,110}\b(?:consultancy|marketing|sales|seo|leads?|business|brands?|clients?)\b", re.I),
 )
 OPERATING_PROBLEM = (
     re.compile(r"\b(?:we|i) (?:own|run|manage|operate|started|took over) (?:a|an|my|our)\b", re.I),
@@ -24,7 +39,7 @@ OPERATING_PROBLEM = (
     re.compile(r"\b(?:we|i) (?:struggle|struggled|spent|paid|lost|need|can't|cannot|haven't|do not have)\b", re.I),
 )
 GENERAL_ADVICE = (
-    re.compile(r"\b(?:top \d+ tips|here is how to|in this article|let me explain|guide to|case study:)\b", re.I),
+    re.compile(r"\b(?:top \d+ tips|here is how to|in this article|let me explain|guide to|case study:|handy guide for beginners|sales formula)\b", re.I),
 )
 
 ALLOWED_PAIN = frozenset(SOLUTION_MAP)
@@ -32,7 +47,9 @@ ALLOWED_PAIN = frozenset(SOLUTION_MAP)
 
 def classify_icp_intent(detail: Mapping[str, Any]) -> dict[str, Any]:
     text = " ".join(str(detail.get(k) or "")[:1500] for k in ("title", "text"))
-    if any(p.search(text) for p in PITCH):
+    if any(p.search(text) for p in NON_PURCHASE):
+        kind = "NON_COMMERCIAL_HIRING_OR_CAREER"
+    elif any(p.search(text) for p in PITCH + SELF_PROMOTION):
         kind = "SELLER_PITCH"
     elif any(p.search(text) for p in DIRECT_REQUEST):
         kind = "EXPLICIT_REQUEST_UNVERIFIED"

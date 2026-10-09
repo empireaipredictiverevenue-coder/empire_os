@@ -12,6 +12,7 @@ from typing import Any, Mapping
 from urllib.parse import urlsplit
 
 from empire_os.icp_intent_relevance import classify_icp_intent
+from empire_os.intent_company_research_tasks import build_tasks
 
 CHANNELS = frozenset({"reddit_intent", "linkedin_intent"})
 SOURCE_LABELS = {"reddit_intent": "reddit", "linkedin_intent": "linkedin"}
@@ -100,6 +101,7 @@ def build_social_intent_review(
     community: Mapping[str, Any] | None = None,
     linkedin: Mapping[str, Any] | None = None,
     now: datetime | None = None,
+    previous_research_tasks: list[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Join ONLY explicit external evidence links to known company domains.
 
@@ -216,6 +218,9 @@ def build_social_intent_review(
             for key, qty in product_hypotheses.most_common()
         ],
         "identity_unverified_review_queue": review,
+        "company_identity_research": build_tasks(
+            observed, now=now, previous_tasks=previous_research_tasks,
+        ),
         "review_queue_truncated": len(review) < len(observed),
         "linkedin_and_reddit_runtime": metrics,
         "historical_post_publication_date_independently_verified": False,

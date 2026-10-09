@@ -133,3 +133,35 @@ sign terms, change product prices or recognise revenue.
 Proof standard: tests for idempotence, recency, fail-closed source health,
 balanced exploration, operator-vs-seller relevance, no commercial claims,
 cross-cycle persistence and shared-registry read-back.
+
+
+## Bounded intent-to-company research tasks
+
+`empire_os/intent_company_research_tasks.py` now converts only relevant,
+time-bounded social observations into **identity research tasks within the
+existing private commercial relationship registry**. The 30-minute buyer
+scout invokes that registry reconciler; no duplicate CRM or research timer.
+
+Research tasks contain: a stable hash of the source URL, source, observation
+time, classified problem/request, candidate product hypothesis, evidence
+links if present, outstanding company/author/budget/contact verification,
+first-seen timestamp and last-evaluated timestamp. An unchanged source URL
+preserves the task identity and original discovery timestamp across refreshes.
+
+Posts that are hiring advertisements, career advice, seller outreach, product
+self-promotion or general content **do not** enter the company-identity task
+queue. High numeric scores are insufficient to overcome those exclusions.
+Bound the queue to 12 research items, with balanced Reddit/LinkedIn coverage.
+
+Even if a public social post quotes a known company website, the connection
+remains an *unverified citation hypothesis*. No social identity, new
+prospect, email address, commercial terms, approval or conversion can be
+created from this evidence. Tasks always require independent company and
+poster identity verification followed by ordinary consent, deliverability
+and founder gates. No automatic direct messages or paid API access.
+
+A research task is not marked complete by generation, and the commercial
+outcome remains unknown until genuine counterparty and canonical revenue
+evidence exists. Source-order learning remains in the existing
+`source_learning_latest.json` journal; Cortex/Economic Memory own verified
+commercial labels.
