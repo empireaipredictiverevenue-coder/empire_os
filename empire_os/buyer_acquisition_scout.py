@@ -916,6 +916,10 @@ def run_buyer_scout(
                 )
                 else None
             ),
+            "canonical_seed_website": (
+                str(canonical_seed_by_domain.get(domain, {}).get("website") or "")
+                if domain in canonical_seed_by_domain else None
+            ),
             "canonical_seed_niche": (
                 canonical_seed_by_domain.get(domain, {}).get("niche")
             ),

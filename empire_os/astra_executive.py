@@ -12,7 +12,7 @@ not create commercial authority.
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from empire_os.agi_memory import build_memory_query
+from empire_os.astra_canonical_company_binding import resolve_company_bindings
 from empire_os.control_fabric import default_registry
 from empire_os.departments import (
     default_departments,
@@ -640,6 +641,7 @@ def build_plan(
     goals: Sequence[ExecutiveGoal],
     *,
     max_steps: int = 8,
+    company_bindings: Mapping[str, Any] | None = None,
 ) -> tuple[ExecutivePlanStep, ...]:
     if not goals:
         return ()
@@ -712,6 +714,26 @@ def build_plan(
             commercial_decision_provenance=_commercial_selection_provenance(
                 world, _clean(row.get("opportunity_key")), row),
         )
+        # Exact canonical prospect and first-party company evidence may supply
+        # *research context* to an already eligible action; it never changes
+        # step identity, authority, selection or queue eligibility.
+        scope = (company_bindings or {}).get(entity)
+        if (
+            action in {"verify_decision_maker", "enrich_identity", "prepare_buyer_review"}
+            and step.auto_dispatch_eligible
+            and component_authority in {"observe", "internal_write"}
+            and row.get("founder_gate_required") is not True
+            and isinstance(scope, Mapping)
+            and scope.get("execution_authority") == "none"
+            and scope.get("canonical_prospect_id") == row.get("prospect_id")
+        ):
+            step = replace(step, intelligence_request={
+                **step.intelligence_request,
+                "company_domain": scope["company_domain"],
+                "canonical_prospect_id": scope["canonical_prospect_id"],
+                "company_identity_source": scope["identity_source"],
+                "identity_scope": "research_only",
+            })
         if component_authority == "founder_gate":
             step = ExecutivePlanStep(
                 **{
@@ -835,6 +857,7 @@ def build_executive_snapshot(
     next_best_action: Mapping[str, Any] | None,
     revenue_pulse: Mapping[str, Any] | None,
     quant_review: Mapping[str, Any] | None = None,
+    scout_identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     world = build_world_state(
         predictive_status=predictive_status,
@@ -844,7 +867,10 @@ def build_executive_snapshot(
         quant_review=quant_review,
     )
     goals = derive_goals(world)
-    plan = build_plan(world, goals)
+    identity = resolve_company_bindings(
+        next_best_action or {}, scout_identity or {},
+    )
+    plan = build_plan(world, goals, company_bindings=identity["bindings"])
     plan_material = json.dumps(
         {
             "goals": [goal.as_dict() for goal in goals],
@@ -876,6 +902,11 @@ def build_executive_snapshot(
         "departments_in_plan": tuple(sorted(department_counts)),
         "department_plan_counts": dict(sorted(department_counts.items())),
         "plan_step_count": len(plan),
+        "canonical_company_binding_status": identity["status"],
+        "canonical_company_binding_count": identity["matched_count"],
+        "canonical_company_binding_blocker_counts": identity[
+            "blocked_reason_counts"
+        ],
         "auto_dispatch_eligible_count": sum(
             step.auto_dispatch_eligible for step in plan
         ),
@@ -905,6 +936,9 @@ def refresh_astra_executive(repo_root: Path) -> dict[str, Any]:
         next_best_action=_read(repo_root / NEXT_BEST_ACTION),
         revenue_pulse=_read(repo_root / REVENUE_PULSE),
         quant_review=_read(repo_root / QUANT_REVIEW),
+        scout_identity=_read(
+            repo_root / "runtime/buyer_acquisition/scout_latest.json"
+        ),
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
