@@ -1,5 +1,7 @@
 # Empire SkillForge — Sovereign Agent Skills & Learning
 
+**Engineering closeout:** See [COMPLETION.md](COMPLETION.md) for the one-command acceptance gauntlet, verified coverage and exact founder/evidence gates.
+
 **State:** OBSERVE. Evidence-backed learning observations and private review drafts are created by the existing department worker; skills are **not automatically approved or executed**.
 
 ## The actual connected flow
