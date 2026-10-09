@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol, Sequence
+from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
@@ -52,6 +53,62 @@ class AuthenticatedRevenueCrmRead:
     """
     tenant_id: str
     repository: PostgresRevenueCrmRepository
+
+
+def build_authenticated_revenue_crm_resolver(
+    authenticate_tenant: Callable[[Request], str | None],
+    dedicated_tenant_dsns: Mapping[str, str],
+    *,
+    connect_factory: Callable | None = None,
+) -> Callable[[Request], AuthenticatedRevenueCrmRead | None]:
+    """Existing CRM's opt-in integration for verified, per-tenant DB logins.
+
+    authenticate_tenant MUST independently authenticate the HTTP principal
+    through a trusted server-side mechanism. Do not use client tenant headers,
+    query strings, or unverified session claims as this callback's result.
+    Every DSN must authenticate as a distinct, dedicated, tenant-bound LOGIN.
+    Configuration does not grant DB roles or activate the HTTP router.
+    """
+    if not callable(authenticate_tenant):
+        raise ValueError("authenticated CRM principal resolver required")
+    credentials: dict[str, str] = {}
+    seen_dsns: set[str] = set()
+    for raw_tenant, raw_dsn in dedicated_tenant_dsns.items():
+        try:
+            tenant = str(UUID(str(raw_tenant)))
+        except (TypeError, ValueError, AttributeError):
+            raise ValueError("canonical CRM tenant configuration required") from None
+        if tenant in credentials:
+            raise ValueError("duplicate canonical CRM tenant configuration")
+        if not isinstance(raw_dsn, str) or not raw_dsn.strip():
+            raise ValueError("dedicated CRM tenant connection required")
+        dsn = raw_dsn.strip()
+        if dsn in seen_dsns:
+            raise ValueError("shared CRM database connection is prohibited")
+        credentials[tenant] = dsn
+        seen_dsns.add(dsn)
+    if not credentials:
+        raise ValueError("no dedicated CRM tenant connections configured")
+
+    def resolve(request: Request) -> AuthenticatedRevenueCrmRead | None:
+        verified_tenant = authenticate_tenant(request)
+        if verified_tenant is None:
+            return None
+        try:
+            tenant = str(UUID(str(verified_tenant)))
+        except (TypeError, ValueError, AttributeError):
+            raise RevenueCrmTransportError("authenticated CRM scope invalid") from None
+        dsn = credentials.get(tenant)
+        if not dsn:
+            raise RevenueCrmTransportError("authenticated CRM tenant not provisioned")
+        return AuthenticatedRevenueCrmRead(
+            tenant_id=tenant,
+            repository=PostgresRevenueCrmRepository(
+                dsn, tenant_id=tenant, connect_factory=connect_factory,
+            ),
+        )
+
+    return resolve
 
 
 class RevenueCrmRetentionRequest(BaseModel):

@@ -164,3 +164,76 @@ def test_database_read_failure_is_sanitized_to_503():
     assert response.status_code == 503
     assert response.json()["detail"] == "authenticated_crm_read_unavailable"
     assert "secret" not in str(response.json())
+
+def test_configured_resolver_requires_server_auth_and_distinct_db_logins():
+    from empire_os.revenue_crm_api import build_authenticated_revenue_crm_resolver
+    cursor_a, cursor_b = Cursor(A), Cursor(B)
+    connections = {
+        "db-tenant-a": Connection(cursor_a),
+        "db-tenant-b": Connection(cursor_b),
+    }
+    resolver = build_authenticated_revenue_crm_resolver(
+        lambda request: getattr(request.app.state, "trusted_tenant", None),
+        {A: "db-tenant-a", B: "db-tenant-b"},
+        connect_factory=lambda dsn: connections[dsn],
+    )
+    app = FastAPI()
+    app.include_router(create_revenue_crm_router(
+        resolve_authenticated_read=resolver
+    ))
+    app.state.trusted_tenant = None
+    client = TestClient(app)
+    unauth = client.get("/v1/revenue-crm/prospects", headers={
+        "Authorization": "Bearer spoof",
+        "X-Tenant-ID": A,
+    })
+    assert unauth.status_code == 401
+    assert cursor_a.calls == [] and cursor_b.calls == []
+
+    app.state.trusted_tenant = A
+    a = client.get("/v1/revenue-crm/prospects", headers={"X-Tenant-ID": B})
+    assert a.status_code == 200
+    assert a.json()["items"][0]["tenant_id"] == A
+    assert cursor_b.calls == []
+
+    app.state.trusted_tenant = B
+    b = client.get("/v1/revenue-crm/prospects", headers={"X-Tenant-ID": A})
+    assert b.status_code == 200
+    assert b.json()["items"][0]["tenant_id"] == B
+    assert len(cursor_b.calls) > 0
+
+    app.state.trusted_tenant = "00000000-0000-0000-0000-000000000104"
+    unknown = client.get("/v1/revenue-crm/prospects")
+    assert unknown.status_code == 503
+    assert unknown.json()["detail"] == "authenticated_crm_read_unavailable"
+
+
+@pytest.mark.parametrize("connections", [
+    {},
+    {"not-uuid": "db-tenant-a"},
+    {A: ""},
+    {A: "same-db", B: "same-db"},
+])
+def test_unsafe_tenant_connection_mapping_rejected_at_configuration(connections):
+    from empire_os.revenue_crm_api import build_authenticated_revenue_crm_resolver
+    with pytest.raises(ValueError):
+        build_authenticated_revenue_crm_resolver(lambda _: A, connections)
+
+
+def test_authenticated_resolver_does_not_promote_failed_database_tenant_binding():
+    from empire_os.revenue_crm_api import build_authenticated_revenue_crm_resolver
+    cursor = Cursor(B)  # Credentials map says A, PostgreSQL says B.
+    resolver = build_authenticated_revenue_crm_resolver(
+        lambda request: request.app.state.trusted_tenant,
+        {A: "db-tenant-a"},
+        connect_factory=lambda _: Connection(cursor),
+    )
+    app = FastAPI()
+    app.state.trusted_tenant = A
+    app.include_router(create_revenue_crm_router(
+        resolve_authenticated_read=resolver
+    ))
+    result = TestClient(app).get("/v1/revenue-crm/prospects")
+    assert result.status_code == 503
+    assert not any("FROM public.revenue_crm_prospects" in sql
+                   for sql, _ in cursor.calls)
