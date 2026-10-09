@@ -14,13 +14,15 @@ from empire_os.commercial_loop_observer import (
     write_commercial_loop_snapshot,
 )
 from empire_os.sb import request_json
+from empire_os.commercial_loop_reader import read_commercial_loop, CommercialLoopReadError
+from empire_os.commercial_loop_refresh_contract import preserve_cycle_local_observations
 SNAPSHOT = Path("/srv/empire_os/runtime/commercial_loop/latest.json")
 
 
 def _existing() -> dict[str, CommercialLoopObservation]:
     try:
-        payload = json.loads(SNAPSHOT.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        payload = read_commercial_loop(SNAPSHOT)
+    except CommercialLoopReadError:
         return {}
 
     observations: dict[str, CommercialLoopObservation] = {}
@@ -45,13 +47,12 @@ def _reader(path: str, params: dict[str, str]):
 
 
 def main() -> int:
-    observations = _existing()
-    observations.update(
-        fetch_canonical_commercial_observations(
-            _reader,
-            now=datetime.now(timezone.utc),
-        )
+    existing = _existing()
+    canonical = fetch_canonical_commercial_observations(
+        _reader,
+        now=datetime.now(timezone.utc),
     )
+    observations = preserve_cycle_local_observations(existing, canonical)
     status = assess_commercial_loop(observations)
     write_commercial_loop_snapshot(status)
     print(json.dumps(status.as_dict(), indent=2, sort_keys=True))
