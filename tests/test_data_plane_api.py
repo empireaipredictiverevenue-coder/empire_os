@@ -12,7 +12,7 @@ def client():
 
 def test_health_is_observe_only():
     body = client().get("/v1/data-plane/health").json()
-    assert body["canonical_operational_truth"] == "supabase_postgresql"
+    assert body["canonical_operational_truth"] == "empiredb_postgresql"
     assert body["deployment_enabled"] is False
     assert body["schema_mutation"] is False
     assert body["execution_authority"] == "none"

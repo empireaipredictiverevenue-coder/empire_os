@@ -65,13 +65,25 @@ class FakeProvider:
 
 
 def test_gateway_is_single_primary_without_write_fallback():
-    gateway = CanonicalDataGateway(FakeProvider())
+    from empire_os.canonical_data_gateway import CanonicalDataGateway
+    from empire_os.data_cloud_contract import DataBackend
+
+    class Provider:
+        backend = DataBackend.SUPABASE_LEGACY
+
+        def configured(self):
+            return True
+
+    gateway = CanonicalDataGateway(
+        Provider(),
+        expected_backend=DataBackend.SUPABASE_LEGACY,
+    )
+
     snapshot = gateway.snapshot().as_dict()
 
     assert snapshot["primary_backend"] == "supabase_legacy"
     assert snapshot["dual_write_enabled"] is False
     assert snapshot["write_fallback_enabled"] is False
-
 
 def test_gateway_delegates_without_exposing_vendor_details():
     provider = FakeProvider()
@@ -109,14 +121,27 @@ def test_expected_backend_mismatch_is_rejected():
         )
 
 
-def test_environment_defaults_to_current_legacy_backend():
-    provider = FakeProvider()
-    gateway = gateway_from_environment(
-        {"SUPABASE_URL": "https://example.supabase.co", "SUPABASE_SERVICE_KEY": "key"},
-        legacy_provider_factory=lambda _: provider,
-    )
-    assert gateway.backend is DataBackend.SUPABASE_LEGACY
+def test_environment_defaults_to_empiredb_backend():
+    from empire_os.canonical_data_gateway import gateway_from_environment
+    from empire_os.data_cloud_contract import DataBackend
 
+    class Provider:
+        backend = DataBackend.EMPIREDB
+
+        def configured(self):
+            return True
+
+    gateway = gateway_from_environment(
+        {},
+        empiredb_provider_factory=lambda _env: Provider(),
+    )
+
+    snapshot = gateway.snapshot().as_dict()
+
+    assert snapshot["primary_backend"] == "empiredb"
+    assert snapshot["configured"] is True
+    assert snapshot["dual_write_enabled"] is False
+    assert snapshot["write_fallback_enabled"] is False
 
 def test_empiredb_selection_uses_registered_provider_factory():
     class FakeEmpireProvider(FakeProvider):

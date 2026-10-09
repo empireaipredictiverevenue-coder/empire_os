@@ -474,3 +474,51 @@ def test_ingest_prospect_atomic_binds_text_and_text_array_contract():
         "domain:example.com",
         "name_metro:example|denver",
     ]
+
+
+@pytest.mark.parametrize('existing', [None, 'Concurrent Person'])
+def test_update_null_cas_executes_only_for_null_row(existing):
+    # Execute provider-generated SQL in an isolated in-memory SQL engine.
+    import sqlite3
+    connection = sqlite3.connect(':memory:')
+    connection.execute("ATTACH DATABASE ':memory:' AS public")
+    connection.execute('CREATE TABLE public.prospects (id TEXT, contact_name TEXT, contacted_status TEXT)')
+    connection.executemany('INSERT INTO public.prospects VALUES (?, ?, ?)',
+                          [('target', existing, 'not_contacted'), ('other', None, 'not_contacted')])
+    calls = []
+
+    class Connection:
+        def execute(self, sql, params):
+            calls.append((sql, params))
+            cursor = connection.execute(sql.replace('%s', '?'), params)
+            return Cursor(cursor.fetchall(), [col[0] for col in cursor.description])
+
+        def commit(self):
+            connection.commit()
+
+        def rollback(self):
+            connection.rollback()
+
+        def close(self):
+            pass
+
+    provider = EmpireDbProvider(FakeConnector(Connection()))
+    rows = provider.update('prospects', {'id': 'target', 'contact_name': None},
+                           {'contact_name': "Adam's name"})
+    assert bool(rows) == (existing is None)
+    assert calls[0][1] == ("Adam's name", 'target')
+    assert '"contact_name" IS NULL' in calls[0][0]
+    assert connection.execute('SELECT * FROM public.prospects ORDER BY id').fetchall() == [
+        ('other', None, 'not_contacted'),
+        ('target', "Adam's name" if existing is None else existing, 'not_contacted')]
+    connection.close()
+
+
+def test_update_non_null_equality_stays_parameterized():
+    connection = FakeConnection()
+    provider = EmpireDbProvider(FakeConnector(connection))
+    provider.update('prospects', {'id': 'target', 'contact_name': 'Existing'},
+                    {'contact_name': 'Adam'})
+    sql, params = connection.calls[0]
+    assert 'WHERE "id" = %s AND "contact_name" = %s' in sql
+    assert params == ('Adam', 'target', 'Existing')

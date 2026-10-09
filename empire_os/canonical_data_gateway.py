@@ -9,6 +9,7 @@ commercial truth.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass
 import os
 from typing import Any, Mapping, Protocol, Sequence
@@ -153,6 +154,23 @@ class CanonicalDataGateway:
     @property
     def configured(self) -> bool:
         return bool(self._provider.configured())
+
+    @contextmanager
+    def transaction(self):
+        """Canonical EmpireDB only; no fallback or additional authority."""
+        self._require_provider()
+        if self.backend is not DataBackend.EMPIREDB:
+            raise DataGatewayOperationUnsupported("transaction requires EmpireDB")
+        with self._provider.transaction() as provider:
+            yield CanonicalDataGateway(provider, expected_backend=DataBackend.EMPIREDB)
+
+    @property
+    def transaction_state(self):
+        return getattr(self._provider, "state", "not_started")
+
+    @property
+    def write_outcome_unknown(self):
+        return bool(getattr(self._provider, "write_outcome_unknown", False))
 
     def snapshot(self) -> GatewaySnapshot:
         return GatewaySnapshot(
@@ -314,14 +332,17 @@ def gateway_from_environment(
 ) -> CanonicalDataGateway:
     """Build the canonical gateway from explicit backend selection.
 
-    Default remains the currently canonical legacy backend during migration.
-    Selecting EmpireDB before its verified provider is registered fails closed.
+    EmpireDB is the canonical default backend.
+
+    The retired legacy provider remains explicitly selectable only for bounded
+    rollback, containment and historical verification. Missing configuration
+    fails closed rather than silently selecting the retired provider.
     """
 
     source = os.environ if environ is None else environ
     raw_backend = str(
         source.get("EMPIRE_DATA_BACKEND")
-        or DataBackend.SUPABASE_LEGACY.value
+        or DataBackend.EMPIREDB.value
     ).strip()
 
     try:

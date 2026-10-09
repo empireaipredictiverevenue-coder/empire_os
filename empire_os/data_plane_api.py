@@ -52,7 +52,7 @@ def create_data_plane_router() -> APIRouter:
         return {
             "mode": "OBSERVE",
             "execution_authority": "none",
-            "canonical_operational_truth": "supabase_postgresql",
+            "canonical_operational_truth": "empiredb_postgresql",
             "deployment_enabled": False,
             "provisioning_enabled": False,
             "schema_mutation": False,

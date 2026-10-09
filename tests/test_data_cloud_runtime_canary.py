@@ -45,8 +45,8 @@ def test_runtime_canary_uses_pgbouncer_and_preserves_canonical(monkeypatch):
     assert seen["gateway_env"]["EMPIRE_DATA_BACKEND"] == "empiredb"
     assert ":6432/" in seen["gateway_env"]["EMPIREDB_DSN"]
     assert ":6432/" in seen["canary_dsn"]
-    assert report["canonical_backend_before"] == "supabase_legacy"
-    assert report["canonical_backend_after"] == "supabase_legacy"
+    assert report["canonical_backend_before"] == "empiredb"
+    assert report["canonical_backend_after"] == "empiredb"
     assert report["canonical_backend_unchanged"] is True
     assert report["representative_read_verified"] is True
     assert report["rollback_only_write_path_verified"] is True

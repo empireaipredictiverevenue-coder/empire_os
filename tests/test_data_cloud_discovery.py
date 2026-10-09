@@ -103,7 +103,7 @@ def test_approved_vendor_boundaries_are_not_business_runtime_coupling(tmp_path: 
     assert by_path["empire_os/supabase_egress_guard.py"] == "migration_containment"
     assert by_path["empire_os/legacy_data_egress.py"] == "migration_containment"
     assert by_path["empire_os/reliability_agent.py"] == "migration_observer"
-    assert by_path["empire_os/astra_token_transport.py"] == "legacy_observer_adapter"
+    assert by_path["empire_os/astra_token_transport.py"] == "retired_observer_adapter_marker"
     assert by_path["scripts/run_supabase_egress_guard.py"] == "migration_containment"
 
 

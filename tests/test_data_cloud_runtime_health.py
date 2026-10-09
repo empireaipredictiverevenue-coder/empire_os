@@ -65,8 +65,8 @@ def test_collect_health_is_read_only_and_keeps_supabase_canonical(
 
     assert result["read_only"] is True
     assert result["production_cutover_authority"] is False
-    assert result["canonical_backend"] == "supabase_legacy"
-    assert result["canonical_backend_source"] == "default_supabase_legacy"
+    assert result["canonical_backend"] == "empiredb"
+    assert result["canonical_backend_source"] == "default_empiredb"
     assert result["candidate_runtime_healthy"] is True
     assert result["operational_cutover_ready"] is False
     assert result["archive_mode_on"] is False

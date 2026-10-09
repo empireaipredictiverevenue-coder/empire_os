@@ -6,9 +6,11 @@ execution are intentionally unsupported.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from decimal import Decimal
 
 import re
+from time import monotonic
 from typing import Any, Mapping, Sequence
 
 from empire_os.data_values import JsonValue
@@ -188,6 +190,18 @@ def _rows(cursor: Any) -> list[dict[str, Any]]:
     ]
 
 
+
+# Governed Buyer Scout raw-prospect promotion.
+# UUID cast is required at the PostgreSQL function boundary.
+_RPC_PARAMS["promote_buyer_scout_candidate_to_prospect"] = (
+    "p_candidate_id",
+    "p_actor",
+)
+
+_RPC_SQL_CASTS["promote_buyer_scout_candidate_to_prospect"] = {
+    "p_candidate_id": "uuid",
+}
+
 _RPC_NUMERIC_PARAMS: dict[str, frozenset[str]] = {
     'propose_buyer_candidate_review': frozenset(('p_company_score', 'p_decision_score',)),
     'refresh_pending_buyer_candidate_review': frozenset(('p_decision_score',)),
@@ -198,6 +212,32 @@ class EmpireDbProvider:
 
     def __init__(self, connector: PostgresConnector) -> None:
         self._connector = connector
+
+    @contextmanager
+    def transaction(self):
+        """One serializable unit; CRUD leases cannot commit or close it."""
+        transaction = _EmpireDbTransaction(self)
+        try:
+            transaction._begin()
+            yield transaction
+            transaction._commit()
+        except BaseException as exc:
+            transaction._rollback(exc)
+            raise
+        finally:
+            transaction._close()
+
+    @contextmanager
+    def read_only_snapshot(self):
+        """One repeatable read for derived intelligence; no mutation surface."""
+        snapshot = _EmpireDbReadOnlySnapshot(self)
+        try:
+            snapshot._begin()
+            yield snapshot
+            snapshot._require_active()
+        finally:
+            snapshot._rollback(None)
+            snapshot._close()
 
     def configured(self) -> bool:
         return bool(self._connector.config_snapshot.get("dsn_configured"))
@@ -499,7 +539,11 @@ class EmpireDbProvider:
             f"UPDATE public.{_ident(table)} SET "
             + ", ".join(f"{_ident(name)} = %s" for name in value_names)
             + " WHERE "
-            + " AND ".join(f"{_ident(name)} = %s" for name in match_names)
+            + " AND ".join(
+                f"{_ident(name)} IS NULL" if match[name] is None
+                else f"{_ident(name)} = %s"
+                for name in match_names
+            )
             + " RETURNING *"
         )
         params = tuple(
@@ -507,7 +551,7 @@ class EmpireDbProvider:
             for name in value_names
         ) + tuple(
             self._adapt(match[name])
-            for name in match_names
+            for name in match_names if match[name] is not None
         )
 
         connection = self._connection()
@@ -630,3 +674,121 @@ class EmpireDbProvider:
             raise
         finally:
             connection.close()
+
+
+class _TransactionLease:
+    """Reuse provider SQL/validation while deferring lifecycle to the owner."""
+
+    def __init__(self, owner):
+        self.owner = owner
+
+    def execute(self, sql, params=()):
+        self.owner._require_active()
+        try:
+            return self.owner._session.execute(sql, params)
+        except BaseException:
+            self.owner._failed = True
+            raise
+
+    def commit(self):
+        pass
+
+    def rollback(self):
+        self.owner._failed = True
+
+    def close(self):
+        pass
+
+
+class _EmpireDbTransaction(EmpireDbProvider):
+    def __init__(self, provider):
+        super().__init__(provider._connector)
+        self._session = None
+        self._failed = False
+        self._deadline = None
+        self.state = "not_started"
+        self.write_outcome_unknown = False
+
+    def _begin(self):
+        self._session = super()._connection()
+        # Connector setup executes SELECT set_config and starts a transaction.
+        # Discard that read-only setup transaction before setting isolation.
+        self._session.rollback()
+        self._session.execute("SET TRANSACTION ISOLATION LEVEL SERIALIZABLE")
+        self._session.execute("SET LOCAL lock_timeout = '5s'")
+        self._session.execute("SET LOCAL statement_timeout = '15s'")
+        self._session.execute("SET LOCAL idle_in_transaction_session_timeout = '30s'")
+        self._deadline = monotonic() + 60
+        self.state = "active"
+
+    def _require_active(self):
+        if self.state != "active":
+            raise RuntimeError("transaction is not active")
+        if self._failed:
+            raise RuntimeError("transaction has failed")
+        if monotonic() >= self._deadline:
+            self._failed = True
+            raise TimeoutError("canonical transaction deadline exceeded")
+
+    def _connection(self):
+        self._require_active()
+        return _TransactionLease(self)
+
+    def _commit(self):
+        self._require_active()
+        self.state = "committing"
+        self._session.commit()
+        self.state = "committed"
+
+    def _rollback(self, exc):
+        # A transport failure during COMMIT can mean the server committed.
+        # Serialization/deadlock rejection is a known abort, never success.
+        self.write_outcome_unknown = (
+            self.state == "committing"
+            and getattr(exc, "sqlstate", None) not in {"40001", "40P01"}
+        )
+        try:
+            if self._session is not None:
+                self._session.rollback()
+            self.state = "unknown" if self.write_outcome_unknown else "rolled_back"
+        except BaseException:
+            self.state = "unknown" if self.write_outcome_unknown else "rollback_unconfirmed"
+
+    def _close(self):
+        if self._session is not None:
+            try:
+                self._session.close()
+            except Exception:
+                # Closing cannot change an acknowledged commit/abort outcome.
+                pass
+
+    def rpc(self, *args, **kwargs):
+        raise DataGatewayOperationUnsupported("RPC is unavailable in table transactions")
+
+    def transaction(self):
+        raise DataGatewayOperationUnsupported("nested transactions are unavailable")
+
+
+class _EmpireDbReadOnlySnapshot(_EmpireDbTransaction):
+    """Reuse validated provider SELECTs on a database-enforced read-only lease."""
+
+    def _begin(self):
+        self._session = EmpireDbProvider._connection(self)
+        self._session.rollback()
+        self._session.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        self._session.execute("SET LOCAL statement_timeout = '15s'")
+        self._session.execute("SET LOCAL idle_in_transaction_session_timeout = '30s'")
+        self._deadline = monotonic() + 60
+        self.state = "active"
+
+    def _deny_write(self, *args, **kwargs):
+        raise DataGatewayOperationUnsupported("read-only snapshot cannot mutate canonical data")
+
+    insert = _deny_write
+    update = _deny_write
+    upsert = _deny_write
+    insert_ignore_conflicts = _deny_write
+    delete = _deny_write
+    rpc = _deny_write
+    transaction = _deny_write
+    read_only_snapshot = _deny_write

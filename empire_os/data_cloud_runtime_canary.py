@@ -35,7 +35,7 @@ def run_runtime_canary(
         raise RuntimeError("EMPIREDB_DSN is required")
 
     canonical_before = str(
-        source.get("EMPIRE_DATA_BACKEND") or "supabase_legacy"
+        source.get("EMPIRE_DATA_BACKEND") or "empiredb"
     ).strip()
     pooled_dsn = pool_dsn(direct_dsn)
 
@@ -52,7 +52,7 @@ def run_runtime_canary(
     prospects_after = int(gateway.count("prospects"))
 
     canonical_after = str(
-        source.get("EMPIRE_DATA_BACKEND") or "supabase_legacy"
+        source.get("EMPIRE_DATA_BACKEND") or "empiredb"
     ).strip()
 
     rollback_verified = commercial.get("rollback_only") is True

@@ -255,7 +255,7 @@ def collect_data_cloud_health(
 
     dsn = str(db_env.get("EMPIREDB_DSN") or "").strip()
     canonical_backend = str(
-        os_env.get("EMPIRE_DATA_BACKEND") or "supabase_legacy"
+        os_env.get("EMPIRE_DATA_BACKEND") or "empiredb"
     ).strip()
 
     postgres_service = _systemctl_active(POSTGRES_UNIT, runner=runner)
@@ -323,7 +323,7 @@ def collect_data_cloud_health(
         "canonical_backend_source": (
             "explicit_env"
             if os_env.get("EMPIRE_DATA_BACKEND")
-            else "default_supabase_legacy"
+            else "default_empiredb"
         ),
         "empiredb_candidate_only": canonical_backend != "empiredb",
         "postgres_service": postgres_service,

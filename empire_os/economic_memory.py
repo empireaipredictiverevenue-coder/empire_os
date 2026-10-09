@@ -161,6 +161,8 @@ def _department_episode(
         **item,
         "work_id":
             work_id or None,
+        "tenant_id": row.get("tenant_id"),
+        "opportunity_key": (row.get("commercial_decision_provenance") or {}).get("opportunity_key"),
         "plan_id":
             _clean(
                 row.get("plan_id")
@@ -243,6 +245,9 @@ def _outcome_memory(
         return None
     if label.get("forecast_derived") is True:
         return None
+    if label.get("value") == 1 and not all((packet.get("verification") or {}).get(key) is True
+            for key in ("payment_verified", "fulfilment_verified", "recognized_revenue")):
+        return None
 
     entity_id = _clean(packet.get("entity_id"))
     outcome_ref = _clean(label.get("outcome_ref"))
@@ -270,6 +275,8 @@ def _outcome_memory(
     return {
         **item,
         "entity_id": entity_id or None,
+        "tenant_id": packet.get("tenant_id"),
+        "learning_lineage": dict(packet.get("learning_lineage") or {}),
         "company_name": _clean(packet.get("company_name")) or None,
         "label_kind": _clean(label.get("kind")) or None,
         "label_value": label.get("value"),
@@ -319,6 +326,15 @@ def _plan_outcome_attributions(
             outcome = by_ref.get(outcome_ref)
             if outcome is None:
                 continue
+            lineage = outcome.get("learning_lineage") or {}
+            if outcome.get("tenant_id") is not None and episode.get("tenant_id") != outcome["tenant_id"]:
+                continue
+            identity = episode.get("decision_identity") or {}
+            if lineage.get("causal_lineage") is not None and lineage.get("opportunity_key") != episode.get("opportunity_key"):
+                continue
+            if any(lineage.get(key) is not None and lineage[key] != identity.get(key)
+                   for key in ("decision_ref", "prediction_ref", "execution_ref")):
+                continue
             key = (work_id, outcome_ref)
             if key in seen:
                 continue
@@ -344,6 +360,8 @@ def _plan_outcome_attributions(
                 "target_component": _clean(episode.get("target_component")) or None,
                 "action": _clean(episode.get("action")) or None,
                 "outcome_ref": outcome_ref,
+                "tenant_id": outcome.get("tenant_id"),
+                "opportunity_key": lineage.get("opportunity_key"),
                 "entity_id": _clean(outcome.get("entity_id")) or None,
                 "label_kind": _clean(outcome.get("label_kind")) or None,
                 "label_value": outcome.get("label_value"),
@@ -478,6 +496,8 @@ def _decision_outcome_attributions(
                 ),
             "work_id":
                 work_id,
+            "tenant_id": attribution.get("tenant_id"),
+            "opportunity_key": attribution.get("opportunity_key"),
             "decision_ref":
                 _clean(
                     identity.get(
@@ -605,19 +625,56 @@ def build_economic_memory_snapshot(
     executive_evaluation: Mapping[str, Any] | None,
     department_work: Sequence[Mapping[str, Any]],
     cortex_learning: Mapping[str, Any] | None,
+    tenant_id: str | None = None,
+    verified_feedback=(),
+    calibration_reviews=(),
+    as_of=None,
 ) -> dict[str, Any]:
     evaluation = dict(executive_evaluation or {})
     cortex = dict(cortex_learning or {})
+    from empire_os.outcome_feedback import validate_verified_feedback
+    from empire_os.predictive_calibration import review_commercial_prediction
+    feedback_rows = list(verified_feedback)
+    reviews = list(calibration_reviews)
+    for feedback in feedback_rows:
+        validate_verified_feedback(feedback, tenant_id=tenant_id, as_of=as_of)
+    validated_packets = [row["cortex_packet"] for row in feedback_rows]
+    for review in reviews:
+        replayed = review_commercial_prediction(prediction=review["prediction"], feedback=review["feedback"],
+                                               tenant_id=tenant_id, as_of=as_of)
+        if replayed != review:
+            raise ValueError("calibration replay mismatch")
 
     episodes = [
         _department_episode(row)
         for row in department_work
         if isinstance(row, Mapping)
+        and (tenant_id is None or row.get("tenant_id") == tenant_id)
     ]
+    # Resolve explicit outcome-owned execution links after the fact, without
+    # modifying the immutable persisted selection/completion snapshot.
+    from empire_os.decision_identity import causal_lineage_from_work
+    raw_work = {row.get("id"): row for row in department_work if isinstance(row, Mapping)}
+    for episode in episodes:
+        work = raw_work.get(episode["work_id"])
+        for feedback in feedback_rows:
+            causal = feedback.get("causal_lineage")
+            if not causal or causal.get("causal_eligible") is not True or causal.get("execution_ref") != episode["ref"]:
+                continue
+            try:
+                expected = causal_lineage_from_work(work, tenant_id=tenant_id,
+                    opportunity_key=causal["opportunity_key"], opportunity_id=causal["opportunity_id"])
+            except ValueError:
+                continue
+            if expected == causal:
+                episode["causal_outcome_refs"] = list(dict.fromkeys([
+                    *episode["causal_outcome_refs"], feedback["outcome_ref"]]))
     outcome_candidates = [
         memory
         for packet in (cortex.get("packets") or [])
         if isinstance(packet, Mapping)
+        and (tenant_id is None or packet.get("tenant_id") == tenant_id)
+        and (tenant_id is None or packet in validated_packets)
         for memory in [_outcome_memory(packet)]
         if memory is not None
     ]
@@ -649,6 +706,12 @@ def build_economic_memory_snapshot(
     return {
         "schema_version": "empire.economic_memory.v1",
         "mode": "OBSERVE",
+        "tenant_id": tenant_id,
+        "verified_learning_feedback": feedback_rows,
+        "calibration_evidence": reviews,
+        "calibration_evidence_count": len(reviews),
+        "learning_stage": "SHADOW_LEARNING",
+        "promoted_learning": False,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "plan_id": _clean(evaluation.get("plan_id")) or None,
         "plan_evaluation_state": (
@@ -701,17 +764,51 @@ def build_economic_memory_snapshot(
 
 def refresh_economic_memory_snapshot(
     repo_root: str | Path,
+    *,
+    repository=None,
+    fulfilment_order_ids=(),
+    tenant_id: str | None = None,
+    original_predictions: Mapping[str, Any] | None = None,
+    as_of=None,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     evaluation = _read(root / EXECUTIVE_EVALUATION)
     plan_id = _clean(evaluation.get("plan_id"))
+    work_rows = _department_work_rows(root, plan_id=plan_id)
+    cortex = _read(root / CORTEX_LEARNING)
+    feedback_rows = []
+    reviews = []
+    if repository is not None:
+        if not tenant_id or as_of is None:
+            raise ValueError("explicit tenant and as_of required for canonical outcome refresh")
+        order_ids = sorted(set(fulfilment_order_ids))
+        if len(order_ids) > 100:
+            raise ValueError("canonical outcome refresh limited to 100 explicit orders")
+        from empire_os.department_work_queue import DepartmentWorkQueue
+        from empire_os.predictive_calibration import review_commercial_prediction
+        for order_id in order_ids:
+            feedback = repository.verified_outcome_feedback(order_id, tenant_id=tenant_id,
+                repo_root=root, as_of=as_of)
+            feedback_rows.append(feedback)
+            causal = feedback.get("causal_lineage")
+            if causal and causal.get("task_key"):
+                work = DepartmentWorkQueue.read_completed_work(root, causal["task_key"])
+                work_rows = [row for row in work_rows if row.get("id") != work["id"]] + [work]
+            prediction = (original_predictions or {}).get(feedback.get("prediction_ref"))
+            if prediction is not None:
+                reviews.append(review_commercial_prediction(prediction=prediction, feedback=feedback,
+                    tenant_id=tenant_id, as_of=as_of))
+        cortex = {"packets": [row["cortex_packet"] for row in feedback_rows]}
+    elif fulfilment_order_ids or original_predictions:
+        raise ValueError("canonical read repository required for outcome runtime handoff")
     payload = build_economic_memory_snapshot(
         executive_evaluation=evaluation,
-        department_work=_department_work_rows(
-            root,
-            plan_id=plan_id,
-        ),
-        cortex_learning=_read(root / CORTEX_LEARNING),
+        department_work=work_rows,
+        cortex_learning=cortex,
+        tenant_id=tenant_id,
+        verified_feedback=feedback_rows,
+        calibration_reviews=reviews,
+        as_of=as_of,
     )
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)

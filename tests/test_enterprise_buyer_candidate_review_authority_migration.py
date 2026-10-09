@@ -16,9 +16,13 @@ def _migration_text() -> str:
 def test_enterprise_review_authority_is_service_role_only_invoker():
     text = _migration_text()
     lowered = text.lower()
+    executable_sql = "\n".join(
+        line.split("--", 1)[0]
+        for line in lowered.splitlines()
+    )
 
     assert "auto_review_enterprise_buyer_candidate" in text
-    assert "security definer" not in lowered
+    assert "security definer" not in executable_sql
     assert "set search_path to ''" in lowered
     assert "revoke execute" in lowered
     assert "from public, anon, authenticated" in lowered

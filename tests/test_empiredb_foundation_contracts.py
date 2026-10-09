@@ -79,7 +79,12 @@ def test_exchange_uses_buyer_repository():
     ).read_text()
 
     assert "BuyerAllocationDataRepository" in source
-    assert "fetch_buyer_rows(buyer_repository)" in source
+    assert (
+        "fetch_buyer_rows("
+        "BuyerAllocationDataRepository(gateway)"
+        ")"
+        in source
+    )
     assert "fetch_buyer_rows(reader)" not in source
 
 
@@ -153,7 +158,7 @@ def test_deferred_enrichment_unit_has_bounded_batch():
     ).read_text()
 
     assert (
-        "run_buyer_deferred_enrichment.py --limit 8"
+        "run_buyer_deferred_enrichment.py --limit 48 --workers 8"
         in unit
     )
     assert "TimeoutStartSec=300" in unit

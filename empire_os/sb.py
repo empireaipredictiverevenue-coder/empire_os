@@ -8,13 +8,14 @@ than adding more calls to this compatibility facade.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import re
 import urllib.parse
 
 from empire_os.data_values import unwrap_data_value
 from typing import Any, Mapping
 
-from empire_os.canonical_data_gateway import gateway_from_environment
+from empire_os.canonical_data_gateway import empiredb_gateway_from_environment
 from empire_os.data_query import (
     ConflictAction,
     DataFilter,
@@ -39,11 +40,11 @@ def _table(name: str) -> str:
 
 
 def _gateway():
-    return gateway_from_environment()
+    return empiredb_gateway_from_environment()
 
 
 def _runtime_gateway():
-    return gateway_from_environment(load_runtime_env(ENV_PATH))
+    return empiredb_gateway_from_environment(load_runtime_env(ENV_PATH))
 
 
 def _configured() -> bool:
@@ -70,6 +71,16 @@ def select(
         limit,
         offset,
     )
+
+
+def count(
+    table: str,
+    filters: dict | None = None,
+) -> int:
+    gateway = _gateway()
+    if not gateway.configured:
+        return 0
+    return gateway.count(_table(table), filters)
 
 
 def insert(
@@ -271,9 +282,14 @@ def _table_request_parts(
     )
 
 
-def _equality_match(filters: tuple[DataFilter, ...]) -> dict[str, Any]:
+def _equality_match(filters: tuple[DataFilter, ...], *, allow_null: bool = False) -> dict[str, Any]:
     match: dict[str, Any] = {}
     for item in filters:
+        if item.column in match:
+            raise ValueError("duplicate compatibility match column")
+        if allow_null and item.operator is FilterOperator.IS_NULL:
+            match[item.column] = None
+            continue
         if item.operator is not FilterOperator.EQ:
             raise ValueError(
                 "compatibility update/delete supports equality filters only"
@@ -316,6 +332,20 @@ def request_json(
     if not gateway.configured:
         return None
 
+    return _request_json(gateway, method, path, payload, prefer=prefer)
+
+
+@contextmanager
+def empiredb_transaction():
+    """Request factory with the same parser and provider, one commit boundary."""
+    with _runtime_gateway().transaction() as gateway:
+        def request(method, path, payload=None, *, prefer=None):
+            return _request_json(gateway, method, path, payload, prefer=prefer)
+        request.gateway = gateway
+        yield request
+
+
+def _request_json(gateway, method, path, payload=None, *, prefer=None):
     # Legacy/PostgREST compatibility boundary:
     # normalize native PostgreSQL/Python values before writes.
     payload = unwrap_data_value(payload)
@@ -394,7 +424,7 @@ def request_json(
             )
         return _compat_result(gateway.update(
             table,
-            _equality_match(filters),
+            _equality_match(filters, allow_null=True),
             dict(payload),
         ))
 

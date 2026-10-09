@@ -179,7 +179,7 @@ def assess_data_plane_readiness(
         "review_recommended": review,
         "insufficient_evidence": unknown,
         "current_stack": {
-            "canonical_operational_truth": "supabase_postgresql",
+            "canonical_operational_truth": "empiredb_postgresql",
             "heavy_infrastructure_default": "disabled_until_measured_need",
         },
     }
