@@ -27,6 +27,85 @@ from typing import Any, Mapping
 
 SCHEMA_VERSION = "empire.decision_identity.v1"
 
+CAUSAL_LINEAGE_SCHEMA = "empire.commercial_causal_lineage.v1"
+CAUSAL_LINEAGE_REFS = (
+    "tenant_id", "opportunity_key", "opportunity_id", "prediction_ref",
+    "decision_ref", "execution_ref", "selection_authority_ref", "source_ref", "state_ref", "task_key",
+)
+
+
+def validate_causal_lineage(raw: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate structured provenance, not authenticity or execution authority."""
+    fields = {"schema_version", *CAUSAL_LINEAGE_REFS, "execution_performed",
+              "causal_eligible", "shadow_only", "execution_authority"}
+    if not isinstance(raw, Mapping) or set(raw) != fields:
+        raise ValueError("malformed commercial causal lineage")
+    if raw["schema_version"] != CAUSAL_LINEAGE_SCHEMA or raw["execution_authority"] != "none":
+        raise ValueError("causal lineage cannot grant authority")
+    for key in CAUSAL_LINEAGE_REFS:
+        value = raw[key]
+        if value is not None and (not isinstance(value, str) or not value.strip() or value != value.strip()):
+            raise ValueError(f"invalid causal lineage {key}")
+    if any(type(raw[key]) is not bool for key in ("shadow_only", "execution_performed", "causal_eligible")):
+        raise ValueError("explicit causal lineage truth flags required")
+    if raw["shadow_only"] and (raw["selection_authority_ref"] or raw["execution_performed"]):
+        raise ValueError("shadow lineage cannot claim authority or execution")
+    if raw["decision_ref"] and not raw["shadow_only"] and not raw["selection_authority_ref"]:
+        raise ValueError("non-shadow lineage requires selection evidence")
+    if bool(raw["execution_ref"]) != raw["execution_performed"]:
+        raise ValueError("execution reference requires canonical execution")
+    if raw["execution_performed"] and (not raw["task_key"] or raw["execution_ref"] != f"department_work:{raw['task_key']}"):
+        raise ValueError("canonical department work execution reference required")
+    eligible = bool(raw["execution_performed"] and not raw["shadow_only"]
+                    and raw["decision_ref"] and raw["selection_authority_ref"])
+    if raw["execution_performed"] and not eligible or raw["causal_eligible"] != eligible:
+        raise ValueError("invalid causal execution eligibility")
+    return dict(raw)
+
+
+def causal_lineage_from_work(work: Mapping[str, Any], *, tenant_id: str,
+                             opportunity_key: str, opportunity_id: str | None,
+                             claimed_lineage: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    """Read canonical persisted work; never create identities or bind execution."""
+    provenance = work.get("commercial_decision_provenance") or {}
+    if not tenant_id or work.get("tenant_id") != tenant_id or provenance.get("tenant_id") != tenant_id:
+        raise ValueError("work causal tenant mismatch or missing")
+    if not opportunity_key or provenance.get("opportunity_key") != opportunity_key:
+        raise ValueError("work causal opportunity mismatch or missing")
+    if provenance.get("opportunity_id") != opportunity_id:
+        raise ValueError("work causal opportunity ID mismatch")
+    selected = work.get("decision_identity")
+    raw = (work.get("result") or {}).get("decision_identity") or selected
+    identity = {}
+    if raw is not None:
+        review = review_decision_identity(raw)
+        if not review["valid"] or raw.get("task_key") != work.get("id"):
+            raise ValueError("invalid canonical work decision identity")
+        identity = review["identity"]
+        if not selected or any(identity[key] != selected.get(key) for key in
+                ("decision_ref", "prediction_ref", "candidate_id", "source_ref", "state_ref", "selection_authority_ref", "shadow_only")):
+            raise ValueError("completed decision contradicts canonical selection")
+        if identity["candidate_id"] != opportunity_key or identity["prediction_ref"] != provenance.get("prediction_ref"):
+            raise ValueError("work causal candidate or prediction mismatch")
+    if identity.get("execution_performed") is True:
+        result = work.get("result") or {}
+        if (work.get("status") != "DONE" or not work.get("result_evidence_refs")
+                or identity["execution_ref"] != f"department_work:{work.get('id')}"
+                or result.get("returncode") != 0 or result.get("adapter") != "safe_internal_command"
+                or any(result.get(key) is True for key in ("simulated", "shadow_only", "proposed", "queued", "attempted", "blocked"))):
+            raise ValueError("work does not prove completed canonical execution")
+    values = {key: identity.get(key) for key in CAUSAL_LINEAGE_REFS}
+    values.update(tenant_id=tenant_id, opportunity_key=opportunity_key, opportunity_id=opportunity_id)
+    values.update(schema_version=CAUSAL_LINEAGE_SCHEMA, execution_authority="none",
+                  execution_performed=identity.get("execution_performed", False),
+                  causal_eligible=identity.get("causal_eligible", False), shadow_only=identity.get("shadow_only", True))
+    lineage = validate_causal_lineage(values)
+    if claimed_lineage is not None:
+        if not isinstance(claimed_lineage, Mapping) or any(key not in lineage or value != lineage[key]
+                for key, value in claimed_lineage.items()):
+            raise ValueError("caller lineage contradicts canonical work")
+    return lineage
+
 
 def _text(value: Any) -> str:
     return " ".join(
