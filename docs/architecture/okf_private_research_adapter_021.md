@@ -53,3 +53,20 @@ a scoped handoff. Automatic publication, retrieval promotion and human
 verification are **not** enabled by this change.
 
 Reference: https://github.com/GoogleCloudPlatform/open-knowledge-format/blob/main/SPEC.md
+
+
+## SkillForge read-only integration (021B)
+The `catalogue(okf_bundle_path=...)` optional argument and
+`scripts/skillforge_catalogue.py --okf-bundle <private bundle>` expose an
+advisory research list. Output contains concept IDs, source URLs, freshness,
+unverified trust and explicit `execution_authority: none`. It does not load
+source excerpts as instructions, create/publish skills, approve content,
+or modify SkillForge's digest-pinned approval registry.
+
+Invalid manifests, modified documents and any content claiming approved or
+stable status are rejected into `okf_research.status: unavailable`. A valid
+bundle does not affect `approved_count`, tenant policy or commercial execution.
+
+Astra may consult the same read-only catalogue via a deliberate call; wiring
+automatic Astra task dispatch or a recurring OKF export is **not** part of this
+integration. No added timer or independent agent loop.

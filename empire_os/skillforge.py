@@ -2,15 +2,18 @@
 from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
+from datetime import datetime, timezone
 from empire_os.skill_exchange import SKILLS_ROOT, SAFE_NAME, TASK_SKILLS
 from empire_os.skill_review import review_local_skill
 from empire_os.skill_trust import SkillTrustError, read_trust_registry
 from empire_os.skillforge_learning import learning_index
 from empire_os.skillforge_proposals import proposal_history
+from empire_os.okf_adapter import list_private_research
 
 
 def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
-              repo_root: Path | None = None) -> dict:
+              repo_root: Path | None = None,
+              okf_bundle_path: Path | None = None) -> dict:
     """Inventory Empire-authored skills; registry approvals are never inferred."""
     registry = None
     if registry_path is not None:
@@ -38,9 +41,21 @@ def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
                        'review_reasons': review['reasons'], 'execution_authority': 'none'})
     learning = learning_index(repo_root) if repo_root is not None else None
     review_queue = proposal_history(repo_root) if repo_root is not None else None
+    okf_research = None
+    if okf_bundle_path is not None:
+        try:
+            okf_research = list_private_research(
+                okf_bundle_path, now=datetime.now(timezone.utc),
+            )
+        except Exception as exc:
+            okf_research = {
+                'status': 'unavailable', 'reason': type(exc).__name__,
+                'research_only': True, 'execution_authority': 'none',
+            }
     return {'product': 'Empire SkillForge', 'schema_version': 'empire.skillforge.catalogue.v1',
             'mode': 'OBSERVE', 'skills': skills, 'skill_count': len(skills),
             'approved_count': sum(s['trust'] == 'approved_pinned' for s in skills),
             'learning': learning,
             'review_queue': review_queue,
+            'okf_research': okf_research,
             'external_download': False, 'execution_authority': 'none'}

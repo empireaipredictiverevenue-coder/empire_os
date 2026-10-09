@@ -208,6 +208,12 @@ def export_private_bundle(
 def verify_bundle_files(root: Path) -> int:
     """Check exported file digests before a reader uses their metadata."""
     manifest = json.loads((root / "manifest.json").read_text())
+    if (manifest.get("schema") != "empire.okf.private.v1"
+        or manifest.get("okf_version") != VERSION
+        or manifest.get("visibility") != "private"
+        or manifest.get("authority") != "none"
+        or not isinstance(manifest.get("files_sha256"), dict)):
+        raise ValueError("untrusted_bundle_manifest")
     count = 0
     for name, digest in manifest["files_sha256"].items():
         if Path(name).is_absolute() or ".." in Path(name).parts:
