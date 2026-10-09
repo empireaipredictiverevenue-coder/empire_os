@@ -154,3 +154,20 @@ def test_atomic_write_detects_race_before_replace(tmp_path, monkeypatch):
         atomic_binding_write(path, 'updated', expected_bytes=b'original')
     assert path.read_text() == 'other-writer'
     assert not list(tmp_path.glob('*.tmp'))
+
+
+@pytest.mark.parametrize('name', [
+    'promote_campaign_final_bindings',
+    'promote_campaign_measured_controls',
+    'promote_opportunities_final_bindings',
+    'reconcile_materialized_runtime_bindings',
+])
+def test_legacy_writers_share_canonical_lock_and_atomic_write(name):
+    import ast
+    from pathlib import Path
+    script = Path(__file__).resolve().parents[1] / 'scripts' / (name + '.py')
+    tree = ast.parse(script.read_text())
+    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)]
+    assert any(isinstance(node.func, ast.Name) and node.func.id == 'binding_writer_lock' for node in calls)
+    assert any(isinstance(node.func, ast.Name) and node.func.id == 'atomic_binding_write' for node in calls)
+    assert not any(isinstance(node.func, ast.Attribute) and node.func.attr == 'replace' and isinstance(node.func.value, ast.Name) and node.func.value.id == 'tmp' for node in calls)
