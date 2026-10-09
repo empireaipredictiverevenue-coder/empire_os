@@ -4,6 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
+from pathlib import Path
 
 from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.buyer_capacity_intake import parse_buyer_capacity_reply
@@ -64,6 +65,7 @@ def run_closer_reply_worker(
     rpc: Rpc,
     *,
     limit: int = 50,
+    repo_root: str | Path = Path(__file__).resolve().parents[1],
 ) -> CloserReplyWorkerResult:
     bounded = max(1, min(int(limit), 500))
     rows = rpc("list_closer_work", {"p_limit": bounded}) or []
@@ -113,6 +115,16 @@ def run_closer_reply_worker(
 
             reply_body = str(context.get("reply_body_text") or "")
             capacity = parse_buyer_capacity_reply(reply_body)
+            causal_lineage = None
+            if context.get("department_work_id") is not None:
+                from empire_os.department_work_queue import DepartmentWorkQueue
+                from empire_os.decision_identity import causal_lineage_from_work
+                work = DepartmentWorkQueue.read_completed_work(repo_root, context["department_work_id"])
+                causal_lineage = causal_lineage_from_work(work, tenant_id=context.get("tenant_id"),
+                    opportunity_key=context.get("opportunity_key"), opportunity_id=context.get("opportunity_id"),
+                    claimed_lineage=context.get("causal_lineage"))
+            elif context.get("causal_lineage") is not None:
+                raise ValueError("causal lineage requires explicit canonical work reference")
             stated_price = parse_buyer_stated_price(reply_body)
             fulfilment_order_id = str(
                 context.get("fulfilment_order_id") or ""
@@ -127,7 +139,7 @@ def run_closer_reply_worker(
                         "p_daily_cap": capacity["daily_cap"],
                         "p_delivery_route": capacity["delivery_route"],
                         "p_delivery_reference": capacity["delivery_reference"],
-                        "p_evidence": capacity["evidence"],
+                        "p_evidence": {**capacity["evidence"], **({"causal_lineage": causal_lineage} if causal_lineage is not None else {})},
                         "p_actor": "empire_closer_planner",
                     },
                 ) or {}

@@ -1,7 +1,7 @@
 """Canonical Phase 4 Commercial Exchange contract.
 
 This module defines the execution contract for Phase 4 without creating schema
-or granting commercial authority. It separates canonical Supabase-native
+or granting commercial authority. It separates canonical EmpireDB-native
 commercial truth from legacy SQLite lane/seat concepts that may be salvaged
 only as design reference.
 

@@ -319,6 +319,8 @@ def normalize_candidate(
             if value is not None:
                 quant_inputs["time_to_revenue_days"] = float(value)
 
+        if (estimate.get("tenant_id") is not None or candidate.get("tenant_id") is not None) and estimate.get("tenant_id") != candidate.get("tenant_id"):
+            raise ValueError("predictive cohort tenant mismatch or missing")
         quant_input_evidence["predictive_intelligence"] = {
             "product_code": predictive_product_code,
             "terminal_outcome_count": estimate.get(

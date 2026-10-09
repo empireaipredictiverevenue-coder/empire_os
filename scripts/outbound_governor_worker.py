@@ -20,8 +20,6 @@ from empire_os.outbound_provider import OutboundProviderError
 from empire_os.outbound_role_transport import (
     PostgresOutboundRpc,
     PostgresStandingAuthorityApproverRpc,
-    SupabaseOutboundRpc,
-    SupabaseStandingAuthorityApproverRpc,
 )
 
 
@@ -67,12 +65,9 @@ def _sender_rpc():
             "empire_outbound_sender",
         )
 
-    if _empiredb_mode():
-        raise OutboundProviderError(
-            "EmpireDB outbound sender DSN required"
-        )
-
-    return SupabaseOutboundRpc("empire_outbound_sender")
+    raise OutboundProviderError(
+        "EmpireDB outbound sender DSN required"
+    )
 
 
 def _approver_rpc():
@@ -94,13 +89,8 @@ def _approver_rpc():
             daily_cap=cap,
         )
 
-    if _empiredb_mode():
-        raise OutboundProviderError(
-            "EmpireDB outbound approver DSN required"
-        )
-
-    return SupabaseStandingAuthorityApproverRpc(
-        daily_cap=cap
+    raise OutboundProviderError(
+        "EmpireDB outbound approver DSN required"
     )
 
 

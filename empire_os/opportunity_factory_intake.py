@@ -120,10 +120,12 @@ def build_factory_intake(
         )
         assessment = assess_opportunity(factory_candidate).as_dict()
 
-    return {
+    result = {
         "schema_version": "empire.opportunity_factory_intake.v1",
         "mode": "OBSERVE",
         "opportunity_key": opportunity_key,
+        "tenant_id": candidate.get("tenant_id"),
+        "opportunity_id": candidate.get("opportunity_id"),
         "opportunity_class": _clean(
             candidate.get("opportunity_class")
         ),
@@ -144,6 +146,16 @@ def build_factory_intake(
         "revenue_verified": False,
         "execution_authority": "none",
     }
+    if "decision_provenance" in candidate:
+        from empire_os.storm_opportunity_bridge import decision_opportunity_provenance
+        provenance = decision_opportunity_provenance(
+            candidate["decision_provenance"]["snapshot"],
+            tenant_id=candidate.get("tenant_id"), event_id=candidate.get("event_id"),
+            subject_id=candidate.get("subject_id"), as_of=datetime.now(timezone.utc),
+        )
+        result["decision_provenance"] = provenance
+        result["research_requirements"] = provenance["research_requirements"]
+    return result
 
 
 def build_factory_intake_batch(

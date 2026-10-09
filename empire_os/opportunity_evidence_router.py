@@ -170,6 +170,7 @@ def build_evidence_routes(
             "lifecycle": lifecycle.as_dict(),
             "route_count": len(routes),
             "routes": routes,
+            "decision_research_requirements": list(row.get("research_requirements") or []),
             "automatic_external_execution_allowed": False,
             "execution_authority": "none",
         })

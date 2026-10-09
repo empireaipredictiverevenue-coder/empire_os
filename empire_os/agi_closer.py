@@ -1,7 +1,7 @@
 """
 Legacy AGI Closer compatibility observer for EmpireOS.
 
-The canonical closer is the Supabase-backed governed state machine.
+The canonical closer is the EmpireDB-backed governed state machine.
 This module may inspect legacy SQLite funnel state and produce recommendations,
 but it has no authority to claim, settle, simulate replies, price deals, send
 outreach, or mutate commercial state.
@@ -25,7 +25,7 @@ CLOSER_SYSTEM_PROMPT = """You are the legacy EmpireOS closer observer.
 
 You may classify what should be reviewed next, but you must not claim or settle
 a prospect, invent deal values, simulate replies, send outreach, or mutate
-commercial state. Canonical execution belongs to the governed Supabase closer
+commercial state. Canonical execution belongs to the governed EmpireDB closer
 and outbound state machines.
 
 Output recommendation JSON only."""
@@ -144,7 +144,7 @@ Output JSON: {{"action":"...","prospect_id":"...","reasoning":"..."}}"""
             "prospect_id": prospect_id,
             "reasoning": reasoning,
             "execution_allowed": False,
-            "canonical_path": "supabase_closer_state_machine",
+            "canonical_path": "empiredb_closer_state_machine",
             "summary": (
                 "Legacy closer execution retired; route observed evidence "
                 "through the canonical governed closer/outbound flow."

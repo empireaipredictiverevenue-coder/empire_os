@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 
 from empire_os.closer_reply_worker import run_closer_reply_worker
-from empire_os.closer_role_transport import SupabaseCloserRpc
+from empire_os.closer_role_transport import PostgresCloserRpc
 
 
 def main() -> int:
@@ -14,7 +15,10 @@ def main() -> int:
     parser.add_argument("--limit", type=int, default=50)
     args = parser.parse_args()
 
-    rpc = SupabaseCloserRpc("empire_closer_planner")
+    rpc = PostgresCloserRpc(
+        os.getenv("EMPIRE_CLOSER_PLANNER_DSN", "").strip(),
+        "empire_closer_planner",
+    )
     result = run_closer_reply_worker(rpc, limit=args.limit)
     payload = result.as_dict()
     payload["ok"] = not payload["errors"]

@@ -73,7 +73,7 @@ class TestAgiCloserAgent:
             result = agent.act(decision)
             assert result["action"] == "recommendation_only"
             assert result["execution_allowed"] is False
-            assert result["canonical_path"] == "supabase_closer_state_machine"
+            assert result["canonical_path"] == "empiredb_closer_state_machine"
             assert "event_id" not in result
             assert "amount_cents" not in result
 

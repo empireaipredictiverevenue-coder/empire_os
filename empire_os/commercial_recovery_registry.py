@@ -130,7 +130,7 @@ RECOVERY_PRODUCTS: tuple[RecoveryProduct, ...] = (
             "Canonical buyer-capacity and allocation foundations exist. "
             "Legacy 462 lane-slot code is reference/salvage only because it "
             "depends on SQLite and old runtime paths. Rebuild explicit seats "
-            "and corridors on Supabase + governed commercial terms + USDT/BSC; "
+            "and corridors on EmpireDB + governed commercial terms + USDT/BSC; "
             "historical seat pricing is not current pricing evidence."
         ),
     ),
