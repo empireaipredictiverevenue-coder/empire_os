@@ -74,6 +74,9 @@ def test_catalog_healthy_fixture_is_only_precondition_not_activation():
     assert result["status"] == "CATALOG_PRECONDITIONS_VERIFIED"
     assert result["blockers"] == []
     assert result["no_data_rows_read"] is True
+    assert result["source_schema"]["status"] == "BLOCKED"
+    assert result["source_schema"]["tenant_binding_rows_verified"] is False
+    assert result["source_schema"]["customer_rows_read"] == 0
     assert result["actual_cross_tenant_read_verified"] is False
     assert result["application_login_tenant_authority_verified"] is False
     assert result["public_api_activation_authorized"] is False

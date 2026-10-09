@@ -14,6 +14,7 @@ from typing import Any
 from empire_os.revenue_crm_transport import (
     BUYER_COLUMNS, PROSPECT_COLUMNS, ROLE,
 )
+from empire_os.revenue_crm_source_schema import inspect_source_schema
 
 VIEWS = {
     "prospects": ("public.revenue_crm_prospects", PROSPECT_COLUMNS.split(",")),
@@ -151,9 +152,11 @@ def inspect_crm_catalog(cursor: Any) -> dict[str, Any]:
             "base_rls_verified": all_bases_safe,
             "role_select_only": select_only,
         }
+    source_schema = inspect_source_schema(cursor)
     return {
         "schema": "empire.revenue_crm_live_catalog_preflight.v1",
         "status": "CATALOG_PRECONDITIONS_VERIFIED" if not issues else "BLOCKED",
+        "source_schema": source_schema,
         "blockers": sorted(set(issues)),
         "role_safe": role_safe,
         "trusted_tenant_function_present": function is not None and function[0] is True,

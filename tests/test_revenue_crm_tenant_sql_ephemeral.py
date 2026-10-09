@@ -236,6 +236,10 @@ def test_catalog_probe_checks_actual_restricted_pg18_catalog(pg):
     assert report["status"] == "CATALOG_PRECONDITIONS_VERIFIED", report["blockers"]
     assert report["role_safe"] is True
     assert report["trusted_tenant_function_present"] is True
+    # This fixture deliberately omits real prospect→entity→tenant evidence.
+    assert report["source_schema"]["status"] == "BLOCKED"
+    assert report["source_schema"]["tenant_binding_rows_verified"] is False
+    assert report["source_schema"]["activation_authorized"] is False
     for name in ("prospects", "buyers"):
         assert report["views"][name] == {
             "present": True, "columns_complete": True,
