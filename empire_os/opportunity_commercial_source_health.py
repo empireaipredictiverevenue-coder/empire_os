@@ -63,6 +63,66 @@ def _source_freshness(raw: Any, now: datetime, max_age_hours: int = 12) -> str:
     return "CURRENT"
 
 
+def _reply_identity_review_health(
+    linkage: Mapping[str, Any], now: datetime,
+) -> dict[str, Any]:
+    """Trust only a fresh, fail-closed planner contract, never identity claims."""
+    reasons: list[str] = []
+    stamp = _time(linkage.get("generated_at"))
+    if not linkage:
+        reasons.append("REPLY_IDENTITY_PLANNER_MISSING")
+    elif stamp is None or not (
+        timedelta(minutes=-5) <= now - stamp <= timedelta(hours=12)
+    ):
+        reasons.append("REPLY_IDENTITY_PLANNER_NOT_CURRENT")
+
+    if linkage and (
+        linkage.get("schema_join_path_available") is not True
+        or linkage.get("verification_status") != "SCHEMA_PATH_FOUND_DATA_PROOF_REQUIRED"
+        or not isinstance(linkage.get("join_edges"), list)
+        or not linkage["join_edges"]
+        or any(
+            not isinstance(edge, Mapping)
+            or edge.get("join_cardinality_verified") is not False
+            for edge in linkage["join_edges"][:20]
+        )
+        or len(linkage["join_edges"]) > 20
+        or linkage.get("schema") != "empire.conversation_reply_linkage_plan.v1"
+        or linkage.get("mode") != "OBSERVE"
+        or linkage.get("external_execution_authority") != "none"
+        or linkage.get("buyer_intent_verified") is not False
+        or linkage.get("canonical_messages_promoted") != 0
+        or linkage.get("normalized_scores_written") != 0
+        or linkage.get("actual_joined_rows_proven") != 0
+        or linkage.get("database_access_attempted") is not False
+        or linkage.get("controlled_identity_review") is not None
+        or linkage.get("controlled_identity_review_not_live_evidence") is not True
+    ):
+        reasons.append("REPLY_IDENTITY_PLANNER_CONTRACT_UNTRUSTED")
+
+    # Even with a valid planner, actual identity/tenant/provider facts must
+    # come from independently authorised original inbound events.
+    reasons.append("ORIGINAL_REPLY_CONTACT_AND_TENANT_PROOF_REQUIRED")
+    clean = len(reasons) == 1
+    return {
+        "status": (
+            "CODE_PATH_CURRENT_ORIGINAL_EVIDENCE_PENDING" if clean
+            else "BLOCKED_PLANNER_EVIDENCE_INVALID"
+        ),
+        "reason_codes": reasons,
+        "planner_observation_current_and_safe": clean,
+        "structural_review_integration_available": clean,
+        "production_structural_matches_verified": 0,
+        "original_provider_authentication_verified": False,
+        "canonical_contact_binding_verified": False,
+        "tenant_authority_verified": False,
+        "buyer_intent_verified": False,
+        "synthetic_test_matches_accepted_as_proof": False,
+        "review_only": True,
+        "execution_authority": "none",
+    }
+
+
 def assess_sources(root: Path, now: datetime | None = None) -> dict[str, Any]:
     root = root.resolve()
     now = now or datetime.now(timezone.utc)
@@ -76,6 +136,7 @@ def assess_sources(root: Path, now: datetime | None = None) -> dict[str, Any]:
     market = _read(root, SOURCES["market_gps_and_commercial_outcomes"][0])
     lineage_health = assess_reply_lineage(market, now)
     linkage = _read(root, "runtime/conversations_replies_control/reply_linkage_plan_latest.json")
+    identity_review_health = _reply_identity_review_health(linkage, now)
 
     observed_messages = canonical.get("canonical_messages")
     observed_messages = observed_messages if isinstance(observed_messages, list) else []
@@ -162,6 +223,7 @@ def assess_sources(root: Path, now: datetime | None = None) -> dict[str, Any]:
     if mailbox_status != "VERIFIED_RUNTIME":
         conversation_reasons.append("MAILBOX_OBSERVER_NOT_VERIFIED")
     conversation_reasons.extend(lineage_health["reason_codes"])
+    conversation_reasons.extend(identity_review_health["reason_codes"])
     # A mailbox/runtime health flag cannot attest to a specific buyer.
     # This diagnostic never declares commercial intent established.
 
@@ -208,6 +270,7 @@ def assess_sources(root: Path, now: datetime | None = None) -> dict[str, Any]:
                 "reply_linkage_schema_status": linkage.get("verification_status", "NOT_RESEARCHED"),
                 "reply_linkage_actual_rows_proven": 0,
                 "reply_linkage_structural_health": lineage_health,
+                "reply_identity_integration_health": identity_review_health,
                 "reply_linkage_blockers": list(linkage.get("blockers") or [])[:8],
                 "quarantine_sample_count": min(len(sample), 500) if isinstance(sample, list) else 0,
                 "quarantine_reason_counts": dict(sorted(causes.items())),
@@ -293,5 +356,9 @@ def diagnostic_for_claim(health: Mapping[str, Any], claim: str) -> dict[str, Any
         "source": source_key,
         "status": source.get("status"),
         "reasons": list(source.get("reason_codes") or []),
+        "reply_identity_integration_status": (
+            (source.get("reply_identity_integration_health") or {}).get("status")
+            if source_key == "conversation_os" else None
+        ),
         "commercial_claim_verified": False,
     }
