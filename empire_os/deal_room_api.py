@@ -13,6 +13,7 @@ from empire_os.deal_room import (
     build_documenso_envelope_plan,
     normalize_documenso_webhook,
     verify_documenso_webhook_secret,
+    documenso_connection_readiness,
 )
 
 
@@ -48,6 +49,7 @@ def create_deal_room_router() -> APIRouter:
                 os.getenv("DOCUMENSO_WEBHOOK_SECRET", "").strip()
             ),
             "provider_execution": False,
+            "documenso": documenso_connection_readiness(),
             "binding_acceptance": False,
             "payment_authority": False,
             "revenue_authority": False,

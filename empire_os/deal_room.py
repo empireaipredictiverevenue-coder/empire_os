@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
 from dataclasses import asdict, dataclass
 from datetime import datetime
 from typing import Any, Mapping
@@ -87,7 +88,13 @@ class AgreementWebhookEvidence:
 
 
 def build_documenso_envelope_plan(draft: AgreementDraft) -> dict[str, Any]:
+    from empire_os.deal_room_documenso_provider import validate_origin, BASE_URL_DEFAULT
+
     draft.validate()
+    instance_origin = validate_origin(
+        os.getenv("DOCUMENSO_API_BASE_URL", BASE_URL_DEFAULT),
+        os.getenv("DOCUMENSO_TRUSTED_HOST", "app.documenso.com"),
+    )
     recipients = []
     for recipient in draft.recipients:
         row: dict[str, Any] = {
@@ -102,7 +109,7 @@ def build_documenso_envelope_plan(draft: AgreementDraft) -> dict[str, Any]:
     return {
         "schema_version": "empire.deal_room.documenso_plan.v1",
         "provider": "documenso",
-        "api_base_url": DOCUMENSO_V2_BASE_URL,
+        "api_base_url": instance_origin,
         "create_endpoint": "/envelope/create",
         "distribute_endpoint": "/envelope/distribute",
         "payload": {
@@ -155,7 +162,9 @@ def normalize_documenso_webhook(
     if not observed_at:
         raise ValueError("createdAt required")
     try:
-        datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        observed_stamp = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+        if observed_stamp.tzinfo is None:
+            raise ValueError("timezone required")
     except ValueError as exc:
         raise ValueError("createdAt must be ISO-8601") from exc
 
@@ -230,12 +239,14 @@ def normalize_documenso_webhook(
 def agreement_evidence_is_verified(
     evidence: AgreementWebhookEvidence,
 ) -> bool:
-    return (
-        evidence.provider == "documenso"
-        and evidence.agreement_complete
-        and not evidence.agreement_rejected
-        and bool(evidence.evidence_ref)
-    )
+    """Webhook evidence alone is NEVER a verified signed agreement.
+
+    An independently authenticated Documenso v2 envelope readback, validated
+    signer roster, approved PDF-version binding, signed artifact and audit
+    trail are required. See empire_os.contract_signing.provider_adapter for
+    read-only reconciliation. The old webhook preview is not an authority.
+    """
+    return False
 
 
 def canonical_agreement_record(
@@ -247,7 +258,7 @@ def canonical_agreement_record(
         "provider": evidence.provider,
         "provider_event": evidence.event,
         "provider_evidence_ref": evidence.evidence_ref,
-        "status": "signed" if verified else evidence.envelope_status.lower(),
+        "status": "verification_pending" if evidence.agreement_complete else evidence.envelope_status.lower(),
         "verified_at": evidence.observed_at if verified else None,
         "signed_at": evidence.completed_at if verified else None,
         "evidence_verified": verified,
@@ -256,3 +267,68 @@ def canonical_agreement_record(
         "payment_request_created": False,
         "revenue_recognition": False,
     }
+
+
+
+def documenso_connection_readiness() -> dict[str, object]:
+    """Safe summary of the existing Documenso account configured for EmpireOS."""
+    from empire_os.deal_room_documenso_provider import (
+        BASE_URL_DEFAULT, validate_origin,
+    )
+
+    base = os.getenv("DOCUMENSO_API_BASE_URL", BASE_URL_DEFAULT).strip()
+    hostname = os.getenv("DOCUMENSO_TRUSTED_HOST", "app.documenso.com").strip()
+    try:
+        validate_origin(base, hostname)
+        allowed_origin = True
+    except ValueError:
+        allowed_origin = False
+    key = os.getenv("DOCUMENSO_API_KEY", "")
+    configured = allowed_origin and key.startswith("api_") and len(key) >= 16
+    return {
+        "schema": "empire.deal_room.documenso_connection.v1",
+        "provider": "documenso",
+        "mode": "OBSERVE",
+        "existing_instance_configured": configured,
+        "trusted_origin_configured": allowed_origin,
+        "api_token_configured": key.startswith("api_") and len(key) >= 16,
+        "webhook_secret_configured": bool(os.getenv("DOCUMENSO_WEBHOOK_SECRET")),
+        "live_provider_verified": False,
+        "contract_distribution_enabled": False,
+        "signature_authorized": False,
+        "execution_authority": "none",
+    }
+
+
+def read_documenso_agreement_status(
+    *, tenant_id: str, agreement_id: str, version: int,
+    envelope_id: str, signer_emails: tuple[str, str],
+    session=None,
+) -> dict[str, object]:
+    """Server-internal, read-only connection to the EXISTING Documenso instance.
+
+    This is not an unauthenticated public API route. Caller must first establish
+    tenant authority and bind canonical agreement and recipients independently.
+    No state is persisted; requires separate PDF/audit verification.
+    """
+    from empire_os.deal_room_documenso_provider import (
+        BASE_URL_DEFAULT, ReadOnlyDocumenso, reconcile_envelope_readback,
+    )
+    from empire_os.contract_signing.policy import valid_id
+
+    if (not valid_id(tenant_id) or not valid_id(agreement_id)
+            or isinstance(version, bool) or not isinstance(version, int) or version < 1):
+        raise ValueError("CANONICAL_TENANT_AGREEMENT_BINDING_REQUIRED")
+    binding = f"{tenant_id}:{agreement_id}:v{version}"
+    provider = ReadOnlyDocumenso(
+        api_base_url=os.getenv("DOCUMENSO_API_BASE_URL", BASE_URL_DEFAULT),
+        trusted_hostname=os.getenv("DOCUMENSO_TRUSTED_HOST", "app.documenso.com"),
+        api_token=os.getenv("DOCUMENSO_API_KEY", ""),
+    )
+    document = provider.get_envelope(envelope_id, session=session)
+    return reconcile_envelope_readback(
+        document,
+        envelope_id=envelope_id,
+        agreement_external_id=binding,
+        signer_emails=signer_emails,
+    )

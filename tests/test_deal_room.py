@@ -60,7 +60,7 @@ def test_agreement_plan_is_non_executing():
 def test_completed_webhook_requires_all_required_recipients():
     evidence = normalize_documenso_webhook(completed_payload())
     assert evidence.agreement_complete is True
-    assert agreement_evidence_is_verified(evidence) is True
+    assert agreement_evidence_is_verified(evidence) is False
     assert evidence.canonical_commercial_mutation is False
 
 
@@ -95,7 +95,7 @@ def test_webhook_api_verifies_secret_and_never_mutates(monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["verified_webhook"] is True
-    assert body["agreement_evidence_verified"] is True
+    assert body["agreement_evidence_verified"] is False
     assert body["canonical_commercial_mutation"] is False
     assert body["revenue_recognition"] is False
 
@@ -104,6 +104,6 @@ def test_verified_documenso_evidence_maps_to_first_revenue_record():
     evidence = normalize_documenso_webhook(completed_payload())
     record = canonical_agreement_record(evidence)
     assert record["agreement_id"] == "envelope_abc123"
-    assert record["status"] == "signed"
-    assert record["evidence_verified"] is True
+    assert record["status"] == "verification_pending"
+    assert record["evidence_verified"] is False
     assert record["canonical_commercial_mutation"] is False
