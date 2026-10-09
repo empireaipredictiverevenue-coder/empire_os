@@ -16,47 +16,22 @@ from empire_os.adaptive_outreach_optimizer import (
 )
 
 
-def _records(dsn: str, *, lookback_days: int) -> list[dict[str, Any]]:
-    try:
-        import psycopg
-    except Exception as exc:  # pragma: no cover
-        raise RuntimeError("psycopg required") from exc
+def _records(dsn: str, *, lookback_days: int, repo_root: str | Path = "/srv/empire_os",
+             as_of: datetime | None = None) -> list[dict[str, Any]]:
+    from empire_os.canonical_data_gateway import CanonicalDataGateway
+    from empire_os.data_backends.empiredb import EmpireDbProvider
+    from empire_os.data_backends.postgres import PostgresConnectionConfig, PostgresConnector
+    from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 
-    days = max(1, min(int(lookback_days), 365))
-    query = """
-    SELECT
-      i.id::text AS intent_id,
-      i.offer_key,
-      i.status,
-      i.metadata,
-      (
-        i.status IN ('delivered','replied')
-        OR EXISTS (
-          SELECT 1
-          FROM public.outbound_replies proof_of_delivery
-          WHERE proof_of_delivery.intent_id=i.id
-        )
-      ) AS delivered,
-      (
-        SELECT rr.classification
-        FROM public.outbound_replies rr
-        WHERE rr.intent_id=i.id
-        ORDER BY rr.received_at DESC
-        LIMIT 1
-      ) AS classification
-    FROM public.outbound_intents i
-    WHERE i.created_at >= clock_timestamp() - (%s * interval '1 day')
-    ORDER BY i.created_at ASC, i.id ASC
-    """
-    with psycopg.connect(dsn) as conn:
-        with conn.cursor() as cur:
-            cur.execute("SET TRANSACTION READ ONLY")
-            cur.execute(query, (days,))
-            columns = [item.name for item in cur.description]
-            return [
-                dict(zip(columns, row))
-                for row in cur.fetchall()
-            ]
+    current = as_of or datetime.now(timezone.utc)
+    if current.tzinfo is None:
+        raise ValueError("timezone-aware outreach snapshot required")
+    provider = EmpireDbProvider(PostgresConnector(PostgresConnectionConfig(
+        dsn=dsn, application_name="empire-outreach-outcome-observer")))
+    with provider.read_only_snapshot() as snapshot:
+        repository = ExecutionBusDataRepository(CanonicalDataGateway(snapshot))
+        return repository.outreach_performance_records(lookback_days=lookback_days,
+            repo_root=repo_root, as_of=current)
 
 
 def refresh(
@@ -70,7 +45,7 @@ def refresh(
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
         raise ValueError("now must include timezone")
-    rows = _records(dsn, lookback_days=lookback_days)
+    rows = _records(dsn, lookback_days=lookback_days, repo_root=root, as_of=current)
     payload = build_performance_snapshot(
         rows,
         generated_at=current.astimezone(timezone.utc).isoformat(),
@@ -80,6 +55,17 @@ def refresh(
         for row in rows
         if str(row.get("classification") or "").strip()
     )
+    payload["outcome_bridge"] = {
+        "schema_version": "empire.outreach-verified-outcome-runtime-bridge.v1",
+        "states": dict(Counter(row.get("outcome_bridge_state", "UNKNOWN") for row in rows)),
+        "canonical_lineage": "outbound_intents -> closer_cases -> fulfilment_orders -> verified_outcome_feedback",
+        "read_only": True,
+        "execution_authority": "none",
+    }
+    payload["middle_funnel_states"] = {
+        stage: dict(Counter(row.get(stage + "_state", "UNKNOWN") for row in rows))
+        for stage in ("qualified_conversation", "commercial_terms")
+    }
     payload["lookback_days"] = max(1, min(int(lookback_days), 365))
     payload["historical_intent_count"] = len(rows)
     payload["historical_reply_classes"] = dict(

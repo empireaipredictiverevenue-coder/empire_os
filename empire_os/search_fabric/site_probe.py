@@ -627,7 +627,15 @@ def _internal_candidates(
             + re.sub(r"<[^>]+>", " ", label)
         ).lower()
 
-        if not any(term in text for term in INTERESTING_LINK_TERMS):
+        commercial_terms = (
+            "advertiser", "lead buyers", "buy leads", "buy calls",
+            "purchase leads", "partner", "solutions", "services",
+            "pay-per-call", "pay per call",
+        )
+        if not any(term in text for term in INTERESTING_LINK_TERMS) and not (
+            priority == "commercial"
+            and any(term in text for term in commercial_terms)
+        ):
             continue
 
         url = urljoin(origin, href)
@@ -637,7 +645,31 @@ def _internal_candidates(
             and _same_site(url, origin)
         ):
             rank = 10
-            if priority == "people":
+            if priority == "commercial":
+                if "contact" in text:
+                    rank = 0
+                elif any(term in text for term in (
+                    "advertiser", "lead buyers", "buy leads", "buy calls",
+                    "purchase leads", "pay-per-call", "pay per call",
+                )):
+                    rank = 1
+                elif any(term in text for term in (
+                    "about", "company", "who-we-are", "our-story",
+                )):
+                    rank = 2
+                elif any(term in text for term in (
+                    "leadership", "team", "staff", "people", "management",
+                )):
+                    rank = 3
+                elif any(term in text for term in (
+                    "services", "solutions", "partner",
+                )):
+                    rank = 4
+                elif "location" in text:
+                    rank = 5
+                else:
+                    rank = 6
+            elif priority == "people":
                 if any(
                     term in text
                     for term in (
@@ -684,6 +716,13 @@ def _internal_candidates(
 
 
 def _common_candidates(origin: str, *, priority: str = "default") -> List[str]:
+    if priority == "commercial":
+        # Bounded first-party fallbacks when a site's navigation hides its
+        # contact/about pages. A fetched page, not its URL, supplies evidence.
+        return [
+            urljoin(origin, path)
+            for path in ("/contact/", "/contact-us/", "/about/", "/about-us/")
+        ]
     if priority != "people":
         return []
     return [urljoin(origin, path) for path in COMMON_PEOPLE_PATHS]
@@ -966,16 +1005,34 @@ def probe_site(
                 )
             )
             queue.extend(internal[6:])
+        elif page_priority == "commercial":
+            # Reserve limited crawl slots for first-party contact/about proof
+            # even when navigation supplies many low-value links.
+            queue.extend(internal[:3])
+            queue.extend(_common_candidates(
+                homepage.url, priority=page_priority,
+            ))
+            queue.extend(internal[3:])
         else:
             queue.extend(internal)
-        queue.extend(
-            _common_candidates(
-                homepage.url,
-                priority=page_priority,
+        if page_priority != "commercial":
+            queue.extend(
+                _common_candidates(
+                    homepage.url,
+                    priority=page_priority,
+                )
             )
-        )
 
-    queue = list(dict.fromkeys(queue))
+    # Normalise trailing slash variants before requesting pages. Several
+    # business sites route /contact/ and /contact to the same document.
+    unique_queue: List[str] = []
+    queue_keys: set[str] = set()
+    for candidate in queue:
+        key = candidate.split("#", 1)[0].rstrip("/")
+        if key not in queue_keys:
+            queue_keys.add(key)
+            unique_queue.append(candidate)
+    queue = unique_queue
     queued = set(queue)
 
     names: List[str] = []
@@ -989,9 +1046,11 @@ def probe_site(
 
     best_title = homepage.title
     best_description = homepage.description
+    seen_document_urls: set[str] = set()
 
     for index, page_url in enumerate(queue):
-        if index >= max_pages:
+        # Count unique fetched pages, not redirect/404 attempts; stay bounded.
+        if len(pages) >= max_pages or index >= max_pages * 3:
             break
         if index == 0:
             document = homepage
@@ -1012,6 +1071,13 @@ def probe_site(
 
             if document is None:
                 continue
+
+        if not _same_site(document.url, origin):
+            continue
+        document_key = document.url.split("#", 1)[0].rstrip("/")
+        if document_key in seen_document_urls:
+            continue
+        seen_document_urls.add(document_key)
 
         if page_priority == "people" and document.format == "html":
             discovered = _internal_candidates(

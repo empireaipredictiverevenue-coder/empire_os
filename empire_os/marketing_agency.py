@@ -13,6 +13,7 @@ from empire_os import copywriter, media_content_pipeline, traffic_specialist
 from empire_os.predictive_revenue_formula import next_best_action_value
 from empire_os.search_intelligence.attribution import preview_search_revenue_attribution
 from empire_os.revenue_distribution import SOURCES, build_revenue_distribution
+from empire_os.tenant_marketing_intake import tenant_marketing_intake_matches
 
 ROLES = {
     "marketing_director": ("marketing_agency",),
@@ -42,11 +43,23 @@ def _action(kind, job_id, refs, **extra):
 
 def build_marketing_agency(snapshots, *, generated_at, limit=5):
     """Reuse source validation, formula, search and conversion evidence adapters."""
+    normalized_generated_at = str(generated_at).strip()
+    if normalized_generated_at.endswith("Z"):
+        normalized_generated_at = normalized_generated_at[:-1] + "+00:00"
+    try:
+        authorization_now = datetime.fromisoformat(normalized_generated_at)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("generated_at must be ISO-8601") from exc
+    if authorization_now.tzinfo is None:
+        raise ValueError("generated_at must include timezone")
+    authorization_now = authorization_now.astimezone(timezone.utc)
     if not 0 <= limit <= 5:
         raise ValueError("agency intake limit must be between zero and five")
     distribution = build_revenue_distribution(snapshots, generated_at=generated_at)
     radar = snapshots.get("radar") or {}
     catalog = snapshots.get("catalog") or {}
+    tenant_intakes = snapshots.get("tenant_marketing_intakes") or []
+    tenant_intakes = tenant_intakes if isinstance(tenant_intakes, list) else []
     radar_rows = radar.get("candidates", []) if isinstance(radar, dict) else []
     catalog_rows = catalog.get("products", []) if isinstance(catalog, dict) else []
     radar_rows = radar_rows if isinstance(radar_rows, list) else []
@@ -60,9 +73,24 @@ def build_marketing_agency(snapshots, *, generated_at, limit=5):
         if key not in organic_keys:
             continue
         row = raw[key]
+        tenant_id = str(row.get("tenant_id") or "").strip()
+        tenant_intake = None
         if any(row.get(k) for k in ("tenant_id", "account_id", "customer_id")):
-            rejected.append({"opportunity_key": key, "reason": "tenant_authorized_intake_required"})
-            continue
+            tenant_intake = next((
+                x for x in tenant_intakes
+                if tenant_marketing_intake_matches(
+                    x,
+                    tenant_id=tenant_id,
+                    opportunity_key=key,
+                    now=authorization_now,
+                )
+            ), None)
+            if tenant_intake is None:
+                rejected.append({
+                    "opportunity_key": key,
+                    "reason": "tenant_authorized_intake_required",
+                })
+                continue
         matches = [p for p in opportunity["product_matches"] if p["product_id"] and p["evidence_refs"]]
         if not matches:
             # Explicit product ambiguity fails closed; absent product is research-only.
@@ -79,10 +107,10 @@ def build_marketing_agency(snapshots, *, generated_at, limit=5):
             ready = product["binding_terms_ready"] is True
             conversation = bool(row.get("conversation_id") and row.get("conversation_evidence_refs"))
             priority = 1 if conversation else 2 if ready else 3
-            candidates.append((priority, key, product["product_code"], opportunity, row, product))
+            candidates.append((priority, key, product["product_code"], opportunity, row, product, tenant_intake))
     # Distribution already owns canonical order; retain it, including unknown economics.
     jobs = []
-    for priority, key, code, opportunity, row, matched in candidates[:limit]:
+    for priority, key, code, opportunity, row, matched, tenant_intake in candidates[:limit]:
         product = products.get(code, {})
         refs = sorted(set(opportunity["evidence_refs"] + matched["evidence_refs"]))
         job_id = "agency_" + hashlib.sha256(f"{key}|{matched['product_id']}".encode()).hexdigest()[:24]
@@ -153,7 +181,13 @@ def build_marketing_agency(snapshots, *, generated_at, limit=5):
             "attribution_identity_chain", "verified_content_claims", "suppression_and_conversation_state",
             *matched["readiness_blockers"]]))
         jobs.append({
-            "agency_job_id": job_id, "account_label": "Empire AI", "account_id": None, "tenant_id": None,
+            "agency_job_id": job_id, "account_label": "Empire AI", "account_id": None,
+            "tenant_id": str(row.get("tenant_id") or "").strip() or None,
+            "tenant_marketing_intake_id": (
+                tenant_intake.get("intake_id")
+                if isinstance(tenant_intake, dict)
+                else None
+            ),
             "opportunity_key": key, "product_id": matched["product_id"], "product_code": code,
             "revenue_lane": row.get("revenue_lane"), "niche": row.get("niche"),
             "geography": row.get("geography") or row.get("metro"), "audience": audience,
@@ -299,9 +333,19 @@ def _materialize_campaign(job, generated_at):
                paid_media_spend_cents=0, total_campaign_cost_cents=None,
                current_stage="DISCOVERED", previous_stage=None,
                stage_history=[{"stage": "DISCOVERED", "previous_stage": None, "evidence_refs": list(refs)}],
-               tenant_scope={"status": "INTERNAL_UNRESOLVED", "account_label": "Empire AI",
-                             "tenant_id": None, "account_id": None, "customer_access_authorized": False,
-                             "authorization_owner": "tenant_isolation.authorize_tenant_resource"},
+               tenant_scope={
+                   "status": (
+                       "TENANT_PLANNING_AUTHORIZED"
+                       if job.get("tenant_id") and job.get("tenant_marketing_intake_id")
+                       else "INTERNAL_UNRESOLVED"
+                   ),
+                   "account_label": "Empire AI",
+                   "tenant_id": job.get("tenant_id"),
+                   "account_id": None,
+                   "customer_access_authorized": False,
+                   "planning_authorization_id": job.get("tenant_marketing_intake_id"),
+                   "authorization_owner": "tenant_isolation.authorize_tenant_resource",
+               },
                product_evidence_refs=[r for r in refs if "commercial_catalog" in r],
                opportunity_evidence_refs=list(refs), why_now_evidence_refs=list(refs))
     advance_campaign(job, "INTAKE")

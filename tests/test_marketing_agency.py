@@ -262,3 +262,91 @@ def test_cycle_idempotence_and_objective_identity():
     data = inputs()
     data['radar']['candidates'][0]['products'] = []
     assert build(data)['campaigns'][0]['campaign_id'] != first['campaigns'][0]['campaign_id']
+
+
+def test_authorized_tenant_enters_planning_without_execution_authority():
+    from empire_os.tenant_marketing_intake import build_tenant_marketing_intake
+
+    data = inputs()
+    row = data['radar']['candidates'][0]
+    row['tenant_id'] = 'tenant-1'
+
+    intake = build_tenant_marketing_intake(
+        tenant_id='tenant-1',
+        opportunity_key=row['opportunity_key'],
+        evidence_refs=['canonical:tenant-authorization:1'],
+        authorized_at=NOW,
+    )
+
+    data['tenant_marketing_intakes'] = [intake]
+
+    result = build(data)
+
+    assert result['agency_job_count'] == 1
+    assert result['paid_acquisition_authorized'] is False
+    assert not any(result['authority'].values())
+
+    job = result['jobs'][0]
+
+    # Tenant identity and authorization provenance survive downstream.
+    assert job['tenant_id'] == 'tenant-1'
+    assert job['tenant_marketing_intake_id'] == intake['intake_id']
+
+    # Materialized campaign preserves tenant planning identity without
+    # granting tenant-resource access or execution authority.
+    assert job['tenant_scope']['status'] == 'TENANT_PLANNING_AUTHORIZED'
+    assert job['tenant_scope']['tenant_id'] == 'tenant-1'
+    assert job['tenant_scope']['planning_authorization_id'] == intake['intake_id']
+    assert job['tenant_scope']['customer_access_authorized'] is False
+    assert job['tenant_scope']['account_id'] is None
+
+    # Planning authorization cannot become execution authority.
+    assert job['lifecycle_plan']['send_authorized'] is False
+    assert job['quality_review']['publish_ready'] is False
+
+    for action in job['specialist_assignments']:
+        assert action['execution_authority'] == 'none'
+
+
+def test_wrong_tenant_authorization_remains_rejected():
+    from empire_os.tenant_marketing_intake import build_tenant_marketing_intake
+
+    data = inputs()
+    row = data['radar']['candidates'][0]
+    row['tenant_id'] = 'tenant-1'
+
+    data['tenant_marketing_intakes'] = [
+        build_tenant_marketing_intake(
+            tenant_id='tenant-2',
+            opportunity_key=row['opportunity_key'],
+            evidence_refs=['canonical:tenant-authorization:wrong'],
+            authorized_at=NOW,
+        )
+    ]
+
+    result = build(data)
+
+    assert result['agency_job_count'] == 0
+    assert {
+        'opportunity_key': row['opportunity_key'],
+        'reason': 'tenant_authorized_intake_required',
+    } in result['rejected_intake']
+
+
+def test_wrong_opportunity_authorization_remains_rejected():
+    from empire_os.tenant_marketing_intake import build_tenant_marketing_intake
+
+    data = inputs()
+    row = data['radar']['candidates'][0]
+    row['tenant_id'] = 'tenant-1'
+
+    data['tenant_marketing_intakes'] = [
+        build_tenant_marketing_intake(
+            tenant_id='tenant-1',
+            opportunity_key='observed:other',
+            evidence_refs=['canonical:tenant-authorization:wrong-opportunity'],
+            authorized_at=NOW,
+        )
+    ]
+
+    assert build(data)['agency_job_count'] == 0

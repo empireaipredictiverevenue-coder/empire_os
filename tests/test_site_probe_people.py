@@ -108,6 +108,76 @@ def test_probe_preserves_bounded_page_email_context(monkeypatch):
     assert len(page["visible_text"]) <= 12_000
 
 
+def test_commercial_priority_discovers_contact_and_buyer_pages_first():
+    import empire_os.search_fabric.site_probe as sp
+
+    html = (
+        '<a href="/locations/london/">London</a>'
+        '<a href="/about/">About us</a>'
+        '<a href="/for-advertisers/">Advertisers and lead buyers</a>'
+        '<a href="/contact/">Contact us</a>'
+        '<a href="https://other.test/contact/">Other contact</a>'
+    )
+    urls = sp._internal_candidates(
+        html, "https://acme.test/", priority="commercial"
+    )
+    assert urls[:3] == [
+        "https://acme.test/contact/",
+        "https://acme.test/for-advertisers/",
+        "https://acme.test/about/",
+    ]
+    assert all("other.test" not in url for url in urls)
+    assert sp._common_candidates(
+        "https://acme.test/", priority="commercial"
+    )[:2] == [
+        "https://acme.test/contact/",
+        "https://acme.test/contact-us/",
+    ]
+
+
+def test_commercial_probe_uses_real_contact_and_buyer_pages(monkeypatch):
+    import empire_os.search_fabric.site_probe as sp
+    from types import SimpleNamespace
+
+    root = "https://acme.test/"
+    nav = (
+        '<a href="/locations/london/">Location</a>'
+        '<a href="/for-advertisers/">Buy leads from publishers</a>'
+        '<a href="/about/">About us</a>'
+        '<a href="/contact/">Contact us</a>'
+    )
+
+    def document(url, text, emails=()):
+        return SimpleNamespace(
+            url=url, canonical_url=url, format="html", text=text,
+            title="Acme Buyers", description="", structured_data=[],
+            emails=list(emails), phones=[], socials=[],
+        )
+
+    documents = {
+        root: document(root, nav),
+        root + "contact/": document(
+            root + "contact/", "Contact Acme", ("sales@acme.test",)
+        ),
+        root + "for-advertisers/": document(
+            root + "for-advertisers/", "We buy leads from publishers."
+        ),
+        root + "about/": document(root + "about/", "About Acme Buyers"),
+    }
+    monkeypatch.setattr(sp, "_fetch", lambda _session, url, **_kw: documents.get(url))
+    monkeypatch.setattr(sp.time, "sleep", lambda _duration: None)
+
+    result = sp.probe_site(
+        root, max_pages=4, request_timeout=1,
+        time_budget_seconds=4, page_priority="commercial", public_only=True,
+    )
+    assert [page["url"] for page in result["pages_checked"]] == [
+        root, root + "contact/", root + "for-advertisers/", root + "about/",
+    ]
+    assert result["emails"] == ["sales@acme.test"]
+    assert result["ok"] is True
+
+
 def test_people_priority_visits_team_before_locations():
     import empire_os.search_fabric.site_probe as sp
 

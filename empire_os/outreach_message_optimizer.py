@@ -5,6 +5,7 @@ proof, pricing, urgency, relationships or revenue. It is analysis/drafting only.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from email.utils import parseaddr
 import re
 from typing import Any, Mapping
@@ -288,6 +289,8 @@ def review_message(
     body: str,
     cta: str,
     contact_title: str | None = None,
+    evidence: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """Score drafting quality against Empire's first-touch review policy."""
     issues: list[str] = []
@@ -338,13 +341,72 @@ def review_message(
         score = 0
         issues.extend(human_gate["blockers"])
 
+    # Import locally: conversation_value owns the canonical freshness rules.
+    from empire_os.conversation_value import _fresh_why_now, _specific_public_proof
+    context = evidence if isinstance(evidence, Mapping) else {}
+    trigger = _fresh_why_now(context, now=now or datetime.now(timezone.utc))
+    proof = _specific_public_proof(context)
+    alignment_input = context.get("message_alignment")
+    alignment_input = alignment_input if isinstance(alignment_input, Mapping) else {}
+    def alignment_state(value: Any) -> str:
+        if value is False:
+            return "CONTRADICTED"
+        if isinstance(value, Mapping):
+            if value.get("supported") is False:
+                return "CONTRADICTED"
+            if value.get("supported") is True and _text(value.get("evidence_ref")):
+                return "SUPPORTED"
+        return "UNKNOWN"
+
+    alignment = {
+        key: alignment_state(alignment_input.get(key))
+        for key in ("buyer_problem_fit", "offer_problem_fit", "proof_claim_fit",
+                    "why_now_relevance", "cta_offer_fit")
+    }
+    blockers = [key for key, state in alignment.items() if state == "CONTRADICTED"]
+    # A trigger permits citing the observation, never inferred urgency or intent.
+    if re.search(r"\b(?:act now|limited time|urgent|urgently|you need|ready to buy|budget available)\b", lower):
+        blockers.append("unsupported_urgency_or_intent")
+    proof_cited = bool(proof and _text(proof).lower().rstrip(".") in lower)
+    trigger_cited = bool(trigger and _text(trigger["summary"]).lower().rstrip(".") in lower)
+    if context and not (proof_cited or trigger_cited):
+        blockers.append("evidence_not_cited")
+    cta_present = bool(_text(cta) and _text(cta).lower() in lower)
+    dimensions = {
+        "structural_quality": max(score, 0),
+        "evidence_quality": 80 if proof_cited or trigger_cited else 0,
+        "relevance_quality": 100 if alignment["buyer_problem_fit"] == "SUPPORTED" else 30,
+        "why_now_quality": 90 if trigger_cited and alignment["why_now_relevance"] == "SUPPORTED" else 60 if trigger_cited else 0,
+        "commercial_value_quality": 100 if alignment["offer_problem_fit"] == "SUPPORTED" else 30,
+        "CTA_quality": 90 if cta_present and alignment["cta_offer_fit"] == "SUPPORTED" else 50 if cta_present else 0,
+        "personalization_quality": 80 if proof_cited or trigger_cited else 0,
+        "trust_risk_quality": 100 if human_gate["eligible"] and not blockers else 0,
+    }
+    persuasion = round(sum(dimensions.values()) / len(dimensions))
+    persuasion = min(persuasion, 74 if trigger is None else 100)
+    if any(state == "UNKNOWN" for state in alignment.values()):
+        persuasion = min(persuasion, 79)
+    if blockers:
+        persuasion = 0
+    backing = ("PROOF_AND_TRIGGER_BACKED" if proof and trigger else
+               "TRIGGER_BACKED" if trigger else "PROOF_BACKED" if proof else "UNKNOWN")
+
     return {
+        "dimensions": dimensions,
+        "structural_score": max(score, 0),
+        "commercial_persuasion_score": persuasion,
+        "why_now_state": "FRESH" if trigger else "UNKNOWN/MISSING",
+        "why_now": trigger,
+        "evidence_backing": backing,
+        "alignment": alignment,
+        "alignment_evidence": dict(alignment_input),
+        "alignment_blockers": blockers,
         "score": max(score, 0),
         "issues": list(dict.fromkeys(issues)),
         "word_count": words,
         "c_suite": c_suite,
         "human_copy_gate": human_gate,
-        "experiment_eligible": bool(human_gate["eligible"] and score >= 80),
+        "experiment_eligible": bool(human_gate["eligible"] and score >= 80 and not blockers and (proof or trigger)),
         "policy": {
             "c_suite_word_limit": 75,
             "other_word_limit": 110,
@@ -366,6 +428,8 @@ def build_body_variants(
     business_name: str,
     reason_now: str,
     proof: str,
+    evidence: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
     contact_title: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build a small vetted set of plain, specific first-touch copy arms."""
@@ -422,6 +486,8 @@ def build_body_variants(
             body=str(row["body"]),
             cta=str(row["cta"]),
             contact_title=contact_title,
+            evidence=evidence if evidence is not None else {"specific_proof": observed_proof},
+            now=now,
         )
         if review["experiment_eligible"]:
             eligible.append({**row, "quality": review})
@@ -437,6 +503,8 @@ def optimise_first_touch(
     business_name: str,
     reason_now: str,
     proof: str,
+    evidence: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
     contact_title: str | None = None,
     territory: str | None = None,
     sender_email: str | None = None,
@@ -461,6 +529,8 @@ def optimise_first_touch(
         business_name=business,
         reason_now=reason,
         proof=observed_proof,
+        evidence=evidence,
+        now=now,
         contact_title=contact_title,
     )
     body = str(bodies[0]["body"])
@@ -470,6 +540,8 @@ def optimise_first_touch(
         body=body,
         cta=cta,
         contact_title=contact_title,
+        evidence=evidence if evidence is not None else {"specific_proof": observed_proof},
+        now=now,
     )
     sender = review_sender_identity(
         sender_email,

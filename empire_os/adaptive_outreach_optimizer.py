@@ -25,6 +25,15 @@ COMMERCIAL_REPLY_CLASSES = frozenset({
     "objection",
     "later",
 })
+LEARNING_DIMENSIONS = (
+    "problem_class", "trigger_class", "proof_class", "cta_strategy",
+    "followup_step", "locale", "timezone",
+)
+FUNNEL_STAGES = (
+    "qualified_conversation", "commercial_terms", "order", "verified_payment",
+    "fulfilled", "recognized_revenue",
+)
+
 STOP_REPLY_CLASSES = frozenset({
     "negative",
     "unsubscribe",
@@ -44,12 +53,16 @@ def segment_key(
     offer_key: Any,
     niche: Any,
     decision_role: Any,
+    dimensions: Mapping[str, Any] | None = None,
 ) -> str:
-    return "|".join((
+    base = "|".join((
         _norm(offer_key) or "unknown_offer",
         _norm(niche) or "unknown_niche",
         _norm(decision_role) or "unknown_role",
     ))
+    known = dimensions if isinstance(dimensions, Mapping) else {}
+    suffix = [f"{key}={_norm(known[key])}" for key in LEARNING_DIMENSIONS if _text(known.get(key))]
+    return "|".join([base, *suffix])
 
 
 def load_snapshot(
@@ -179,6 +192,10 @@ def _choose_arm(
         segment=segment,
         arm_type=arm_type,
     )
+    if segment != "__global__" and not _mature(stats, arm_ids):
+        broader = _arm_stats(snapshot, segment="__global__", arm_type=arm_type)
+        if _mature(broader, arm_ids):
+            segment, stats = "__global__", broader
     if not _mature(stats, arm_ids):
         arm = _balanced_arm(
             arm_ids,
@@ -205,7 +222,7 @@ def _choose_arm(
         mode = "adaptive_exploration"
     else:
         arm = max(
-            arm_ids,
+            tuple(item for item in arm_ids if int(stats.get(item, {}).get("delivered") or 0) >= MIN_DELIVERED_PER_ARM),
             key=lambda item: (
                 _arm_score(stats.get(item, {})),
                 int(stats.get(item, {}).get("commercial_replies") or 0),
@@ -341,6 +358,7 @@ def select_message_arms(
     niche: Any,
     decision_role: Any,
     snapshot: Mapping[str, Any] | None = None,
+    dimensions: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     key = _text(assignment_key)
     if not key:
@@ -359,6 +377,7 @@ def select_message_arms(
         offer_key=offer_key,
         niche=niche,
         decision_role=decision_role,
+        dimensions=dimensions,
     )
     state = snapshot if isinstance(snapshot, Mapping) else {}
     subject_arm, subject_meta = _choose_arm(
@@ -379,6 +398,7 @@ def select_message_arms(
         "schema_version": "empire.adaptive-outreach-selection.v1",
         "assignment_key": key,
         "exact_segment": exact,
+        "learning_dimensions": {key: dimensions[key] for key in LEARNING_DIMENSIONS if dimensions and _text(dimensions.get(key))},
         "subject_arm": subject_arm,
         "body_arm": body_arm,
         "subject_selection": subject_meta,
@@ -397,6 +417,15 @@ class _Counts:
     replies: int = 0
     commercial_replies: int = 0
     stop_replies: int = 0
+    positive_replies: int = 0
+    negative_replies: int = 0
+    unsubscribes: int = 0
+    qualified_conversation: int = 0
+    commercial_terms: int = 0
+    order: int = 0
+    verified_payment: int = 0
+    fulfilled: int = 0
+    recognized_revenue: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -405,6 +434,10 @@ class _Counts:
             "replies": self.replies,
             "commercial_replies": self.commercial_replies,
             "stop_replies": self.stop_replies,
+            "positive_replies": self.positive_replies,
+            "negative_replies": self.negative_replies,
+            "unsubscribes": self.unsubscribes,
+            **{stage: getattr(self, stage) for stage in FUNNEL_STAGES},
             "commercial_reply_rate": (
                 round(self.commercial_replies / self.delivered, 6)
                 if self.delivered else None
@@ -424,6 +457,10 @@ def build_performance_snapshot(
     segments: dict[str, dict[str, Any]] = {}
     labelled = 0
     unlabelled = 0
+    rejected_feedback = 0
+    seen_intents: set[str] = set()
+    seen_outcomes: set[str] = set()
+    seen_middle_stages: set[str] = set()
 
     def ensure_segment(key: str) -> dict[str, Any]:
         return segments.setdefault(key, {
@@ -433,6 +470,11 @@ def build_performance_snapshot(
         })
 
     for raw in records:
+        intent_id = _text(raw.get("intent_id"))
+        if intent_id and intent_id in seen_intents:
+            continue
+        if intent_id:
+            seen_intents.add(intent_id)
         metadata = raw.get("metadata")
         metadata = metadata if isinstance(metadata, Mapping) else {}
         adaptive = metadata.get("adaptive_outreach")
@@ -449,7 +491,42 @@ def build_performance_snapshot(
         delivered = bool(raw.get("delivered"))
         classification = _norm(raw.get("classification"))
 
-        for key in (exact, "__global__"):
+        # Terminal economic evidence enters only through the existing V2B gate.
+        downstream = {stage: False for stage in FUNNEL_STAGES}
+        feedback = raw.get("verified_outcome_feedback")
+        if isinstance(feedback, Mapping):
+            from empire_os.outcome_feedback import validate_verified_feedback
+            try:
+                validate_verified_feedback(feedback, tenant_id=raw.get("tenant_id"), as_of=generated_at)
+            except (ValueError, TypeError, KeyError):
+                rejected_feedback += 1
+            else:
+                # Require explicit recipient/order attribution; never join on a reply label.
+                if (raw.get("fulfilment_order_id") and
+                        raw.get("fulfilment_order_id") == feedback.get("fulfilment_order_id")):
+                    outcome_ref = _text(feedback.get("outcome_ref"))
+                    if (outcome_ref not in seen_outcomes and feedback.get("actual_revenue") is True
+                            and feedback.get("verified_label") == 1):
+                        seen_outcomes.add(outcome_ref)
+                        for stage in ("order", "verified_payment", "fulfilled", "recognized_revenue"):
+                            downstream[stage] = True
+        from datetime import datetime
+        from empire_os.conversation_qualification import validate_qualified_conversation_stage
+        from empire_os.commercial_terms_materializer import validate_commercial_terms_stage
+        for stage, validate in (("qualified_conversation", validate_qualified_conversation_stage),
+                                ("commercial_terms", validate_commercial_terms_stage)):
+            evidence = raw.get(stage + "_evidence")
+            if not isinstance(evidence, Mapping):
+                continue
+            try:
+                validate(evidence, raw, as_of=datetime.fromisoformat(generated_at.replace("Z", "+00:00")))
+            except (ValueError, TypeError, KeyError):
+                continue
+            ref = evidence["stage_ref"]
+            if ref not in seen_middle_stages:
+                seen_middle_stages.add(ref)
+                downstream[stage] = True
+        for key in dict.fromkeys((exact, "__global__")):
             segment = ensure_segment(key)
             if delivered:
                 segment["delivered"] += 1
@@ -464,10 +541,19 @@ def build_performance_snapshot(
                 counts.intents += 1
                 if delivered:
                     counts.delivered += 1
-                if classification:
+                for stage, verified in downstream.items():
+                    if verified:
+                        setattr(counts, stage, getattr(counts, stage) + 1)
+                if classification in COMMERCIAL_REPLY_CLASSES | STOP_REPLY_CLASSES | {"other"}:
                     counts.replies += 1
                     if classification in COMMERCIAL_REPLY_CLASSES:
                         counts.commercial_replies += 1
+                    if classification == "positive":
+                        counts.positive_replies += 1
+                    if classification == "negative":
+                        counts.negative_replies += 1
+                    if classification == "unsubscribe":
+                        counts.unsubscribes += 1
                     if classification in STOP_REPLY_CLASSES:
                         counts.stop_replies += 1
 
@@ -503,8 +589,13 @@ def build_performance_snapshot(
                 row.get("body_arms", {}),
                 tuple(row.get("body_arms", {}).keys()),
             )
-            for row in serialised.values()
+            for row in serialised.values() if row["delivered"] >= SEGMENT_MIN_DELIVERED
         ),
+        "rejected_outcome_feedback_count": rejected_feedback,
+        "downstream_stage_policy": "canonical_middle_stage_evidence + verified_outcome_feedback; no reply-derived stages",
+        "unavailable_stage_sources": [],
+        "middle_stage_sources": {"qualified_conversation": "closer_events.state_advanced.qualified", "commercial_terms": "approved installed review + commercial_terms_events"},
+        "expected_economics_is_prediction": True,
         "uses_open_tracking": False,
         "canonical_truth": "EmpireDB outbound events + classified replies",
         "execution_authority": "none",

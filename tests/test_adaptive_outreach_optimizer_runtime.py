@@ -12,7 +12,7 @@ def test_refresh_writes_derived_learning_snapshot(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runtime,
         "_records",
-        lambda _dsn, lookback_days: [
+        lambda _dsn, lookback_days, **_kwargs: [
             {
                 "delivered": True,
                 "classification": "positive",

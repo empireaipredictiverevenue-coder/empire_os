@@ -72,13 +72,13 @@ class TestMarketing:
         assert state is not None
         assert state.current_state == "discovered"
 
-    def test_tick(self, backend):
-        result = tick(backend)
+    def test_tick(self, backend, tmp_path):
+        result = tick(backend, surface_root=str(tmp_path))
         assert result["scanned"] >= 8
         assert result["target_niche"] is not None
         assert result["drafts"] == 1
         assert len(result["registered"]) == 1
 
         # Running again should still work (target may shift)
-        result2 = tick(backend)
+        result2 = tick(backend, surface_root=str(tmp_path))
         assert result2["scanned"] >= 8
