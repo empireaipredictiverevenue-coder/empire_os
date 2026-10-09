@@ -1,0 +1,19 @@
+{
+  "schema_version": "empire.buyer_network_manual_holds.v1",
+  "holds": [
+    {
+      "domain": "paymyreferral.com",
+      "state": "HOLD",
+      "reason_code": "FIRST_PARTY_LEGAL_CONTACT_LINKS_HTTP_404",
+      "observed_on": "2026-10-09",
+      "review_required": true,
+      "evidence_urls": [
+        "https://paymyreferral.com/terms",
+        "https://paymyreferral.com/compliance",
+        "https://paymyreferral.com/marketplace-rules",
+        "https://paymyreferral.com/contact"
+      ],
+      "resolution_condition": "Independent proof of current contractual terms, lawful consent pathway and functioning first-party commercial contact or application; explicit founder review to lift HOLD"
+    }
+  ]
+}

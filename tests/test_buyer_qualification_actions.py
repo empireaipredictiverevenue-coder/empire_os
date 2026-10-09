@@ -12,6 +12,10 @@ from scripts.build_buyer_qualification_actions import (
 def _case(root:Path,*,verified:bool=True, bad:int=0):
     directory=root/BASE
     directory.mkdir(parents=True,exist_ok=True)
+    config=root/'config/buyer_network_manual_review_holds.json'
+    config.parent.mkdir(parents=True,exist_ok=True)
+    config.write_text(json.dumps({'schema_version':'empire.buyer_network_manual_holds.v1',
+                                  'holds':[]}))
     d1='publisheralpha.example.com'
     d2='buyerbeta.example.com'
     queue=[{'domain':d1,'status':'VERIFY_REQUIREMENTS'},

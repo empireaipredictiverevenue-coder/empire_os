@@ -5,8 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from empire_os.buyer_review_holds import load_review_holds
+
 
 ROOT = Path("/srv/empire_os")
+HOLDS = ROOT / "config/buyer_network_manual_review_holds.json"
 
 BASE = (
     ROOT
@@ -238,6 +241,10 @@ def gaps(candidate):
 
 def main():
 
+    # Founder due-diligence HOLD policy is authoritative for review promotion.
+    # Evaluate it before any existing runtime snapshot is overwritten.
+    manual_holds = load_review_holds(HOLDS)
+
     discovery = json.loads(
         DISCOVERY.read_text()
     )
@@ -260,6 +267,7 @@ def main():
 
     packets = []
     backlog = []
+    held_domains = []
 
     for candidate in queue.get(
         "candidates",
@@ -272,6 +280,22 @@ def main():
         ).lower()
 
         if not valid_domain(domain):
+            continue
+
+        manual_hold = manual_holds.get(domain)
+        if manual_hold is not None:
+            held_domains.append(domain)
+            backlog.append({
+                "domain": domain,
+                "status": "MANUAL_EVIDENCE_HOLD",
+                "source_status": candidate.get("status"),
+                "score": candidate.get("score"),
+                "verticals": candidate.get("verticals", []),
+                "reasons": ["manual_hold:" + manual_hold["reason_code"]],
+                "review_required": True,
+                "authority": "OBSERVE",
+                "outbound_authority": False,
+            })
             continue
 
         status = candidate.get(
@@ -441,6 +465,9 @@ def main():
             "trusted_ready_count":
                 len(packets),
 
+            "manual_hold_count": len(held_domains),
+            "manual_hold_domains": sorted(set(held_domains)),
+
             "packets":
                 packets,
 
@@ -476,6 +503,7 @@ def main():
             "backlog_count":
                 len(backlog),
 
+            "manual_hold_count": len(held_domains),
             "candidates":
                 backlog,
         },
@@ -492,6 +520,7 @@ def main():
             "Verification backlog: "
             + str(len(backlog))
         ),
+        ("Manual due-diligence holds: " + str(len(held_domains))),
         "",
     ]
 
@@ -578,6 +607,8 @@ def main():
 
                 "trusted_ready_count":
                     len(packets),
+
+                "manual_hold_count": len(held_domains),
 
                 "trusted_ready_domains":
                     [

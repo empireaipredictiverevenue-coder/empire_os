@@ -19,6 +19,8 @@ import re
 import tempfile
 from typing import Any
 
+from empire_os.buyer_review_holds import load_review_holds
+
 ROOT = Path('/srv/empire_os')
 BASE = Path('runtime/buyer_network_intelligence')
 SOURCES = {
@@ -80,6 +82,7 @@ def _snapshots(root: Path):
 def plan(root: Path = ROOT) -> dict[str,Any]:
     root=Path(root).resolve()
     snapshots, hashes = _snapshots(root)
+    holds = load_review_holds(root/'config/buyer_network_manual_review_holds.json')
     shortlist=snapshots['shortlist'].get('shortlist')
     packets=snapshots['packets'].get('packets')
     queued=snapshots['queue'].get('candidates')
@@ -113,7 +116,8 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         domain=_domain(item.get('domain'))
         if not domain or domain in seen or domain not in current_domains:continue
         seen.add(domain)
-        is_founder_review = domain in verified_packets
+        manual_hold = holds.get(domain)
+        is_founder_review = domain in verified_packets and manual_hold is None
         gaps=[g for g in item.get('evidence_gaps',[])
               if isinstance(g,str) and g in EVIDENCE_TASKS] if isinstance(item.get('evidence_gaps'),list) else []
         gaps=list(dict.fromkeys(gaps))
@@ -125,7 +129,13 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         score=score if type(score) is int and 0<=score<=100 else 0
         actions.append({
             'domain':domain,
-            'tier':'FOUNDER_REVIEW_ONLY' if is_founder_review else 'EVIDENCE_RECOVERY',
+            'tier':('MANUAL_EVIDENCE_HOLD' if manual_hold is not None
+                    else 'FOUNDER_REVIEW_ONLY' if is_founder_review
+                    else 'EVIDENCE_RECOVERY'),
+            'manual_hold_reason':manual_hold['reason_code'] if manual_hold is not None else None,
+            'manual_hold_resolution_condition':(
+                manual_hold['resolution_condition'] if manual_hold is not None else None
+            ),
             'queue_status':str(item.get('queue_status') or 'WATCH')[:50],
             'founder_priority':score,
             'verticals':[v for v in item.get('verticals',[]) if isinstance(v,str) and len(v)<50][:8],
@@ -142,8 +152,8 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'mailbox_send_provisioned':False,
             'actual_revenue':False,
         })
-    actions.sort(key=lambda x:(0 if x['tier']=='FOUNDER_REVIEW_ONLY' else 1,
-                               -x['founder_priority'],x['domain']))
+    order={'FOUNDER_REVIEW_ONLY':0,'EVIDENCE_RECOVERY':1,'MANUAL_EVIDENCE_HOLD':2}
+    actions.sort(key=lambda x:(order[x['tier']],-x['founder_priority'],x['domain']))
     # Reject stale mixed-source races. A scheduler might replace its snapshots
     # concurrently; do not promote an optimistic partial report.
     _,after_hashes=_snapshots(root)
@@ -157,6 +167,7 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         'network_candidate_count':len(current_domains),
         'shortlisted_count':len(actions),
         'trusted_founder_review_count':sum(x['tier']=='FOUNDER_REVIEW_ONLY' for x in actions),
+        'manual_evidence_hold_count':sum(x['tier']=='MANUAL_EVIDENCE_HOLD' for x in actions),
         'contact_verified_for_outbound_count':0,
         'outbound_sent':False,'outbound_enabled':False,
         'human_review_required':True,'buyer_conversation_verified':False,
@@ -201,8 +212,10 @@ def main() -> int:
         'network_candidate_count':report['network_candidate_count'],
         'shortlisted_count':report['shortlisted_count'],
         'trusted_founder_review_count':report['trusted_founder_review_count'],
+        'manual_evidence_hold_count':report['manual_evidence_hold_count'],
         'gap_counts':report['gap_counts'],
         'target_domains_by_tier':[{'domain':x['domain'],'tier':x['tier'],
+                                   'manual_hold_reason':x['manual_hold_reason'],
                                    'missing_evidence':x['missing_evidence']}
                                   for x in report['targets'][:10]],
         'written':bool(args.write),'outbound_sent':False,
