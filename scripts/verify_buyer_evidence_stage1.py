@@ -116,8 +116,55 @@ def _show(unit: str, key: str) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def recent_monitor_pass(journal: str, now: datetime) -> bool:
+    """Check the latest structured oneshot result, not volatile systemd timestamps."""
+    if now.tzinfo is None:
+        raise ValueError("timezone-aware time required")
+    observations = []
+    for line in journal.splitlines():
+        try:
+            entry = json.loads(line)
+            msg = json.loads(entry.get("MESSAGE", ""))
+            stamp = datetime.fromtimestamp(
+                int(entry["__REALTIME_TIMESTAMP"]) / 1000000, timezone.utc
+            )
+        except (ValueError, TypeError, KeyError, OverflowError, json.JSONDecodeError):
+            continue
+        if (
+            isinstance(msg, dict)
+            and msg.get("schema") == "empire.conversation_collector_systemd_health.v1"
+        ):
+            observations.append((stamp, msg))
+    if not observations:
+        return False
+    stamp, msg = max(observations, key=lambda pair: pair[0])
+    elapsed = now.astimezone(timezone.utc) - stamp
+    return (
+        timedelta(minutes=-2) <= elapsed <= timedelta(minutes=15)
+        and msg.get("status") == "PASS"
+        and msg.get("execution_authority") == "none"
+        and msg.get("authenticated_buyer_intent") is False
+    )
+
+
+def _recent_monitor_verified() -> bool:
+    try:
+        completed = subprocess.run(
+            [
+                "journalctl", "-u", "empire-conversation-collector-health.service",
+                "--no-pager", "-o", "json", "-n", "80",
+            ],
+            capture_output=True, text=True, timeout=8,
+        )
+        return (
+            completed.returncode == 0
+            and recent_monitor_pass(completed.stdout, datetime.now(timezone.utc))
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
 def main() -> int:
-    import sys
     try:
         cat = subprocess.run(
             ["systemctl", "cat", "empire-department-cycle.service"],
@@ -142,11 +189,8 @@ def main() -> int:
             independent_health_monitor_ready=(
                 _show("empire-conversation-collector-health.service", "LoadState") == "loaded"
                 and _show("empire-conversation-collector-health.service", "Result") == "success"
-                and _show(
-                    "empire-conversation-collector-health.service",
-                    "ExecMainExitTimestamp",
-                ) not in ("", "n/a")
                 and "empire-conversation-collector-health.service" in cat.stdout
+                and _recent_monitor_verified()
             ),
         )
     except (OSError, subprocess.TimeoutExpired):

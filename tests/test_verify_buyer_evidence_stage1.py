@@ -156,3 +156,43 @@ def test_independent_healthy_systemd_monitor_closes_masked_error_gap(tmp_path):
     assert result["status"] == "PASS"
     assert result["independent_health_monitor_ready"] is True
     assert result["execution_authority"] == "none"
+
+
+def test_latest_recent_health_journal_proves_completed_oneshot_without_timestamp():
+    from datetime import datetime, timedelta, timezone
+    import json
+    now = datetime(2026, 10, 9, 19, 14, tzinfo=timezone.utc)
+    def entry(offset, status="PASS"):
+        ts = int((now + timedelta(minutes=offset)).timestamp() * 1000000)
+        return json.dumps({
+            "__REALTIME_TIMESTAMP": str(ts),
+            "MESSAGE": json.dumps({
+                "schema": "empire.conversation_collector_systemd_health.v1",
+                "status": status,
+                "execution_authority": "none",
+                "authenticated_buyer_intent": False,
+            })
+        })
+    m = loader()
+    assert m.recent_monitor_pass(entry(-2), now) is True
+    assert m.recent_monitor_pass(entry(-30), now) is False
+    assert m.recent_monitor_pass(entry(10), now) is False
+    assert m.recent_monitor_pass(entry(-2) + "\n" + entry(-1, "COLLECTOR_READ_UNVERIFIED"), now) is False
+    assert m.recent_monitor_pass(entry(-1, "COLLECTOR_READ_UNVERIFIED") + "\n" + entry(-2), now) is False
+    assert m.recent_monitor_pass("malformed json", now) is False
+    assert m.recent_monitor_pass("", now) is False
+
+
+def test_unauthenticated_journal_claim_never_proves_stage1_monitor():
+    import json
+    now = datetime(2026, 10, 9, 19, 14, tzinfo=timezone.utc)
+    msg = {
+        "schema": "empire.conversation_collector_systemd_health.v1",
+        "status": "PASS", "execution_authority": "send",
+        "authenticated_buyer_intent": True,
+    }
+    entry = json.dumps({
+        "__REALTIME_TIMESTAMP": str(int(now.timestamp() * 1000000)),
+        "MESSAGE": json.dumps(msg),
+    })
+    assert loader().recent_monitor_pass(entry, now) is False
