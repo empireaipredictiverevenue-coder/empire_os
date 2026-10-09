@@ -108,6 +108,8 @@ _TRUSTED_CONTACT_RECOVERY_SOURCES = {
 def _direct_public_contact_recovery(
     candidate: Any,
     result: dict[str, Any],
+    *,
+    target_people: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Recover a bound email without re-running the full site probe."""
     if result.get("review_ready") is True:
@@ -155,6 +157,60 @@ def _direct_public_contact_recovery(
             "decision_score": score,
         } if trusted else None
 
+    target_evidence_urls: list[str] = []
+
+    for person in target_people or []:
+        if not isinstance(
+            person,
+            dict,
+        ):
+            continue
+
+        if (
+            str(
+                person.get("name")
+                or ""
+            )
+            .strip()
+            .casefold()
+            != name.casefold()
+        ):
+            continue
+
+        evidence_url = str(
+            person.get(
+                "evidence_url"
+            )
+            or ""
+        ).strip()
+
+        if (
+            evidence_url
+            and _same_host(
+                evidence_url,
+                str(
+                    candidate.website
+                    or ""
+                ),
+            )
+        ):
+            target_evidence_urls.append(
+                evidence_url
+            )
+
+    # Structured-data / visible-text identity is admissible here only when
+    # the exact vetted person also carries a same-host first-party evidence
+    # URL. The downstream exact-person/email/MX gates remain unchanged.
+    if (
+        not trusted
+        and source in {
+            "structured_data",
+            "visible_text",
+        }
+        and target_evidence_urls
+    ):
+        trusted = True
+
     if not trusted or not isinstance(decision, dict):
         return result
 
@@ -166,6 +222,7 @@ def _direct_public_contact_recovery(
         max_queries=2,
         max_results_per_query=4,
         max_pages_total=3,
+        evidence_urls=target_evidence_urls,
     )
     evidence = observed.get("evidence") or []
     if not evidence:
@@ -901,6 +958,7 @@ def run_cycle(
                 recovered_result = _direct_public_contact_recovery(
                     candidate,
                     dict(result or {}),
+                    target_people=target_people,
                 )
                 if recovered_result.get("public_person_contact_evidence") is not None:
                     public_contact_recovery_attempts += 1
@@ -1026,8 +1084,14 @@ def adaptive_capacity(
     requested_workers: int = MAX_CYCLE_WORKERS,
 ) -> dict[str, Any]:
     queue = queue or BuyerDeferredEnrichmentQueue()
-    statuses = queue.snapshot().get("deferred_by_status") or {}
+    snapshot = queue.snapshot()
+    statuses = snapshot.get("deferred_by_status") or {}
     backlog = sum(int(statuses.get(s) or 0) for s in ("pending", "deferred", "running"))
+    # Work waiting for a retry deadline cannot benefit from extra workers.
+    # Retain the full backlog for health reporting, size only to due work.
+    runnable_backlog = max(0, min(
+        int(snapshot.get("due_now", backlog)), backlog,
+    ))
     cpu_count = max(1, int(os.cpu_count() or 1))
     try:
         load_1m = float(os.getloadavg()[0])
@@ -1039,11 +1103,12 @@ def adaptive_capacity(
         worker_ceiling = max(MIN_CYCLE_WORKERS, worker_ceiling // 2)
     elif load_ratio >= 0.85:
         worker_ceiling = max(MIN_CYCLE_WORKERS, worker_ceiling - 2)
-    workers = max(1, min(int(requested_workers), worker_ceiling, max(1, backlog)))
+    workers = max(1, min(int(requested_workers), worker_ceiling, max(1, runnable_backlog)))
     limit_ceiling = min(MAX_CYCLE_LIMIT, max(workers, workers * 6))
-    limit = max(1, min(int(requested_limit), limit_ceiling, max(1, backlog)))
+    limit = max(1, min(int(requested_limit), limit_ceiling, max(1, runnable_backlog)))
     return {
         "backlog": backlog,
+        "runnable_backlog": runnable_backlog,
         "cpu_count": cpu_count,
         "load_1m": round(load_1m, 3),
         "load_ratio": round(load_ratio, 3),

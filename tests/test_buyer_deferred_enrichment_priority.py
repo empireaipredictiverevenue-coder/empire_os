@@ -93,6 +93,23 @@ def test_claim_due_prevents_duplicate_worker_claims(tmp_path):
     assert first_ids.isdisjoint(second_ids)
 
 
+def test_reenqueue_cannot_steal_active_worker_lease(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({"prospect_id": "p1", "reason": "no_contact_evidence",
+               "business_name": "Real Buyer", "website": "https://buyer.example"})
+    first = q.claim_due(limit=1, worker_id="worker-a", lease_seconds=420)
+    assert first[0]["status"] == "running"
+    assert q.enqueue({"prospect_id": "p1", "reason": "no_contact_evidence"})
+    import json
+    row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
+    assert row["status"] == "running"
+    assert row["lease_owner"] == "worker-a"
+    assert row["lease_expires_at"] == first[0]["lease_expires_at"]
+    assert row["business_name"] == "Real Buyer"
+    assert row["website"] == "https://buyer.example"
+    assert q.claim_due(limit=1, worker_id="worker-b") == []
+
+
 def test_expired_claim_is_recovered_by_another_worker(tmp_path):
     q = _queue(tmp_path)
     q.enqueue({
@@ -117,6 +134,20 @@ def test_expired_claim_is_recovered_by_another_worker(tmp_path):
     )
     assert recovered[0]["prospect_id"] == "p1"
     assert recovered[0]["lease_owner"] == "worker-b"
+
+
+def test_expired_lease_is_counted_as_due(tmp_path):
+    q = _queue(tmp_path)
+    q.enqueue({"prospect_id": "p1", "reason": "no_contact_evidence"})
+    current = datetime.now(timezone.utc)
+    q.claim_due(limit=1, worker_id="worker-a", lease_seconds=60, now=current)
+    assert q.snapshot()["due_now"] == 0
+    import json
+    p = tmp_path / "deferred.json"
+    data = json.loads(p.read_text())
+    data["p1"]["lease_expires_at"] = (current - timedelta(minutes=1)).isoformat()
+    p.write_text(json.dumps(data))
+    assert q.snapshot()["due_now"] == 1
 
 
 def test_defer_again_clears_worker_lease(tmp_path):

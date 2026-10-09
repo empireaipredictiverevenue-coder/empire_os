@@ -298,14 +298,55 @@ class BuyerDeferredEnrichmentQueue:
                 and str(route.get("value") or "").strip()
             ][:8]
 
+            # Materially new person evidence can move an existing
+            # deferred prospect into hot contact recovery. Its previous
+            # retry timestamp was calculated before that evidence existed.
+            # Accelerate only the non-hot -> hot transition once; an
+            # already-hot prospect keeps its governed backoff.
+            preview = dict(existing)
+            preview.update({
+                "reason": reason,
+                "target_people": (
+                    target_people
+                    or list(existing.get("target_people") or [])
+                ),
+                "company_contact_routes": (
+                    company_contact_routes
+                    or list(existing.get("company_contact_routes") or [])
+                ),
+            })
+
+            previous_lane = _recovery_lane(existing)
+            next_lane = _recovery_lane(preview)
+            # Re-ingestion must not unclaim active work or dispatch it twice.
+            # An expired running lease is recovered by claim_due itself.
+            preserve_running_lease = existing.get("status") == "running"
+
+            accelerate_hot_transition = (
+                previous_lane != "hot_contact_recovery"
+                and next_lane == "hot_contact_recovery"
+            )
+
+            next_retry_at = (
+                now
+                if accelerate_hot_transition
+                else existing.get("next_retry_at") or now
+            )
+
             requested_priority = _priority(
                 item.get("priority_score"),
                 default=_priority(existing.get("priority_score")),
             )
             existing_priority = _priority(existing.get("priority_score"))
             existing.update({
-                "business_name": str(item.get("business_name") or "").strip(),
-                "website": str(item.get("website") or "").strip(),
+                "business_name": (
+                    str(item.get("business_name") or "").strip()
+                    or str(existing.get("business_name") or "").strip()
+                ),
+                "website": (
+                    str(item.get("website") or "").strip()
+                    or str(existing.get("website") or "").strip()
+                ),
                 "phone": (
                     str(item.get("phone") or "").strip()
                     or str(existing.get("phone") or "").strip()
@@ -317,9 +358,12 @@ class BuyerDeferredEnrichmentQueue:
                 ),
                 "reason": reason,
                 "next_prerequisite": _recovery_prerequisite(reason),
-                "status": "pending",
+                "status": "running" if preserve_running_lease else "pending",
                 "updated_at": now,
-                "next_retry_at": existing.get("next_retry_at") or now,
+                "next_retry_at": (
+                    existing.get("next_retry_at")
+                    if preserve_running_lease else next_retry_at
+                ),
                 "account_key": (
                     str(item.get("account_key") or "").strip()
                     or existing.get("account_key")
@@ -585,6 +629,10 @@ class BuyerDeferredEnrichmentQueue:
                 if status in {"pending", "deferred"}:
                     retry_at = _parse(row.get("next_retry_at"))
                     if retry_at is None or retry_at <= current:
+                        due_now += 1
+                elif status == "running":
+                    lease_end = _parse(row.get("lease_expires_at"))
+                    if lease_end is not None and lease_end <= current:
                         due_now += 1
         oldest_pending_hours = max(pending_ages, default=0.0)
         stale_pending_count = sum(age >= 6.0 for age in pending_ages)
