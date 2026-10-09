@@ -350,3 +350,49 @@ UTC/UK midnight observation-boundary case without weakening freshness
 checks, moving any data or granting outbound authority. Dedicated
 boundary tests cover 2026-10-09T23:46Z (10 Oct in London) and naive-time
 rejection. Live one-shot readback is still required after this fix.
+
+## Canonical $1,500 product reference — 10 Oct 2026
+
+The existing commercial catalog at
+`runtime/commercial_catalog/latest.json` contains exactly one matching
+`managed_service` row: **Empire Opportunity Intelligence Pilot**,
+product ID `a4b11ace-4199-4419-a43d-2bcbeda33364`. Its current
+founder-approved internal price is **USD 1,500 flat**, with verified
+catalog/version/pricing state and an original approval reference
+`founder_approval:first_cash_economics:2026-09-21`. The existing
+`commercial_pricing_live_verifier.verify_catalog_snapshot` independently
+checks price drift in the same source; no second catalog or quote engine
+was created.
+
+`scripts/refresh_contractor_revenue_review.py` now attaches a strictly
+**internal** product reference if the catalog is a bounded, fresh,
+unambiguous, founder-approved snapshot and its existing price verifier
+passes. A missing, stale, duplicated, mismatched, drifted or otherwise
+invalid product remains an explicit hold. A currently catalog-approved
+product is **not** a recipient-specific purchase recommendation, a
+completed price quote, agreed 14-day scope, verified fulfilment, or
+permission to include pricing or a CTA in a first touch. The existing
+rapport policy continues returning `RESEARCH` for all eight candidates.
+
+The public-facing read-only founder summary reports only the count of
+verified internal products, **not** private catalog pricing, contact data,
+or prospect-specific commercial terms. Later governed deal work must use
+the existing Deal Room + Documenso after demonstrated two-way interest,
+recipient checks, and founder approval. No call, email, contract,
+payment, or recognised revenue results from this catalog link.
+
+### Actual service proof of rapport-first refresh
+
+The authorised one-shot `empire-company-routed-buyer-review.service`
+reported `Result=success`, and the private 0600 founder snapshot at
+`runtime/revenue_strike/contractor_founder_review_latest.json` shows
+`as_of=2026-10-10`,
+`canonical_domain_history_observed=true`,
+`rapport_gate_research_count=8`,
+`public_business_email_research_count=1`,
+`outbound_authorized=false`.
+The actual loopback founder HTTP endpoint
+`GET http://127.0.0.1:8766/v1/founder-dashboard/overview` returned
+HTTP 200 with the same rapport/candidate/hold counts. The internal
+catalog-linked extension needs its **own subsequent service-run
+readback** before claiming that specific new field is production live.

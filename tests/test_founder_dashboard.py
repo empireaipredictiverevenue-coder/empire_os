@@ -2408,3 +2408,28 @@ def test_founder_contractors_reports_rapport_no_pitch_guardrail_in_overview(tmp_
     assert "no commercial pitch" in result["founder_next_action"]
     assert "secret@" not in str(result)
     assert result["outbound_authorized"] is False
+
+
+
+def test_founder_contractors_displays_catalog_verified_count_not_price_or_contacts(tmp_path):
+    root=make_root(tmp_path)
+    write_json(root/"runtime/revenue_strike/contractor_founder_review_latest.json",{
+        "schema":"empire.revenue_strike.contractor_founder_review.v1",
+        "as_of":"2026-10-10", "mode":"OBSERVE", "outbound_authorized":False,
+        "summary":{"historical_contractor_companies":8,
+                   "rapport_gate_research_count":8,
+                   "existing_catalog_offer_verified_internal":1},
+        "existing_commercial_product":{
+            "founder_catalog_price_cents":150000,
+            "secret":"INTERNAL_ONLY",
+            "outbound_authorized":False,
+        },
+        "packets":[{"email":"PRIVATE_RECIPIENT@example.com"}],
+    })
+    d=build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert d["internal_catalog_product_verified_count"]==1
+    assert d["rapport_gate_research_count"]==8
+    assert d["outbound_authorized"] is False
+    assert "INTERNAL_ONLY" not in str(d)
+    assert "150000" not in str(d)
+    assert "PRIVATE_RECIPIENT" not in str(d)
