@@ -443,3 +443,57 @@ def test_prepared_crm040_migration_enforces_real_source_ownership(pg):
 
     # Can only be installed once: pre-existing objects fail closed.
     run("crm_release_fixture",sql,expect_error=True)
+
+
+def test_catalog_grant_lineage_runs_on_real_ephemeral_postgres(pg):
+    """Same read-only SQL as operator probe; no production connection."""
+    import importlib.util
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "probe_crm_application_login_contract.py"
+    spec = importlib.util.spec_from_file_location("crm_privilege_probe", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    run, _, _ = pg
+    # The older reusable test fixture predates production migration 018's
+    # evidence_ref column; extend only the disposable PostgreSQL schema.
+    run("crm_fixture", "ALTER TABLE public.empire_tenant_role_bindings ADD COLUMN evidence_ref text;")
+    role = "'crm_login_unbound'"
+    statement = module.build_catalog_statement(role)
+
+    def inventory():
+        lines = run("crm_fixture", statement).splitlines()
+        return json.loads(next(line for line in lines if line.startswith("{")))
+
+    baseline = inventory()
+    assert baseline["crm_two_views_present"] is True
+    assert baseline["crm_views_security_invoker"] is True
+    assert baseline["crm_views_security_barrier"] is False  # fixture has no barrier
+    assert baseline["crm_source_tables_rls_enabled"] is True
+    assert baseline["crm_grant_public"] is False
+    assert baseline["crm_grant_direct_app"] is False
+    assert baseline["crm_grant_inherited"] is False
+    assert baseline["app_login_crm_select"] is False
+
+    try:
+        run("crm_fixture", "GRANT SELECT ON public.revenue_crm_prospects TO PUBLIC;")
+        public = inventory()
+        assert public["crm_grant_public"] is True
+        assert public["app_login_crm_select"] is True
+        run("crm_fixture", "REVOKE SELECT ON public.revenue_crm_prospects FROM PUBLIC;")
+
+        run("crm_fixture", "GRANT SELECT ON public.revenue_crm_prospects TO crm_login_unbound;")
+        direct = inventory()
+        assert direct["crm_grant_public"] is False
+        assert direct["crm_grant_direct_app"] is True
+        assert direct["app_login_crm_select"] is True
+    finally:
+        run("crm_fixture", """
+            REVOKE SELECT ON public.revenue_crm_prospects FROM PUBLIC;
+            REVOKE SELECT ON public.revenue_crm_prospects FROM crm_login_unbound;
+        """)
+    restored = inventory()
+    assert restored["crm_grant_public"] is False
+    assert restored["crm_grant_direct_app"] is False

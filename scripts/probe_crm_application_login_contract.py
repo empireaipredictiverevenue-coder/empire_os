@@ -37,6 +37,20 @@ def classify(app_database: str, app_epoch: int, catalog: dict[str, Any]) -> dict
         "app_login_binding_evidence_present": catalog.get("app_login_evidenced") is True,
         "app_login_crm_role_member": catalog.get("app_login_crm_member") is True,
         "app_login_crm_view_select": catalog.get("app_login_crm_select") is True,
+        "app_login_crm_buyer_view_select": catalog.get("app_login_crm_buyer_select") is True,
+        "crm_two_views_present": catalog.get("crm_two_views_present") is True,
+        "crm_views_security_invoker": catalog.get("crm_views_security_invoker") is True,
+        "crm_views_security_barrier": catalog.get("crm_views_security_barrier") is True,
+        "crm_source_tables_rls_enabled": catalog.get("crm_source_tables_rls_enabled") is True,
+        "app_can_select_base_source_columns": catalog.get("app_base_columns_select") is True,
+        "crm_view_select_grant_public": catalog.get("crm_grant_public") is True,
+        "crm_view_select_grant_direct_app": catalog.get("crm_grant_direct_app") is True,
+        "crm_view_select_grant_inherited": catalog.get("crm_grant_inherited") is True,
+        "crm_view_owned_by_app": catalog.get("crm_view_owned_by_app") is True,
+        "crm_view_effective_permission_without_reader_membership": (
+            catalog.get("app_login_crm_select") is True
+            and catalog.get("app_login_crm_member") is False
+        ),
         "app_login_can_mutate_tenant_binding": catalog.get("app_login_binding_update") is True,
         "independent_active_bound_logins": int(catalog.get("other_bound_logins", 0)),
         "independent_evidenced_bound_logins": int(catalog.get("other_evidenced_logins", 0)),
@@ -46,6 +60,105 @@ def classify(app_database: str, app_epoch: int, catalog: dict[str, Any]) -> dict
         "role_changes_performed": False,
     }
 
+
+def build_catalog_statement(quoted_login: str) -> str:
+    """Return catalog-only SQL for a safely quoted app role name."""
+    return f"""
+BEGIN TRANSACTION READ ONLY;
+SET LOCAL statement_timeout = '5000ms';
+WITH target AS (
+ SELECT r.oid, r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb,
+        r.rolcreaterole, r.rolbypassrls, r.rolreplication
+ FROM pg_catalog.pg_roles r WHERE r.rolname = {quoted_login}
+), login_status AS (
+ SELECT
+  count(*)=1 AS app_login_present,
+  coalesce(bool_or(rolsuper OR rolcreatedb OR rolcreaterole
+                   OR rolbypassrls OR rolreplication),false) AS app_login_elevated,
+  coalesce(bool_or(pg_catalog.pg_has_role(
+       oid,'empire_revenue_crm_reader'::regrole,'MEMBER')),false)
+       AS app_login_crm_member,
+  coalesce(bool_or(pg_catalog.has_table_privilege(
+       oid,'public.revenue_crm_prospects','SELECT')),false)
+       AS app_login_crm_select,
+  coalesce(bool_or(pg_catalog.has_table_privilege(
+       oid,'public.revenue_crm_buyers','SELECT')),false)
+       AS app_login_crm_buyer_select,
+  coalesce(bool_or(pg_catalog.has_table_privilege(
+       oid,'public.empire_tenant_role_bindings','UPDATE')),false)
+       AS app_login_binding_update
+ FROM target
+), bindings AS (
+ SELECT count(*) FILTER (WHERE b.role_name = {quoted_login}) > 0
+         AS app_login_bound,
+        count(*) FILTER (
+          WHERE b.role_name = {quoted_login}
+            AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
+        ) > 0 AS app_login_evidenced,
+        count(*) FILTER (
+          WHERE b.role_name <> {quoted_login}
+            AND r.rolcanlogin AND NOT r.rolsuper
+        ) AS other_bound_logins,
+        count(*) FILTER (
+          WHERE b.role_name <> {quoted_login}
+            AND r.rolcanlogin AND NOT r.rolsuper
+            AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
+        ) AS other_evidenced_logins
+ FROM public.empire_tenant_role_bindings b
+ JOIN pg_catalog.pg_roles r ON b.role_name=r.rolname
+ WHERE b.active
+), crm_acl AS (
+ SELECT
+    count(DISTINCT v.oid) = 2 AS crm_two_views_present,
+    coalesce(bool_and(coalesce('security_invoker=true'=ANY(v.reloptions),false)),false)
+        AS crm_views_security_invoker,
+    coalesce(bool_and(coalesce('security_barrier=true'=ANY(v.reloptions),false)),false)
+        AS crm_views_security_barrier,
+    coalesce(bool_or(
+       a.privilege_type='SELECT' AND a.grantee=0
+    ),false) AS crm_grant_public,
+    coalesce(bool_or(
+       a.privilege_type='SELECT' AND a.grantee=t.oid
+    ),false) AS crm_grant_direct_app,
+    coalesce(bool_or(CASE WHEN
+       a.privilege_type='SELECT' AND a.grantee<>0
+       AND a.grantee<>t.oid
+       THEN pg_catalog.pg_has_role(t.oid,a.grantee,'USAGE')
+       ELSE false END),false) AS crm_grant_inherited,
+    coalesce(bool_or(v.relowner=t.oid),false) AS crm_view_owned_by_app
+ FROM pg_catalog.pg_class v
+ JOIN pg_catalog.pg_namespace n ON v.relnamespace=n.oid
+ CROSS JOIN target t
+ LEFT JOIN LATERAL pg_catalog.aclexplode(
+     coalesce(v.relacl,pg_catalog.acldefault('v',v.relowner))
+ ) a ON true
+ WHERE n.nspname='public'
+   AND v.relname IN ('revenue_crm_prospects','revenue_crm_buyers')
+   AND v.relkind='v'
+), crm_base AS (
+ SELECT
+   count(DISTINCT c.oid) = 2
+      AND coalesce(bool_and(c.relrowsecurity),false)
+      AS crm_source_tables_rls_enabled,
+   coalesce(bool_or(
+      pg_catalog.has_any_column_privilege(t.oid,c.oid,'SELECT')
+   ),false) AS app_base_columns_select
+ FROM pg_catalog.pg_class c
+ JOIN pg_catalog.pg_namespace n ON c.relnamespace=n.oid
+ CROSS JOIN target t
+ WHERE n.nspname='public' AND c.relname IN ('prospects','buyers')
+)
+SELECT row_to_json(result)
+FROM (
+ SELECT current_database() AS database,
+        extract(epoch from pg_postmaster_start_time())::bigint
+          AS postmaster_epoch,
+        login_status.*, bindings.*, crm_acl.*, crm_base.*
+ FROM login_status CROSS JOIN bindings
+ CROSS JOIN crm_acl CROSS JOIN crm_base
+) result;
+COMMIT;
+"""
 
 def main() -> int:
     blocked = {
@@ -74,58 +187,7 @@ def main() -> int:
                 )
                 db, login, epoch = c.fetchone()
             safe_login = sql.Literal(str(login)).as_string(conn)
-        statement = f"""
-BEGIN TRANSACTION READ ONLY;
-SET LOCAL statement_timeout = '5000ms';
-WITH target AS (
- SELECT r.oid, r.rolname, r.rolcanlogin, r.rolsuper, r.rolcreatedb,
-        r.rolcreaterole, r.rolbypassrls, r.rolreplication
- FROM pg_catalog.pg_roles r WHERE r.rolname = {safe_login}
-), login_status AS (
- SELECT
-  count(*)=1 AS app_login_present,
-  coalesce(bool_or(rolsuper OR rolcreatedb OR rolcreaterole
-                   OR rolbypassrls OR rolreplication),false) AS app_login_elevated,
-  coalesce(bool_or(pg_catalog.pg_has_role(
-       oid,'empire_revenue_crm_reader'::regrole,'MEMBER')),false)
-       AS app_login_crm_member,
-  coalesce(bool_or(pg_catalog.has_table_privilege(
-       oid,'public.revenue_crm_prospects','SELECT')),false)
-       AS app_login_crm_select,
-  coalesce(bool_or(pg_catalog.has_table_privilege(
-       oid,'public.empire_tenant_role_bindings','UPDATE')),false)
-       AS app_login_binding_update
- FROM target
-), bindings AS (
- SELECT count(*) FILTER (WHERE b.role_name = {safe_login}) > 0
-         AS app_login_bound,
-        count(*) FILTER (
-          WHERE b.role_name = {safe_login}
-            AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
-        ) > 0 AS app_login_evidenced,
-        count(*) FILTER (
-          WHERE b.role_name <> {safe_login}
-            AND r.rolcanlogin AND NOT r.rolsuper
-        ) AS other_bound_logins,
-        count(*) FILTER (
-          WHERE b.role_name <> {safe_login}
-            AND r.rolcanlogin AND NOT r.rolsuper
-            AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
-        ) AS other_evidenced_logins
- FROM public.empire_tenant_role_bindings b
- JOIN pg_catalog.pg_roles r ON b.role_name=r.rolname
- WHERE b.active
-)
-SELECT row_to_json(result)
-FROM (
- SELECT current_database() AS database,
-        extract(epoch from pg_postmaster_start_time())::bigint
-          AS postmaster_epoch,
-        login_status.*, bindings.*
- FROM login_status CROSS JOIN bindings
-) result;
-COMMIT;
-"""
+        statement = build_catalog_statement(safe_login)
         process = subprocess.run(
             ["runuser", "-u", "postgres", "--", "psql", "-X", "-w",
              "-q", "-At", "-v", "ON_ERROR_STOP=1", "-d", "empiredb",

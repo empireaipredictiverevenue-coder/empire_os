@@ -81,3 +81,37 @@ def test_probe_does_not_print_names_or_operate_on_customer_rows():
         "SELECT * FROM public.buyers", "SELECT * FROM public.prospects",
     ):
         assert forbidden not in source
+
+
+def test_unbound_app_view_grant_is_visible_but_never_authorizes_activation():
+    report = module.classify(
+        "empiredb", 1234, catalog(
+            app_login_crm_select=True,
+            app_login_crm_buyer_select=True,
+            crm_two_views_present=True,
+            crm_views_security_invoker=True,
+            crm_views_security_barrier=True,
+            crm_source_tables_rls_enabled=True,
+            crm_grant_public=True,
+        )
+    )
+    assert report["crm_view_effective_permission_without_reader_membership"] is True
+    assert report["crm_view_select_grant_public"] is True
+    assert report["app_login_has_active_tenant_binding"] is False
+    assert report["app_activation_authorized"] is False
+    assert report["live_cross_tenant_proof"] is False
+    assert report["customer_rows_read"] is False
+
+
+def test_catalog_query_includes_both_views_and_fails_open_nothing():
+    sql = module.build_catalog_statement("'crm_app_fixture'")
+    assert "BEGIN TRANSACTION READ ONLY" in sql
+    assert "pg_catalog.aclexplode" in sql
+    assert "pg_catalog.has_any_column_privilege" in sql
+    assert "crm_grant_direct_app" in sql
+    assert "crm_grant_inherited" in sql
+    assert "crm_grant_public" in sql
+    assert "crm_source_tables_rls_enabled" in sql
+    assert "revenue_crm_buyers" in sql
+    assert "SELECT row_to_json(result)" in sql
+    assert "COMMIT;" in sql
