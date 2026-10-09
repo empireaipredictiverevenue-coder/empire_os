@@ -40,3 +40,31 @@ def test_campaign_rejects_consequential_execution_even_with_authority_control(fl
     campaign = {**proof(), 'lane': 'campaigns', 'runtime_verified_controls': ['input_quality', 'action_authority'], flag: True}
     with pytest.raises(PromotionProofError):
         validate_control_proof(campaign, lane='campaigns', allowed={'input_quality', 'action_authority'}, now=NOW)
+
+
+def test_atomic_binding_write_rejects_changed_source(tmp_path):
+    from empire_os.runtime_promotion_guard import atomic_binding_write, PromotionWriteError
+    p = tmp_path / 'bindings.json'
+    p.write_text('newer')
+    with pytest.raises(PromotionWriteError, match='changed'):
+        atomic_binding_write(p, 'old', expected_bytes=b'original')
+    assert p.read_text() == 'newer'
+    assert not list(tmp_path.glob('*.tmp'))
+
+
+def test_atomic_binding_write_success(tmp_path):
+    from empire_os.runtime_promotion_guard import atomic_binding_write
+    p = tmp_path / 'bindings.json'
+    p.write_text('old')
+    atomic_binding_write(p, 'new', expected_bytes=b'old')
+    assert p.read_text() == 'new'
+
+
+def test_binding_writer_lock_is_reentrant_across_sequential_calls(tmp_path):
+    from empire_os.runtime_promotion_guard import binding_writer_lock
+    path = tmp_path / 'bindings.json'
+    with binding_writer_lock(path):
+        path.write_text('first')
+    with binding_writer_lock(path):
+        path.write_text('second')
+    assert path.read_text() == 'second'
