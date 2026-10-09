@@ -7,6 +7,8 @@ Does not send email or upgrade a provider reply to canonical buyer evidence.
 from __future__ import annotations
 import argparse
 import json
+from urllib import request, error
+from typing import Any, Callable
 
 from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider, MailboxReadUnavailable
 
@@ -48,12 +50,111 @@ def readiness_report(provider: OwnedIMAPMailboxProvider, *, probe: bool = False)
     return result
 
 
+
+SERVICE_BASE = 'http://127.0.0.1:8766'
+
+
+class _NoRedirects(request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _local_json(path: str, *, opener: Callable[..., Any] | None = None) -> dict:
+    # Caller cannot supply a URL: no untrusted network destination or login.
+    open_fn = opener or request.build_opener(_NoRedirects()).open
+    req = request.Request(SERVICE_BASE + path, method='GET',
+                          headers={'Accept': 'application/json'})
+    with open_fn(req, timeout=5) as response:
+        if response.status != 200:
+            raise ValueError('unexpected_http_status')
+        payload = json.loads(response.read(65536).decode('utf-8'))
+    if not isinstance(payload, dict):
+        raise ValueError('invalid_service_payload')
+    return payload
+
+
+def service_readiness_report(*, probe: bool = False,
+                             opener: Callable[..., Any] | None = None) -> dict:
+    """Check the *running* Founder API environment without reading credentials.
+
+    --service-probe uses the existing read-only summary, bounded to one item
+    per folder; it never prints person/message/secret fields.
+    """
+    result = {
+        'schema_version': 'empire.owned_imap_service_readiness.v1',
+        'provider': 'owned_imap', 'mode': 'OBSERVE',
+        'service_checked': True, 'configured': False,
+        'read_only': True, 'live_probe_performed': False,
+        'suppression_evidence_complete': False,
+        'canonical_buyer_conversation_verified': False,
+        'outbound_sent': False, 'execution_authority': 'none',
+    }
+    try:
+        status = _local_json('/v1/founder-mailbox/readiness', opener=opener)
+    except error.HTTPError as exc:
+        result['status'] = 'ROUTE_NOT_DEPLOYED' if exc.code == 404 else 'SERVICE_READINESS_UNAVAILABLE'
+        result['http_status'] = int(exc.code)
+        return result
+    except (error.URLError, TimeoutError, OSError):
+        result['status'] = 'SERVICE_UNAVAILABLE'
+        return result
+    except (ValueError, UnicodeError, TypeError, KeyError):
+        result['status'] = 'SERVICE_RESPONSE_INVALID'
+        return result
+    if (status.get('provider') != 'owned_imap'
+        or status.get('execution_authority') != 'none'
+        or status.get('canonical_identity_verified') is not False
+        or status.get('suppression_evidence_complete') is not False):
+        result['status'] = 'SERVICE_CONTRACT_UNVERIFIED'
+        return result
+    result['configured'] = status.get('configured') is True
+    if not result['configured']:
+        result['status'] = 'CONFIGURATION_REQUIRED'
+        return result
+    if not probe:
+        result['status'] = 'CONFIGURED_UNPROVEN'
+        return result
+    result['live_probe_performed'] = True
+    try:
+        summary = _local_json('/v1/founder-mailbox/summary?limit=1', opener=opener)
+    except error.HTTPError as exc:
+        result['status'] = 'READ_PROBE_BLOCKED'
+        result['http_status'] = int(exc.code)
+        return result
+    except (error.URLError, TimeoutError, OSError, ValueError, UnicodeError, TypeError, KeyError):
+        result['status'] = 'READ_PROBE_BLOCKED'
+        return result
+    if (summary.get('provider') != 'owned_imap'
+        or summary.get('execution_authority') != 'none'
+        or summary.get('canonical_buyer_conversation_verified') is not False
+        or summary.get('suppression_evidence_complete') is not False):
+        result['status'] = 'READ_PROBE_CONTRACT_UNVERIFIED'
+        return result
+    metrics = summary.get('summary')
+    if not isinstance(metrics, dict):
+        result['status'] = 'READ_PROBE_CONTRACT_UNVERIFIED'
+        return result
+    threads = metrics.get('all')
+    if type(threads) is not int or not 0 <= threads <= 2:
+        result['status'] = 'READ_PROBE_CONTRACT_UNVERIFIED'
+        return result
+    result['status'] = 'READ_PROBE_SUCCESS'
+    result['threads_observed_in_sample'] = threads
+    return result
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--probe', action='store_true',
-                        help='Explicitly connect to your own IMAP server in read-only mode')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--probe', action='store_true',
+                      help='Probe using credentials in the current process environment')
+    mode.add_argument('--service', action='store_true',
+                      help='Check the running loopback Founder API without credentials')
+    mode.add_argument('--service-probe', action='store_true',
+                      help='Read one item per folder through the running Founder API')
     args = parser.parse_args()
-    output = readiness_report(OwnedIMAPMailboxProvider(), probe=args.probe)
+    output = (service_readiness_report(probe=args.service_probe)
+              if args.service or args.service_probe
+              else readiness_report(OwnedIMAPMailboxProvider(), probe=args.probe))
     print(json.dumps(output, sort_keys=True, indent=2))
     return 0 if output['status'] == 'READ_PROBE_SUCCESS' else 2
 

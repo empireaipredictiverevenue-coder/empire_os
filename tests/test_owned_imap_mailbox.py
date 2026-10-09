@@ -227,3 +227,91 @@ def test_login_failure_closes_connection_and_returns_sanitized_reason():
         own.list_received(limit=1)
     assert calls==['LOGOUT']
     assert 'private-password' not in str(error.value)
+
+
+def test_service_readiness_returns_404_for_old_process_without_leaking_content():
+    import io
+    from urllib.error import HTTPError
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    def old_process(request, *, timeout):
+        raise HTTPError(request.full_url,404,'missing',{},io.BytesIO(b'secret mailbox data'))
+    result=service_readiness_report(opener=old_process)
+    assert result['status']=='ROUTE_NOT_DEPLOYED'
+    assert result['http_status']==404
+    assert result['live_probe_performed'] is False
+    assert 'secret mailbox data' not in repr(result)
+
+
+def test_service_readiness_separates_installed_from_actual_bounded_probe():
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    import json
+    requests=[]
+    class Response:
+        status=200
+        def __init__(self,obj):self.content=json.dumps(obj).encode()
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def read(self,amount):return self.content[:amount]
+    def opener(req, *, timeout):
+        assert timeout == 5
+        requests.append(req.full_url)
+        if req.full_url.endswith('/readiness'):
+            return Response({'provider':'owned_imap','configured':True,
+                             'execution_authority':'none',
+                             'canonical_identity_verified':False,
+                             'suppression_evidence_complete':False})
+        assert req.full_url.endswith('/summary?limit=1')
+        return Response({'provider':'owned_imap','execution_authority':'none',
+                         'canonical_buyer_conversation_verified':False,
+                         'suppression_evidence_complete':False,
+                         'summary':{'all':2,'replies':1,
+                                    'verified_canonical_buyer_replies':0},
+                         'threads':[{'body_text':'sensitive test content'}]})
+    initial=service_readiness_report(opener=opener)
+    assert initial['status']=='CONFIGURED_UNPROVEN'
+    assert len(requests)==1
+    full=service_readiness_report(probe=True,opener=opener)
+    assert full['status']=='READ_PROBE_SUCCESS'
+    assert full['threads_observed_in_sample']==2
+    assert full['canonical_buyer_conversation_verified'] is False
+    assert 'sensitive test content' not in repr(full)
+    assert len(requests)==3
+
+
+def test_service_readiness_rejects_malformed_and_provider_identity_mismatch():
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    import json
+    class Response:
+        status=200
+        def __init__(self,payload):self.payload=json.dumps(payload).encode()
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,n):return self.payload[:n]
+    def bad_mode(req,*,timeout):
+        return Response({'provider':'resend','configured':True,
+                         'execution_authority':'none',
+                         'canonical_identity_verified':False,
+                         'suppression_evidence_complete':False})
+    report=service_readiness_report(opener=bad_mode)
+    assert report['status']=='SERVICE_CONTRACT_UNVERIFIED'
+    assert report['live_probe_performed'] is False
+
+
+def test_service_readiness_incomplete_config_does_not_invoke_summary():
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    import json
+    class Response:
+        status=200
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def read(self,n):return json.dumps({'provider':'owned_imap','configured':False,
+            'execution_authority':'none','canonical_identity_verified':False,
+            'suppression_evidence_complete':False}).encode()
+    calls=[]
+    def opener(req,*,timeout):
+        calls.append(req.full_url)
+        return Response()
+    result=service_readiness_report(probe=True,opener=opener)
+    assert result['status']=='CONFIGURATION_REQUIRED'
+    assert result['live_probe_performed'] is False
+    assert len(calls)==1
