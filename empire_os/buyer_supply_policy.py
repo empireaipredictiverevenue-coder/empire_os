@@ -141,3 +141,153 @@ def lead_smart_observed_policy(*, source_ref: str) -> dict[str, Any]:
             "ads_reviewed": False,
         },
     )
+
+
+def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
+    """Materialize Lead Smart roofing terms confirmed on 2026-10-05.
+
+    Evidence is buyer-reported commercial policy only. This does not prove a
+    live payout amount, tracking assignment, routing operation, fulfilment,
+    revenue, or authorization to send traffic.
+    """
+    policy = build_buyer_supply_policy(
+        buyer_name="Lead Smart",
+        source_ref=source_ref,
+        acquisition={
+            "offer_name": "Main Roofing Contractors - Nationwide - Variable Rate",
+            "service": "roofing",
+            "preferred_work": [
+                "installation",
+                "replacement",
+            ],
+            "traffic_sources": {
+                "organic_seo_landing_pages": {
+                    "buyer_approved": True,
+                },
+                "paid_search": {
+                    "creative_approved": True,
+                    "brand_bidding_allowed": False,
+                },
+            },
+            "buyer_approved": True,
+            "traffic_source_approval_required": True,
+        },
+        creative={
+            "unbranded_required": True,
+            "generic_creative_required": True,
+            "paid_search_copy_approved": True,
+            "brand_bidding_allowed": False,
+            "prohibited": [
+                "promotions",
+                "guarantees",
+                "discounts",
+                "unsubstantiated_claims",
+            ],
+        },
+        conversion={
+            "metric": "connected_call_seconds",
+            "qualification_seconds": None,
+            "qualification_seconds_min": 60,
+            "qualification_seconds_max": 120,
+            "qualification_route_dependent": True,
+            "appointment_cpl_possible": True,
+            "caller_requirement": "homeowner",
+            "geography_requirement": "covered_zip",
+            "duplicate_window_days": 30,
+            "duplicate_pays_once": True,
+            "scope": "most_buyers",
+            "campaign_specific": True,
+        },
+        pricing={
+            "dynamic": True,
+            "pricing_mode": "live_bid_at_call_time",
+            "coverage_tool_role": "planning",
+            "mechanism_verified": True,
+            "actual_payout_observed": False,
+            "payout_value": None,
+            "currency": None,
+            "verified": False,
+        },
+        routing={
+            "platform": "Ringba",
+            "selected_mode": "direct",
+            "available_modes": ["direct", "rtb"],
+            "offer_application_required": True,
+
+            # Ringba system evidence received 2026-10-06 confirms
+            # Lead Smart approved Empire's roofing offer application.
+            # This does not establish tracking or execution authority.
+            "offer_application_status": "approved",
+            "offer_application_approved": True,
+            "ringba_offer_label": "Roofing - Nationwide",
+            "ringba_campaign_id": "CA8278ed3f26e9495b881fe3833174d007",
+            "payout_model": "VARIABLE_RATE",
+            "payout_currency": "USD",
+            "observed_payout_min": 5,
+            "observed_payout_max": 150,
+            "revshare_percentage": None,
+            "rtb_enabled": False,
+            "payout_value_authority": "RINGBA_REALISED_EVENT",
+            "qualification_route_dependent": True,
+            "appointment_cpl_possible": True,
+            "max_tracking_numbers_without_prior_discussion": 5,
+            "zip_coverage_required": True,
+            "facebook_marketplace_allowed": False,
+            "free_quote_claim_allowed": False,
+            "free_estimate_claim_allowed": False,
+            "fake_or_ai_generated_reviews_allowed": False,
+            "required_site_disclaimer": (
+                "This site is a free service to assist homeowners in connecting "
+                "with local service contractors. All contractors are independent "
+                "and this site does not warrant or guarantee any work performed. "
+                "It is the responsibility of the homeowner to verify that the "
+                "hired contractor furnishes the necessary license and insurance "
+                "required for the work being performed. All persons depicted in "
+                "a photo or video are actors or models and not contractors listed "
+                "on this site."
+            ),
+            "offer_approval_source_ref": "gmail:1a1112c17349445a",
+            "offer_approval_observed_at": "2026-10-06T12:24:24Z",
+
+            "tracking_number_assigned": True,
+            "tracking_number": "+18883579305",
+            "tracking_verified": False,
+            "routing_verified": False,
+            "subids_required": False,
+            "rtb_supported": True,
+            "rtb_terms_verified": False,
+            "reporting_fields": [
+                "duration",
+                "connect_status",
+                "payout_per_call",
+            ],
+        },
+        review={
+            # Seth explicitly approved the unbranded paid-search copy.
+            # Preserve site/landing-page review as unknown until evidence
+            # specifically establishes those assets were reviewed.
+            "sites_reviewed": False,
+            "landing_pages_reviewed": False,
+            "ads_reviewed": True,
+        },
+    )
+
+    policy["capacity"] = {
+        "mode": "uncapped",
+        "daily_cap": None,
+        "buyer_reported": True,
+    }
+
+    policy["operating_hours"] = {
+        "timezone": "CST",
+        "monday_friday": "08:00-18:00",
+        "saturday_sunday": "10:00-16:00",
+    }
+
+    policy["evidence"] = {
+        "observed_at": "2026-10-05T14:15:08Z",
+        "evidence_type": "buyer_reported_email",
+        "execution_authority": False,
+    }
+
+    return policy

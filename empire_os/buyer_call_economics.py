@@ -31,6 +31,7 @@ def build_call_economics(
     qualification_seconds: int | None,
     daily_cap: int | None,
     traffic_source: str | None,
+    capacity_mode: str | None = None,
     traffic_source_approved: bool,
     routing_mode: str | None,
     routing_verified: bool,
@@ -70,15 +71,35 @@ def build_call_economics(
     elif not qualification_verified:
         blockers.append("qualification_rule_invalid")
 
-    capacity_verified = (
-        not isinstance(daily_cap, bool)
-        and isinstance(daily_cap, int)
-        and daily_cap > 0
-    )
-    if daily_cap is None:
-        blockers.append("capacity_unverified")
-    elif not capacity_verified:
-        blockers.append("capacity_invalid")
+    capacity = str(capacity_mode or "").strip().lower() or None
+
+    if capacity not in {None, "capped", "uncapped"}:
+        blockers.append("capacity_mode_invalid")
+        capacity_verified = False
+    elif capacity == "uncapped":
+        capacity_verified = daily_cap is None
+        if daily_cap is not None:
+            blockers.append("capacity_conflict")
+    elif capacity == "capped":
+        capacity_verified = (
+            not isinstance(daily_cap, bool)
+            and isinstance(daily_cap, int)
+            and daily_cap > 0
+        )
+        if not capacity_verified:
+            blockers.append("capacity_invalid")
+    else:
+        # Backwards compatibility: a positive legacy daily_cap is verified capped
+        # capacity. Missing capacity remains unknown and fails closed.
+        capacity_verified = (
+            not isinstance(daily_cap, bool)
+            and isinstance(daily_cap, int)
+            and daily_cap > 0
+        )
+        if daily_cap is None:
+            blockers.append("capacity_unverified")
+        elif not capacity_verified:
+            blockers.append("capacity_invalid")
 
     if not traffic:
         blockers.append("traffic_source_unverified")
@@ -125,6 +146,11 @@ def build_call_economics(
             "verified": qualification_verified,
         },
         "capacity": {
+            "mode": (
+                capacity
+                if capacity is not None
+                else ("capped" if capacity_verified else "unknown")
+            ),
             "daily_cap": daily_cap,
             "verified": capacity_verified,
         },

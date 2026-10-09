@@ -93,3 +93,14 @@ def test_cycle_skips_existing_score(monkeypatch):
     assert result["skipped_existing"] == 1
     assert result["failed"] == 0
     assert result["recognized_revenue_written"] is False
+
+
+def test_omega_projection_includes_read_only_evaluation_contract():
+    q = qualification()
+    row = worker.build_omega_score_row(q, identity_link(q))
+    features = row["features"]
+    assert features["evaluation_schema_version"] == "empire.omega-evaluation.v2"
+    assert features["evaluation_grade"] in {"A", "B", "C", "D"}
+    assert len(features["evaluation_evidence_coverage"]) == 8
+    assert row["explanation"]["evaluation_only"] is True
+    assert row["explanation"]["value_meter"]["verified_realized_revenue"] is None

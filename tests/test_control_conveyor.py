@@ -51,3 +51,15 @@ def test_capacity_allocation_and_outcome_have_explicit_owners():
     assert stages["verified_buyer_capacity"]["authority"] == "internal_write"
     assert stages["inventory_allocation"]["owner_component"] == "fulfilment"
     assert stages["commercial_outcome"]["owner_component"] == "outcome_feedback"
+
+
+def test_unknown_upstream_stage_precedes_later_blocked_stage():
+    payload = build_conveyor({"stages": [
+        {"stage": "real_acquisition", "observed": True},
+        {"stage": "qualification_v2", "observed": None},
+        {"stage": "buyer_conversation", "observed": False},
+    ]})
+    assert payload["current_blocker"] == "qualification_v2"
+    assert payload["blocker_state"] == "unknown"
+    assert payload["owner_component"] == "qualification"
+    assert payload["controls_execution"] is False

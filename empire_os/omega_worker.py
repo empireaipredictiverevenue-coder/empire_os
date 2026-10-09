@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from empire_os.intelligence.omega import MODEL_VERSION, analyze
+from empire_os.omega_evaluation import evaluate
 from empire_os.lead_scoring_v2 import MIN_DECISION_CONFIDENCE
 from empire_os.sb import request_json
 
@@ -65,6 +66,7 @@ def build_omega_score_row(
         raise OmegaWorkerError("qualification input snapshot missing")
     lead = dict(snapshot)
     prediction = analyze(lead)
+    evaluation = evaluate(lead)
     scored_at = _text(qualification.get("scored_at"))
     if not scored_at:
         raise OmegaWorkerError("qualification scored_at missing")
@@ -92,6 +94,9 @@ def build_omega_score_row(
             "expected_gross_profit": prediction.expected_gross_profit,
             "legacy_omega_score": prediction.legacy_omega_score,
             "legacy_omega_tier": prediction.legacy_omega_tier,
+            "evaluation_schema_version": evaluation["schema_version"],
+            "evaluation_grade": evaluation["grade"],
+            "evaluation_evidence_coverage": evaluation["legacy_eight_domain_evidence"],
         },
         "explanation": {
             "next_best_action": prediction.next_best_action,
@@ -108,6 +113,8 @@ def build_omega_score_row(
             ),
             "commercial_value_known": prediction.expected_revenue is not None,
             "gross_profit_known": prediction.expected_gross_profit is not None,
+            "evaluation_only": True,
+            "value_meter": evaluation["value_meter"],
         },
         "scored_at": scored_at,
     }

@@ -94,8 +94,17 @@ class PhysicalObservation:
     confidence: float | None = None
     evidence_class: str = "observed"
     execution_authority: str = "none"
+    source_truth: str | None = None
+    assertion_truth: str | None = None
+    physical_truth: str = "UNKNOWN"
 
     def __post_init__(self) -> None:
+        if self.physical_truth not in {"UNKNOWN", "INFERRED"}:
+            raise ValueError("physical verification pipeline required")
+        if self.evidence_class == "model_inference" and self.physical_truth != "INFERRED":
+            object.__setattr__(self, "physical_truth", "INFERRED")
+        if self.source == "nws_alert" and (self.physical_truth != "UNKNOWN" or self.phenomenon != "storm_exposure"):
+            raise ValueError("NWS alerts cannot verify physical occurrence or damage")
         if not self.subject_ref.strip():
             raise ValueError("physical observation requires subject_ref")
         if not self.source.strip():

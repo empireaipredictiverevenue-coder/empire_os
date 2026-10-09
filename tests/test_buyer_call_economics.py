@@ -84,6 +84,53 @@ def test_verified_inputs_make_pilot_ready_but_do_not_authorize_live_traffic():
     assert decision["revenue_recognized"] is False
 
 
+def test_verified_uncapped_capacity_is_supported():
+    economics = _base(
+        geography="verified-buyer-geo",
+        payout_amount=100.0,
+        payout_currency="USD",
+        qualification_seconds=120,
+        daily_cap=None,
+        capacity_mode="uncapped",
+        traffic_source="organic_seo",
+        traffic_source_approved=True,
+        routing_mode="ringba",
+        routing_verified=True,
+        tracking_verified=True,
+        buyer_asset_approved=True,
+    )
+
+    assert "capacity_unverified" not in economics["blockers"]
+    assert "capacity_invalid" not in economics["blockers"]
+    assert economics["capacity"]["mode"] == "uncapped"
+    assert economics["capacity"]["daily_cap"] is None
+    assert economics["capacity"]["verified"] is True
+    assert economics["pilot_ready"] is True
+    assert economics["live_traffic_authorized"] is False
+
+
+def test_uncapped_capacity_rejects_numeric_daily_cap_conflict():
+    economics = _base(
+        daily_cap=10,
+        capacity_mode="uncapped",
+    )
+
+    assert economics["capacity"]["verified"] is False
+    assert "capacity_conflict" in economics["blockers"]
+    assert economics["pilot_ready"] is False
+
+
+def test_unknown_capacity_mode_fails_closed():
+    economics = _base(
+        daily_cap=None,
+        capacity_mode="mystery",
+    )
+
+    assert economics["capacity"]["verified"] is False
+    assert "capacity_mode_invalid" in economics["blockers"]
+    assert economics["pilot_ready"] is False
+
+
 def test_margin_stays_unknown_until_acquisition_cost_is_known():
     economics = _base(
         geography="verified-buyer-geo",

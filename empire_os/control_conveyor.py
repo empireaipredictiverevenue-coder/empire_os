@@ -53,6 +53,10 @@ def _stage_owner(stage: str) -> tuple[str, str, str | None]:
     return "control_fabric", "observe", None
 
 
+# Unknown future stages remain visible, but cannot silently acquire blocker authority.
+from empire_os.commercial_loop_observer import STAGE_ORDER as _CANONICAL_STAGES
+
+
 def build_conveyor(loop: Mapping[str, Any]) -> dict[str, Any]:
     raw_stages = loop.get("stages") if isinstance(loop, Mapping) else []
     stages: list[ConveyorStage] = []
@@ -80,10 +84,15 @@ def build_conveyor(loop: Mapping[str, Any]) -> dict[str, Any]:
             },
         ))
 
+    # The canonical commercial loop treats the first non-True stage as its
+    # blocker. Do not skip unknown upstream evidence in favour of a later False.
     blocker = next(
-        (stage for stage in stages if stage.observed is False),
+        (stage for stage in stages if stage.observed is not True
+         and stage.stage in _CANONICAL_STAGES),
         None,
     )
+    if blocker is None:
+        blocker = next((stage for stage in stages if stage.observed is False), None)
     unknown = tuple(
         stage.stage for stage in stages if stage.observed is None
     )
@@ -95,6 +104,10 @@ def build_conveyor(loop: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": "empire.control_conveyor.v1",
         "loop_complete": loop.get("loop_complete") is True,
         "current_blocker": blocker.stage if blocker else None,
+        "blocker_state": (
+            "blocked" if blocker and blocker.observed is False
+            else "unknown" if blocker else None
+        ),
         "owner_component": blocker.owner_component if blocker else None,
         "authority": blocker.authority if blocker else "none",
         "next_event": blocker.next_event if blocker else None,

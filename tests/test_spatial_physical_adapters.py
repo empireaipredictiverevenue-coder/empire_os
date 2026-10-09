@@ -21,9 +21,11 @@ def test_nws_alert_becomes_exposure_not_damage():
     row = physical_from_storm_event(event)
 
     assert row.phenomenon == "storm_exposure"
-    assert row.evidence_class == "observed"
-    assert row.measurements["severity_index"] == 4.0
-    assert row.confidence == 0.95
+    assert row.evidence_class == "derived_signal"
+    assert row.measurements == {}
+    assert row.physical_truth == "UNKNOWN"
+    assert row.assertion_truth == "SOURCE_REPORTS_OBSERVED"
+    assert row.confidence is None
     assert row.execution_authority == "none"
 
 
