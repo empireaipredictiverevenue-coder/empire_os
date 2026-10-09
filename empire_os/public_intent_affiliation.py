@@ -48,9 +48,17 @@ def validate_evidence(doc: Mapping[str, Any]) -> list[dict[str, Any]]:
                 or not HOST.fullmatch(company_domain)
                 or host(official) != company_domain):
             raise ValueError("first_party_domain_mismatch")
-        if host(source) not in ("linkedin.com", "reddit.com"):
+        # LinkedIn publishes legitimate country subdomains (in.linkedin.com,
+        # es.linkedin.com). Match a registrable platform suffix exactly;
+        # never allow linkedin.com.attacker.example lookalikes.
+        allowed = ("linkedin.com", "reddit.com")
+        def trusted_social_url(value: Any) -> bool:
+            domain = host(value)
+            return any(domain == base or domain.endswith("." + base)
+                       for base in allowed)
+        if not trusted_social_url(source):
             raise ValueError("unsupported_social_post")
-        if host(profile) not in ("linkedin.com", "reddit.com"):
+        if not trusted_social_url(profile):
             raise ValueError("unsupported_social_profile")
         if (not isinstance(person, str) or not 3 <= len(person) <= 100
                 or not isinstance(company, str) or not 3 <= len(company) <= 150):

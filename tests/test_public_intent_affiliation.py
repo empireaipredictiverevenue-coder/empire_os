@@ -10,7 +10,7 @@ from empire_os.commercial_social_intent import build_social_intent_review
 
 NOW=datetime(2026,10,9,23,0,tzinfo=timezone.utc)
 MANNING_POST=("https://www.linkedin.com/posts/chase-manning-24712353_"
-              "looking-for-a-freelance-seo-specialist-share-activity-7431795613647745024-zZ4E")
+              "looking-for-a-freelance-seo-specialist-share-7431795613647745024-zZ4E")
 SHIVYA_POST=("https://www.linkedin.com/posts/sahil-aggarwal-2b1a99221_"
              "looking-for-an-seo-team-agency-were-looking-activity-7475907789199003648-EKq0")
 
@@ -132,3 +132,13 @@ def test_existing_social_review_carries_public_evidence_only_in_research_task():
     assert out["verified_poster_to_company_identity_count"]==0
     assert out["verified_commercial_buying_intent_count"]==0
     assert out["outbound_sent"] is False
+
+
+def test_country_specific_linkedin_profile_is_valid_but_lookalikes_blocked():
+    record=reviewed()
+    record["social_profile_url"]="https://in.linkedin.com/in/chase-manning-24712353"
+    result=validate_evidence(document([record]))
+    assert len(result)==1
+    record["social_profile_url"]="https://in.linkedin.com.evil.example/in/chase-manning"
+    with pytest.raises(ValueError,match="unsupported_social_profile"):
+        validate_evidence(document([record]))
