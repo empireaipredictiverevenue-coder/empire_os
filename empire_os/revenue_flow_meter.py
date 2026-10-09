@@ -11,6 +11,10 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlsplit
+
+from empire_os.buyer_flow_recovery import (
+    candidate_evidence_states, compare_repeated_domains, plan_recovery,
+)
 import json
 import os
 
@@ -253,6 +257,10 @@ def build_flow_meter(
             "scout", _amount(scout.get("observed_first_party_buyer_claim_receipt_count")),
             "scout_run_raw_source_receipts_not_buyer_proof", health,
         ),
+        "search_infrastructure_domains_rejected": _metric(
+            "scout", _amount(scout.get("rejected_search_infrastructure_domain_count")),
+            "scout_run_quality_filter", health,
+        ),
         "reconciled": _metric("reconciliation", recon_count, "scout_run", health),
         "holding_persisted": _metric("persistence", persisted, "scout_run_aggregate_only", health),
         "verified_purchasing_statements": _metric(
@@ -390,6 +398,10 @@ def build_flow_meter(
         "handoffs": edges,
         "blockers": blocker_rows[:15],
         "health_checks": healthy,
+        "recovery_plan": plan_recovery(
+            {"source_health": health, "blockers": blocker_rows},
+            scout, now=current,
+        ),
         "all_sources_current": all(s["status"] == "fresh" for s in health.values()),
         "verified_end_to_end_conversion_rate": None,
         "recognized_revenue_verified": (
@@ -437,6 +449,7 @@ def write_flow_meter(
     report: Mapping[str, Any],
     *,
     keep_history: bool = True,
+    cohort_states: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     _atomic_private_json(root / OUTPUT, report)
@@ -473,6 +486,16 @@ def write_flow_meter(
         "recognized_revenue_cents": report.get("stages", {}).get(
             "recognized_revenue_cents", {}
         ).get("current_count"),
+        # Exact-company repeated-run comparisons are possible without
+        # storing personal contacts, raw URLs or company domains in history.
+        "cohort_domain_evidence": {
+            key: {
+                "purchase_statement_verified": bool(row.get("purchase_statement_verified")),
+                "person_contact_binding": bool(row.get("named_person_email_bound")),
+                "canonical_company_correlated": bool(row.get("canonical_company_correlated")),
+            }
+            for key, row in (cohort_states or {}).items()
+        },
     }
     if record["scout_run_id"] and record["scout_current"]:
         samples = [
@@ -503,6 +526,57 @@ def refresh_flow_meter(
     keep_history: bool = True,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
-    payload = build_flow_meter(_load_receipts(root), now=now)
-    tracking = write_flow_meter(root, payload, keep_history=keep_history)
+    inputs = _load_receipts(root)
+    payload = build_flow_meter(inputs, now=now)
+    current = now or datetime.now(timezone.utc)
+    cohort = (
+        candidate_evidence_states(inputs["scout"], now=current)
+        if payload["health_checks"]["scout_fresh"]
+        and payload["health_checks"]["evidence_quality_aligned"]
+        and isinstance(inputs.get("scout"), Mapping)
+        else {}
+    )
+    payload["repeat_company_evidence_progress"] = {
+        "status": "baseline_only",
+        "causal_revenue_conversion_rate": None,
+    }
+    history_file = root / HISTORY
+    if keep_history and cohort and history_file.exists():
+        existing = json.loads(history_file.read_text(encoding="utf-8"))
+        if not isinstance(existing, Mapping) or not isinstance(existing.get("samples"), list):
+            raise ValueError("invalid_flow_history")
+        other_cycles = [
+            row for row in existing["samples"]
+            if isinstance(row, Mapping)
+            and row.get("scout_run_id") != payload["scout_run_id"]
+            and isinstance(row.get("cohort_domain_evidence"), Mapping)
+        ]
+        if other_cycles:
+            previous = max(
+                other_cycles,
+                key=lambda row: str(row.get("scout_generated_at") or ""),
+            )
+            current_flags = {
+                fp: {k: row[k] for k in (
+                    "purchase_statement_verified",
+                    "named_person_email_bound",
+                    "canonical_company_correlated",
+                )}
+                for fp, row in cohort.items()
+            }
+            old_flags = {
+                fp: {
+                    "purchase_statement_verified": item.get("purchase_statement_verified"),
+                    "named_person_email_bound": item.get("person_contact_binding"),
+                    "canonical_company_correlated": item.get("canonical_company_correlated"),
+                }
+                for fp, item in previous["cohort_domain_evidence"].items()
+                if isinstance(item, Mapping)
+            }
+            payload["repeat_company_evidence_progress"] = compare_repeated_domains(
+                old_flags, current_flags,
+            )
+    tracking = write_flow_meter(
+        root, payload, keep_history=keep_history, cohort_states=cohort,
+    )
     return {**payload, "tracking": tracking}

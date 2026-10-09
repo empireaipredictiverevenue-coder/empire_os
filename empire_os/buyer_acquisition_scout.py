@@ -22,6 +22,7 @@ from empire_os.buyer_acquisition_team import (
     commercial_research_profile, direct_buyer_profile,
 )
 from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+from empire_os.buyer_flow_recovery import NON_PROSPECT_DISCOVERY_HOSTS
 from empire_os.buyer_discovery import (
     classify_decision_role,
     looks_like_person_name,
@@ -354,10 +355,14 @@ def run_buyer_scout(
     )
 
     provenance: dict[str, list[dict[str, Any]]] = {}
+    rejected_search_infrastructure: set[str] = set()
     for row in queries:
         for domain in domain_map.get(row["query"], []):
             host = _host(domain)
             if not host:
+                continue
+            if host in NON_PROSPECT_DISCOVERY_HOSTS:
+                rejected_search_infrastructure.add(host)
                 continue
             provenance.setdefault(host, []).append({
                 "query": row["query"],
@@ -389,7 +394,9 @@ def run_buyer_scout(
             continue
         row = dict(raw)
         host = _host(str(row.get("website") or ""))
-        if not host:
+        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS:
+            if host in NON_PROSPECT_DISCOVERY_HOSTS:
+                rejected_search_infrastructure.add(host)
             continue
 
         profile_key = str(row.get("icp_profile_key") or "").strip()
@@ -474,7 +481,9 @@ def run_buyer_scout(
             continue
         row = dict(raw)
         host = _host(str(row.get("website") or row.get("domain") or ""))
-        if not host:
+        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS:
+            if host in NON_PROSPECT_DISCOVERY_HOSTS:
+                rejected_search_infrastructure.add(host)
             continue
         research_seed_domains.add(host)
 
@@ -1091,6 +1100,9 @@ def run_buyer_scout(
         "query_count": len(queries),
         "search_enabled": bool(search_enabled),
         "search_domain_count": search_domain_count,
+        "rejected_search_infrastructure_domain_count": len(
+            rejected_search_infrastructure
+        ),
         "canonical_seed_domain_count": seed_domain_count,
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
         "intent_seed_domain_count": intent_seed_domain_count,
