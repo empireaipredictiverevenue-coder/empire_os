@@ -106,14 +106,20 @@ class OwnedIMAPMailboxProvider:
                     pass
             return {
                 'id': identity,
-                'message_id': str(parsed.get('Message-ID') or '').strip() or None,
+                # Original RFC identifiers are transport headers, not authenticated identity.
+                'message_id': str(parsed.get('Message-ID') or '').strip()[:512] or None,
+                'in_reply_to': str(parsed.get('In-Reply-To') or '').strip()[:1024] or None,
+                'references': str(parsed.get('References') or '').strip()[:4096] or None,
                 'from': str(parsed.get('From') or ''),
                 'to': [str(v) for v in parsed.get_all('To', [])],
                 'reply_to': [str(v) for v in parsed.get_all('Reply-To', [])],
                 'subject': str(parsed.get('Subject') or ''),
                 'text': body,
-                'received_at': time if direction == 'inbox' else None,
+                # RFC Date is sender-controlled, not the receiving IMAP server clock.
+                'message_date': time,
+                'received_at': None,
                 'created_at': time if direction == 'sent' else None,
+                'source_received_at_verified': False,
                 'status': 'sent' if direction == 'sent' else 'received',
                 'last_event': 'sent' if direction == 'sent' else 'received',
                 'provider': 'owned_imap',
