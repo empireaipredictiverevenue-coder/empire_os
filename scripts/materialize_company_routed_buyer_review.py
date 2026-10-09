@@ -69,6 +69,19 @@ def _canonical_contact_history() -> tuple[set[str], set[str], set[str]]:
     return prior_prospects, prior_domains, suppressed_emails
 
 
+def _contractor_source_review_date(utc_now):
+    """Public research evidence dates use founder local time (Europe/London).
+
+    Avoid rejecting a 10 Oct UK-captured observation from an existing
+    authorised service that starts at 23:xx UTC on 9 Oct.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+    if not isinstance(utc_now, datetime) or utc_now.tzinfo is None:
+        raise ValueError("AWARE_CONTRACTOR_OBSERVATION_TIME_REQUIRED")
+    return utc_now.astimezone(ZoneInfo("Europe/London")).date()
+
+
 def refresh_existing_contractor_history(
     *, prior_contact_domains: set[str], suppressed_emails: set[str],
 ) -> dict:
@@ -83,7 +96,7 @@ def refresh_existing_contractor_history(
     from scripts.refresh_contractor_revenue_review import run, write_review_snapshot
 
     today = datetime.now(timezone.utc)
-    review = run(as_of=today.date(), now=today)
+    review = run(as_of=_contractor_source_review_date(today), now=today)
     checked = attach_existing_canonical_contact_history(
         review,
         prior_contact_domains=prior_contact_domains,

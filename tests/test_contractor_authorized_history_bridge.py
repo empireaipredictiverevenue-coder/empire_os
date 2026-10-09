@@ -130,3 +130,21 @@ def test_writer_refuses_symlink_target(monkeypatch,tmp_path):
     with pytest.raises(ValueError,match="LOCATION"):
         contractor.write_review_snapshot(row)
     assert target.read_text()=="preserve"
+
+
+
+def test_business_research_source_calendar_resolves_uk_utc_boundary():
+    from datetime import datetime, timezone
+    assert existing._contractor_source_review_date(
+        datetime(2026,10,9,23,46,tzinfo=timezone.utc)
+    ) == datetime(2026,10,10).date()
+    assert existing._contractor_source_review_date(
+        datetime(2026,10,10,12,0,tzinfo=timezone.utc)
+    ) == datetime(2026,10,10).date()
+
+
+def test_source_review_date_requires_aware_datetime():
+    from datetime import datetime
+    import pytest
+    with pytest.raises(ValueError,match="AWARE"):
+        existing._contractor_source_review_date(datetime(2026,10,10,0,40))

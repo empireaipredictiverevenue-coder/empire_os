@@ -332,3 +332,21 @@ business email and historically printed person email, but a
 by this new research evidence.** Any draft must eventually go
 through the **existing** Outbound Department copy validator and
 independent send-authority checks.
+
+### UK evidence calendar vs UTC service-run date (10 October 2026)
+
+A live `empire-company-routed-buyer-review.service` one-shot at
+2026-10-09T23:46:37Z returned `contractor_history_state=BLOCKED_ValueError`
+while its canonical DB reader reported `history_guard_ok=true`. The
+source observation date of the new 10 Oct 2026 business-contact review was
+ahead of the worker's still-9-Oct UTC calendar date. **No unsafe
+overwrite occurred**; the preceding canonical contractor snapshot stayed
+intact.
+
+The existing runner now calculates the report `as_of` date explicitly in
+the founder's `Europe/London` timezone, while retaining the authoritative
+database access and snapshot-read timestamp in UTC. This resolves the
+UTC/UK midnight observation-boundary case without weakening freshness
+checks, moving any data or granting outbound authority. Dedicated
+boundary tests cover 2026-10-09T23:46Z (10 Oct in London) and naive-time
+rejection. Live one-shot readback is still required after this fix.
