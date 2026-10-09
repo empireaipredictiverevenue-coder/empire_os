@@ -147,7 +147,7 @@ def test_builds_canonical_projection_and_preserves_conflicts():
     result = build_lead_intelligence(reader, prospect_id)
 
     assert result["schema_version"] == "lead_intelligence.v1"
-    assert result["source_of_truth"] == "canonical_supabase"
+    assert result["source_of_truth"] == "canonical_empiredb"
     assert result["read_only"] is True
     assert result["prospect_id"] == prospect_id
     assert result["identity"]["entity"]["id"] == entity_id

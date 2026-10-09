@@ -1,9 +1,13 @@
 from datetime import datetime, timezone
 from uuid import uuid4
+from copy import deepcopy
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
 
 from empire_os.hunter.domain_intelligence import DomainIntelligenceReport
 from empire_os.hunter.evidence_graph import build_evidence_plan
-from empire_os.hunter.materializer import SupabaseHunterMaterializer
+from empire_os.hunter.materializer import HunterMaterializerError, SupabaseHunterMaterializer
 from empire_os.hunter.models import (
     ContactEvidence,
     DomainPattern,
@@ -52,6 +56,7 @@ def plan_fixture():
 class FakeRequest:
     def __init__(self):
         self.calls = []
+        self.facts = []
 
     def __call__(
         self,
@@ -109,11 +114,21 @@ class FakeRequest:
             and path == "/rest/v1/intelligence_contact_points"
         ):
             return [{"id": "contact-1"}]
-        if (
-            method == "POST"
-            and path.startswith("/rest/v1/intelligence_facts")
-        ):
-            return [{"id": "fact-1"}]
+        if urlsplit(path).path == "/rest/v1/intelligence_facts":
+            params = parse_qs(urlsplit(path).query)
+            if method == "GET":
+                assert params["select"] == ["entity_id,fact_key,source_id,evidence_hash"]
+                assert params["limit"] == ["2"]
+                return deepcopy([row for row in self.facts
+                                 if "eq." + row["evidence_hash"] == params["evidence_hash"][0]][:2])
+            assert method == "POST"
+            assert "on_conflict" not in params
+            assert prefer == "resolution=ignore-duplicates,return=representation"
+            if any(row["evidence_hash"] == payload["evidence_hash"] for row in self.facts):
+                return []
+            row = {"id": str(uuid4()), **deepcopy(payload)}
+            self.facts.append(row)
+            return [deepcopy(row)]
         raise AssertionError((method, path, payload, prefer))
 
 
@@ -214,3 +229,71 @@ def test_confirmed_contact_is_not_downgraded_by_probable_refresh():
     )
     assert patch[2]["verification_state"] == "verified"
     assert patch[2]["confidence"] == 0.96
+
+def test_fact_replay_reuses_without_insert_or_mutation():
+    fake = FakeRequest()
+    writer = SupabaseHunterMaterializer(request_factory=fake)
+    plan = plan_fixture()
+    assert writer.materialize(plan, write_authorized=True)["facts_inserted"] == 1
+    before = deepcopy(fake.facts)
+    fake.calls.clear()
+    assert writer.materialize(plan, write_authorized=True)["facts_inserted"] == 0
+    assert fake.facts == before
+    assert not any(call["method"] != "GET" and "intelligence_facts" in call["path"]
+                   for call in fake.calls)
+    assert fake("POST", "/rest/v1/intelligence_facts", payload=before[0],
+                prefer="resolution=ignore-duplicates,return=representation") == []
+    assert fake.facts == before
+
+
+@pytest.mark.parametrize("field", ["entity_id", "fact_key", "source_id", "evidence_hash"])
+def test_fact_conflicting_existing_row_fails_closed(field):
+    fake = FakeRequest()
+    plan = plan_fixture()
+    SupabaseHunterMaterializer(request_factory=fake)._facts(source_id="source-1", plan=plan)
+    row = deepcopy(fake.facts[0])
+    row[field] = "conflicting"
+    calls = []
+    def request(method, path, **kwargs):
+        calls.append(method)
+        return [row]
+    with pytest.raises(HunterMaterializerError):
+        SupabaseHunterMaterializer(request_factory=request)._facts(source_id="source-1", plan=plan)
+    assert calls == ["GET"]
+
+
+@pytest.mark.parametrize("canonical", ["compatible", "missing", "conflicting", "multiple"])
+def test_fact_zero_row_insert_requires_compatible_canonical_reread(canonical):
+    fake = FakeRequest()
+    plan = plan_fixture()
+    def raced(method, path, **kwargs):
+        if method == "POST":
+            rows = fake(method, path, **kwargs)
+            if canonical == "missing":
+                fake.facts.clear()
+            elif canonical == "conflicting":
+                fake.facts[0]["source_id"] = "another-source"
+            elif canonical == "multiple":
+                fake.facts.append(deepcopy(rows[0]))
+            return []
+        return fake(method, path, **kwargs)
+    writer = SupabaseHunterMaterializer(request_factory=raced)
+    if canonical == "compatible":
+        assert writer._facts(source_id="source-1", plan=plan) == 0
+        assert len(fake.facts) == 1
+    else:
+        with pytest.raises(HunterMaterializerError):
+            writer._facts(source_id="source-1", plan=plan)
+    assert [call["method"] for call in fake.calls] == ["GET", "POST", "GET"]
+
+
+def test_multiple_existing_facts_fail_without_write():
+    fake = FakeRequest()
+    writer = SupabaseHunterMaterializer(request_factory=fake)
+    plan = plan_fixture()
+    writer._facts(source_id="source-1", plan=plan)
+    fake.facts.append(deepcopy(fake.facts[0]))
+    fake.calls.clear()
+    with pytest.raises(HunterMaterializerError):
+        writer._facts(source_id="source-1", plan=plan)
+    assert [call["method"] for call in fake.calls] == ["GET"]

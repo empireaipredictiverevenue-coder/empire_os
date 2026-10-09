@@ -1,7 +1,9 @@
-"""Bounded Supabase materializer for Empire Hunter evidence."""
+"""Bounded EmpireDB materializer for Empire Hunter evidence."""
 from __future__ import annotations
 
 import urllib.parse
+from datetime import datetime
+from uuid import UUID, uuid5
 from typing import Any, Callable
 
 from empire_os.hunter.evidence_graph import HunterEvidencePlan
@@ -39,15 +41,17 @@ class HunterMaterializerError(RuntimeError):
     pass
 
 
-class SupabaseHunterMaterializer:
+class EmpireDbHunterMaterializer:
     """Write only the canonical Intelligence Fabric tables Hunter owns."""
 
     def __init__(
         self,
         *,
         request_factory: RequestFn = request_json,
+        deterministic_person_ids: bool = False,
     ):
         self._request = request_factory
+        self._deterministic_person_ids = deterministic_person_ids
 
     def _get(
         self,
@@ -144,6 +148,8 @@ class SupabaseHunterMaterializer:
                 "limit": "100",
             },
         )
+        if len(employment) >= 100:
+            raise HunterMaterializerError("current employment search incomplete")
         person_ids = sorted({
             str(row.get("person_id"))
             for row in employment
@@ -174,6 +180,15 @@ class SupabaseHunterMaterializer:
             if str(row.get("normalized_name") or "")
             == person.normalized_name
         ]
+        if self._deterministic_person_ids:
+            stable_id = str(uuid5(UUID(plan.entity_id), person.normalized_name))
+            stable = self._get("/rest/v1/intelligence_people", {
+                "select": "id,normalized_name", "id": f"eq.{stable_id}", "limit": "2",
+            })
+            if len(stable) > 1 or (stable and stable[0].get("normalized_name") != person.normalized_name):
+                raise HunterMaterializerError("conflicting deterministic person identity")
+            if stable and matches and any(row["id"] != stable_id for row in matches):
+                raise HunterMaterializerError("ambiguous deterministic person identity")
         if len(matches) > 1:
             raise HunterMaterializerError(
                 "ambiguous current person identity"
@@ -181,18 +196,34 @@ class SupabaseHunterMaterializer:
         if len(matches) == 1:
             return str(matches[0]["id"])
 
-        rows = self._post(
-            "/rest/v1/intelligence_people",
-            {
-                "canonical_name": person.canonical_name,
-                "normalized_name": person.normalized_name,
-                "identity_confidence": person.identity_confidence,
-            },
-        )
+        payload = {
+            "canonical_name": person.canonical_name,
+            "normalized_name": person.normalized_name,
+            "identity_confidence": person.identity_confidence,
+        }
+        path = "/rest/v1/intelligence_people"
+        prefer = "return=representation"
+        if self._deterministic_person_ids:
+            # Stable entity-scoped identity also survives a failed employment
+            # write after person insertion. Never query global names.
+            payload["id"] = str(uuid5(UUID(plan.entity_id), person.normalized_name))
+            path += "?on_conflict=id"
+            prefer = "resolution=ignore-duplicates,return=representation"
+        rows = self._post(path, payload, prefer=prefer)
+        if not rows and self._deterministic_person_ids:
+            rows = self._get("/rest/v1/intelligence_people", {
+                "select": "id,canonical_name,normalized_name,identity_confidence",
+                "id": f"eq.{payload['id']}", "limit": "2",
+            })
+            historical = self._get("/rest/v1/intelligence_employment", {
+                "select": "id", "person_id": f"eq.{payload['id']}", "limit": "1",
+            })
+            if historical:
+                raise HunterMaterializerError("deterministic person is not an unlinked retry")
         if len(rows) != 1 or not rows[0].get("id"):
-            raise HunterMaterializerError(
-                "could not create intelligence person"
-            )
+            raise HunterMaterializerError("could not create intelligence person")
+        if self._deterministic_person_ids and rows[0].get("normalized_name") != person.normalized_name:
+            raise HunterMaterializerError("conflicting deterministic person identity")
         current_people.append(rows[0])
         return str(rows[0]["id"])
 
@@ -270,7 +301,7 @@ class SupabaseHunterMaterializer:
             "/rest/v1/intelligence_contact_points",
             {
                 "select": (
-                    "id,verification_state,confidence,verified_at,"
+                    "id,person_id,verification_state,confidence,verified_at,"
                     "last_seen_at"
                 ),
                 "entity_id": f"eq.{row.entity_id}",
@@ -286,6 +317,8 @@ class SupabaseHunterMaterializer:
             )
         if existing:
             current = existing[0]
+            if current.get("person_id") and current["person_id"] != person_id:
+                raise HunterMaterializerError("conflicting contact person binding")
             old_state = _canonical_state(
                 current.get("verification_state")
             )
@@ -315,7 +348,10 @@ class SupabaseHunterMaterializer:
                 {"id": f"eq.{current['id']}"},
                 {
                     "person_id": person_id,
-                    "last_seen_at": observed_at,
+                    "last_seen_at": max(
+                        (value for value in (current.get("last_seen_at"), observed_at) if value),
+                        key=lambda value: datetime.fromisoformat(value.replace("Z", "+00:00")),
+                    ),
                     "verification_state": state,
                     "verified_at": verified_at,
                     "confidence": confidence,
@@ -357,11 +393,35 @@ class SupabaseHunterMaterializer:
     ) -> int:
         inserted = 0
         for row in plan.facts:
+            expected = {
+                "entity_id": row.entity_id,
+                "fact_key": row.fact_key,
+                "source_id": source_id,
+                "evidence_hash": row.evidence_hash,
+            }
+            def lookup():
+                return self._get("/rest/v1/intelligence_facts", {
+                    "select": "entity_id,fact_key,source_id,evidence_hash",
+                    "evidence_hash": f"eq.{row.evidence_hash}",
+                    "limit": "2",
+                })
+
+            def validate(rows):
+                if len(rows) != 1 or any(
+                    rows[0].get(key) != value for key, value in expected.items()
+                ):
+                    raise HunterMaterializerError(
+                        "missing, ambiguous or conflicting canonical intelligence fact"
+                    )
+
+            existing = lookup()
+            if existing:
+                validate(existing)
+                continue
             result = self._post(
-                (
-                    "/rest/v1/intelligence_facts"
-                    "?on_conflict=evidence_hash"
-                ),
+                # The evidence_hash unique index is partial. A bare conflict
+                # target cannot infer it; let PostgreSQL handle all conflicts.
+                "/rest/v1/intelligence_facts",
                 {
                     "entity_type": "company",
                     "entity_id": row.entity_id,
@@ -381,7 +441,12 @@ class SupabaseHunterMaterializer:
                     "return=representation"
                 ),
             )
-            inserted += len(result)
+            if not result:
+                validate(lookup())
+            elif len(result) == 1:
+                inserted += 1
+            else:
+                raise HunterMaterializerError("ambiguous intelligence fact insert")
         return inserted
 
     def materialize(
@@ -402,8 +467,11 @@ class SupabaseHunterMaterializer:
                 "facts": len(plan.facts),
             }
 
-        source_id = self._source_id(plan)
         current_people = self._current_people(plan.entity_id)
+        for person in plan.people:
+            if sum(row.get("normalized_name") == person.normalized_name for row in current_people) > 1:
+                raise HunterMaterializerError("ambiguous current person identity")
+        source_id = self._source_id(plan)
         people_ids: dict[str, str] = {}
         for person in plan.people:
             people_ids[person.normalized_name] = self._person_id(
@@ -458,6 +526,7 @@ class SupabaseHunterMaterializer:
             "entity_id": plan.entity_id,
             "source_id": source_id,
             "people_resolved": len(people_ids),
+            "person_ids": people_ids,
             "employments_written": employment_written,
             "contacts_inserted": contact_inserted,
             "contacts_updated": contact_updated,
@@ -466,3 +535,6 @@ class SupabaseHunterMaterializer:
             "payment_actions": False,
             "revenue_actions": False,
         }
+
+# Historical import compatibility only; active runtime uses EmpireDbHunterMaterializer.
+SupabaseHunterMaterializer = EmpireDbHunterMaterializer

@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 
 from empire_os.hunter.domain_intelligence import analyze_domain
 from empire_os.hunter.evidence_graph import build_evidence_plan
-from empire_os.hunter.materializer import SupabaseHunterMaterializer
+from empire_os.hunter.materializer import EmpireDbHunterMaterializer
 
 
 def main(argv=None) -> int:
@@ -61,7 +61,7 @@ def main(argv=None) -> int:
             observed_at=datetime.now(timezone.utc),
         )
         result["materialization_plan"] = plan.as_dict()
-        result["materialization"] = SupabaseHunterMaterializer().materialize(
+        result["materialization"] = EmpireDbHunterMaterializer().materialize(
             plan,
             write_authorized=bool(args.materialize),
         )

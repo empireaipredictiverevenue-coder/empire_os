@@ -53,7 +53,7 @@ def test_enrichment_cycle_is_bounded_and_internal(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         worker,
-        "SupabaseHunterMaterializer",
+        "EmpireDbHunterMaterializer",
         lambda: Materializer(),
     )
 
@@ -129,7 +129,7 @@ def test_recent_entity_is_skipped_for_cooldown(monkeypatch, tmp_path):
 
     monkeypatch.setattr(
         worker,
-        "SupabaseHunterMaterializer",
+        "EmpireDbHunterMaterializer",
         lambda: Materializer(),
     )
 

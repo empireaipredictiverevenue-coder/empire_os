@@ -9,7 +9,7 @@ from typing import Any
 
 from empire_os.hunter.domain_intelligence import analyze_domain
 from empire_os.hunter.evidence_graph import build_evidence_plan
-from empire_os.hunter.materializer import SupabaseHunterMaterializer
+from empire_os.hunter.materializer import EmpireDbHunterMaterializer
 from empire_os.hunter.priority_worker import build_priority_queue
 from empire_os.sb import request_json
 
@@ -119,7 +119,7 @@ def run_hunter_enrichment_cycle(
     results: list[dict[str, Any]] = []
     errors: list[dict[str, str]] = []
     skipped_cooldown = 0
-    materializer = SupabaseHunterMaterializer()
+    materializer = EmpireDbHunterMaterializer()
 
     for item in eligible:
         if len(results) + len(errors) >= bounded:

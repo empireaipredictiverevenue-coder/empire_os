@@ -321,7 +321,7 @@ def build_lead_intelligence(
 
     return {
         "schema_version": "lead_intelligence.v1",
-        "source_of_truth": "canonical_supabase",
+        "source_of_truth": "canonical_empiredb",
         "read_only": True,
         "prospect_id": pid,
         "prospect": prospect,
