@@ -18,6 +18,7 @@ from empire_os.commercial_relationship_registry import (
 )
 
 from empire_os.commercial_social_intent import build_social_intent_review
+from empire_os.public_intent_affiliation import load_evidence as load_public_affiliation
 
 ROOT = Path("/srv/empire_os")
 RELATIVE = Path("runtime/buyer_network_intelligence")
@@ -62,12 +63,16 @@ def build(root: Path = ROOT) -> dict:
         )
         previous_social = previous.get("social_intent_review") or {}
         previous_research = previous_social.get("company_identity_research") or {}
+        public_affiliation = load_public_affiliation(
+            base / "intent_company_identity_evidence_latest.json"
+        )
         result["social_intent_review"] = build_social_intent_review(
             inbox, result["relationships"],
             community=community, linkedin=linkedin,
             previous_research_tasks=previous_research.get(
                 "identity_review_tasks", []
             ),
+            public_affiliation_evidence=public_affiliation,
         )
     except (OSError, ValueError, TypeError):
         result["social_intent_review"] = {

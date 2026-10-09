@@ -165,3 +165,43 @@ outcome remains unknown until genuine counterparty and canonical revenue
 evidence exists. Source-order learning remains in the existing
 `source_learning_latest.json` journal; Cortex/Economic Memory own verified
 commercial labels.
+
+
+## Public first-party corroboration of social identity (9 October 2026)
+
+The existing commercial-registry reconciler now optionally reads a private,
+bounded manual public-evidence file:
+`runtime/buyer_network_intelligence/intent_company_identity_evidence_latest.json`.
+This evidence feed is **not** a new CRM, scanner, outbound gateway or timer.
+
+Each record must link an exact shortlisted public post to a professional
+public profile and an independent first-party business page that identifies
+the same person. The official page URL must belong to the stated company
+domain; mismatched domains, unsupported social sites, duplicate post IDs
+and files without private permissions fail closed.
+
+The two reviewed matches were:
+
+- **Manning Pest Services** (manningpestservices.com): Chase Manning's public
+  LinkedIn post seeks Tulsa-area local SEO for his own pest-control business;
+  his company's About page lists him as founder. Independent public
+  evidence: https://www.manningpestservices.com/about and
+  https://www.linkedin.com/in/chase-manning-24712353 .
+- **Shivya Ayurveda** (shivyahealthcare.com): Sahil Aggarwal's public post
+  seeks technical SEO/GEO/AEO for a brand; Shivya's About page independently
+  names him as founder. The site/profile association is supported, but the
+  target brand for that particular request is not independently confirmed.
+  Evidence: https://shivyahealthcare.com/pages/about-us and
+  https://in.linkedin.com/in/sahil-aggarwal-2b1a99221 .
+
+These dated public posts could represent requirements that have already
+been fulfilled. The first-party links are a **reviewed company-affiliation
+lead**, not proof of a current offer, identity of an email recipient,
+commercial budget, buying authority, consent, founder approval, billable
+calls or realised revenue.
+
+Reviewed records can improve the order of identity-research tasks, but
+`source_attribution_proven`, `verified_buyer_intent`,
+`person_contact_verified` and `founder_outreach_authorized` remain false.
+No new prospect is written by the review, and only the existing founder
+commercial registry displays the evidence.

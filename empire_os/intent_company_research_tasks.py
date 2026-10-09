@@ -22,11 +22,16 @@ def build_tasks(
     observations: Sequence[Mapping[str, Any]], *,
     now: datetime | None = None,
     previous_tasks: Sequence[Mapping[str, Any]] = (),
+    public_affiliation_evidence: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     previous = {
         str(x.get("task_id")): x for x in previous_tasks
         if isinstance(x, Mapping) and x.get("task_id")
+    }
+    validated_notes = {
+        str(r["source_post_url"]): dict(r)
+        for r in public_affiliation_evidence
     }
     seen: set[str] = set()
     candidates = []
@@ -51,7 +56,8 @@ def build_tasks(
             continue
         seen.add(key)
         matches = item.get("potential_company_matches") or []
-        has_evidence = bool(matches)
+        affiliation = validated_notes.get(url)
+        has_evidence = bool(matches) or bool(affiliation)
         # Raw signal score is a tiebreaker, not proof of buying intent.
         priority = (
             (2 if category == "EXPLICIT_REQUEST_UNVERIFIED" else 1),
@@ -76,8 +82,12 @@ def build_tasks(
                 detail.get("candidate_offer_hypotheses") or []
             )[:4],
             "potential_company_matches": list(matches)[:4],
-            "task_status": "EVIDENCE_LINK_REVIEW" if has_evidence
-                           else "INDEPENDENT_COMPANY_IDENTITY_RESEARCH",
+            "public_affiliation_evidence": dict(affiliation) if affiliation else None,
+            "task_status": (
+                "FIRST_PARTY_AFFILIATION_REVIEW" if affiliation
+                else "EVIDENCE_LINK_REVIEW" if matches
+                else "INDEPENDENT_COMPANY_IDENTITY_RESEARCH"
+            ),
             "requirements": [
                 "INDEPENDENT_COMPANY_IDENTITY_EVIDENCE",
                 "POSTER_COMPANY_CONNECTION",
@@ -115,6 +125,10 @@ def build_tasks(
         "created_or_preserved_task_count": len(chosen),
         "review_backlog_truncated": len(chosen) < len(candidates),
         "identity_review_tasks": [x[2] for x in chosen],
+        "first_party_affiliation_evidence_tasks": sum(
+            x[2]["task_status"] == "FIRST_PARTY_AFFILIATION_REVIEW"
+            for x in chosen
+        ),
         "verified_buyer_count": 0,
         "outbound_authorized": False,
         "new_prospects_written": 0,

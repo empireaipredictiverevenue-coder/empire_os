@@ -102,6 +102,7 @@ def build_social_intent_review(
     linkedin: Mapping[str, Any] | None = None,
     now: datetime | None = None,
     previous_research_tasks: list[Mapping[str, Any]] = (),
+    public_affiliation_evidence: list[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Join ONLY explicit external evidence links to known company domains.
 
@@ -220,6 +221,7 @@ def build_social_intent_review(
         "identity_unverified_review_queue": review,
         "company_identity_research": build_tasks(
             observed, now=now, previous_tasks=previous_research_tasks,
+            public_affiliation_evidence=public_affiliation_evidence,
         ),
         "review_queue_truncated": len(review) < len(observed),
         "linkedin_and_reddit_runtime": metrics,
