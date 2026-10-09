@@ -82,8 +82,14 @@ def _latest_verified_outcome(twin: Mapping[str, Any]) -> Mapping[str, Any] | Non
         row
         for row in outcomes.get("history", []) or []
         if isinstance(row, Mapping)
+        and _clean(row.get("id"))
         and _clean(row.get("evidence_kind"))
         and _clean(row.get("evidence_reference"))
+        and row.get("synthetic") is not True
+        and row.get("forecast_derived") is not True
+        and row.get("verified") is not False
+        and isinstance(row.get("evidence", {}), Mapping)
+        and not any((row.get("evidence") or {}).get(key) is True for key in ("synthetic", "forecast_derived"))
     ]
     return rows[-1] if rows else None
 
@@ -143,6 +149,12 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
 
     entity_id = _clean(twin.get("entity_id"))
     outcome = _latest_verified_outcome(twin)
+    tenant_id = _clean(twin.get("tenant_id")) or None
+    if outcome is not None and tenant_id:
+        outcome_tenant = (outcome.get("tenant_id") or (outcome.get("evidence") or {}).get("tenant_id")
+                          or ((outcome.get("evidence") or {}).get("causal_lineage") or {}).get("tenant_id"))
+        if outcome_tenant != tenant_id:
+            outcome = None
     conversion_outcome = (
         _clean(outcome.get("conversion_outcome")).lower()
         if outcome else ""
@@ -172,7 +184,7 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
             continue
         evidence_id = _clean(row.get("id"))
         verification_refs.append(
-            f"canonical:bsc_payment_evidence:{evidence_id}"
+            _clean(row.get("canonical_evidence_ref")) or f"canonical:bsc_payment_evidence:{evidence_id}"
             if evidence_id
             else f"bsc_transaction:{tx_hash}"
         )
@@ -230,6 +242,7 @@ def build_cortex_learning_packet(twin: Mapping[str, Any]) -> dict[str, Any]:
         "schema_version": "empire.cortex_learning_packet.v1",
         "mode": "OBSERVE",
         "entity_id": entity_id,
+        "tenant_id": tenant_id,
         "company_name": _clean(identity.get("company_name")),
         "feature_namespace": "account_buyer_digital_twin",
         "research_features": {

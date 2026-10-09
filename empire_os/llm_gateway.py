@@ -236,7 +236,12 @@ class LLMGateway:
 
         if provider == "ollama":
             return OllamaClient(
-                model=model or _env("OLLAMA_MODEL", "qwen2.5:7b"),
+                base_url=(
+                    _env("EMPIRE_LLM_OLLAMA_URL")
+                    or _env("OLLAMA_BASE_URL")
+                    or "http://127.0.0.1:11434"
+                ),
+                model=model or _env("OLLAMA_MODEL", "qwen2.5-coder:7b"),
                 timeout=timeout,
             )
 

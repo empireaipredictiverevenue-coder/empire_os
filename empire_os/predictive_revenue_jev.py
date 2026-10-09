@@ -7,6 +7,7 @@ it has no commercial, allocation, outbound, payment or revenue authority.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -79,6 +80,10 @@ class PredictiveRevenueJEVPacket:
     blockers: tuple[str, ...]
     evidence_refs: tuple[str, ...]
     value_available: bool
+    prediction_ref: str | None = None
+    decision_provenance: Mapping[str, Any] | None = None
+    tenant_id: str | None = None
+    opportunity_id: str | None = None
     mode: str = "OBSERVE"
     recommendation_only: bool = True
     actual_revenue: bool = False
@@ -181,6 +186,7 @@ def compile_predictive_revenue_jev(
     max_signal_age_seconds: int = 21600,
     predictive_revenue_inputs: Mapping[str, Any] | None = None,
     actions: Sequence[Mapping[str, Any]] = (),
+    quant_review: Mapping[str, Any] | None = None,
 ) -> PredictiveRevenueJEVPacket:
     """Compile one evidence-backed signal to one recommendation-only packet."""
     if as_of.tzinfo is None:
@@ -220,6 +226,37 @@ def compile_predictive_revenue_jev(
             freshness = "FRESH"
 
     row = dict(normalized_opportunity or {})
+    originating = dict(quant_review) if quant_review is not None else row
+    if quant_review is not None:
+        if not _clean(row.get("opportunity_key")) or originating.get("opportunity_key") != row.get("opportunity_key"):
+            raise ValueError("Quant/JEV opportunity identity mismatch")
+        if row.get("prediction_ref") is not None and row["prediction_ref"] != originating.get("prediction_ref"):
+            raise ValueError("Quant/JEV prediction identity mismatch")
+    prediction_ref = originating.get("prediction_ref")
+    for key in ("tenant_id", "opportunity_id"):
+        value = originating.get(key)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("invalid originating commercial scope")
+        if row.get(key) is not None and row[key] != value:
+            raise ValueError("Quant/JEV commercial scope mismatch")
+    if prediction_ref is not None and (not isinstance(prediction_ref, str) or not prediction_ref.strip()):
+        raise ValueError("invalid originating prediction_ref")
+    provenance = originating.get("decision_provenance")
+    if provenance is not None:
+        if not isinstance(provenance, Mapping):
+            raise ValueError("structured decision provenance required")
+        # Carry canonical structured lineage only, never model prose/reasoning.
+        keys = ("schema_version", "snapshot_hash", "decision_id", "tenant_id", "event_id",
+                "subject_id", "scope_level", "as_of", "generated_at", "state", "reason_codes",
+                "freshness", "freshness_as_of", "truth_class")
+        provenance = {key: deepcopy(provenance[key]) for key in keys if key in provenance}
+        for key, value in provenance.items():
+            if key == "reason_codes":
+                if not isinstance(value, (tuple, list)) or any(not isinstance(code, str) for code in value):
+                    raise ValueError("invalid decision reason codes")
+            elif value is not None and not isinstance(value, str):
+                raise ValueError("invalid structured decision provenance")
+        provenance["execution_authority"] = "none"
     normalized_signals = dict(row.get("normalized_signals") or {})
     quant_inputs = dict(row.get("quant_inputs") or {})
 
@@ -260,6 +297,11 @@ def compile_predictive_revenue_jev(
         )
 
     erv = expected_revenue_value(dict(predictive_revenue_inputs or {}))
+    for action in actions:
+        for key, expected in (("opportunity_key", row.get("opportunity_key")), ("prediction_ref", prediction_ref),
+                              ("tenant_id", originating.get("tenant_id")), ("opportunity_id", originating.get("opportunity_id"))):
+            if action.get(key) is not None and action[key] != expected:
+                raise ValueError("JEV action origin identity mismatch")
     nba = next_best_action_value(list(actions))
     explicit_output, output_blocker = _explicit_recommended_output_type(
         nba,
@@ -293,6 +335,12 @@ def compile_predictive_revenue_jev(
     recommended_action = nba.get("recommended_action")
     if not isinstance(recommended_action, Mapping):
         recommended_action = None
+    else:
+        for action in nba["actions"]:
+            action.update(opportunity_key=row.get("opportunity_key"), prediction_ref=prediction_ref,
+                          tenant_id=originating.get("tenant_id"), opportunity_id=originating.get("opportunity_id"),
+                          decision_provenance=deepcopy(provenance), execution_authority="none")
+        recommended_action = dict(nba["recommended_action"])
 
     return PredictiveRevenueJEVPacket(
         signal_id=envelope.signal_id,
@@ -340,4 +388,8 @@ def compile_predictive_revenue_jev(
         blockers=tuple(dict.fromkeys(blockers)),
         evidence_refs=tuple(evidence_refs),
         value_available=economics is not None,
+        prediction_ref=prediction_ref,
+        tenant_id=originating.get("tenant_id"),
+        opportunity_id=originating.get("opportunity_id"),
+        decision_provenance=provenance,
     )

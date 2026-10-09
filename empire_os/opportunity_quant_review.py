@@ -76,9 +76,13 @@ def build_quant_review(
 
         rows.append({
             "opportunity_key": key,
+            "tenant_id": raw.get("tenant_id"),
+            "opportunity_id": raw.get("opportunity_id"),
             "prediction_ref": _prediction_ref(key, packet),
             "opportunity_class": raw.get("opportunity_class"),
             "factory_ready": raw.get("factory_ready") is True,
+            "decision_provenance": raw.get("decision_provenance"),
+            "research_requirements": list(raw.get("research_requirements") or []),
             "quant_input_evidence": dict(
                 normalization.get("quant_input_evidence") or {}
             ),

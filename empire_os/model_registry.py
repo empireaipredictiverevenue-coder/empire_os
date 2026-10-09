@@ -351,7 +351,7 @@ class ModelRegistry:
             "ollama-local-fallback": ModelSpec(
                 model_id="ollama-local-fallback",
                 provider="ollama",
-                model=os.environ.get("OLLAMA_MODEL", "qwen2.5:7b"),
+                model=os.environ.get("OLLAMA_MODEL", "qwen2.5-coder:7b"),
                 capabilities=frozenset({
                     "general",
                     "classification",

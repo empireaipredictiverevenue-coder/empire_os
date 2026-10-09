@@ -128,7 +128,22 @@ def build_product_estimate(
     *,
     min_terminal_samples: int = 20,
     min_timing_samples: int = 8,
+    tenant_id: str | None = None,
+    as_of=None,
 ) -> dict[str, Any]:
+    if tenant_id is not None:
+        from empire_os.outcome_feedback import validate_verified_feedback
+        for row in rows:
+            validate_verified_feedback(row, tenant_id=tenant_id, as_of=as_of)
+        unique = {}
+        for row in rows:
+            if row['outcome_ref'] in unique and unique[row['outcome_ref']] != row:
+                raise ValueError('ambiguous cohort outcome')
+            unique[row['outcome_ref']] = row
+        rows = [unique[key] for key in sorted(unique)]
+        orders = [row.get('fulfilment_order_id') for row in rows]
+        if None in orders or len(set(orders)) != len(orders):
+            raise ValueError('cohort requires explicitly resolved distinct fulfilment orders')
     terminal = [
         row
         for row in rows
@@ -180,6 +195,8 @@ def build_product_estimate(
         "canonical:commercial_outcomes",
         "canonical:fulfilment_orders",
     ]
+    if tenant_id is not None:
+        refs.extend(row['outcome_ref'] for row in rows)
     if any(row.get("actual_revenue") is True for row in rows):
         refs.append("canonical:commercial_events:revenue_recognized")
 
@@ -191,6 +208,10 @@ def build_product_estimate(
 
     return {
         "product_code": product_code,
+        "tenant_id": tenant_id,
+        "learning_stage": "SHADOW_LEARNING",
+        "shadow_only": True,
+        "promoted_learning": False,
         "terminal_outcome_count": len(terminal),
         "success_count": successes,
         "failure_count": failures,
@@ -237,6 +258,8 @@ def build_predictive_intelligence_snapshot(
     *,
     min_terminal_samples: int = 20,
     min_timing_samples: int = 8,
+    tenant_id: str | None = None,
+    as_of=None,
 ) -> dict[str, Any]:
     product_map = _catalog_product_map(catalog)
     grouped: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
@@ -258,12 +281,15 @@ def build_predictive_intelligence_snapshot(
             rows,
             min_terminal_samples=min_terminal_samples,
             min_timing_samples=min_timing_samples,
+            tenant_id=tenant_id,
+            as_of=as_of,
         )
         for code, rows in sorted(grouped.items())
     }
 
     return {
         "schema_version": "empire.predictive_intelligence.v1",
+        "tenant_id": tenant_id,
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "source_outcome_count": len(outcomes),

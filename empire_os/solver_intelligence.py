@@ -6,6 +6,7 @@ both required.
 """
 from __future__ import annotations
 
+from importlib import import_module
 from importlib.util import find_spec
 import os
 from typing import Any, Mapping
@@ -26,9 +27,19 @@ SUPPORTED_EXACT_WORKLOADS = frozenset({
 
 def _installed(module: str) -> bool:
     try:
-        return find_spec(module) is not None
+        if find_spec(module) is not None:
+            return True
+    except (ImportError, ModuleNotFoundError, ValueError):
+        pass
+
+    # Nested namespace packages can be importable while
+    # find_spec() reports no direct spec. A local import is
+    # the definitive bounded availability check.
+    try:
+        import_module(module)
     except (ImportError, ModuleNotFoundError, ValueError):
         return False
+    return True
 
 
 def _flag(name: str, env: Mapping[str, str]) -> bool:

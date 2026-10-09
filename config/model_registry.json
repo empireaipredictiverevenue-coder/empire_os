@@ -201,45 +201,6 @@
       "priority": 65
     },
     {
-      "model_id": "ollama-local-fallback",
-      "provider": "ollama",
-      "model": "qwen2.5:7b",
-      "capabilities": [
-        "general",
-        "classification",
-        "extraction",
-        "summarization",
-        "coding"
-      ],
-      "reasoning": false,
-      "vision": false,
-      "quality": {
-        "default": 0.45,
-        "coding": 0.5
-      },
-      "cost_per_1k_input": 0,
-      "cost_per_1k_output": 0,
-      "free": true,
-      "enabled": true,
-      "priority": 10,
-      "metadata": {
-        "local_fallback": true,
-        "commercial_decision_eligible": false,
-        "policy_basis": "uncalibrated local fallback; fail closed"
-      },
-      "disallowed_tasks": [
-        "untrusted_inbound",
-        "revenue_truth",
-        "payment",
-        "funds",
-        "identity_inference",
-        "contact_inference",
-        "tool_routing"
-      ],
-      "allow_untrusted_input": false,
-      "max_stakes": "normal"
-    },
-    {
       "model_id": "local-qwen25-coder-1.5b",
       "provider": "llamacpp",
       "model": "qwen2.5-coder:1.5b",
@@ -286,6 +247,152 @@
         "observed_prompt_injection_failure": true,
         "commercial_decision_eligible": false,
         "policy_basis": "local Empire policy eval; untrusted inbound failure"
+      }
+    },
+    {
+      "model_id": "local-qwen25-coder-7b",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:7b",
+      "capabilities": [
+        "general",
+        "coding",
+        "classification",
+        "extraction",
+        "summarization"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.48,
+        "coding": 0.58,
+        "classification": 0.48,
+        "extraction": 0.48,
+        "summarization": 0.5
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 14,
+      "pricing_known": true,
+      "available": true,
+      "health": "uncalibrated",
+      "deployment": "local",
+      "disallowed_tasks": [
+        "untrusted_inbound",
+        "revenue_truth",
+        "payment",
+        "funds",
+        "identity_inference",
+        "contact_inference",
+        "tool_routing"
+      ],
+      "allow_untrusted_input": false,
+      "max_stakes": "normal",
+      "metadata": {
+        "local_endpoint": "http://127.0.0.1:11434",
+        "model_family": "qwen2.5-coder",
+        "declared_size": "7b",
+        "commercial_decision_eligible": false,
+        "benchmark_evidence_required": true,
+        "economic_memory_required": true,
+        "policy_basis": "observed installed local model; uncalibrated; fail closed"
+      }
+    },
+    {
+      "model_id": "local-qwen25-coder-14b",
+      "provider": "ollama",
+      "model": "qwen2.5-coder:14b",
+      "capabilities": [
+        "general",
+        "coding",
+        "classification",
+        "extraction",
+        "summarization"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.52,
+        "coding": 0.64,
+        "classification": 0.5,
+        "extraction": 0.5,
+        "summarization": 0.54
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 16,
+      "pricing_known": true,
+      "available": true,
+      "health": "uncalibrated",
+      "deployment": "local",
+      "disallowed_tasks": [
+        "untrusted_inbound",
+        "revenue_truth",
+        "payment",
+        "funds",
+        "identity_inference",
+        "contact_inference",
+        "tool_routing"
+      ],
+      "allow_untrusted_input": false,
+      "max_stakes": "normal",
+      "metadata": {
+        "local_endpoint": "http://127.0.0.1:11434",
+        "model_family": "qwen2.5-coder",
+        "declared_size": "14b",
+        "commercial_decision_eligible": false,
+        "benchmark_evidence_required": true,
+        "economic_memory_required": true,
+        "policy_basis": "observed installed local model; uncalibrated; fail closed"
+      }
+    },
+    {
+      "model_id": "local-qwen3-coder-30b",
+      "provider": "ollama",
+      "model": "qwen3-coder:30b",
+      "capabilities": [
+        "general",
+        "coding",
+        "summarization"
+      ],
+      "reasoning": false,
+      "vision": false,
+      "quality": {
+        "default": 0.55,
+        "coding": 0.7,
+        "summarization": 0.56
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "enabled": true,
+      "priority": 18,
+      "pricing_known": true,
+      "available": true,
+      "health": "uncalibrated",
+      "deployment": "local",
+      "disallowed_tasks": [
+        "untrusted_inbound",
+        "revenue_truth",
+        "payment",
+        "funds",
+        "identity_inference",
+        "contact_inference",
+        "tool_routing"
+      ],
+      "allow_untrusted_input": false,
+      "max_stakes": "normal",
+      "metadata": {
+        "local_endpoint": "http://127.0.0.1:11434",
+        "model_family": "qwen3-coder",
+        "declared_size": "30b",
+        "commercial_decision_eligible": false,
+        "benchmark_evidence_required": true,
+        "economic_memory_required": true,
+        "policy_basis": "observed installed local model; uncalibrated; fail closed"
       }
     }
   ],

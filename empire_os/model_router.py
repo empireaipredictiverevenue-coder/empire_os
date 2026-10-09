@@ -347,6 +347,37 @@ class ModelRouter:
             score = quality + reasoning_gain
             score -= self._cost_penalty(model, 0.08)
 
+            # Runtime health evidence modifies the configured quality PRIOR
+            # without replacing it. Confirmed degraded models are already
+            # excluded by ModelRegistry; sparse degraded evidence remains
+            # eligible for bounded probation so it can gather evidence.
+            health_evidence = (
+                getattr(model, "metadata", {}) or {}
+            ).get("runtime_health_evidence") or {}
+
+            health_status = str(
+                health_evidence.get("status")
+                or getattr(model, "health", "unknown")
+                or "unknown"
+            ).strip().lower()
+
+            try:
+                health_samples = int(
+                    health_evidence.get("samples") or 0
+                )
+            except (TypeError, ValueError):
+                health_samples = 0
+
+            health_penalty = 0.0
+            health_class = "unknown"
+
+            if health_status == "degraded" and 0 < health_samples < 5:
+                health_class = "probation"
+                health_penalty = 0.20
+                score -= health_penalty
+            elif health_status == "healthy" and health_samples >= 5:
+                health_class = "healthy_evidenced"
+
             if signals["coding"] >= 0.5 and "coding" in model.capabilities:
                 score += 0.05
 
@@ -360,6 +391,16 @@ class ModelRouter:
                 score = -math.inf
 
             rationale_parts = []
+
+            if health_class != "unknown":
+                rationale_parts.append(
+                    f"health={health_class}"
+                )
+
+            if health_penalty:
+                rationale_parts.append(
+                    f"health_penalty={health_penalty:.3f}"
+                )
 
             if model.reasoning:
                 rationale_parts.append(
