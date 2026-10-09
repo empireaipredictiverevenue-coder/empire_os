@@ -1,0 +1,856 @@
+{
+  "cases": [
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 3,
+      "id": "seven_day_uptrend",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "seven_day_uptrend",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 3,
+      "id": "seven_day_flat",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        }
+      ],
+      "scenario_class": "seven_day_flat",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 3,
+      "id": "seven_day_downtrend",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 400
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 380
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 360
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 340
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 320
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 300
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 280
+        }
+      ],
+      "scenario_class": "seven_day_downtrend",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 3,
+      "id": "shuffled_dates",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        }
+      ],
+      "scenario_class": "shuffled_dates",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 3,
+      "id": "longer_valid_series",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 110
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 130
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 150
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-08",
+          "source": "synthetic_offline_metric",
+          "value": 170
+        },
+        {
+          "date": "2026-09-09",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-10",
+          "source": "synthetic_offline_metric",
+          "value": 190
+        },
+        {
+          "date": "2026-09-11",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-12",
+          "source": "synthetic_offline_metric",
+          "value": 210
+        },
+        {
+          "date": "2026-09-13",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        },
+        {
+          "date": "2026-09-14",
+          "source": "synthetic_offline_metric",
+          "value": 230
+        }
+      ],
+      "scenario_class": "longer_valid_series",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "allow",
+      "horizon_days": 365,
+      "id": "valid_horizon_365",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "valid_horizon_365",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "short_three_days",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 110
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        }
+      ],
+      "scenario_class": "short_three_days",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "short_six_days",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 105
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 110
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 115
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 125
+        }
+      ],
+      "scenario_class": "short_six_days",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "empty_history",
+      "metric": "synthetic_daily_count",
+      "points": [],
+      "scenario_class": "empty_history",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 0,
+      "id": "horizon_zero",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "horizon_zero",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 366,
+      "id": "horizon_over_limit",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "horizon_over_limit",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "negative_metric",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 110
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 130
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 150
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": -1
+        }
+      ],
+      "scenario_class": "negative_metric",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "missing_provenance",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "missing_provenance",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "duplicate_observation_dates",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "duplicate_observation_dates",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "irregular_daily_cadence",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-12",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "irregular_daily_cadence",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "future_observation_leakage",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-10-04",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-10-05",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-10-06",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-10-07",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-10-08",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-10-09",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-10-10",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "future_observation_leakage",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "metric_name_missing",
+      "metric": "",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "metric_name_missing",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "non_numeric_metric",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": "NaN"
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "2026-09-07",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "non_numeric_metric",
+      "split": "holdout"
+    },
+    {
+      "as_of_date": "2026-10-09",
+      "expected_decision": "block",
+      "horizon_days": 3,
+      "id": "malformed_observation_date",
+      "metric": "synthetic_daily_count",
+      "points": [
+        {
+          "date": "2026-09-01",
+          "source": "synthetic_offline_metric",
+          "value": 100
+        },
+        {
+          "date": "2026-09-02",
+          "source": "synthetic_offline_metric",
+          "value": 120
+        },
+        {
+          "date": "2026-09-03",
+          "source": "synthetic_offline_metric",
+          "value": 140
+        },
+        {
+          "date": "2026-09-04",
+          "source": "synthetic_offline_metric",
+          "value": 160
+        },
+        {
+          "date": "2026-09-05",
+          "source": "synthetic_offline_metric",
+          "value": 180
+        },
+        {
+          "date": "2026-09-06",
+          "source": "synthetic_offline_metric",
+          "value": 200
+        },
+        {
+          "date": "not-a-date",
+          "source": "synthetic_offline_metric",
+          "value": 220
+        }
+      ],
+      "scenario_class": "malformed_observation_date",
+      "split": "holdout"
+    }
+  ],
+  "data_provenance": "authored_synthetic_contract_cases",
+  "domain": "predictive_cloud_opportunity_loop",
+  "origin_note": "Authored examples from predictive_cloud_v3.py contract; no real future outcomes or independent labels",
+  "schema_version": "empire.skillforge.domain_holdout.v1"
+}
