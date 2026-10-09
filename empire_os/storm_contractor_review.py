@@ -15,7 +15,9 @@ from urllib.parse import urlparse
 from empire_os.claims_exchange.adapters import normalized_domain
 from empire_os.claims_exchange.controls import parse_date, reject_sensitive_input, safe_https_source
 from empire_os.claims_exchange.dossier import build_dossiers
-from empire_os.storm_contractor_independent_evidence import review_independent_evidence
+from empire_os.storm_contractor_independent_evidence import (
+    review_independent_evidence, review_official_state_dataset,
+)
 
 SCHEMA = "empire.revenue_strike.contractor_founder_review.v1"
 SOURCE_SCHEMA = "empire.revenue_strike.dfw_public_signals.v1"
@@ -39,7 +41,8 @@ def _safe_signal_source(url: object, expected_domain: str) -> bool:
 
 def build_contractor_review(cohort: Mapping, sites: Mapping,
                             signals: Mapping, *, as_of: date,
-                            independent_evidence: Mapping | None = None) -> dict:
+                            independent_evidence: Mapping | None = None,
+                            state_registry_evidence: Mapping | None = None) -> dict:
     for source in (cohort, sites, signals):
         reject_sensitive_input(source)
     dossiers = build_dossiers(cohort, sites, as_of=as_of)
@@ -47,6 +50,15 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         independent_evidence,
         cohort_names={row["original_domain"]: row["company_name"]
                       for row in dossiers["dossiers"]},
+        as_of=as_of,
+    )
+    state_research = review_official_state_dataset(
+        state_registry_evidence,
+        approved_bbb_names={
+            domain: record["directory_business_name"]
+            for domain, record in independent.items()
+            if record["state"] == "THIRD_PARTY_PROFILE_DOMAIN_MATCH"
+        },
         as_of=as_of,
     )
     if (not isinstance(signals, Mapping)
@@ -105,12 +117,20 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         )
         if independent_state == "INDEPENDENT_SOURCE_IDENTITY_CONFLICT_HOLD" and stage != "IDENTITY_CHANGE_HOLD":
             stage = "IDENTITY_EVIDENCE_CONFLICT_HOLD"
+        official_state = state_research.get(domain)
+        if (official_state
+                and official_state["status"] == "STATE_CODE_REVIEW_HOLD"
+                and stage == "CORROBORATION_PENDING"):
+            stage = "OFFICIAL_STATE_CODE_REVIEW_HOLD"
         site_ready = stage == "CORROBORATION_PENDING"
         score = (30 if site_ready else 0) + (8 if r["public_contact_source_observed"] else 0)
         if site_ready:
             score += sum(SCORE[k] for k in kinds)
             if independent_state == "THIRD_PARTY_PROFILE_DOMAIN_MATCH":
                 score += 24  # prioritise a stronger business-identity research route
+            if (official_state and official_state["status"] ==
+                    "OFFICIAL_DATASET_NAME_MATCH_PENDING_LIVE_STATUS"):
+                score += 16  # public registry name match, NOT a verified legal link
         score = min(score, 75) if site_ready else 0  # no promotion under identity holds
         tasks = list(r["research_tasks"])
         tasks += [
@@ -126,6 +146,10 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             tasks.append("RESOLVE_OR_REJECT_REDIRECT_IDENTITY_NO_AUTO_MERGE")
         if stage == "IDENTITY_EVIDENCE_CONFLICT_HOLD":
             tasks.append("RESOLVE_THIRD_PARTY_IDENTITY_CONFLICT_DO_NOT_CONTACT")
+        if stage == "OFFICIAL_STATE_CODE_REVIEW_HOLD":
+            tasks.append("RECHECK_CURRENT_TEXAS_FRANCHISE_RIGHT_TO_TRANSACT_NO_CONTACT")
+        if official_state is not None:
+            tasks.append("CONFIRM_ENTITY_IN_LIVE_TEXAS_COMPTROLLER_SEARCH_AND_SOS")
         if independent_state == "THIRD_PARTY_PROFILE_DOMAIN_MATCH":
             tasks.append("CONFIRM_OFFICIAL_REGISTRATION_AND_DOMAIN_CONTROL_BEFORE_OUTREACH")
             if independent_record and independent_record.get("business_management_research"):
@@ -144,6 +168,12 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
                 "state_registry_identity_verified": False,
                 "domain_ownership_verified": False,
                 "marketing_buyer_intent_verified": False,
+                "outbound_authorized": False,
+            },
+            "official_state_entity_research": official_state or {
+                "status": "NO_OFFICIAL_STATE_ENTITY_MATCH_ATTACHED",
+                "live_official_account_status_verified": False,
+                "website_entity_control_verified": False,
                 "outbound_authorized": False,
             },
             "research_priority_score": score,
@@ -185,6 +215,10 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         "no_third_party_profile_link": sum(
             p["independent_business_research"]["state"] == "NO_THIRD_PARTY_PROFILE_LINK"
             for p in packets),
+        "official_state_dataset_name_matches": len(state_research),
+        "official_state_code_review_holds": sum(
+            p["qualification"] == "OFFICIAL_STATE_CODE_REVIEW_HOLD" for p in packets),
+        "official_live_account_status_verified": 0,
         "verified_company_legal_registrations": 0,
         "independently_verified_purchase_intent": 0,
         "approved_outbound_count": 0,

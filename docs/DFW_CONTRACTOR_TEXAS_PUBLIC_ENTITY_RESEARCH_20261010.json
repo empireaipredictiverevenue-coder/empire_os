@@ -1,0 +1,59 @@
+{
+  "dataset_id": "9cir-efmm",
+  "dataset_last_reported_update_date": "2026-10-03",
+  "dossier_domain_matches_independently_confirmed": false,
+  "observed_at": "2026-10-09T23:36:25.014030+00:00",
+  "official_live_account_status_verified": false,
+  "outbound_authorized": false,
+  "records": [
+    {
+      "broad_name_matches_in_query": 3,
+      "company_domain": "maxexteriors.com",
+      "exact_normalized_name_matches": 1,
+      "official_status_details_separately_verified": false,
+      "outbound_authorized": false,
+      "right_to_transact_business_code_raw": "A",
+      "sos_charter_date": "2018-11-05",
+      "sos_file_number": "0803161730",
+      "sos_status_code_raw": "R",
+      "taxpayer_city": "GLENN HEIGHTS",
+      "taxpayer_name": "MAX EXTERIORS LLC",
+      "taxpayer_state": "TX",
+      "verified_web_domain_is_same_entity": false
+    },
+    {
+      "broad_name_matches_in_query": 1,
+      "company_domain": "180roofing.com",
+      "exact_normalized_name_matches": 1,
+      "official_status_details_separately_verified": false,
+      "outbound_authorized": false,
+      "right_to_transact_business_code_raw": "N",
+      "sos_charter_date": "2018-05-04",
+      "sos_file_number": "0803007394",
+      "sos_status_code_raw": "R",
+      "taxpayer_city": "MESQUITE",
+      "taxpayer_name": "180 ROOFING AND CONTRACTING, LLC",
+      "taxpayer_state": "TX",
+      "verified_web_domain_is_same_entity": false
+    },
+    {
+      "broad_name_matches_in_query": 1,
+      "company_domain": "spcroofs.com",
+      "exact_normalized_name_matches": 1,
+      "official_status_details_separately_verified": false,
+      "outbound_authorized": false,
+      "right_to_transact_business_code_raw": "A",
+      "sos_charter_date": "2013-01-01",
+      "sos_file_number": "0801673144",
+      "sos_status_code_raw": "A",
+      "taxpayer_city": "GRAPEVINE",
+      "taxpayer_name": "SPC CONSTRUCTION AND ROOFING, INC.",
+      "taxpayer_state": "TX",
+      "verified_web_domain_is_same_entity": false
+    }
+  ],
+  "schema": "empire.revenue_strike.texas_official_state_dataset_research.v1",
+  "source": "Texas Comptroller of Public Accounts - Active Franchise Taxpayers open data",
+  "source_url": "https://data.texas.gov/resource/9cir-efmm.json",
+  "status_codes_uninterpreted": true
+}

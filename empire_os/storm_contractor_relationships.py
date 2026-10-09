@@ -1,7 +1,9 @@
 """Safe read-only join of the existing EmpireOS commercial relationship registry.
 
-Company-domain overlap is a prior-conversation HOLD, never a suppression
-clearance, purchaser qualification, contact approval, or CRM mutation.
+Company-domain overlap is a deduplication signal, not by itself prior
+correspondence. Only separately observed thread/directional mail creates a
+conversation review hold. Neither is suppression clearance, purchaser
+qualification, contact approval, or CRM mutation.
 """
 from __future__ import annotations
 
@@ -64,7 +66,7 @@ def relationship_context(review: Mapping, registry: Mapping | None,
                     raise ValueError("UNTRUSTED_RELATIONSHIP_DOMAIN")
                 indexed.setdefault(domain, []).append(record)
 
-    related = ambiguous = 0
+    related = ambiguous = research_only = conversation = 0
     for item in packets:
         if not isinstance(item, dict):
             raise ValueError("MALFORMED_CONTRACTOR_REVIEW_PACKET")
@@ -78,8 +80,19 @@ def relationship_context(review: Mapping, registry: Mapping | None,
             status = "AMBIGUOUS_RELATIONSHIP_HOLD"
             ambiguous += 1
         elif matches:
-            status = "KNOWN_RELATIONSHIP_REVIEW_HOLD"
             related += 1
+            match = matches[0]
+            had_correspondence = bool(
+                match.get("gmail_thread_ids")
+                or match.get("last_inbound_at")
+                or match.get("last_outbound_at")
+            )
+            if had_correspondence:
+                status = "KNOWN_RELATIONSHIP_REVIEW_HOLD"
+                conversation += 1
+            else:
+                status = "KNOWN_RESEARCH_RECORD_NO_CONVERSATION"
+                research_only += 1
         else:
             status = "NO_EXACT_MATCH_NOT_A_SUPPRESSION_CLEARANCE"
         item["existing_commercial_relationship"] = {
@@ -101,6 +114,8 @@ def relationship_context(review: Mapping, registry: Mapping | None,
             item["review_tasks"] = sorted(set(item["review_tasks"]) | {
                 "RESOLVE_AMBIGUOUS_RELATIONSHIP_IDENTITY_NO_OUTBOUND"})
     output["summary"]["existing_relationship_domain_matches"] = related
+    output["summary"]["existing_research_only_domain_matches"] = research_only
+    output["summary"]["existing_conversation_domain_matches"] = conversation
     output["summary"]["ambiguous_relationship_domain_holds"] = ambiguous
     output["summary"]["relationship_registry_checked"] = state == "FRESH"
     output["existing_relationship_registry_state"] = state

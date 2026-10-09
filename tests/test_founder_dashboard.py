@@ -2352,3 +2352,38 @@ def test_existing_founder_overview_reports_reconciled_domains_without_pii(tmp_pa
     assert d["outbound_authorized"] is False
     assert "PRIVATE_BUYER" not in str(d)
     assert "private@" not in str(d)
+
+
+
+def test_founder_reports_research_duplicate_and_official_status_holds_separately(tmp_path):
+    root = make_root(tmp_path)
+    write_json(root / "runtime/revenue_strike/contractor_founder_review_latest.json", {
+        "schema":"empire.revenue_strike.contractor_founder_review.v1",
+        "as_of":"2026-10-10","mode":"OBSERVE","outbound_authorized":False,
+        "packets":[{"name":"PRIVATE_NAME","contact":"person@example.org"}],
+        "summary":{
+            "historical_contractor_companies":8,
+            "first_party_site_corroboration_pending":4,
+            "third_party_directory_domain_matches":3,
+            "third_party_identity_conflict_holds":2,
+            "identity_change_holds":1,
+            "existing_relationship_domain_matches":7,
+            "existing_research_only_domain_matches":7,
+            "existing_conversation_domain_matches":0,
+            "official_state_dataset_name_matches":3,
+            "official_state_code_review_holds":1,
+            "relationship_registry_checked":True,
+        },
+    })
+    d=build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert d["candidate_count"]==8
+    assert d["existing_relationship_exact_domain_matches"]==7
+    assert d["existing_research_only_domain_matches"]==7
+    assert d["existing_conversation_domain_matches"]==0
+    assert d["official_state_dataset_name_matches"]==3
+    assert d["official_state_code_review_holds"]==1
+    assert d["verified_company_registration_count"]==0
+    assert d["verified_buyer_intent_count"]==0
+    assert d["outbound_authorized"] is False
+    assert "PRIVATE_NAME" not in str(d)
+    assert "person@" not in str(d)

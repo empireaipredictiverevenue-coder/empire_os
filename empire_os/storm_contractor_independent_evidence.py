@@ -121,3 +121,115 @@ def review_independent_evidence(data: Mapping | None, *, cohort_names: Mapping[s
             "outbound_authorized": False,
         }
     return by_domain
+
+
+
+OFFICIAL_STATE_SCHEMA = "empire.revenue_strike.texas_official_state_dataset_research.v1"
+OFFICIAL_STATE_URL = "https://data.texas.gov/resource/9cir-efmm.json"
+
+
+def _official_name_key(raw: str) -> str:
+    """Normalise legal punctuation/AND/& and company suffix, not trade aliases."""
+    if not isinstance(raw, str) or len(raw) > 150:
+        raise ValueError("OFFICIAL_LEGAL_NAME_INVALID")
+    parts = re.findall(r"[a-z0-9]+", raw.lower().replace("&", " and "))
+    return " ".join(x for x in parts if x not in {
+        "and", "inc", "llc", "limited", "corporation", "corp", "co",
+    })
+
+
+def review_official_state_dataset(
+    data: Mapping | None, *, approved_bbb_names: Mapping[str, str],
+    as_of: date,
+) -> dict[str, dict]:
+    """Parse exact legal-name matches from the official Texas public dataset.
+
+    Raw status codes are NOT a live franchise-status certificate, and this
+    evidence is NOT a demonstrated relation between a state entity and website.
+    Non-A right-to-transact codes are held pending a verified official lookup.
+    """
+    if data is None:
+        return {}
+    reject_sensitive_input(data)
+    if (not isinstance(data, Mapping)
+            or data.get("schema") != OFFICIAL_STATE_SCHEMA
+            or data.get("source_url") != OFFICIAL_STATE_URL
+            or data.get("dataset_id") != "9cir-efmm"
+            or data.get("status_codes_uninterpreted") is not True
+            or data.get("outbound_authorized") is not False
+            or data.get("official_live_account_status_verified") is not False
+            or data.get("dossier_domain_matches_independently_confirmed") is not False):
+        raise ValueError("OFFICIAL_DATASET_SOURCE_CONTRACT_INVALID")
+    captured = data.get("observed_at")
+    try:
+        from datetime import datetime
+        observed = datetime.fromisoformat(captured.replace("Z", "+00:00"))
+        if observed.tzinfo is None:
+            raise ValueError("NO_OFFICIAL_OBSERVATION_TIMEZONE")
+        observed_date = observed.date()
+    except (ValueError, AttributeError, TypeError) as exc:
+        raise ValueError("OFFICIAL_OBSERVATION_TIMESTAMP_INVALID") from exc
+    published = parse_date(data.get("dataset_last_reported_update_date"))
+    if (not published or published > observed_date or observed_date > as_of
+            or (as_of - published).days > 30):
+        raise ValueError("OFFICIAL_DATASET_NOT_CURRENT")
+    records = data.get("records")
+    if not isinstance(records, list) or len(records) > 25:
+        raise ValueError("UNBOUNDED_OFFICIAL_RESEARCH")
+    found = {}
+    for row in records:
+        if not isinstance(row, Mapping):
+            raise ValueError("OFFICIAL_RECORD_NOT_OBJECT")
+        domain = normalized_domain(row.get("company_domain"))
+        name = row.get("taxpayer_name")
+        if (not domain or domain in found or domain not in approved_bbb_names
+                or _official_name_key(name) != _official_name_key(approved_bbb_names[domain])):
+            raise ValueError("OFFICIAL_ENTITY_NAME_NOT_COHORT_CORROBORATED")
+        if (row.get("taxpayer_state") != "TX"
+                or row.get("verified_web_domain_is_same_entity") is not False
+                or row.get("official_status_details_separately_verified") is not False
+                or row.get("outbound_authorized") is not False):
+            raise ValueError("OFFICIAL_EVIDENCE_AUTHORITY_INVALID")
+        file_number = row.get("sos_file_number")
+        if not isinstance(file_number, str) or not re.fullmatch(r"[0-9]{10}", file_number):
+            raise ValueError("OFFICIAL_ENTITY_FILE_NUMBER_INVALID")
+        raw_right = row.get("right_to_transact_business_code_raw")
+        raw_sos = row.get("sos_status_code_raw")
+        if (not isinstance(raw_right, str) or not re.fullmatch(r"[A-Z]{1,2}", raw_right)
+                or not isinstance(raw_sos, str) or not re.fullmatch(r"[A-Z]{1,2}", raw_sos)):
+            raise ValueError("OFFICIAL_STATE_CODE_UNVERIFIED")
+        count = row.get("exact_normalized_name_matches")
+        broad = row.get("broad_name_matches_in_query")
+        if (type(count) is not int or count != 1 or type(broad) is not int
+                or not 1 <= broad <= 15):
+            raise ValueError("OFFICIAL_EXACT_NAME_MATCH_NOT_UNIQUE")
+        from datetime import date as _date
+        charter = parse_date(row.get("sos_charter_date"))
+        if (not charter or charter > published
+                or not isinstance(row.get("taxpayer_city"), str)
+                or not re.fullmatch(r"[A-Z .-]{2,70}", row["taxpayer_city"])):
+            raise ValueError("OFFICIAL_ENTITY_DETAILS_INVALID")
+        state = (
+            "STATE_CODE_REVIEW_HOLD"
+            if raw_right != "A" else
+            "OFFICIAL_DATASET_NAME_MATCH_PENDING_LIVE_STATUS"
+        )
+        found[domain] = {
+            "status": state,
+            "legal_name_as_listed": name,
+            "sos_file_number": file_number,
+            "charter_date_as_listed": charter.isoformat(),
+            "city_as_listed": row["taxpayer_city"],
+            "sos_status_code_raw": raw_sos,
+            "right_to_transact_business_code_raw": raw_right,
+            "dataset_last_reported_update_date": published.isoformat(),
+            "source_url": OFFICIAL_STATE_URL,
+            "broad_similar_name_row_count": broad,
+            "official_name_match_count": 1,
+            "website_entity_control_verified": False,
+            "live_official_account_status_verified": False,
+            "current_business_authority_verified": False,
+            "named_recipient_suppression_verified": False,
+            "outbound_authorized": False,
+        }
+    return found

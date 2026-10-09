@@ -217,3 +217,60 @@ Runtime activation proof requires an actual authorised run of the
 *existing* `empire-company-routed-buyer-review.service`; passing tests
 alone does **not** prove the new snapshot has been refreshed with canonical
 history. No unit file modifications or service restart are required.
+
+## Official Texas Comptroller government open-data check — 2026-10-10
+
+Read-only queries to the **original Texas Comptroller of Public Accounts**
+public dataset, without a new service, credential, signup, fee or scraper
+provider:
+
+- Source: https://data.texas.gov/dataset/Active-Franchise-Taxpayers/9cir-efmm
+- Official JSON endpoint: https://data.texas.gov/resource/9cir-efmm.json
+- Dataset update reported by portal: **3 October 2026**
+- Captured research: `docs/DFW_CONTRACTOR_TEXAS_PUBLIC_ENTITY_RESEARCH_20261010.json`
+
+Three exact normalized legal-name candidates were found in the source:
+
+| Company website under investigation | Official dataset legal name | SOS file | Raw right-to-transact code | Raw SOS code | Research action |
+| --- | --- | --- | --- | --- | --- |
+| maxexteriors.com | MAX EXTERIORS LLC | 0803161730 | A | R | Live entity/status and domain control confirmation still required; broad search found 2 other differently named Max Exteriors firms |
+| spcroofs.com | SPC CONSTRUCTION AND ROOFING, INC. | 0801673144 | A | A | Live entity/status and domain control confirmation still required |
+| 180roofing.com | 180 ROOFING AND CONTRACTING, LLC | 0803007394 | **N** | R | **OFFICIAL_STATE_CODE_REVIEW_HOLD**, zero research priority, do not contact pending a direct official account-status verification |
+
+The raw code **N** is not interpreted as an official revocation/forfeiture
+finding without independent, current, primary-source detail verification.
+The code difference from **A** is sufficient reason for a conservative
+hold. The public open-data extract is **not** a certificate of fact/status
+or proof that a state legal entity controls the candidate domain. Registered
+agent, authority of the named business person, legal ability to perform
+claims-adjacent services, marketing purchase intent and recipient-level
+suppression remain unverified.
+
+For the current legal status, use the official live Comptroller entity search
+by the above filing number:
+https://comptroller.texas.gov/taxes/franchise/account-status/search
+and, if needed, Texas SOSPortal formal entity filing records. Avoid inferring
+legal capacity from generic third-party directory results.
+
+## CRM reconciliation truth — changed on 10 October 2026
+
+The existing commercial relationship registry was independently refreshed
+and grew to **195** company records. Seven of the eight DFW contractor
+domains now exist as **research-only** company records, with **no recorded
+inbound/outbound or linked Gmail conversations** in those seven records.
+The existing relationship join now distinguishes:
+
+- `existing_relationship_domain_matches`: deduplicated existing CRM
+  company records, including research-only
+- `existing_research_only_domain_matches`: no actual correspondence in
+  registry (current seven)
+- `existing_conversation_domain_matches`: actual registry-backed
+  correspondence evidence (current zero)
+
+No source record is promoted to a prior-customer or approved-outbound state
+merely by appearing in a research inventory. A negative contact history,
+a positive public business record, or a directory-listed manager are not
+recipient-level suppression clearance and are never an instruction to send.
+
+**Revenue stage remains zero verified buyer conversations and zero
+recognised revenue from the DFW contractor cohort.**

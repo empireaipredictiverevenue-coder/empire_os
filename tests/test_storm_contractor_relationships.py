@@ -135,3 +135,41 @@ def test_live_snapshot_join_matches_existing_relationship_count():
     assert out["summary"]["historical_contractor_companies"]==8
     assert not out["outbound_authorized"]
     assert out["summary"]["relationship_registry_checked"] or out["existing_relationship_registry_state"]=="STALE"
+
+
+
+def test_research_only_registry_rows_do_not_claim_prior_conversations():
+    d=registry()
+    row=d["relationships"][0]
+    row["gmail_thread_ids"]=[]
+    row["last_inbound_at"]=None
+    row["last_outbound_at"]=None
+    row["stage"]="RESEARCH_ONLY"
+    out=relationship_context(base(),d,now=NOW)
+    assert out["summary"]["existing_relationship_domain_matches"]==1
+    assert out["summary"]["existing_research_only_domain_matches"]==1
+    assert out["summary"]["existing_conversation_domain_matches"]==0
+    candidate=next(p for p in out["packets"] if p["company_domain"]=="maxexteriors.com")
+    assert candidate["existing_commercial_relationship"]["status"]=="KNOWN_RESEARCH_RECORD_NO_CONVERSATION"
+    assert "RECONCILE_EXISTING_COMMERCIAL_RELATIONSHIP_BEFORE_NEW_OUTREACH" not in candidate["review_tasks"]
+    assert not candidate["suppression_verified_clear"]
+    assert not candidate["outbound_authorized"]
+
+
+def test_actual_thread_is_distinct_from_research_only_registry():
+    out=relationship_context(base(),registry(),now=NOW)
+    assert out["summary"]["existing_relationship_domain_matches"]==1
+    assert out["summary"]["existing_conversation_domain_matches"]==1
+    assert out["summary"]["existing_research_only_domain_matches"]==0
+
+
+def test_live_registry_matches_do_not_claim_actual_conversations_without_evidence():
+    path=ROOT/"runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json"
+    if not path.exists(): pytest.skip("registry not available")
+    registry_snapshot=json.loads(path.read_text())
+    result=relationship_context(base(),registry_snapshot,now=datetime.now(timezone.utc))
+    for packet in result["packets"]:
+        relationship=packet["existing_commercial_relationship"]
+        if relationship["status"]=="KNOWN_RESEARCH_RECORD_NO_CONVERSATION":
+            assert not packet["outbound_authorized"]
+            assert not relationship["recipient_suppression_cleared"]
