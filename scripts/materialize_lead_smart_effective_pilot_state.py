@@ -39,6 +39,11 @@ COVERAGE = Path(
     "coverage/intelligence/latest.json"
 )
 
+ZIP_GATE = Path(
+    "runtime/revenue/lead_smart/"
+    "coverage/activation/latest.json"
+)
+
 OUT = Path(
     "runtime/revenue/lead_smart/"
     "effective_pilot_state/latest.json"
@@ -83,6 +88,9 @@ def main() -> int:
             coverage_intelligence=
                 load(COVERAGE),
 
+            zip_activation=
+                load(ZIP_GATE),
+
             evidence_refs={
                 "tracking_verification":
                     (
@@ -105,6 +113,14 @@ def main() -> int:
                         "sha256:"
                         + digest(
                             COVERAGE
+                        )
+                    ),
+
+                "zip_activation":
+                    (
+                        "sha256:"
+                        + digest(
+                            ZIP_GATE
                         )
                     ),
             },

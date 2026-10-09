@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 
@@ -10,6 +11,19 @@ SCHEMA_VERSION = (
 )
 
 
+def _fresh(when: Any, *, now: datetime, max_age_seconds: int) -> bool:
+    if not isinstance(when, str):
+        return False
+    try:
+        value = datetime.fromisoformat(when.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if value.tzinfo is None:
+        return False
+    age = (now - value.astimezone(timezone.utc)).total_seconds()
+    return 0 <= age <= max_age_seconds
+
+
 def build_effective_pilot_state(
     *,
     base_review: Mapping[str, Any],
@@ -17,6 +31,8 @@ def build_effective_pilot_state(
     routing_observation: Mapping[str, Any],
     coverage_intelligence: Mapping[str, Any],
     evidence_refs: Mapping[str, str],
+    zip_activation: Mapping[str, Any] | None = None,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """
     Compose static commercial policy with independently
@@ -24,9 +40,9 @@ def build_effective_pilot_state(
 
     The static buyer policy is not rewritten.
 
-    Provider verification may promote tracking truth only.
-    Routing, ZIP activation and traffic remain independent
-    gates.
+    Provider evidence may promote tracking truth. The separately
+    verified, fresh ZIP-activation artifact may promote ZIP coverage
+    truth, but neither independently permits routing or traffic.
     """
 
     base = deepcopy(
@@ -44,6 +60,12 @@ def build_effective_pilot_state(
     coverage = dict(
         coverage_intelligence
     )
+
+    current_time = now or datetime.now(timezone.utc)
+    if current_time.tzinfo is None:
+        raise ValueError('timezone-aware verification time required')
+    current_time = current_time.astimezone(timezone.utc)
+    zip_gate = dict(zip_activation or {})
 
     if (
         tracking.get(
@@ -151,13 +173,9 @@ def build_effective_pilot_state(
         "tracking_verified"
     ] = True
 
-    # Independent gates remain false.
+    # Buyer route attestation is not independent runtime proof.
     commercial_truth[
         "routing_verified"
-    ] = False
-
-    commercial_truth[
-        "zip_coverage_activation_verified"
     ] = False
 
     coverage_rows = int(
@@ -195,6 +213,33 @@ def build_effective_pilot_state(
         )
         is True
     )
+
+    zip_verified = (
+        zip_gate.get("schema_version")
+        == "empire.lead_smart.zip_targeting_gate.v1"
+        and zip_gate.get("mode") == "PREACTIVATION"
+        and zip_gate.get("zip_targeting_gate_verified") is True
+        and zip_gate.get("zip_coverage_activation_verified") is True
+        and zip_gate.get("source_fresh_for_targeting") is True
+        and zip_gate.get("zip_count") == unique_zips
+        and unique_zips > 0
+        and isinstance(evidence_refs.get("coverage_intelligence"), str)
+        and evidence_refs["coverage_intelligence"].startswith("sha256:")
+        and (zip_gate.get("evidence_refs") or {}).get("coverage_intelligence")
+        == evidence_refs["coverage_intelligence"]
+        and _fresh(
+            zip_gate.get("source_observed_at"),
+            now=current_time, max_age_seconds=21600,
+        )
+        and _fresh(
+            (zip_gate.get("verified_freshness") or {}).get(
+                "source_newest_last_updated"
+            ),
+            now=current_time, max_age_seconds=108000,
+        )
+    )
+
+    commercial_truth["zip_coverage_activation_verified"] = zip_verified
 
     route_configuration_observed = (
         routing.get(
@@ -269,7 +314,7 @@ def build_effective_pilot_state(
                 fresh_for_targeting,
 
             "activation_verified":
-                False,
+                zip_verified,
         },
 
         "routing": {
@@ -295,7 +340,7 @@ def build_effective_pilot_state(
 
         "remaining_activation_gates": [
             "routing_runtime_verification",
-            "zip_coverage_activation_verification",
+            *([] if zip_verified else ["zip_coverage_activation_verification"]),
             "landing_publication_authority",
             "founder_live_traffic_authority",
         ],
