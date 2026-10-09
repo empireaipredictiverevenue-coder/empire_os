@@ -16,6 +16,7 @@ from empire_os.commercial_loop_observer import (
 from empire_os.sb import request_json
 from empire_os.commercial_loop_reader import read_commercial_loop, CommercialLoopReadError
 from empire_os.commercial_loop_refresh_contract import preserve_cycle_local_observations
+from empire_os.commercial_evidence_inventory import fetch_qualification_omega_inventory
 SNAPSHOT = Path("/srv/empire_os/runtime/commercial_loop/latest.json")
 
 
@@ -53,6 +54,8 @@ def main() -> int:
         now=datetime.now(timezone.utc),
     )
     observations = preserve_cycle_local_observations(existing, canonical)
+    # Inventory is authoritative for durable local stages, not cycle activity.
+    observations.update(fetch_qualification_omega_inventory(_reader))
     status = assess_commercial_loop(observations)
     write_commercial_loop_snapshot(status)
     print(json.dumps(status.as_dict(), indent=2, sort_keys=True))

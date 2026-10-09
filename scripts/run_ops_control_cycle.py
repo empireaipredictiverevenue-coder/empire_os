@@ -411,6 +411,12 @@ def main() -> int:
     )
     if commercial_loop_read_error:
         conveyor["commercial_loop_read_error"] = commercial_loop_read_error
+        conveyor["current_blocker"] = "commercial_loop_snapshot_unavailable"
+        conveyor["blocker_state"] = "unknown"
+        conveyor["owner_component"] = "commercial_loop_observer"
+        conveyor["authority"] = "observe"
+        conveyor["next_event"] = "commercial_loop_snapshot_refresh_required"
+        conveyor["loop_complete"] = False
 
     findings = sentinel.get("findings") or []
     blocking_findings = [
