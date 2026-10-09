@@ -26,3 +26,17 @@ def test_valid_observe_proof():
 def test_fail_closed(patch):
     with pytest.raises(PromotionProofError):
         validate_control_proof({**proof(), **patch}, lane='leads', allowed={'input_quality'}, now=NOW)
+
+
+def test_campaign_observer_allows_authority_control_as_evidence_only():
+    campaign = {**proof(), 'lane': 'campaigns', 'runtime_verified_controls': ['input_quality', 'action_authority']}
+    verified = validate_control_proof(campaign, lane='campaigns', allowed={'input_quality', 'action_authority'}, now=NOW)
+    assert verified & {'input_quality'} == {'input_quality'}
+    assert 'action_authority' in verified  # This is an observed control, not an execution grant.
+
+
+@pytest.mark.parametrize('flag', ['outbound', 'db_write', 'action_authority_granted', 'campaign_state_mutated'])
+def test_campaign_rejects_consequential_execution_even_with_authority_control(flag):
+    campaign = {**proof(), 'lane': 'campaigns', 'runtime_verified_controls': ['input_quality', 'action_authority'], flag: True}
+    with pytest.raises(PromotionProofError):
+        validate_control_proof(campaign, lane='campaigns', allowed={'input_quality', 'action_authority'}, now=NOW)
