@@ -318,7 +318,16 @@ def normalize_search_result(
         raise ValueError("unsupported community platform")
 
     url = _clean(result.get("link") or result.get("url"))
-    if not url or not any(domain in url.lower() for domain in domains):
+    # Exact hostname/subdomain check: a lookalike URL containing
+    # "linkedin.com" or "reddit.com" is NOT a platform observation.
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").casefold()
+    except ValueError:
+        return None
+    if (parsed.scheme not in ("https", "http") or not host
+            or not any(host == domain or host.endswith("." + domain)
+                       for domain in domains)):
         return None
 
     title = _clean(result.get("title"))

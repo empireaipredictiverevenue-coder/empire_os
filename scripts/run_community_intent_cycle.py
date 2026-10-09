@@ -15,7 +15,11 @@ from empire_os.community_intent import (
 )
 from empire_os.control_fabric import EventEnvelope, route_event
 from empire_os.pain_solution_engine import build_pain_solution_briefs
-from empire_os.search_fabric.search import search
+from empire_os.search_fabric.reliable_search import search_reliable
+from empire_os.icp_intent_source_atlas import (
+    REDDIT_ROTATION as ICP_REDDIT_ROTATION,
+    atlas_summary,
+)
 
 ROOT = Path("/srv/empire_os")
 OUTPUT = ROOT / "runtime/community_intent/latest.json"
@@ -23,17 +27,14 @@ HISTORY = ROOT / "runtime/community_intent/observations.json"
 
 # Exactly one Reddit and one LinkedIn search are attempted per cycle.
 # The 15-minute timer rotates the search so we do not hammer providers.
-REDDIT_ROTATION = (
+# Priority first-party ICP communities plus cross-industry signal coverage.
+# Exactly one public Reddit RSS query per existing 15-minute timer tick.
+REDDIT_ROTATION = ICP_REDDIT_ROTATION + (
     ("sales", "lead generation", "b2b", "online"),
     ("sales", "sales pipeline", "b2b", "online"),
-    ("smallbusiness", "lead generation", "b2b", "online"),
-    ("Roofing", "qualified appointments", "roofing", "US"),
-    ("Roofing", "google ads leads", "roofing", "US"),
-    ("Roofing", "need more leads", "roofing", "US"),
-    ("HVAC", "need more leads", "hvac", "US"),
     ("solar", "need more leads", "solar", "US"),
-    ("Entrepreneur", "customer acquisition", "b2b", "online"),
 )
+
 
 LINKEDIN_ROTATION = (
     ('"looking for" sales automation', "b2b", "online"),
@@ -145,14 +146,30 @@ def _collect_linkedin(
     niche: str,
     metro: str,
 ) -> tuple[list[IntentObservation], dict]:
-    payload = search(
+    # The search reliability layer enforces a persistent provider circuit:
+    # no multi-engine retry storm every 15 minutes when public providers
+    # return blocks. Historical cached results must NEVER become a new
+    # observation (social-post publication dates are not authenticated).
+    payload = search_reliable(
         f"site:linkedin.com/posts {query}",
         num=5,
+        use_cache=False,
     )
-    engine = (payload.get("searchParameters") or {}).get("engine")
-    error = payload.get("error")
+    params = payload.get("searchParameters") or {}
+    engine = params.get("engine")
+    freshness_verified = (
+        not payload.get("error")
+        and params.get("search_state") == "RESULTS"
+        and not any(params.get(name) for name in (
+            "cache", "memory_cache", "stale_cache",
+        ))
+        and payload.get("organic") is not None
+    )
+    error = payload.get("error") or (
+        None if freshness_verified else "PROVIDER_UNAVAILABLE_OR_CACHED"
+    )
     rows: list[IntentObservation] = []
-    for result in payload.get("organic") or []:
+    for result in (payload.get("organic") or []) if freshness_verified else []:
         if not isinstance(result, dict):
             continue
         observation = normalize_search_result(
@@ -165,10 +182,17 @@ def _collect_linkedin(
         if observation is not None:
             rows.append(observation)
     return rows, {
-        "ok": not bool(error),
+        "ok": freshness_verified,
         "engine": engine,
         "error": error,
-        "result_count": len(payload.get("organic") or []),
+        "search_state": params.get("search_state"),
+        "search_operational_status": payload.get("search_operational_status"),
+        "circuit_open": bool(params.get("circuit_open")),
+        "cached_results_rejected_as_live": bool(
+            params.get("cache") or params.get("stale_cache")
+            or params.get("memory_cache")
+        ),
+        "result_count": len(payload.get("organic") or []) if freshness_verified else 0,
         "accepted_observations": len(rows),
         "query": query,
     }
@@ -271,6 +295,7 @@ def main() -> int:
             row.intent_band == "medium" for row in observations
         ),
         "by_source": dict(source_counts),
+        "icp_source_atlas": atlas_summary(),
         "source_status": {
             "reddit": {
                 "ok": reddit.get("ok"),

@@ -11,6 +11,8 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 from urllib.parse import urlsplit
 
+from empire_os.icp_intent_relevance import classify_icp_intent
+
 CHANNELS = frozenset({"reddit_intent", "linkedin_intent"})
 SOURCE_LABELS = {"reddit_intent": "reddit", "linkedin_intent": "linkedin"}
 NON_COMPANY_HOSTS = frozenset({
@@ -114,6 +116,8 @@ def build_social_intent_review(
     observed = []
     seen_urls = set()
     linked = []
+    classified_counts = Counter()
+    product_hypotheses = Counter()
     for key, raw in signals.items():
         if not isinstance(raw, Mapping) or raw.get("source") not in CHANNELS:
             continue
@@ -151,14 +155,27 @@ def build_social_intent_review(
                 potential[known[domain]] = {
                     "entity_key": known[domain], "evidence_website": str(ref)[:2048],
                 }
-        if score < 35 and not potential:
+        classification = classify_icp_intent(detail)
+        classified_counts[classification["intent_class"]] += 1
+        if (score < 35 and not potential
+                and classification["intent_class"] not in (
+                    "EXPLICIT_REQUEST_UNVERIFIED",
+                    "OPERATOR_PROBLEM_SELF_REPORTED",
+                )):
             continue
+        for offer in classification["candidate_offer_hypotheses"]:
+            if classification["intent_class"] in (
+                "EXPLICIT_REQUEST_UNVERIFIED",
+                "OPERATOR_PROBLEM_SELF_REPORTED",
+            ):
+                product_hypotheses[offer["offer_key"]] += 1
         item = {
             "signal_id": str(key)[:100],
             "channel": SOURCE_LABELS[channel],
             "public_post_url": public_url[:2048],
             "observed_at": stamp.isoformat(),
             "reported_intent_score": score,
+            "icp_relevance": classification,
             "niche": str(detail.get("niche") or raw.get("niche") or "")[:65],
             "potential_company_matches": list(potential.values()),
             "poster_company_identity_verified": False,
@@ -189,6 +206,15 @@ def build_social_intent_review(
         "verified_poster_to_company_identity_count": 0,
         "verified_commercial_buying_intent_count": 0,
         "stale_or_unproven_observation_count": counts["stale_or_unproven_observation"],
+        "intent_class_counts": dict(sorted(classified_counts.items())),
+        "candidate_offer_interest_signals": [
+            {
+                "offer_key": key,
+                "signal_observations": qty,
+                "paid_demand_verified": False,
+            }
+            for key, qty in product_hypotheses.most_common()
+        ],
         "identity_unverified_review_queue": review,
         "review_queue_truncated": len(review) < len(observed),
         "linkedin_and_reddit_runtime": metrics,
