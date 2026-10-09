@@ -278,7 +278,7 @@ def _execution_plane_bridge(
 
 
 
-def run_one_department_work(
+def _run_one_department_work_impl(
     repo_root: str | Path,
     *,
     worker_id: str = "department-worker",
@@ -801,6 +801,32 @@ def run_one_department_work(
     }
 
 
+
+def run_one_department_work(
+    repo_root: str | Path,
+    *,
+    worker_id: str = "department-worker",
+    timeout_seconds: int = 120,
+) -> dict[str, Any]:
+    """Execute existing governed work; capture evidenced reusable lessons as drafts.
+
+    SkillForge failure must never change the canonical business result.
+    """
+    outcome = _run_one_department_work_impl(
+        repo_root, worker_id=worker_id, timeout_seconds=timeout_seconds,
+    )
+    if outcome.get("state") != "DONE" or not outcome.get("work_id"):
+        return outcome
+    try:
+        from empire_os.skillforge_learning import capture_completed_work
+        observation = capture_completed_work(repo_root, outcome["work_id"])
+    except (OSError, ValueError, TypeError, RuntimeError):
+        observation = {"status": "capture_error", "approved": False}
+    # Never conflate queue completion or learned candidate with skill approval.
+    outcome["skillforge_observation"] = observation
+    return outcome
+
+
 def run_department_worker(
     repo_root: str | Path,
     *,
@@ -819,7 +845,31 @@ def run_department_worker(
         results.append(result)
         if result.get("state") == "IDLE":
             break
+    # Reuse this existing bounded department cycle: no new worker or timer.
+    # A draft proposal never conveys agent execution or commercial authority.
+    skillforge_proposals: dict[str, Any] = {
+        "status": "no_new_learning_observations", "approved": False,
+    }
+    if any(
+        (row.get("skillforge_observation") or {}).get("status") == "candidate_saved"
+        for row in results
+    ):
+        try:
+            from empire_os.skillforge_proposals import refresh_skill_proposals
+            proposal_result = refresh_skill_proposals(repo_root, apply=True)
+            skillforge_proposals = {
+                "status": "review_proposals_refreshed",
+                "approved": False,
+                "review_drafts_saved": proposal_result["review_drafts_saved"],
+                "invalid_observations": proposal_result["invalid_observations"],
+                "inventory_truncated": proposal_result["inventory_truncated"],
+                "execution_authority": "none",
+            }
+        except (OSError, ValueError, TypeError, RuntimeError):
+            # Learning must not change the canonical completion outcome.
+            skillforge_proposals = {"status": "proposal_refresh_error", "approved": False}
     return {
+        "skillforge_proposals": skillforge_proposals,
         "ok": all(row.get("ok") is not False for row in results),
         "processed_count": sum(
             row.get("state") not in {None, "IDLE"}

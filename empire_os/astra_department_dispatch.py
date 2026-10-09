@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.skill_exchange import recommend_work_item_skills
 
 
 ASTRA_EXECUTIVE = Path("runtime/astra/executive_latest.json")
@@ -75,6 +76,10 @@ def dispatch_executive_plan(repo_root: str | Path) -> dict[str, Any]:
                 "target_component": work.target_component,
                 "action": work.action,
                 "created": created,
+                "skill_advice": recommend_work_item_skills({
+                    "id": work.id, "department_keys": list(work.department_keys),
+                    "target_component": work.target_component,
+                }),
             })
 
     payload = {
