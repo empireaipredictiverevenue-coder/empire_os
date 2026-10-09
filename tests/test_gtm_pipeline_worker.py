@@ -71,6 +71,10 @@ def test_pipeline_auto_reviews_then_proposes_only_ready_reviews():
                 "decision": "proposed",
                 "intent_id": "00000000-0000-0000-0000-000000000020",
             }
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(
@@ -108,6 +112,10 @@ def test_pipeline_defaults_to_25_daily_review_cap():
             return {"status": "approved", "decision": "approved"}
         if path.endswith("list_buyer_reviews_for_outbound"):
             return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -123,6 +131,10 @@ def test_pipeline_skips_ineligible_review_without_fabricating_evidence():
         if path.endswith("auto_review_buyer_candidate"):
             raise RuntimeError("verified decision-maker contact evidence required")
         if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
             return []
         raise AssertionError((method, path))
 
@@ -191,6 +203,10 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
                 "decision": "proposed",
                 "intent_id": "00000000-0000-0000-0000-000000000032",
             }
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -234,6 +250,10 @@ def test_pipeline_skips_when_canonical_context_cannot_be_resolved():
             return []
         if path.endswith("propose_reviewed_outbound_intent"):
             raise AssertionError("unresolved context must not be proposed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -262,6 +282,10 @@ def test_placeholder_contact_is_deferred_not_proposed():
             return [bad]
         if path.endswith("propose_reviewed_outbound_intent"):
             raise AssertionError("placeholder contact must never be proposed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -285,6 +309,10 @@ def test_missing_specific_proof_is_deferred_not_service_error():
             return [no_proof]
         if path.endswith("propose_reviewed_outbound_intent"):
             raise AssertionError("evidence-poor contact must not be proposed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -316,6 +344,10 @@ def test_gtm_defers_when_recipient_is_outside_local_contact_window():
             return [row]
         if path.endswith("propose_reviewed_outbound_intent"):
             raise AssertionError("out-of-hours intent must not be proposed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     # 11:00 UTC = 06:00 in Wichita in September.
@@ -341,6 +373,10 @@ def test_gtm_defers_multilingual_country_without_explicit_language():
             return [row]
         if path.endswith("propose_reviewed_outbound_intent"):
             raise AssertionError("language-unresolved intent must not be proposed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -395,6 +431,10 @@ def test_pipeline_skips_pending_contact_already_approved():
             return []
         if path.endswith("auto_review_buyer_candidate"):
             raise AssertionError("duplicate contact must not be auto-reviewed")
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(request, now=NOW)
@@ -425,6 +465,10 @@ def test_pipeline_skips_second_duplicate_pending_contact_same_cycle():
             approved_calls.append(payload["p_review_id"])
             return {"status": "approved", "decision": "approved"}
         if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
             return []
         raise AssertionError((method, path))
 
@@ -507,6 +551,10 @@ def test_pipeline_prioritizes_fresh_reviews_and_excludes_stale_backlog():
             return []
         if path.endswith("list_buyer_reviews_for_outbound"):
             return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
+            return []
         raise AssertionError((method, path))
 
     result = run_gtm_pipeline(
@@ -534,6 +582,10 @@ def test_pipeline_only_uses_fresh_approved_contacts_as_duplicate_blockers():
             seen_paths.append(path)
             return []
         if path.endswith("list_buyer_reviews_for_outbound"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_intents?"):
+            return []
+        if method == "GET" and path.startswith("/rest/v1/outbound_suppressions?"):
             return []
         raise AssertionError((method, path))
 
@@ -698,13 +750,10 @@ def test_founder_review_history_guard_fails_closed():
             return []
         raise AssertionError((method, path))
 
-    result = run_gtm_pipeline(request, now=NOW)
+    import pytest
 
-    assert result.founder_review_required == ()
-    assert any(
-        "founder_history_guard_failed" in reason
-        for reason in result.deferred_reasons
-    )
+    with pytest.raises(RuntimeError, match="history unavailable"):
+        run_gtm_pipeline(request, now=NOW)
 
 
 def test_prior_outbound_history_excludes_founder_review_candidate():
@@ -793,3 +842,149 @@ def test_suppressed_contact_excluded_before_founder_review():
         "suppressed_contact" in reason
         for reason in result.deferred_reasons
     )
+
+def test_safety_lookup_failure_prevents_all_gtm_mutations():
+    import pytest
+
+    for blocked in ("outbound_intents", "outbound_suppressions"):
+        calls = []
+
+        def request(method, path, payload=None, **_kwargs):
+            calls.append((method, path))
+            if method == "POST":
+                raise AssertionError("unsafe mutation attempted")
+            if path.startswith("/rest/v1/buyer_candidate_reviews?"):
+                return []
+            if blocked in path:
+                raise RuntimeError("safety lookup unavailable")
+            if "outbound_intents" in path or "outbound_suppressions" in path:
+                return []
+            raise AssertionError(path)
+
+        with pytest.raises(RuntimeError, match="safety lookup unavailable"):
+            run_gtm_pipeline(request, now=NOW)
+        assert not any(method == "POST" for method, _ in calls)
+
+
+def test_invalid_safety_projection_prevents_all_gtm_mutations():
+    import pytest
+
+    for blocked in ("outbound_intents", "outbound_suppressions"):
+        calls = []
+
+        def request(method, path, payload=None, **_kwargs):
+            calls.append((method, path))
+            if method == "POST":
+                raise AssertionError("unsafe mutation attempted")
+            if path.startswith("/rest/v1/buyer_candidate_reviews?"):
+                return []
+            if blocked in path:
+                return None
+            if "outbound_intents" in path or "outbound_suppressions" in path:
+                return []
+            raise AssertionError(path)
+
+        with pytest.raises(ValueError, match="invalid projection"):
+            run_gtm_pipeline(request, now=NOW)
+        assert not any(method == "POST" for method, _ in calls)
+
+
+def test_safety_projections_at_limit_fail_closed():
+    import pytest
+
+    for table, count in (("outbound_intents", 1000), ("outbound_suppressions", 5000)):
+        writes = []
+
+        def request(method, path, payload=None, **kwargs):
+            if method == "GET" and "buyer_candidate_reviews" in path:
+                return []
+            if method == "GET" and "outbound_intents" in path:
+                return [{}] * count if table == "outbound_intents" else []
+            if method == "GET" and "outbound_suppressions" in path:
+                return [{}] * count if table == "outbound_suppressions" else []
+            writes.append((method, path))
+            raise AssertionError("mutation attempted")
+
+        with pytest.raises(ValueError, match="safety pagination repeated page"):
+            run_gtm_pipeline(request, now=NOW)
+        assert writes == []
+
+
+def test_founder_history_helper_rejects_invalid_projection():
+    import pytest
+    from empire_os.gtm_pipeline_worker import _founder_review_has_prior_contact
+
+    def request(method, path, **kwargs):
+        return None
+
+    with pytest.raises(ValueError, match="invalid projection"):
+        _founder_review_has_prior_contact(
+            request, prospect_id="prospect-1", contact_email="person@example.com"
+        )
+
+
+def test_approved_review_history_limit_fails_closed():
+    import pytest
+    calls = []
+
+    def request(method, path, payload=None, **kwargs):
+        calls.append((method, path))
+        if method == "GET" and "buyer_candidate_reviews" in path:
+            if "status=eq.approved" in path:
+                return [{"contact_email": "person@example.com"}] * 100
+            return []
+        raise AssertionError("should not continue after incomplete approved history")
+
+    with pytest.raises(ValueError, match="safety pagination repeated page"):
+        run_gtm_pipeline(request, now=NOW)
+    assert all(method == "GET" for method, _ in calls)
+
+
+def test_founder_history_requires_contact_identity():
+    import pytest
+    from empire_os.gtm_pipeline_worker import _founder_review_has_prior_contact
+
+    with pytest.raises(ValueError, match="requires prospect or contact"):
+        _founder_review_has_prior_contact(
+            lambda *args, **kwargs: [], prospect_id=None, contact_email=None
+        )
+
+
+def test_missing_review_projection_fails_closed():
+    import pytest
+    for missing_status in ("pending", "approved"):
+        calls = []
+
+        def request(method, path, payload=None, **kwargs):
+            calls.append((method, path))
+            if method == "GET" and "buyer_candidate_reviews" in path:
+                if f"status=eq.{missing_status}" in path:
+                    return None
+                return []
+            raise AssertionError("unsafe downstream operation")
+
+        with pytest.raises(ValueError, match="(review projection must be a list|invalid projection)"):
+            run_gtm_pipeline(request, now=NOW)
+        assert all(method == "GET" for method, _ in calls)
+
+
+def test_safety_pagination_reads_beyond_first_page():
+    from empire_os.gtm_pipeline_worker import _complete_safety_projection
+    from urllib.parse import parse_qs, urlsplit
+
+    offsets = []
+
+    def request(method, path, **kwargs):
+        query = parse_qs(urlsplit(path).query)
+        offset = int(query["offset"][0])
+        offsets.append(offset)
+        return [{"normalized_contact": f"contact{n}@example.com"}
+                for n in range(offset, min(offset + 2, 5))]
+
+    rows = _complete_safety_projection(
+        request, "outbound_suppressions", {"select": "normalized_contact"},
+        page_size=2,
+    )
+    assert len(rows) == 5
+    assert offsets == [0, 2, 4]
+    assert rows[-1]["normalized_contact"] == "contact4@example.com"

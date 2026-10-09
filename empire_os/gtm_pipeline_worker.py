@@ -67,6 +67,8 @@ def _founder_review_has_prior_contact(
     prospect = str(prospect_id or "").strip()
     email = str(contact_email or "").strip().lower()
     domain = email.split("@", 1)[1] if "@" in email else ""
+    if not prospect and not email:
+        raise ValueError("founder history lookup requires prospect or contact")
 
     if prospect:
         query = urlencode({
@@ -78,8 +80,10 @@ def _founder_review_has_prior_contact(
         rows = request(
             "GET",
             f"/rest/v1/outbound_intents?{query}",
-        ) or []
-        if isinstance(rows, list) and rows:
+        )
+        if not isinstance(rows, list):
+            raise ValueError("founder history lookup returned invalid projection")
+        if rows:
             return True
 
     if domain:
@@ -92,8 +96,10 @@ def _founder_review_has_prior_contact(
         rows = request(
             "GET",
             f"/rest/v1/outbound_intents?{query}",
-        ) or []
-        if isinstance(rows, list) and rows:
+        )
+        if not isinstance(rows, list):
+            raise ValueError("founder history lookup returned invalid projection")
+        if rows:
             return True
 
     if email:
@@ -105,8 +111,10 @@ def _founder_review_has_prior_contact(
         rows = request(
             "GET",
             f"/rest/v1/outbound_suppressions?{query}",
-        ) or []
-        if isinstance(rows, list) and rows:
+        )
+        if not isinstance(rows, list):
+            raise ValueError("founder history lookup returned invalid projection")
+        if rows:
             return True
 
     return False
@@ -244,6 +252,8 @@ def build_outbound_payload(
                 body=str(body_rows[0]["core_body"]),
                 cta=str(body_rows[0]["cta"]),
                 contact_title=str(review.get("contact_title") or ""),
+                evidence=evidence,
+                now=now,
             )
             eligible = quality.get(
                 "experiment_eligible",
@@ -264,6 +274,8 @@ def build_outbound_payload(
                 body=str(row["core_body"]),
                 cta=str(row["cta"]),
                 contact_title=str(review.get("contact_title") or ""),
+                evidence=evidence,
+                now=now,
             )
             eligible = quality.get(
                 "experiment_eligible",
@@ -291,6 +303,15 @@ def build_outbound_payload(
             niche=niche,
             decision_role=evidence.get("decision_role"),
             snapshot=optimizer_snapshot,
+            dimensions={
+                "problem_class": evidence.get("problem_class"),
+                "trigger_class": (
+                    ((copy.quality_review or {}).get("why_now") or {}).get("signal_type")
+                ),
+                "proof_class": evidence.get("proof_class"),
+                "locale": locale.outreach_language,
+                "timezone": locale.timezone,
+            },
         )
         subject_row = next(
             row for row in safe_subjects
@@ -314,6 +335,8 @@ def build_outbound_payload(
             body=core_body,
             cta=str(body_row["cta"]),
             contact_title=str(review.get("contact_title") or ""),
+            evidence=evidence,
+            now=now,
         )
         eligible = selected_quality.get(
             "experiment_eligible",
@@ -374,6 +397,31 @@ def build_outbound_payload(
     }
 
 
+def _complete_safety_projection(
+    request: Request, table: str, params: Mapping[str, str], *, page_size: int
+) -> list[dict[str, Any]]:
+    """Read every safety page; refuse repeated pages or malformed projections."""
+    rows: list[dict[str, Any]] = []
+    offset = 0
+    previous_page = None
+    while True:
+        query = urlencode({**params, "limit": str(page_size), "offset": str(offset)})
+        batch = request("GET", f"/rest/v1/{table}?{query}")
+        if not isinstance(batch, list) or any(not isinstance(x, dict) for x in batch):
+            raise ValueError(f"{table} invalid projection")
+        if len(batch) > page_size:
+            raise ValueError(f"{table} safety projection exceeded page size")
+        if len(batch) == page_size and batch == previous_page:
+            raise ValueError(f"{table} safety pagination repeated page")
+        rows.extend(batch)
+        if len(batch) < page_size:
+            return rows
+        previous_page = batch
+        offset += page_size
+        if offset >= 100000:
+            raise ValueError(f"{table} safety pagination exceeded bound")
+
+
 def run_gtm_pipeline(
     request: Request,
     *,
@@ -388,6 +436,8 @@ def run_gtm_pipeline(
     if current.tzinfo is None:
         raise ValueError("now must include timezone")
 
+    # No contact may be approved from an incomplete identity/history projection.
+    # The bounded review batch is a scheduling limit, not a safety-evidence limit.
     pending_cutoff = current - timedelta(days=7)
     pending_query = urlencode({
         "select": (
@@ -402,24 +452,19 @@ def run_gtm_pipeline(
     pending = request(
         "GET",
         f"/rest/v1/buyer_candidate_reviews?{pending_query}",
-    ) or []
+    )
     if not isinstance(pending, list):
         raise ValueError("pending review projection must be a list")
 
     approved_cutoff = current - timedelta(days=7)
-    approved_query = urlencode({
-        "select": "contact_email,reviewed_at",
-        "status": "eq.approved",
-        "reviewed_at": f"gte.{approved_cutoff.isoformat()}",
-        "order": "reviewed_at.desc",
-        "limit": "100",
-    })
-    approved_rows = request(
-        "GET",
-        f"/rest/v1/buyer_candidate_reviews?{approved_query}",
-    ) or []
-    if not isinstance(approved_rows, list):
-        raise ValueError("approved review projection must be a list")
+    approved_rows = _complete_safety_projection(
+        request, "buyer_candidate_reviews", {
+            "select": "contact_email,reviewed_at",
+            "status": "eq.approved",
+            "reviewed_at": f"gte.{approved_cutoff.isoformat()}",
+            "order": "reviewed_at.desc,id.desc",
+        }, page_size=100,
+    )
 
     seen_contacts = {
         str((row or {}).get("contact_email") or "").strip().lower()
@@ -427,57 +472,30 @@ def run_gtm_pipeline(
         if str((row or {}).get("contact_email") or "").strip()
     }
 
-    history_query = urlencode({
-        "select": "prospect_id,normalized_recipient,status",
-        "status": (
-            "in.(sending,sent,delivered,replied,bounced,failed,suppressed)"
-        ),
-        "order": "created_at.desc",
-        "limit": "1000",
-    })
-    try:
-        history_rows = request(
-            "GET",
-            f"/rest/v1/outbound_intents?{history_query}",
-        ) or []
-    except Exception:
-        history_rows = []
-    if not isinstance(history_rows, list):
-        history_rows = []
-
+    history_rows = _complete_safety_projection(
+        request, "outbound_intents", {
+            "select": "prospect_id,normalized_recipient,status",
+            "status": "in.(sending,sent,delivered,replied,bounced,failed,suppressed)",
+            "order": "created_at.desc,id.desc",
+        }, page_size=1000,
+    )
     prior_prospect_ids = {
-        str((row or {}).get("prospect_id") or "").strip()
-        for row in history_rows
-        if str((row or {}).get("prospect_id") or "").strip()
+        str(row.get("prospect_id") or "").strip()
+        for row in history_rows if str(row.get("prospect_id") or "").strip()
     }
     prior_contacts = {
-        str((row or {}).get("normalized_recipient") or "").strip().lower()
-        for row in history_rows
-        if str((row or {}).get("normalized_recipient") or "").strip()
+        str(row.get("normalized_recipient") or "").strip().lower()
+        for row in history_rows if str(row.get("normalized_recipient") or "").strip()
     }
-    prior_domains = {
-        value.rsplit("@", 1)[-1]
-        for value in prior_contacts
-        if "@" in value
-    }
+    prior_domains = {x.rsplit("@", 1)[-1] for x in prior_contacts if "@" in x}
 
-    suppression_query = urlencode({
-        "select": "normalized_contact",
-        "limit": "5000",
-    })
-    try:
-        suppression_rows = request(
-            "GET",
-            f"/rest/v1/outbound_suppressions?{suppression_query}",
-        ) or []
-    except Exception:
-        suppression_rows = []
-    if not isinstance(suppression_rows, list):
-        suppression_rows = []
+    suppression_rows = _complete_safety_projection(
+        request, "outbound_suppressions", {"select": "normalized_contact", "order": "normalized_contact.asc"},
+        page_size=5000,
+    )
     suppressed_contacts = {
-        str((row or {}).get("normalized_contact") or "").strip().lower()
-        for row in suppression_rows
-        if str((row or {}).get("normalized_contact") or "").strip()
+        str(row.get("normalized_contact") or "").strip().lower()
+        for row in suppression_rows if str(row.get("normalized_contact") or "").strip()
     }
 
     approved_count = 0
@@ -511,15 +529,11 @@ def run_gtm_pipeline(
             or (contact_domain and contact_domain in prior_domains)
         ):
             skipped += 1
-            pending_skip_reasons.append(
-                f"{review_id}:prior_outbound_history"
-            )
+            pending_skip_reasons.append(f"{review_id}:prior_outbound_history")
             continue
         if contact and contact in suppressed_contacts:
             skipped += 1
-            pending_skip_reasons.append(
-                f"{review_id}:suppressed_contact"
-            )
+            pending_skip_reasons.append(f"{review_id}:suppressed_contact")
             continue
         try:
             result = request(
