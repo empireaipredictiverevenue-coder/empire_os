@@ -9,6 +9,7 @@ from typing import Any, Mapping
 from empire_os.department_work_queue import DepartmentWorkQueue
 from empire_os.skill_exchange import recommend_work_item_skills
 from empire_os.okf_adapter import list_private_research
+from empire_os.astra_okf_auto_retrieval import auto_retrieve_for_astra
 
 
 ASTRA_EXECUTIVE = Path("runtime/astra/executive_latest.json")
@@ -60,6 +61,7 @@ def dispatch_executive_plan(
     authority_blocked = 0
     unowned = 0
     items: list[dict[str, Any]] = []
+    admitted_steps: list[Mapping[str, Any]] = []
 
     if plan_id:
         for step in snapshot.get("plan") or []:
@@ -96,6 +98,7 @@ def dispatch_executive_plan(
             )
             queued += int(created)
             existing += int(not created)
+            admitted_steps.append(step)
             items.append({
                 "work_id": work.id,
                 "step_id": work.step_id,
@@ -108,6 +111,13 @@ def dispatch_executive_plan(
                     "target_component": work.target_component,
                 }),
             })
+
+    # Automatic research selection happens AFTER all queue decisions.
+    # It cannot modify a step, work item, existing authority or dispatch.
+    if okf_bundle_path is None and admitted_steps:
+        auto_advisory = auto_retrieve_for_astra(root, admitted_steps)
+        if auto_advisory["status"] != "no_relevant_company_bound_task":
+            okf_advisory = auto_advisory
 
     payload = {
         "schema_version": "empire.astra.department_dispatch.v1",

@@ -207,19 +207,43 @@ def export_private_bundle(
 
 def verify_bundle_files(root: Path) -> int:
     """Check exported file digests before a reader uses their metadata."""
-    manifest = json.loads((root / "manifest.json").read_text())
+    root = Path(root)
+    if root.is_symlink() or (root / "buyers").is_symlink():
+        raise ValueError("okf_bundle_symlink_denied")
+    manifest_path = root / "manifest.json"
+    if manifest_path.is_symlink():
+        raise ValueError("okf_manifest_symlink_denied")
+    manifest = json.loads(manifest_path.read_text())
     if (manifest.get("schema") != "empire.okf.private.v1"
         or manifest.get("okf_version") != VERSION
         or manifest.get("visibility") != "private"
         or manifest.get("authority") != "none"
         or not isinstance(manifest.get("files_sha256"), dict)):
         raise ValueError("untrusted_bundle_manifest")
+    hashes = manifest["files_sha256"]
+    expected = set(hashes)
+    actual = {"index.md"} | {
+        "buyers/" + path.name
+        for path in (root / "buyers").iterdir()
+        if path.suffix == ".md"
+    }
+    if expected != actual or "index.md" not in expected:
+        raise ValueError("okf_manifest_inventory_mismatch")
     count = 0
-    for name, digest in manifest["files_sha256"].items():
-        if Path(name).is_absolute() or ".." in Path(name).parts:
-            raise ValueError("unsafe_path")
-        item = root / name
-        if item.is_symlink() or sha256(item.read_bytes()).hexdigest() != digest:
+    for name, digest in hashes.items():
+        rel = Path(name)
+        if (
+            not isinstance(name, str) or not isinstance(digest, str)
+            or rel.is_absolute() or ".." in rel.parts
+            or not (name == "index.md" or (
+                len(rel.parts) == 2 and rel.parts[0] == "buyers"
+                and rel.suffix == ".md"
+            ))
+            or not HASH.fullmatch(digest)
+        ):
+            raise ValueError("unsafe_path_or_digest")
+        item = root / rel
+        if item.is_symlink() or not item.is_file() or sha256(item.read_bytes()).hexdigest() != digest:
             raise ValueError("integrity_check_failed")
         count += int(name != "index.md")
     return count
