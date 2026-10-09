@@ -168,3 +168,17 @@ def test_ringba_observed_offer_truth_and_authority_boundary():
     assert r.get("traffic_enabled", False) is False
 
     assert p.get("execution_authority") in (None, "none", "NONE")
+
+
+def test_lead_smart_support_evidence_flows_to_commercial_truth_without_activation():
+    result = review()
+    truth = result["commercial_truth"]
+    assert truth["operating_hours_confirmation"]["source_ref"] == (
+        "gmail:1a12229d9d3ffe75"
+    )
+    assert truth["operating_hours_confirmation"]["zone_name"] == "America/Chicago"
+    assert truth["direct_route_requirements"]["direct_ivr_collects_zip"] is True
+    assert truth["direct_route_requirements"]["caller_id_pass_through_verified"] is False
+    assert truth["landing_review_report"]["approved"] is False
+    assert result["traffic_enabled"] is False
+    assert result["execution_authority"] == "none"

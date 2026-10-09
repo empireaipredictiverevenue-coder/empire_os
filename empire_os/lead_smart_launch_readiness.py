@@ -33,6 +33,8 @@ def build_launch_readiness(
     routing: Mapping[str, Any],
     operating_hours: Mapping[str, Any] | None = None,
     timezone_confirmation: Mapping[str, Any] | None = None,
+    caller_id_pass_through_verified: bool = False,
+    buyer_landing_page_approved: bool = False,
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
     now: datetime | None = None,
@@ -87,6 +89,10 @@ def build_launch_readiness(
     gates = {
         "operating_hours_verified": hours["operating_hours_verified"],
 
+        "caller_id_pass_through_verified": (
+            caller_id_pass_through_verified is True
+        ),
+
         "tracking_verified":
             tracking_verified,
 
@@ -95,6 +101,8 @@ def build_launch_readiness(
 
         "routing_runtime_verified":
             routing_verified,
+
+        "buyer_landing_page_approved": buyer_landing_page_approved is True,
 
         "landing_publication_authorized":
             bool(

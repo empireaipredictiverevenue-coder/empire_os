@@ -113,6 +113,12 @@ def build_review() -> dict[str, Any]:
         "observed_payout_max": routing.get("observed_payout_max"),
         "revshare_percentage": routing.get("revshare_percentage"),
         "rtb_enabled": routing.get("rtb_enabled"),
+        "direct_route_requirements": dict(
+            routing.get("direct_route_requirements") or {}
+        ),
+        "landing_review_report": dict(
+            routing.get("landing_review_report") or {}
+        ),
         "buyer_route_report": dict(routing.get("buyer_route_report") or {}),
         "rtb_transport_requirements": dict(
             routing.get("rtb_transport_requirements") or {}
@@ -143,6 +149,9 @@ def build_review() -> dict[str, Any]:
             review.get("landing_pages_reviewed") is True
         ),
         "operating_hours": dict(policy.get("operating_hours") or {}),
+        "operating_hours_confirmation": dict(
+            policy.get("operating_hours_confirmation") or {}
+        ),
     }
 
     return {

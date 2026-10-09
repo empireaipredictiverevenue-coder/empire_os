@@ -45,13 +45,15 @@ def timezone_confirmation(now=NOW, zone="America/Chicago"):
     }
 
 
-def readiness(*, track=None, zip_state=None, route=None, authority=False, publication=False, now=NOW, tz=None, operating_hours=None):
+def readiness(*, track=None, zip_state=None, route=None, authority=False, publication=False, now=NOW, tz=None, operating_hours=None, caller_id=False, buyer_page=False):
     return build_launch_readiness(
         tracking=tracking() if track is None else track,
         zip_gate=zip_gate() if zip_state is None else zip_state,
         routing=routing() if route is None else route,
         operating_hours=REPORT if operating_hours is None else operating_hours,
         timezone_confirmation=tz,
+        caller_id_pass_through_verified=caller_id,
+        buyer_landing_page_approved=buyer_page,
         landing_publication_authorized=publication,
         founder_live_traffic_authorized=authority,
         now=now,
@@ -84,7 +86,7 @@ def test_founder_authority_alone_cannot_bypass_routing():
 
 def test_all_independent_fresh_gates_required():
     result = readiness(route=routing(True), authority=True, publication=True,
-                       tz=timezone_confirmation())
+                       tz=timezone_confirmation(), caller_id=True, buyer_page=True)
     assert result["blockers"] == []
     assert result["launch_ready"] is True
     assert result["call_cta_enabled"] is True
@@ -196,3 +198,56 @@ def test_hour_boundaries_and_daylight_saving(timestamp, zone, should_pass):
 def test_untrusted_or_invalid_timezone_claim_fails_closed(bad):
     result = evaluate_buyer_hours(REPORT, bad, now=NOW)
     assert result["operating_hours_verified"] is False
+
+
+def test_oct9_support_timezone_confirmation_closes_timezone_interpretation_only():
+    from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    confirmed = policy["operating_hours_confirmation"]
+    result = readiness(
+        now=datetime(2026, 10, 9, 19, 35, 30, tzinfo=timezone.utc),
+        tz=confirmed,
+        track={
+            "state": "VERIFIED",
+            "tracking_verified": True,
+            "verified_at": "2026-10-09T19:35:28Z",
+            "source_observed_at": "2026-10-09T19:35:28Z",
+        },
+        zip_state={
+            "zip_targeting_gate_verified": True,
+            "zip_coverage_activation_verified": True,
+            "source_fresh_for_targeting": True,
+            "source_observed_at": "2026-10-09T19:35:28Z",
+            "verified_freshness": {
+                "source_newest_last_updated": "2026-10-09T19:35:28Z"
+            },
+        },
+    )
+    assert result["operating_hours"]["timezone_interpretation_verified"] is True
+    assert result["gates"]["operating_hours_verified"] is True
+    assert result["gates"]["caller_id_pass_through_verified"] is False
+    assert result["gates"]["buyer_landing_page_approved"] is False
+    assert result["launch_ready"] is False
+    assert result["execution_authority"] == "NONE"
+
+
+def test_even_all_other_green_gates_cannot_override_missing_caller_id_proof():
+    result = readiness(
+        route=routing(True), authority=True, publication=True,
+        tz=timezone_confirmation(), buyer_page=True, caller_id=False,
+    )
+    assert result["blockers"] == ["caller_id_pass_through_verified"]
+    assert result["launch_ready"] is False
+    assert result["call_cta_enabled"] is False
+
+
+def test_even_all_other_green_gates_cannot_override_buyer_page_pending():
+    result = readiness(
+        route=routing(True), authority=True, publication=True,
+        tz=timezone_confirmation(), buyer_page=False, caller_id=True,
+    )
+    assert result["blockers"] == ["buyer_landing_page_approved"]
+    assert result["launch_ready"] is False
+    assert result["organic_traffic_authorized"] is False

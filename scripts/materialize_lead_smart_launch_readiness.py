@@ -44,18 +44,29 @@ def load(path: Path) -> dict:
 
 
 def main() -> int:
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    direct = policy["routing"]["direct_route_requirements"]
     result = build_launch_readiness(
         tracking=load(TRACKING),
         zip_gate=load(ZIP_GATE),
         routing=load(ROUTING),
 
-        operating_hours=lead_smart_confirmed_roofing_policy(
-            source_ref="gmail:1a10c6b2530f2951"
-        )["operating_hours"],
+        operating_hours=policy["operating_hours"],
 
-        # Seth reported CST. Daylight-saving interpretation has not
-        # yet been explicitly confirmed. Never silently assume it.
-        timezone_confirmation=None,
+        # Verified source: Lead Smart Support Agent 9 October 2026.
+        timezone_confirmation=policy["operating_hours_confirmation"],
+
+        # Pass-through is contractually required on Direct, but evidence
+        # of the runtime caller-ANI path has not been independently proved.
+        caller_id_pass_through_verified=(
+            direct["caller_id_pass_through_verified"] is True
+        ),
+
+        buyer_landing_page_approved=(
+            policy["routing"]["landing_review_report"]["approved"] is True
+        ),
 
         landing_publication_authorized=
             False,

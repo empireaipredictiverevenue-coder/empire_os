@@ -227,6 +227,26 @@ def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
             "observed_payout_max": 150,
             "revshare_percentage": None,
             "rtb_enabled": False,
+            # Lead Smart Support Agent, 2026-10-09 19:35 UTC:
+            # The Direct IVR collects the ZIP; no affiliate RTB ping is
+            # needed. Original caller ID is still required on Direct.
+            "direct_route_requirements": {
+                "source_ref": "gmail:1a12229d9d3ffe75",
+                "reported_by": "Lead Smart Support Agent",
+                "direct_ivr_collects_zip": True,
+                "affiliate_zip_ping_required": False,
+                "original_caller_id_pass_through_required": True,
+                "caller_id_pass_through_verified": False,
+                "rtb_enabled": False,
+            },
+            # Buyer confirms the submitted page is still awaiting review.
+            "landing_review_report": {
+                "status": "AWAITING_SETH_REVIEW",
+                "url": "https://empire-ai.co.uk/roofing",
+                "source_ref": "gmail:1a12229d9d3ffe75",
+                "approved": False,
+                "call_button_must_remain_disabled": True,
+            },
             # 2026-10-09: Seth reported everything *should* be active.
             # Buyer assertion is not equivalent to a connected-call proof.
             "buyer_route_report": {
@@ -299,6 +319,16 @@ def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
         "timezone": "CST",
         "monday_friday": "08:00-18:00",
         "saturday_sunday": "10:00-16:00",
+    }
+
+    # Support agent explicitly clarified local Central time observes DST.
+    # Keep statement separate from call-hour evaluation or live authority.
+    policy["operating_hours_confirmation"] = {
+        "buyer_confirmed": True,
+        "reported_by": "Lead Smart Support Agent",
+        "source_ref": "gmail:1a12229d9d3ffe75",
+        "confirmed_at": "2026-10-09T19:35:28Z",
+        "zone_name": "America/Chicago",
     }
 
     policy["evidence"] = {

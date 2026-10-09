@@ -270,3 +270,30 @@ def test_lead_smart_confirmed_policy_records_ringba_offer_approval():
     assert routing["tracking_number"] == "+18883579305"
     assert routing["tracking_verified"] is False
     assert routing["routing_verified"] is False
+
+
+def test_lead_smart_oct9_support_clarifications_preserve_unknowns():
+    from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
+
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    hours = policy["operating_hours_confirmation"]
+    assert hours["source_ref"] == "gmail:1a12229d9d3ffe75"
+    assert hours["reported_by"] == "Lead Smart Support Agent"
+    assert hours["zone_name"] == "America/Chicago"
+    assert hours["confirmed_at"] == "2026-10-09T19:35:28Z"
+
+    direct = policy["routing"]["direct_route_requirements"]
+    assert direct["direct_ivr_collects_zip"] is True
+    assert direct["affiliate_zip_ping_required"] is False
+    assert direct["original_caller_id_pass_through_required"] is True
+    assert direct["caller_id_pass_through_verified"] is False
+    assert direct["rtb_enabled"] is False
+    assert policy["routing"]["routing_verified"] is False
+
+    landing = policy["routing"]["landing_review_report"]
+    assert landing["status"] == "AWAITING_SETH_REVIEW"
+    assert landing["approved"] is False
+    assert landing["call_button_must_remain_disabled"] is True
+    assert policy["review"]["landing_pages_reviewed"] is False
