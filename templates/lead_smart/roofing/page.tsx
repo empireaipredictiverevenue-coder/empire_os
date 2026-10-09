@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import RoofingCoverageCheck from "./coverage-check";
 import { ArrowRight, Check, ChevronRight, Droplets, FileText, House, MapPin, MessageSquareText, Phone, ShieldCheck, Wind } from "lucide-react";
 
 export const metadata: Metadata = {
@@ -149,6 +150,8 @@ export default function RoofingServicePage() {
           </aside>
         </div>
       </section>
+
+      <RoofingCoverageCheck />
 
       <section id="how-it-works" className="border-b border-[#deecf9] bg-white">
         <div className="mx-auto max-w-[1260px] px-5 py-14 sm:px-8 sm:py-16">

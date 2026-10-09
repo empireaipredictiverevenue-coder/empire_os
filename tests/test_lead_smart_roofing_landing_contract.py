@@ -145,3 +145,25 @@ def test_roofing_cta_requires_tracking_zip_routing_and_founder_authority():
         "FOUNDER_LIVE_TRAFFIC_AUTHORIZED;"
         in compact
     )
+
+def test_roofing_page_mounts_read_only_zip_preview():
+    page = source()
+    client = Path(
+        "apps/empire-public-site/src/app/roofing/coverage-check.tsx"
+    ).read_text()
+    assert 'import RoofingCoverageCheck from "./coverage-check";' in page
+    assert "<RoofingCoverageCheck />" in page
+    assert "roofing-coverage.json" in client
+    assert 'cache: "no-store"' in client
+    assert "Date.parse(item.expires_at)" in client
+    assert 'item.call_authorized !== false' in client
+    assert 'item.execution_authority !== "NONE"' in client
+    assert "a listed zip does not guarantee" in client.lower()
+    assert 'href="tel:' not in client
+    assert "No phone number will be enabled by this preview" in client
+
+
+def test_roofing_page_public_and_template_source_remain_identical():
+    canonical = PAGE.read_bytes()
+    site = Path("apps/empire-public-site/src/app/roofing/page.tsx").read_bytes()
+    assert canonical == site
