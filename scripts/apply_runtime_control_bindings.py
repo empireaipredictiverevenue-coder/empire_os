@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from empire_os.detection_fabric import (
@@ -37,27 +39,25 @@ def measured_campaign_outcome_proven():
     )
 
 
-def atomic_write(
-    path,
-    payload,
-):
-
-    tmp = path.with_suffix(
-        ".tmp"
-    )
-
-    tmp.write_text(
-        json.dumps(
-            payload,
-            indent=2,
-            sort_keys=True,
-            default=str,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    tmp.replace(path)
+def atomic_write(path, payload):
+    """Durably publish Fabric output with a unique sibling temp file."""
+    target = Path(path)
+    fd, name = tempfile.mkstemp(prefix=f'.{target.name}.', suffix='.tmp', dir=target.parent)
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as handle:
+            json.dump(payload, handle, indent=2, sort_keys=True, default=str)
+            handle.write('\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(name, target)
+        dirfd = os.open(target.parent, os.O_RDONLY)
+        try:
+            os.fsync(dirfd)
+        finally:
+            os.close(dirfd)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
 
 
 def main():
