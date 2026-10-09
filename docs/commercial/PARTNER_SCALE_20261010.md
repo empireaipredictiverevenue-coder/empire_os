@@ -100,3 +100,54 @@ landing and tracking proof + buyer-approved traffic source + accepted
 controlled pilot plan. **Live revenue proven:** genuine qualified billable
 event plus independently verified payment/settlement and fulfilment.
 Do not mark a company as onboarded because an email reply or code test passed.
+
+
+## 10 October — LeadBank has advanced to onboarding preparation
+
+Exact Gmail response `1a1230003eb39320` in existing thread
+`1a0cfb65e0dd960e`, dated **2026-10-09T23:29:13Z**, was received
+after the three founder-authorized partnership follow-ups. Eleonora explicitly
+stated that she **will send** the agreement and onboarding form and has
+forwarded technical questions to Mahad, then offered a call.
+
+**Document receipt: not yet evidenced.** Technical answers, buyer
+ZIP-level coverage, payable event, approved traffic source, routing method,
+payout, executed agreement and live supply authorisation are all still
+unverified. No call required to accept this pending email handoff.
+
+The existing private
+`runtime/buyer_network_intelligence/gmail_relationship_evidence_latest.json`
+was updated using the exact Gmail message ID and timestamp, retaining all 57
+prior thread records and preserving the original global mailbox capture time.
+The existing registry now categorizes LeadBank as `INBOUND_REVIEW_REQUIRED`.
+No extra outreach was sent after this reply.
+
+### Reusable preactivation packets, never Lead Smart clones
+
+The existing `partner_pilot_readiness_queue` now includes a nested,
+partner-identified `technical_review_packet` for each of LeadBank,
+Validated and Connexis. Each contains:
+
+- Proposed first-party organic supply and review-only landing namespace.
+- Null-valued provider IDs, buyer ZIPs, payout/settlement, eligibility,
+  approved disclosures, signed agreement, tracking number and destination.
+- Explicit booleans blocking caller-ID, routing, landing publication,
+  signing, traffic and revenue.
+- Evidence lineage for a human-reviewed promise, only when its exact
+  current Gmail inbound message matches the stored source ID.
+- An independent `current_next_partner_task`; no field is populated
+  with another partner's number, offer, payout or route.
+
+**LeadBank next:** review Eleonora's agreement and onboarding form on
+receipt; then parse Mahad's actual technical specification. A promised
+document is not a received, reviewed or signed document.
+
+**Validated next:** await Zach's accepted geography and qualification
+terms before preparing a partner-specific landing and route for review.
+
+**Connexis next:** choose a named live UK or US programme from Kieran's
+confirmed buy-box before selecting postcode geography or integration.
+
+Automatic refresh is through the existing buyer-scout-to-registry path;
+no separate queue/timer/service was introduced. Current technical
+review packets grant **zero** of nine launch approvals.

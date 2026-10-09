@@ -423,3 +423,99 @@ def test_pilot_does_not_inherit_verified_tracking_from_lead_smart():
     assert target["activation_gates"]["partner_specific_routing_verified"] is False
     assert target["activation_gates"]["buyer_landing_approved"] is False
     assert target["gate_count_verified"] == 0
+
+
+def test_leadbank_actual_reply_promises_documents_not_approvals():
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_PILOT_SCOPES,
+    )
+    src, queue, qual = sources()
+    partner=PARTNER_PILOT_SCOPES["leadbank"]
+    observed=row(
+        "leadbank", "alliancevs.io", partner["reviewed_thread"],
+        inbound="2026-10-09T23:29:13Z",
+        outbound="2026-10-09T23:25:27Z",
+    )
+    observed["last_inbound_message_id"]="1a1230003eb39320"
+    observed["last_outbound_message_id"]="1a122fc6010e3b5b"
+    src["threads"].append(observed)
+    recent=datetime(2026,10,9,23,45,tzinfo=timezone.utc)
+    report=reconcile(src,queue,qual,now=recent)
+    state=next(x for x in report["partner_pilot_readiness_queue"]
+               if x["entity_key"]=="leadbank")
+    asset=state["technical_review_packet"]
+    assert state["activation_stage"]=="ONBOARDING_DOCUMENTS_AND_TECH_HANDOFF_PROMISED"
+    assert state["agreement_and_handoff_promised_not_received"] is True
+    assert state["current_next_partner_task"]=="REVIEW_AGREEMENT_AND_MAHAD_SPEC_ON_RECEIPT"
+    evidence=asset["buyer_commercial_source_evidence"]
+    assert evidence["inbound_message_id"]=="1a1230003eb39320"
+    assert evidence["agreement_and_onboarding_form_promised"] is True
+    assert evidence["mahad_technical_questions_forwarded"] is True
+    assert evidence["agreement_received"] is False
+    assert evidence["commercial_buybox_received"] is False
+    assert state["gate_count_verified"]==0
+    assert all(v is False for v in state["activation_gates"].values())
+    assert asset["partner_tracking_number"] is None
+    assert asset["routing_provider_selected"] is None
+    assert asset["partner_tracking_campaign_id"] is None
+    assert asset["signed_agreement_evidence"] is None
+    assert asset["traffic_enabled"] is False
+    assert asset["lead_smart_route_or_number_inherited"] is False
+    assert asset["actual_revenue"] is False
+
+
+def test_newer_unread_inbound_cannot_inherit_old_leadbank_promise_as_current():
+    from empire_os.commercial_relationship_registry import PARTNER_PILOT_SCOPES
+    src,queue,qual=sources()
+    record=row(
+        "leadbank", "alliancevs.io",
+        PARTNER_PILOT_SCOPES["leadbank"]["reviewed_thread"],
+        inbound="2026-10-09T23:40:00Z",
+        outbound="2026-10-09T23:25:27Z",
+    )
+    record["last_inbound_message_id"]="fedcba1234567890"
+    src["threads"].append(record)
+    report=reconcile(src,queue,qual,now=datetime(2026,10,9,23,50,tzinfo=timezone.utc))
+    s=next(x for x in report["partner_pilot_readiness_queue"]
+           if x["entity_key"]=="leadbank")
+    assert s["agreement_and_handoff_promised_not_received"] is False
+    assert s["technical_review_packet"]["buyer_commercial_source_evidence"] is None
+    assert s["activation_stage"]=="WAITING_BUYER_BUYBOX"
+
+
+def test_partner_technical_pilot_review_packets_are_buyer_isolated():
+    from empire_os.commercial_relationship_registry import PARTNER_PILOT_SCOPES
+    src,queue,qual=sources()
+    for key,domain in (
+        ("leadbank","alliancevs.io"),
+        ("validated","validatedlg.ai"),
+        ("connexis","connex.is")
+    ):
+        spec=PARTNER_PILOT_SCOPES[key]
+        src["threads"].append(row(
+            key,domain,spec["reviewed_thread"],
+            inbound="2026-10-09T18:00:00Z",
+            outbound="2026-10-09T19:00:00Z",
+        ))
+    report=reconcile(src,queue,qual,now=NOW)
+    packets={r["entity_key"]:r["technical_review_packet"]
+             for r in report["partner_pilot_readiness_queue"]}
+    assert set(packets)=={"leadbank","validated","connexis"}
+    namespaces={p["proposed_landing_review_asset"] for p in packets.values()}
+    assert len(namespaces)==3
+    for key,p in packets.items():
+        assert p["entity_key"]==key
+        assert p["proposed_landing_review_asset"].startswith("review-only://")
+        assert p["company_site_source"]=="https://empire-ai.co.uk"
+        for field in (
+            "external_buyer_program_id","verified_target_zips_or_postcodes",
+            "verified_buyer_hours_timezone","verified_payout_and_settlement",
+            "verified_billable_event","partner_tracking_number",
+            "partner_tracking_campaign_id","routing_destination_or_sip_endpoint",
+        ):
+            assert p[field] is None
+        assert p["traffic_source_accepted_by_buyer"] is False
+        assert p["buyer_commercial_terms_inherited"] is False
+        assert p["contract_signing_authorized"] is False
+        assert p["landing_page_created_or_published"] is False
+        assert p["execution_authority"]=="NONE"

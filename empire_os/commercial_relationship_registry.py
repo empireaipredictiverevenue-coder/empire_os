@@ -76,6 +76,75 @@ PARTNER_PILOT_SCOPES = {
     },
 }
 
+# First-party reviewed incoming email. A promise to send documents does NOT
+# create signed/received terms or convert a buyer into an activated account.
+PARTNER_REVIEWED_RESPONSE_EVIDENCE = {
+    "leadbank": {
+        "inbound_message_id": "1a1230003eb39320",
+        "gmail_thread_id": "1a0cfb65e0dd960e",
+        "observed_at": "2026-10-09T23:29:13Z",
+        "agreement_and_onboarding_form_promised": True,
+        "mahad_technical_questions_forwarded": True,
+        "agreement_received": False,
+        "commercial_buybox_received": False,
+        "buyer_routing_contract_received": False,
+        "buyer_markets_and_payout_verified": False,
+    }
+}
+
+
+def partner_technical_review_packet(
+    key: str, spec: Mapping[str, Any], record: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Proposed, isolated pilot specification; NOT any existing buyer route.
+
+    This preserves the offer/setup questions while remaining null for every
+    field whose value requires explicit buyer or provider evidence.
+    """
+    doc = PARTNER_REVIEWED_RESPONSE_EVIDENCE.get(key)
+    linked = bool(
+        doc and record.get("last_inbound_message_id") == doc["inbound_message_id"]
+        and doc["gmail_thread_id"] in record.get("gmail_thread_ids", [])
+    )
+    evidence = dict(doc) if linked else None
+    return {
+        "schema_version": "empire.partner_technical_review_packet.v1",
+        "entity_key": key,
+        "status": "REVIEW_ONLY",
+        "proposed_campaign_scope_not_accepted": spec["corridor"],
+        "owned_first_party_organic_source_proposed": True,
+        "traffic_source_accepted_by_buyer": False,
+        "company_site_source": "https://empire-ai.co.uk",
+        "external_buyer_program_id": None,
+        "verified_target_zips_or_postcodes": None,
+        "verified_eligible_job_types": None,
+        "verified_buyer_hours_timezone": None,
+        "verified_daily_cap": None,
+        "verified_billable_event": None,
+        "verified_payout_and_settlement": None,
+        "approved_consumer_disclosures": None,
+        "signed_agreement_evidence": None,
+        "proposed_landing_review_asset": (
+            f"review-only://partner-pilot/{key}/landing"
+        ),
+        "landing_page_created_or_published": False,
+        "partner_tracking_number": None,
+        "partner_tracking_campaign_id": None,
+        "routing_provider_selected": None,
+        "routing_destination_or_sip_endpoint": None,
+        "caller_id_passthrough_test_verified": False,
+        "routing_runtime_test_verified": False,
+        "buyer_commercial_source_evidence": evidence,
+        "lead_smart_route_or_number_inherited": False,
+        "buyer_commercial_terms_inherited": False,
+        "traffic_enabled": False,
+        "payment_instructions_created": False,
+        "actual_revenue": False,
+        "contract_signing_authorized": False,
+        "execution_authority": "NONE",
+    }
+
+
 PARTNER_LAUNCH_GATES = (
     "buyer_buybox_received_and_verified",
     "current_target_geography_verified",
@@ -107,9 +176,21 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
         safe_stage = relationship["stage"] not in ("EVIDENCE_HOLD", "DELIVERY_HOLD")
         snapshot_fresh = relationship.get("gmail_snapshot_fresh") is True
         gates = {gate: False for gate in PARTNER_LAUNCH_GATES}
+        review_packet = partner_technical_review_packet(key, spec, relationship)
+        leadbank_docs_promised = (
+            key == "leadbank"
+            and review_packet["buyer_commercial_source_evidence"] is not None
+        )
         rows.append({
             "entity_key": key,
             "company": relationship["company"],
+            "technical_review_packet": review_packet,
+            "agreement_and_handoff_promised_not_received": leadbank_docs_promised,
+            "current_next_partner_task": (
+                "REVIEW_AGREEMENT_AND_MAHAD_SPEC_ON_RECEIPT"
+                if leadbank_docs_promised
+                else "WAIT_CURRENT_BUYBOX_AND_SOURCE_APPROVAL"
+            ),
             "proposed_corridor_not_buyer_approved": spec["corridor"],
             "reviewed_gmail_thread_id": spec["reviewed_thread"],
             "partner_request_evidence_ref": spec["partner_request_ref"],
@@ -124,7 +205,9 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
             "gate_count_verified": 0,
             "gate_count_total": len(gates),
             "activation_stage": (
-                "WAITING_BUYER_BUYBOX"
+                "ONBOARDING_DOCUMENTS_AND_TECH_HANDOFF_PROMISED"
+                if leadbank_docs_promised and snapshot_fresh
+                else "WAITING_BUYER_BUYBOX"
                 if thread_present and reply_present and snapshot_fresh and safe_stage
                 else "REVIEW_RELATIONSHIP_EVIDENCE"
             ),
