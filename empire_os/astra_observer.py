@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import fields
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -78,6 +79,8 @@ def run_observer_cycle(
     dsn: str,
     mode: str = "OBSERVE",
     feedback_limit: int = 100,
+    economic_memory: Mapping[str, Any] | None = None,
+    tenant_id: str | None = None,
     min_samples: int = 20,
     min_conversions: int = 5,
     operational_snapshot_json: str | None = None,
@@ -103,12 +106,20 @@ def run_observer_cycle(
         rows = []
     if not isinstance(rows, list):
         raise AstraObserverError("outcome feedback projection must return a list")
+    if economic_memory is not None:
+        # The legacy projection lacks tenant/outcome IDs and cannot train this scoped path.
+        rows = []
 
     calibration = build_outcome_calibration(
         rows,
         min_samples=max(int(min_samples), 1),
         min_conversions=max(int(min_conversions), 1),
     )
+    learning_feedback = None
+    if economic_memory is not None:
+        from empire_os.astra_feedback import build_verified_learning_feedback
+        learning_feedback = build_verified_learning_feedback(economic_memory, tenant_id=tenant_id,
+                                                             as_of=now_utc or datetime.now(timezone.utc))
     snapshot = parse_operational_snapshot(operational_snapshot_json)
     evidence_payload: dict[str, Any] | None = None
 
@@ -208,9 +219,12 @@ def run_observer_cycle(
     else:
         board = build_operating_board(
             snapshot,
-            negative_margin_orders=calibration.negative_margin_orders,
-            calibration_ready=calibration.calibration_ready,
-            gross_margin_rate=calibration.gross_margin_rate,
+            negative_margin_orders=(learning_feedback["outcome_calibration"]["negative_margin_orders"]
+                                    if learning_feedback is not None else calibration.negative_margin_orders),
+            calibration_ready=(learning_feedback["outcome_calibration"]["calibration_ready"]
+                               if learning_feedback is not None else calibration.calibration_ready),
+            gross_margin_rate=(learning_feedback["outcome_calibration"]["gross_margin_rate"]
+                               if learning_feedback is not None else calibration.gross_margin_rate),
         )
         source = (
             "explicit_operational_snapshot"
@@ -234,6 +248,7 @@ def run_observer_cycle(
         "feedback_limit": limit,
         "feedback_rows": len(rows),
         "calibration": calibration.as_dict(),
+        "verified_learning_feedback": learning_feedback,
         "operational_evidence": evidence_payload,
         "decision": decision,
         "operating_board": operating_board,

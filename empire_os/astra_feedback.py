@@ -126,3 +126,39 @@ def buyer_history_features(row: Mapping[str, Any]) -> dict[str, Any]:
         "buyer_id": row.get("buyer_id"),
         "opportunity_id": row.get("opportunity_id"),
     }
+
+
+def build_verified_learning_feedback(memory, *, tenant_id, as_of):
+    """Consume scoped outcome/calibration memory as shadow review evidence only."""
+    from copy import deepcopy
+    from empire_os.outcome_feedback import validate_verified_feedback
+    from empire_os.predictive_calibration import review_commercial_prediction
+    if not tenant_id or memory.get('tenant_id') != tenant_id:
+        raise ValueError('Astra learning tenant mismatch or missing')
+    rows = list(memory.get('verified_learning_feedback') or [])
+    unique = {}
+    for row in rows:
+        validate_verified_feedback(row, tenant_id=tenant_id, as_of=as_of)
+        ref = row['outcome_ref']
+        if ref in unique and unique[ref] != row:
+            raise ValueError('ambiguous verified learning outcome')
+        unique[ref] = row
+    rows = [unique[key] for key in sorted(unique)]
+    reviews = []
+    for review in memory.get('calibration_evidence') or []:
+        expected = review_commercial_prediction(prediction=review['prediction'], feedback=review['feedback'],
+                                               tenant_id=tenant_id, as_of=as_of)
+        if expected != review or review['outcome_ref'] not in unique:
+            raise ValueError('Astra calibration provenance mismatch')
+        reviews.append(deepcopy(review))
+    summary = build_outcome_calibration(rows).as_dict()
+    for key in ('actual_revenue_cents', 'actual_cost_cents', 'gross_profit_cents'):
+        if any(row.get(key) is None for row in rows):
+            summary[key] = None
+    if summary['actual_revenue_cents'] is None or summary['gross_profit_cents'] is None:
+        summary['gross_margin_rate'] = None
+    return dict(tenant_id=tenant_id, outcome_calibration=summary,
+        verified_feedback=deepcopy(rows), calibration_evidence=reviews,
+        decision_attributions=deepcopy(memory.get('decision_outcome_attributions') or []),
+        learning_stage='SHADOW_LEARNING', shadow_only=True, verified_improvement=False,
+        promoted_learning=False, model_weight_mutation=False, execution_authority='none')

@@ -290,3 +290,31 @@ def decide_with_outcomes(
         gross_margin_rate=gross_margin_rate,
         limit=1,
     ).primary
+
+
+def decide_outbound_account(
+    account,
+    *,
+    history=(),
+    evidence=(),
+    replies=(),
+    suppressions=(),
+    now=None,
+    recommendation=None,
+):
+    """Advisory Astra entry point for the governed Outbound Department.
+
+    Astra may recommend an action, but the deterministic outbound planner
+    remains authoritative and always returns execution_authority=none.
+    """
+    from empire_os.outbound_department import plan_outbound_account
+
+    return plan_outbound_account(
+        account,
+        history=history,
+        evidence=evidence,
+        replies=replies,
+        suppressions=suppressions,
+        now=now,
+        astra_recommendation=recommendation,
+    )

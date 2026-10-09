@@ -122,6 +122,7 @@ class ExecutivePlanStep:
     intelligence_request: Mapping[str, Any]
     success_condition: str
     rationale: str
+    commercial_decision_provenance: Mapping[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -542,6 +543,7 @@ def _step(
     entity_refs: Sequence[str] = (),
     topic_keys: Sequence[str] = (),
     task_type: str = "planning",
+    commercial_decision_provenance: Mapping[str, Any] | None = None,
 ) -> ExecutivePlanStep:
     authority = _authority_for(component)
     founder_gate = authority == "founder_gate"
@@ -581,7 +583,56 @@ def _step(
         ),
         success_condition=success_condition,
         rationale=rationale,
+        commercial_decision_provenance=commercial_decision_provenance,
     )
+
+
+def _commercial_selection_provenance(world, opportunity_key, recommendation=None):
+    """Preserve an originating prediction at delegated selection, never grant authority."""
+    if not opportunity_key:
+        return None
+    recommendation = recommendation or {}
+    originating = [row for row in world.get("quant_review_items") or []
+                   if row.get("opportunity_key") == opportunity_key]
+    if len(originating) > 1:
+        raise ValueError("ambiguous Quant prediction for selected work")
+    if originating:
+        source = originating[0]
+        prediction_ref = source.get("prediction_ref")
+        if recommendation.get("prediction_ref") is not None and recommendation["prediction_ref"] != prediction_ref:
+            raise ValueError("selected work prediction identity mismatch")
+        # Typed immutable state; refresh clocks are deliberately excluded.
+        material = json.dumps({"opportunity_key": opportunity_key,
+                               "decision_packet": source.get("decision_packet")},
+                              sort_keys=True, separators=(",", ":"), allow_nan=False)
+        source_ref = "quant_review_snapshot:" + hashlib.sha256(material.encode()).hexdigest()
+        state_ref = source_ref
+    elif recommendation.get("prediction_ref") is not None:
+        source = recommendation
+        prediction_ref = recommendation["prediction_ref"]
+        source_ref = recommendation.get("source_ref")
+        state_ref = recommendation.get("state_ref")
+        if not source_ref or not state_ref:
+            raise ValueError("selected work immutable recommendation/state refs required")
+    else:
+        return None
+    for key in ("tenant_id", "opportunity_id"):
+        value = source.get(key)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise ValueError("selected work invalid commercial scope")
+        if recommendation.get(key) is not None and recommendation[key] != value:
+            raise ValueError("selected work commercial scope mismatch")
+    return {
+        "opportunity_key": opportunity_key,
+        "tenant_id": source.get("tenant_id"),
+        "opportunity_id": source.get("opportunity_id"),
+        "prediction_ref": prediction_ref,
+        "state_ref": state_ref,
+        "source_ref": source_ref,
+        "shadow_only": True,
+        "selection_authority_ref": None,
+        "execution_authority": "none",
+    }
 
 
 def build_plan(
@@ -658,6 +709,8 @@ def build_plan(
             entity_refs=(entity,) if entity else (),
             topic_keys=(action, "buyer_state"),
             task_type="commercial_decision",
+            commercial_decision_provenance=_commercial_selection_provenance(
+                world, _clean(row.get("opportunity_key")), row),
         )
         if component_authority == "founder_gate":
             step = ExecutivePlanStep(
@@ -726,6 +779,7 @@ def build_plan(
         if signature in seen:
             continue
         seen.add(signature)
+        provenance = _commercial_selection_provenance(world, opportunity_key)
         steps.append(_step(
             goal=next(
                 (
@@ -753,6 +807,7 @@ def build_plan(
             task_type=(
                 "coding" if component == "empire_coder" else "research"
             ),
+            commercial_decision_provenance=provenance,
         ))
         if len(steps) >= max_steps:
             return tuple(steps)

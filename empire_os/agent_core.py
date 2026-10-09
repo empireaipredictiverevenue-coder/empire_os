@@ -47,8 +47,8 @@ class OllamaClient:
 
     def __init__(
         self,
-        base_url: str = "http://10.218.156.211:11434",
-        model: str = "qwen2.5:7b",
+        base_url: str = "http://127.0.0.1:11434",
+        model: str = "qwen2.5-coder:7b",
         timeout: int = 30,
     ):
         self.base_url = base_url.rstrip("/")
