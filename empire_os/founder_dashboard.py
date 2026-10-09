@@ -1155,6 +1155,36 @@ def _data_cloud_runtime(
     }
 
 
+
+def _contractor_revenue_strike_public_summary(raw: dict[str, Any] | None) -> dict[str, Any]:
+    """Safe aggregate only; never expose prospect contacts on overview API."""
+    summary = raw.get("summary") if isinstance(raw, dict) and raw.get("schema") == "empire.revenue_strike.contractor_founder_review.v1" else None
+    if not isinstance(summary, dict) or raw.get("mode") != "OBSERVE" or raw.get("outbound_authorized") is not False:
+        return {
+            "state": "UNVERIFIED",
+            "candidate_count": 0,
+            "identity_corrob_pending_count": 0,
+            "identity_change_hold_count": 0,
+            "verified_buyer_intent_count": 0,
+            "outbound_authorized": False,
+            "execution_authority": "none",
+        }
+    def count(key: str) -> int:
+        value = summary.get(key)
+        return value if type(value) is int and 0 <= value <= 1000 else 0
+    return {
+        "state": "RESEARCH_ONLY",
+        "as_of": raw.get("as_of") if isinstance(raw.get("as_of"), str) else None,
+        "candidate_count": count("historical_contractor_companies"),
+        "identity_corrob_pending_count": count("first_party_site_corroboration_pending"),
+        "identity_change_hold_count": count("identity_change_holds"),
+        "verified_buyer_intent_count": 0,
+        "founder_next_action": "Independent company identity, interest and suppression verification before a pilot proposal",
+        "outbound_authorized": False,
+        "execution_authority": "none",
+    }
+
+
 def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     runtime = repo_root / "runtime"
     loop_path = runtime / "commercial_loop" / "latest.json"
@@ -1267,6 +1297,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "economic_memory": _economic_memory(
             _read_json(economic_memory_path),
             economic_memory_path,
+        ),
+        "contractor_revenue_strike": _contractor_revenue_strike_public_summary(
+            _read_json(runtime / "revenue_strike" / "contractor_founder_review_latest.json"),
         ),
         "commercial_funnel": build_funnel_runtime(repo_root),
         "revenue_pulse": build_revenue_pulse_runtime(repo_root),

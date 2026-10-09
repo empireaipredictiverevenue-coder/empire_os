@@ -2260,3 +2260,47 @@ def test_dashboard_exposes_empire_data_cloud_health(tmp_path):
     assert data_cloud["pitr_verified"] is False
     assert data_cloud["production_cutover_authority"] is False
     assert data_cloud["execution_authority"] == "none"
+
+
+
+def test_existing_founder_overview_projects_only_safe_contractor_counts(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/revenue_strike/contractor_founder_review_latest.json",
+        {
+            "schema": "empire.revenue_strike.contractor_founder_review.v1",
+            "as_of": "2026-10-09", "mode": "OBSERVE",
+            "outbound_authorized": False,
+            "packets": [{"company_name": "SECRET_RESEARCH_COMPANY",
+                         "public_business_contact": "SECRET_RESEARCH_CONTACT"}],
+            "summary": {
+                "historical_contractor_companies": 8,
+                "first_party_site_corroboration_pending": 7,
+                "identity_change_holds": 1,
+                "independently_verified_purchase_intent": 0,
+            },
+        },
+    )
+    result = build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert result["candidate_count"] == 8
+    assert result["identity_change_hold_count"] == 1
+    assert result["verified_buyer_intent_count"] == 0
+    assert result["outbound_authorized"] is False
+    assert "SECRET_RESEARCH_COMPANY" not in str(result)
+    assert "SECRET_RESEARCH_CONTACT" not in str(result)
+
+
+def test_founder_contractor_overview_fails_closed_on_untrusted_authority(tmp_path):
+    root = make_root(tmp_path)
+    write_json(
+        root / "runtime/revenue_strike/contractor_founder_review_latest.json",
+        {
+            "schema": "empire.revenue_strike.contractor_founder_review.v1",
+            "mode": "OBSERVE", "outbound_authorized": True,
+            "summary": {"historical_contractor_companies": 600},
+        },
+    )
+    result = build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert result["state"] == "UNVERIFIED"
+    assert result["candidate_count"] == 0
+    assert result["outbound_authorized"] is False

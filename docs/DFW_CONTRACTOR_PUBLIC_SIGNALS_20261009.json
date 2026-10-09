@@ -1,0 +1,56 @@
+{
+  "schema": "empire.revenue_strike.dfw_public_signals.v1",
+  "observed_at": "2026-10-09",
+  "market": "Dallas-Fort Worth, TX",
+  "notes": "Public-site evidence about business activity, not verified need to buy Empire services, not proof of buyer capacity, licences, sales outcomes, or consent to outreach.",
+  "signals": [
+    {
+      "company_domain": "poweredgetx.com",
+      "kind": "public_sales_hiring",
+      "source_url": "https://poweredgetx.com/careers",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Public sales careers page invites applicants for roofing sales roles.",
+      "verified_from_first_party_site": true
+    },
+    {
+      "company_domain": "poweredgetx.com",
+      "kind": "claimed_capacity",
+      "source_url": "https://poweredgetx.com/",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Website states four crews and approximately 100 roofs/month capacity; this is self-reported and not independently confirmed.",
+      "verified_from_first_party_site": true
+    },
+    {
+      "company_domain": "maxexteriors.com",
+      "kind": "first_party_digital_customer_funnel",
+      "source_url": "https://www.maxexteriors.com/areas/roofing-contractor-fort-worth-tx",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Site describes a customer-facing roof health dashboard and digital proposal flow, indicating an existing funnel rather than a proven marketing gap.",
+      "verified_from_first_party_site": true
+    },
+    {
+      "company_domain": "spcroofs.com",
+      "kind": "public_business_contact",
+      "source_url": "https://www.spcroofs.com/contact",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Site publishes a corporate Euless office and a general contact route.",
+      "verified_from_first_party_site": true
+    },
+    {
+      "company_domain": "180roofing.com",
+      "kind": "public_business_contact",
+      "source_url": "https://180roofing.com/service-areas/fort-worth/",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Site publishes roofing/restoration service and a public business contact route for DFW.",
+      "verified_from_first_party_site": true
+    },
+    {
+      "company_domain": "labaroof.com",
+      "kind": "public_business_contact",
+      "source_url": "https://labaroof.com/contact",
+      "observed_at": "2026-10-09",
+      "observed_fact": "Site publishes an Argyle-based DFW roofing operation and general contact route.",
+      "verified_from_first_party_site": true
+    }
+  ]
+}

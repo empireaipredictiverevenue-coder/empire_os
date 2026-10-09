@@ -1,0 +1,123 @@
+{
+  "schema": "empire.claims_exchange.dfw_site_review_v1",
+  "notes": "Curated public first-party website observations on 2026-10-09; not proof of legal identity, licenses, ownership, insurer appointment, capacity, claims authority or willingness to buy.",
+  "sites": [
+    {
+      "original_domain": "maxexteriors.com",
+      "source_url": "https://www.maxexteriors.com/",
+      "final_url": "https://www.maxexteriors.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "Max Exteriors",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "phone",
+        "value": "469-779-7325"
+      },
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "mastercraftroof.com",
+      "source_url": "https://mastercraftroof.com/",
+      "final_url": "https://cedarcrestroofing.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_redirect_review",
+      "self_described_name": "Cedar Crest Roofing",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": null,
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "poweredgetx.com",
+      "source_url": "https://poweredgetx.com/",
+      "final_url": "https://poweredgetx.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "PowerEdge Roofing & Home Repair",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "email",
+        "value": "info@poweredgetx.com"
+      },
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "riseroofingconstruction.com",
+      "source_url": "https://riseroofingconstruction.com/",
+      "final_url": "https://riseroofingconstruction.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "RISE Roofing & Construction",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "email",
+        "value": "team@riseroofingconstruction.com"
+      },
+      "insurance_claims_wording_observed": false
+    },
+    {
+      "original_domain": "spcroofs.com",
+      "source_url": "https://www.spcroofs.com/",
+      "final_url": "https://www.spcroofs.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "SPC Construction & Roofing",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "phone",
+        "value": "817-684-1088"
+      },
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "180roofing.com",
+      "source_url": "https://180roofing.com/service-areas/fort-worth/",
+      "final_url": "https://180roofing.com/service-areas/fort-worth/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "180 Roofing & Contracting",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "email",
+        "value": "info@180roofing.com"
+      },
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "labaroof.com",
+      "source_url": "https://labaroof.com/contact",
+      "final_url": "https://labaroof.com/contact",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "LABA Roofing",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "email",
+        "value": "info@labaroof.com"
+      },
+      "insurance_claims_wording_observed": true
+    },
+    {
+      "original_domain": "topnotchroofingrr.com",
+      "source_url": "https://www.topnotchroofingrr.com/",
+      "final_url": "https://www.topnotchroofingrr.com/",
+      "observed_at": "2026-10-09",
+      "reviewer": "web_first_party_snapshot_review",
+      "self_described_name": "Top Notch Roofing & Restoration",
+      "roofing_services_observed": true,
+      "dfw_service_area_observed": true,
+      "public_business_contact": {
+        "type": "phone",
+        "value": "469-902-2106"
+      },
+      "insurance_claims_wording_observed": true
+    }
+  ]
+}
