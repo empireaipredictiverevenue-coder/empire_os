@@ -243,51 +243,33 @@ def collect_domain_context(
     return profiles
 
 
+# Known identities must originate in buyer-specific evidence. Previously this
+# walked ALL runtime JSON (~3.5 GB, 30k files), conflating logs/placeholder
+# URLs with buyer identities and making every cycle expensive.
+KNOWN_EVIDENCE_PATHS = (
+    "buyer_acquisition/scout_latest.json",
+    "buyer_acquisition/latest.json",
+    "buyer_acquisition/linkedin_revenue_department_latest.json",
+    "revenue_sprint/lead_buyer_evidence_2026-10-02.json",
+    "truth_quality_control/buyer_input_latest.json",
+)
+
+
 def existing_runtime_domains() -> set[str]:
-
     domains: set[str] = set()
-
     runtime = ROOT / "runtime"
-
-    if not runtime.exists():
-        return domains
-
-    for path in runtime.rglob(
-        "*.json"
-    ):
-
-        if (
-            "buyer_network_intelligence"
-            in str(path)
-        ):
-            continue
-
+    for relative in KNOWN_EVIDENCE_PATHS:
+        path = runtime / relative
         try:
-            text = path.read_text(
-                encoding="utf-8",
-                errors="replace",
-            )
-
-        except Exception:
+            if not path.is_file() or path.stat().st_size > 5_000_000:
+                continue
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
             continue
-
-        for match in DOMAIN_RE.finditer(
-            text
-        ):
-
-            domain = (
-                match.group(1)
-                .lower()
-                .rstrip(".")
-            )
-
-            if domain.startswith(
-                "www."
-            ):
-                domain = domain[4:]
-
-            domains.add(domain)
-
+        for match in DOMAIN_RE.finditer(text):
+            domain = match.group(1).lower().rstrip(".")
+            if accepted_domain(domain):
+                domains.add(domain)
     return domains
 
 
