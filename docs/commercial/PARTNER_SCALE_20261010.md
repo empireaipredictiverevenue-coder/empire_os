@@ -151,3 +151,44 @@ confirmed buy-box before selecting postcode geography or integration.
 Automatic refresh is through the existing buyer-scout-to-registry path;
 no separate queue/timer/service was introduced. Current technical
 review packets grant **zero** of nine launch approvals.
+
+
+## 10 October: actual offline landing previews — same pipeline, no launch
+
+The existing `empire_os/buyer_pilot_assets.py` and
+`scripts/reconcile_buyer_email_relationships.py --write` now generate
+**private, partner-isolated buyer-facing landing previews** as part of the
+current buyer-scout cycle. No web app, production route, SMTP, number
+purchase, new timers or provider mutation was introduced.
+
+- LeadBank: `runtime/buyer_network_intelligence/partner_private_reviews/leadbank/index.html`
+- Validated: `runtime/buyer_network_intelligence/partner_private_reviews/validated/index.html`
+- Connexis: `runtime/buyer_network_intelligence/partner_private_reviews/connexis/index.html`
+
+Each directory is `0700`; HTML, review JSON and approved, founder-owned
+roofing artwork are `0600`. These are local private filesystem previews,
+**not public URLs and not approved partner landing pages**. The original
+`/roofing` production source, tracking number and approved artwork are
+unmodified.
+
+The LeadBank/Validated variants propose roofing installation/replacement,
+using our self-owned roof hero artwork. Connexis remains vertical-neutral
+until Kieran identifies the live programme. The same commercial registry
+provides source hypotheses and nine independent launch gates. A true
+approval or routing/number assignment in a packet deliberately blocks
+generating another *preactivation-only* preview from that state.
+
+**Consumer/marketing limitations:** No forms, calls, `tel:` links, buyer
+logos, price claims, tracking pixels, buyer-specific disclosures or approved
+ZIP claims. Previews contain a disabled CTA and `noindex,nofollow`; private
+filesystem storage, not robots metadata, is the real publication protection.
+
+**Automation:** The existing reconciler produces and verifies the assets
+whenever its current `--write` path runs; the existing 30-minute buyer
+scout already invokes this. Review files are deterministic/idempotent and
+are not evidence of a configured lead route, legal agreement or realised
+revenue. The registry stores the generated private paths and content hash.
+
+**Remaining external gates:** LeadBank's actual agreement/form and Mahad's
+routing instructions; Validated's ZIP buy-box and source sign-off; Connexis'
+one live buyer corridor; plus separate founder approval for all live actions.

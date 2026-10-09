@@ -19,6 +19,10 @@ from empire_os.commercial_relationship_registry import (
 
 from empire_os.commercial_social_intent import build_social_intent_review
 from empire_os.public_intent_affiliation import load_evidence as load_public_affiliation
+from empire_os.buyer_pilot_assets import (
+    build_partner_landing_review, render_partner_landing_review_html,
+)
+from hashlib import sha256
 
 ROOT = Path("/srv/empire_os")
 RELATIVE = Path("runtime/buyer_network_intelligence")
@@ -135,6 +139,87 @@ def atomic_private_write(path: Path, result: dict) -> None:
             os.unlink(temporary)
 
 
+def _atomic_private_bytes(path: Path, payload: bytes) -> None:
+    if (path.is_symlink() or path.parent.is_symlink()
+            or not path.parent.is_dir()):
+        raise RelationshipEvidenceError("unsafe_private_preview_destination")
+    fd, temporary = tempfile.mkstemp(prefix=".buyer_private_preview_", dir=path.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as writer:
+            writer.write(payload)
+            writer.flush()
+            os.fsync(writer.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def materialize_partner_private_reviews(root: Path, registry: dict) -> dict:
+    """Generate bounded static review files; no public web route or telephony.
+
+    The existing buyer scout already calls this reconciler. The preview uses
+    self-owned artwork, never partner-specific trading/approval assumptions.
+    """
+    pilots = registry.get("partner_pilot_readiness_queue")
+    if not isinstance(pilots, list) or len(pilots) > 3:
+        raise RelationshipEvidenceError("unexpected_partner_pilot_count")
+    base = root / RELATIVE / "partner_private_reviews"
+    if base.is_symlink():
+        raise RelationshipEvidenceError("unsafe_private_preview_directory")
+    artifact_data = []
+    for pilot in pilots:
+        review = build_partner_landing_review(pilot)
+        key = review["entity_key"]
+        html = render_partner_landing_review_html(review).encode("utf-8")
+        packet = (json.dumps(review, indent=2, sort_keys=True) + "\n").encode()
+        directory = base / key
+        if directory.is_symlink():
+            raise RelationshipEvidenceError("unsafe_partner_preview_directory")
+        art = review.get("self_owned_illustration")
+        media = None
+        if art is not None:
+            src = root / "templates/lead_smart/roofing/roofing-hero.webp"
+            if src.is_symlink() or not src.is_file() or src.stat().st_size > 2_000_000:
+                raise RelationshipEvidenceError("self_owned_review_media_not_available")
+            media = src.read_bytes()
+            if not media.startswith(b"RIFF") or media[8:12] != b"WEBP":
+                raise RelationshipEvidenceError("unexpected_private_preview_media")
+        artifact_data.append((key, directory, html, packet, media))
+    base.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if base.stat().st_mode & 0o077:
+        raise RelationshipEvidenceError("private_preview_base_permissions_unsafe")
+    out = []
+    for key, directory, html, packet, media in artifact_data:
+        directory.mkdir(mode=0o700, exist_ok=True)
+        if directory.stat().st_mode & 0o077:
+            raise RelationshipEvidenceError("private_preview_partner_permissions_unsafe")
+        _atomic_private_bytes(directory / "index.html", html)
+        _atomic_private_bytes(directory / "review.json", packet)
+        if media is not None:
+            _atomic_private_bytes(directory / "roofing-hero.webp", media)
+        out.append({
+            "entity_key": key,
+            "relative_private_html_path": str(
+                (directory / "index.html").relative_to(root)
+            ),
+            "html_sha256": sha256(html).hexdigest(),
+            "rendered_without_live_links": True,
+            "source_page_or_route_deployed": False,
+            "outbound_authorized": False,
+        })
+    return {
+        "status": "PRIVATE_REVIEW_ONLY",
+        "review_file_count": len(out),
+        "rendered_at_runtime_only": True,
+        "no_public_web_route_created": True,
+        "call_routing_authorized": False,
+        "execution_authority": "NONE",
+        "artifacts": out,
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")
@@ -142,6 +227,9 @@ def main() -> int:
     try:
         result = build()
         if args.write:
+            result["partner_private_landing_reviews"] = (
+                materialize_partner_private_reviews(ROOT, result)
+            )
             atomic_private_write(ROOT / RELATIVE / OUTPUT_NAME, result)
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         # Never leak contact data or source text through errors.
