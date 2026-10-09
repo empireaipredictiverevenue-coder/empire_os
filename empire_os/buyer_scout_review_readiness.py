@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
 import re
+import urllib.parse
 
 
 OUTPUT = Path("runtime/buyer_acquisition/review_readiness_latest.json")
@@ -57,6 +58,116 @@ def reliable_business_name(
     return True
 
 
+_CORPORATE_SUFFIXES = frozenset({
+    "llc", "inc", "incorporated", "ltd", "limited", "corp",
+    "corporation", "pllc", "llp", "lp", "company", "co",
+})
+
+
+def _legal_identity_key(value: Any) -> tuple[str, ...]:
+    tokens = re.findall(r"[a-z0-9]+", str(value or "").casefold())
+    while tokens and tokens[-1] in _CORPORATE_SUFFIXES:
+        tokens.pop()
+    return tuple(tokens)
+
+
+def _official_source_identity_matches(
+    query_evidence: list[Any],
+    site: Mapping[str, Any],
+    business_name: str,
+) -> bool:
+    """Never equate a registry result with an unrelated search-hit domain."""
+    observed_names = list(site.get("site_business_names") or [])
+    if site.get("business_name_source") in {
+        "first_party_site_identity", "canonical_seed_corroborated_by_site",
+    }:
+        observed_names.append(business_name)
+    observed = {_legal_identity_key(name) for name in observed_names}
+    observed.discard(())
+
+    for item in query_evidence:
+        if not isinstance(item, Mapping):
+            continue
+        refs = item.get("source_refs") or []
+        if not isinstance(refs, (list, tuple)) or not any(
+            str(ref).startswith("official:") for ref in refs
+        ):
+            continue
+        # Official licence searches use a leading quoted registered name.
+        # No quoted name or no exact first-party corroboration => blocked.
+        match = re.match(r'^\s*["“]([^"”]+)["”]', str(item.get("query") or ""))
+        if not match or _legal_identity_key(match.group(1)) not in observed:
+            return False
+    return True
+
+
+def quarantine_stale_official_readiness(
+    rows: list[Mapping[str, Any]],
+    *,
+    patch_call: PatchCall | None = None,
+) -> dict[str, Any]:
+    """Quarantine only unpromoted false-ready official registry/site joins.
+
+    This operation never creates prospects, sends messages or changes terms.
+    An empty/ambiguous PATCH response fails closed: no success is claimed.
+    """
+    mismatches: list[str] = []
+    quarantined = 0
+    for raw in rows[:200]:
+        row = dict(raw)
+        if (
+            row.get("review_state") != "review_ready"
+            or row.get("reconciliation_state") != "REVIEW_READY"
+            or row.get("canonical_prospect_id")
+            or row.get("canonical_buyer_id")
+        ):
+            continue
+        if _official_source_identity_matches(
+            row.get("query_evidence") or [],
+            row.get("site_evidence") or {},
+            str(row.get("business_name") or ""),
+        ):
+            continue
+        identifier = str(row.get("id") or "").strip()
+        if not identifier:
+            raise ValueError("stale ready candidate missing identity")
+        mismatches.append(identifier)
+        if patch_call is None:
+            continue
+        query = urllib.parse.urlencode({
+            "id": "eq." + identifier,
+            "review_state": "eq.review_ready",
+            "reconciliation_state": "eq.REVIEW_READY",
+            "canonical_prospect_id": "is.null",
+            "canonical_buyer_id": "is.null",
+        })
+        response = patch_call(
+            "PATCH", "/rest/v1/buyer_scout_candidates?" + query,
+            {
+                "review_state": "discovered",
+                "reconciliation_state": "NEW_EXTERNAL_BUYER_CANDIDATE",
+                "reviewed_at": None,
+                "reviewed_by": None,
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+        if (
+            not isinstance(response, list)
+            or len(response) != 1
+            or response[0].get("id") != identifier
+        ):
+            raise RuntimeError("stale_ready_quarantine_unconfirmed:" + identifier)
+        quarantined += 1
+    return {
+        "review_ready_audited_count": min(len(rows), 200),
+        "mismatch_ids": mismatches,
+        "quarantined_count": quarantined,
+        "database_write_performed": bool(quarantined),
+        "outbound_sent": False,
+        "execution_authority": "holding_repair_only" if patch_call else "none",
+    }
+
+
 def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     if str(row.get("reconciliation_state") or "") != (
         "NEW_EXTERNAL_BUYER_CANDIDATE"
@@ -84,6 +195,8 @@ def review_readiness(row: Mapping[str, Any]) -> tuple[bool, str]:
     query_evidence = row.get("query_evidence")
     if not isinstance(query_evidence, list) or not query_evidence:
         return False, "query_evidence_missing"
+    if not _official_source_identity_matches(query_evidence, site, business_name):
+        return False, "official_registry_identity_mismatch"
 
     site = (
         dict(row.get("site_evidence"))
@@ -176,12 +289,16 @@ def materialize_review_readiness(
             )
             continue
 
+        compare_query = urllib.parse.urlencode({
+            "id": "eq." + candidate_id,
+            "review_state": "eq." + str(row.get("review_state")),
+            "reconciliation_state": "eq.NEW_EXTERNAL_BUYER_CANDIDATE",
+            "canonical_prospect_id": "is.null",
+            "canonical_buyer_id": "is.null",
+        })
         response = patch_call(
             "PATCH",
-            (
-                "/rest/v1/buyer_scout_candidates"
-                f"?id=eq.{candidate_id}"
-            ),
+            "/rest/v1/buyer_scout_candidates?" + compare_query,
             {
                 "review_state": "review_ready",
                 "reconciliation_state": "REVIEW_READY",
@@ -190,6 +307,17 @@ def materialize_review_readiness(
                 "updated_at": datetime.now(timezone.utc).isoformat(),
             },
         ) if patch_call is not None else None
+        if patch_call is not None and (
+            not isinstance(response, list)
+            or len(response) != 1
+            or not isinstance(response[0], Mapping)
+            or str(response[0].get("id") or "") != candidate_id
+            or response[0].get("review_state") != "review_ready"
+        ):
+            blocked["review_transition_unconfirmed"] = (
+                blocked.get("review_transition_unconfirmed", 0) + 1
+            )
+            continue
         ready += 1
         updates.append({
             "candidate_id": candidate_id,

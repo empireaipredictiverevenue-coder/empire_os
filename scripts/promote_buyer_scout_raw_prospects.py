@@ -11,6 +11,21 @@ from empire_os.buyer_scout_raw_prospect_promotion import (
     write_raw_prospect_promotion,
 )
 from empire_os.sb import request_json
+from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+
+
+def _identity_safe_rows(rows):
+    return [
+        row for row in rows
+        if isinstance(row, dict)
+        and _official_source_identity_matches(
+            row.get("query_evidence") or [],
+            row.get("site_evidence") or {},
+            str(row.get("business_name") or ""),
+        )
+    ]
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
@@ -24,7 +39,7 @@ def main() -> int:
         "select": (
             "id,domain,business_name,website,review_state,"
             "reconciliation_state,canonical_buyer_id,"
-            "canonical_prospect_id"
+            "canonical_prospect_id,site_evidence,query_evidence"
         ),
         "review_state": "eq.review_ready",
         "reconciliation_state": "eq.REVIEW_READY",
@@ -36,8 +51,9 @@ def main() -> int:
         "/rest/v1/buyer_scout_candidates?" + query,
     ) or []
 
+    eligible = _identity_safe_rows(rows)
     payload = run_raw_prospect_promotion(
-        [row for row in rows if isinstance(row, dict)],
+        eligible,
         rpc_call=lambda method, path, body: request_json(
             method,
             path,

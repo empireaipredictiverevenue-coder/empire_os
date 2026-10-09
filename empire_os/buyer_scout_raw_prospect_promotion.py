@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
+from empire_os.buyer_scout_review_readiness import _official_source_identity_matches
+
 
 OUTPUT = Path(
     "runtime/buyer_acquisition/raw_prospect_promotion_latest.json"
@@ -29,6 +31,11 @@ def _eligible(
             row.get("review_state") == "review_ready"
             and row.get("reconciliation_state") == "REVIEW_READY"
             and str(row.get("id") or "").strip()
+            and _official_source_identity_matches(
+                row.get("query_evidence") or [],
+                row.get("site_evidence") or {},
+                str(row.get("business_name") or ""),
+            )
         ):
             rows.append(row)
     rows.sort(key=lambda row: str(row.get("id") or ""))
@@ -41,13 +48,38 @@ def run_raw_prospect_promotion(
     rpc_call: RpcCall,
     execute: bool = False,
     actor: str | None = None,
+    authority_mode: str = "founder_governed",
 ) -> dict[str, Any]:
     source_rows = [dict(row) for row in candidates]
     rows = _eligible(source_rows)
     actor_name = str(actor or "").strip()
+    authority = str(
+        authority_mode or ""
+    ).strip()
+
+    if authority not in {
+        "founder_governed",
+        "auto_internal",
+    }:
+        raise ValueError(
+            "unsupported raw-prospect promotion authority"
+        )
 
     if execute and rows and not actor_name:
-        raise ValueError("actor is required for governed execution")
+        raise ValueError(
+            "actor is required for governed execution"
+        )
+
+    if (
+        execute
+        and rows
+        and authority == "auto_internal"
+        and actor_name
+        != "empire_autonomous_commercial_progression"
+    ):
+        raise ValueError(
+            "AUTO_INTERNAL promotion requires ACP actor"
+        )
 
     results: list[dict[str, Any]] = []
     decisions: Counter[str] = Counter()
@@ -101,7 +133,13 @@ def run_raw_prospect_promotion(
         "schema_version": (
             "empire.buyer_scout_raw_prospect_promotion.v1"
         ),
-        "mode": "GOVERNED" if execute else "OBSERVE",
+        "mode": (
+            "AUTO_INTERNAL"
+            if execute and authority == "auto_internal"
+            else "GOVERNED"
+            if execute
+            else "OBSERVE"
+        ),
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "execute_requested": bool(execute),
         "candidate_count": len(source_rows),
@@ -119,10 +157,24 @@ def run_raw_prospect_promotion(
         "terms_accepted": False,
         "payment_action": False,
         "actual_revenue": False,
-        "autonomous_execution": False,
+        "autonomous_execution": bool(
+            execute
+            and authority == "auto_internal"
+        ),
+        "bounded_internal_authority": bool(
+            execute
+            and authority == "auto_internal"
+        ),
         "standing_authority": False,
+        "standing_external_authority": False,
+        "external_execution_authorized": False,
+        "outreach_authorized": False,
+        "call_authorized": False,
         "execution_authority": (
-            "founder_governed_raw_prospect_promotion"
+            "internal_write"
+            if execute
+            and authority == "auto_internal"
+            else "founder_governed_raw_prospect_promotion"
             if execute
             else "none"
         ),

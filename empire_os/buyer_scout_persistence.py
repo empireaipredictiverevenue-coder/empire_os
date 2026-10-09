@@ -110,6 +110,13 @@ def persist_new_external_candidates(
                 )[:10]
                 if isinstance(person, Mapping)
             ],
+            "first_party_buyer_evidence_pages": [
+                dict(page)
+                for page in (
+                    candidate.get("first_party_buyer_evidence_pages") or []
+                )[:5]
+                if isinstance(page, Mapping)
+            ],
             "direct_signal_hits": list(
                 candidate.get("direct_signal_hits") or []
             ),

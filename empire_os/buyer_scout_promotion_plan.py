@@ -1,6 +1,6 @@
 """Prepare fail-closed canonical prospect promotion proposals.
 
-This module does not write to Supabase. It converts REVIEW_READY buyer-scout
+This module does not write directly to canonical EmpireDB. It converts REVIEW_READY buyer-scout
 holding candidates into deterministic raw prospect proposals while explicitly
 keeping buy_signal_score unknown and outreach disabled.
 """
