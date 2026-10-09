@@ -74,6 +74,37 @@ def build(root: Path = ROOT) -> dict:
             "outbound_sent": False,
             "execution_authority": "NONE",
         }
+    # The 15-minute community cycle owns source-learning updates. The
+    # 30-minute buyer scout only reads the same operational history and
+    # surfaces the next safe research task beside founder relationships.
+    try:
+        from empire_os.community_intent_learning import SCHEMA, load_history
+        learning_path = root / "runtime/community_intent/source_learning_latest.json"
+        learning = _read_private(learning_path, limit=2_500_000)
+        episodes = load_history(learning_path)
+        if learning.get("schema_version") != SCHEMA:
+            raise ValueError("unexpected_icp_learning_schema")
+        result["icp_research_learning"] = {
+            "status": "OBSERVE",
+            "schema_version": SCHEMA,
+            "generated_at": learning.get("generated_at"),
+            "episode_count": len(episodes),
+            "next_research_task": learning.get("next_research_task"),
+            "next_research_source": learning.get("next_research_source"),
+            "source_results": learning.get("source_results", [])[:35],
+            "verified_buyer_conversions": 0,
+            "recognized_revenue_cents": None,
+            "outbound_authorized": False,
+            "execution_authority": "NONE",
+        }
+    except (OSError, ValueError, TypeError):
+        result["icp_research_learning"] = {
+            "status": "UNAVAILABLE",
+            "reason": "LEARNING_SNAPSHOT_MISSING_OR_INVALID",
+            "verified_buyer_conversions": 0,
+            "outbound_authorized": False,
+            "execution_authority": "NONE",
+        }
     return result
 
 
@@ -128,6 +159,12 @@ def main() -> int:
             )
         ),
         "social_intent_verified_buyers": 0,
+        "icp_learning_status": (
+            result.get("icp_research_learning", {}).get("status", "UNAVAILABLE")
+        ),
+        "icp_next_research_task": (
+            result.get("icp_research_learning", {}).get("next_research_task")
+        ),
         "outbound_authorized": False, "execution_authority": "NONE",
     }, sort_keys=True))
     return 0

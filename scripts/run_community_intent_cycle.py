@@ -21,9 +21,18 @@ from empire_os.icp_intent_source_atlas import (
     atlas_summary,
 )
 
+from empire_os.community_intent_learning import (
+    load_history as load_source_learning,
+    record_episode,
+    select_source,
+    snapshot as source_learning_snapshot,
+    write_snapshot as write_source_learning,
+)
+
 ROOT = Path("/srv/empire_os")
 OUTPUT = ROOT / "runtime/community_intent/latest.json"
 HISTORY = ROOT / "runtime/community_intent/observations.json"
+LEARNING = ROOT / "runtime/community_intent/source_learning_latest.json"
 
 # Exactly one Reddit and one LinkedIn search are attempted per cycle.
 # The 15-minute timer rotates the search so we do not hammer providers.
@@ -202,9 +211,13 @@ def main() -> int:
     now = datetime.now(timezone.utc)
     slot = int(now.timestamp() // (15 * 60))
 
-    subreddit, reddit_query, reddit_niche, reddit_metro = (
-        REDDIT_ROTATION[slot % len(REDDIT_ROTATION)]
+    previous_learning = load_source_learning(LEARNING)
+    selected_source = select_source(
+        REDDIT_ROTATION, previous_learning, slot=slot
     )
+    subreddit, reddit_query, reddit_niche, reddit_metro = selected_source
+    previous_observations = _load_history()
+    previous_urls = {row.url for row in previous_observations}
     reddit = collect_reddit_rss_intent(
         subreddit=subreddit,
         query=reddit_query,
@@ -223,8 +236,23 @@ def main() -> int:
     )
 
     current = reddit_rows + linkedin_rows
-    existing = _load_history()
-    observations = _merge_window(existing, current, now=now)
+    observations = _merge_window(previous_observations, current, now=now)
+    learned_episodes, learning_episode = record_episode(
+        previous_learning,
+        source=selected_source,
+        slot=slot,
+        retrieval_ok=reddit.get("ok") is True,
+        observations=reddit_rows,
+        previously_observed_urls=previous_urls,
+        now=now,
+    )
+    next_research_source = select_source(
+        REDDIT_ROTATION, learned_episodes, slot=slot+1
+    )
+    learning = source_learning_snapshot(
+        learned_episodes, REDDIT_ROTATION,
+        now=now, latest=learning_episode, next_source=next_research_source,
+    )
 
     HISTORY.parent.mkdir(parents=True, exist_ok=True)
     history_tmp = HISTORY.with_suffix(".json.tmp")
@@ -284,7 +312,21 @@ def main() -> int:
         "execution_authority": "none",
         "outreach_authority": "none",
         "observations": len(observations),
-        "new_observations": len(current),
+        "new_observations": len({
+            row.url for row in current if row.url not in previous_urls
+        }),
+        "fetched_observations": len(current),
+        "icp_research_learning": {
+            "schema_version": learning["schema_version"],
+            "episode_count": learning["episode_count"],
+            "latest_source": learning_episode["source_id"],
+            "new_source_posts": learning_episode["unique_new_posts"],
+            "next_research_task": learning["next_research_task"],
+            "next_research_source": learning["next_research_source"],
+            "learning_scope": learning["learning_scope"],
+            "actual_revenue_learning": learning["actual_revenue_learning"],
+            "execution_authority": "NONE",
+        },
         "high_intent": sum(
             row.intent_band == "high" for row in observations
         ),
@@ -323,6 +365,7 @@ def main() -> int:
         json.dumps(payload, indent=2, sort_keys=True) + "\n"
     )
     tmp.replace(OUTPUT)
+    write_source_learning(LEARNING, learning)
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
 

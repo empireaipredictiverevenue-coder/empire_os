@@ -94,3 +94,42 @@ cached historical results from new evidence.
 **Remaining genuine blockers:** authenticated social-to-business attribution,
 publisher/buyer commercial qualification and fresh LinkedIn public search
 provider availability. All outbound remains founder-gated.
+
+
+## Adaptive execution memory and autonomous next research task
+
+The same existing 15-minute `scripts/run_community_intent_cycle.py`
+implements `empire_os/community_intent_learning.py`. It writes an
+idempotent, bounded operational learning journal at
+`runtime/community_intent/source_learning_latest.json` (maximum 512
+episodes). There is **no new timer, autonomous code rewrite or new CRM**.
+
+Per successful or failed public Reddit research attempt, the journal
+captures: source, collection slot, HTTP/collector outcome, number of truly
+new posts, distinct explicit solution requests, self-reported operator
+problems, seller pitches, and the next safe research action.
+
+Automatic source selection follows three fail-closed rules:
+1. Newly configured public communities are sampled before high-scoring
+   historical communities are exploited.
+2. Historical *research usefulness* and provider reliability adjust
+   priority; a hard maximum-idle rule prevents source starvation.
+3. Retries inside the same 15-minute slot do not create duplicate history,
+   outcomes, conversion labels or billing events.
+
+The existing buyer-commercial registry reads that operational journal and
+displays the next research task alongside the Gmail/intent review. An
+unavailable or malformed journal is explicitly marked unavailable, without
+taking down the warm-buyer conversation workflow.
+
+**Important:** observed Reddit/LinkedIn posts, internal research-task
+completion and heuristic request classifications are *not* verified
+commercial conversions. Cortex and Economic Memory require canonical
+independently verified commercial outcomes (and payment/fulfilment for
+a positive revenue label). The learning journal may reprioritise permitted
+public research only. It cannot self-edit source code, activate outreach,
+sign terms, change product prices or recognise revenue.
+
+Proof standard: tests for idempotence, recency, fail-closed source health,
+balanced exploration, operator-vs-seller relevance, no commercial claims,
+cross-cycle persistence and shared-registry read-back.

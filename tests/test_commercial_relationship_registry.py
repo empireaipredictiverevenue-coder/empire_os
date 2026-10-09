@@ -314,3 +314,41 @@ def test_existing_registry_builder_reads_social_signal_evidence_without_contact_
     assert result["social_intent_review"]["verified_commercial_buying_intent_count"]==0
     assert result["outbound_authorized"] is False
     assert not any(x["outbound_authorized"] for x in result["relationships"])
+
+
+def test_existing_founder_registry_displays_source_learning_without_buying_claim(
+    tmp_path,
+):
+    from empire_os.community_intent_learning import record_episode, snapshot, write_snapshot
+
+    src, queue, qual = sources()
+    src["captured_at"] = datetime.now(timezone.utc).isoformat()
+    base=tmp_path/"runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    for name, data in (
+        ("gmail_relationship_evidence_latest.json",src),
+        ("candidate_queue_latest.json",queue),
+        ("founder_qualification_actions_latest.json",qual),
+    ):
+        path=base/name
+        path.write_text(json.dumps(data))
+        if name.startswith("gmail_"):
+            path.chmod(0o600)
+    research=("RoofingSales","marketing leads","roofing","US")
+    date=datetime.now(timezone.utc)
+    episodes,entry=record_episode([],source=research,slot=222,
+        retrieval_ok=True,observations=[],previously_observed_urls=set(),
+        now=date)
+    proof=snapshot(episodes,[research],now=date,latest=entry,
+                   next_source=research)
+    learning=tmp_path/"runtime/community_intent/source_learning_latest.json"
+    learning.parent.mkdir(parents=True)
+    write_snapshot(learning,proof)
+    enriched=build(tmp_path)
+    record=enriched["icp_research_learning"]
+    assert record["status"]=="OBSERVE"
+    assert record["episode_count"]==1
+    assert record["next_research_task"]=="RESEARCH_NEXT_ICP_SOURCE"
+    assert record["verified_buyer_conversions"]==0
+    assert record["recognized_revenue_cents"] is None
+    assert enriched["outbound_authorized"] is False
