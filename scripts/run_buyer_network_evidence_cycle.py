@@ -21,7 +21,11 @@ OUT = ROOT / "runtime/buyer_network_intelligence/research_cycle_latest.json"
 # The existing canonical buyer pipeline owns candidate classification,
 # identity and founder shortlist refreshes. Do not duplicate those writers:
 # doing so briefly exposed unfiltered intermediate queues (881 vs 143).
-STEPS = ("probe_buyer_network_direct_sites.py",)
+STEPS = (
+    "probe_buyer_network_direct_sites.py",
+    # Read-only snapshots -> 0600 founder review actions; no outreach.
+    "build_buyer_qualification_actions.py",
+)
 
 
 
@@ -47,6 +51,8 @@ def run(
         args = [sys.executable, str(root / "scripts" / name)]
         if plan_only:
             args.append("--plan-only")
+        elif name == "build_buyer_qualification_actions.py":
+            args.append("--write")
         try:
             completed = call(
                 args, cwd=root, env=env, text=True, capture_output=True,
@@ -112,6 +118,10 @@ def run(
         "canonical_queue_owner": "existing_buyer_intelligence_pipeline",
         "traffic_activation": False,
         "founder_review_automatic_approval": False,
+        "founder_qualification_snapshot_refresh_attempted": (
+            not plan_only
+            and any(r["script"] == "build_buyer_qualification_actions.py" for r in results)
+        ),
         "execution_authority": "NONE",
     }
     if not plan_only:
