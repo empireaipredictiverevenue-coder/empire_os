@@ -6,6 +6,7 @@ outbound, writes CRM, sells a lead, accepts claims fees or starts contracts.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from copy import deepcopy
 from datetime import date
 from hashlib import sha256
 import json
@@ -14,6 +15,7 @@ from urllib.parse import urlparse
 from empire_os.claims_exchange.adapters import normalized_domain
 from empire_os.claims_exchange.controls import parse_date, reject_sensitive_input, safe_https_source
 from empire_os.claims_exchange.dossier import build_dossiers
+from empire_os.storm_contractor_independent_evidence import review_independent_evidence
 
 SCHEMA = "empire.revenue_strike.contractor_founder_review.v1"
 SOURCE_SCHEMA = "empire.revenue_strike.dfw_public_signals.v1"
@@ -36,10 +38,17 @@ def _safe_signal_source(url: object, expected_domain: str) -> bool:
 
 
 def build_contractor_review(cohort: Mapping, sites: Mapping,
-                            signals: Mapping, *, as_of: date) -> dict:
+                            signals: Mapping, *, as_of: date,
+                            independent_evidence: Mapping | None = None) -> dict:
     for source in (cohort, sites, signals):
         reject_sensitive_input(source)
     dossiers = build_dossiers(cohort, sites, as_of=as_of)
+    independent = review_independent_evidence(
+        independent_evidence,
+        cohort_names={row["original_domain"]: row["company_name"]
+                      for row in dossiers["dossiers"]},
+        as_of=as_of,
+    )
     if (not isinstance(signals, Mapping)
             or signals.get("schema") != SOURCE_SCHEMA
             or signals.get("market") != "Dallas-Fort Worth, TX"
@@ -89,11 +98,20 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         signals_for_company = sorted(by_domain.get(domain, []), key=lambda x: (x["kind"], x["source_url"]))
         kinds = {x["kind"] for x in signals_for_company}
         stage = r["qualification_stage"]
+        independent_record = independent.get(domain)
+        independent_state = (
+            independent_record["state"] if independent_record
+            else "NO_THIRD_PARTY_PROFILE_LINK"
+        )
+        if independent_state == "INDEPENDENT_SOURCE_IDENTITY_CONFLICT_HOLD" and stage != "IDENTITY_CHANGE_HOLD":
+            stage = "IDENTITY_EVIDENCE_CONFLICT_HOLD"
         site_ready = stage == "CORROBORATION_PENDING"
         score = (30 if site_ready else 0) + (8 if r["public_contact_source_observed"] else 0)
         if site_ready:
             score += sum(SCORE[k] for k in kinds)
-        score = min(score, 75)  # strictly below qualification threshold
+            if independent_state == "THIRD_PARTY_PROFILE_DOMAIN_MATCH":
+                score += 24  # prioritise a stronger business-identity research route
+        score = min(score, 75) if site_ready else 0  # no promotion under identity holds
         tasks = list(r["research_tasks"])
         tasks += [
             "VERIFY_REGISTERED_COMPANY_AND_DOMAIN_CONTROL",
@@ -106,6 +124,10 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             tasks.append("QUALIFY_SALES_HIRING_RELEVANCE_NO_INTENT_INFERRED")
         if stage == "IDENTITY_CHANGE_HOLD":
             tasks.append("RESOLVE_OR_REJECT_REDIRECT_IDENTITY_NO_AUTO_MERGE")
+        if stage == "IDENTITY_EVIDENCE_CONFLICT_HOLD":
+            tasks.append("RESOLVE_THIRD_PARTY_IDENTITY_CONFLICT_DO_NOT_CONTACT")
+        if independent_state == "THIRD_PARTY_PROFILE_DOMAIN_MATCH":
+            tasks.append("CONFIRM_OFFICIAL_REGISTRATION_AND_DOMAIN_CONTROL_BEFORE_OUTREACH")
         tasks = sorted(set(tasks))
         packets.append({
             "entity_id": r["entity_id"],
@@ -115,6 +137,13 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
             "role": "potential_b2b_contractor_customer",
             "origin": "existing_revenue_strike_dfw_cohort",
             "qualification": stage,
+            "independent_business_research": independent_record or {
+                "state": "NO_THIRD_PARTY_PROFILE_LINK",
+                "state_registry_identity_verified": False,
+                "domain_ownership_verified": False,
+                "marketing_buyer_intent_verified": False,
+                "outbound_authorized": False,
+            },
             "research_priority_score": score,
             "source_evidence": signals_for_company,
             "site_review": r["site_evidence"],
@@ -147,6 +176,14 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         "historical_contractor_companies": len(packets),
         "first_party_site_corroboration_pending": sum(p["qualification"]=="CORROBORATION_PENDING" for p in packets),
         "identity_change_holds": sum(p["qualification"]=="IDENTITY_CHANGE_HOLD" for p in packets),
+        "third_party_identity_conflict_holds": sum(p["qualification"]=="IDENTITY_EVIDENCE_CONFLICT_HOLD" for p in packets),
+        "third_party_directory_domain_matches": sum(
+            p["independent_business_research"]["state"] == "THIRD_PARTY_PROFILE_DOMAIN_MATCH"
+            for p in packets),
+        "no_third_party_profile_link": sum(
+            p["independent_business_research"]["state"] == "NO_THIRD_PARTY_PROFILE_LINK"
+            for p in packets),
+        "verified_company_legal_registrations": 0,
         "independently_verified_purchase_intent": 0,
         "approved_outbound_count": 0,
         "verified_payments": 0,
@@ -175,3 +212,68 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
         "contract_sent": False,
         "execution_authority": "none",
     }
+
+
+
+def attach_existing_canonical_contact_history(
+    review: Mapping, *, prior_contact_domains: set[str],
+    suppressed_emails: set[str],
+) -> dict:
+    """Re-use EmpireOS's existing read-only buyer-contact-history guard.
+
+    A domain-only comparison can find a hold, but CANNOT clear an actual
+    recipient. Never use this as consent, an outbound eligibility result or
+    an action gate.
+    """
+    if review.get("schema") != SCHEMA or review.get("outbound_authorized") is not False:
+        raise ValueError("CONTACT_HISTORY_REQUIRES_GOVERNED_REVIEW")
+    if not isinstance(prior_contact_domains, set) or not isinstance(suppressed_emails, set):
+        raise ValueError("UNVERIFIED_CANONICAL_HISTORY_INPUT")
+    for group in (prior_contact_domains, suppressed_emails):
+        if len(group) > 100000 or any(not isinstance(x, str) for x in group):
+            raise ValueError("CANONICAL_HISTORY_INPUT_UNBOUNDED")
+    from empire_os.claims_exchange.adapters import normalized_domain
+    prior = {normalized_domain(d) for d in prior_contact_domains if normalized_domain(d)}
+    suppressed = {
+        normalized_domain(s.partition("@")[2]) for s in suppressed_emails
+        if "@" in s and normalized_domain(s.partition("@")[2])
+    }
+    checked = deepcopy(review)
+    previous = suppressed_count = 0
+    for p in checked["packets"]:
+        domain = p["company_domain"]
+        has_prior = domain in prior
+        has_suppression = domain in suppressed
+        previous += int(has_prior)
+        suppressed_count += int(has_suppression)
+        p["domain_contact_history_checked"] = True
+        p["previous_contact_domain_hold"] = has_prior
+        p["domain_has_suppressed_contact"] = has_suppression
+        p["recipient_level_suppression_verified"] = False
+        p["suppression_verified_clear"] = False
+        p["canonical_contact_history_checked"] = False
+        p["founder_review_ready"] = False
+        p["outbound_authorized"] = False
+        p["contact_history_state"] = (
+            "SUPPRESSED_DOMAIN_CONTACT_HOLD" if has_suppression
+            else "PRIOR_OUTBOUND_DOMAIN_REVIEW_HOLD" if has_prior
+            else "NO_DOMAIN_MATCH_RECIPIENT_STILL_UNVERIFIED"
+        )
+        tasks = set(p["review_tasks"])
+        tasks.add("VERIFY_EXACT_CONTACT_AND_CONSENT_BEFORE_ANY_SEND")
+        if has_prior:
+            tasks.add("RECONCILE_PREVIOUS_CONTACT_NO_DUPLICATE_OUTREACH")
+        if has_suppression:
+            tasks.add("DO_NOT_CONTACT_SUPPRESSION_REQUIRES_MANUAL_REVIEW")
+        p["review_tasks"] = sorted(tasks)
+    checked["summary"]["prior_outbound_domain_review_holds"] = previous
+    checked["summary"]["suppressed_domain_contact_holds"] = suppressed_count
+    checked["canonical_domain_history_observed"] = True
+    checked["individual_recipient_suppression_cleared"] = False
+    checked["outbound_authorized"] = False
+    checked["execution_authority"] = "none"
+    checked["review_digest"] = sha256(json.dumps({
+        "as_of": checked["as_of"], "summary": checked["summary"],
+        "packets": checked["packets"],
+    }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+    return checked

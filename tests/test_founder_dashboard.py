@@ -2304,3 +2304,29 @@ def test_founder_contractor_overview_fails_closed_on_untrusted_authority(tmp_pat
     assert result["state"] == "UNVERIFIED"
     assert result["candidate_count"] == 0
     assert result["outbound_authorized"] is False
+
+
+
+def test_founder_overview_exposes_directory_matches_and_identity_conflicts_only(tmp_path):
+    root=make_root(tmp_path)
+    write_json(root / "runtime/revenue_strike/contractor_founder_review_latest.json", {
+        "schema": "empire.revenue_strike.contractor_founder_review.v1",
+        "as_of": "2026-10-09", "mode": "OBSERVE",
+        "outbound_authorized": False,
+        "packets": [{"company_name": "CONFIDENTIAL_B2B_RESEARCH",
+                     "contact": "private@research.example"}],
+        "summary": {
+            "historical_contractor_companies": 8,
+            "first_party_site_corroboration_pending": 5,
+            "identity_change_holds": 1,
+            "third_party_directory_domain_matches": 3,
+            "third_party_identity_conflict_holds": 2,
+        },
+    })
+    result=build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert result["third_party_domain_match_count"]==3
+    assert result["third_party_identity_conflict_hold_count"]==2
+    assert result["verified_company_registration_count"]==0
+    assert result["verified_buyer_intent_count"]==0
+    assert result["outbound_authorized"] is False
+    assert "private@" not in str(result)

@@ -49,3 +49,51 @@ PYTHONPATH=. ./.venv/bin/python scripts/refresh_contractor_revenue_review.py --a
 ```
 
 No agents sent outbound, accessed private claims, signed documents, started services, changed DB rows, incurred paid traffic or issued a fee in this implementation.
+
+
+## Third-party identity and canonical contact-history upgrade — 2026-10-09
+
+The same existing Revenue Strike review now ingests the manually reviewed
+`docs/DFW_CONTRACTOR_INDEPENDENT_EVIDENCE_20261009.json` with
+`empire_os/storm_contractor_independent_evidence.py` as a pure corroboration
+overlay. Direct BBB profile website links validate **directory website/name
+matching**, not state incorporation, corporate-control, buyer intent or
+consent to outreach:
+
+- Max Exteriors: https://www.bbb.org/us/tx/desoto/profile/roofing-contractors/max-exteriors-llc-0875-91051523
+- 180 Roofing: https://www.bbb.org/us/tx/mesquite/profile/roofing-contractors/180-roofing-contracting-llc-0875-90938685
+- SPC Construction & Roofing: https://www.bbb.org/us/tx/euless/profile/roofing-contractors/spc-construction-roofing-inc-0825-155405122
+
+**Holds:** RISE similar-name BBB profile links a different domain,
+https://www.bbb.org/us/tx/southlake/profile/roof-structure/rise-roofing-construction-0825-1000215721 ;
+Top Notch same-name BBB profile shows business age/rating inconsistent with
+the reviewed prospect website, and does not establish the same domain,
+https://www.bbb.org/us/tx/wylie/profile/residential-roofing/top-notch-roofing-restoration-0875-91348579 .
+Mastercraft historical domain already has a different-company redirect hold.
+Do not infer that any conflicting company is the same legal entity.
+
+**Existing canonical prior contact reader reused** from
+`scripts/materialize_company_routed_buyer_review.py` via optional
+`--check-contact-history` in the existing
+`scripts/refresh_contractor_revenue_review.py`. This is an opt-in, bounded
+**read-only** EmpireDB check and requires the existing operational
+`EMPIREDB_DSN`. Failed checks do not overwrite the prior review snapshot.
+A negative company-domain match NEVER clears individual recipient suppression
+or confers authority to email anyone. No separate database, service, timer
+or CRM has been created.
+
+Run with the existing authorised read-only EmpireDB service environment:
+
+```sh
+PYTHONPATH=. ./.venv/bin/python scripts/refresh_contractor_revenue_review.py --as-of 2026-10-09 --check-contact-history
+```
+
+A separate explicit `--write` is required to persist the OBSERVE-only
+review snapshot. If the DB role/env is unavailable, this fails closed
+instead of claiming that suppression has passed.
+
+**Ranking is for research time allocation only.** $1,500 pilot fee and 14
+days remain hypothetical. Active commercial need, confirmed person-bound
+contact route, exact recipient suppression, founder send approval,
+Documenso contract issuance, valid USDT BSC payment and fulfilled outcomes
+all remain unverified.
