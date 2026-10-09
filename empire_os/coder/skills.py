@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from .policy import resolve_workspace
+from empire_os.skillforge_coder_guard import trusted_coder_skill
 
 
 _CURATED_SKILLS = {
@@ -71,35 +72,38 @@ class SkillLoader:
         *,
         max_chars: int = 20_000,
     ) -> SkillDocument:
-        catalog = {
-            **_CURATED_SKILLS,
-            **_native_skill_paths(),
-        }
+        """Return complete, ACTIVE, digest-approved Empire-owned instructions.
+
+        Knowledge Garden ACTIVE is a necessary but not sufficient trust gate.
+        Legacy curated third-party skill documents are no longer prompt-loadable.
+        """
+        catalog = {**_CURATED_SKILLS, **_native_skill_paths()}
+        if isinstance(name, str) and name.startswith('empire-'):
+            catalog[name] = f'empire_os/skills_library/skills/{name}/SKILL.md'
         try:
             relative = catalog[name]
-        except KeyError as exc:
-            raise KeyError(
-                f"unknown governed Empire Coder skill: {name}"
-            ) from exc
+        except (KeyError, TypeError) as exc:
+            raise KeyError(f'unknown governed Empire Coder skill: {name}') from exc
         if relative not in self.active_knowledge_paths:
-            raise PermissionError(
-                f"skill is not ACTIVE in knowledge garden: {relative}"
-            )
-        path = self.workspace / relative
-        content = path.read_text(
-            encoding="utf-8", errors="replace"
-        )[:max_chars]
-        return SkillDocument(name, relative, content)
+            raise PermissionError(f'skill is not ACTIVE in knowledge garden: {relative}')
+        loaded = trusted_coder_skill(self.workspace, relative)
+        if loaded is None:
+            raise PermissionError('Empire SkillForge approved digest required')
+        if type(max_chars) is not int or max_chars < len(loaded['body']) or len(loaded['body']) > 12_000:
+            raise PermissionError('bounded complete skill text required')
+        return SkillDocument(name, relative, loaded['body'])
 
     def available(self) -> tuple[str, ...]:
-        catalog = {
-            **_CURATED_SKILLS,
-            **_native_skill_paths(),
-        }
+        catalog = {**_CURATED_SKILLS, **_native_skill_paths()}
+        for relative in sorted(self.active_knowledge_paths):
+            parts = Path(relative).parts
+            if (len(parts) == 5 and parts[:3] == ('empire_os','skills_library','skills')
+                and parts[-1] == 'SKILL.md' and parts[3].startswith('empire-')):
+                catalog[parts[3]] = relative
         return tuple(
-            name
-            for name, path in sorted(catalog.items())
-            if path in self.active_knowledge_paths
+            name for name, relative in sorted(catalog.items())
+            if relative in self.active_knowledge_paths
+            and trusted_coder_skill(self.workspace, relative) is not None
         )
 
     def persona(self) -> str:

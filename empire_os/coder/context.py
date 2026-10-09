@@ -52,10 +52,11 @@ class ContextBuilder:
         self.active_knowledge_paths = set(str(path) for path in paths)
 
     def _knowledge_allowed(self, path: str) -> bool:
-        guarded = (
-            path.startswith("empire_os/data/prompts/")
-            or path.startswith("empire_os/skills_library/")
-        )
+        # Skill files are instructions, never ordinary search excerpts.
+        # The dedicated Coder loader validates full content, trust, and digest.
+        if path.startswith("empire_os/skills_library/"):
+            return False
+        guarded = path.startswith("empire_os/data/prompts/")
         if not guarded:
             return True
         return path in self.active_knowledge_paths

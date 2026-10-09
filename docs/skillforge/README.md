@@ -46,3 +46,25 @@ Preflight exits nonzero until explicit skills are approved. Static evaluation ch
 6. Load only approved skills with the bounded loader; no skill can grant additional execution or commercial authority.
 
 **Known gaps:** SkillForge does not yet automatically run independent quality evaluations, infer genuinely superior procedures, or promote proposed skills; legacy agent modules may still use their older third-party skills loader and need a separate audit before consolidation. Hashes are pseudonymous identifiers, not proof of anonymization or independent cryptographic attestation. Do not copy confidential information into a proposed skill.
+
+## Stage 2 — offline quality evaluation and controlled promotion
+
+SkillForge V2 adds three distinct review instruments. None can grant commercial authority or trust by itself:
+
+- `scripts/skillforge_benchmark.py --suite /path/to/holdout.json` scores paired baseline/candidate **already-produced** decision JSON against supplied expected labels. It requires the v1 suite schema, evidence-hash identifiers, bounded unique holdout cases, negative cases, and prohibits claims that live outbound/payments/writes occurred. It reports exact-match accuracy, wins/regressions, negative-case failures and a strict **numeric-only** gate. The labels and evidence hashes are *supplied assertions*, not independently authenticated; the report always says independent quality is unverified.
+- `scripts/skillforge_promotion_preflight.py --skill-name empire-reply-triage [--suite /path/to/holdout.json]` binds the evaluated result to the **exact skill content digest**, then lists outstanding independent evaluation, reproducibility, licence, privacy, prompt-injection and founder approvals. It never edits `config/skill_trust_registry.json` and never claims a skill promoted.
+- `scripts/skillforge_local_smoke.py` optionally tests a candidate's influence on the local model at the **fixed loopback URL** `127.0.0.1:11435` using two built-in synthetic examples. No agent tools, DB, emails, payments, browser, external inference provider, or real customer data are available. This is a wiring smoke test only (2 cases), not a verified holdout benchmark. Outputs include no raw source examples and cannot qualify for promotion.
+
+The review sequence for a real skill is: collect independent case labels with provenance → run bounded agent evaluation on an isolated model/workspace → compare baseline and candidate accuracy including negative cases → validate evidence and outcomes against source truth → confirm stable operational behaviour and licensing/tenant safety → explicit founder approval for the exact digest → reviewed source-controlled update of the trust registry. A manually set `status=approved` is not cryptographic proof of founder intent; authoritative code review and deployment gates must remain separate.
+
+## Stage 2 — legacy loader consolidation
+
+The old `empire_os.skills_library` API now returns only approved, digest-pinned Empire-owned `SKILL.md` content. Unknown roles and unapproved, changed, missing, escaped or overlong skills return no instructions. No Anthropic brand/presentation/document pack is automatically injected.
+
+`SyntheticAgent` no longer loads its historic unreviewed `skills.jsonl` entries as prompt skills, nor reads arbitrary third-party `SKILL.md` files as persona SOULs. Historic success notes remain *untrusted activity data*; these are not automatically translated into verified reusable procedures.
+
+The Empire Coder Knowledge Garden still records candidate knowledge status, but ACTIVE/task promotion alone is **not** SkillForge instruction approval. `ContextBuilder` will not inject arbitrary library skill excerpts into context. The explicit Coder `SkillLoader` requires both ACTIVE knowledge state and a matching Empire SkillForge trust digest; only complete, bounded instructions may be retrieved.
+
+The legacy email expert no longer reads `/tmp/repo_skills`; it drafts from the approved Empire commercial email pack if/when one is reviewed. Its remote compliance-check outage fallback is fail-closed. Neither the email skill nor this change gives outbound send authority.
+
+**Remaining scoped work:** coder graph still contains legacy skill names as selection metadata (they cannot load through the guarded path); some specialized agents operate dedicated open-source research engines separately from skills (for example the last30days engine). Those are separate integrations requiring their own execution, licence and data boundary audit. No third-party repo or skill library was deleted or silently approved.

@@ -2,8 +2,8 @@
 Empire OS v3 - Email Expert Agent
 ==================================
 
-Robust, safe, CAN-SPAM/GDPR/TCPA-compliant, trustworthy
-outbound-emails service.
+Legacy email composition helper. Compliance and outbound permission are
+independent operational gates, not guaranteed by generated copy.
 
 Consults:
   - skills-library at /tmp/repo_skills/skills/:
@@ -28,14 +28,14 @@ from pathlib import Path
 
 sys.path.insert(0, "/root/empire_os")
 import requests
+from empire_os.skills_library import load_skills_for_role, available_skills
 
 HUB      = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 OLLAMA   = os.environ.get("OLLAMA_URL", "http://10.218.156.211:11434")
 LLM_MODEL= os.environ.get("LLM_MODEL", "qwen2.5:7b")
 FB       = Path("/root/feedback")
 LOG      = FB / "email_expert.jsonl"
-SKILLS_DIR = Path("/tmp/repo_skills/skills")
-SOUL_DIR  = Path("/root/empire_os/empire_os/agents/souls")
+SOUL_DIR  = Path(__file__).resolve().parent / "souls"
 INTERVAL = int(os.environ.get("INTERVAL_SEC", "30"))
 
 
@@ -50,11 +50,11 @@ def log(level, msg, **fields):
 
 
 def load_skill_text(name: str) -> str:
-    """Read a skill SKILL.md if it's cached locally."""
-    p = SKILLS_DIR / name / "SKILL.md"
-    if p.exists():
-        return p.read_text()[:2000]
-    return ""
+    """Only digest-approved Empire commercial-copy guidance can enter prompts."""
+    if name != 'empire-commercial-email-copy':
+        return ''
+    return next((row['body'] for row in load_skills_for_role('email')
+                 if row['name'] == name), '')
 
 
 UNSUBSCRIBE_MARKER = "\n\n---\nYou received this because of your prior inquiry. Unsubscribe: https://empire-ai.co.uk/unsub/{tenant_id}\n"
@@ -73,12 +73,11 @@ PROMPT_template = (
 
 
 def compose(brief: dict) -> dict:
-    skill_text = (load_skill_text("brand-guidelines") + "\n" +
-                  load_skill_text("internal-comms"))[:1500]
+    skill_text = load_skill_text('empire-commercial-email-copy')
     compliance_text = ""
     p = SOUL_DIR / "legal_compliance_SOUL.md"
-    if p.exists():
-        compliance_text = p.read_text()[:800]
+    if p.is_file() and not p.is_symlink() and p.resolve().is_relative_to(SOUL_DIR.resolve()) and p.stat().st_size <= 24000:
+        compliance_text = p.read_text(encoding='utf-8')[:1200]
     prompt = PROMPT_template.format(
         skill_excerpt=skill_text,
         compliance_excerpt=compliance_text,
@@ -114,7 +113,7 @@ def compliance_check(brief: dict, body: str) -> dict:
                                 "intent":   "marketing"},
                           timeout=8).json()
     except Exception:
-        r = {"ok": True, "issues": ["compliance_remote_unavailable"]}
+        r = {"ok": False, "issues": ["compliance_remote_unavailable"]}
     body_lc = body.lower()
     if "unsubscribe" not in body_lc:
         r.setdefault("issues", []).append("missing_unsubscribe_link")
@@ -129,11 +128,7 @@ def cycle():
     # Heartbeat - the hub calls this agent via /v1/email/compose. We
     # don't generate proactively; we just confirm readiness + skills
     # available.
-    ready_skills = []
-    if SKILLS_DIR.exists():
-        for d in SKILLS_DIR.iterdir():
-            if (d / "SKILL.md").exists():
-                ready_skills.append(d.name)
+    ready_skills = available_skills()
     log("INFO", "agent_ready",
         skills=ready_skills,
         legal_compliance_loaded=(SOUL_DIR / "legal_compliance_SOUL.md").exists(),

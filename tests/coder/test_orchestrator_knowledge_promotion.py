@@ -58,7 +58,10 @@ def test_task_promotion_changes_only_that_tasks_context(tmp_path):
         first.id,
         terms=["UNIQUE_TASK_FRONTEND_GUIDANCE"],
     )
-    assert path in {
+    # Knowledge Garden promotion is still recorded for traceability,
+    # but can no longer inject third-party SKILL.md instructions into prompts.
+    # SkillForge requires a separate pinned digest and dedicated loader.
+    assert path not in {
         doc.path for doc in promoted.documents
     }
 

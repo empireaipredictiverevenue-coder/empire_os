@@ -21,6 +21,7 @@ TASK_SKILLS = {
     'skill_authoring': ('innovator', ('empire-skill-authoring',)),
     'product_catalog_verification': ('product', ('empire-product-catalog-verification',)),
     'fulfilment_verification': ('operations_fulfilment', ('empire-fulfilment-verification',)),
+    'email_drafting': ('email', ('empire-commercial-email-copy',)),
 }
 
 
@@ -55,6 +56,7 @@ def discover_task_skills(task: str, *, root: Path = SKILLS_ROOT) -> dict:
 DEPARTMENT_TASKS = {
     'sales': 'commercial_reply', 'closer': 'commercial_reply',
     'sales_revenue': 'commercial_reply',
+    'email': 'email_drafting', 'copywriting': 'email_drafting',
     'lead_generation': 'lead_generation', 'acquisition': 'lead_generation',
     'seo': 'seo_research', 'marketing': 'seo_research',
     'marketing_growth': 'seo_research',

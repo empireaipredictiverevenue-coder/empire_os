@@ -52,38 +52,37 @@ def test_native_skill_still_requires_active_garden_path():
         loader.load("cinematic-frontend")
 
 
-def test_native_skill_loads_when_existing_document_is_active():
-    relative = (
-        "empire_os/skills_library/skills/"
-        "frontend-design/SKILL.md"
-    )
-
-    loader = SkillLoader(
-        ROOT,
-        active_knowledge_paths=(relative,),
-    )
-
-    document = loader.load("cinematic-frontend")
-
-    assert document.name == "cinematic-frontend"
-    assert document.path == relative
-    assert document.content
+def test_old_active_garden_document_no_longer_bypasses_skillforge():
+    relative = 'empire_os/skills_library/skills/frontend-design/SKILL.md'
+    loader = SkillLoader(ROOT, active_knowledge_paths=(relative,))
+    with pytest.raises(PermissionError, match='approved digest'):
+        loader.load('cinematic-frontend')
+    assert 'cinematic-frontend' not in loader.available()
 
 
-def test_available_exposes_native_skill_only_when_active():
-    relative = (
-        "empire_os/skills_library/skills/"
-        "frontend-design/SKILL.md"
-    )
-
-    inactive = SkillLoader(ROOT, active_knowledge_paths=())
-    active = SkillLoader(
-        ROOT,
-        active_knowledge_paths=(relative,),
-    )
-
-    assert "cinematic-frontend" not in inactive.available()
-    assert "cinematic-frontend" in active.available()
+def test_empire_coder_loads_only_pinned_complete_skill(tmp_path):
+    from hashlib import sha256
+    import json
+    (tmp_path/'.git').mkdir()
+    name='empire-engineering-verification'
+    relative=f'empire_os/skills_library/skills/{name}/SKILL.md'
+    folder=tmp_path/'empire_os/skills_library/skills'/name
+    folder.mkdir(parents=True)
+    body='# Full verified skill\nKeep OBSERVE, validate evidence and founder authority.'
+    (folder/'SKILL.md').write_text(body)
+    registry_path=tmp_path/'config/skill_trust_registry.json'
+    registry_path.parent.mkdir()
+    registry_path.write_text(json.dumps({'schema_version':'empire.skill_trust.v1',
+        'approved_skills':{name:{'status':'approved','sha256':sha256(body.encode()).hexdigest()}}}))
+    loader=SkillLoader(tmp_path,active_knowledge_paths=(relative,))
+    assert loader.available()==(name,)
+    assert loader.load(name).content==body
+    with pytest.raises(PermissionError,match='bounded complete'):
+        loader.load(name,max_chars=5)
+    (folder/'SKILL.md').write_text('changed')
+    with pytest.raises(PermissionError,match='approved digest'):
+        loader.load(name)
+    assert loader.available()==()
 
 
 def test_persona_remains_metadata_not_authority():

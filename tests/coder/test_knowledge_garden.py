@@ -110,7 +110,9 @@ def test_context_builder_filters_guarded_knowledge(tmp_path):
     paths = {doc.path for doc in pack.documents}
 
     assert "docs/BLUEPRINT_V6.md" in paths
-    assert "empire_os/skills_library/skills/mcp-builder/SKILL.md" in paths
+    # Skill documents are never injected as arbitrary search excerpts.
+    # Only the dedicated digest-pinned SkillForge loader can load them.
+    assert "empire_os/skills_library/skills/mcp-builder/SKILL.md" not in paths
     assert "empire_os/data/prompts/stale.txt" not in paths
     assert "empire_os/data/prompts/review.txt" not in paths
 
