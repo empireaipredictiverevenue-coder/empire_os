@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from empire_os.runtime_promotion_guard import atomic_binding_write, binding_writer_lock
 
 from empire_os.detection_fabric import (
     CONTROL_NAMES,
@@ -30,32 +31,12 @@ OUTPUT = (
 )
 
 
-def atomic_write(
-    path,
-    payload,
-):
-
-    path.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    tmp = path.with_suffix(
-        ".tmp"
-    )
-
-    tmp.write_text(
-        json.dumps(
-            payload,
-            indent=2,
-            sort_keys=True,
-            default=str,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    tmp.replace(path)
+def atomic_write(path, payload):
+    with binding_writer_lock(path):
+        if not path.exists():
+            raise SystemExit('FAIL: canonical bindings absent; bootstrap requires separate approval')
+        expected = path.read_bytes()
+        atomic_binding_write(path, json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", expected_bytes=expected)
 
 
 def main():
