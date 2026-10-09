@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime, timezone
 from typing import Any, Mapping
+
+from empire_os.lead_smart_coverage_reader import freshness as coverage_freshness
 
 
 SNAPSHOT_SCHEMA = (
@@ -21,6 +24,7 @@ def build_zip_targeting_gate(
     *,
     snapshot: Mapping[str, Any],
     intelligence: Mapping[str, Any],
+    now: datetime | None = None,
 ) -> dict[str, Any]:
     """
     Verify Empire's PRE-CALL ZIP targeting gate.
@@ -129,6 +133,45 @@ def build_zip_targeting_gate(
             "for targeting"
         )
 
+    if re.fullmatch(r"[0-9a-f]{64}", str(source.get("source_hash", ""))) is None:
+        raise ValueError("coverage source hash missing or invalid")
+
+    # Re-evaluate the source clock at verification time. Cached
+    # 'fresh' booleans cannot keep an old snapshot valid forever.
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("verification clock must be timezone aware")
+    now = now.astimezone(timezone.utc)
+    try:
+        observed_at = datetime.fromisoformat(
+            str(source["observed_at"]).replace("Z", "+00:00")
+        )
+        if observed_at.tzinfo is None:
+            raise ValueError("observed_at requires timezone")
+        if (observed_at.astimezone(timezone.utc) - now).total_seconds() > 300:
+            raise ValueError("future-dated coverage observation")
+        source_updated_at = datetime.fromisoformat(
+            str(source["coverage"]["source_newest_last_updated"])
+            .replace("Z", "+00:00")
+        )
+        if source_updated_at.tzinfo is None:
+            raise ValueError("source update requires timezone")
+        if (source_updated_at.astimezone(timezone.utc) - now).total_seconds() > 300:
+            raise ValueError("future-dated coverage source update")
+        current_freshness = coverage_freshness(source, now=now)
+    except (KeyError, TypeError, AttributeError) as exc:
+        raise ValueError("missing coverage freshness evidence") from exc
+
+    if current_freshness["fresh_for_targeting_analysis"] is not True:
+        raise ValueError("coverage source is stale at verification time")
+
+    if (
+        intel.get("coverage", {}).get("source_hash") != source.get("source_hash")
+        or intel.get("coverage", {}).get("row_count") != source.get("coverage", {}).get("row_count")
+        or intel.get("coverage", {}).get("unique_zip_count") != source.get("coverage", {}).get("unique_zip_count")
+    ):
+        raise ValueError("coverage intelligence source mismatch")
+
     rows = list(
         source.get("rows") or []
     )
@@ -185,11 +228,14 @@ def build_zip_targeting_gate(
             "duplicate ZIP rows detected"
         )
 
-    if len(unique) != 28040:
-        raise ValueError(
-            "current observed roofing ZIP "
-            f"count mismatch: {len(unique)}"
-        )
+    declared = source.get("coverage") or {}
+    if (
+        type(declared.get("row_count")) is not int
+        or type(declared.get("unique_zip_count")) is not int
+        or declared["row_count"] != len(rows)
+        or declared["unique_zip_count"] != len(unique)
+    ):
+        raise ValueError("coverage cardinality mismatch")
 
     return {
         "schema_version":
@@ -221,7 +267,9 @@ def build_zip_targeting_gate(
             ),
 
         "source_fresh_for_targeting":
-            True,
+            current_freshness["fresh_for_targeting_analysis"],
+
+        "verified_freshness": current_freshness,
 
         "zip_count":
             len(unique),
