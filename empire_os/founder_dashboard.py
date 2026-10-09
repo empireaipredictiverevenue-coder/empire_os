@@ -1273,6 +1273,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "revenue_command_queue": build_revenue_command_queue_runtime(
             repo_root
         ),
+        "revenue_capacity_board": _read_json(
+            runtime / "revenue_capacity_board" / "latest.json"
+        ),
         "market_sweeps_revenue_gps": (
             build_market_sweep_runtime(repo_root)
         ),

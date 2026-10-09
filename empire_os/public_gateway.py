@@ -151,6 +151,8 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
         candidate = base / "buy.html"
     elif clean == "predictive-revenue":
         candidate = base / "predictive-revenue.html"
+    elif clean == "roofing":
+        candidate = base / "roofing.html"
     elif clean.startswith("industries/"):
         slug = clean.split("/", 1)[1]
         if not slug or any(ch not in "abcdefghijklmnopqrstuvwxyz0123456789-" for ch in slug):
@@ -794,6 +796,21 @@ def favicon():
         media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@app.get("/roofing")
+def roofing_page():
+    path = _site_html_path("roofing")
+    if path is None:
+        return JSONResponse({"error": "roofing_page_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="text/html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
+
+@app.get("/roofing-hero.webp")
+def roofing_hero():
+    path = SITE_OUT / "roofing-hero.webp"
+    if not path.is_file():
+        return JSONResponse({"error": "roofing_image_unavailable"}, status_code=404)
+    return FileResponse(path, media_type="image/webp")
 
 
 @app.get("/trust")
