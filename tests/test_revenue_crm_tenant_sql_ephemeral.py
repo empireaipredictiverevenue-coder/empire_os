@@ -497,3 +497,64 @@ def test_catalog_grant_lineage_runs_on_real_ephemeral_postgres(pg):
     restored = inventory()
     assert restored["crm_grant_public"] is False
     assert restored["crm_grant_direct_app"] is False
+
+
+def test_inherited_crm_view_permission_does_not_bind_unbound_login(pg):
+    """Match production privilege shape in disposable PG, not customer data."""
+    import importlib.util
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[1] / "scripts" / "probe_crm_application_login_contract.py"
+    spec = importlib.util.spec_from_file_location("crm_inherited_privilege_probe", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    run, _, _ = pg
+    # Match canonical migration 018 when this isolated test is run alone.
+    run("crm_fixture", "ALTER TABLE public.empire_tenant_role_bindings ADD COLUMN IF NOT EXISTS evidence_ref text;")
+
+    run("crm_fixture", """
+        REVOKE empire_revenue_crm_reader FROM crm_login_unbound;
+        CREATE ROLE crm_fixture_inherited_reader NOLOGIN;
+        GRANT SELECT ON public.revenue_crm_prospects,public.revenue_crm_buyers
+          TO crm_fixture_inherited_reader;
+        GRANT SELECT ON public.prospects,public.buyers
+          TO crm_fixture_inherited_reader;
+        GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
+          TO crm_fixture_inherited_reader;
+        GRANT USAGE ON SCHEMA public TO crm_fixture_inherited_reader;
+        GRANT crm_fixture_inherited_reader TO crm_login_unbound WITH INHERIT TRUE;
+    """)
+    try:
+        statement = module.build_catalog_statement("'crm_login_unbound'")
+        found = json.loads(next(line for line in run("crm_fixture", statement).splitlines()
+                                if line.startswith("{")))
+        assert found["app_login_crm_member"] is False
+        assert found["crm_grant_inherited"] is True
+        assert found["crm_grant_public"] is False
+        assert found["crm_grant_direct_app"] is False
+        assert found["app_login_crm_select"] is True
+
+        # Raw view access through inheritance must not grant a tenant identity.
+        report = run("crm_fixture", """
+            BEGIN TRANSACTION READ ONLY;
+            SELECT public.empire_current_tenant_id() IS NULL;
+            SELECT count(*) FROM public.revenue_crm_prospects;
+            SELECT count(*) FROM public.revenue_crm_buyers;
+            ROLLBACK;
+        """, user="crm_login_unbound")
+        assert report.splitlines() == ["BEGIN", "t", "0", "0", "ROLLBACK"]
+    finally:
+        run("crm_fixture", """
+            REVOKE crm_fixture_inherited_reader FROM crm_login_unbound;
+            REVOKE SELECT ON public.prospects,public.buyers
+              FROM crm_fixture_inherited_reader;
+            REVOKE SELECT ON public.revenue_crm_prospects,
+              public.revenue_crm_buyers FROM crm_fixture_inherited_reader;
+            REVOKE EXECUTE ON FUNCTION public.empire_current_tenant_id()
+              FROM crm_fixture_inherited_reader;
+            REVOKE USAGE ON SCHEMA public FROM crm_fixture_inherited_reader;
+            DROP ROLE crm_fixture_inherited_reader;
+            GRANT empire_revenue_crm_reader TO crm_login_unbound;
+        """)
