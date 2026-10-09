@@ -22,6 +22,63 @@ The Founder Mailbox read API previously chose `ResendMailboxProvider` when no ex
 
 Supply these through the **existing founder service's securely permissioned environment**, using a root-owned `0600` EnvironmentFile or a systemd credentials mechanism as appropriate. The existing deployment service must actually receive those values; setting them in an unrelated terminal is not production configuration. The IMAP credential only permits read access if the account's server-side ACLs support it; use a read-only account if available. Do not alter mailbox DNS, MX records, outbound SMTP, sender reputation, automation timers or startup units as part of this code change.
 
+## Production recovery and safe activation order
+
+**Verified outage (9 October 2026):** adding a systemd drop-in with the mandatory line
+`EnvironmentFile=/etc/empire/founder-imap.env` before creating the file caused
+`empire-founder-dashboard-api.service` to fail with systemd `Result=resources`,
+`Failed to load environment files: No such file or directory` and a restart loop.
+
+The correct service is `empire-founder-dashboard-api.service` (loopback
+`127.0.0.1:8766`, existing environment `/etc/empire_os.env`), **not**
+`founder-dashboard-api.service`. The interactive `ubuntu` shell does not inherit
+that protected service environment. Testing the interactive environment alone
+therefore does not prove service configuration.
+
+**If this exact startup failure occurs, restore just the Founder API first:**
+
+```bash
+cd /srv/empire_os
+sudo sed -i \
+  's|^EnvironmentFile=/etc/empire/founder-imap.env$|EnvironmentFile=-/etc/empire/founder-imap.env|' \
+  /etc/systemd/system/empire-founder-dashboard-api.service.d/20-owned-imap.conf
+sudo systemctl daemon-reload
+sudo systemctl reset-failed empire-founder-dashboard-api.service
+sudo systemctl restart empire-founder-dashboard-api.service
+systemctl is-active empire-founder-dashboard-api.service
+./.venv/bin/python scripts/verify_owned_imap_mailbox.py --service
+```
+
+The leading `-` makes an **optional** EnvironmentFile: systemd does not take
+Founder API offline just because the new IMAP secret file is absent. It grants
+no inbox, outbound, suppression or commercial authority. A healthy service can
+correctly report `CONFIGURATION_REQUIRED` for its optional mailbox integration.
+
+**Before configuring real mail access**, create the protected secret file
+interactively (never print or source it and never put the values in Git/chat):
+
+```bash
+sudo install -d -m 0700 -o root -g root /etc/empire
+sudo touch /etc/empire/founder-imap.env
+sudo chmod 0600 /etc/empire/founder-imap.env
+sudoedit /etc/empire/founder-imap.env
+```
+
+Fill in the actual owned provider's IMAP TLS host, login and mailbox-specific
+password, and confirm the server's Sent-folder name. The systemd drop-in should
+reference the existing file as
+`EnvironmentFile=-/etc/empire/founder-imap.env`. After the protected file is
+complete, restart **only** `empire-founder-dashboard-api.service` and verify
+with `./.venv/bin/python scripts/verify_owned_imap_mailbox.py --service-probe`.
+The service-aware probe uses the *actual running API*, not the interactive
+shell's environment, and does not disclose messages or credentials.
+
+If the `--service` result is `ROUTE_NOT_DEPLOYED`, the running process has not
+loaded the new read-only mailbox code; a controlled restart of this single
+service is appropriate after confirming the environment file is optional or
+already present. Never restart unrelated EmpireOS workers/Cloudflare/Caddy to
+recover this API.
+
 ## One clean verification path
 
 1. Without connecting to the provider, run:
