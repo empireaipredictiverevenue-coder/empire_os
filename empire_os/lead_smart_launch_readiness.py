@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any, Mapping
 
 
@@ -9,6 +10,20 @@ SCHEMA_VERSION = (
 )
 
 
+
+def _fresh(timestamp: Any, *, now: datetime, max_age_seconds: int) -> bool:
+    if not isinstance(timestamp, str):
+        return False
+    try:
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if parsed.tzinfo is None:
+        return False
+    age = (now - parsed.astimezone(timezone.utc)).total_seconds()
+    return 0 <= age <= max_age_seconds
+
+
 def build_launch_readiness(
     *,
     tracking: Mapping[str, Any],
@@ -16,7 +31,12 @@ def build_launch_readiness(
     routing: Mapping[str, Any],
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
+    now = now or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise ValueError("launch verification time requires timezone")
+    now = now.astimezone(timezone.utc)
 
     tracking_verified = (
         tracking.get("state") == "VERIFIED"
@@ -24,6 +44,8 @@ def build_launch_readiness(
             "tracking_verified"
         )
         is True
+        and _fresh(tracking.get("verified_at"), now=now, max_age_seconds=3600)
+        and _fresh(tracking.get("source_observed_at"), now=now, max_age_seconds=3600)
     )
 
     zip_verified = (
@@ -35,6 +57,13 @@ def build_launch_readiness(
             "zip_coverage_activation_verified"
         )
         is True
+        and zip_gate.get("source_fresh_for_targeting") is True
+        and _fresh(zip_gate.get("source_observed_at"), now=now, max_age_seconds=21600)
+        and _fresh(
+            (zip_gate.get("verified_freshness") or {}).get("source_newest_last_updated"),
+            now=now,
+            max_age_seconds=108000,
+        )
     )
 
     routing_verified = (
@@ -42,6 +71,7 @@ def build_launch_readiness(
             "routing_runtime_verified"
         )
         is True
+        and _fresh(routing.get("observed_at"), now=now, max_age_seconds=3600)
     )
 
     gates = {
