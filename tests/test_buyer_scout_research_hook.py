@@ -17,12 +17,20 @@ def test_existing_scout_invokes_governed_evidence_without_new_timer(tmp_path):
     result = scout.research_network_after_scout(str(tmp_path), runner=runner)
     assert result["status"] == "PASS"
     assert result["mode"] == "OBSERVE"
-    assert len(seen) == 1
+    assert len(seen) == 2
     args, options = seen[0]
     assert args[1] == str(tmp_path / "scripts/run_buyer_network_evidence_cycle.py")
     assert options["timeout"] <= 300
     assert options["env"]["LIVE_OUTBOUND"] == "0"
     assert options["env"]["EMPIRE_EXECUTION_AUTHORITY"] == "OBSERVE"
+    second_args, second_opts = seen[1]
+    assert second_args[1] == str(tmp_path / "scripts/reconcile_buyer_email_relationships.py")
+    assert second_args[-1] == "--write"
+    assert second_opts["timeout"] <= 35
+    assert second_opts["env"]["OUTBOUND_ENABLED"] == "0"
+    assert result["relationship_registry"] == "PASS"
+    assert result["mailbox_ingest_in_this_cycle"] is False
+    assert result["outbound_sent"] is False
 
 
 def test_optional_research_failure_does_not_claim_success(tmp_path):
@@ -36,6 +44,24 @@ def test_optional_research_failure_does_not_claim_success(tmp_path):
     assert result["status"] == "FAILED"
     assert result["exit_code"] == 7
     assert "private-error" not in str(result)
+
+
+def test_missing_or_unsafe_gmail_evidence_blocks_registry_only(tmp_path):
+    class Failed:
+        returncode = 2
+        stdout = ""
+        stderr = "secret content should not escape"
+    calls = []
+    def runner(args, **kwargs):
+        calls.append(args)
+        return Done() if len(calls) == 1 else Failed()
+
+    result = scout.research_network_after_scout(str(tmp_path), runner=runner)
+    assert len(calls) == 2
+    assert result["status"] == "PARTIAL"
+    assert result["relationship_registry"] == "BLOCKED"
+    assert result["outbound_sent"] is False
+    assert "secret content" not in str(result)
 
 
 def test_existing_systemd_timer_is_reused_without_new_unit():

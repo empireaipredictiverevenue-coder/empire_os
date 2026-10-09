@@ -178,9 +178,36 @@ def research_network_after_scout(
             )
         except subprocess.TimeoutExpired:
             return {"status": "TIMEOUT", "mode": "OBSERVE"}
+        if proc.returncode != 0:
+            return {
+                "status": "FAILED", "mode": "OBSERVE",
+                "exit_code": proc.returncode,
+                "relationship_registry": "NOT_REFRESHED",
+            }
+        try:
+            linked = runner(
+                [
+                    sys.executable,
+                    str(root / "scripts/reconcile_buyer_email_relationships.py"),
+                    "--write",
+                ],
+                cwd=root, env=env, capture_output=True,
+                text=True, timeout=35, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return {
+                "status": "PARTIAL", "mode": "OBSERVE", "exit_code": 0,
+                "relationship_registry": "TIMEOUT",
+            }
         return {
-            "status": "PASS" if proc.returncode == 0 else "FAILED",
-            "mode": "OBSERVE", "exit_code": proc.returncode,
+            "status": "PASS" if linked.returncode == 0 else "PARTIAL",
+            "mode": "OBSERVE", "exit_code": 0,
+            "relationship_registry": (
+                "PASS" if linked.returncode == 0 else "BLOCKED"
+            ),
+            "mailbox_ingest_in_this_cycle": False,
+            "outbound_sent": False,
+            "execution_authority": "NONE",
         }
 
 
