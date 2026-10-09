@@ -4,11 +4,14 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Protocol, Sequence
+from typing import Any, Callable, Mapping, Protocol, Sequence
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from empire_os.revenue_crm_transport import (
+    PostgresRevenueCrmRepository, RevenueCrmTransportError,
+)
 from empire_os.revenue_crm_customer_success import (
     route_customer_success_review,
 )
@@ -37,6 +40,18 @@ class RevenueCrmRepository(Protocol):
 
     def prospect(self, prospect_id: str) -> Mapping[str, Any] | None:
         ...
+
+
+@dataclass(frozen=True)
+class AuthenticatedRevenueCrmRead:
+    """Server-authenticated, tenant-bound repository handoff.
+
+    Never construct this from client-supplied tenant IDs or headers. The caller
+    must independently verify request authentication and choose a dedicated
+    PostgreSQL login whose session_user is bound to the same tenant.
+    """
+    tenant_id: str
+    repository: PostgresRevenueCrmRepository
 
 
 class RevenueCrmRetentionRequest(BaseModel):
@@ -255,7 +270,14 @@ def create_revenue_crm_router(
     *,
     conversation_read_repository: Any = None,
     evidence_root: Path = Path("/srv/empire_os"),
+    resolve_authenticated_read: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
 ) -> APIRouter:
+    # A single global Postgres repository is not a multi-tenant HTTP auth
+    # boundary. Keep test-only in-memory repositories compatible.
+    if isinstance(repository, PostgresRevenueCrmRepository):
+        raise ValueError("request-scoped CRM authentication required")
+    if repository is not None and resolve_authenticated_read is not None:
+        raise ValueError("ambiguous CRM repository authority")
     router = APIRouter(prefix="/v1/revenue-crm")
 
     @router.get("/health")
@@ -269,13 +291,44 @@ def create_revenue_crm_router(
             "repository_available": repository is not None,
         }
 
-    def require_repository() -> RevenueCrmRepository:
+    def require_repository(request: Request) -> RevenueCrmRepository:
+        if resolve_authenticated_read is not None:
+            try:
+                access = resolve_authenticated_read(request)
+            except Exception:
+                # Never disclose identity, login, tenant or database details.
+                raise HTTPException(
+                    status_code=503, detail="authenticated_crm_read_unavailable",
+                ) from None
+            if access is None:
+                raise HTTPException(
+                    status_code=401, detail="authenticated_crm_scope_required",
+                )
+            if (
+                not isinstance(access, AuthenticatedRevenueCrmRead)
+                or not isinstance(access.repository, PostgresRevenueCrmRepository)
+                or access.tenant_id != access.repository.tenant_id
+            ):
+                raise HTTPException(
+                    status_code=503, detail="authenticated_crm_read_unavailable",
+                )
+            # DB transport separately verifies trusted session_user binding,
+            # executes SET LOCAL ROLE and rejects tenant-mismatched rows.
+            return access.repository
         if repository is None:
             raise HTTPException(
                 status_code=503,
                 detail="revenue_crm_repository_not_activated",
             )
         return repository
+
+    def guarded_crm_read(read: Callable[[], Any]) -> Any:
+        try:
+            return read()
+        except RevenueCrmTransportError:
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_read_unavailable",
+            ) from None
 
     @router.post("/search-growth/preview")
     def search_growth_preview(req: RevenueCrmSearchGrowthRequest):
@@ -466,9 +519,11 @@ def create_revenue_crm_router(
         }
 
     @router.get("/prospects")
-    def prospects(limit: int = Query(default=100, ge=1, le=500)):
-        repo = require_repository()
-        rows = [dict(row) for row in repo.prospects(limit=limit)]
+    def prospects(request: Request, limit: int = Query(default=100, ge=1, le=500)):
+        repo = require_repository(request)
+        rows = [dict(row) for row in guarded_crm_read(
+            lambda: repo.prospects(limit=limit)
+        )]
         return {
             "source": "canonical_revenue_crm_repository",
             "count": len(rows),
@@ -478,9 +533,11 @@ def create_revenue_crm_router(
         }
 
     @router.get("/buyers")
-    def buyers(limit: int = Query(default=100, ge=1, le=500)):
-        repo = require_repository()
-        rows = [dict(row) for row in repo.buyers(limit=limit)]
+    def buyers(request: Request, limit: int = Query(default=100, ge=1, le=500)):
+        repo = require_repository(request)
+        rows = [dict(row) for row in guarded_crm_read(
+            lambda: repo.buyers(limit=limit)
+        )]
         return {
             "source": "canonical_revenue_crm_repository",
             "count": len(rows),
@@ -490,18 +547,18 @@ def create_revenue_crm_router(
         }
 
     @router.get("/prospects/{prospect_id}/next-action")
-    def next_action(prospect_id: str):
-        repo = require_repository()
-        row = repo.prospect(prospect_id)
+    def next_action(prospect_id: str, request: Request):
+        repo = require_repository(request)
+        row = guarded_crm_read(lambda: repo.prospect(prospect_id))
         if row is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         return derive_next_action(row).as_dict()
 
     @router.get("/prospects/{prospect_id}/reply-qualification-review")
-    def reply_qualification_review(prospect_id: str):
+    def reply_qualification_review(prospect_id: str, request: Request):
         """Existing canonical CRM read + Conversation OS review; never a closer handoff."""
-        repo = require_repository()
-        prospect = repo.prospect(prospect_id)
+        repo = require_repository(request)
+        prospect = guarded_crm_read(lambda: repo.prospect(prospect_id))
         if prospect is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         cid = str(prospect.get("conversation_id") or "").strip()
@@ -542,9 +599,9 @@ def create_revenue_crm_router(
             ) from None
 
     @router.get("/prospects/{prospect_id}/close-readiness")
-    def close_readiness(prospect_id: str):
-        repo = require_repository()
-        row = repo.prospect(prospect_id)
+    def close_readiness(prospect_id: str, request: Request):
+        repo = require_repository(request)
+        row = guarded_crm_read(lambda: repo.prospect(prospect_id))
         if row is None:
             raise HTTPException(status_code=404, detail="prospect_not_found")
         try:
