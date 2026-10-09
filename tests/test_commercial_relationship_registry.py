@@ -519,3 +519,65 @@ def test_partner_technical_pilot_review_packets_are_buyer_isolated():
         assert p["contract_signing_authorized"] is False
         assert p["landing_page_created_or_published"] is False
         assert p["execution_authority"]=="NONE"
+
+
+def test_public_partner_programmes_never_promote_commercial_launch_gates():
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_PUBLIC_PROGRAMME_REFERENCES,
+        PARTNER_PILOT_SCOPES,
+    )
+    src, queue, qualification = sources()
+    for key, domain in (
+        ("leadbank", "alliancevs.io"),
+        ("validated", "validatedlg.ai"),
+        ("connexis", "connex.is"),
+    ):
+        src["threads"].append(row(
+            key, domain, PARTNER_PILOT_SCOPES[key]["reviewed_thread"],
+            inbound="2026-10-09T18:00:00Z",
+            outbound="2026-10-09T19:00:00Z",
+        ))
+    result = reconcile(src, queue, qualification, now=NOW)
+    records = {x["entity_key"]: x
+               for x in result["partner_pilot_readiness_queue"]}
+    assert set(records) == set(PARTNER_PUBLIC_PROGRAMME_REFERENCES)
+    assert records["leadbank"]["technical_review_packet"]["official_public_programme_references"] == []
+    assert len(records["validated"]["technical_review_packet"]["official_public_programme_references"]) == 2
+    assert len(records["connexis"]["technical_review_packet"]["official_public_programme_references"]) == 2
+    assert records["connexis"]["current_next_partner_task"] == "CLARIFY_CONNEXIS_LIVE_CALLS_VS_API_CPL_TERMS"
+    assert records["validated"]["current_next_partner_task"] == "CONFIRM_VALIDATED_AFFILIATE_TERMS_AND_BUYBOX"
+    for key, rec in records.items():
+        info = rec["technical_review_packet"]
+        assert info["selected_partner_offer_format"] is None
+        assert info["general_public_programme_bound_to_this_account"] is False
+        assert info["applicable_payout_model_confirmed_by_partner"] is False
+        assert info["contract_signing_channel_confirmed"] is False
+        assert info["web_or_portal_acceptance_authorized"] is False
+        assert info["partner_tracking_number"] is None
+        assert info["verified_payout_and_settlement"] is None
+        assert info["traffic_enabled"] is False
+        assert info["contract_signing_authorized"] is False
+        assert rec["gate_count_verified"] == 0
+        assert all(v is False for v in rec["activation_gates"].values())
+        for source in info["official_public_programme_references"]:
+            assert source["source"].startswith("https://")
+            assert source["checked_date"] == "2026-10-10"
+            assert source["not_corroborated"]
+            assert source["next_question"]
+    assert result["outbound_authorized"] is False
+
+
+def test_public_connexis_api_and_paypercall_terms_cannot_be_collapsed():
+    from empire_os.commercial_relationship_registry import PARTNER_PUBLIC_PROGRAMME_REFERENCES
+    refs = PARTNER_PUBLIC_PROGRAMME_REFERENCES["connexis"]
+    assert len(refs) == 2
+    assert {x["reference_type"] for x in refs} == {
+        "PUBLIC_PAY_PER_CALL_PROGRAMME",
+        "PUBLIC_API_CPL_PUBLISHER_TERMS",
+    }
+    calls = next(x for x in refs if x["reference_type"] == "PUBLIC_PAY_PER_CALL_PROGRAMME")
+    leads = next(x for x in refs if x["reference_type"] == "PUBLIC_API_CPL_PUBLISHER_TERMS")
+    assert "without a minimum" in calls["public_observation"]
+    assert "£50" in leads["public_observation"]
+    assert "90%" in leads["public_observation"]
+    assert calls["source"] != leads["source"]

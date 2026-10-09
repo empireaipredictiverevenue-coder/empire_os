@@ -93,6 +93,50 @@ PARTNER_REVIEWED_RESPONSE_EVIDENCE = {
 }
 
 
+# Independently viewed official public pages are evidence of a *general*
+# advertised programme only. They are NOT a current campaign buy-box,
+# individually offered payout, accepted contract or granted API permission.
+PARTNER_PUBLIC_PROGRAMME_REFERENCES = {
+    "leadbank": (),
+    "validated": (
+        {
+            "source": "https://validatedlg.ai/affiliate-agreement",
+            "checked_date": "2026-10-10",
+            "reference_type": "PUBLIC_AFFILIATE_AGREEMENT",
+            "public_observation": "Owned or approved acquisition sources, valid compensable transactions, sub-affiliate restrictions and possible payout offsets require campaign-specific review.",
+            "not_corroborated": "Signed/accepted contract or approved roofing buy-box.",
+            "next_question": "Which affiliate agreement, campaign insertion order, traffic-source rules, payout and technical setup apply to Empire AI's first-party organic roofing pilot?",
+        },
+        {
+            "source": "https://validatedlg.ai/capabilities",
+            "checked_date": "2026-10-10",
+            "reference_type": "PUBLIC_ACQUISITION_FORMAT_DESCRIPTION",
+            "public_observation": "Public formats include pay-per-call, live transfers and first-party forms with per-buyer attribution and routing requirements.",
+            "not_corroborated": "Current roofing buyer market, campaign eligibility or an actual assigned route.",
+            "next_question": "Confirm that our first pilot is pay-per-call rather than form/API lead delivery, with exact payable-event and geo/hours requirements.",
+        },
+    ),
+    "connexis": (
+        {
+            "source": "https://connex.is/pay-per-call",
+            "checked_date": "2026-10-10",
+            "reference_type": "PUBLIC_PAY_PER_CALL_PROGRAMME",
+            "public_observation": "The public live-call marketplace describes per-campaign, duration-based billing and weekly Friday publisher payouts without a minimum.",
+            "not_corroborated": "Empire AI's accepted call payout, threshold, campaign, assigned number or signed terms.",
+            "next_question": "Is Empire AI being offered the pay-per-call publisher programme, and if so what are the verified call duration, source/consent, caps, route and payout conditions?",
+        },
+        {
+            "source": "https://connex.is/legal/terms-publisher",
+            "checked_date": "2026-10-10",
+            "reference_type": "PUBLIC_API_CPL_PUBLISHER_TERMS",
+            "public_observation": "The separate API lead-publisher terms describe a default 90% share of accepted CPL, 7-day duplicate rule, recorded consent and a £50 weekly withdrawal minimum.",
+            "not_corroborated": "Applicability to live calls, individual accepted contract, specific lead/call pricing or source permission.",
+            "next_question": "Do the API/CPL terms apply at all to our live-call pilot, and which programme's withdrawal minimum, rev-share or payout schedule actually governs the deal?",
+        },
+    ),
+}
+
+
 def partner_technical_review_packet(
     key: str, spec: Mapping[str, Any], record: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -135,6 +179,14 @@ def partner_technical_review_packet(
         "caller_id_passthrough_test_verified": False,
         "routing_runtime_test_verified": False,
         "buyer_commercial_source_evidence": evidence,
+        "official_public_programme_references": [
+            dict(x) for x in PARTNER_PUBLIC_PROGRAMME_REFERENCES[key]
+        ],
+        "general_public_programme_bound_to_this_account": False,
+        "applicable_payout_model_confirmed_by_partner": False,
+        "selected_partner_offer_format": None,
+        "contract_signing_channel_confirmed": False,
+        "web_or_portal_acceptance_authorized": False,
         "lead_smart_route_or_number_inherited": False,
         "buyer_commercial_terms_inherited": False,
         "traffic_enabled": False,
@@ -189,6 +241,10 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
             "current_next_partner_task": (
                 "REVIEW_AGREEMENT_AND_MAHAD_SPEC_ON_RECEIPT"
                 if leadbank_docs_promised
+                else "CLARIFY_CONNEXIS_LIVE_CALLS_VS_API_CPL_TERMS"
+                if key == "connexis"
+                else "CONFIRM_VALIDATED_AFFILIATE_TERMS_AND_BUYBOX"
+                if key == "validated"
                 else "WAIT_CURRENT_BUYBOX_AND_SOURCE_APPROVAL"
             ),
             "proposed_corridor_not_buyer_approved": spec["corridor"],

@@ -13,12 +13,15 @@ one existing buyer scout, no additional scheduler or platform.
 | Validated / Home Services Lead Group | Zach's 7 Oct reply `gmail:1a114d6b9b33e40b`; founder's reply `gmail:1a117d5a0e0fb530` | Buyer has described publisher source/compliance conditions and revenue share, but not live roofing buy-box | US roofing install/replacement, first-party organic call traffic, one source-approved corridor |
 | Connexis | Kieran's 28 Sep reply `gmail:1a0e6d76dbe29583`; founder's follow-up `gmail:1a10922d0223f192` | Kieran promised programme details; none received | Choose one current UK or US buyer campaign for first-party organic calls |
 
-**Three review-only threaded Gmail drafts saved on 10 Oct** in the original
-threads. No sends: LeadBank `1a0cfb65e0dd960e` to Eleonora (Alina CC);
-Validated `1a0cfb667dca0957` to Zach; Connexis `1a0d9fa5b944630a`
-to Kieran. Founder approval/suppression checks remain required before sends.
-The drafts exist in connected `flavag83@gmail.com`; the professional mailbox
-has not been independently configured on EmpireOS.
+**Three founder-approved messages were SENT on 9 October UTC** in their
+original Gmail threads following direct suppression and recipient checks:
+LeadBank thread `1a0cfb65e0dd960e` to Eleonora (Alina CC), sent
+message `1a122fc6010e3b5b` at 23:25:27 UTC; Validated thread
+`1a0cfb667dca0957` to Zach, message `1a122fc70c9614c1`
+at 23:25:31 UTC; Connexis thread `1a0d9fa5b944630a` to Kieran,
+message `1a122fc85a098bea` at 23:25:36 UTC. No further sends
+are authorised by that action. Actual sending mailbox:
+`flavag83@gmail.com`, **not** the unconfigured Empire AI professional mailbox.
 
 ## Reuse Lead Smart's *process*, never another partner's contract
 
@@ -192,3 +195,46 @@ revenue. The registry stores the generated private paths and content hash.
 **Remaining external gates:** LeadBank's actual agreement/form and Mahad's
 routing instructions; Validated's ZIP buy-box and source sign-off; Connexis'
 one live buyer corridor; plus separate founder approval for all live actions.
+
+
+## 10 October: official programme research and contract-channel ambiguity
+
+First-party **public website review only**, not verified individual buyer
+terms, portal enrolment, source acceptance, legal signoff or permission
+to execute. This evidence is attached to each partner's existing
+technical review packet as official public programme references with
+the research date and explicit outstanding questions. None of the nine
+launch gates changes.
+
+- **Validated**: Public affiliate agreement, effective 20 September 2026,
+  https://validatedlg.ai/affiliate-agreement, describes approved traffic
+  sources, sub-affiliate restrictions, invalid-call reversals, payout
+  conditions and possible tax/onboarding documents.
+  https://validatedlg.ai/capabilities lists distinct call, transfer
+  and form formats. Zach must confirm our first-party organic source,
+  the particular campaign, accepted agreement/insertion order, buyer
+  geography, payable event and exact delivery mechanism. No electronic
+  agreement or portal activation is accepted by this public review.
+
+- **Connexis**: https://connex.is/pay-per-call describes live calls,
+  buyer-duration thresholds, real-time routing, Friday publisher payments
+  and no minimum withdrawal for the advertised call programme.
+  https://connex.is/legal/terms-publisher describes a separate API-based
+  accepted-CPL-lead publisher arrangement: default 90% share, £50
+  withdrawal minimum, recorded consent evidence, seven-day duplicate
+  policy and potential quality rejection. These are **different apparent
+  commercial lanes**, not necessarily inconsistent contracts. Kieran
+  must identify which one applies to Empire AI, and confirm any
+  individual payout, approved source, settlement, compliance and routing
+  conditions. Never apply lead-API terms to live calls by inference.
+
+- **LeadBank**: No buyer-specific public commercial or routing contract
+  independently verified. Eleonora has promised an agreement and form,
+  and Mahad's technical response is pending. The requirements can only
+  progress from the genuine received and reviewed documentation.
+
+The evidence is operational research rather than contractual acceptance:
+publicly advertised financial ranges are **not** receivables; public
+programme descriptions do not grant traffic, number, signature, payout
+or cost authority. Continue through existing founder-gated Documenso
+and partner-specific compliance routes after reviewing actual documents.
