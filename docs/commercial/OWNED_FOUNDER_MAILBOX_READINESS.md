@@ -31,7 +31,7 @@ Supply these through the **existing founder service's securely permissioned envi
 
 The correct service is `empire-founder-dashboard-api.service` (loopback
 `127.0.0.1:8766`, existing environment `/etc/empire_os.env`), **not**
-`founder-dashboard-api.service`. The interactive `ubuntu` shell does not inherit
+`founder-dashboard-api.service`. The service-aware verifier tolerates brief loopback startup races without restarting again. The interactive `ubuntu` shell does not inherit
 that protected service environment. Testing the interactive environment alone
 therefore does not prove service configuration.
 

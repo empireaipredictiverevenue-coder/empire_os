@@ -315,3 +315,67 @@ def test_service_readiness_incomplete_config_does_not_invoke_summary():
     assert result['status']=='CONFIGURATION_REQUIRED'
     assert result['live_probe_performed'] is False
     assert len(calls)==1
+
+
+def test_service_restart_race_retries_only_connection_refused():
+    import json
+    from urllib.error import URLError
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    calls=[]
+    pauses=[]
+    class Response:
+        status=200
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def read(self,n):
+            return json.dumps({
+                'provider':'owned_imap',
+                'execution_authority':'none',
+                'canonical_identity_verified':False,
+                'suppression_evidence_complete':False,
+                'configured':False,
+            }).encode()
+    def startup(req,*,timeout):
+        calls.append(req.full_url)
+        if len(calls) <= 2:
+            raise URLError('connection refused after restart')
+        return Response()
+    report=service_readiness_report(opener=startup,startup_attempts=4,
+                                    startup_sleep=pauses.append)
+    assert report['status']=='CONFIGURATION_REQUIRED'
+    assert report['live_probe_performed'] is False
+    assert len(calls)==3
+    assert all(x.endswith('/v1/founder-mailbox/readiness') for x in calls)
+    assert pauses==[0.5,0.5]
+
+
+def test_service_startup_timeout_is_bounded_and_does_not_claim_mailbox_probe():
+    from urllib.error import URLError
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    calls=[]
+    pauses=[]
+    def never_ready(req,*,timeout):
+        calls.append(req.full_url)
+        raise URLError('startup still in progress')
+    result=service_readiness_report(probe=True,opener=never_ready,
+                                    startup_attempts=3,startup_sleep=pauses.append)
+    assert result['status']=='SERVICE_UNAVAILABLE'
+    assert result['startup_checks_attempted']==3
+    assert result['action']=='check_founder_api_service_status_without_restarting'
+    assert result['live_probe_performed'] is False
+    assert len(calls)==3
+    assert pauses==[0.5,0.5]
+
+
+def test_service_http_404_is_not_retried():
+    import io
+    from urllib.error import HTTPError
+    from scripts.verify_owned_imap_mailbox import service_readiness_report
+    calls=[]
+    def old_route(req,*,timeout):
+        calls.append(req.full_url)
+        raise HTTPError(req.full_url,404,'old version',{},io.BytesIO())
+    result=service_readiness_report(opener=old_route,startup_attempts=12,
+                                    startup_sleep=lambda _: (_ for _ in ()).throw(AssertionError('retry forbidden')))
+    assert result['status']=='ROUTE_NOT_DEPLOYED'
+    assert len(calls)==1

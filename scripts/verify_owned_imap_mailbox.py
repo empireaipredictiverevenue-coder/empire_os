@@ -7,6 +7,7 @@ Does not send email or upgrade a provider reply to canonical buyer evidence.
 from __future__ import annotations
 import argparse
 import json
+import time
 from urllib import request, error
 from typing import Any, Callable
 
@@ -74,7 +75,9 @@ def _local_json(path: str, *, opener: Callable[..., Any] | None = None) -> dict:
 
 
 def service_readiness_report(*, probe: bool = False,
-                             opener: Callable[..., Any] | None = None) -> dict:
+                             opener: Callable[..., Any] | None = None,
+                             startup_attempts: int = 1,
+                             startup_sleep: Callable[[float], Any] = time.sleep) -> dict:
     """Check the *running* Founder API environment without reading credentials.
 
     --service-probe uses the existing read-only summary, bounded to one item
@@ -89,18 +92,31 @@ def service_readiness_report(*, probe: bool = False,
         'canonical_buyer_conversation_verified': False,
         'outbound_sent': False, 'execution_authority': 'none',
     }
-    try:
-        status = _local_json('/v1/founder-mailbox/readiness', opener=opener)
-    except error.HTTPError as exc:
-        result['status'] = 'ROUTE_NOT_DEPLOYED' if exc.code == 404 else 'SERVICE_READINESS_UNAVAILABLE'
-        result['http_status'] = int(exc.code)
-        return result
-    except (error.URLError, TimeoutError, OSError):
-        result['status'] = 'SERVICE_UNAVAILABLE'
-        return result
-    except (ValueError, UnicodeError, TypeError, KeyError):
-        result['status'] = 'SERVICE_RESPONSE_INVALID'
-        return result
+    # A just-restarted Uvicorn process may be `active` before TCP is ready.
+    # Retry ONLY connection/startup failures; never repeat IMAP reads or mask
+    # real 404, credentials, policy, parsing, or provider mismatches.
+    if type(startup_attempts) is not int or not 1 <= startup_attempts <= 12:
+        raise ValueError('invalid_startup_attempt_count')
+    status = None
+    for attempt in range(startup_attempts):
+        try:
+            status = _local_json('/v1/founder-mailbox/readiness', opener=opener)
+            break
+        except error.HTTPError as exc:
+            result['status'] = 'ROUTE_NOT_DEPLOYED' if exc.code == 404 else 'SERVICE_READINESS_UNAVAILABLE'
+            result['http_status'] = int(exc.code)
+            return result
+        except (error.URLError, TimeoutError, OSError):
+            if attempt + 1 < startup_attempts:
+                startup_sleep(0.5)
+                continue
+            result['status'] = 'SERVICE_UNAVAILABLE'
+            result['startup_checks_attempted'] = startup_attempts
+            result['action'] = 'check_founder_api_service_status_without_restarting'
+            return result
+        except (ValueError, UnicodeError, TypeError, KeyError):
+            result['status'] = 'SERVICE_RESPONSE_INVALID'
+            return result
     if (status.get('provider') != 'owned_imap'
         or status.get('execution_authority') != 'none'
         or status.get('canonical_identity_verified') is not False
@@ -152,7 +168,8 @@ def main() -> int:
     mode.add_argument('--service-probe', action='store_true',
                       help='Read one item per folder through the running Founder API')
     args = parser.parse_args()
-    output = (service_readiness_report(probe=args.service_probe)
+    output = (service_readiness_report(probe=args.service_probe,
+                                       startup_attempts=12)
               if args.service or args.service_probe
               else readiness_report(OwnedIMAPMailboxProvider(), probe=args.probe))
     print(json.dumps(output, sort_keys=True, indent=2))
