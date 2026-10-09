@@ -2,6 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
+import os
+import subprocess
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
 import json
 import urllib.parse
@@ -135,6 +140,50 @@ def _canonical_seed_records(
     return rows
 
 
+def research_network_after_scout(
+    repo_root: str,
+    *,
+    runner=None,
+) -> dict:
+    """Piggyback on the EXISTING 30-min buyer scout, without new timers.
+
+    A failure of an optional read-only research refresh never blocks buyer
+    acquisition. It is still independently visible in the evidence JSON.
+    """
+    root = Path(repo_root).resolve()
+    lock_path = root / "runtime/buyer_network_intelligence/research_cycle.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    runner = runner or subprocess.run
+    with lock_path.open("a+") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return {"status": "ALREADY_RUNNING", "mode": "OBSERVE"}
+        env = os.environ.copy()
+        env.update({
+            "EMPIRE_MODE": "OBSERVE",
+            "EMPIRE_EXECUTION_AUTHORITY": "OBSERVE",
+            "OUTBOUND_ENABLED": "0",
+            "EMPIRE_OUTBOUND_ENABLED": "0",
+            "LIVE_OUTBOUND": "0",
+        })
+        try:
+            proc = runner(
+                [
+                    sys.executable,
+                    str(root / "scripts/run_buyer_network_evidence_cycle.py"),
+                ],
+                cwd=root, env=env, capture_output=True,
+                text=True, timeout=300, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return {"status": "TIMEOUT", "mode": "OBSERVE"}
+        return {
+            "status": "PASS" if proc.returncode == 0 else "FAILED",
+            "mode": "OBSERVE", "exit_code": proc.returncode,
+        }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
@@ -145,6 +194,7 @@ def main() -> int:
     parser.add_argument("--low-yield-canonical-limit", type=int, default=3,
                         help="Allow up to 3 canonical research seeds when public search yields 1-2 domains")
     parser.add_argument("--intent-seed-limit", type=int, default=12)
+    parser.add_argument("--skip-buyer-network-research", action="store_true")
     args = parser.parse_args()
 
     public_research = refresh_public_research_seeds(
@@ -190,8 +240,14 @@ def main() -> int:
         research_seed_records=research_seeds,
         low_yield_canonical_limit=args.low_yield_canonical_limit,
     )
+    research_status = (
+        {"status": "SKIPPED", "mode": "OBSERVE"}
+        if args.skip_buyer_network_research
+        else research_network_after_scout(args.repo_root)
+    )
     print(json.dumps({
         "ok": True,
+        "buyer_network_research": research_status,
         "query_count": payload["query_count"],
         "domain_count": payload["domain_count"],
         "search_domain_count": payload["search_domain_count"],
