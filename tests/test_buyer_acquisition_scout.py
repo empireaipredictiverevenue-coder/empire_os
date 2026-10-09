@@ -125,6 +125,8 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
     assert row["domain"] == "buyer.example"
     assert row["explicit_direct_buyer_evidence"] is True
     assert row["buyer_relationship"] == "direct_inventory_buyer"
+    assert row["commercial_sitemap_candidate_count"] == 0
+    assert row["commercial_sitemap_page_fetch_count"] == 0
     claim = row["buyer_claim_provenance"]["claim_receipts"][0]
     assert claim["source_url"] == "https://buyer.example/advertisers/"
     assert claim["claim_excerpt"] == "We buy leads from verified publishers."

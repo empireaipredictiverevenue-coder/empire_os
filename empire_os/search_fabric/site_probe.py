@@ -742,6 +742,20 @@ _SITEMAP_PEOPLE_TERMS = (
     "company",
 )
 
+# Sitemaps discover URLs only. Never infer buying intent from a pathname.
+_SITEMAP_COMMERCIAL_TERMS = (
+    "buy-leads", "buy-calls", "purchase-leads", "purchase-calls",
+    "buying-leads", "lead-acquisition", "call-acquisition",
+    "for-advertisers", "advertiser", "lead-buyers", "call-buyers",
+    "pay-per-call", "media-buying", "for-buyers", "lead-purchasing",
+    "demand-partner", "partners/buy", "partnerships/buy",
+)
+
+
+def _commercial_url_candidate(url: str) -> bool:
+    path = urlparse(url).path.casefold()
+    return any(term in path for term in _SITEMAP_COMMERCIAL_TERMS)
+
 
 def _sitemap_people_candidates(
     session: requests.Session,
@@ -752,8 +766,9 @@ def _sitemap_people_candidates(
     max_urls: int = 12,
     max_fetches: int = 4,
     public_only: bool = False,
+    priority: str = "people",
 ) -> List[str]:
-    """Discover hidden first-party people pages from bounded sitemap reads."""
+    """Discover bounded first-party priority pages; URLs are not claim proof."""
     root = f"{urlparse(origin).scheme}://{urlparse(origin).netloc}"
     sitemap_urls = [
         urljoin(root + "/", "sitemap.xml"),
@@ -763,6 +778,13 @@ def _sitemap_people_candidates(
     nested: List[str] = []
     reads = 0
     read_cap = max(0, min(int(max_fetches), 4))
+    commercial = priority == "commercial"
+
+    def eligible(value: str) -> bool:
+        return (
+            _commercial_url_candidate(value) if commercial
+            else any(term in urlparse(value).path.lower() for term in _SITEMAP_PEOPLE_TERMS)
+        )
 
     def locs(text: str) -> List[str]:
         return [
@@ -796,11 +818,14 @@ def _sitemap_people_candidates(
             if lower.endswith(".xml"):
                 if any(
                     token in lower
-                    for token in ("page", "team", "people", "staff", "author")
+                    for token in (
+                        ("page", "post", "partner", "lead", "buyer", "advertis", "call", "service")
+                        if commercial else ("page", "team", "people", "staff", "author")
+                    )
                 ):
                     nested.append(value)
                 continue
-            if any(term in lower for term in _SITEMAP_PEOPLE_TERMS):
+            if eligible(value):
                 discovered.append(value.split("#", 1)[0])
         if discovered or (nested and reads >= read_cap - 1):
             # Reserve the remaining fetch for an actual nested people map,
@@ -822,13 +847,7 @@ def _sitemap_people_candidates(
         ):
             continue
         for value in locs(doc.text):
-            if (
-                _same_site(value, origin)
-                and any(
-                    term in value.lower()
-                    for term in _SITEMAP_PEOPLE_TERMS
-                )
-            ):
+            if _same_site(value, origin) and eligible(value):
                 discovered.append(value.split("#", 1)[0])
                 if len(discovered) >= max_urls:
                     break
@@ -1004,6 +1023,7 @@ def probe_site(
 
     queue = [homepage.url]
     sitemap_people_urls: List[str] = []
+    sitemap_commercial_urls: List[str] = []
 
     if homepage.format == "html":
         internal = _internal_candidates(
@@ -1055,13 +1075,31 @@ def probe_site(
                 queue.extend(sitemap_people_urls)
                 queue.extend(internal)
         elif page_priority == "commercial":
-            # Reserve limited crawl slots for first-party contact/about proof
-            # even when navigation supplies many low-value links.
-            queue.extend(internal[:3])
+            # Keep the five-HTML-page budget. First-party purchase pages
+            # hidden from navigation deserve the remaining slots before
+            # generic contact/about pages. Sitemaps reveal only candidates,
+            # never evidence of buying until the page is actually fetched.
+            explicit_links = [
+                link for link in internal if _commercial_url_candidate(link)
+            ]
+            if (
+                max_pages >= 3
+                and urlparse(homepage.url).path in {"", "/"}
+                and len(explicit_links) < 2
+            ):
+                sitemap_commercial_urls = _sitemap_people_candidates(
+                    session, origin, timeout=min(request_timeout, 2.0),
+                    deadline=deadline,
+                    max_urls=min(2, max_pages - 1),
+                    max_fetches=2,
+                    priority="commercial", public_only=public_only,
+                )
+            queue.extend(internal[:2])
+            queue.extend(sitemap_commercial_urls)
             queue.extend(_common_candidates(
                 homepage.url, priority=page_priority,
             ))
-            queue.extend(internal[3:])
+            queue.extend(internal[2:])
         else:
             queue.extend(internal)
         if page_priority != "commercial":
@@ -1303,6 +1341,10 @@ def probe_site(
         "sitemap_people_candidates": len(sitemap_people_urls),
         "sitemap_people_pages_fetched": sum(
             1 for page in pages if page["url"] in sitemap_people_urls
+        ),
+        "sitemap_commercial_candidates": len(sitemap_commercial_urls),
+        "sitemap_commercial_pages_fetched": sum(
+            1 for page in pages if page["url"] in sitemap_commercial_urls
         ),
         "evidence_score": round(evidence_score, 4),
         "time_budget_seconds": round(time_budget_seconds, 2),

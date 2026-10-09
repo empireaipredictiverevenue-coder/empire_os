@@ -31,6 +31,8 @@ def payloads():
             "direct_publication": True,
         }],
         "first_party_emails": ["jane@buyer.example"],
+        "commercial_sitemap_candidate_count": 2,
+        "commercial_sitemap_page_fetch_count": 1,
     }
     suspect = {
         "domain": "vendor.example", "website": "https://vendor.example",
@@ -56,6 +58,8 @@ def test_scorecard_separates_direct_proof_and_contact_observations():
     assert out["stage_receipts_time_aligned"] is True
     assert out["scout_candidate_count"] == 2
     assert out["candidate_with_valid_direct_purchase_receipt"] == 1
+    assert out["candidate_with_sitemap_commercial_page"] == 1
+    assert out["commercial_sitemap_pages_fetched"] == 1
     assert out["unsupported_positive_direct_buyer_flags"] == 1
     assert out["candidate_with_named_person_record"] == 2
     assert out["candidate_with_published_company_email"] == 2

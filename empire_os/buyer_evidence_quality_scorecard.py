@@ -54,6 +54,10 @@ def build_evidence_quality_scorecard(
         if domain:
             seen_domains.add(domain)
         role_count[str(row.get("buyer_relationship") or "unknown")] += 1
+        sitemap_fetched = max(0, int(row.get("commercial_sitemap_page_fetch_count") or 0))
+        if sitemap_fetched:
+            counts["candidate_with_sitemap_commercial_page"] += 1
+            counts["commercial_sitemap_pages_fetched"] += sitemap_fetched
         if row.get("first_party_people"):
             counts["candidate_with_named_person_record"] += 1
         if row.get("first_party_emails"):
@@ -123,6 +127,12 @@ def build_evidence_quality_scorecard(
         "scout_candidate_count": count,
         "unique_scout_domain_count": len(seen_domains),
         "buyer_relationship_counts": dict(sorted(role_count.items())),
+        "candidate_with_sitemap_commercial_page": counts[
+            "candidate_with_sitemap_commercial_page"
+        ],
+        "commercial_sitemap_pages_fetched": counts[
+            "commercial_sitemap_pages_fetched"
+        ],
         "candidate_with_named_person_record": counts["candidate_with_named_person_record"],
         "candidate_with_published_company_email": counts["candidate_with_published_company_email"],
         "candidate_with_published_company_phone": counts["candidate_with_published_company_phone"],

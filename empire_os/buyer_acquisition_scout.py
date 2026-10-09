@@ -1010,6 +1010,12 @@ def run_buyer_scout(
             ),
             "explicit_direct_buyer_evidence": verified_direct_buyer,
             "first_party_buyer_evidence_pages": buyer_evidence_pages,
+            "commercial_sitemap_candidate_count": int(
+                evidence.get("sitemap_commercial_candidates") or 0
+            ),
+            "commercial_sitemap_page_fetch_count": int(
+                evidence.get("sitemap_commercial_pages_fetched") or 0
+            ),
             "direct_signal_hits": profile["direct_signal_hits"],
             "reseller_signal_hits": profile["reseller_signal_hits"],
             "target_buyer_pools": pools,
@@ -1125,6 +1131,14 @@ def run_buyer_scout(
         ),
         "buyer_role_conflict_count": sum(
             row.get("buyer_relationship") == "mixed_role_requires_review"
+            for row in candidates
+        ),
+        "commercial_sitemap_candidates_discovered": sum(
+            int(row.get("commercial_sitemap_candidate_count") or 0)
+            for row in candidates
+        ),
+        "commercial_sitemap_pages_fetched": sum(
+            int(row.get("commercial_sitemap_page_fetch_count") or 0)
             for row in candidates
         ),
         "icp_assessed_candidate_count": sum(
