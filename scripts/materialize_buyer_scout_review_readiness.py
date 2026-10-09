@@ -12,6 +12,7 @@ from empire_os.buyer_scout_review_readiness import (
 )
 from empire_os.sb import request_json
 from empire_os.buyer_evidence_quality_scorecard import refresh_evidence_quality_scorecard
+from empire_os.revenue_flow_meter import refresh_flow_meter
 
 
 def _audit_stale_ready(*, limit: int, observe_only: bool) -> dict:
@@ -109,7 +110,47 @@ def main() -> int:
     except Exception as exc:
         print("EVIDENCE_QUALITY_SCORECARD_UNAVAILABLE:" + type(exc).__name__ + ":" + str(exc)[:180])
 
+    # Use this existing scheduled materializer: no additional timer or agent.
+    # Aggregate-only report is advisory. Failure never grants approval and
+    # never interrupts the governed review workflow above.
+    flow_status = "unavailable"
+    flow_summary = {}
+    try:
+        flow = refresh_flow_meter(args.repo_root)
+        checks = flow["health_checks"]
+        upstream_current = (
+            checks["scout_fresh"]
+            and checks["scout_to_reconciliation_verified"]
+            and checks["evidence_quality_aligned"]
+            and checks["review_fresh"]
+        )
+        flow_status = (
+            "fully_current" if upstream_current
+            and checks["commercial_truth_fresh"]
+            and checks["revenue_truth_fresh"]
+            else "upstream_current_downstream_stale" if upstream_current
+            else "partial_or_stale"
+        )
+        flow_summary = {
+            "scout_domain_join_count": flow["handoffs"][
+                "scout_to_reconciliation"
+            ]["joined_count"],
+            "review_inventory_scanned": flow["stages"][
+                "holding_review_scanned"
+            ]["current_count"],
+            "astra_canonical_company_matches": flow["stages"][
+                "astra_canonical_bindings"
+            ]["current_count"],
+            "commercial_funnel_current": flow["health_checks"][
+                "commercial_truth_fresh"
+            ],
+        }
+    except Exception as exc:
+        print("REVENUE_FLOW_METER_UNAVAILABLE:" + type(exc).__name__ + ":" + str(exc)[:180])
+
     print(json.dumps({
+        "flow_meter_status": flow_status,
+        "flow_meter_summary": flow_summary,
         "evidence_quality_status": quality_status,
         "evidence_quality_summary": quality_summary,
         "ok": True,
