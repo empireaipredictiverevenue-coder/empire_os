@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+import time
 from hashlib import sha256
 import ipaddress
 import json
@@ -20,6 +21,7 @@ import tempfile
 from typing import Any
 
 from empire_os.buyer_review_holds import load_review_holds
+from empire_os.buyer_first_party_due_diligence import load_due_diligence
 
 ROOT = Path('/srv/empire_os')
 BASE = Path('runtime/buyer_network_intelligence')
@@ -83,6 +85,9 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
     root=Path(root).resolve()
     snapshots, hashes = _snapshots(root)
     holds = load_review_holds(root/'config/buyer_network_manual_review_holds.json')
+    due_path = root/BASE/'due_diligence_latest.json'
+    due_reviews, due_holds = load_due_diligence(due_path, now_epoch=time.time())
+    due_hash = sha256(due_path.read_bytes()).hexdigest() if due_path.is_file() else None
     shortlist=snapshots['shortlist'].get('shortlist')
     packets=snapshots['packets'].get('packets')
     queued=snapshots['queue'].get('candidates')
@@ -117,7 +122,13 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         if not domain or domain in seen or domain not in current_domains:continue
         seen.add(domain)
         manual_hold = holds.get(domain)
-        is_founder_review = domain in verified_packets and manual_hold is None
+        auto_hold = due_holds.get(domain)
+        due_review = due_reviews.get(domain) or {}
+        due_ready = (due_review.get('freshness') == 'CURRENT'
+                     and due_review.get('homepage_reachable') is True
+                     and due_review.get('state') == 'NEEDS_FOUNDER_REVIEW')
+        is_founder_review = (domain in verified_packets and manual_hold is None
+                             and auto_hold is None and due_ready)
         gaps=[g for g in item.get('evidence_gaps',[])
               if isinstance(g,str) and g in EVIDENCE_TASKS] if isinstance(item.get('evidence_gaps'),list) else []
         gaps=list(dict.fromkeys(gaps))
@@ -130,8 +141,12 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         actions.append({
             'domain':domain,
             'tier':('MANUAL_EVIDENCE_HOLD' if manual_hold is not None
+                    else 'AUTOMATED_EVIDENCE_HOLD' if auto_hold is not None
+                    else 'DUE_DILIGENCE_PENDING' if domain in verified_packets and not due_ready
                     else 'FOUNDER_REVIEW_ONLY' if is_founder_review
                     else 'EVIDENCE_RECOVERY'),
+            'automated_hold_reason':auto_hold['reason_code'] if auto_hold else None,
+            'first_party_due_diligence':due_review,
             'manual_hold_reason':manual_hold['reason_code'] if manual_hold is not None else None,
             'manual_hold_resolution_condition':(
                 manual_hold['resolution_condition'] if manual_hold is not None else None
@@ -152,12 +167,14 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'mailbox_send_provisioned':False,
             'actual_revenue':False,
         })
-    order={'FOUNDER_REVIEW_ONLY':0,'EVIDENCE_RECOVERY':1,'MANUAL_EVIDENCE_HOLD':2}
+    order={'FOUNDER_REVIEW_ONLY':0,'DUE_DILIGENCE_PENDING':1,
+           'EVIDENCE_RECOVERY':2,'AUTOMATED_EVIDENCE_HOLD':3,'MANUAL_EVIDENCE_HOLD':4}
     actions.sort(key=lambda x:(order[x['tier']],-x['founder_priority'],x['domain']))
     # Reject stale mixed-source races. A scheduler might replace its snapshots
     # concurrently; do not promote an optimistic partial report.
     _,after_hashes=_snapshots(root)
-    if hashes!=after_hashes:
+    after_due_hash = sha256(due_path.read_bytes()).hexdigest() if due_path.is_file() else None
+    if hashes!=after_hashes or due_hash!=after_due_hash:
         raise BuyerPriorityError('source_snapshots_changed_during_read')
     return {
         'schema_version':'empire.buyer_qualification_actions.v1',
@@ -166,8 +183,20 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         'source_sha256':hashes,
         'network_candidate_count':len(current_domains),
         'shortlisted_count':len(actions),
+        'first_party_due_diligence_current_count':sum(
+            x['first_party_due_diligence'].get('freshness') == 'CURRENT'
+            for x in actions
+        ),
+        'first_party_due_diligence_unverified_count':sum(
+            x['first_party_due_diligence'].get('freshness') != 'CURRENT'
+            or not x['first_party_due_diligence'].get('homepage_reachable')
+            for x in actions
+        ),
         'trusted_founder_review_count':sum(x['tier']=='FOUNDER_REVIEW_ONLY' for x in actions),
         'manual_evidence_hold_count':sum(x['tier']=='MANUAL_EVIDENCE_HOLD' for x in actions),
+        'automated_evidence_hold_count':sum(x['tier']=='AUTOMATED_EVIDENCE_HOLD' for x in actions),
+        'due_diligence_pending_count':sum(x['tier']=='DUE_DILIGENCE_PENDING' for x in actions),
+        'due_diligence_source_sha256':due_hash,
         'contact_verified_for_outbound_count':0,
         'outbound_sent':False,'outbound_enabled':False,
         'human_review_required':True,'buyer_conversation_verified':False,
@@ -211,11 +240,16 @@ def main() -> int:
     print(json.dumps({'status':'PASS','mode':report['mode'],
         'network_candidate_count':report['network_candidate_count'],
         'shortlisted_count':report['shortlisted_count'],
+        'first_party_due_diligence_current_count':report['first_party_due_diligence_current_count'],
+        'first_party_due_diligence_unverified_count':report['first_party_due_diligence_unverified_count'],
         'trusted_founder_review_count':report['trusted_founder_review_count'],
         'manual_evidence_hold_count':report['manual_evidence_hold_count'],
+        'automated_evidence_hold_count':report['automated_evidence_hold_count'],
+        'due_diligence_pending_count':report['due_diligence_pending_count'],
         'gap_counts':report['gap_counts'],
         'target_domains_by_tier':[{'domain':x['domain'],'tier':x['tier'],
                                    'manual_hold_reason':x['manual_hold_reason'],
+                                   'automated_hold_reason':x['automated_hold_reason'],
                                    'missing_evidence':x['missing_evidence']}
                                   for x in report['targets'][:10]],
         'written':bool(args.write),'outbound_sent':False,

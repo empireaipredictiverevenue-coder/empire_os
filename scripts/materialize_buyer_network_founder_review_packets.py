@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+import time
 from pathlib import Path
 from typing import Any
 
 from empire_os.buyer_review_holds import load_review_holds
+from empire_os.buyer_first_party_due_diligence import load_due_diligence
 
 
 ROOT = Path("/srv/empire_os")
 HOLDS = ROOT / "config/buyer_network_manual_review_holds.json"
+DUE_DILIGENCE = ROOT / "runtime/buyer_network_intelligence/due_diligence_latest.json"
 
 BASE = (
     ROOT
@@ -244,6 +247,9 @@ def main():
     # Founder due-diligence HOLD policy is authoritative for review promotion.
     # Evaluate it before any existing runtime snapshot is overwritten.
     manual_holds = load_review_holds(HOLDS)
+    site_reviews, automated_holds = load_due_diligence(
+        DUE_DILIGENCE, now_epoch=time.time(),
+    )
 
     discovery = json.loads(
         DISCOVERY.read_text()
@@ -268,6 +274,8 @@ def main():
     packets = []
     backlog = []
     held_domains = []
+    automated_held_domains = []
+    pending_due_diligence_domains = []
 
     for candidate in queue.get(
         "candidates",
@@ -301,6 +309,44 @@ def main():
         status = candidate.get(
             "status"
         )
+
+        automated_hold = automated_holds.get(domain)
+        if automated_hold is not None:
+            automated_held_domains.append(domain)
+            backlog.append({
+                "domain": domain,
+                "status": "AUTOMATED_EVIDENCE_HOLD",
+                "source_status": status,
+                "score": candidate.get("score"),
+                "verticals": candidate.get("verticals", []),
+                "reasons": ["automated_hold:" + automated_hold["reason_code"]],
+                "review_required": True,
+                "evidence_observed_at": automated_hold["observed_at"],
+                "authority": "OBSERVE",
+                "outbound_authority": False,
+            })
+            continue
+
+        site_review = site_reviews.get(domain) or {}
+        due_current = (
+            site_review.get("freshness") == "CURRENT"
+            and site_review.get("homepage_reachable") is True
+            and site_review.get("state") == "NEEDS_FOUNDER_REVIEW"
+        )
+        if status == "READY_TO_APPROACH" and not due_current:
+            pending_due_diligence_domains.append(domain)
+            backlog.append({
+                "domain": domain,
+                "status": "DUE_DILIGENCE_PENDING",
+                "source_status": status,
+                "score": candidate.get("score"),
+                "verticals": candidate.get("verticals", []),
+                "reasons": ["first_party_due_diligence_missing_stale_or_unavailable"],
+                "review_required": True,
+                "authority": "OBSERVE",
+                "outbound_authority": False,
+            })
+            continue
 
         verified_item = verified.get(
             domain
@@ -348,6 +394,10 @@ def main():
 
                     "buyer_role_corroborated":
                         True,
+                    "first_party_due_diligence_current": True,
+                    "due_diligence_link_count": site_review.get("link_count", 0),
+                    "commercial_terms_verified": False,
+                    "payout_economics_verified": False,
 
                     "authority":
                         "FOUNDER_REVIEW_ONLY",
@@ -467,6 +517,9 @@ def main():
 
             "manual_hold_count": len(held_domains),
             "manual_hold_domains": sorted(set(held_domains)),
+            "automated_evidence_hold_count": len(automated_held_domains),
+            "automated_evidence_hold_domains": sorted(set(automated_held_domains)),
+            "due_diligence_pending_count": len(pending_due_diligence_domains),
 
             "packets":
                 packets,
@@ -504,6 +557,8 @@ def main():
                 len(backlog),
 
             "manual_hold_count": len(held_domains),
+            "automated_evidence_hold_count": len(automated_held_domains),
+            "due_diligence_pending_count": len(pending_due_diligence_domains),
             "candidates":
                 backlog,
         },
@@ -521,6 +576,8 @@ def main():
             + str(len(backlog))
         ),
         ("Manual due-diligence holds: " + str(len(held_domains))),
+        ("Automated critical-link holds: " + str(len(automated_held_domains))),
+        ("Pending independent first-party link checks: " + str(len(pending_due_diligence_domains))),
         "",
     ]
 
@@ -609,6 +666,8 @@ def main():
                     len(packets),
 
                 "manual_hold_count": len(held_domains),
+                "automated_evidence_hold_count": len(automated_held_domains),
+                "due_diligence_pending_count": len(pending_due_diligence_domains),
 
                 "trusted_ready_domains":
                     [

@@ -23,6 +23,9 @@ OUT = ROOT / "runtime/buyer_network_intelligence/research_cycle_latest.json"
 # doing so briefly exposed unfiltered intermediate queues (881 vs 143).
 STEPS = (
     "probe_buyer_network_direct_sites.py",
+    # Four targeted first-party legal/contact checks on existing 30-min scout;
+    # no extra timer, auto approval, signup, send, or payment.
+    "observe_buyer_first_party_due_diligence.py",
     # Read-only snapshots -> 0600 founder review actions; no outreach.
     "build_buyer_qualification_actions.py",
 )
@@ -56,7 +59,8 @@ def run(
         try:
             completed = call(
                 args, cwd=root, env=env, text=True, capture_output=True,
-                timeout=120 if "probe_" in name else 55,
+                timeout=(120 if "probe_" in name else
+                         90 if "observe_buyer_first_party_due_diligence.py" in name else 55),
                 check=False,
             )
             result = {
@@ -118,6 +122,10 @@ def run(
         "canonical_queue_owner": "existing_buyer_intelligence_pipeline",
         "traffic_activation": False,
         "founder_review_automatic_approval": False,
+        "first_party_due_diligence_refresh_attempted": (
+            not plan_only
+            and any(r["script"] == "observe_buyer_first_party_due_diligence.py" for r in results)
+        ),
         "founder_qualification_snapshot_refresh_attempted": (
             not plan_only
             and any(r["script"] == "build_buyer_qualification_actions.py" for r in results)

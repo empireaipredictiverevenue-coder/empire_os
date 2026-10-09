@@ -2,6 +2,7 @@
 from __future__ import annotations
 import importlib.util
 import json
+import time
 from pathlib import Path
 import pytest
 
@@ -42,6 +43,17 @@ def _maker_inputs(folder:Path,domains=('paymyreferral.com','astoriacompany.com')
     json.dump({'candidates':[{'domain':d,'status':'READY_TO_APPROACH','score':99,
                               'evidence':evidence,'verticals':['home_services']} for d in domains]},
               (folder/'candidate_queue_latest.json').open('w'))
+    due={'schema_version':'empire.buyer_due_diligence.v1','mode':'OBSERVE',
+         'outbound_sent':False,'execution_authority':'none',
+         'observations':[{
+            'domain':domain,'observed_epoch':time.time(),
+            'observed_at':'2026-10-09T21:00:00+00:00',
+            'state':'NEEDS_FOUNDER_REVIEW',
+            'home':{'url':'https://'+domain+'/','status':'PASS','http_status':200},
+            'checked_links':[],'critical_broken_links':[],
+            'outbound_authorized':False,
+         } for domain in domains]}
+    (folder/'due_diligence_latest.json').write_text(json.dumps(due))
 
 
 def test_durable_repo_hold_is_verified():
@@ -56,7 +68,7 @@ def test_first_party_manual_hold_applies_to_materializer_main(tmp_path,monkeypat
     _maker_inputs(base)
     config=_holds(tmp_path/'config/buyer_network_manual_review_holds.json')
     monkeypatch.setattr(mod,'HOLDS',config)
-    for var,file in [('DISCOVERY','discovery_latest.json'),('VERIFICATION','verification_latest.json'),
+    for var,file in [('DUE_DILIGENCE','due_diligence_latest.json'),('DISCOVERY','discovery_latest.json'),('VERIFICATION','verification_latest.json'),
                      ('QUEUE','candidate_queue_latest.json'),('PACKETS','founder_review_packets_latest.json'),
                      ('PACKETS_MD','founder_review_packets_latest.md'),('BACKLOG','verification_backlog_latest.json')]:
         monkeypatch.setattr(mod,var,base/file)
@@ -84,7 +96,7 @@ def test_invalid_config_does_not_overwrite_existing_packets(tmp_path,monkeypatch
     config.parent.mkdir()
     config.write_text('not json')
     monkeypatch.setattr(mod,'HOLDS',config)
-    for var,file in [('DISCOVERY','discovery_latest.json'),('VERIFICATION','verification_latest.json'),
+    for var,file in [('DUE_DILIGENCE','due_diligence_latest.json'),('DISCOVERY','discovery_latest.json'),('VERIFICATION','verification_latest.json'),
                      ('QUEUE','candidate_queue_latest.json'),('PACKETS','founder_review_packets_latest.json'),
                      ('PACKETS_MD','founder_review_packets_latest.md'),('BACKLOG','verification_backlog_latest.json')]:
         monkeypatch.setattr(mod,var,base/file)
@@ -125,3 +137,77 @@ def test_symlink_and_missing_hold_policy_fail_closed(tmp_path):
         load_review_holds(link)
     with pytest.raises(BuyerReviewHoldError,match='missing_or_unsafe'):
         load_review_holds(tmp_path/'not-here.json')
+
+
+def test_automated_broken_legal_link_blocks_first_party_packet(tmp_path,monkeypatch,capsys):
+    """Even fully corroborated buyer sites cannot bypass independent 404 proof."""
+    mod=_maker()
+    base=tmp_path/'runtime/buyer_network_intelligence'
+    _maker_inputs(base,('paymyreferral.com','astoriacompany.com'))
+    config=_holds(tmp_path/'config/buyer_network_manual_review_holds.json',())
+    due_file=base/'due_diligence_latest.json'
+    due=json.loads(due_file.read_text())
+    row=next(x for x in due['observations'] if x['domain']=='paymyreferral.com')
+    row['state']='EVIDENCE_HOLD'
+    row['checked_links']=[{'category':'terms','url':'https://paymyreferral.com/terms',
+                           'status':'HTTP_ERROR','http_status':404}]
+    row['critical_broken_links']=[{'category':'terms','url':'https://paymyreferral.com/terms',
+                                   'http_status':404}]
+    due_file.write_text(json.dumps(due))
+    monkeypatch.setattr(mod,'HOLDS',config)
+    for var,file in [('DUE_DILIGENCE','due_diligence_latest.json'),('DISCOVERY','discovery_latest.json'),
+                     ('VERIFICATION','verification_latest.json'),('QUEUE','candidate_queue_latest.json'),
+                     ('PACKETS','founder_review_packets_latest.json'),('PACKETS_MD','founder_review_packets_latest.md'),
+                     ('BACKLOG','verification_backlog_latest.json')]:
+        monkeypatch.setattr(mod,var,base/file)
+    mod.main()
+    summary=json.loads(capsys.readouterr().out)
+    assert summary['manual_hold_count']==0
+    assert summary['automated_evidence_hold_count']==1
+    assert summary['trusted_ready_domains']==['astoriacompany.com']
+    backlog=json.loads((base/'verification_backlog_latest.json').read_text())
+    held=next(x for x in backlog['candidates'] if x['domain']=='paymyreferral.com')
+    assert held['status']=='AUTOMATED_EVIDENCE_HOLD'
+    assert held['outbound_authority'] is False
+    assert held['reasons']==['automated_hold:FIRST_PARTY_CRITICAL_LINK_HTTP_404_OR_410']
+
+
+def test_missing_due_diligence_never_promotes_ready_buyer(tmp_path,monkeypatch,capsys):
+    mod=_maker()
+    base=tmp_path/'runtime/buyer_network_intelligence'
+    _maker_inputs(base,('astoriacompany.com',))
+    (base/'due_diligence_latest.json').unlink()
+    config=_holds(tmp_path/'config/buyer_network_manual_review_holds.json',())
+    monkeypatch.setattr(mod,'HOLDS',config)
+    for var,file in [('DUE_DILIGENCE','due_diligence_latest.json'),('DISCOVERY','discovery_latest.json'),
+                     ('VERIFICATION','verification_latest.json'),('QUEUE','candidate_queue_latest.json'),
+                     ('PACKETS','founder_review_packets_latest.json'),('PACKETS_MD','founder_review_packets_latest.md'),
+                     ('BACKLOG','verification_backlog_latest.json')]:
+        monkeypatch.setattr(mod,var,base/file)
+    mod.main()
+    result=json.loads(capsys.readouterr().out)
+    assert result['trusted_ready_count']==0
+    assert result['due_diligence_pending_count']==1
+    backlog=json.loads((base/'verification_backlog_latest.json').read_text())
+    assert backlog['candidates'][0]['status']=='DUE_DILIGENCE_PENDING'
+
+
+def test_corrupted_due_snapshot_does_not_overwrite_founder_packets(tmp_path,monkeypatch):
+    from empire_os.buyer_first_party_due_diligence import DueDiligenceError
+    mod=_maker()
+    base=tmp_path/'runtime/buyer_network_intelligence'
+    _maker_inputs(base,('astoriacompany.com',))
+    due=base/'due_diligence_latest.json'
+    due.write_text('{corrupted snapshot')
+    config=_holds(tmp_path/'config/buyer_network_manual_review_holds.json',())
+    monkeypatch.setattr(mod,'HOLDS',config)
+    for var,file in [('DUE_DILIGENCE','due_diligence_latest.json'),('DISCOVERY','discovery_latest.json'),
+                     ('VERIFICATION','verification_latest.json'),('QUEUE','candidate_queue_latest.json'),
+                     ('PACKETS','founder_review_packets_latest.json'),('PACKETS_MD','founder_review_packets_latest.md'),
+                     ('BACKLOG','verification_backlog_latest.json')]:
+        monkeypatch.setattr(mod,var,base/file)
+    original=base/'founder_review_packets_latest.json'
+    original.write_text('DONT_OVERWRITE_REVIEW_PACKET')
+    with pytest.raises(DueDiligenceError,match='invalid'):
+        mod.main()
+    assert original.read_text()=='DONT_OVERWRITE_REVIEW_PACKET'

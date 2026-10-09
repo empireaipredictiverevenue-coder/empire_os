@@ -1,6 +1,7 @@
 """Frozen mailbox + qualification packets never imply a commercially verified buyer."""
 from __future__ import annotations
 import json
+import time
 from pathlib import Path
 import pytest
 
@@ -43,6 +44,17 @@ def _case(root:Path,*,verified:bool=True, bad:int=0):
           'raw_contact':'private@example.org'}]},
      'queue':{'candidate_count':len(queue),'candidates':queue},
     }
+    due={'schema_version':'empire.buyer_due_diligence.v1','mode':'OBSERVE',
+         'execution_authority':'none','outbound_sent':False,
+         'observations':[{
+             'domain':d,'observed_epoch':time.time(),
+             'observed_at':'2026-10-09T21:00:00+00:00',
+             'state':'NEEDS_FOUNDER_REVIEW',
+             'home':{'url':'https://'+d+'/','status':'PASS','http_status':200},
+             'checked_links':[],'critical_broken_links':[],
+             'outbound_authorized':False,
+         } for d in (d1,d2)]}
+    (directory/'due_diligence_latest.json').write_text(json.dumps(due))
     if bad==1:
         data['shortlist']['shortlist_count']=1000
     for key,name in SOURCES.items():
@@ -55,6 +67,8 @@ def test_founder_review_ranks_first_but_cannot_send(tmp_path):
     report=plan(tmp_path)
     assert report['network_candidate_count']==2
     assert report['shortlisted_count']==2
+    assert report['first_party_due_diligence_current_count']==2
+    assert report['first_party_due_diligence_unverified_count']==0
     assert report['trusted_founder_review_count']==1
     assert report['buyer_conversation_verified'] is False
     assert report['contact_verified_for_outbound_count']==0
@@ -120,3 +134,34 @@ def test_sources_do_not_allow_private_or_ip_targets(tmp_path):
     report=plan(tmp_path)
     assert len(report['targets'])==2
     assert all(x['domain']!='127.0.0.1' for x in report['targets'])
+
+
+def test_auto_critical_link_hold_overrides_existing_founder_packet(tmp_path):
+    import time
+    directory=_case(tmp_path)
+    path=directory/'due_diligence_latest.json'
+    due=json.loads(path.read_text())
+    row=due['observations'][0]
+    row['state']='EVIDENCE_HOLD'
+    row['critical_broken_links']=[{
+        'category':'terms','url':'https://publisheralpha.example.com/terms','http_status':404}]
+    row['checked_links']=[{'category':'terms',
+        'url':'https://publisheralpha.example.com/terms','http_status':404,'status':'HTTP_ERROR'}]
+    path.write_text(json.dumps(due))
+    report=plan(tmp_path)
+    assert report['trusted_founder_review_count']==0
+    assert report['automated_evidence_hold_count']==1
+    held=next(x for x in report['targets'] if x['domain']=='publisheralpha.example.com')
+    assert held['tier']=='AUTOMATED_EVIDENCE_HOLD'
+    assert held['automated_hold_reason']=='FIRST_PARTY_CRITICAL_LINK_HTTP_404_OR_410'
+    assert held['outbound_authorized'] is False
+
+
+def test_no_legal_due_artifact_cannot_claim_review_readiness(tmp_path):
+    directory=_case(tmp_path)
+    (directory/'due_diligence_latest.json').unlink()
+    report=plan(tmp_path)
+    assert report['trusted_founder_review_count']==0
+    assert report['first_party_due_diligence_unverified_count']==2
+    assert report['due_diligence_pending_count']==1
+    assert report['outbound_enabled'] is False
