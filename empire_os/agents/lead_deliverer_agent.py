@@ -214,63 +214,13 @@ def post_webhook(url: str, api_key: str, lead: dict) -> tuple[bool, int, str]:
 
 def send_email(to: str, subject: str, body_text: str, body_html: str = None,
                metadata: dict = None) -> tuple[bool, str]:
-    """Send email via Resend HTTP API, or log it if no key set.
+    """Fail closed: the retired Resend sender is not an owned professional mailbox.
 
-    Uses requests lib — Python's urllib triggers Cloudflare 1010 on
-    api.resend.com because of TLS fingerprint, requests passes.
-
-    Args:
-        to: recipient email
-        subject: email subject
-        body_text: plain text body
-        body_html: optional HTML body
-        metadata: optional dict forwarded to Resend — appears in webhook events
+    Never infer delivery from logging, key existence or a green agent step.
+    The governed replacement requires verified sender, reply identity,
+    suppression, provider and explicit outbound approvals before activation.
     """
-    api_key = ""
-    try:
-        if ENV_PATH.exists():
-            for line in ENV_PATH.read_text().splitlines():
-                line = line.strip()
-                if line.startswith("RESEND_API_KEY="):
-                    api_key = line.split("=", 1)[1].strip()
-                    break
-    except Exception:
-        pass
-
-    if not api_key:
-        _log_event("EMAIL_FALLBACK", "no RESEND_API_KEY, logged only",
-                  to=to, subject=subject, body_preview=body_text[:200])
-        return True, "logged (no Resend key)"
-
-    payload = {
-        "from": RESEND_FROM,
-        "to": [to],
-        "reply_to": [RESEND_REPLY_TO],
-        "subject": subject,
-        "text": body_text,
-    }
-    if f"@{ALLOWED_SEND_DOMAIN}" not in RESEND_FROM:
-        return False, f"from '{RESEND_FROM}' not on allowed domain @{ALLOWED_SEND_DOMAIN}"
-    if body_html:
-        payload["html"] = body_html
-    if metadata:
-        # Resend only accepts string-keyed string-valued metadata
-        payload["metadata"] = {str(k): str(v) for k, v in metadata.items()}
-
-    try:
-        import requests
-        r = requests.post(
-            "https://api.resend.com/emails",
-            headers={"Authorization": "Bearer " + api_key,
-                     "Content-Type": "application/json"},
-            json=payload,
-            timeout=10,
-        )
-        if r.status_code < 300:
-            return True, f"sent ({r.status_code}): {r.text[:200]}"
-        return False, f"HTTP {r.status_code}: {r.text[:200]}"
-    except Exception as e:
-        return False, str(e)[:300]  # noqa: E501
+    return False, "owned_mailbox_outbound_disabled"
 
 
 def deliver_lead(buyer: dict, lead: dict) -> dict:

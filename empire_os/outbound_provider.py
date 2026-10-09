@@ -306,6 +306,13 @@ def send_with_resend(payload: dict[str, Any], *, api_key: str,
         raise OutboundProviderError("Resend API key required")
     if not isinstance(payload, dict) or not payload.get("_sender_address"):
         raise OutboundProviderError("validated Resend payload required")
+    # LIVE RESEND RETIRED: the founder requires the owned professional mailbox.
+    # Injected test doubles still exercise payload/signature semantics, but
+    # production must not import/call an actual third-party Resend transport.
+    if resend_module is None:
+        raise OutboundProviderError(
+            "owned professional mailbox not provisioned; third-party email transport disabled"
+        )
     outbound = {k: v for k, v in payload.items() if not k.startswith("_") and v is not None}
     idempotency_key = str(payload.get("_idempotency_key") or "").strip()
     if not idempotency_key:

@@ -40,11 +40,16 @@ def parser() -> argparse.ArgumentParser:
 
 
 def _provider_ready() -> bool:
-    return all([
-        os.getenv("RESEND_API_KEY", "").strip(),
-        os.getenv("EMPIRE_OUTBOUND_FROM", "").strip(),
-        os.getenv("EMPIRE_REPLY_TO", "").strip(),
-    ])
+    """No provider is approved while the owned mail channel is unprovisioned.
+
+    A Resend key is not an Empire-owned mailbox, and the current production
+    executor still selects Resend rather than an approved sovereign transport.
+    Do NOT infer live authority from IMAP config alone: read access would not
+    establish outbound sender, suppression, reply lineage, or founder approval.
+    Keep the existing worker read-only until an independently reviewed owned
+    transport and its complete commercial proof gates are installed.
+    """
+    return False
 
 
 def _empiredb_mode() -> bool:
@@ -111,17 +116,21 @@ def main(argv=None) -> int:
     args = parser().parse_args(argv)
     auto_approve = _bool_env("EMPIRE_OUTBOUND_AUTO_APPROVE")
     auto_send = _bool_env("EMPIRE_OUTBOUND_AUTO_SEND")
+    provider_ready = _provider_ready()
+    # Timers may request --execute; without a verified owned mailbox / sender
+    # that request MUST NOT create approvals, claims or live delivery events.
+    execution_enabled = bool(args.execute and provider_ready)
     policy = OutboundGovernorPolicy(
-        mode=args.mode,
-        allow_auto_approval=auto_approve,
-        allow_auto_send=auto_send,
+        mode=args.mode if provider_ready else "OBSERVE",
+        allow_auto_approval=auto_approve if provider_ready else False,
+        allow_auto_send=auto_send if provider_ready else False,
     )
     sender_rpc = _sender_rpc()
     work = sender_rpc("list_outbound_governor_work", {"p_limit": args.limit})
     results = []
 
     approver_rpc = None
-    if args.execute and auto_approve and args.mode == "GUARDED_EXECUTE":
+    if execution_enabled and auto_approve and policy.mode == "GUARDED_EXECUTE":
         approver_rpc = _approver_rpc()
 
     # Already-approved sends are the most actionable work. Process them before
@@ -146,7 +155,7 @@ def main(argv=None) -> int:
 
             executable_actions = {"AUTO_APPROVE_ELIGIBLE", "AUTO_SEND_ELIGIBLE"}
             if (
-                args.execute
+                execution_enabled
                 and decision.get("mutation_authorized") is True
                 and decision.get("decision") in executable_actions
             ):
@@ -193,7 +202,7 @@ def main(argv=None) -> int:
                             reply_to=os.getenv("EMPIRE_REPLY_TO", "").strip(),
                             resend_api_key=os.getenv("RESEND_API_KEY", "").strip(),
                         )
-            elif args.execute and decision.get("decision") == "AUTO_REPAIR":
+            elif execution_enabled and decision.get("decision") == "AUTO_REPAIR":
                 record["execution_deferred"] = (
                     "deterministic repair adapter not yet enabled"
                 )
@@ -217,7 +226,13 @@ def main(argv=None) -> int:
     print(json.dumps({
         "decision": "WORKER_CYCLE",
         "mode": policy.mode,
-        "execute": bool(args.execute),
+        "execute": execution_enabled,
+        "execution_requested": bool(args.execute),
+        "owned_mailbox_gate": "CLOSED" if not provider_ready else "OPEN",
+        "execution_blocked_reason": (
+            "owned_mailbox_and_authorized_sender_unverified"
+            if not provider_ready else None
+        ),
         "count": len(results),
         "fatal_error_count": fatal_errors,
         "results": results,

@@ -7,11 +7,7 @@ import json
 import os
 import sys
 
-from empire_os.outbound_provider import (
-    OutboundProviderError,
-    build_resend_send,
-    send_with_resend,
-)
+from empire_os.outbound_provider import OutboundProviderError
 from empire_os.outbound_role_transport import PostgresOutboundRpc
 
 
@@ -31,6 +27,11 @@ def emit(value):
 
 def main(argv=None):
     args = parser().parse_args(argv)
+    if args.send:
+        raise OutboundProviderError(
+            "owned mailbox and authorized outbound transport not provisioned; "
+            "manual email sending blocked"
+        )
     dsn = os.getenv("EMPIRE_OUTBOUND_SENDER_DSN", "").strip()
     if not dsn:
         raise OutboundProviderError(
@@ -45,19 +46,7 @@ def main(argv=None):
         emit({"decision":"review_only","review":review,
               "next_gate":"rerun with --send after operator review"})
         return 0
-    api_key = os.getenv("RESEND_API_KEY", "").strip()
-    claim = rpc("claim_outbound_send", {
-        "p_intent_id": args.intent_id, "p_actor": args.actor,
-    })
-    payload = build_resend_send(claim, sender=args.sender, reply_to=args.reply_to)
-    provider_message_id = send_with_resend(payload, api_key=api_key)
-    result = rpc("record_outbound_delivery", {
-        "p_intent_id": args.intent_id, "p_event_type":"sent",
-        "p_actor":args.actor, "p_provider_message_id":provider_message_id,
-        "p_payload":{"provider":"resend"},
-    })
-    emit({"review":review,"provider_message_id":provider_message_id,"result":result})
-    return 0
+
 
 
 if __name__ == "__main__":
