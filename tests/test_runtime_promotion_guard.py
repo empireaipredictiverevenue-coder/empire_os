@@ -105,3 +105,52 @@ with binding_writer_lock(sys.argv[1]): print('acquired')
         assert time.monotonic() - start >= .65
     finally:
         proc.wait(timeout=5)
+
+
+def test_atomic_write_interruption_before_replace_preserves_original(tmp_path, monkeypatch):
+    import os
+    from empire_os import runtime_promotion_guard as guard
+    path = tmp_path / 'bindings.json'
+    path.write_text('original')
+    original_replace = os.replace
+    def interrupted_replace(source, destination):
+        assert path.read_text() == 'original'
+        raise OSError('simulated process interruption before replace')
+    monkeypatch.setattr(os, 'replace', interrupted_replace)
+    with pytest.raises(OSError, match='simulated process interruption'):
+        guard.atomic_binding_write(path, 'updated', expected_bytes=b'original')
+    assert path.read_text() == 'original'
+    assert not list(tmp_path.glob('*.tmp'))
+    monkeypatch.setattr(os, 'replace', original_replace)
+    guard.atomic_binding_write(path, 'recovered', expected_bytes=b'original')
+    assert path.read_text() == 'recovered'
+
+
+def test_atomic_write_fsync_failure_preserves_original(tmp_path, monkeypatch):
+    import os
+    from empire_os.runtime_promotion_guard import atomic_binding_write
+    path = tmp_path / 'bindings.json'
+    path.write_text('original')
+    def failed_sync(fd):
+        raise OSError('simulated disk sync failure')
+    monkeypatch.setattr(os, 'fsync', failed_sync)
+    with pytest.raises(OSError, match='disk sync failure'):
+        atomic_binding_write(path, 'updated', expected_bytes=b'original')
+    assert path.read_text() == 'original'
+    assert not list(tmp_path.glob('*.tmp'))
+
+
+def test_atomic_write_detects_race_before_replace(tmp_path, monkeypatch):
+    import os
+    from empire_os.runtime_promotion_guard import atomic_binding_write, PromotionWriteError
+    path = tmp_path / 'bindings.json'
+    path.write_text('original')
+    original_fsync = os.fsync
+    def competing_writer(fd):
+        path.write_text('other-writer')
+        return original_fsync(fd)
+    monkeypatch.setattr(os, 'fsync', competing_writer)
+    with pytest.raises(PromotionWriteError, match='changed before replace'):
+        atomic_binding_write(path, 'updated', expected_bytes=b'original')
+    assert path.read_text() == 'other-writer'
+    assert not list(tmp_path.glob('*.tmp'))
