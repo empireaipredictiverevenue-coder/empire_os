@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
+from empire_os.lead_smart_operating_hours import evaluate_buyer_hours
+
 
 SCHEMA_VERSION = (
     "empire.lead_smart."
@@ -29,6 +31,8 @@ def build_launch_readiness(
     tracking: Mapping[str, Any],
     zip_gate: Mapping[str, Any],
     routing: Mapping[str, Any],
+    operating_hours: Mapping[str, Any] | None = None,
+    timezone_confirmation: Mapping[str, Any] | None = None,
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
     now: datetime | None = None,
@@ -74,7 +78,15 @@ def build_launch_readiness(
         and _fresh(routing.get("observed_at"), now=now, max_age_seconds=3600)
     )
 
+    hours = evaluate_buyer_hours(
+        operating_hours,
+        timezone_confirmation,
+        now=now,
+    )
+
     gates = {
+        "operating_hours_verified": hours["operating_hours_verified"],
+
         "tracking_verified":
             tracking_verified,
 
@@ -123,6 +135,8 @@ def build_launch_readiness(
 
         "gates":
             gates,
+
+        "operating_hours": hours,
 
         "blockers":
             blockers,

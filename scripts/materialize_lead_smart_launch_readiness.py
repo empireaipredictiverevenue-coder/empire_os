@@ -8,6 +8,7 @@ from pathlib import Path
 from empire_os.lead_smart_launch_readiness import (
     build_launch_readiness,
 )
+from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
 
 
 TRACKING = Path(
@@ -47,6 +48,14 @@ def main() -> int:
         tracking=load(TRACKING),
         zip_gate=load(ZIP_GATE),
         routing=load(ROUTING),
+
+        operating_hours=lead_smart_confirmed_roofing_policy(
+            source_ref="gmail:1a10c6b2530f2951"
+        )["operating_hours"],
+
+        # Seth reported CST. Daylight-saving interpretation has not
+        # yet been explicitly confirmed. Never silently assume it.
+        timezone_confirmation=None,
 
         landing_publication_authorized=
             False,
