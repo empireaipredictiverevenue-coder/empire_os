@@ -48,8 +48,8 @@ def test_fresh_existing_review_is_reused_without_post(monkeypatch):
             return [{
                 "id": "review-fresh",
                 "status": "approved",
-                "proposed_at": "2026-10-01T20:00:00+00:00",
-                "reviewed_at": "2026-10-01T20:02:00+00:00",
+                "proposed_at": datetime.now(timezone.utc).isoformat(),
+                "reviewed_at": datetime.now(timezone.utc).isoformat(),
             }]
         raise AssertionError("fresh review must not be proposed again")
 

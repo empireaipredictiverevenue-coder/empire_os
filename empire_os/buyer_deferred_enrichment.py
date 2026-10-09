@@ -12,6 +12,7 @@ import json
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from empire_os.buyer_discovery import looks_like_person_name
 
@@ -244,6 +245,63 @@ def canonical_phone(value: Any) -> str:
     return ""
 
 
+def _first_party_evidence_url(url: Any, website: Any) -> bool:
+    """Same-host, public HTTPS/HTTP URL is a lead to verify, not proof to send."""
+    try:
+        page = urlsplit(str(url or "").strip())
+        site = urlsplit(str(website or "").strip())
+    except ValueError:
+        return False
+    def host(value):
+        name = (value.hostname or "").casefold()
+        return name[4:] if name.startswith("www.") else name
+    return (
+        page.scheme in {"https", "http"}
+        and site.scheme in {"https", "http"}
+        and bool(host(page))
+        and host(page) == host(site)
+    )
+
+
+def _new_recovery_evidence(
+    previous: Mapping[str, Any],
+    people: list[dict[str, Any]],
+    routes: list[dict[str, Any]],
+    *,
+    website: str,
+) -> bool:
+    """Wake cooldown only for distinct first-party person or verified route."""
+    old_people = {
+        (
+            str(p.get("name") or "").casefold(),
+            str(p.get("title") or "").casefold(),
+            str(p.get("evidence_url") or "").strip().lower(),
+        )
+        for p in previous.get("target_people") or []
+        if isinstance(p, Mapping)
+    }
+    for person in people:
+        url = str(person.get("evidence_url") or "")
+        key = (
+            str(person.get("name") or "").casefold(),
+            str(person.get("title") or "").casefold(),
+            url.strip().lower(),
+        )
+        if _first_party_evidence_url(url, website) and key not in old_people:
+            return True
+    old_routes = {
+        (str(r.get("channel") or "").casefold(), str(r.get("value") or "").casefold())
+        for r in previous.get("company_contact_routes") or []
+        if isinstance(r, Mapping) and r.get("verified") is True
+    }
+    return any(
+        r.get("verified") is True
+        and (str(r.get("channel") or "").casefold(), str(r.get("value") or "").casefold())
+        not in old_routes
+        for r in routes
+    )
+
+
 class BuyerDeferredEnrichmentQueue:
     def __init__(
         self,
@@ -321,6 +379,25 @@ class BuyerDeferredEnrichmentQueue:
             # Re-ingestion must not unclaim active work or dispatch it twice.
             # An expired running lease is recovered by claim_due itself.
             preserve_running_lease = existing.get("status") == "running"
+            website = (
+                str(item.get("website") or "").strip()
+                or str(existing.get("website") or "").strip()
+            )
+            new_evidence = (
+                previous_lane == "hot_contact_recovery"
+                and next_lane == "hot_contact_recovery"
+                and _new_recovery_evidence(
+                    existing, target_people, company_contact_routes,
+                    website=website,
+                )
+            )
+            last_wake = _parse(existing.get("last_evidence_acceleration_at"))
+            current_time = _parse(now) or _now()
+            evidence_wake_at = (
+                max(current_time, last_wake + timedelta(hours=6))
+                if new_evidence and last_wake is not None
+                else current_time
+            ) if new_evidence else None
 
             accelerate_hot_transition = (
                 previous_lane != "hot_contact_recovery"
@@ -332,6 +409,10 @@ class BuyerDeferredEnrichmentQueue:
                 if accelerate_hot_transition
                 else existing.get("next_retry_at") or now
             )
+            if evidence_wake_at is not None:
+                prior_retry = _parse(next_retry_at)
+                if prior_retry is None or evidence_wake_at < prior_retry:
+                    next_retry_at = _iso(evidence_wake_at)
 
             requested_priority = _priority(
                 item.get("priority_score"),
@@ -360,6 +441,21 @@ class BuyerDeferredEnrichmentQueue:
                 "next_prerequisite": _recovery_prerequisite(reason),
                 "status": "running" if preserve_running_lease else "pending",
                 "updated_at": now,
+                "last_evidence_acceleration_at": (
+                    now if new_evidence and (
+                        last_wake is None
+                        or current_time - last_wake >= timedelta(hours=6)
+                    ) else existing.get("last_evidence_acceleration_at")
+                ),
+                "pending_evidence_wake_at": (
+                    _iso(min(
+                        evidence_wake_at,
+                        _parse(existing.get("pending_evidence_wake_at"))
+                        or evidence_wake_at,
+                    ))
+                    if preserve_running_lease and evidence_wake_at is not None
+                    else existing.get("pending_evidence_wake_at")
+                ),
                 "next_retry_at": (
                     existing.get("next_retry_at")
                     if preserve_running_lease else next_retry_at
@@ -508,6 +604,10 @@ class BuyerDeferredEnrichmentQueue:
             if not isinstance(row, dict):
                 return
             now = _now()
+            next_retry = now + timedelta(minutes=max(5, int(retry_minutes)))
+            evidence_wake = _parse(row.get("pending_evidence_wake_at"))
+            if evidence_wake is not None:
+                next_retry = min(next_retry, max(now, evidence_wake))
             row.update({
                 "reason": reason,
                 "next_prerequisite": _recovery_prerequisite(reason),
@@ -515,9 +615,8 @@ class BuyerDeferredEnrichmentQueue:
                 "status": "deferred",
                 "last_attempt_at": _iso(now),
                 "updated_at": _iso(now),
-                "next_retry_at": _iso(
-                    now + timedelta(minutes=max(5, int(retry_minutes)))
-                ),
+                "next_retry_at": _iso(next_retry),
+                "pending_evidence_wake_at": None,
                 "lease_owner": None,
                 "lease_expires_at": None,
             })
@@ -616,10 +715,17 @@ class BuyerDeferredEnrichmentQueue:
         current = _now()
         pending_ages: list[float] = []
         due_now = 0
+        evidence_wakes_24h = 0
+        evidence_refresh_pending = 0
         for row in deferred.values():
             if isinstance(row, dict):
                 status = str(row.get("status") or "unknown")
                 counts[status] = counts.get(status, 0) + 1
+                wake_at = _parse(row.get("last_evidence_acceleration_at"))
+                if wake_at is not None and wake_at >= current - timedelta(hours=24):
+                    evidence_wakes_24h += 1
+                if row.get("pending_evidence_wake_at"):
+                    evidence_refresh_pending += 1
                 if status == "pending":
                     created = _parse(row.get("created_at"))
                     if created is not None:
@@ -661,6 +767,8 @@ class BuyerDeferredEnrichmentQueue:
             "deferred_total": len(deferred),
             "deferred_by_status": counts,
             "due_now": due_now,
+            "evidence_wakes_last_24h": evidence_wakes_24h,
+            "evidence_refresh_pending_count": evidence_refresh_pending,
             "oldest_pending_hours": round(oldest_pending_hours, 2),
             "stale_pending_count": stale_pending_count,
             "backlog_health": backlog_health,

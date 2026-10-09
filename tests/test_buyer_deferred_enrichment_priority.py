@@ -136,6 +136,123 @@ def test_expired_claim_is_recovered_by_another_worker(tmp_path):
     assert recovered[0]["lease_owner"] == "worker-b"
 
 
+def test_new_first_party_person_evidence_wakes_hot_cooldown_once(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    original = {
+        "prospect_id": "hot", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder",
+                           "source": "first_party_site_current",
+                           "evidence_url": "https://buyer.example/team/"}],
+    }
+    assert q.enqueue(original)
+    file = tmp_path / "deferred.json"
+    data = json.loads(file.read_text())
+    future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    data["hot"]["attempts"] = 32
+    data["hot"]["status"] = "deferred"
+    data["hot"]["next_retry_at"] = future
+    file.write_text(json.dumps(data))
+
+    fresh = dict(original, target_people=[{
+        "name": "John Buyer", "title": "CEO",
+        "source": "first_party_site_current",
+        "evidence_url": "https://buyer.example/leadership/",
+    }])
+    assert q.enqueue(fresh)
+    after = json.loads(file.read_text())["hot"]
+    assert after["next_retry_at"] <= datetime.now(timezone.utc).isoformat()
+    assert after["last_evidence_acceleration_at"]
+    assert q.snapshot()["evidence_wakes_last_24h"] == 1
+    assert q.due(limit=1)[0]["prospect_id"] == "hot"
+
+    # Repeated identical data cannot bypass the governed cooldown.
+    q.defer_again("hot", reason="no_bound_contact", attempts=33, retry_minutes=43200)
+    first_backoff = json.loads(file.read_text())["hot"]["next_retry_at"]
+    assert q.enqueue(fresh)
+    assert json.loads(file.read_text())["hot"]["next_retry_at"] == first_backoff
+
+
+def test_off_site_or_unverified_contact_cannot_wake_hot_backoff(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    base = {"prospect_id": "hot", "reason": "no_bound_contact",
+            "website": "https://buyer.example/",
+            "target_people": [{"name": "Jane Buyer", "title": "Founder"}]}
+    q.enqueue(base)
+    file = tmp_path / "deferred.json"
+    data = json.loads(file.read_text())
+    future = (datetime.now(timezone.utc) + timedelta(days=30)).isoformat()
+    data["hot"]["next_retry_at"] = future
+    file.write_text(json.dumps(data))
+    untrusted = dict(base, target_people=[{
+        "name": "Other Buyer", "title": "CEO",
+        "evidence_url": "https://unrelated.test/team/"}])
+    assert q.enqueue(untrusted)
+    after = json.loads(file.read_text())["hot"]
+    assert after["next_retry_at"] == future
+    assert not after.get("last_evidence_acceleration_at")
+
+
+def test_new_verified_route_during_active_lease_wakes_after_worker_finishes(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    base = {
+        "prospect_id": "busy",
+        "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder"}],
+    }
+    q.enqueue(base)
+    first = q.claim_due(limit=1, worker_id="first", lease_seconds=420)
+    assert first[0]["status"] == "running"
+    updated = dict(base, company_contact_routes=[{
+        "channel": "email", "value": "sales@buyer.example", "verified": True,
+    }])
+    assert q.enqueue(updated)
+    row = json.loads((tmp_path / "deferred.json").read_text())["busy"]
+    assert row["status"] == "running"
+    assert row["lease_owner"] == "first"
+    assert row["pending_evidence_wake_at"]
+    assert q.snapshot()["evidence_refresh_pending_count"] == 1
+    assert q.claim_due(limit=1, worker_id="second") == []
+    q.defer_again("busy", reason="no_bound_contact", attempts=1, retry_minutes=43200)
+    after = json.loads((tmp_path / "deferred.json").read_text())["busy"]
+    assert after["pending_evidence_wake_at"] is None
+    assert after["status"] == "deferred"
+    assert q.due(limit=1)[0]["prospect_id"] == "busy"
+
+
+def test_new_evidence_wake_is_rate_limited_against_repeated_refreshes(tmp_path):
+    import json
+    q = _queue(tmp_path)
+    base = {
+        "prospect_id": "hot", "reason": "no_bound_contact",
+        "website": "https://buyer.example/",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder"}],
+    }
+    q.enqueue(base)
+    for index in (1, 2):
+        q.defer_again("hot", reason="no_bound_contact",
+                      attempts=index + 8, retry_minutes=43200)
+        new = dict(base, target_people=[{
+            "name": ("John Buyer" if index == 1 else "Alex Buyer"),
+            "title": "CEO",
+            "evidence_url": f"https://buyer.example/team/{index}",
+        }])
+        q.enqueue(new)
+        row = json.loads((tmp_path / "deferred.json").read_text())["hot"]
+        retry_at = datetime.fromisoformat(row["next_retry_at"])
+        if index == 1:
+            first_wake = row["last_evidence_acceleration_at"]
+            assert retry_at <= datetime.now(timezone.utc)
+        else:
+            assert row["last_evidence_acceleration_at"] == first_wake
+            delay = retry_at - datetime.now(timezone.utc)
+            assert timedelta(hours=5) < delay <= timedelta(hours=6)
+
+
 def test_expired_lease_is_counted_as_due(tmp_path):
     q = _queue(tmp_path)
     q.enqueue({"prospect_id": "p1", "reason": "no_contact_evidence"})

@@ -14,6 +14,20 @@ def test_deferred_enrichment_service_uses_bounded_batch():
     assert "TimeoutStartSec=300" in unit
 
 
+def test_existing_schedule_connects_recovered_reviews_to_gtm():
+    # Reuse systemd handoff instead of creating a new timer or agent.
+    unit = (ROOT / "deploy/systemd/empire-buyer-deferred-enrichment.service").read_text()
+    timer = (ROOT / "deploy/systemd/empire-buyer-deferred-enrichment.timer").read_text()
+    source = (ROOT / "scripts/run_buyer_deferred_enrichment.py").read_text()
+    assert "OnSuccess=empire-gtm-pipeline.service" in unit
+    assert "OnSuccess=empire-company-routed-buyer-review.service" in unit
+    assert "OnUnitInactiveSec=2min" in timer
+    assert '"buyer_review_proposed"' in source
+    assert "queue.resolve(" in source
+    assert '"buyer_reviews_proposed": proposed' in source
+    assert '"execution_allowed": False' in source
+
+
 def test_deferred_enrichment_network_timeouts_fit_bounded_cycle():
     script = (
         ROOT / "scripts/run_buyer_deferred_enrichment.py"
