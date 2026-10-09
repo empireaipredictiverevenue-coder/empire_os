@@ -7,7 +7,7 @@ to the existing runtime/revenue_strike location. Never sends or signs.
 from __future__ import annotations
 
 from argparse import ArgumentParser
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -18,6 +18,7 @@ from empire_os.claims_exchange.controls import parse_date
 from empire_os.storm_contractor_review import (
     build_contractor_review, attach_existing_canonical_contact_history,
 )
+from empire_os.storm_contractor_relationships import relationship_context
 
 ROOT = Path(__file__).resolve().parents[1]
 COHORT = ROOT / "runtime/revenue_strike/dfw_storm_2026-09-20.json"
@@ -25,6 +26,7 @@ SITES = ROOT / "docs/DFW_SITE_OBSERVATIONS_20261009.json"
 SIGNALS = ROOT / "docs/DFW_CONTRACTOR_PUBLIC_SIGNALS_20261009.json"
 INDEPENDENT = ROOT / "docs/DFW_CONTRACTOR_INDEPENDENT_EVIDENCE_20261009.json"
 OUTPUT = ROOT / "runtime/revenue_strike/contractor_founder_review_latest.json"
+EXISTING_RELATIONSHIPS = ROOT / "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json"
 MAX_BYTES = 1024 * 1024
 
 
@@ -37,10 +39,17 @@ def _load(path: Path) -> dict:
     return data
 
 
-def run(*, as_of: date) -> dict:
-    return build_contractor_review(
+def run(*, as_of: date, now: datetime | None = None) -> dict:
+    base = build_contractor_review(
         _load(COHORT), _load(SITES), _load(SIGNALS), as_of=as_of,
         independent_evidence=_load(INDEPENDENT),
+    )
+    try:
+        relationships = _load(EXISTING_RELATIONSHIPS)
+    except (OSError, ValueError, json.JSONDecodeError):
+        relationships = None  # fail closed; no implied contact clearance
+    return relationship_context(
+        base, relationships, now=now or datetime.now(timezone.utc),
     )
 
 
@@ -82,6 +91,8 @@ def main(argv=None) -> int:
             "mode": "OBSERVE",
             "summary": payload["summary"],
             "review_digest": payload["review_digest"],
+            "existing_relationship_registry_state": payload.get("existing_relationship_registry_state", "UNAVAILABLE"),
+            "existing_relationship_domain_matches": payload["summary"].get("existing_relationship_domain_matches", 0),
             "canonical_domain_history_observed": payload.get("canonical_domain_history_observed", False),
             "individual_recipient_suppression_cleared": False,
             "prioritized_company_research": [

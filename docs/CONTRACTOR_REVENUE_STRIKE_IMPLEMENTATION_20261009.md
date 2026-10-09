@@ -97,3 +97,46 @@ days remain hypothetical. Active commercial need, confirmed person-bound
 contact route, exact recipient suppression, founder send approval,
 Documenso contract issuance, valid USDT BSC payment and fulfilled outcomes
 all remain unverified.
+
+## Existing relationship registry reconciliation (10 October 2026)
+
+To avoid starting another CRM or forgetting conversations, the existing
+`scripts/refresh_contractor_revenue_review.py` now directly consumes
+`runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json`
+through `empire_os/storm_contractor_relationships.py`. The join is exact
+company domain, read-only and aggregate. Matched or ambiguous domain = HOLD
+for review; *no match* = **not sufficient to assert zero prior contact** and
+never a release for outreach. The join does not return email addresses,
+thread IDs or the unrelated buyer CRM's private correspondence in contractor
+snapshots. Gmail evidence is treated as untrusted historical context only.
+
+10 Oct 2026 check: the source registry contained 185 relationships (4 two-way
+relationships) and matched **zero of the eight contractor domains exactly**;
+this is not a canonical suppression check, company registration, or interest
+confirmation. The full source registry remains in its existing directory; no
+second relationship registry or campaign list was created. The founder
+overview shows only summary counts and read-only state.
+
+Official public state identity-verification sources, where actual entity
+results are not yet obtained:
+- Free Texas Comptroller taxable-entity-status search by official name:
+  https://comptroller.texas.gov/taxes/franchise/account-status/search.php
+- Texas Secretary of State **SOSPortal** now handles official business filings
+  and searches (modernisation launched 29 September 2026):
+  https://www.sos.texas.gov/corp/business-law.shtml
+- SOSPortal currently states a $1 search fee; **no fee or filing was executed**.
+  https://www.sos.state.tx.us/corp/sosda/index.shtml
+- A BBB listing, a sales-hiring listing, and self-published capacity claims
+  are context for qualification, not official legal entity or ownership proof.
+
+Regulated insurance claims/settlement percentage terms remain prohibited in
+the default fixed-fee contractor-growth offer without counsel-approved scope
+and appropriate licensing. In particular, no claims adjusting or percentage
+of settlement services are implied.
+
+**Revenue checkpoint:** Top candidates Max Exteriors, 180 Roofing and SPC
+have directory-to-site name/domain corroboration and require official
+registration and authorised buyer-contact evidence. PowerEdge remains a
+research lead based on first-party hiring/context. No verified decision-maker
+conversation, no approved send, no Documenso envelope, no paid order, and
+no realised revenue from this cohort.
