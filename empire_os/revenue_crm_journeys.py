@@ -38,7 +38,10 @@ def journey_blueprint() -> dict[str, Any]:
         "design_editable": False,
         "execution_authority": "none",
         "visual_graph_ready": True,
-        "actual_drag_drop_editor_built": False,
+        "actual_drag_drop_editor_built": True,
+        "visual_editor_route": "/v1/revenue-crm/journeys/designer",
+        "visual_editor_mode": "LOCAL_DESIGN_ONLY",
+        "workflow_server_persistence": False,
         "nodes": nodes,
         "edges": [
             {"from": STAGES[i], "to": STAGES[i + 1], "condition": "evidence_review_only"}

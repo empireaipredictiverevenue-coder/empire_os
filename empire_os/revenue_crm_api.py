@@ -8,6 +8,7 @@ from typing import Any, Callable, Mapping, Protocol, Sequence
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from empire_os.revenue_crm_transport import (
@@ -577,6 +578,30 @@ def create_revenue_crm_router(
             "offer_mutation": False,
             "customer_success": route.as_dict(),
         }
+
+    @router.get("/journeys/designer", response_class=HTMLResponse)
+    def journey_designer(request: Request):
+        # Never serve the designer through the unauthenticated legacy CRM UI.
+        # A server-verified tenant read is required even for the static view.
+        require_repository(request)
+        asset = Path(__file__).resolve().parent / "static" / "revenue_crm_journey_designer.html"
+        return HTMLResponse(content=asset.read_text(encoding="utf-8"), headers={
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": (
+                "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; "
+                "connect-src 'self'; base-uri 'none'; object-src 'none'; "
+                "form-action 'none'; frame-ancestors 'none'"
+            ),
+        })
+
+    @router.get("/journeys/designer.js")
+    def journey_designer_javascript(request: Request):
+        require_repository(request)
+        asset = Path(__file__).resolve().parent / "static" / "revenue_crm_journey_designer.js"
+        return Response(content=asset.read_bytes(), media_type="text/javascript", headers={
+            "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+        })
 
     @router.get("/journeys/blueprint")
     def journeys_blueprint(request: Request):

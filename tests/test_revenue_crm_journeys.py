@@ -47,7 +47,9 @@ def test_visual_graph_contract_is_bounded_no_actions():
     assert len(graph["edges"]) == len(STAGES) - 1
     assert len({n["id"] for n in graph["nodes"]}) == len(STAGES)
     assert graph["visual_graph_ready"] is True
-    assert graph["actual_drag_drop_editor_built"] is False
+    assert graph["actual_drag_drop_editor_built"] is True
+    assert graph["visual_editor_mode"] == "LOCAL_DESIGN_ONLY"
+    assert graph["workflow_server_persistence"] is False
     assert {c["channel"] for c in graph["supported_channels"]} == {
         "email", "sms", "web_push"
     }
