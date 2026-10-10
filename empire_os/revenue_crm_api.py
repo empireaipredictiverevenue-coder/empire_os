@@ -17,6 +17,9 @@ from empire_os.revenue_crm_customer_success import (
     route_customer_success_review,
 )
 from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
+from empire_os.revenue_crm_journeys import (
+    journey_blueprint, preview_crm_journey, preview_segment_distribution,
+)
 from empire_os.search_intelligence.ai_visibility import AiCitationObservation
 from empire_os.search_intelligence.backlinks import BacklinkObservation
 from empire_os.revenue_crm_readiness import assess_close_readiness
@@ -574,6 +577,52 @@ def create_revenue_crm_router(
             "offer_mutation": False,
             "customer_success": route.as_dict(),
         }
+
+    @router.get("/journeys/blueprint")
+    def journeys_blueprint(request: Request):
+        # Same repository/auth boundary as tenant CRM views, even though the
+        # visual graph is static. No public unauthenticated CRM expansion.
+        require_repository(request)
+        return journey_blueprint()
+
+    @router.get("/journeys/segments/preview")
+    def journeys_segment_preview(
+        request: Request, limit: int = Query(default=100, ge=1, le=500),
+    ):
+        repo = require_repository(request)
+        rows = [dict(row) for row in guarded_crm_read(
+            lambda: repo.prospects(limit=limit)
+        )]
+        # A real tenant reader carries the authenticated tenant scope. The
+        # test-memory repository is also required to declare one explicitly.
+        tenant = getattr(repo, "tenant_id", None)
+        if not isinstance(tenant, str) or not tenant.strip():
+            raise HTTPException(status_code=503, detail="crm_tenant_scope_unavailable")
+        try:
+            return preview_segment_distribution(
+                rows, tenant_id=tenant, requested_limit=limit,
+            )
+        except ValueError:
+            raise HTTPException(status_code=503, detail="crm_segment_source_invalid") from None
+
+    @router.get("/prospects/{prospect_id}/journey-preview")
+    def crm_journey_preview(prospect_id: str, request: Request):
+        repo = require_repository(request)
+        row = guarded_crm_read(lambda: repo.prospect(prospect_id))
+        if row is None:
+            raise HTTPException(status_code=404, detail="prospect_not_found")
+        tenant = getattr(repo, "tenant_id", None)
+        if (not isinstance(tenant, str) or not tenant.strip()
+                or not isinstance(row, Mapping)
+                or str(row.get("tenant_id") or "") != tenant):
+            raise HTTPException(status_code=503, detail="crm_journey_tenant_scope_invalid")
+        try:
+            return preview_crm_journey(
+                row, now=datetime.now(timezone.utc),
+                next_action=derive_next_action(row).as_dict(),
+            )
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=503, detail="crm_journey_source_invalid") from None
 
     @router.get("/prospects")
     def prospects(request: Request, limit: int = Query(default=100, ge=1, le=500)):
