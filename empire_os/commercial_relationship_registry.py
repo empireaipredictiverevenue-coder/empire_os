@@ -76,6 +76,57 @@ PARTNER_PILOT_SCOPES = {
     },
 }
 
+# Consolidated first-pass information requests ALREADY sent by the founder
+# in the original partner threads on 9 October 2026. A source match is only
+# evidence that questions were asked; it grants no campaign or send authority.
+# Keeping this next to the existing buyer queue prevents agents from
+# endlessly re-asking the same list while waiting on real buyer answers.
+LAST_CONSOLIDATED_BUYER_REQUEST = {
+    "leadbank": "1a122fc6010e3b5b",
+    "validated": "1a122fc70c9614c1",
+    "connexis": "1a122fc85a098bea",
+}
+
+SINGLE_PASS_BUYER_QUESTION_GROUPS = (
+    "live_buybox_geographies_jobs_hours_caps",
+    "accepted_event_duration_quality_duplicates_disputes",
+    "payout_settlement_currency_terms",
+    "first_party_source_landing_consent_disclosures",
+    "route_caller_id_zip_tracking_postbacks_and_test",
+    "agreement_tax_onboarding_and_technical_handoff",
+)
+
+
+def single_pass_intake_status(key: str, relationship: Mapping[str, Any]) -> dict[str, Any]:
+    """Report proof of a previously sent comprehensive request, never send."""
+    expected = LAST_CONSOLIDATED_BUYER_REQUEST[key]
+    source_matches = (
+        expected == relationship.get("last_outbound_message_id")
+        and PARTNER_PILOT_SCOPES[key]["reviewed_thread"]
+            in relationship.get("gmail_thread_ids", [])
+        and when(relationship.get("last_outbound_at")) is not None
+    )
+    return {
+        "schema_version": "empire.partner_single_pass_intake_status.v1",
+        "question_groups": list(SINGLE_PASS_BUYER_QUESTION_GROUPS),
+        "past_full_information_request_proven_in_import": source_matches,
+        "last_full_request_evidence_ref": "gmail:" + expected if source_matches else None,
+        "next_action": (
+            "WAIT_PARTNER_ANSWERS_NO_DUPLICATE_REQUEST"
+            if source_matches else "RECONCILE_EXISTING_EMAIL_HISTORY_BEFORE_ASKING"
+        ),
+        "source_mailbox": "flavag83@gmail.com",
+        "source_snapshot_fresh": relationship.get("gmail_snapshot_fresh") is True,
+        "buyer_buybox_verified": False,
+        "buyer_terms_verified": False,
+        "answer_complete": False,
+        "outbound_authorized": False,
+        "contract_authorized": False,
+        "traffic_authorized": False,
+        "execution_authority": "NONE",
+    }
+
+
 # First-party reviewed incoming email. A promise to send documents does NOT
 # create signed/received terms or convert a buyer into an activated account.
 PARTNER_REVIEWED_RESPONSE_EVIDENCE = {
@@ -381,6 +432,7 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
             "mailbox_snapshot_fresh": snapshot_fresh,
             "relationship_stage": relationship["stage"],
             "partner_requirement_evidence_requested": spec["next_partner_evidence"],
+            "single_pass_buyer_intake": single_pass_intake_status(key, relationship),
             "activation_gates": gates,
             "gate_count_verified": 0,
             "gate_count_total": len(gates),
