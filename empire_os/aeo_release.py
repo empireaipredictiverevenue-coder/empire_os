@@ -101,32 +101,49 @@ def load_release(
 ) -> dict | None:
     try:
         release = _read_json(release_path)
-        if release.get("release_verified") is not True:
+        if (
+            release.get("schema_version") != "empire.aeo-release.v1"
+            or release.get("release_verified") is not True
+            or release.get("zero_paid_media") is not True
+            or release.get("execution_authority") != "none"
+        ):
             return None
-        if release.get("zero_paid_media") is not True:
+        refs = release.get("deployment_evidence_refs")
+        if (
+            not isinstance(refs, list) or not refs
+            or any(not isinstance(ref, str) or not ref.strip() for ref in refs)
+        ):
             return None
-        if not release.get("deployment_evidence_refs"):
+        pages = release.get("pages")
+        if (
+            not isinstance(pages, list)
+            or not 1 <= len(pages) <= MAX_RELEASE_PAGES
+            or any(
+                not isinstance(page, dict)
+                or set(page) != {"niche", "metro", "path", "sha256"}
+                for page in pages
+            )
+        ):
             return None
-        if release.get("recovery_sha256") != _sha(recovery_path):
+        requested = [(p["niche"], p["metro"]) for p in pages]
+        if len(set(requested)) != len(requested):
             return None
-        requested = [
-            (str(row.get("niche") or ""), str(row.get("metro") or ""))
-            for row in release.get("pages", [])
-            if isinstance(row, dict)
-        ]
+        # Snapshot-wide hashes are deliberately NOT a publishing dependency:
+        # each periodic SEO recovery refresh can change 200+ unrelated pages.
+        # Re-check EVERY previously approved page against the *current*
+        # recovery's individual content hash, structure and risk flags.
+        # The immutable approved path and content digest must still match.
+        before = _sha(recovery_path)
         verified = build_release_manifest(
             requested,
             aeo_root=aeo_root,
             recovery_path=recovery_path,
-            evidence_refs=release["deployment_evidence_refs"],
+            evidence_refs=refs,
         )
-        expected = {(r["niche"], r["metro"]): r["sha256"] for r in verified["pages"]}
-        observed = {
-            (r.get("niche"), r.get("metro")): r.get("sha256")
-            for r in release.get("pages", [])
-            if isinstance(r, dict)
-        }
-        if observed != expected:
+        after = _sha(recovery_path)
+        if before != after or verified["recovery_sha256"] != before:
+            return None
+        if pages != verified["pages"]:
             return None
         return release
     except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
@@ -159,3 +176,54 @@ def released_paths(**kwargs) -> list[str]:
     if release is None:
         return []
     return [f"/aeo/{row['niche']}/{row['metro']}/" for row in release["pages"]]
+
+
+def release_status(
+    *,
+    aeo_root: Path = DEFAULT_AEO_ROOT,
+    recovery_path: Path = DEFAULT_RECOVERY,
+    release_path: Path = DEFAULT_RELEASE,
+) -> dict:
+    """Evidence-only AEO release status; no crawler, publisher or mutations."""
+    result: dict = {
+        "schema_version": "empire.aeo-release-status.v1",
+        "mode": "OBSERVE",
+        "source": "existing_bounded_release_manifest",
+        "execution_authority": "none",
+        "published_or_indexed_verified": False,
+        "organic_traffic_verified": False,
+        "revenue_verified": False,
+        "release_valid": False,
+        "snapshot_refresh_detected": False,
+        "approved_page_count": 0,
+        "released_paths": [],
+        "reason": "RELEASE_UNAVAILABLE_OR_EVIDENCE_INVALID",
+    }
+    try:
+        manifest = _read_json(release_path)
+        old_digest = manifest.get("recovery_sha256")
+        current_digest = _sha(recovery_path)
+        result["snapshot_refresh_detected"] = (
+            isinstance(old_digest, str) and old_digest != current_digest
+        )
+        valid = load_release(
+            aeo_root=aeo_root,
+            recovery_path=recovery_path,
+            release_path=release_path,
+        )
+        if valid is None:
+            return result
+        result["release_valid"] = True
+        result["approved_page_count"] = len(valid["pages"])
+        result["released_paths"] = [
+            f"/aeo/{page['niche']}/{page['metro']}/"
+            for page in valid["pages"]
+        ]
+        result["reason"] = (
+            "APPROVED_PAGE_EVIDENCE_VALID_AFTER_REFRESH"
+            if result["snapshot_refresh_detected"]
+            else "APPROVED_PAGE_EVIDENCE_VALID"
+        )
+    except (OSError, ValueError, KeyError, TypeError, json.JSONDecodeError):
+        pass
+    return result
