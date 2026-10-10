@@ -164,6 +164,52 @@ RULES: tuple[Rule, ...] = (
             )),
         ),
     ),
+    # Existing scheduled competitor->account research->brief chain.
+    # A timer alone, stale artifacts or empty research is not proof.
+    Rule(
+        "Scheduled competitor sweeps",
+        (
+            ("systemd_enabled", ("empire-opportunity-brief.timer",)),
+            ("systemd_active", ("empire-opportunity-brief.timer",)),
+            ("json_file_recent", (
+                "runtime/competitive_intelligence/competitor_audience_latest.json",
+                "empire.competitor_audience_runtime.v1", "generated_at", 75,
+            )),
+            ("json_file_key", (
+                "runtime/competitive_intelligence/competitor_audience_latest.json",
+                "execution_authority", "none",
+            )),
+            ("json_int_min", (
+                "runtime/competitive_intelligence/competitor_audience_latest.json",
+                "competitor_count", 1,
+            )),
+            ("json_file_recent", (
+                "runtime/competitive_intelligence/competitor_account_research_latest.json",
+                "empire.competitor_account_research_batch.v1",
+                "generated_at", 75,
+            )),
+            ("json_file_key", (
+                "runtime/competitive_intelligence/competitor_account_research_latest.json",
+                "execution_authority", "none",
+            )),
+            ("json_int_min", (
+                "runtime/competitive_intelligence/competitor_account_research_latest.json",
+                "observation_count", 1,
+            )),
+            ("json_file_recent", (
+                "runtime/competitive_intelligence/competitor_account_briefs_latest.json",
+                "empire.account_intelligence_brief_batch.v1", "generated_at", 75,
+            )),
+            ("json_file_key", (
+                "runtime/competitive_intelligence/competitor_account_briefs_latest.json",
+                "execution_authority", "none",
+            )),
+            ("json_int_min", (
+                "runtime/competitive_intelligence/competitor_account_briefs_latest.json",
+                "brief_count", 1,
+            )),
+        ),
+    ),
 )
 
 
@@ -340,6 +386,26 @@ def _probe(
                 and right > 0
             ),
             "observed": {str(left_key): left, str(right_key): right},
+        }
+
+    if kind == "json_int_min":
+        rel, key, minimum = args
+        data = _read_json(root / str(rel)) or {}
+        observed = _nested(data, str(key))
+        # bool is an int subclass in Python: do not admit True as a count.
+        passed = (
+            type(observed) is int
+            and type(minimum) is int
+            and minimum >= 1
+            and observed >= minimum
+        )
+        return {
+            "kind": kind,
+            "target": str(rel),
+            "key": str(key),
+            "observed": observed,
+            "minimum": minimum,
+            "passed": passed,
         }
 
     if kind == "json_list_empty":

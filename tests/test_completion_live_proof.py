@@ -289,3 +289,100 @@ def test_duplicate_title_invalidates_an_earlier_valid_checkpoint(tmp_path):
     assert updated["pending_rule_match_count"] == 1
     assert not title_path.exists()
     assert str(title_path.relative_to(tmp_path)) in updated["checkpoints_invalidated"]
+
+
+def _competitor_sweep_fixture(root: Path, *, timestamp=NOW) -> None:
+    _write(
+        root / "docs/MASTER_REMAINING_CHECKLIST.md",
+        "# Demo\n## Automate recurring intelligence\n"
+        "- [ ] Scheduled competitor sweeps\n",
+    )
+    for filename, schema, metric, count in (
+        ("competitor_audience_latest.json",
+         "empire.competitor_audience_runtime.v1", "competitor_count", 9),
+        ("competitor_account_research_latest.json",
+         "empire.competitor_account_research_batch.v1", "observation_count", 21),
+        ("competitor_account_briefs_latest.json",
+         "empire.account_intelligence_brief_batch.v1", "brief_count", 2),
+    ):
+        _write(
+            root / "runtime/competitive_intelligence" / filename,
+            {"schema_version": schema, "generated_at": timestamp.isoformat(),
+             "mode": "OBSERVE", "execution_authority": "none", metric: count},
+        )
+
+
+def test_competitor_sweep_live_rule_requires_fresh_full_chain(tmp_path):
+    _competitor_sweep_fixture(tmp_path)
+    result = run_completion_live_proof(
+        tmp_path, now=NOW, http_get=lambda url: (0, ""),
+        systemd_probe=lambda unit, mode: unit == "empire-opportunity-brief.timer",
+    )
+    assert result["configured_rule_count"] == 7
+    assert result["pending_rule_match_count"] == 1
+    assert result["live_proof_pass_count"] == 1
+    row, = result["results"]
+    assert row["item"] == "Scheduled competitor sweeps"
+    assert all(p["passed"] is True for p in row["probes"])
+    packet = json.loads((tmp_path / row["checkpoint_ref"]).read_text())
+    assert packet["checklist_lines"] == [3]
+    assert packet["external_action_performed"] is False
+    assert packet["execution_authority"] == "none"
+    assert "- [ ] Scheduled competitor sweeps" in (
+        tmp_path / "docs/MASTER_REMAINING_CHECKLIST.md"
+    ).read_text()
+
+
+def test_competitor_sweep_rule_revokes_on_stale_source(tmp_path):
+    from datetime import timedelta
+    _competitor_sweep_fixture(tmp_path)
+    good = run_completion_live_proof(
+        tmp_path, now=NOW, http_get=lambda _: (0, ""),
+        systemd_probe=lambda unit, mode: True,
+    )
+    assert good["live_proof_pass_count"] == 1
+    changed = tmp_path / "runtime/competitive_intelligence/competitor_account_research_latest.json"
+    data = json.loads(changed.read_text())
+    data["generated_at"] = (NOW - timedelta(minutes=90)).isoformat()
+    _write(changed, data)
+    stale = run_completion_live_proof(
+        tmp_path, now=NOW, http_get=lambda _: (0, ""),
+        systemd_probe=lambda unit, mode: True,
+    )
+    assert stale["live_proof_pass_count"] == 0
+    assert stale["live_proof_blocked_count"] == 1
+    assert len(stale["checkpoints_invalidated"]) == 1
+    assert not (tmp_path / good["checkpoints_written"][0]).exists()
+
+
+def test_competitor_sweep_rule_rejects_missing_malformed_and_zero_evidence(tmp_path):
+    _competitor_sweep_fixture(tmp_path)
+    rel = "runtime/competitive_intelligence/competitor_account_briefs_latest.json"
+    path = tmp_path / rel
+    original = json.loads(path.read_text())
+    for invalid in (0, True, "2", None, -1):
+        current = dict(original, brief_count=invalid)
+        _write(path, current)
+        result = run_completion_live_proof(
+            tmp_path, now=NOW, http_get=lambda _: (0, ""),
+            systemd_probe=lambda unit, mode: True,
+        )
+        assert result["live_proof_pass_count"] == 0
+        assert result["checkpoints_written"] == []
+    path.unlink()
+    missing = run_completion_live_proof(
+        tmp_path, now=NOW, http_get=lambda _: (0, ""),
+        systemd_probe=lambda unit, mode: True,
+    )
+    assert missing["live_proof_pass_count"] == 0
+
+
+def test_competitor_sweep_rule_requires_enabled_and_active_timer(tmp_path):
+    _competitor_sweep_fixture(tmp_path)
+    for good_mode in ("active", "enabled"):
+        result = run_completion_live_proof(
+            tmp_path, now=NOW, http_get=lambda _: (0, ""),
+            systemd_probe=lambda unit, mode: mode == good_mode,
+        )
+        assert result["live_proof_pass_count"] == 0
+        assert result["live_proof_blocked_count"] == 1
