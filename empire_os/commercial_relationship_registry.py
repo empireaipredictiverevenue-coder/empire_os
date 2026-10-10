@@ -603,6 +603,24 @@ def reconcile(
         raise RelationshipEvidenceError("naive_now")
     now = now.astimezone(timezone.utc)
     fresh = ensure_source(source, now=now)
+    # A connector may refresh only explicitly checked buyer threads. Do NOT
+    # mark all 57 other historical messages fresh from a four-thread scan.
+    partial_at = when(source.get("partial_update_at"))
+    partial_ids = source.get("partial_updated_thread_ids", [])
+    if not isinstance(partial_ids, list) or len(partial_ids) > 500:
+        raise RelationshipEvidenceError("invalid_partial_gmail_thread_set")
+    if any(not isinstance(tid, str) or not HEX_ID.fullmatch(tid)
+           for tid in partial_ids) or len(set(partial_ids)) != len(partial_ids):
+        raise RelationshipEvidenceError("invalid_partial_gmail_thread_ids")
+    if partial_at is None and partial_ids:
+        raise RelationshipEvidenceError("missing_partial_gmail_capture_time")
+    if partial_at is not None and (partial_at - now).total_seconds() > 300:
+        raise RelationshipEvidenceError("future_partial_gmail_capture")
+    partial_fresh = (
+        partial_at is not None
+        and 0 <= (now-partial_at).total_seconds() <= MAX_AGE_SECONDS
+    )
+    refreshed_threads = set(partial_ids) if partial_fresh else set()
     candidates = queue.get("candidates")
     targets = qualification.get("targets")
     if not isinstance(candidates, list) or not isinstance(targets, list):
@@ -690,14 +708,17 @@ def reconcile(
             stage = "CONTACTED_AWAITING_RESPONSE"
         else:
             stage = "RESEARCH_ONLY"
+        record_mail_fresh = fresh or bool(
+            record["gmail_thread_ids"] & refreshed_threads
+        )
         new_reply = (
-            fresh and inc is not None
+            record_mail_fresh and inc is not None
             and key in old and record["last_inbound_message_id"] != old[key].get("last_inbound_message_id")
         )
         newly_received += bool(new_reply)
         founder_action, needs_review, action_reason = founder_review_action(
             stage=stage, hints=record['next_action_codes'], last_outbound=out,
-            now=now, gmail_snapshot_fresh=fresh,
+            now=now, gmail_snapshot_fresh=record_mail_fresh,
             linked_gmail=bool(record['gmail_thread_ids']),
         )
         result.append({
@@ -724,7 +745,7 @@ def reconcile(
             "discovery_status": record["discovery_status"],
             "qualification_tier": record["qualification_tier"],
             "founder_priority": record["founder_priority"],
-            "gmail_snapshot_fresh": fresh,
+            "gmail_snapshot_fresh": record_mail_fresh,
             "commercial_buyer_approved": False,
             "suppression_evidence_complete": False,
             "outbound_authorized": False,
@@ -775,6 +796,10 @@ def reconcile(
         "source_mailbox": source["mailbox"],
         "gmail_snapshot_captured_at": source["captured_at"],
         "gmail_snapshot_fresh": fresh,
+        "partial_gmail_thread_scan_at": (
+            partial_at.isoformat() if partial_at is not None else None
+        ),
+        "partial_gmail_thread_count_fresh": len(refreshed_threads),
         "automatic_live_gmail_ingest_configured": False,
         "gmail_source_sha256": sha256(raw).hexdigest(),
         "discovery_queue_generated_at": queue.get("generated_at"),
