@@ -222,6 +222,7 @@ def build_snapshot() -> dict[str, Any]:
             ),
         },
         "buyers": buyers,
+        "revenue_stream_portfolio": stream_portfolio_status(),
         "next_action": next_action,
         "blockers": blockers,
         "outbound_sent": False,
@@ -243,3 +244,282 @@ def write_snapshot(
     tmp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n")
     tmp.replace(path)
     return path
+
+# A portfolio-wide commercial projection belongs to the EXISTING completion
+# supervisor, not a new agent or parallel source of commercial authority.
+# Canonical EmpireDB-derived artifacts remain the only product/revenue inputs.
+PORTFOLIO_SOURCES = {
+    "catalog": "runtime/commercial_catalog/latest.json",
+    "relationships": "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json",
+    "enterprise": "runtime/predictive_revenue/enterprise_activation_latest.json",
+    "exchange": "runtime/commercial_exchange/latest.json",
+    "lead_smart": "runtime/revenue/lead_smart/effective_pilot_state/latest.json",
+    "payment": "runtime/orders_payments_revenue_control/orders_payments_revenue_runtime_latest.json",
+    "funnel": "runtime/commercial_funnel/latest.json",
+    "contractors": "runtime/revenue_strike/contractor_founder_review_latest.json",
+}
+PORTFOLIO_SCHEMAS = {
+    "catalog": "empire.commercial-product-catalog.v1",
+    "relationships": "empire.commercial_relationship_registry.v1",
+    "enterprise": "empire.predictive-revenue-enterprise-activation.v1",
+    "exchange": "empire.commercial_exchange_snapshot.v1",
+    "lead_smart": "empire.lead_smart.effective_pilot_state.v1",
+    "payment": "empire-orders-payments-revenue-runtime-control-v1",
+    "funnel": "empire.founder_commercial_funnel.v1",
+    "contractors": "empire.revenue_strike.contractor_founder_review.v1",
+}
+PORTFOLIO_GATES = (
+    "real_counterparty", "current_buy_box_or_customer_need",
+    "verified_product_terms", "complete_onboarding",
+    "delivery_or_route_proven", "payment_proven", "realised_revenue_proven",
+)
+PORTFOLIO_SINGLE_REQUEST_GROUPS = (
+    "verified_business_identity_authorized_decision_maker",
+    "actual_buy_box_or_customer_need_and_geographies",
+    "approved_product_scope_price_payout_and_settlement",
+    "licensing_consent_source_rules_and_data_protection",
+    "technical_integration_delivery_and_safe_test",
+    "agreement_onboarding_support_payment_and_renewal",
+)
+# One portfolio, many commercially different streams. None of these
+# descriptions establishes buyer approval, a current claim or cash.
+REVENUE_STREAM_CONTRACTS = (
+    ("lead_calls", "Buyer-led qualified calls and leads", (), "Get one exact approved partner buy-box, source/landing sign-off, route and payout"),
+    ("search_aeo_geo", "SEO/AEO/GEO intelligence and monitoring", ("search_core",), "Prove buyer-specific baseline, named customer, fulfilment and recurring billing"),
+    ("solar_intelligence", "Regional solar opportunity intelligence", ("solar_catalog",), "Verify qualified UK/other local buyer, delivery and source-specific price"),
+    ("predictive_revenue", "Predictive Revenue / Predictive Cloud", ("predictive_revenue",), "Qualify two founder-review enterprise targets and prove delivery/pricing"),
+    ("exchange_seats", "Commercial Exchange buyer seats and territories", ("commercial_exchange",), "Validate one real buyer seat, accepted capacity, exclusive rights and contracted terms"),
+    ("property_permit_capital", "Property, permits and private-capital intelligence", ("property", "private_capital", "public_record_intelligence"), "Qualify one actual data buyer and prove the purchased deliverable"),
+    ("managed_growth", "Managed growth and opportunity intelligence", ("opportunity_intelligence",), "Qualify client, define scoped deliverables and acceptance/retention proof"),
+    ("avatar_voice_workforce", "Digital Avatar, AI Workforce and voice", (), "Complete product-specific pilot tests, live unit economics and first authorised customer"),
+    ("saas_white_label", "SaaS tenants and white-label licences", ("recovered_mrr",), "Verify login/tenant isolation, current sellable offer and a paying tenant"),
+    ("affiliate_distribution", "Affiliate, reseller and referral channels", (), "Verify lawful referral rules, partner agreement, source attribution and payouts"),
+    ("contractor_direct", "Contractor growth, storm and roofing pilots", (), "Qualify a current contractor, verified human contact, scoped pilot and founder-approved outbound"),
+    ("insurance_carrier_network", "Insurance carrier / managed-repair B2B intelligence", (), "Verify actual software buyer or authorised managed-repair programme requirements; do not treat vendor onboarding as a purchase"),
+    ("claims_settlement_regulated", "Insurance claims / settlement-linked services", (), "Hold: obtain jurisdiction, licence, business model and independent qualified legal approval"),
+    ("legal_mass_tort", "Legal and mass-tort intelligence", (), "Verify genuine law-firm buyer, ethical advertising/referral compliance and accepted commercial scope"),
+)
+
+
+def _archived_complete_buyer_requests(root: Path) -> int:
+    """Review-only proof of previous comprehensive requests despite newer replies."""
+    from empire_os.commercial_relationship_registry import (
+        LAST_CONSOLIDATED_BUYER_REQUEST, PARTNER_PILOT_SCOPES,
+    )
+    path = root / (
+        "runtime/buyer_network_intelligence/"
+        "buyer_partner_message_index_20261010.json"
+    )
+    if (not path.is_file() or path.is_symlink()
+            or path.stat().st_mode & 0o077 or path.stat().st_size > 500_000):
+        return 0
+    index = _read_json(path)
+    if (not isinstance(index, Mapping)
+            or index.get("schema_version")
+                != "empire.buyer_gmail_original_message_index.v1"
+            or index.get("source") not in (
+                "connected_gmail_connector_read_only", "empire_gmail_api_readonly"
+            )):
+        return 0
+    threads = index.get("threads")
+    if not isinstance(threads, list) or len(threads) != 4:
+        return 0
+    indexed = {}
+    for item in threads:
+        if not isinstance(item, Mapping):
+            return 0
+        tid = item.get("thread_id")
+        if tid in indexed or item.get("truncated") is not False:
+            return 0
+        messages = item.get("messages")
+        if (not isinstance(messages, list)
+                or item.get("message_count") != len(messages)):
+            return 0
+        indexed[tid] = messages
+    seen = 0
+    for key, expected_id in LAST_CONSOLIDATED_BUYER_REQUEST.items():
+        tid = PARTNER_PILOT_SCOPES[key]["reviewed_thread"]
+        messages = indexed.get(tid) or []
+        if any(isinstance(m, Mapping)
+               and m.get("id") == expected_id
+               and isinstance(m.get("labels"), list)
+               and "SENT" in m["labels"]
+               for m in messages):
+            seen += 1
+    return seen
+
+
+def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
+    """Evidence-bound commercial maturity for EVERY blueprint revenue family.
+
+    This produces no send, claim, price, routing or payment authority.
+    Missing sources are UNKNOWN, never silently counted as zero successes.
+    """
+    sources: dict[str, dict[str, Any] | None] = {}
+    source_status = {}
+    for key, relative in PORTFOLIO_SOURCES.items():
+        path = root / relative
+        raw = _read_json(path) if path.is_file() and path.stat().st_size <= 8_000_000 else None
+        expected = PORTFOLIO_SCHEMAS[key]
+        schema = (raw.get("schema_version") or raw.get("schema")) if isinstance(raw, Mapping) else None
+        valid = isinstance(raw, Mapping) and schema == expected
+        sources[key] = dict(raw) if valid else None
+        source_status[key] = "READABLE_SCHEMA_VERIFIED" if valid else "MISSING_OR_UNEXPECTED_SCHEMA"
+
+    catalog = sources["catalog"]
+    products = catalog.get("products") if catalog else None
+    if not isinstance(products, list):
+        products = []
+    family_counts: dict[str, dict[str, int]] = {}
+    for item in products:
+        if not isinstance(item, Mapping):
+            continue
+        family = item.get("product_family")
+        code = item.get("product_code")
+        if not isinstance(family, str) or not isinstance(code, str):
+            continue
+        group = ("solar_catalog" if code.startswith("solar_opportunity_map_")
+                 else "search_core" if family == "search_intelligence"
+                 else family)
+        counts = family_counts.setdefault(group, {"catalogued": 0, "active": 0, "terms_ready": 0})
+        counts["catalogued"] += 1
+        counts["active"] += item.get("active") is True
+        counts["terms_ready"] += (item.get("active") is True
+                                  and item.get("binding_terms_ready") is True)
+    relationships = sources["relationships"]
+    warm = relationships.get("warm_business_action_queue") if relationships else None
+    genuine_partner_count = 0
+    if isinstance(warm, list):
+        genuine_partner_count = sum(
+            isinstance(x, Mapping) and x.get("last_inbound_at") is not None
+            and x.get("gmail_snapshot_fresh") is True
+            and x.get("company") in (
+                "Lead Smart", "LeadBank", "Connexis",
+                "Validated / Home Services Lead Group",
+            ) for x in warm
+        )
+    pilot_rows = relationships.get("partner_pilot_readiness_queue") if relationships else None
+    if not isinstance(pilot_rows, list):
+        pilot_rows = []
+    partner_gates_verified = sum(
+        x.get("gate_count_verified") == 9
+        and x.get("gate_count_total") == 9
+        for x in pilot_rows if isinstance(x, Mapping)
+    )
+    previous_full_request_count = max(
+        _archived_complete_buyer_requests(root),
+        sum(
+            (x.get("single_pass_buyer_intake") or {}).get(
+                "past_full_information_request_proven_in_import") is True
+            for x in pilot_rows if isinstance(x, Mapping)
+        ),
+    )
+    enterprise = sources["enterprise"]
+    exchange = sources["exchange"]
+    smart = sources["lead_smart"]
+    contractor = sources["contractors"]
+    payment = sources["payment"]
+    funnel = sources["funnel"]
+
+    payment_semantics = payment.get("semantic_truth") if payment else None
+    payment_present = (
+        isinstance(payment_semantics, Mapping)
+        and payment_semantics.get("real_payment_observed") is True
+    )
+    # An aggregate payment observation, even if true in the future, does
+    # not establish allocation to a specific product or customer.
+    money_from_any_stream_proven = False
+    rows = []
+    for key, title, families, next_action in REVENUE_STREAM_CONTRACTS:
+        grouped = [family_counts.get(name, {}) for name in families]
+        counts = {
+            "catalogued": sum(n.get("catalogued", 0) for n in grouped),
+            "active": sum(n.get("active", 0) for n in grouped),
+            "terms_ready": sum(n.get("terms_ready", 0) for n in grouped),
+        }
+        counterparty = key == "lead_calls" and genuine_partner_count > 0
+        offer_ready = counts["terms_ready"] > 0
+        blockers = []
+        if key == "claims_settlement_regulated":
+            blockers.append("REGULATED_CLAIMS_COMPENSATION_AND_LICENSING_HOLD")
+        if not counterparty:
+            blockers.append("NO_PROVEN_CURRENT_BUYER_CONVERSATION_FOR_STREAM")
+        if not offer_ready:
+            blockers.append("NO_VERIFIED_IN_SCOPE_CATALOG_TERMS")
+        blockers.extend(("CURRENT_CUSTOMER_NEED_OR_BUY_BOX_NOT_VERIFIED",
+                         "ONBOARDING_AND_ACCEPTED_AGREEMENT_NOT_VERIFIED",
+                         "BUYER_SPECIFIC_DELIVERY_NOT_VERIFIED",
+                         "PAYMENT_AND_RECOGNISED_REVENUE_NOT_VERIFIED"))
+        if key == "lead_calls":
+            if smart is None or smart.get("traffic_enabled") is not False:
+                blockers.append("LEAD_SMART_RUNTIME_TRUTH_UNAVAILABLE")
+            elif not smart.get("routing", {}).get("runtime_verified") is True:
+                blockers.append("LEAD_SMART_BUYER_ROUTE_RUNTIME_NOT_VERIFIED")
+            if partner_gates_verified == 0:
+                blockers.append("NO_BUYER_PARTNER_FULL_ACTIVATION_GATES")
+        if key == "exchange_seats" and exchange is not None:
+            if exchange.get("verified_market_price_count") == 0:
+                blockers.append("NO_VERIFIED_EXCHANGE_MARKET_PRICE")
+        if key == "predictive_revenue" and enterprise is None:
+            blockers.append("ENTERPRISE_TARGET_REVIEW_UNAVAILABLE")
+        if key in {"insurance_carrier_network", "claims_settlement_regulated"}:
+            blockers.append("CARRIER_VENDOR_PROGRAMME_NOT_PROOF_OF_PURCHASE")
+        if key == "contractor_direct" and contractor is None:
+            blockers.append("CONTRACTOR_FOUNDER_REVIEW_UNAVAILABLE")
+        stage = ("ENGAGED_AWAITING_VERIFIED_BUY_BOX" if counterparty
+                 else "CATALOG_READY_NO_BUYER_PROOF" if offer_ready
+                 else "RESEARCH_OR_PRODUCT_ACTIVATION_REQUIRED")
+        if key == "claims_settlement_regulated":
+            stage = "LEGAL_AND_LICENSING_BLOCKED"
+        gates = {name: False for name in PORTFOLIO_GATES}
+        gates["real_counterparty"] = counterparty
+        gates["verified_product_terms"] = offer_ready
+        rows.append({
+            "stream_key": key, "name": title,
+            "stage": stage, "catalog": counts, "gates": gates,
+            "single_pass_intake_groups": list(PORTFOLIO_SINGLE_REQUEST_GROUPS),
+            "past_complete_request_proven_count": (
+                previous_full_request_count if key == "lead_calls" else 0
+            ),
+            "new_request_authorized": False,
+            "blocking_evidence": blockers, "next_evidence_task": next_action,
+            "legal_gate_required": key in (
+                "insurance_carrier_network", "claims_settlement_regulated",
+                "legal_mass_tort", "affiliate_distribution",
+            ),
+            "partner_approved_traffic": False,
+            "founder_outbound_authorized": False,
+            "actual_revenue": False,
+            "execution_authority": "NONE",
+        })
+    return {
+        "schema_version": "empire.revenue_stream_portfolio.v1",
+        "mode": "OBSERVE", "stream_count": len(rows),
+        "sources": source_status,
+        "catalog_totals": {
+            "total": catalog.get("product_count") if catalog else None,
+            "active": catalog.get("active_count") if catalog else None,
+            "binding_terms_ready": catalog.get("binding_terms_ready_count") if catalog else None,
+        },
+        "warm_buyer_conversations_observed": genuine_partner_count if relationships else None,
+        "enterprise_internal_review_ready_count": (
+            enterprise.get("review_ready_count") if enterprise else None),
+        "exchange_seat_records_not_verified_sellable": (
+            exchange.get("buyer_seat_count") if exchange else None),
+        "exchange_verified_market_price_count": (
+            exchange.get("verified_market_price_count") if exchange else None),
+        "current_payment_observation": (
+            "PRESENT_REQUIRES_INDEPENDENT_ATTRIBUTION" if payment_present
+            else "NOT_OBSERVED" if payment_semantics is not None
+            else "UNKNOWN"),
+        "funnel_recognized_revenue_cents": (
+            funnel.get("recognized_revenue_cents") if funnel else None),
+        "payment_per_stream_attributed": money_from_any_stream_proven,
+        "streams": rows,
+        "external_outbound_authorized": False,
+        "contract_acceptance_authorized": False,
+        "routing_activation_authorized": False,
+        "payment_action_authorized": False,
+        "actual_revenue_from_portfolio_proven": False,
+        "execution_authority": "NONE",
+    }
