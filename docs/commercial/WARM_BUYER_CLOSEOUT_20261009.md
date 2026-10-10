@@ -43,3 +43,44 @@ The registry includes 183 observed business/company relationships, 57 linked his
 5. **ENGINEERING COMPLETE FOR THIS STEP:** one relationship-registry change, local tests, live OBSERVE read-back and narrow commit. No more new versions until a specific unfulfilled business contract is found.
 
 **Security:** prior partner onboarding correspondence included login information in plaintext. Do not copy that material to reports, source control, scripts or chats. Treat credential rotation as a separate authorized mailbox/provider action if the disclosed credential remains valid.
+
+## 10 October — current Gmail and Lead Smart pilot readback
+
+Read-only Gmail thread verification (no sends or mailbox mutations) found
+no later qualifying replies in the original LeadBank, Validated, Connexis
+or Lead Smart partner threads than those already recorded here. A
+separate recent-email search for LeadBank/AllianceVS, Validated and
+Connexis did **not** find a new onboarding agreement, onboarding form,
+buyer ZIP buy-box or Mahad technical instructions. Eleonora's last
+independently reviewed reply is still her **promise** at
+`gmail:1a1230003eb39320`; it is not evidence of receipt or signature.
+The existing relationship queue correctly shows LeadBank's onboarding
+handoff pending, and all three of those prospective buyer lanes have
+**zero of nine independent activation gates** verified. No duplicate
+follow-up is needed while awaiting the promised documents.
+
+**Lead Smart launch truth:** the existing `effective_pilot_state`
+previously listed only three outstanding activation gates, omitting two
+independent holds already correctly enforced by the detailed launch
+checker. Its existing projection now explicitly lists all **five**:
+`routing_runtime_verification`,
+`buyer_landing_page_approval`,
+`caller_id_pass_through_verification`,
+`landing_publication_authority`, and
+`founder_live_traffic_authority` (plus ZIP freshness hold when needed).
+A refreshed real local projection shows tracking bound and ZIP evidence
+current, but **all five launch gates still outstanding**. Seth's emailed
+report that the route is expected active does not independently prove
+current buyer routing; support's `America/Chicago` timezone and Direct
+IVR ZIP collection answer do not prove caller-ID pass-through.
+Seth explicitly reserved review of `/roofing` and instructed keeping
+its call button OFF until he approves. Current public page is HTTP 200,
+`noindex`, with zero `tel:` links. No traffic, recognised payout,
+service restart or provider mutation was performed.
+
+**Next commercial action:** await the actual LeadBank agreement and
+Mahad specification, and Seth's exact landing approval or corrections.
+On receipt, map only evidence-backed buyer terms to the existing queue;
+do not send another follow-up, publish call buttons or reuse a partner's
+terms for another. These are external dependencies, not extra software
+features.

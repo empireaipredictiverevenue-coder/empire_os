@@ -241,6 +241,21 @@ def build_effective_pilot_state(
 
     commercial_truth["zip_coverage_activation_verified"] = zip_verified
 
+    # These are independently outstanding activation gates, even if Ringba
+    # binds a valid number to the approved campaign. The static buyer offer
+    # and tracking proof must never hide the landing or caller-ID holds.
+    landing_review = commercial_truth.get("landing_review_report") or {}
+    direct_route = commercial_truth.get("direct_route_requirements") or {}
+    landing_approved = (
+        isinstance(landing_review, Mapping)
+        and landing_review.get("approved") is True
+        and str(landing_review.get("source_ref") or "").startswith("gmail:")
+    )
+    caller_id_verified = (
+        isinstance(direct_route, Mapping)
+        and direct_route.get("caller_id_pass_through_verified") is True
+    )
+
     route_configuration_observed = (
         routing.get(
             "routing_configuration_observed"
@@ -341,6 +356,8 @@ def build_effective_pilot_state(
         "remaining_activation_gates": [
             "routing_runtime_verification",
             *([] if zip_verified else ["zip_coverage_activation_verification"]),
+            *([] if landing_approved else ["buyer_landing_page_approval"]),
+            *([] if caller_id_verified else ["caller_id_pass_through_verification"]),
             "landing_publication_authority",
             "founder_live_traffic_authority",
         ],

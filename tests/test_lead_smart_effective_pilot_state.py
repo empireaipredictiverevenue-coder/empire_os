@@ -294,3 +294,53 @@ def test_stale_or_wrong_evidence_does_not_promote_zip_coverage():
         assert result["coverage"]["activation_verified"] is False
         assert "zip_coverage_activation_verification" in result["remaining_activation_gates"]
         assert result["traffic_enabled"] is False
+
+
+def test_effective_gates_list_does_not_hide_landing_or_caller_id_blockers():
+    result = _effective_with_zip(_zip_gate())
+    blockers = result["remaining_activation_gates"]
+    assert "buyer_landing_page_approval" in blockers
+    assert "caller_id_pass_through_verification" in blockers
+    assert "routing_runtime_verification" in blockers
+    assert "landing_publication_authority" in blockers
+    assert "founder_live_traffic_authority" in blockers
+    assert "zip_coverage_activation_verification" not in blockers
+    assert result["call_cta_enabled"] is False
+    assert result["traffic_enabled"] is False
+    assert result["execution_authority"] == "NONE"
+
+
+def test_buyer_approved_landing_requires_evidence_and_still_cannot_launch():
+    review = base()
+    review["commercial_truth"]["landing_review_report"] = {
+        "approved": True, "source_ref": "gmail:buyer-confirmation-id",
+    }
+    review["commercial_truth"]["direct_route_requirements"] = {
+        "caller_id_pass_through_verified": True,
+    }
+    result = build_effective_pilot_state(
+        base_review=review, tracking_verification=tracking(),
+        routing_observation=routing(), coverage_intelligence=coverage(),
+        zip_activation=_zip_gate(),
+        now=datetime(2026,10,9,17,45,tzinfo=timezone.utc),
+        evidence_refs={"coverage_intelligence":"sha256:c"},
+    )
+    assert "buyer_landing_page_approval" not in result["remaining_activation_gates"]
+    assert "caller_id_pass_through_verification" not in result["remaining_activation_gates"]
+    assert "routing_runtime_verification" in result["remaining_activation_gates"]
+    assert result["commercial_activation_authorized"] is False
+    assert result["call_cta_enabled"] is False
+
+
+def test_unattributed_landing_approval_cannot_clear_reported_gate():
+    review = base()
+    review["commercial_truth"]["landing_review_report"] = {
+        "approved": True, "source_ref": "model_guess"
+    }
+    result = build_effective_pilot_state(
+        base_review=review, tracking_verification=tracking(),
+        routing_observation=routing(), coverage_intelligence=coverage(),
+        evidence_refs={},
+    )
+    assert "buyer_landing_page_approval" in result["remaining_activation_gates"]
+    assert result["traffic_enabled"] is False
