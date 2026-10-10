@@ -1,0 +1,95 @@
+{
+  "schema_version": "empire.publisher_supply_recruitment_evidence.v1",
+  "origin": "first_party_web_research_and_unsent_connected_gmail_drafts",
+  "observed_date": "2026-10-10",
+  "items": [
+    {
+      "domain": "roofpitch.net",
+      "company": "RoofPitch.net",
+      "vertical": "US_ROOFING",
+      "market": "US",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "contact@roofpitch.net",
+      "source_url": "https://roofpitch.net/contact/",
+      "draft_id": "r-7308898636584911923",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a12683067c30ff3"
+    },
+    {
+      "domain": "solarbriton.co.uk",
+      "company": "Solar Briton",
+      "vertical": "UK_SOLAR",
+      "market": "UK",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "support@solarbriton.co.uk",
+      "source_url": "https://solarbriton.co.uk/about-us/",
+      "draft_id": "r6622731623980583833",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a1268b899c78a29"
+    },
+    {
+      "domain": "getbuilding.co.uk",
+      "company": "Getbuilding",
+      "vertical": "UK_RENOVATION",
+      "market": "UK",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "contact@getbuilding.co.uk",
+      "source_url": "https://getbuilding.co.uk/about/",
+      "draft_id": "r1874867192599035924",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a12682ff8b4cf79"
+    },
+    {
+      "domain": "homecurrent.co.uk",
+      "company": "Home Current",
+      "vertical": "UK_HOUSEHOLD_ENERGY",
+      "market": "UK",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "partners@homecurrent.co.uk",
+      "source_url": "https://homecurrent.co.uk/contact/",
+      "draft_id": "r-2945887134592920174",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a12682f51851b43"
+    },
+    {
+      "domain": "gettradesmen.uk",
+      "company": "GetTradesmen",
+      "vertical": "UK_TRADES_REFERRALS",
+      "market": "UK",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "gettradesmen@gmail.com",
+      "source_url": "https://gettradesmen.uk/contact/",
+      "draft_id": "r5274609807388443841",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a12697d934b3361"
+    },
+    {
+      "domain": "pavementcalculator.com",
+      "company": "PavementCalculator",
+      "vertical": "US_CONSTRUCTION_SERVICES",
+      "market": "US",
+      "role": "TRAFFIC_SUPPLY_HYPOTHESIS",
+      "contact_email": "partners@pavementcalculator.com",
+      "source_url": "https://pavementcalculator.com/legal/contact/",
+      "draft_id": "r36193163051190971",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a12697e4630d81a"
+    },
+    {
+      "domain": "roofingcalculatorusa.com",
+      "company": "RoofingCalculatorUSA",
+      "vertical": "US_ROOFING",
+      "market": "US",
+      "role": "PAID_MEDIA_OPTION_REVIEW",
+      "contact_email": "hello@roofingcalculatorusa.com",
+      "source_url": "https://roofingcalculatorusa.com/advertise",
+      "draft_id": "r-3369532799067624463",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a1268b8ecb61953"
+    },
+    {
+      "domain": "legaldesire.com",
+      "company": "Legal Desire",
+      "vertical": "B2B_LEGAL_TECH",
+      "market": "INTERNATIONAL",
+      "role": "B2B_MEDIA_RESEARCH",
+      "contact_email": "anuj@legaldesire.com",
+      "source_url": "https://legaldesire.com/contact/",
+      "draft_id": "r7340280390560374271",
+      "draft_url": "https://mail.google.com/mail/u/?authuser=flavag83%40gmail.com#all/1a1268c06884ac4b"
+    }
+  ]
+}

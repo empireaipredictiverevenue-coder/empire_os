@@ -270,3 +270,116 @@ def build_human_review_queue(snapshots, review, opportunities, *, limit=20):
                                       'next_proposed_action': 'Review existing Buyer Acquisition product/pool research routes and obtain person and demand evidence; no outreach.',
                                       'state': 'RESEARCH_ONLY_NO_VERIFIED_DEMAND' if any(lane in r['revenue_lanes'] for r in rows) else 'EVIDENCE_GAP_RESEARCH_REQUIRED'} for lane in LANES},
     }
+
+# Supply-side recruitment projection; intentionally separate from buyer affiliates.
+# This never polls Gmail, approves sends, allocates traffic, or calculates income.
+def build_publisher_recruitment_summary(prospects, delivery):
+    import hashlib
+
+    out = {
+        "schema_version": "empire.publisher_supply_recruitment_review.v1",
+        "mode": "OBSERVE", "state": "EVIDENCE_UNAVAILABLE",
+        "source_role": "potential_supply_publisher_not_buyer",
+        "source_mailbox_live_sync": False,
+        "candidate_count": 0, "email_submitted_count": 0,
+        "hard_bounce_count": 0, "awaiting_response_count": 0,
+        "unsent_draft_count": 0, "verified_reply_count": 0,
+        "verified_onboarded_count": 0, "recognized_revenue_cents": 0,
+        "outbound_authorized": False, "traffic_authorized": False,
+        "publisher_payment_authorized": False, "execution_authority": "none",
+        "items": [],
+    }
+    if prospects is None or delivery is None:
+        return out
+    try:
+        if (not isinstance(prospects, dict) or
+            prospects.get("schema_version") !=
+                "empire.publisher_supply_recruitment_evidence.v1" or
+            not isinstance(delivery, dict) or
+            delivery.get("schema_version") !=
+                "empire.publisher_recruitment.gmail_sent_evidence.v1" or
+            delivery.get("source_mailbox") != "flavag83@gmail.com" or
+            delivery.get("delivered_or_inbox_placement_verified") is not False or
+            delivery.get("empire_os_outbound_governor_send") is not False or
+            delivery.get("buyer_programme_activated") is not False or
+            delivery.get("revenue_recognized_cents") != 0 or
+            delivery.get("publisher_enrolled_count") != 0):
+            raise ValueError("untrusted_recruitment_source")
+        candidates = prospects.get("items")
+        messages = delivery.get("messages")
+        if (not isinstance(candidates, list) or not 0 <= len(candidates) <= 25
+                or not isinstance(messages, list) or not 0 <= len(messages) <= len(candidates)):
+            raise ValueError("unbounded_recruitment_source")
+        by_contact, domains = {}, set()
+        for candidate in candidates:
+            if not isinstance(candidate, dict):
+                raise ValueError("invalid_recruitment_candidate")
+            address, domain = candidate.get("contact_email"), candidate.get("domain")
+            if (not isinstance(address, str) or "@" not in address
+                    or not isinstance(domain, str) or not domain
+                    or address in by_contact or domain in domains
+                    or not str(candidate.get("draft_url", "")).startswith("https://mail.google.com/")
+                    or not str(candidate.get("source_url", "")).startswith("https://")):
+                raise ValueError("duplicate_or_invalid_recruitment_candidate")
+            by_contact[address] = candidate
+            domains.add(domain)
+
+        sent, bounce_count = {}, 0
+        for message in messages:
+            if not isinstance(message, dict):
+                raise ValueError("invalid_recruitment_send")
+            contact, mid = message.get("recipient"), message.get("gmail_message_id")
+            hard_bounce = message.get("recipient_delivery_status") == "BOUNCED_NO_SUCH_USER_550_5_1_1"
+            if (contact not in by_contact or contact in sent
+                    or not isinstance(mid, str) or len(mid) < 16
+                    or message.get("gmail_label") != "SENT"
+                    or message.get("unsubscribe_text_present") is not True
+                    or message.get("postal_footer_present") is not True
+                    or message.get("commercial_terms_agreed") is not False):
+                raise ValueError("untrusted_recruitment_send")
+            if hard_bounce:
+                if (message.get("retry_authorized") is not False
+                        or not isinstance(message.get("bounce_gmail_message_id"), str)):
+                    raise ValueError("unverified_hard_bounce")
+                bounce_count += 1
+            elif message.get("recipient_delivery_status") is not None:
+                raise ValueError("untrusted_recruitment_delivery_state")
+            sent[contact] = hard_bounce
+        if (delivery.get("submitted_to_gmail_count") != len(sent)
+                or delivery.get("confirmed_hard_bounce_count") != bounce_count
+                or delivery.get("no_bounce_observed_yet_count") != len(sent) - bounce_count):
+            raise ValueError("conflicting_recruitment_totals")
+        rows = []
+        for contact, candidate in by_contact.items():
+            stage = ("HARD_BOUNCE_NO_RETRY" if sent.get(contact) is True
+                     else "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED" if contact in sent
+                     else "DRAFT_UNSENT")
+            rows.append({
+                "domain": candidate["domain"],
+                "company": candidate.get("company"),
+                "market": candidate.get("market"),
+                "vertical": candidate.get("vertical"),
+                "commercial_role": "TRAFFIC_SUPPLY_RESEARCH_ONLY",
+                "stage": stage,
+                "reply_verified": False,
+                "live_buyer_route_verified": False,
+                "outbound_authorized": False,
+                "payout_verified": False,
+            })
+        out.update({
+            "state": "HUMAN_REVIEW_ONLY",
+            "evidence_observed_date": delivery.get("observed_date"),
+            "source_sha256": hashlib.sha256(
+                json.dumps(
+                    {"prospects": prospects, "delivery": delivery},
+                    sort_keys=True, allow_nan=False).encode()).hexdigest(),
+            "candidate_count": len(candidates),
+            "email_submitted_count": len(sent),
+            "hard_bounce_count": bounce_count,
+            "awaiting_response_count": len(sent) - bounce_count,
+            "unsent_draft_count": len(candidates) - len(sent),
+            "items": rows,
+        })
+    except (ValueError, TypeError, KeyError):
+        out["state"] = "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
+    return out

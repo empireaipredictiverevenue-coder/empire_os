@@ -208,3 +208,53 @@ def test_full_review_pool_preserves_default_top20():
         full["review_candidate_count"]
         == 25
     )
+
+def test_publisher_supply_projection_is_only_evidence_not_buyer_authority():
+    from empire_os.revenue_distribution_review import build_publisher_recruitment_summary
+    prospects = {
+        "schema_version": "empire.publisher_supply_recruitment_evidence.v1",
+        "items": [
+            {"domain": "example.org", "company": "Example", "market": "US",
+             "vertical": "US_ROOFING", "contact_email": "info@example.org",
+             "source_url": "https://example.org/contact/",
+             "draft_url": "https://mail.google.com/mail/u/?authuser=a#all/1"}
+        ],
+    }
+    delivery = {
+        "schema_version": "empire.publisher_recruitment.gmail_sent_evidence.v1",
+        "source_mailbox": "flavag83@gmail.com",
+        "delivered_or_inbox_placement_verified": False,
+        "empire_os_outbound_governor_send": False,
+        "buyer_programme_activated": False, "revenue_recognized_cents": 0,
+        "publisher_enrolled_count": 0, "submitted_to_gmail_count": 1,
+        "confirmed_hard_bounce_count": 1, "no_bounce_observed_yet_count": 0,
+        "messages": [
+            {"recipient": "info@example.org", "gmail_message_id": "1234567890abcdef",
+             "gmail_label": "SENT", "unsubscribe_text_present": True,
+             "postal_footer_present": True, "commercial_terms_agreed": False,
+             "recipient_delivery_status": "BOUNCED_NO_SUCH_USER_550_5_1_1",
+             "bounce_gmail_message_id": "1234567890abcdea",
+             "retry_authorized": False}
+        ],
+    }
+    left, right = deepcopy(prospects), deepcopy(delivery)
+    out = build_publisher_recruitment_summary(prospects, delivery)
+    assert out["state"] == "HUMAN_REVIEW_ONLY"
+    assert (out["candidate_count"], out["email_submitted_count"],
+            out["hard_bounce_count"], out["awaiting_response_count"],
+            out["recognized_revenue_cents"]) == (1, 1, 1, 0, 0)
+    assert out["items"][0]["stage"] == "HARD_BOUNCE_NO_RETRY"
+    assert out["publisher_payment_authorized"] is False
+    assert out["outbound_authorized"] is False
+    assert prospects == left and delivery == right
+
+    bad = deepcopy(delivery)
+    bad["messages"][0]["recipient"] = "not-the-prospect@example.org"
+    assert build_publisher_recruitment_summary(prospects, bad)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
+    bad = deepcopy(delivery)
+    bad["confirmed_hard_bounce_count"] = 0
+    assert build_publisher_recruitment_summary(prospects, bad)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
+    assert build_publisher_recruitment_summary(prospects, None)["candidate_count"] == 0
+    bad = deepcopy(delivery)
+    bad["messages"][0]["recipient_delivery_status"] = "DELIVERED"
+    assert build_publisher_recruitment_summary(prospects, bad)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"

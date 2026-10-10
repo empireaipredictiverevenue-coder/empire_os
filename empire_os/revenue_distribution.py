@@ -13,7 +13,9 @@ from empire_os.agent_web import public_capabilities
 from empire_os.a2a_discovery import COMMERCE_CAPABILITIES
 from empire_os.predictive_revenue_formula import CORE_FACTORS, predictive_revenue_formula
 from empire_os.commercial_product_catalog import assess_catalog_item
-from empire_os.revenue_distribution_review import REVIEW_SOURCES, build_human_review_queue
+from empire_os.revenue_distribution_review import (
+    REVIEW_SOURCES, build_human_review_queue, build_publisher_recruitment_summary,
+)
 from empire_os.traffic_specialist import review_organic_traffic
 from empire_os.conversion_intelligence import (
     CANONICAL_STAGES, ConversionStageEvidence, ConversionSpecialistReview,
@@ -329,6 +331,19 @@ def refresh_revenue_distribution(repo_root: Path, *, generated_at: str | None = 
         except (OSError, ValueError):
             review[name] = None
     payload.update(build_human_review_queue(snapshots, review, payload["opportunities"]))
+    recruitment = []
+    for relative in (
+        "docs/commercial/PUBLISHER_SUPPLY_RECRUITMENT_EVIDENCE_20261010.json",
+        "docs/commercial/PUBLISHER_RECRUITMENT_GMAIL_SEND_EVIDENCE_20261010.json",
+    ):
+        path = repo_root / relative
+        try:
+            if path.is_symlink() or path.stat().st_size > 100_000:
+                raise ValueError("unsafe_publisher_evidence")
+            recruitment.append(json.loads(path.read_text(encoding="utf-8")))
+        except (OSError, ValueError):
+            recruitment.append(None)
+    payload["publisher_supply_recruitment"] = build_publisher_recruitment_summary(*recruitment)
     output = repo_root / OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = None

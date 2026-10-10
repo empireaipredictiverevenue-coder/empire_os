@@ -16,7 +16,7 @@ def main() -> int:
     parser.add_argument("--acquisition-budget-cents", type=int, default=None)
     args = parser.parse_args()
     payload = refresh_revenue_distribution(args.repo_root.resolve(), generated_at=args.generated_at, acquisition_budget_cents=args.acquisition_budget_cents)
-    print(json.dumps({"mode": payload["mode"], "opportunities": len(payload["opportunities"]), "proposals": len(payload["distribution_actions"]), "blockers": payload["blockers"], "authority": payload["authority"], "human_review_count": len(payload["human_review_queue"]), "person_bound_count": sum(row["person_verified"] for row in payload["human_review_queue"]), "review_blockers": payload["review_blockers"]}, sort_keys=True))
+    print(json.dumps({"mode": payload["mode"], "opportunities": len(payload["opportunities"]), "proposals": len(payload["distribution_actions"]), "blockers": payload["blockers"], "authority": payload["authority"], "human_review_count": len(payload["human_review_queue"]), "person_bound_count": sum(row["person_verified"] for row in payload["human_review_queue"]), "publisher_supply_recruitment": {k: payload["publisher_supply_recruitment"][k] for k in ("state", "candidate_count", "email_submitted_count", "hard_bounce_count", "awaiting_response_count", "unsent_draft_count", "recognized_revenue_cents")}, "review_blockers": payload["review_blockers"]}, sort_keys=True))
     return 0
 
 
