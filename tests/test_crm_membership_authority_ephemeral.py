@@ -199,7 +199,7 @@ def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
     from empire_os.revenue_crm_first_party_login import (
-        hash_invited_password, PostgresCrmPasswordLogin,
+        hash_invited_password, PostgresCrmPasswordLogin, prepare_crm_invitation,
         build_account_bound_membership_lookup, create_crm_login_router,
     )
     from empire_os.revenue_crm_signed_auth import (
@@ -221,18 +221,24 @@ def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
     assert run("""SELECT relrowsecurity FROM pg_class
         WHERE oid='public.empire_crm_login_credentials'::regclass;""") == "t"
 
-    # Fixture operator actions ONLY: no production role, secret or membership.
-    import secrets
-    salt = secrets.token_bytes(32)
-    password = "test-only-long-invite-passphrase-123"
-    digest = hash_invited_password(password, salt)
+    # Fixture operator actions ONLY: pending invite; no live accounts.
     subject = "pilot:verified"
     email = "pilot@example.invalid"
+    password = "test-only-long-invite-passphrase-123"
+    prepared = prepare_crm_invitation(
+        subject=subject, email=email, tenant_id=A,
+        evidence_ref="fixture:pilot-proof",
+    )
+    salt = prepared.password_salt
+    digest = prepared.password_digest
     run("""
         CREATE ROLE empire_crm_auth_login LOGIN NOINHERIT;
         GRANT SELECT ON public.empire_crm_login_credentials
           TO empire_crm_auth_login;
-        GRANT UPDATE(failed_attempts,locked_until,last_login_at,updated_at)
+        GRANT UPDATE(
+          failed_attempts,locked_until,last_login_at,updated_at,
+          password_salt,password_digest,status,password_change_required,
+          invitation_token_hash,invitation_redeemed_at)
           ON public.empire_crm_login_credentials TO empire_crm_auth_login;
         GRANT EXECUTE ON FUNCTION public.empire_crm_read_member(text,uuid)
           TO empire_crm_membership_login;
@@ -240,9 +246,12 @@ def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
     run(f"""
         INSERT INTO public.empire_crm_login_credentials
           (subject,login_email,password_salt,password_digest,status,
-           evidence_ref,password_change_required,verified_at)
+           evidence_ref,password_change_required,verified_at,
+           invitation_token_hash,invitation_expires_at,invitation_tenant_id)
         VALUES ('{subject}','{email}',decode('{salt.hex()}','hex'),
-            decode('{digest.hex()}','hex'),'active','fixture:pilot-proof',false,now());
+            decode('{digest.hex()}','hex'),'pending','fixture:pilot-proof',true,now(),
+            decode('{prepared.invitation_token_hash.hex()}','hex'),
+            now()+interval '2 days','{A}'::uuid);
         INSERT INTO public.empire_crm_tenant_memberships
           (tenant_id,subject,role,status,evidence_ref,verified_at)
         VALUES ('{A}','{subject}','viewer','active','fixture:pilot-proof',now());
@@ -266,10 +275,62 @@ def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
     app.include_router(create_crm_login_router(
         password_login=password_login,
         load_membership=active_member,
+        load_invitation_membership=member_reader,
         signing_key=private_key, key_id="test-issuer",
     ))
     client = TestClient(app)
     data = {"email": email, "password": password, "tenant_id": A}
+    invite = {
+        "invitation_token": prepared.token,
+        "new_password": password,
+        "tenant_id": A,
+    }
+    # Pending users cannot log in before proving control of the invited inbox.
+    assert client.post("/v1/revenue-crm/auth/login", json=data).status_code == 401
+    assert client.post("/v1/revenue-crm/auth/accept-invite", json={
+        **invite, "invitation_token": "EI1_" + "x" * 43,
+    }).status_code == 401
+    # Even if the user belongs to B, an invitation for A cannot be redeemed as B.
+    run(f"""INSERT INTO public.empire_crm_tenant_memberships
+        (tenant_id,subject,role,status,evidence_ref,verified_at)
+        VALUES ('{B}'::uuid,'{subject}','viewer','active','fixture:also-B',now());""")
+    assert client.post("/v1/revenue-crm/auth/accept-invite", json={
+        **invite, "tenant_id": B,
+    }).status_code == 401
+    run(f"""DELETE FROM public.empire_crm_tenant_memberships
+        WHERE tenant_id='{B}'::uuid AND subject='{subject}';""")
+    assert run("SELECT status FROM public.empire_crm_login_credentials "
+               f"WHERE subject='{subject}';") == "pending"
+    # Invite expiration, revoked membership, and untrusted DB LOGIN all deny.
+    run(f"""UPDATE public.empire_crm_login_credentials
+        SET invitation_expires_at=now()-interval '1 minute'
+        WHERE subject='{subject}';""")
+    assert client.post("/v1/revenue-crm/auth/accept-invite", json=invite).status_code == 401
+    run(f"""UPDATE public.empire_crm_login_credentials
+        SET invitation_expires_at=now()+interval '2 days'
+        WHERE subject='{subject}';""")
+    run(f"""UPDATE public.empire_crm_tenant_memberships
+        SET status='disabled',revoked_at=now()
+        WHERE subject='{subject}' AND tenant_id='{A}';""")
+    assert client.post("/v1/revenue-crm/auth/accept-invite", json=invite).status_code == 401
+    run(f"""UPDATE public.empire_crm_tenant_memberships
+        SET status='active',revoked_at=NULL
+        WHERE subject='{subject}' AND tenant_id='{A}';""")
+    blocked_auth = PostgresCrmPasswordLogin(
+        auth_dsn.replace("user=empire_crm_auth_login", "user=crm_unbound_fixture"),
+    )
+    assert blocked_auth.accept_invitation(
+        prepared.token, password, A, load_membership=member_reader,
+    ) is False
+    accepted = client.post("/v1/revenue-crm/auth/accept-invite", json=invite)
+    assert accepted.status_code == 200, accepted.text
+    assert accepted.headers["cache-control"] == "no-store"
+    assert accepted.json() == {
+        "accepted": True, "access_token_issued": False, "login_required": True,
+    }
+    assert client.post("/v1/revenue-crm/auth/accept-invite", json=invite).status_code == 401
+    assert run("SELECT status FROM public.empire_crm_login_credentials "
+               f"WHERE subject='{subject}';") == "active"
 
     # Signed token was really derived from a user credential and live evidence.
     success = client.post("/v1/revenue-crm/auth/login", json=data)
@@ -323,3 +384,60 @@ def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
         auth_dsn.replace("user=empire_crm_auth_login", "user=crm_unbound_fixture")
     ).authenticate(email, password) is None
     run(file=migration42,check=False)
+
+
+def test_prepare_crm_invitation_is_random_and_does_not_provision_user():
+    from empire_os.revenue_crm_first_party_login import prepare_crm_invitation
+    from datetime import datetime, timezone, timedelta
+    import hashlib
+    import pytest
+
+    when = datetime(2026, 10, 10, tzinfo=timezone.utc)
+    a = prepare_crm_invitation(
+        subject="test:person", email=" Pilot@Example.invalid ",
+        tenant_id=A, evidence_ref="founder:reviewed:fixture", now=when,
+    )
+    b = prepare_crm_invitation(
+        subject="test:person", email=" Pilot@Example.invalid ",
+        tenant_id=A, evidence_ref="founder:reviewed:fixture", now=when,
+    )
+    assert a.login_email == "pilot@example.invalid"
+    assert a.invitation_tenant_id == A
+    assert a.expires_at == when + timedelta(hours=48)
+    assert a.token != b.token
+    assert a.invitation_token_hash != b.invitation_token_hash
+    assert a.password_salt != b.password_salt
+    assert len(a.password_digest) == 64
+    assert a.invitation_token_hash == hashlib.sha256(a.token.encode()).digest()
+    for invalid in (
+        {"subject": "has space"},
+        {"email": "no-mailbox"},
+        {"evidence_ref": ""},
+        {"tenant_id": "unknown"},
+    ):
+        inputs = {
+            "subject": "test:person", "email": "pilot@example.invalid",
+            "tenant_id": A, "evidence_ref": "fixture:valid", "now": when,
+        }
+        inputs.update(invalid)
+        with pytest.raises(ValueError):
+            prepare_crm_invitation(**inputs)
+    # This is a pure offline packet builder: no runtime DB, service or send.
+
+
+def test_prepared_042_never_creates_accounts_or_public_route():
+    from pathlib import Path
+    sql = (Path(__file__).resolve().parents[1]
+           / "migrations/empiredb/042_crm_first_party_login.sql").read_text()
+    hub = (Path(__file__).resolve().parents[1]
+           / "empire_os/hub.py").read_text()
+    assert "PREPARED ONLY" in sql
+    assert "invitation_token_hash" in sql
+    assert "invitation_redeemed_at" in sql
+    assert "CREATE POLICY crm_auth_login_read" in sql
+    assert "CREATE POLICY crm_auth_login_lockout" in sql
+    assert "REVOKE ALL ON TABLE" in sql
+    assert "INSERT INTO" not in sql
+    assert "CREATE ROLE " not in sql
+    assert "/v1/revenue-crm/auth/login" not in hub
+    assert "create_crm_login_router(" not in hub

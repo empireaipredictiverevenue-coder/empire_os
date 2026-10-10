@@ -10,12 +10,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
+from dataclasses import dataclass
 import json
 import re
 import secrets
 import time
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from uuid import UUID
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -39,6 +40,8 @@ SCRYPT_P = 1
 SCRYPT_MEMORY = 96 * 1024 * 1024
 MAX_FAILURES = 5
 TOKEN_SECONDS = 300
+INVITATION_SECONDS = 48 * 3600
+_INVITATION = re.compile(r"^EI1_[A-Za-z0-9_-]{43}$")
 
 # Prevent cheap username enumeration even for non-existent accounts.
 _DUMMY_SALT = hashlib.sha256(b"empire-first-party-unknown-credential").digest()
@@ -93,6 +96,58 @@ def _normal_email(login_email: str) -> str | None:
     if not _EMAIL.fullmatch(normalized):
         return None
     return normalized
+
+
+@dataclass(frozen=True)
+class PreparedCrmInvitation:
+    """Operator-only provisioning packet; token must never enter logs/audit."""
+    subject: str
+    login_email: str
+    invitation_tenant_id: str
+    token: str
+    invitation_token_hash: bytes
+    password_salt: bytes
+    password_digest: bytes
+    evidence_ref: str
+    expires_at: datetime
+
+
+def prepare_crm_invitation(
+    *, subject: str, email: str, tenant_id: str, evidence_ref: str,
+    now: datetime | None = None,
+) -> PreparedCrmInvitation:
+    """Construct pending invite material. DOES NOT insert rows or send email.
+
+    Only a separately authorised operator may store the hash/evidence in
+    EmpireDB and send the one-time token to the independently verified inbox.
+    """
+    normalized = _normal_email(email)
+    if (
+        not isinstance(subject, str) or not _SUBJECT.fullmatch(subject)
+        or normalized is None or not isinstance(evidence_ref, str)
+        or not 1 <= len(evidence_ref.strip()) <= 512
+    ):
+        raise ValueError("verified CRM invitation identity/evidence required")
+    try:
+        tenant = str(UUID(str(tenant_id)))
+    except (TypeError, ValueError, AttributeError) as exc:
+        raise ValueError("canonical CRM invite tenant required") from exc
+    if tenant != tenant_id:
+        raise ValueError("canonical CRM invite tenant required")
+    issued = now or datetime.now(timezone.utc)
+    if issued.tzinfo is None:
+        raise ValueError("timezone-aware invitation clock required")
+    issued = issued.astimezone(timezone.utc)
+    token = "EI1_" + secrets.token_urlsafe(32)
+    return PreparedCrmInvitation(
+        subject=subject, login_email=normalized,
+        invitation_tenant_id=tenant, token=token,
+        invitation_token_hash=hashlib.sha256(token.encode("ascii")).digest(),
+        password_salt=secrets.token_bytes(SALT_BYTES),
+        password_digest=secrets.token_bytes(DERIVED_BYTES),
+        evidence_ref=evidence_ref.strip(),
+        expires_at=issued + timedelta(seconds=INVITATION_SECONDS),
+    )
 
 
 class PostgresCrmPasswordLogin:
@@ -171,6 +226,91 @@ class PostgresCrmPasswordLogin:
 
 
 
+    def accept_invitation(
+        self, token: str, new_password: str, tenant_id: str,
+        *, load_membership: Callable[[str, str], TenantMembership | None],
+    ) -> bool:
+        """One-time invite redemption; must be delivered via verified email.
+
+        The account is already founder-provisioned and is still pending.
+        This endpoint cannot insert accounts, tenants, or membership records.
+        """
+        if (
+            not isinstance(token, str) or not _INVITATION.fullmatch(token)
+            or not isinstance(new_password, str)
+            or not MIN_PASSWORD_LENGTH <= len(new_password) <= MAX_PASSWORD_LENGTH
+            or not callable(load_membership)
+        ):
+            return False
+        try:
+            tenant = str(UUID(str(tenant_id)))
+        except (TypeError, ValueError, AttributeError):
+            return False
+        if tenant != tenant_id:
+            return False
+        invite_digest = hashlib.sha256(token.encode("ascii")).digest()
+        try:
+            with self._connect(self._dsn) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("SET LOCAL statement_timeout = '7000ms'")
+                    cursor.execute("SELECT session_user")
+                    if cursor.fetchone() != (LOGIN_ROLE,):
+                        return False
+                    cursor.execute(
+                        "SELECT subject,status,invitation_expires_at,"
+                        "invitation_redeemed_at,verified_at,invitation_tenant_id "
+                        "FROM public.empire_crm_login_credentials "
+                        "WHERE invitation_token_hash=%s FOR UPDATE",
+                        (invite_digest,),
+                    )
+                    row = cursor.fetchone()
+                    if not isinstance(row, (tuple, list)) or len(row) != 6:
+                        return False
+                    subject, status, expires, redeemed, verified, invited_tenant = row
+                    now = datetime.now(timezone.utc)
+                    if (
+                        not isinstance(subject, str) or not _SUBJECT.fullmatch(subject)
+                        or status != "pending" or redeemed is not None
+                        or str(invited_tenant) != tenant
+                        or expires is None or expires <= now
+                        or verified is None or verified > now
+                    ):
+                        return False
+                    try:
+                        membership = load_membership(subject, tenant)
+                        permitted = (
+                            isinstance(membership, TenantMembership)
+                            and membership.user_id == subject
+                            and membership.tenant_id == tenant
+                            and membership.can("read")
+                        )
+                    except Exception:
+                        permitted = False
+                    if not permitted:
+                        return False
+                    salt = secrets.token_bytes(SALT_BYTES)
+                    digest = hash_invited_password(new_password, salt)
+                    cursor.execute(
+                        "UPDATE public.empire_crm_login_credentials SET "
+                        "password_salt=%s,password_digest=%s,"
+                        "status='active',password_change_required=false,"
+                        "invitation_token_hash=NULL,"
+                        "invitation_redeemed_at=clock_timestamp(),"
+                        "failed_attempts=0,locked_until=NULL,"
+                        "updated_at=clock_timestamp() "
+                        "WHERE subject=%s AND status='pending' "
+                        "AND invitation_token_hash=%s "
+                        "AND invitation_tenant_id=%s::uuid "
+                        "AND invitation_expires_at>clock_timestamp() "
+                        "RETURNING subject",
+                        (salt, digest, subject, invite_digest, tenant),
+                    )
+                    success = cursor.fetchone()
+                    return success == (subject,)
+        except Exception:
+            # Driver failures may contain credentials; no details to caller.
+            return False
+
     def active_account(self, subject: str) -> bool:
         """Fresh, separate read: revoked login blocks previously issued JWTs."""
         if not isinstance(subject, str) or not _SUBJECT.fullmatch(subject):
@@ -239,6 +379,12 @@ class CrmLoginRequest(BaseModel):
     tenant_id: str = Field(min_length=36, max_length=36)
 
 
+class CrmInviteAcceptRequest(BaseModel):
+    invitation_token: str = Field(min_length=45, max_length=64)
+    new_password: str = Field(min_length=MIN_PASSWORD_LENGTH, max_length=MAX_PASSWORD_LENGTH)
+    tenant_id: str = Field(min_length=36, max_length=36)
+
+
 def _verified_member(
     load_membership: Callable[[str, str], TenantMembership | None],
     subject: str, tenant_id: str,
@@ -258,6 +404,7 @@ def create_crm_login_router(
     *,
     password_login: PostgresCrmPasswordLogin,
     load_membership: Callable[[str, str], TenantMembership | None],
+    load_invitation_membership: Callable[[str, str], TenantMembership | None],
     signing_key: Ed25519PrivateKey,
     key_id: str,
     now: Callable[[], int] | None = None,
@@ -266,12 +413,30 @@ def create_crm_login_router(
     if (
         not isinstance(password_login, PostgresCrmPasswordLogin)
         or not callable(load_membership)
+        or not callable(load_invitation_membership)
         or not isinstance(signing_key, Ed25519PrivateKey)
         or not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", key_id or "")
     ):
         raise ValueError("canonical CRM login dependencies required")
     clock = now or (lambda: int(time.time()))
     router = APIRouter(prefix="/v1/revenue-crm/auth", tags=["revenue-crm-auth"])
+
+    @router.post("/accept-invite")
+    def accept_invite(request: CrmInviteAcceptRequest, response: Response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        if not password_login.accept_invitation(
+            request.invitation_token, request.new_password, request.tenant_id,
+            load_membership=load_invitation_membership,
+        ):
+            raise HTTPException(status_code=401, detail="crm_invite_denied")
+        # Deliberately no auto-login: user signs in after redeeming.
+        return {
+            "accepted": True,
+            "access_token_issued": False,
+            "login_required": True,
+        }
 
     @router.post("/login")
     def login(request: CrmLoginRequest, response: Response):

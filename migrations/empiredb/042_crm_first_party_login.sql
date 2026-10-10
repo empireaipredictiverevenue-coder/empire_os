@@ -32,13 +32,24 @@ CREATE TABLE public.empire_crm_login_credentials (
     evidence_ref text NOT NULL
         CHECK (length(btrim(evidence_ref)) BETWEEN 1 AND 512),
     password_change_required boolean NOT NULL DEFAULT true,
+    invitation_tenant_id uuid NOT NULL,
+    invitation_token_hash bytea UNIQUE
+        CHECK (invitation_token_hash IS NULL OR octet_length(invitation_token_hash)=32),
+    invitation_expires_at timestamptz,
+    invitation_redeemed_at timestamptz,
     failed_attempts integer NOT NULL DEFAULT 0
         CHECK (failed_attempts BETWEEN 0 AND 5),
     locked_until timestamptz,
     verified_at timestamptz NOT NULL,
     last_login_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-    updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
+    updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    CHECK (status <> 'pending' OR
+           (invitation_token_hash IS NOT NULL AND invitation_expires_at IS NOT NULL)),
+    CHECK (status <> 'active' OR
+           (invitation_token_hash IS NULL AND invitation_redeemed_at IS NOT NULL
+            AND password_change_required = false)),
+    CHECK (invitation_redeemed_at IS NULL OR invitation_token_hash IS NULL)
 );
 ALTER TABLE public.empire_crm_login_credentials ENABLE ROW LEVEL SECURITY;
 -- Session identity is verified separately from SET ROLE; an unbound shared
