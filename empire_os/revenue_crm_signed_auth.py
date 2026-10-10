@@ -185,6 +185,82 @@ class SignedCrmTenantVerifier:
         return tenant
 
 
+class EmpireDbCrmMembershipReader:
+    """Dedicated, least-privilege EmpireDB membership lookup for signed CRM.
+
+    This does not authenticate a human. Only a separately authenticated issuer
+    may sign user tokens. The reader connects as a dedicated LOGIN that may
+    execute the bounded 041 function but cannot select membership-table rows.
+    On lookup failure or revoked/unknown membership, fail closed.
+    """
+
+    DATABASE_LOGIN = "empire_crm_membership_login"
+    SQL = (
+        "SELECT user_id, tenant_id, role, status "
+        "FROM public.empire_crm_read_member(%s::text,%s::uuid)"
+    )
+
+    def __init__(
+        self,
+        dsn: str,
+        *,
+        connect_factory: Callable | None = None,
+    ) -> None:
+        self._dsn = str(dsn or "").strip()
+        if not self._dsn:
+            raise ValueError("dedicated membership lookup database connection required")
+        if connect_factory is None:
+            import psycopg
+            connect_factory = psycopg.connect
+        self._connect = connect_factory
+
+    def __call__(self, user_id: str, tenant_id: str) -> TenantMembership | None:
+        if not isinstance(user_id, str) or not _SUBJECT.fullmatch(user_id):
+            return None
+        try:
+            expected = str(UUID(str(tenant_id)))
+        except (TypeError, ValueError, AttributeError):
+            return None
+        if expected != tenant_id:
+            return None
+
+        try:
+            with self._connect(self._dsn) as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET TRANSACTION READ ONLY")
+                    cursor.execute("SET LOCAL statement_timeout = '3000ms'")
+                    cursor.execute("SELECT session_user")
+                    identity = cursor.fetchone()
+                    if (
+                        not isinstance(identity, (list, tuple))
+                        or len(identity) != 1
+                        or identity[0] != self.DATABASE_LOGIN
+                    ):
+                        return None
+                    cursor.execute(self.SQL, (user_id, expected))
+                    row = cursor.fetchone()
+                    if row is None or len(row) != 4:
+                        return None
+                    membership = TenantMembership(
+                        user_id=str(row[0]), tenant_id=str(row[1]),
+                        role=str(row[2]), status=str(row[3]),
+                    )
+                    membership.validate()
+                    if (
+                        membership.user_id != user_id
+                        or membership.tenant_id != expected
+                        or not membership.can("read")
+                    ):
+                        return None
+                    # Malformed/ambiguous SQL function results fail closed.
+                    if cursor.fetchone() is not None:
+                        return None
+                    return membership
+        except Exception:
+            # Driver diagnostics can include credentials; never expose them.
+            return None
+
+
 def build_signed_crm_tenant_authenticator(
     trusted_public_keys: Mapping[str, bytes | Ed25519PublicKey],
     *,
