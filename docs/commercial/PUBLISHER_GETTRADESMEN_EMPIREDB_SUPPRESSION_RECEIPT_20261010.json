@@ -1,0 +1,18 @@
+{
+  "schema_version": "empire.publisher_gmail_hard_bounce_canonical_receipt.v1",
+  "date": "2026-10-10",
+  "provenance": "founder_supplied_production_cli_stdout",
+  "command": "scripts/record_publisher_gmail_hard_bounce.py --apply --approved-gettradesmen-bounce",
+  "recipient": "gettradesmen@gmail.com",
+  "status": "INSERTED",
+  "reason": "hard_bounce_550_5_1_1",
+  "source": "gmail_dsn:1a126bc2866c04ea",
+  "proof_sha256": "81e95ad53673d1f42787d83ff3aaed2644b98079c467913cd1c92d6f6a2b33c9",
+  "canonical_readback_verified": true,
+  "external_delivery_attempt": false,
+  "outbound_sent": false,
+  "payment": false,
+  "traffic_enabled": false,
+  "verification_basis": "CLI reported post-commit readback from canonical EmpireDB; assistant has not independently queried privileged DB",
+  "scope": "single exact email contact; preserve existing data and governance"
+}
