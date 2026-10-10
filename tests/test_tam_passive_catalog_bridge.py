@@ -229,3 +229,58 @@ def test_failed_market_gps_never_requests_tam_probe(
                             AssertionError("must not probe if GPS failed")
                         ))
     assert m.main()==4
+
+
+
+def test_real_observed_missing_rpc_and_existing_grants_route_to_isolated_plan(
+    tmp_path,
+):
+    from empire_os.revenue_completion_supervisor import (
+        tam_restricted_reader_catalog_status, tam_reader_prerequisites,
+    )
+    p=tmp_path/"live_proof.json"
+    evidence=safe_proof(
+        status="RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
+        migration_028_contract_verified=False,
+        function_exists=False,
+        security_definer_verified=False,
+        capability_execute_verified=False,
+        source_table_direct_read_grants=True,
+    )
+    p.write_text(json.dumps(evidence))
+    p.chmod(0o600)
+    observed=tam_restricted_reader_catalog_status(p)
+    assert observed["fresh"] is True
+    assert observed["restricted_catalog_verified"] is False
+    assert observed["issue_codes"]==[
+        "TAM_RESTRICTED_RPC_MISSING",
+        "MATERIALIZER_HAS_EFFECTIVE_SOURCE_TABLE_PRIVILEGES",
+    ]
+    assert observed["held_migration_028_incompatible_with_live_materializer"] is True
+    assert observed["repair_class"]==(
+        "DESIGN_SEPARATE_TAM_CAPABILITY_PRESERVE_EXISTING_MATERIALIZER"
+    )
+    prerequisites=tam_reader_prerequisites({},catalog_probe_path=p)
+    assert prerequisites["restricted_empiredb_sql_reader_live_verified"] is False
+    assert prerequisites["migration_028_live_authority"]=="UNVERIFIED_NOT_AUTHORISED_HERE"
+    assert prerequisites["auto_planner_retry_authorized"] is False
+    assert "postgresql://" not in str(prerequisites)
+
+
+def test_ambiguous_or_partial_live_preflight_never_infers_repair_authority(tmp_path):
+    from empire_os.revenue_completion_supervisor import tam_restricted_reader_catalog_status
+    p=tmp_path/"live_proof.json"
+    payload=safe_proof(
+        status="RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
+        migration_028_contract_verified=False,
+        function_exists=False,
+        security_definer_verified=False,
+        capability_execute_verified=False,
+        source_table_direct_read_grants=False,
+    )
+    p.write_text(json.dumps(payload))
+    p.chmod(0o600)
+    state=tam_restricted_reader_catalog_status(p)
+    assert "TAM_RESTRICTED_RPC_MISSING" in state["issue_codes"]
+    assert state["held_migration_028_incompatible_with_live_materializer"] is False
+    assert state["execution_authority"]=="none"

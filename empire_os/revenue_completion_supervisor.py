@@ -433,10 +433,41 @@ def tam_restricted_reader_catalog_status(
         ))
         and doc.get("source_table_direct_read_grants") is False
     )
+    issues: list[str] = []
+    if doc.get("restricted_login_verified") is not True:
+        issues.append("DEDICATED_MATERIALIZER_LOGIN_NOT_VERIFIED")
+    if doc.get("capability_role_verified") is not True:
+        issues.append("MATERIALIZER_CAPABILITY_ROLE_NOT_VERIFIED")
+    if doc.get("function_exists") is False:
+        issues.append("TAM_RESTRICTED_RPC_MISSING")
+    if doc.get("source_tables_present") is False:
+        issues.append("TAM_CANONICAL_SOURCE_TABLES_MISSING")
+    # The catalog reports effective privileges, not necessarily which
+    # membership / PUBLIC grant they came from. Existing bootstrap source
+    # separately proves direct grants on two of the three tables.
+    if doc.get("source_table_direct_read_grants") is True:
+        issues.append("MATERIALIZER_HAS_EFFECTIVE_SOURCE_TABLE_PRIVILEGES")
+    if doc.get("function_exists") is True and doc.get(
+        "capability_execute_verified"
+    ) is False:
+        issues.append("TAM_FUNCTION_EXECUTE_NOT_VERIFIED")
+    # Never interpret this as a migration or credential activation approval.
+    incompatible = (
+        "TAM_RESTRICTED_RPC_MISSING" in issues
+        and "MATERIALIZER_HAS_EFFECTIVE_SOURCE_TABLE_PRIVILEGES" in issues
+    )
     return {
         "status": status,
         "restricted_catalog_verified": proven,
         "fresh": True,
+        "issue_codes": issues,
+        "held_migration_028_incompatible_with_live_materializer": incompatible,
+        "repair_class": (
+            "DESIGN_SEPARATE_TAM_CAPABILITY_PRESERVE_EXISTING_MATERIALIZER"
+            if incompatible
+            else "CATALOG_VERIFICATION_REQUIRED" if not proven
+            else "CONFIGURE_MARKET_RESEARCH_SCOPE"
+        ),
         "no_data_rows_read": True,
         "execution_authority": "none",
     }
@@ -524,7 +555,11 @@ def build_snapshot() -> dict[str, Any]:
             "canonical_source_separate_from_llm_planner": True,
         },
         "tam_next_evidence_task": (
-            "VERIFY_RESTRICTED_TAM_CATALOG_WITH_PROTECTED_CREDENTIAL"
+            "DESIGN_ISOLATED_TAM_CAPABILITY_AND_SEEK_SEPARATE_FOUNDER_APPROVAL"
+            if tam_prerequisites["restricted_reader_catalog_check"].get(
+                "held_migration_028_incompatible_with_live_materializer"
+            )
+            else "VERIFY_RESTRICTED_TAM_CATALOG_WITH_PROTECTED_CREDENTIAL"
             if not tam_prerequisites["restricted_empiredb_sql_reader_live_verified"]
             else "CONFIGURE_EXPLICIT_TAM_SCOPE_AND_RUN_BOUNDED_READER"
             if not tam_runtime_available

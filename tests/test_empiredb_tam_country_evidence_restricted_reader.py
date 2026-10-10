@@ -176,3 +176,27 @@ BEGIN
   END IF;
 END $$;
 """)
+
+
+
+def test_held_migration_028_rejects_existing_market_gps_materializer_selects(
+    execute,
+):
+    """Production's old materializer bootstrap permits these two reads.
+
+    Migration 028 must NOT be applied as-is or "fixed" by revoking working
+    Market GPS/Intelligence permissions without a separate approved design.
+    This runs only in the isolated temporary PostgreSQL cluster.
+    """
+    execute("postgres", "CREATE DATABASE empiredb;")
+    execute("empiredb", SCHEMA)
+    execute("empiredb", """
+        GRANT SELECT ON
+          public.prospect_entity_links,
+          public.business_entities
+        TO empire_intelligence_materializer;
+    """)
+    execute(
+        "empiredb", MIGRATION.read_text(),
+        expected_error="unexpected TAM materializer table authority",
+    )
