@@ -17,6 +17,7 @@ from uuid import uuid4
 from empire_os.runtime_env import load_runtime_env
 from empire_os.tam_source_acquisition_connector import (
     canonical_targets, source_observations, build_review,
+    build_first_party_site_review,
     validate_scope, MAX_TARGETS, MAX_SOURCE,
 )
 
@@ -49,7 +50,7 @@ def save_private(packet: dict, folder: Path=REPORT_DIR) -> Path:
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser()
     parser.add_argument("--observe",action="store_true",required=True)
-    parser.add_argument("--source",choices=("recc_solar","overpass_osm"),
+    parser.add_argument("--source",choices=("recc_solar","overpass_osm","first_party_site"),
                         required=True)
     parser.add_argument("--sector",choices=("solar","roofing"),required=True)
     parser.add_argument("--country",choices=("GB","US"),required=True)
@@ -63,6 +64,10 @@ def main(argv=None) -> int:
                    country=args.country,limit=args.max_targets)
     if not 1 <= args.max_source <= MAX_SOURCE:
         parser.error("source observation limit out of bounds")
+    if (args.source=="first_party_site" and
+            (args.max_source > 5 or args.page_count != 1
+             or args.source_page != 0 or args.metro)):
+        parser.error("first-party website review permits five public sites only")
     if (not 1 <= args.page_count <= 3
             or args.source_page < 0
             or args.source_page+args.page_count-1 > 40
@@ -73,6 +78,32 @@ def main(argv=None) -> int:
     env=load_runtime_env("/etc/empiredb.env",required=("EMPIREDB_DSN",))
     targets=canonical_targets(env["EMPIREDB_DSN"],
                               sector=args.sector,limit=args.max_targets)
+    if args.source=="first_party_site":
+        packet=build_first_party_site_review(
+            targets=targets,max_sites=args.max_source,
+        )
+        packet["target_query_limit"]=args.max_targets
+        packet["target_selection_complete"]=False
+        path=save_private(packet)
+        print(json.dumps({
+            "status":"READ_ONLY_FIRST_PARTY_EVIDENCE_REVIEW_PREPARED",
+            "source":"first_party_site","country_focus":"GB",
+            "entities_considered":packet["entities_considered"],
+            "entities_with_unique_business_host":packet[
+                "entities_with_unique_business_host"],
+            "entities_skipped_for_ambiguous_identity_or_domain":packet[
+                "entities_skipped_for_ambiguous_identity_or_domain"],
+            "site_probes_attempted":packet["site_probes_attempted"],
+            "sites_retrieved_from_expected_host":packet[
+                "sites_retrieved_from_expected_host"],
+            "sites_supporting_exact_canonical_name":packet[
+                "sites_supporting_exact_canonical_name"],
+            "private_review_file":str(path),
+            "country_verified":False,"acquisitions_appended":0,
+            "database_write":False,"outbound_sent":False,
+            "execution_authority":"none",
+        },sort_keys=True))
+        return 0
     observations=[]
     page_counts=[]
     for page in range(args.source_page,args.source_page+args.page_count):

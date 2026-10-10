@@ -11,13 +11,14 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+import ipaddress
 import re
 from typing import Any, Callable, Iterable, Mapping
 from urllib.parse import urlsplit
 
 SECTORS = frozenset({"solar", "roofing"})
 COUNTRIES = frozenset({"GB", "US"})
-SOURCES = frozenset({"recc_solar", "overpass_osm"})
+SOURCES = frozenset({"recc_solar", "overpass_osm", "first_party_site"})
 MAX_TARGETS = 500
 MAX_SOURCE = 40
 MAX_RECC_PAGE = 40  # at most 41 public listing pages; 40 details/page
@@ -42,7 +43,7 @@ WITH targets AS MATERIALIZED (
 )
 SELECT t.id::text,t.canonical_name,t.canonical_niche,
   t.canonical_website,t.canonical_phone,
-  l.prospect_id::text,p.website,p.phone
+  l.prospect_id::text,p.website,p.phone,p.business_name
 FROM targets t
 JOIN public.prospect_entity_links l
   ON l.entity_id=t.id AND l.active IS TRUE
@@ -116,7 +117,8 @@ def validate_scope(*, source: str, sector: str, country: str,
     if (source not in SOURCES or sector not in SECTORS or
         country not in COUNTRIES or type(limit) is not int
         or not 1 <= limit <= MAX_TARGETS or
-        (source == "recc_solar" and (sector,country)!=("solar","GB"))):
+        (source in {"recc_solar","first_party_site"}
+            and (sector,country)!=("solar","GB"))):
         raise ValueError("source acquisition scope not approved")
 
 
@@ -157,7 +159,7 @@ def canonical_targets(dsn: str, *, sector: str, limit: int = 250,
         "entity_id":r[0],"canonical_name":r[1],"sector":r[2],
         "canonical_website":r[3],"canonical_phone":r[4],
         "prospect_id":r[5],"prospect_website":r[6],
-        "prospect_phone":r[7],
+        "prospect_phone":r[7],"prospect_name":r[8],
     } for r in rows]
 
 
@@ -169,6 +171,8 @@ def source_observations(*, source: str, sector: str, country: str,
     validate_scope(source=source,sector=sector,country=country,limit=1)
     if type(max_source) is not int or not 1 <= max_source <= MAX_SOURCE:
         raise ValueError("source observation bound invalid")
+    if source=="first_party_site":
+        raise ValueError("first-party evidence must use the target-bound site probe")
     if type(source_page) is not int or not 0 <= source_page <= MAX_RECC_PAGE:
         raise ValueError("RECC source page outside bounded research scope")
     if source == "recc_solar":
@@ -438,4 +442,186 @@ def build_review(*, targets: Iterable[Mapping], observations: Iterable[Mapping],
         "execution_authority":"none",
         "tam_market_population_verified":False,
         "source_observation_is_not_automatic_identity_proof":True,
+    }
+
+
+def build_first_party_site_review(
+    *, targets: Iterable[Mapping[str, Any]],
+    max_sites: int = 5,
+    site_probe: Callable | None = None,
+) -> dict[str, Any]:
+    """Conservatively inspect owned-site *claims* for existing solar entities.
+
+    No DB writes, country assertions or source acquisition admissions.
+    A single first-party website seen on ten prospect rows is still only
+    a candidate *entity-level* source. All records remain founder-review.
+    """
+    if type(max_sites) is not int or not 1 <= max_sites <= 5:
+        raise ValueError("first-party probe is limited to five business websites")
+    if site_probe is None:
+        from empire_os.search_fabric.site_probe import probe_site
+        site_probe = probe_site
+
+    by_entity: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in targets:
+        if row.get("sector") != "solar":
+            continue
+        entity = str(row.get("entity_id") or "").strip()
+        prospect = str(row.get("prospect_id") or "").strip()
+        name = _clean_name(row.get("canonical_name"))
+        if not entity or not prospect or not name:
+            continue
+        by_entity[entity].append(dict(row))
+
+    hosts: dict[str, str] = {}
+    candidate_url: dict[str, str] = {}
+    disqualified: dict[str, str] = {}
+    for entity, rows in by_entity.items():
+        names = {_clean_name(r.get("canonical_name")) for r in rows}
+        linked_names = {
+            _clean_name(r.get("prospect_name"))
+            for r in rows if str(r.get("prospect_name") or "").strip()
+        }
+        if len(names) != 1 or (linked_names and linked_names != names):
+            disqualified[entity] = "CONFLICTING_CANONICAL_OR_PROSPECT_NAMES"
+            continue
+        found: set[str] = set()
+        urls: dict[str, list[str]] = defaultdict(list)
+        for row in rows:
+            for key in ("canonical_website", "prospect_website"):
+                value = str(row.get(key) or "").strip()
+                host = _identity_domain(value)
+                if not host:
+                    continue
+                try:
+                    parsed = urlsplit(value)
+                    if (parsed.scheme not in ("http", "https")
+                            or parsed.query or parsed.fragment
+                            or parsed.path not in ("", "/")
+                            or parsed.username or parsed.password):
+                        continue
+                except (ValueError, TypeError):
+                    continue
+                if (not re.fullmatch(r"[a-z0-9.-]+", host)
+                        or host.endswith((".local", ".internal", ".localhost",
+                                          ".test", ".invalid", ".onion"))
+                        or host in ("co.uk", "org.uk", "com", "net", "org")
+                        or host.startswith(".") or "." not in host):
+                    continue
+                try:
+                    ipaddress.ip_address(host)
+                except ValueError:
+                    pass
+                else:
+                    continue
+                found.add(host)
+                urls[host].append(value)
+        if len(found) != 1:
+            disqualified[entity] = (
+                "NO_UNAMBIGUOUS_BUSINESS_WEBSITE" if not found
+                else "CONFLICTING_BUSINESS_WEBSITE_HOSTS"
+            )
+            continue
+        host = next(iter(found))
+        hosts[entity] = host
+        candidate_url[entity] = "https://" + host + "/"
+
+    shared_hosts = Counter(hosts.values())
+    for entity, host in list(hosts.items()):
+        if shared_hosts[host] != 1:
+            disqualified[entity] = "BUSINESS_HOST_SHARED_ACROSS_ENTITIES"
+            del hosts[entity]
+            candidate_url.pop(entity, None)
+
+    findings: list[dict[str, Any]] = []
+    selected = sorted(hosts)[:max_sites]
+    for entity in selected:
+        host = hosts[entity]
+        rows = by_entity[entity]
+        requested_url = candidate_url[entity]
+        try:
+            data = site_probe(
+                requested_url,
+                max_pages=2, request_timeout=4.0,
+                time_budget_seconds=10.0, public_only=True,
+            )
+        except Exception:
+            data = {}
+        verified_host = (
+            isinstance(data, Mapping)
+            and data.get("ok") is True
+            and _identity_domain(data.get("final_url")) == host
+            and data.get("final_url", "").startswith("https://")
+            and isinstance(data.get("pages_checked"), list)
+            and len(data["pages_checked"]) >= 1
+            and any(
+                isinstance(page, Mapping)
+                and _identity_domain(page.get("url")) == host
+                for page in data["pages_checked"]
+            )
+        )
+        observed_names = (
+            data.get("business_names") if isinstance(data, Mapping) else []
+        )
+        if not isinstance(observed_names, list):
+            observed_names = []
+        name_supported = verified_host and any(
+            _clean_name(x) == _clean_name(rows[0]["canonical_name"])
+            for x in observed_names if isinstance(x, str)
+        )
+        state = (
+            "FIRST_PARTY_NAME_EVIDENCE_REVIEW" if name_supported
+            else "FIRST_PARTY_SITE_OBSERVED_NAME_UNVERIFIED" if verified_host
+            else "FIRST_PARTY_PROBE_UNAVAILABLE_OR_UNTRUSTED"
+        )
+        findings.append({
+            "entity_id": entity,
+            "linked_prospect_count": len({
+                str(r["prospect_id"]) for r in rows
+            }),
+            "canonical_name": rows[0]["canonical_name"],
+            "review_state": state,
+            "first_party_host": host,
+            "source_url": data.get("final_url") if verified_host else None,
+            "observed_business_names": [
+                n for n in observed_names if isinstance(n, str)
+            ][:6] if verified_host else [],
+            "observed_business_addresses": [
+                a for a in data.get("addresses", [])
+                if isinstance(a, str)
+            ][:4] if verified_host and isinstance(data.get("addresses"), list) else [],
+            "homepage_fetched": bool(verified_host),
+            "country_explicitly_verified": False,
+            "canonical_resolution_verified": False,
+            "prospect_attachment_authorized": False,
+            "acquisition_appended": False,
+            "source_provenance_verified_for_ledger": False,
+        })
+    return {
+        "schema_version": "empire.tam-first-party-source-review.v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "OBSERVE",
+        "sector": "solar",
+        "country_research_focus": "GB",
+        "country_verified_from_site": False,
+        "source": "first_party_site",
+        "entities_considered": len(by_entity),
+        "entities_with_unique_business_host": len(hosts),
+        "entities_skipped_for_ambiguous_identity_or_domain": len(disqualified),
+        "site_probe_limit": max_sites,
+        "site_probes_attempted": len(selected),
+        "sites_retrieved_from_expected_host": sum(
+            f["homepage_fetched"] for f in findings
+        ),
+        "sites_supporting_exact_canonical_name": sum(
+            f["review_state"] == "FIRST_PARTY_NAME_EVIDENCE_REVIEW"
+            for f in findings
+        ),
+        "findings": findings,
+        "database_write": False,
+        "acquisitions_appended": 0,
+        "outbound_sent": False,
+        "buyer_intent_inferred": False,
+        "execution_authority": "none",
+        "tam_population_verified": False,
     }
