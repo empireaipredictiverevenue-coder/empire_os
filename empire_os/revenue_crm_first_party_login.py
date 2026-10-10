@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 import re
 import secrets
@@ -104,10 +104,10 @@ class PreparedCrmInvitation:
     subject: str
     login_email: str
     invitation_tenant_id: str
-    token: str
-    invitation_token_hash: bytes
-    password_salt: bytes
-    password_digest: bytes
+    token: str = field(repr=False)
+    invitation_token_hash: bytes = field(repr=False)
+    password_salt: bytes = field(repr=False)
+    password_digest: bytes = field(repr=False)
     evidence_ref: str
     expires_at: datetime
 
