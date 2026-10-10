@@ -449,6 +449,7 @@ def build_first_party_site_review(
     *, targets: Iterable[Mapping[str, Any]],
     max_sites: int = 5,
     site_probe: Callable | None = None,
+    diagnose_only: bool = False,
 ) -> dict[str, Any]:
     """Conservatively inspect owned-site *claims* for existing solar entities.
 
@@ -458,7 +459,9 @@ def build_first_party_site_review(
     """
     if type(max_sites) is not int or not 1 <= max_sites <= 5:
         raise ValueError("first-party probe is limited to five business websites")
-    if site_probe is None:
+    if type(diagnose_only) is not bool:
+        raise ValueError("invalid diagnostics mode")
+    if site_probe is None and not diagnose_only:
         from empire_os.search_fabric.site_probe import probe_site
         site_probe = probe_site
 
@@ -476,6 +479,11 @@ def build_first_party_site_review(
     hosts: dict[str, str] = {}
     candidate_url: dict[str, str] = {}
     disqualified: dict[str, str] = {}
+    entities_with_candidate_url = 0
+    candidate_url_rows = 0
+    candidate_usable_website_rows = 0
+    candidate_unusable_website_rows = 0
+    candidate_path_urls = 0
     for entity, rows in by_entity.items():
         names = {_clean_name(r.get("canonical_name")) for r in rows}
         linked_names = {
@@ -490,17 +498,26 @@ def build_first_party_site_review(
         for row in rows:
             for key in ("canonical_website", "prospect_website"):
                 value = str(row.get(key) or "").strip()
+                if not value:
+                    continue
+                candidate_url_rows += 1
                 host = _identity_domain(value)
                 if not host:
+                    candidate_unusable_website_rows += 1
                     continue
                 try:
                     parsed = urlsplit(value)
                     if (parsed.scheme not in ("http", "https")
-                            or parsed.query or parsed.fragment
-                            or parsed.path not in ("", "/")
-                            or parsed.username or parsed.password):
+                            or parsed.username or parsed.password
+                            or parsed.query or parsed.fragment):
+                        candidate_unusable_website_rows += 1
                         continue
+                    # A site's /about or /contact URL may still identify
+                    # its public host. Probe its root, NOT that deep path.
+                    if parsed.path not in ("", "/"):
+                        candidate_path_urls += 1
                 except (ValueError, TypeError):
+                    candidate_unusable_website_rows += 1
                     continue
                 if (not re.fullmatch(r"[a-z0-9.-]+", host)
                         or host.endswith((".local", ".internal", ".localhost",
@@ -515,7 +532,10 @@ def build_first_party_site_review(
                 else:
                     continue
                 found.add(host)
+                candidate_usable_website_rows += 1
                 urls[host].append(value)
+        if found:
+            entities_with_candidate_url += 1
         if len(found) != 1:
             disqualified[entity] = (
                 "NO_UNAMBIGUOUS_BUSINESS_WEBSITE" if not found
@@ -526,7 +546,14 @@ def build_first_party_site_review(
         hosts[entity] = host
         candidate_url[entity] = "https://" + host + "/"
 
+    entity_candidates_before_shared_host_filter = len(hosts)
     shared_hosts = Counter(hosts.values())
+    shared_host_entity_count = sum(
+        1 for host in hosts.values() if shared_hosts[host] > 1
+    )
+    shared_host_distinct_count = sum(
+        1 for n in shared_hosts.values() if n > 1
+    )
     for entity, host in list(hosts.items()):
         if shared_hosts[host] != 1:
             disqualified[entity] = "BUSINESS_HOST_SHARED_ACROSS_ENTITIES"
@@ -534,7 +561,7 @@ def build_first_party_site_review(
             candidate_url.pop(entity, None)
 
     findings: list[dict[str, Any]] = []
-    selected = sorted(hosts)[:max_sites]
+    selected = [] if diagnose_only else sorted(hosts)[:max_sites]
     for entity in selected:
         host = hosts[entity]
         rows = by_entity[entity]
@@ -608,6 +635,24 @@ def build_first_party_site_review(
         "entities_considered": len(by_entity),
         "entities_with_unique_business_host": len(hosts),
         "entities_skipped_for_ambiguous_identity_or_domain": len(disqualified),
+        "eligibility_diagnostic": {
+            "rejection_reasons": dict(sorted(Counter(
+                disqualified.values()
+            ).items())),
+            "entity_candidates_before_cross_entity_host_check":
+                entity_candidates_before_shared_host_filter,
+            "entities_with_any_valid_candidate_host": entities_with_candidate_url,
+            "unique_candidate_host_count": len(shared_hosts),
+            "cross_entity_shared_host_entity_count":
+                shared_host_entity_count,
+            "cross_entity_shared_host_distinct_count":
+                shared_host_distinct_count,
+            "candidate_website_values_examined": candidate_url_rows,
+            "eligible_website_values": candidate_usable_website_rows,
+            "unusable_website_values": candidate_unusable_website_rows,
+            "website_values_with_path": candidate_path_urls,
+        },
+        "diagnose_only": diagnose_only,
         "site_probe_limit": max_sites,
         "site_probes_attempted": len(selected),
         "sites_retrieved_from_expected_host": sum(

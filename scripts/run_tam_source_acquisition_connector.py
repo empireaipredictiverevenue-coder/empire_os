@@ -59,11 +59,14 @@ def main(argv=None) -> int:
     parser.add_argument("--max-source",type=int,default=40)
     parser.add_argument("--source-page",type=int,default=0)
     parser.add_argument("--page-count",type=int,default=1)
+    parser.add_argument("--diagnose-only",action="store_true")
     args=parser.parse_args(argv)
     validate_scope(source=args.source,sector=args.sector,
                    country=args.country,limit=args.max_targets)
     if not 1 <= args.max_source <= MAX_SOURCE:
         parser.error("source observation limit out of bounds")
+    if args.diagnose_only and args.source!="first_party_site":
+        parser.error("--diagnose-only is only for first-party identity eligibility")
     if (args.source=="first_party_site" and
             (args.max_source > 5 or args.page_count != 1
              or args.source_page != 0 or args.metro)):
@@ -81,18 +84,25 @@ def main(argv=None) -> int:
     if args.source=="first_party_site":
         packet=build_first_party_site_review(
             targets=targets,max_sites=args.max_source,
+            diagnose_only=args.diagnose_only,
         )
         packet["target_query_limit"]=args.max_targets
         packet["target_selection_complete"]=False
         path=save_private(packet)
         print(json.dumps({
-            "status":"READ_ONLY_FIRST_PARTY_EVIDENCE_REVIEW_PREPARED",
+            "status":(
+                "READ_ONLY_FIRST_PARTY_ELIGIBILITY_DIAGNOSTIC"
+                if args.diagnose_only
+                else "READ_ONLY_FIRST_PARTY_EVIDENCE_REVIEW_PREPARED"
+            ),
             "source":"first_party_site","country_focus":"GB",
             "entities_considered":packet["entities_considered"],
             "entities_with_unique_business_host":packet[
                 "entities_with_unique_business_host"],
             "entities_skipped_for_ambiguous_identity_or_domain":packet[
                 "entities_skipped_for_ambiguous_identity_or_domain"],
+            "eligibility_diagnostic":packet["eligibility_diagnostic"],
+            "diagnose_only":args.diagnose_only,
             "site_probes_attempted":packet["site_probes_attempted"],
             "sites_retrieved_from_expected_host":packet[
                 "sites_retrieved_from_expected_host"],

@@ -178,8 +178,9 @@ def test_first_party_cli_returns_only_aggregate_counts(monkeypatch, capsys, tmp_
                         lambda *a,**k:{"EMPIREDB_DSN":"postgresql:///empiredb"})
     monkeypatch.setattr(cli,"canonical_targets",
                         lambda *a,**k:[row("a","p1","Solar Ltd","https://solar.co.uk")])
-    def stub(*,targets,max_sites):
+    def stub(*,targets,max_sites,diagnose_only):
         assert max_sites == 3
+        assert diagnose_only is False
         return build_first_party_site_review(
             targets=targets,max_sites=max_sites,
             site_probe=lambda *a,**k:evidence("solar.co.uk","Solar Ltd"),
@@ -226,3 +227,81 @@ def test_invalid_or_nonbusiness_site_hosts_are_never_probed(host):
     )
     assert report["site_probes_attempted"]==0
     assert report["acquisitions_appended"]==0
+
+
+def test_no_network_diagnostic_emits_precise_shared_host_rejection_counts():
+    def forbidden(*a,**kw):
+        raise AssertionError("diagnose-only must not fetch a public site")
+    r=build_first_party_site_review(targets=[
+        row("a","p1","Solar A","https://shared-business.co.uk/about"),
+        row("b","p2","Solar B","https://shared-business.co.uk/contact"),
+        row("c","p3","Solar C","https://unique-business.co.uk/solar"),
+        row("d","p4","Solar D",""),
+    ],max_sites=5,site_probe=forbidden,diagnose_only=True)
+    d=r["eligibility_diagnostic"]
+    assert r["diagnose_only"] is True
+    assert r["site_probes_attempted"]==0
+    assert r["entities_considered"]==4
+    assert d["entity_candidates_before_cross_entity_host_check"]==3
+    assert d["cross_entity_shared_host_entity_count"]==2
+    assert d["cross_entity_shared_host_distinct_count"]==1
+    assert d["website_values_with_path"]==3
+    assert d["rejection_reasons"]=={
+        "BUSINESS_HOST_SHARED_ACROSS_ENTITIES":2,
+        "NO_UNAMBIGUOUS_BUSINESS_WEBSITE":1,
+    }
+    assert r["entities_with_unique_business_host"]==1
+    assert r["acquisitions_appended"]==0
+
+
+def test_deep_path_candidate_can_be_probed_only_from_company_root():
+    seen=[]
+    def probe(url,**kwargs):
+        seen.append(url)
+        return evidence("solarco.co.uk","Solar Co")
+    r=build_first_party_site_review(targets=[
+        row("a","p1","Solar Co","https://solarco.co.uk/contact")
+    ],site_probe=probe)
+    assert seen==["https://solarco.co.uk/"]
+    assert r["sites_supporting_exact_canonical_name"]==1
+    assert r["eligibility_diagnostic"]["website_values_with_path"]==1
+    assert r["country_verified_from_site"] is False
+
+
+def test_diagnostic_cli_prohibits_site_network(monkeypatch,capsys,tmp_path):
+    from scripts import run_tam_source_acquisition_connector as cli
+    monkeypatch.setattr(cli.os,"geteuid",lambda:0)
+    monkeypatch.setattr(cli,"load_runtime_env",
+                        lambda *a,**k:{"EMPIREDB_DSN":"postgresql:///empiredb"})
+    monkeypatch.setattr(cli,"canonical_targets",lambda *a,**k:[
+        row("a","p1","Solar Co","https://example-solar.co.uk/about")
+    ])
+    def review(*,targets,max_sites,diagnose_only):
+        assert diagnose_only is True
+        return build_first_party_site_review(
+            targets=targets,max_sites=max_sites,diagnose_only=True,
+            site_probe=lambda *a,**k:(_ for _ in ()).throw(
+                AssertionError("not allowed to access network"))
+        )
+    monkeypatch.setattr(cli,"build_first_party_site_review",review)
+    monkeypatch.setattr(cli,"save_private",lambda packet:tmp_path/"private.json")
+    assert cli.main(["--observe","--source","first_party_site",
+         "--sector","solar","--country","GB","--diagnose-only",
+         "--max-source","5"])==0
+    receipt=json.loads(capsys.readouterr().out)
+    assert receipt["status"]=="READ_ONLY_FIRST_PARTY_ELIGIBILITY_DIAGNOSTIC"
+    assert receipt["site_probes_attempted"]==0
+    assert receipt["diagnose_only"] is True
+    assert receipt["eligibility_diagnostic"][
+        "entity_candidates_before_cross_entity_host_check"]==1
+    assert receipt["acquisitions_appended"]==0
+    assert receipt["database_write"] is False
+    assert "candidate_name" not in receipt
+
+
+def test_diagnose_flag_refused_for_recc_source():
+    from scripts import run_tam_source_acquisition_connector as cli
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["--observe","--source","recc_solar",
+                  "--sector","solar","--country","GB","--diagnose-only"])
+    assert exc.value.code==2
