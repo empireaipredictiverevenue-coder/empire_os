@@ -18,6 +18,7 @@ from empire_os.runtime_env import load_runtime_env
 from empire_os.tam_source_acquisition_connector import (
     canonical_targets, source_observations, build_review,
     build_first_party_site_review, build_first_party_discovery_review,
+    build_recc_source_first_review,
     validate_scope, MAX_TARGETS, MAX_SOURCE,
 )
 
@@ -50,7 +51,7 @@ def save_private(packet: dict, folder: Path=REPORT_DIR) -> Path:
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser()
     parser.add_argument("--observe",action="store_true",required=True)
-    parser.add_argument("--source",choices=("recc_solar","overpass_osm","first_party_site","first_party_search"),
+    parser.add_argument("--source",choices=("recc_solar","overpass_osm","first_party_site","first_party_search","recc_source_first"),
                         required=True)
     parser.add_argument("--sector",choices=("solar","roofing"),required=True)
     parser.add_argument("--country",choices=("GB","US"),required=True)
@@ -60,6 +61,7 @@ def main(argv=None) -> int:
     parser.add_argument("--source-page",type=int,default=0)
     parser.add_argument("--page-count",type=int,default=1)
     parser.add_argument("--diagnose-only",action="store_true")
+    parser.add_argument("--max-site-probes",type=int,default=2)
     args=parser.parse_args(argv)
     validate_scope(source=args.source,sector=args.sector,
                    country=args.country,limit=args.max_targets)
@@ -69,6 +71,12 @@ def main(argv=None) -> int:
             args.max_source > 5 or args.page_count != 1
             or args.source_page != 0 or args.metro):
         parser.error("first-party discovery permits at most five entities")
+    if args.source=="recc_source_first" and (
+            args.max_source > 5
+            or not 1 <= args.max_site_probes <= 2
+            or args.page_count != 1 or args.source_page != 0
+            or args.metro or args.diagnose_only):
+        parser.error("source-first review restricted to five members and two sites")
     if args.diagnose_only and args.source!="first_party_site":
         parser.error("--diagnose-only is only for first-party identity eligibility")
     if (args.source=="first_party_site" and
@@ -82,6 +90,29 @@ def main(argv=None) -> int:
         parser.error("bounded source page sweep requires RECC, 1-3 pages")
     if os.geteuid()!=0:
         raise SystemExit("source acquisition connector requires authorised root")
+    if args.source=="recc_source_first":
+        packet=build_recc_source_first_review(
+            max_members=args.max_source,
+            max_site_probes=args.max_site_probes,
+        )
+        location=save_private(packet)
+        print(json.dumps({
+            "status":"PUBLIC_RECC_SOURCE_FIRST_REVIEW_PREPARED",
+            "source":"recc_solar","country_source":"GB",
+            "members_listed":packet["members_listed"],
+            "canonical_acquisition_previews":packet["canonical_acquisition_previews"],
+            "public_sites_probed":packet["public_sites_probed"],
+            "first_party_identity_supported_review_count":packet[
+                "first_party_identity_supported_review_count"],
+            "member_postcodes_present":packet["member_postcodes_present"],
+            "review_holds":packet["review_holds"],
+            "private_review_file":str(location),
+            "existing_canonical_duplicate_check_performed":False,
+            "database_queries":0,"database_writes":0,
+            "prospects_created":0,"acquisitions_appended":0,
+            "outbound_sent":False,"execution_authority":"none",
+        },sort_keys=True))
+        return 0
     env=load_runtime_env("/etc/empiredb.env",required=("EMPIREDB_DSN",))
     targets=canonical_targets(env["EMPIREDB_DSN"],
                               sector=args.sector,limit=args.max_targets)

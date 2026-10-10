@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 SECTORS = frozenset({"solar", "roofing"})
 COUNTRIES = frozenset({"GB", "US"})
-SOURCES = frozenset({"recc_solar", "overpass_osm", "first_party_site", "first_party_search"})
+SOURCES = frozenset({"recc_solar", "overpass_osm", "first_party_site", "first_party_search", "recc_source_first"})
 MAX_TARGETS = 500
 MAX_SOURCE = 40
 MAX_RECC_PAGE = 40  # at most 41 public listing pages; 40 details/page
@@ -118,7 +118,7 @@ def validate_scope(*, source: str, sector: str, country: str,
     if (source not in SOURCES or sector not in SECTORS or
         country not in COUNTRIES or type(limit) is not int
         or not 1 <= limit <= MAX_TARGETS or
-        (source in {"recc_solar","first_party_site","first_party_search"}
+        (source in {"recc_solar","first_party_site","first_party_search","recc_source_first"}
             and (sector,country)!=("solar","GB"))):
         raise ValueError("source acquisition scope not approved")
 
@@ -173,7 +173,7 @@ def source_observations(*, source: str, sector: str, country: str,
     validate_scope(source=source,sector=sector,country=country,limit=1)
     if type(max_source) is not int or not 1 <= max_source <= MAX_SOURCE:
         raise ValueError("source observation bound invalid")
-    if source in {"first_party_site","first_party_search"}:
+    if source in {"first_party_site","first_party_search","recc_source_first"}:
         raise ValueError("first-party evidence must use target-bound research")
     if type(source_page) is not int or not 0 <= source_page <= MAX_RECC_PAGE:
         raise ValueError("RECC source page outside bounded research scope")
@@ -889,4 +889,212 @@ def build_first_party_discovery_review(
         "execution_authority":"none",
         "buyer_intent_inferred":False,
         "tam_population_verified":False,
+    }
+
+
+def build_recc_source_first_review(
+    *, max_members: int = 5, max_site_probes: int = 2,
+    listing_fetch: Callable | None = None,
+    detail_fetch: Callable | None = None,
+    site_probe: Callable | None = None,
+) -> dict[str, Any]:
+    """RECC member -> original member evidence -> independently probed site.
+
+    Source-first is independent of the unverified existing prospect graph.
+    This is a NON-WRITING acquisition PREVIEW, not import authority.
+    """
+    if (type(max_members) is not int or not 1 <= max_members <= 5
+        or type(max_site_probes) is not int
+        or not 1 <= max_site_probes <= 2):
+        raise ValueError("RECC source-first must remain at 5 members / 2 sites")
+    from urllib.parse import urlencode
+    from empire_os.lead_sources import recc_solar
+    from empire_os.prospect_ingest import prepare_candidate
+    from empire_os.search_fabric.identity_guard import assess_first_party_identity
+    from empire_os.search_fabric.verification import is_directory_url
+
+    if listing_fetch is None:
+        listing_fetch=recc_solar._get
+    if detail_fetch is None:
+        detail_fetch=recc_solar._detail
+    if site_probe is None:
+        from empire_os.search_fabric.site_probe import probe_site
+        site_probe=probe_site
+    query=urlencode({"technology":"Solar PV","submitbutton":"submit"})
+    listing_url=recc_solar.SEARCH_URL+"?"+query
+    try:
+        listing=listing_fetch(listing_url)
+        members=recc_solar._member_links(listing,limit=max_members)
+    except Exception:
+        raise RuntimeError("RECC source-first public listing unavailable") from None
+
+    prelim=[]
+    reasons=Counter()
+    seen_member_urls=set()
+    for member_url,display_name in members:
+        if (member_url in seen_member_urls
+            or not _provenance(member_url,"recc_solar")):
+            reasons["INVALID_MEMBER_SOURCE_REFERENCE"]+=1
+            continue
+        seen_member_urls.add(member_url)
+        try:
+            c=detail_fetch(display_name,member_url)
+        except Exception:
+            reasons["MEMBER_DETAIL_UNAVAILABLE"]+=1
+            continue
+        if c is None or not isinstance(getattr(c,"raw",None),Mapping):
+            reasons["MEMBER_DETAIL_UNQUALIFIED"]+=1
+            continue
+        if (str(getattr(c,"source",None))!="recc_solar"
+            or str(getattr(c,"niche",None))!="solar"
+            or str(getattr(c,"country_code",None))!="GB"
+            or getattr(c,"url",None)!=member_url
+            or _clean_name(getattr(c,"name",None))!=_clean_name(display_name)):
+            reasons["MEMBER_EVIDENCE_CONTRACT_MISMATCH"]+=1
+            continue
+        try:
+            prepared=prepare_candidate(c)
+        except Exception:
+            reasons["CANONICAL_PREPARATION_FAILED"]+=1
+            continue
+        if (prepared["evidence"]["source"]!="recc_solar"
+            or prepared["evidence"]["source_url"]!=member_url
+            or prepared["prospect"].get("website")
+            or prepared["prospect"].get("niche")!="solar"
+            or prepared["evidence"].get("locale",{}).get("country_code")!="GB"):
+            reasons["CANONICAL_PREPARATION_FAILED"]+=1
+            continue
+        claimed_url=str(c.raw.get("business_website") or "")
+        host=_identity_domain(claimed_url)
+        if (not host or is_directory_url(claimed_url)
+            or host in ("recc.org.uk","openstreetmap.org")
+            or host.endswith((".recc.org.uk",".openstreetmap.org"))
+            or host in ("co.uk","org.uk","com","net","org")
+            or host.endswith((".local",".internal",".test",".invalid",".onion"))):
+            reasons["NO_INDEPENDENT_COMPANY_WEBSITE"]+=1
+            host=""
+        if host:
+            try:
+                parsed=urlsplit(claimed_url)
+                if (parsed.scheme not in ("https","http")
+                    or parsed.username or parsed.password
+                    or parsed.port not in (None,80,443)):
+                    host=""
+            except ValueError:
+                host=""
+        if host:
+            try:
+                ipaddress.ip_address(host)
+            except ValueError:
+                pass
+            else:
+                host=""
+        prelim.append({
+            "candidate_name":str(c.name),
+            "member_url":member_url,
+            "company_website_from_member":claimed_url if host else None,
+            "source_phone_public":str(getattr(c,"phone","") or ""),
+            "source_postcode":str(c.raw.get("postcode") or ""),
+            "source_country_code":"GB",
+            "site_host":host,
+            "fingerprint_preview":prepared["ingest_key"],
+            "candidate_metro":str(getattr(c,"metro","") or ""),
+        })
+    duplicates=Counter(x["site_host"] for x in prelim if x["site_host"])
+    findings=[]
+    probed=0
+    for info in prelim:
+        state="MEMBER_SOURCE_ONLY_REVIEW"
+        safe=False
+        accepted=False
+        host=info["site_host"]
+        if not host:
+            reasons["MISSING_OR_INVALID_FIRST_PARTY_HOST"]+=1
+        elif duplicates[host]>1:
+            reasons["COMPANY_DOMAIN_SHARED_ACROSS_RECC_MEMBERS"]+=1
+            state="COMPANY_DOMAIN_COLLISION_REVIEW"
+        elif probed>=max_site_probes:
+            reasons["SITE_PROBE_BUDGET_EXHAUSTED"]+=1
+        else:
+            probed+=1
+            url="https://"+host+"/"
+            try:
+                site=site_probe(
+                    url,max_pages=1,request_timeout=4.0,
+                    time_budget_seconds=8.0,public_only=True,
+                )
+            except Exception:
+                site={}
+            safe=(isinstance(site,Mapping)
+                and site.get("ok") is True
+                and _identity_domain(site.get("final_url"))==host
+                and str(site.get("final_url","")).startswith("https://")
+                and isinstance(site.get("pages_checked"),list)
+                and any(
+                    isinstance(x,Mapping)
+                    and _identity_domain(x.get("url"))==host
+                    for x in site["pages_checked"]))
+            if not safe:
+                reasons["WEBSITE_SAME_HOST_RECEIPT_MISSING"]+=1
+                state="FIRST_PARTY_SITE_UNAVAILABLE_REVIEW"
+            else:
+                try:
+                    verdict=assess_first_party_identity(
+                        prospect={
+                            "business_name":info["candidate_name"],
+                            "metro":info["candidate_metro"],
+                            "niche":"solar","website":"",
+                        },
+                        candidate_url=url,probe=dict(site),
+                    )
+                    accepted=verdict.get("accepted") is True
+                except Exception:
+                    accepted=False
+                if accepted:
+                    state="RECC_AND_FIRST_PARTY_IDENTITY_SUPPORTED_REVIEW"
+                else:
+                    state="FIRST_PARTY_IDENTITY_HELD_REVIEW"
+                    reasons["SITE_IDENTITY_NOT_CORROBORATED"]+=1
+        findings.append({
+            "state":state,
+            "company_name_from_recc":info["candidate_name"],
+            "recc_member_source_url":info["member_url"],
+            "business_website_from_recc":info["company_website_from_member"],
+            "public_phone_from_recc":info["source_phone_public"],
+            "public_postcode_from_recc":info["source_postcode"],
+            "source_country_code":"GB",
+            "original_source_fingerprint":info["fingerprint_preview"],
+            "site_received_same_host_receipt":safe,
+            "site_identity_guard_accepted":accepted,
+            "existing_empiredb_duplicate_check":"NOT_PERFORMED",
+            "specific_prospect_binding_verified":False,
+            "commercial_buyer_intent_verified":False,
+            "source_acquisition_appended":False,
+        })
+    return {
+        "schema_version":"empire.tam-recc-source-first-review.v1",
+        "generated_at":datetime.now(timezone.utc).isoformat(),
+        "mode":"OBSERVE",
+        "source":"recc_solar",
+        "country_source":"GB",
+        "members_listed":len(members),
+        "canonical_acquisition_previews":len(prelim),
+        "public_sites_probed":probed,
+        "first_party_identity_supported_review_count":sum(
+            f["state"]=="RECC_AND_FIRST_PARTY_IDENTITY_SUPPORTED_REVIEW"
+            for f in findings),
+        "member_postcodes_present":sum(
+            bool(x["public_postcode_from_recc"]) for x in findings),
+        "review_holds":dict(sorted(reasons.items())),
+        "findings":findings,
+        "database_queries":0,
+        "database_writes":0,
+        "outbound_sent":False,
+        "tenant_authority":"none",
+        "execution_authority":"none",
+        "prospects_created":0,
+        "acquisitions_appended":0,
+        "existing_canonical_duplicate_check_performed":False,
+        "company_identity_not_automatically_promoted":True,
+        "buyer_intent_inferred":False,
     }
