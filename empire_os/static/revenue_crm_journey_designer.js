@@ -112,6 +112,8 @@
       } else if (!n.id.startsWith("custom_") || n.locked ||
                  !["review", "decision"].includes(n.type)) {
         throw new Error("Only manual review or decision steps may be added");
+      } else if (/\b(send|deliver|subscribe|charge|call|publish|execute|activate|message)\b/i.test(n.label)) {
+        throw new Error("Design labels cannot instruct delivery or execution");
       }
       return {
         id: n.id, type: n.type, label: n.label, x: n.x, y: n.y,

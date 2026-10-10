@@ -64,6 +64,7 @@ rejected(d => d.edges.push({from:"custom_1",to:"source_observed",condition:"evid
 rejected(d => d.nodes.push({...d.nodes[4]})); // duplicate custom step
 rejected(d => d.nodes[4].type="send_email"); // no send step
 rejected(d => d.nodes[4].label="person@example.com"); // reject address labels
+rejected(d => d.nodes[4].label="Send an email"); // reject executable marketing labels
 rejected(d => d.nodes[4].x=999999); // bounded canvas
 rejected(d => d.execution_authority="live"); // cannot claim authority
 rejected(d => d.tenant_data_included=true); // cannot include tenant data

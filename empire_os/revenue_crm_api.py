@@ -9,7 +9,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from empire_os.revenue_crm_transport import (
     PostgresRevenueCrmRepository, RevenueCrmTransportError,
@@ -20,6 +20,10 @@ from empire_os.revenue_crm_customer_success import (
 from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
 from empire_os.revenue_crm_journeys import (
     journey_blueprint, preview_crm_journey, preview_segment_distribution,
+)
+from empire_os.revenue_crm_designs import UnsafeJourneyDesign
+from empire_os.revenue_crm_design_store import (
+    JourneyStorageUnavailable, PostgresCrmJourneyDesignStore,
 )
 from empire_os.search_intelligence.ai_visibility import AiCitationObservation
 from empire_os.search_intelligence.backlinks import BacklinkObservation
@@ -326,12 +330,21 @@ def derive_next_action(
     )
 
 
+class JourneyDesignDraftRequest(BaseModel):
+    # No caller-supplied tenant ID. Reject extra fields, not just ignore them.
+    model_config = ConfigDict(extra="forbid")
+    design: dict[str, Any]
+    design_id: str | None = None
+    expected_prior_revision: int | None = Field(default=None, ge=1, le=999999)
+
+
 def create_revenue_crm_router(
     repository: RevenueCrmRepository | None = None,
     *,
     conversation_read_repository: Any = None,
     evidence_root: Path = Path("/srv/empire_os"),
     resolve_authenticated_read: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
+    resolve_authenticated_design_writer: Callable[[Request], PostgresCrmJourneyDesignStore | None] | None = None,
 ) -> APIRouter:
     # A single global Postgres repository is not a multi-tenant HTTP auth
     # boundary. Keep test-only in-memory repositories compatible.
@@ -339,6 +352,9 @@ def create_revenue_crm_router(
         raise ValueError("request-scoped CRM authentication required")
     if repository is not None and resolve_authenticated_read is not None:
         raise ValueError("ambiguous CRM repository authority")
+    if (resolve_authenticated_design_writer is not None
+            and (resolve_authenticated_read is None or repository is not None)):
+        raise ValueError("design storage requires authenticated CRM tenant resolver")
     router = APIRouter(prefix="/v1/revenue-crm")
 
     @router.get("/health")
@@ -602,6 +618,39 @@ def create_revenue_crm_router(
         return Response(content=asset.read_bytes(), media_type="text/javascript", headers={
             "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
         })
+
+    @router.post("/journeys/designs/drafts", status_code=201)
+    def save_journey_design_draft(request: Request, draft: JourneyDesignDraftRequest):
+        # Explicit opt-in ONLY: no production resolver, role or table is
+        # activated by the existence of this route. Never accept tenant ID
+        # from a header/body; require the real dedicated tenant read context.
+        repo = require_repository(request)
+        if (resolve_authenticated_design_writer is None
+                or not isinstance(repo, PostgresRevenueCrmRepository)):
+            raise HTTPException(status_code=503, detail="crm_journey_storage_not_activated")
+        try:
+            writer = resolve_authenticated_design_writer(request)
+        except Exception:
+            raise HTTPException(status_code=503, detail="crm_journey_storage_not_activated") from None
+        if (not isinstance(writer, PostgresCrmJourneyDesignStore)
+                or writer.tenant_id != repo.tenant_id):
+            raise HTTPException(status_code=503, detail="crm_journey_tenant_writer_unavailable")
+        try:
+            result = writer.save(
+                draft.design, design_id=draft.design_id,
+                expected_prior_revision=draft.expected_prior_revision,
+            )
+        except UnsafeJourneyDesign:
+            raise HTTPException(status_code=422, detail="unsafe_journey_design") from None
+        except JourneyStorageUnavailable:
+            raise HTTPException(status_code=503, detail="crm_journey_storage_not_activated") from None
+        return {
+            "mode": "DESIGN_ONLY", "tenant_id": result.tenant_id,
+            "design_id": result.design_id, "revision": result.revision,
+            "sha256": result.sha256, "status": result.result,
+            "execution_authority": "none", "send_authorized": False,
+            "payment_authorized": False, "workflow_activated": False,
+        }
 
     @router.get("/journeys/blueprint")
     def journeys_blueprint(request: Request):
