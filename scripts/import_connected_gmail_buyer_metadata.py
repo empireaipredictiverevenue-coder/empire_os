@@ -45,9 +45,26 @@ def _private(path: Path, max_size: int) -> dict:
     return data
 
 
+# Connected Gmail sometimes returns sender metadata as "Display Name user@host"
+# without RFC-822 angle brackets. Extract exactly one syntactically valid
+# address, and keep the existing known-buyer-domain + thread binding checks.
+SENDER_ADDR = re.compile(
+    r"(?<![a-zA-Z0-9._+%\-@])"
+    r"([a-zA-Z0-9._+%\-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,24})"
+    r"(?![a-zA-Z0-9._+%\-@])"
+)
+
+
 def _addr(value: object) -> str:
-    parsed = parseaddr(value if isinstance(value, str) else "")[1].lower()
-    return parsed if EMAIL.fullmatch(parsed) else ""
+    if not isinstance(value, str) or len(value) > 512 or any(
+        c in value for c in ("\r", "\n", "\x00")
+    ):
+        return ""
+    addresses = SENDER_ADDR.findall(value)
+    if len(addresses) != 1:
+        return ""
+    single = addresses[0].lower()
+    return single if EMAIL.fullmatch(single) else ""
 
 
 def _provider_email_timestamp(value: object):

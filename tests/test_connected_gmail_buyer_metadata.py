@@ -109,3 +109,24 @@ def test_raw_email_body_rejected_at_connector_boundary():
     index["threads"][0]["messages"][0]["body"]="Do not copy private emails"
     with pytest.raises(RelationshipEvidenceError,match="RAW_MAIL"):
         refreshed_summary(old,index,now=NOW)
+
+
+
+def test_unbracketed_provider_sender_metadata_updates_latest_sent_history():
+    old,index=inputs()
+    target=index["threads"][0]
+    target["messages"][-1]["from"]="Buyer Name reply@leadsmartinc.com"
+    target["messages"][0]["from"]="Phil Livesley flavag83@gmail.com"
+    result,summary=refreshed_summary(old,index,now=NOW)
+    row=next(x for x in result["threads"] if x["entity_key"]=="lead-smart")
+    assert row["last_outbound_message_id"]==target["messages"][0]["id"]
+    assert row["last_inbound_message_id"]==target["messages"][-1]["id"]
+    assert summary["new_history_directions"]==8
+
+
+def test_multi_address_or_injected_sender_cannot_be_treated_as_known_buyer():
+    from scripts.import_connected_gmail_buyer_metadata import _addr
+    assert _addr("Two addresses kieran@connex.is fake@connex.is")==""
+    assert _addr("Kieran kieran@connex.is\r\nReply-To: fake@evil.example")==""
+    assert _addr("Director kieran@connex.is")=="kieran@connex.is"
+    assert _addr("From <KIERAN@CONNEX.IS>")=="kieran@connex.is"
