@@ -96,9 +96,28 @@ def test_missing_provenance_fails_no_row(pg):
     assert _read(pg)=="0|0|0"
 
 
-def test_entity_binding_drift_fails_no_row(pg):
-    pg("UPDATE public.tenant_business_entity_bindings SET active=false WHERE entity_id='00000000-0000-0000-0000-000000000001'")
-    pg(file=SQL,user="postgres",check=False)
+def test_expired_observed_business_data_does_not_block_pending_identity(pg):
+    pg("UPDATE public.tenant_business_entity_bindings SET active=false")
+    output=pg(file=SQL,user="postgres")
+    assert "pending" in output
+    assert _read(pg)=="1|0|1"
+
+
+def test_no_observed_business_data_does_not_block_pending_identity(pg):
+    pg("TRUNCATE public.tenant_business_entity_bindings")
+    output=pg(file=SQL,user="postgres")
+    assert "pending" in output
+    assert _read(pg)=="1|0|1"
+
+
+def test_ambiguous_tenant_role_bindings_fail_closed(pg):
+    pg(f"""
+      INSERT INTO public.empire_tenant_role_bindings
+       (role_name,tenant_id,active,evidence_ref)
+      VALUES ('empiredb_readonly','{TENANT}',true,'fixture:extra-role');
+    """)
+    rejected=pg(file=SQL,user="postgres",check=False)
+    assert "COMMIT" not in rejected
     assert _read(pg)=="0|0|0"
 
 

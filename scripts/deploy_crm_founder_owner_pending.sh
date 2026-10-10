@@ -12,7 +12,7 @@ die() { printf 'CRM_FOUNDER_MEMBER=BLOCKED reason=%s\n' "$1" >&2; exit 3; }
 cd /srv/empire_os
 
 sql=scripts/provision_crm_founder_owner_pending.sql
-sql_sha=b2287dbfffc288d205cf27ef33db070bd59780db7bbfa9c2b76db0c76f4d441c
+sql_sha=2f30edf3b017c244376a083baffadc8f6c97bda163ab576cd9d1b7eb550e1282
 [[ -f "$sql" ]] || die 'SQL_MISSING'
 [[ "$(sha256sum "$sql" | cut -d' ' -f1)" == "$sql_sha" ]] ||
   die 'SQL_HASH_DRIFT'
@@ -82,13 +82,10 @@ SELECT
       AND b.role_name='empire_intelligence_materializer_login'
       AND b.active AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
       AND r.rolcanlogin AND NOT r.rolsuper AND NOT r.rolbypassrls)
-  ||'|'||(SELECT count(*) FROM public.tenant_business_entity_bindings b
-    WHERE b.tenant_id='708efd4b-53b2-43d7-961d-1cecab67f17a'
-      AND b.active AND b.binding_kind='observed'
-      AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
-      AND b.valid_from<=now() AND (b.valid_until IS NULL OR b.valid_until>now()))
+  ||'|'||(SELECT count(*) FROM public.empire_tenant_role_bindings b
+    WHERE b.tenant_id='708efd4b-53b2-43d7-961d-1cecab67f17a')
 ")" || die 'PREFLIGHT_QUERY_FAILED'
-[[ "$preflight" == '1|1|0|0|2|1|4' ]] ||
+[[ "$preflight" == '1|1|0|0|2|1|1' ]] ||
   die 'EXISTING_TENANT_OR_MEMBERSHIP_RECONCILE_FIRST'
 
 db_bytes="$(pg "SELECT pg_database_size('empiredb')")" ||

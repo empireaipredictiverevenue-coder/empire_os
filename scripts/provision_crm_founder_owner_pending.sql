@@ -23,7 +23,6 @@ BEGIN
   IF to_regclass('public.empire_crm_tenant_memberships') IS NULL
      OR to_regclass('public.empire_crm_login_credentials') IS NULL
      OR to_regclass('public.empire_tenant_role_bindings') IS NULL
-     OR to_regclass('public.tenant_business_entity_bindings') IS NULL
   THEN
     RAISE EXCEPTION 'CRM_OWNER=BLOCKED reason=CANONICAL_SCHEMA_REQUIRED';
   END IF;
@@ -44,21 +43,13 @@ BEGIN
   THEN
     RAISE EXCEPTION 'CRM_OWNER=BLOCKED reason=INTERNAL_OPERATOR_TENANT_NOT_EVIDENCED';
   END IF;
-  -- All four earlier bindings were OBSERVED, not owned or managed.
-  -- These prove an existing internal operator scope, not a founder identity.
-  IF (SELECT count(*) FROM public.tenant_business_entity_bindings b
-      WHERE b.tenant_id=tenant
-        AND b.active AND b.binding_kind='observed'
-        AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
-        AND b.valid_from <= now()
-        AND (b.valid_until IS NULL OR b.valid_until > now())) <> 4
-     OR EXISTS (
-       SELECT 1 FROM public.tenant_business_entity_bindings b
-       WHERE b.tenant_id=tenant AND b.active
-         AND b.binding_kind IN ('owned','managed')
-     )
+  -- Founder membership is identity/tenant authority, not market-data scope.
+  -- OBSERVED business-entity bindings can expire without proving or revoking
+  -- a human founder's ownership. A single evidenced operator role is required.
+  IF (SELECT count(*) FROM public.empire_tenant_role_bindings b
+      WHERE b.tenant_id=tenant) <> 1
   THEN
-    RAISE EXCEPTION 'CRM_OWNER=BLOCKED reason=EXPECTED_OPERATOR_BINDINGS_DRIFTED';
+    RAISE EXCEPTION 'CRM_OWNER=BLOCKED reason=UNEXPECTED_TENANT_ROLE_BINDINGS';
   END IF;
   IF EXISTS (SELECT 1 FROM public.empire_crm_tenant_memberships)
      OR EXISTS (SELECT 1 FROM public.empire_crm_login_credentials)

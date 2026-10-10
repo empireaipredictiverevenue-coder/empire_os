@@ -19,6 +19,9 @@ def test_exact_one_row_sql_pinned_to_deploy_script():
     assert "--approved-pending-owner" in src
     assert "ROOT_OPERATOR_REQUIRED" in src
     assert "CRM_IDENTITY_ROLES_NOT_DORMANT" in SQL.read_text()
+    assert "UNEXPECTED_TENANT_ROLE_BINDINGS" in SQL.read_text()
+    assert "tenant_business_entity_bindings" not in SQL.read_text()
+    assert "tenant_business_entity_bindings" not in src
     assert "OR EXISTS (SELECT 1 FROM public.empire_crm_login_credentials)" in SQL.read_text()
 
 
