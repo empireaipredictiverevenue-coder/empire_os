@@ -258,3 +258,36 @@ def test_publisher_supply_projection_is_only_evidence_not_buyer_authority():
     bad = deepcopy(delivery)
     bad["messages"][0]["recipient_delivery_status"] = "DELIVERED"
     assert build_publisher_recruitment_summary(prospects, bad)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
+
+def test_real_publisher_reply_is_paid_only_not_a_new_revenue_event():
+    import json
+    from pathlib import Path
+    from empire_os.revenue_distribution_review import build_publisher_recruitment_summary
+    root = Path(__file__).resolve().parents[1]
+    prospects = json.loads((root / "docs/commercial/PUBLISHER_SUPPLY_RECRUITMENT_EVIDENCE_20261010.json").read_text())
+    delivery = json.loads((root / "docs/commercial/PUBLISHER_RECRUITMENT_GMAIL_SEND_EVIDENCE_20261010.json").read_text())
+    result = build_publisher_recruitment_summary(prospects, delivery)
+    assert result["state"] == "HUMAN_REVIEW_ONLY"
+    assert result["candidate_count"] == 8
+    assert result["email_submitted_count"] == 4
+    assert result["hard_bounce_count"] == 1
+    assert result["reply_observed_count"] == 1
+    assert result["paid_only_reply_count"] == 1
+    assert result["awaiting_response_count"] == 2
+    assert result["unsent_draft_count"] == 4
+    assert result["recognized_revenue_cents"] == 0
+    assert result["verified_onboarded_count"] == 0
+    assert result["outbound_authorized"] is False
+    rows = {r["domain"]: r for r in result["items"]}
+    assert rows["pavementcalculator.com"]["stage"] == "PAID_ONLY_NO_ZERO_BUDGET_FIT"
+    assert rows["pavementcalculator.com"]["reply_observed_in_connected_gmail"] is True
+    assert rows["gettradesmen.uk"]["stage"] == "HARD_BOUNCE_NO_RETRY"
+    assert rows["roofpitch.net"]["stage"] == "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED"
+    assert rows["solarbriton.co.uk"]["stage"] == "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED"
+
+    forged = deepcopy(delivery)
+    forged["messages"][3]["reply_from"] = "unrelated@example.net"
+    assert build_publisher_recruitment_summary(prospects, forged)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
+    forged = deepcopy(delivery)
+    forged["reply_observed_count"] = 0
+    assert build_publisher_recruitment_summary(prospects, forged)["state"] == "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"

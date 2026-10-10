@@ -284,6 +284,7 @@ def build_publisher_recruitment_summary(prospects, delivery):
         "candidate_count": 0, "email_submitted_count": 0,
         "hard_bounce_count": 0, "awaiting_response_count": 0,
         "unsent_draft_count": 0, "verified_reply_count": 0,
+        "reply_observed_count": 0, "paid_only_reply_count": 0,
         "verified_onboarded_count": 0, "recognized_revenue_cents": 0,
         "outbound_authorized": False, "traffic_authorized": False,
         "publisher_payment_authorized": False, "execution_authority": "none",
@@ -324,7 +325,7 @@ def build_publisher_recruitment_summary(prospects, delivery):
             by_contact[address] = candidate
             domains.add(domain)
 
-        sent, bounce_count = {}, 0
+        sent, bounce_count, paid_only_replies = {}, 0, {}
         for message in messages:
             if not isinstance(message, dict):
                 raise ValueError("invalid_recruitment_send")
@@ -344,14 +345,31 @@ def build_publisher_recruitment_summary(prospects, delivery):
                 bounce_count += 1
             elif message.get("recipient_delivery_status") is not None:
                 raise ValueError("untrusted_recruitment_delivery_state")
+            reply_id = message.get("reply_message_id")
+            if reply_id is not None:
+                if (hard_bounce or not isinstance(reply_id, str) or len(reply_id) < 16
+                        or reply_id == mid or message.get("reply_from") != contact
+                        or not isinstance(message.get("reply_received_at"), str)
+                        or message.get("reply_classification") != "PAID_ONLY_UPFRONT_REQUIRED"
+                        or message.get("reported_minimum_placement_usd") != 500
+                        or message.get("reply_terms_accepted") is not False
+                        or message.get("no_cost_publisher_fit") is not False):
+                    raise ValueError("untrusted_recruitment_reply")
+                paid_only_replies[contact] = reply_id
+            elif any(key in message for key in ("reply_from", "reply_received_at",
+                         "reply_classification", "reported_minimum_placement_usd")):
+                raise ValueError("orphan_recruitment_reply_metadata")
             sent[contact] = hard_bounce
         if (delivery.get("submitted_to_gmail_count") != len(sent)
                 or delivery.get("confirmed_hard_bounce_count") != bounce_count
-                or delivery.get("no_bounce_observed_yet_count") != len(sent) - bounce_count):
+                or delivery.get("no_bounce_observed_yet_count") != len(sent) - bounce_count
+                or delivery.get("reply_observed_count", 0) != len(paid_only_replies)
+                or delivery.get("paid_only_reply_count", 0) != len(paid_only_replies)):
             raise ValueError("conflicting_recruitment_totals")
         rows = []
         for contact, candidate in by_contact.items():
             stage = ("HARD_BOUNCE_NO_RETRY" if sent.get(contact) is True
+                     else "PAID_ONLY_NO_ZERO_BUDGET_FIT" if contact in paid_only_replies
                      else "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED" if contact in sent
                      else "DRAFT_UNSENT")
             rows.append({
@@ -361,6 +379,7 @@ def build_publisher_recruitment_summary(prospects, delivery):
                 "vertical": candidate.get("vertical"),
                 "commercial_role": "TRAFFIC_SUPPLY_RESEARCH_ONLY",
                 "stage": stage,
+                "reply_observed_in_connected_gmail": contact in paid_only_replies,
                 "reply_verified": False,
                 "live_buyer_route_verified": False,
                 "outbound_authorized": False,
@@ -376,7 +395,9 @@ def build_publisher_recruitment_summary(prospects, delivery):
             "candidate_count": len(candidates),
             "email_submitted_count": len(sent),
             "hard_bounce_count": bounce_count,
-            "awaiting_response_count": len(sent) - bounce_count,
+            "reply_observed_count": len(paid_only_replies),
+            "paid_only_reply_count": len(paid_only_replies),
+            "awaiting_response_count": len(sent) - bounce_count - len(paid_only_replies),
             "unsent_draft_count": len(candidates) - len(sent),
             "items": rows,
         })
