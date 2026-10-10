@@ -208,3 +208,58 @@ rejected-call reasons, net money settled per qualified visit, source
 attribution and payments actually received. Do not use domain novelty
 or aggregate website traffic as the success metric. Preserve buyer-specific
 suppression, legal approval and traffic gates.
+
+
+## 10 October 2026 — actual Polyares first-party probe after admission repair
+
+After production commit `b2613702`, an authenticated
+`empire_os` Python environment executed the existing read-only
+`scripts.probe_buyer_network_direct_sites.probe_candidate()` against
+`polyares.com` with no mailbox, database, telephony, spend or send authority.
+
+- Probe exit: **0 / success**.
+- Paths attempted: **9** (standard existing pages plus the reviewed
+  `/pay-per-call-affiliate-program` page).
+- First-party pages successfully fetched: **3**:
+  `https://www.polyares.com/`,
+  `https://www.polyares.com/contact`, and
+  `https://www.polyares.com/pay-per-call-affiliate-program`.
+- First-party site signal classifier: publisher programme **true**,
+  active-demand *textual claim* **true**, integration **true**,
+  economics **true**, compliance **true**, contactable **true**,
+  and no observed published programme-closure notice.
+- Actual independent accepted-traffic proof, buyer-specific purchase
+  capacity, signed agreement, verified call price, payout/payment and
+  CRM publisher login: **none**.
+- Correct research result: **site-corroborated publisher opportunity,
+  not buyer-approved**, no outreach or revenue represented.
+
+**Useful direct route discovered:** Polyares contact page
+`https://www.polyares.com/contact` has a publisher-question form
+(first and last name, company, phone, email, landing URL and message).
+This is distinct from `https://app.polyares.com/register/start`,
+where the account-registration process asks the visitor to accept
+website Terms of Use. Neither route has been submitted or accepted.
+No verified public publisher mailbox address was found; do not invent
+an email destination or submit the form using fabricated phone
+number, caller identity or monthly traffic.
+
+**A concise and truthful first enquiry, for founder approval:**
+
+> We operate Empire AI (empire-ai.co.uk), developing first-party
+> consumer-initiated organic home-services enquiries. We are seeking
+> one controlled U.S. roofing installation/replacement pilot, with
+> your team selecting the state/ZIP area where there is current
+> buying capacity. Before registration or activating any calls,
+> please confirm first-party SEO source approval, the exact
+> homeowner/job qualifications, call-duration threshold, duplicate
+> rules, your tracked-number handoff, written category/ZIP pricing,
+> net settlement and dispute terms. We are preactivation and do
+> not claim existing billable call volume. Please reply by email
+> with a suggested pilot buy-box and required documents.
+
+This is **draft copy only**; no form, portal account or message was sent.
+The current server-side search fabric does not replace this verified
+first-party corroboration. A future real partner reply should enter
+the existing `partner_inbound_requirements` reviewer before any new
+contract, traffic or tracking activation.
