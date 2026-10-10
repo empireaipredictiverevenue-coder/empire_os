@@ -46,14 +46,14 @@ def tam_status(runtime_root: Path = DEFAULT_TAM_RUNTIME) -> dict[str, Any]:
 
     state = "NOT_QUEUED"
     job: Mapping[str, Any] | None = None
-    if completed:
-        state, job = "COMPLETED", completed[-1]
-    elif failed:
-        state, job = "FAILED", failed[-1]
-    elif running:
+    if running:
         state, job = "RUNNING", running[-1]
     elif pending:
         state, job = "PENDING", pending[-1]
+    elif completed:
+        state, job = "COMPLETED", completed[-1]
+    elif failed:
+        state, job = "FAILED", failed[-1]
 
     worker_alive = None
     if state == "RUNNING" and job is not None:
@@ -66,8 +66,28 @@ def tam_status(runtime_root: Path = DEFAULT_TAM_RUNTIME) -> dict[str, Any]:
             except (ValueError, ProcessLookupError, PermissionError):
                 worker_alive = False
 
+    historical = failed[-1] if failed else None
+    active_job = state in {"PENDING", "RUNNING"}
+    # A bounded exhausted job is diagnostic history, not an actively
+    # failing model service. No automatic re-enqueue or retry is implied.
+    operational_state = (
+        "ACTIVE_PLAN_JOB" if active_job else
+        "IDLE_HISTORIC_TERMINAL_FAILURE" if state == "FAILED" else
+        "IDLE_NO_PLAN_JOB"
+    )
     return {
         "state": state,
+        "operational_state": operational_state,
+        "active_job": active_job,
+        "terminal_failure_history_count": len(failed),
+        "last_terminal_failure_at": (
+            historical.get("updated_at") if historical else None
+        ),
+        "last_terminal_failure_reason": (
+            "MODEL_INFERENCE_TIMEOUT"
+            if historical and "TimeoutError" in str(historical.get("error"))
+            else "OTHER_TERMINAL_FAILURE" if historical else None
+        ),
         "job_id": job.get("id") if job else None,
         "task_id": job.get("task_id") if job else None,
         "attempts": int(job.get("attempts") or 0) if job else 0,
@@ -176,10 +196,112 @@ def buyer_status(
     }
 
 
+def tam_snapshot_truth(
+    candidate: Any, *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Fail-close canonical TAM projection; a JSON file is not runtime proof."""
+    clock = now or datetime.now(timezone.utc)
+    reason = "SNAPSHOT_MISSING"
+    age = None
+    if isinstance(candidate, Mapping):
+        reason = "SNAPSHOT_CONTRACT_NOT_VERIFIED"
+        required_false = (
+            "tam_inferred_from_observed_roster", "buyer_intent_inferred",
+            "demand_inferred", "pricing_inferred", "revenue_inferred",
+            "prospect_created", "outreach_enabled", "external_execution",
+        )
+        generated = candidate.get("generated_at")
+        ts = None
+        if isinstance(generated, str):
+            try:
+                ts = datetime.fromisoformat(
+                    generated.replace("Z", "+00:00")
+                )
+                if ts.tzinfo is None:
+                    ts = None
+            except ValueError:
+                pass
+        if ts is not None:
+            age = (clock - ts).total_seconds()
+        evidence_valid = (
+            candidate.get("schema_version")
+                == "empire.tam-market-intelligence.v1"
+            and candidate.get("mode") == "OBSERVE"
+            and candidate.get("source") == "empiredb_restricted_tam_reader"
+            and candidate.get("canonical_data") is True
+            and candidate.get("tenant_source_scope_verified") is False
+            and candidate.get("data_scope") == "PLATFORM_MARKET_RESEARCH_ONLY"
+            and candidate.get("execution_authority") == "none"
+            and isinstance(candidate.get("tenant_id"), str)
+            and bool(candidate["tenant_id"].strip())
+            and isinstance(candidate.get("market_scopes"), list)
+            and isinstance(candidate.get("opportunity_classes"), list)
+            and isinstance(candidate.get("market_scope_count"), int)
+            and candidate["market_scope_count"] == len(candidate["market_scopes"])
+            and isinstance(candidate.get("source_row_count"), int)
+            and candidate["source_row_count"] >= 0
+            and all(candidate.get(k) is False for k in required_false)
+        )
+        if evidence_valid and age is not None:
+            if age < -300:
+                reason = "SNAPSHOT_CLOCK_IN_FUTURE"
+            elif age > 72 * 3600:
+                reason = "SNAPSHOT_STALE_REQUIRES_RESTRICTED_REFRESH"
+            else:
+                reason = "CANONICAL_TAM_OBSERVE_SNAPSHOT_VERIFIED"
+        elif evidence_valid:
+            reason = "SNAPSHOT_FRESHNESS_UNVERIFIED"
+    passed = reason == "CANONICAL_TAM_OBSERVE_SNAPSHOT_VERIFIED"
+    return {
+        "available": passed,
+        "reason_code": reason,
+        "schema_version": (
+            candidate.get("schema_version") if passed else None
+        ),
+        "market_scope_count": candidate["market_scope_count"] if passed else 0,
+        "opportunity_class_count": (
+            len(candidate["opportunity_classes"]) if passed else 0
+        ),
+        "source_row_count": candidate["source_row_count"] if passed else None,
+        "tam_counts_inferred_from_roster": False,
+        "buyer_intent_inferred": False,
+        "execution_authority": "none",
+    }
+
+
+def tam_reader_prerequisites(env: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Report protected-reader readiness without exposing identifiers/secrets.
+
+    Only values exported into the actual service process count as operational
+    configuration. Protected root env files need an authorised preflight and
+    configured systemd EnvironmentFile before unprivileged workers can use them.
+    """
+    config = env if env is not None else os.environ
+    missing = [
+        name for name in (
+            "EMPIRE_TAM_TENANT_ID", "EMPIRE_TAM_ACTIVE_INDUSTRIES",
+            "EMPIRE_TAM_ACTIVE_COUNTRIES",
+            "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",
+        ) if not isinstance(config.get(name), str) or not config[name].strip()
+    ]
+    return {
+        "runtime_environment_configured": len(missing) == 0,
+        "missing_runtime_environment_keys": missing,
+        "restricted_empiredb_sql_reader_live_verified": False,
+        "migration_028_live_authority": "UNVERIFIED_NOT_AUTHORISED_HERE",
+        "auto_planner_retry_authorized": False,
+        "service_restart_authorized": False,
+        "execution_authority": "none",
+    }
+
+
 def build_snapshot() -> dict[str, Any]:
     tam = tam_status()
     tam_runtime = _read_json(DEFAULT_TAM_SNAPSHOT)
-    tam_runtime_available = isinstance(tam_runtime, dict)
+    tam_truth = tam_snapshot_truth(tam_runtime)
+    tam_runtime_available = tam_truth["available"]
+    tam_prerequisites = tam_reader_prerequisites()
     buyers = buyer_status()
     if buyers["genuine_review_ready_count"] > 0:
         next_action = "founder_review_genuine_buyers"
@@ -191,8 +313,11 @@ def build_snapshot() -> dict[str, Any]:
     blockers: list[str] = []
     if not tam_runtime_available:
         blockers.append("tam_runtime_evidence_unavailable")
-    elif tam["state"] == "FAILED":
-        blockers.append("tam_planner_failed_historical")
+        if not tam_prerequisites["runtime_environment_configured"]:
+            blockers.append("tam_restricted_reader_runtime_configuration_required")
+    # A completed/failed historical AI plan job is diagnostic only. Canonical
+    # TAM is built by the restricted deterministic EmpireDB reader, never
+    # promoted by rerunning an Ollama proposal.
     if tam["state"] == "RUNNING" and tam["worker_alive"] is False:
         blockers.append("tam_planner_worker_missing")
     backlog_health = str(buyers.get("backlog_health") or "UNKNOWN")
@@ -208,19 +333,18 @@ def build_snapshot() -> dict[str, Any]:
         "observed_at": _now(),
         "mode": "OBSERVE",
         "tam": tam,
-        "tam_runtime": {
-            "available": tam_runtime_available,
-            "schema_version": (
-                tam_runtime.get("schema_version")
-                if isinstance(tam_runtime, dict)
-                else None
-            ),
-            "opportunity_class_count": (
-                len(tam_runtime.get("opportunity_classes") or [])
-                if isinstance(tam_runtime, dict)
-                else 0
-            ),
+        "tam_runtime": tam_truth,
+        "tam_reader_prerequisites": tam_prerequisites,
+        "tam_diagnostics": {
+            "historical_planner_failure": tam["terminal_failure_history_count"] > 0,
+            "planner_failure_not_retried": tam["active_job"] is False,
+            "canonical_source_separate_from_llm_planner": True,
         },
+        "tam_next_evidence_task": (
+            "CHECK_RESTRICTED_READER_MIGRATION_028_AND_CONFIGURE_EXPLICIT_TAM_SCOPE"
+            if not tam_runtime_available
+            else "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
+        ),
         "buyers": buyers,
         "revenue_stream_portfolio": stream_portfolio_status(),
         "next_action": next_action,

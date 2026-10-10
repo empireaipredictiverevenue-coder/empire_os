@@ -13,6 +13,10 @@ def main() -> int:
         "ok": True,
         "path": str(path),
         "tam_state": payload["tam"]["state"],
+        "tam_operational_state": payload["tam"]["operational_state"],
+        "tam_canonical_runtime_available": payload["tam_runtime"]["available"],
+        "tam_runtime_reason": payload["tam_runtime"]["reason_code"],
+        "tam_next_evidence_task": payload["tam_next_evidence_task"],
         "genuine_review_ready_count": (
             payload["buyers"]["genuine_review_ready_count"]
         ),

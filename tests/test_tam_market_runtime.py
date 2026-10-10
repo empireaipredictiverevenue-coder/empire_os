@@ -141,3 +141,51 @@ def test_missing_snapshot_fails_closed(tmp_path):
     assert result["available"] is False
     assert result["opportunity_classes"] == []
     assert result["execution_authority"] == "none"
+
+
+
+def test_tam_runtime_rejects_cross_tenant_source_binding():
+    from empire_os.tam_market_runtime import build_tam_runtime
+    with pytest.raises(ValueError,match="mixed tenant"):
+        build_tam_runtime(
+            [{
+                "tenant_id":"different-tenant","entity_id":"e7",
+                "company_name":"Business","industry":"roofing",
+                "country_code":"US","source_ref":"registry:7",
+                "observed_at":"2026-10-10T10:00:00+00:00",
+                "execution_authority":"none",
+            }],
+            tenant_id="intended-tenant",
+            active_industries=["roofing"],active_countries=["US"],
+        )
+
+
+def test_tam_runtime_has_time_and_never_claims_tenant_login_is_verified():
+    result=build_tam_runtime(
+       [{
+         "entity_id":"e8", "company_name":"Real canonical firm",
+         "industry":"roofing","country_code":"US",
+         "source_ref":"registry:8",
+         "observed_at":"2026-10-10T10:00:00+00:00",
+         "execution_authority":"none",
+       }],
+       tenant_id="research-scope", active_industries=["roofing"],
+       active_countries=["US"],
+    )
+    assert result["source"]=="empiredb_restricted_tam_reader"
+    assert result["tenant_source_scope_verified"] is False
+    assert result["data_scope"]=="PLATFORM_MARKET_RESEARCH_ONLY"
+    assert result["generated_at"]
+    assert result["outreach_enabled"] is False
+
+
+def test_tam_snapshot_is_owner_private_and_symlink_safe(tmp_path):
+    path=write_tam_snapshot(tmp_path,{"mode":"OBSERVE","execution_authority":"none"})
+    assert path.stat().st_mode & 0o777 == 0o600
+    path.unlink()
+    target=tmp_path/"elsewhere.json"
+    target.write_text("keep")
+    path.symlink_to(target)
+    with pytest.raises(ValueError,match="unsafe TAM snapshot"):
+        write_tam_snapshot(tmp_path,{"mode":"OBSERVE"})
+    assert target.read_text()=="keep"

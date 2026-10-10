@@ -158,3 +158,30 @@ def test_top_level_authority_and_commercial_flags_stay_false():
     assert result["prospect_created"] is False
     assert result["outreach_enabled"] is False
     assert result["execution_authority"] == "none"
+
+
+
+@pytest.mark.parametrize("count", [True, False, "100", 1.5, -1, 1_000_000_001])
+def test_untrusted_tam_size_cannot_claim_verified_market_total(count):
+    with pytest.raises(ValueError,match="bounded integer"):
+        build_tam_market_intelligence(
+            tenant_id="tenant-1",
+            observations=[observed("e1")],
+            tam_evidence=[tam(count)],
+        )
+
+
+def test_conflicting_canonical_company_identity_fails_closed_instead_of_merging():
+    first=observed("e1")
+    changed=MarketEntityObservation(
+        tenant_id="tenant-1",entity_id="e1",
+        company_name="Completely Different Firm",
+        industry="roofing",country_code="US",
+        source_ref="other_registry:2",
+        observed_at="2026-10-02T12:00:00+00:00",
+    )
+    with pytest.raises(ValueError,match="conflicting canonical entity identity"):
+        build_tam_market_intelligence(
+            tenant_id="tenant-1",
+            observations=[first,changed],
+        )

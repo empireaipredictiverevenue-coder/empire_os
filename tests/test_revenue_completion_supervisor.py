@@ -123,9 +123,30 @@ def test_build_snapshot_keeps_failed_planner_as_history_when_runtime_exists(monk
 
     monkeypatch.setattr(supervisor, "DEFAULT_TAM_RUNTIME", tmp_path / "coder")
     snapshot = tmp_path / "tam.json"
+    from datetime import datetime, timezone
     _write(snapshot, {
         "schema_version": "empire.tam-market-intelligence.v1",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "mode": "OBSERVE",
+        "source": "empiredb_restricted_tam_reader",
+        "canonical_data": True,
+        "tenant_source_scope_verified": False,
+        "data_scope": "PLATFORM_MARKET_RESEARCH_ONLY",
+        "tenant_id": "test-platform",
+        "market_scope_count": 1,
+        "market_scopes": [{"industry": "roofing", "country_code": "US",
+                           "tam_state": "UNKNOWN", "tam_entity_count": None}],
+        "source_row_count": 1,
         "opportunity_classes": [{"opportunity_key": "tam:test"}],
+        "execution_authority": "none",
+        "tam_inferred_from_observed_roster": False,
+        "buyer_intent_inferred": False,
+        "demand_inferred": False,
+        "pricing_inferred": False,
+        "revenue_inferred": False,
+        "prospect_created": False,
+        "outreach_enabled": False,
+        "external_execution": False,
     })
     monkeypatch.setattr(supervisor, "DEFAULT_TAM_SNAPSHOT", snapshot)
     monkeypatch.setattr(supervisor, "buyer_status", lambda: {
@@ -137,7 +158,107 @@ def test_build_snapshot_keeps_failed_planner_as_history_when_runtime_exists(monk
         "status": "FAILED", "error": "timeout",
     })
     result = build_snapshot()
-    assert "tam_planner_failed_historical" in result["blockers"]
+    assert "tam_planner_failed_historical" not in result["blockers"]
     assert "tam_runtime_evidence_unavailable" not in result["blockers"]
+    assert result["tam_diagnostics"]["historical_planner_failure"] is True
+    assert result["tam_diagnostics"]["canonical_source_separate_from_llm_planner"] is True
     assert result["tam_runtime"]["available"] is True
     assert result["tam_runtime"]["opportunity_class_count"] == 1
+
+
+
+def test_historical_tam_ollama_timeout_is_not_an_active_retry(tmp_path):
+    from empire_os.revenue_completion_supervisor import tam_status
+    _write(tmp_path / "jobs/failed/job.json", {
+        "id": "j-oct2", "status": "FAILED", "attempts": 3,
+        "updated_at": "2026-10-02T19:20:37+00:00",
+        "error": "RuntimeError:ollama_request_failed:TimeoutError:max_attempts_exhausted",
+    })
+    result=tam_status(tmp_path)
+    assert result["state"]=="FAILED"
+    assert result["active_job"] is False
+    assert result["operational_state"]=="IDLE_HISTORIC_TERMINAL_FAILURE"
+    assert result["last_terminal_failure_reason"]=="MODEL_INFERENCE_TIMEOUT"
+    assert result["terminal_failure_history_count"]==1
+    assert result["attempts"]==3
+
+
+def test_tam_snapshot_truth_refuses_empty_schema_label_stale_and_send_authority():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.revenue_completion_supervisor import tam_snapshot_truth
+    now=datetime(2026,10,10,12,0,tzinfo=timezone.utc)
+    sample={
+        "schema_version":"empire.tam-market-intelligence.v1",
+        "mode":"OBSERVE","source":"empiredb_restricted_tam_reader",
+        "canonical_data":True,
+        "tenant_source_scope_verified":False,
+        "data_scope":"PLATFORM_MARKET_RESEARCH_ONLY",
+        "tenant_id":"research-platform",
+        "generated_at":now.isoformat(),"market_scope_count":1,
+        "market_scopes":[{"tam_state":"UNKNOWN","tam_entity_count":None}],
+        "source_row_count":1,"opportunity_classes":[],
+        "execution_authority":"none",
+        "tam_inferred_from_observed_roster":False,
+        "buyer_intent_inferred":False,"demand_inferred":False,
+        "pricing_inferred":False,"revenue_inferred":False,
+        "prospect_created":False,"outreach_enabled":False,
+        "external_execution":False,
+    }
+    good=tam_snapshot_truth(sample,now=now)
+    assert good["available"] is True
+    assert good["market_scope_count"]==1
+    assert good["tam_counts_inferred_from_roster"] is False
+    for edits,reason in (
+        ({"outreach_enabled":True},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"tenant_source_scope_verified":True},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"data_scope":"TENANT_CUSTOMER_RUNTIME"},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"source":"unknown_web_scrape"},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"market_scope_count":50},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"execution_authority":"internal_write"},"SNAPSHOT_CONTRACT_NOT_VERIFIED"),
+        ({"generated_at":(now-timedelta(days=4)).isoformat()},
+         "SNAPSHOT_STALE_REQUIRES_RESTRICTED_REFRESH"),
+        ({"generated_at":(now+timedelta(hours=2)).isoformat()},
+         "SNAPSHOT_CLOCK_IN_FUTURE"),
+    ):
+        actual=tam_snapshot_truth({**sample,**edits},now=now)
+        assert actual["available"] is False
+        assert actual["reason_code"]==reason
+        assert actual["opportunity_class_count"]==0
+    assert tam_snapshot_truth({"schema_version":sample["schema_version"]},
+                              now=now)["available"] is False
+
+
+def test_tam_prerequisites_are_boolean_checks_without_secret_values():
+    from empire_os.revenue_completion_supervisor import tam_reader_prerequisites
+    good={
+        "EMPIRE_TAM_TENANT_ID":"tenant-secret-123",
+        "EMPIRE_TAM_ACTIVE_INDUSTRIES":"roofing,solar",
+        "EMPIRE_TAM_ACTIVE_COUNTRIES":"US,GB",
+        "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":"postgresql://secret:secret@localhost/empiredb",
+    }
+    ready=tam_reader_prerequisites(good)
+    assert ready["runtime_environment_configured"] is True
+    assert ready["missing_runtime_environment_keys"]==[]
+    assert ready["restricted_empiredb_sql_reader_live_verified"] is False
+    assert ready["auto_planner_retry_authorized"] is False
+    assert "secret" not in str(ready)
+    missing=tam_reader_prerequisites({})
+    assert missing["runtime_environment_configured"] is False
+    assert len(missing["missing_runtime_environment_keys"])==4
+
+
+
+def test_current_tam_queue_activity_outweighs_older_failed_history(tmp_path):
+    from empire_os.revenue_completion_supervisor import tam_status
+    _write(tmp_path / "jobs/failed/old.json", {
+        "status":"FAILED","error":"TimeoutError","attempts":3
+    })
+    _write(tmp_path / "jobs/pending/new.json", {
+        "status":"PENDING","attempts":0,"id":"new"
+    })
+    result=tam_status(tmp_path)
+    assert result["state"]=="PENDING"
+    assert result["active_job"] is True
+    assert result["operational_state"]=="ACTIVE_PLAN_JOB"
+    assert result["terminal_failure_history_count"]==1
+    assert result["last_terminal_failure_reason"]=="MODEL_INFERENCE_TIMEOUT"

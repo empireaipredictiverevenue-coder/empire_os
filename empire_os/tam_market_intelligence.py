@@ -61,8 +61,11 @@ class TamCountEvidence:
         if not _clean(self.industry):
             raise ValueError("industry required")
         _country(self.country_code)
-        if int(self.entity_count) < 0:
-            raise ValueError("entity_count must be nonnegative")
+        if (isinstance(self.entity_count, bool)
+                or not isinstance(self.entity_count, int)
+                or self.entity_count < 0
+                or self.entity_count > 1_000_000_000):
+            raise ValueError("entity_count must be a bounded integer")
         if not _clean(self.source_ref) or not _clean(self.observed_at):
             raise ValueError("TAM evidence provenance required")
         if self.evidence_class != "VERIFIED_OBSERVATION":
@@ -122,6 +125,8 @@ def build_tam_market_intelligence(
                 "evidence_refs": set(),
             },
         )
+        if entity["company_name"].casefold() != _clean(item.company_name).casefold():
+            raise ValueError("conflicting canonical entity identity in TAM market")
         entity["evidence_refs"].add(_clean(item.source_ref))
         scope["evidence_refs"].add(_clean(item.source_ref))
         scope["observed_at"].add(_clean(item.observed_at))

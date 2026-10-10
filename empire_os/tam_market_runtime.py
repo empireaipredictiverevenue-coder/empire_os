@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping
 
 from empire_os.intelligence_materializer_env import load_materializer_env
@@ -93,6 +94,11 @@ def build_tam_runtime(
     for row in rows:
         if str(row.get("execution_authority") or "none") != "none":
             raise ValueError("TAM source row has execution authority")
+        # A cross-tenant or explicitly foreign tenant row must never be
+        # silently rebound to the current research tenant.
+        row_tenant = row.get("tenant_id")
+        if row_tenant is not None and str(row_tenant).strip() != tenant:
+            raise ValueError("mixed tenant TAM runtime observation")
         observations.append(
             MarketEntityObservation(
                 tenant_id=tenant,
@@ -114,9 +120,15 @@ def build_tam_runtime(
     )
     return {
         **result,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "source": "empiredb_restricted_tam_reader",
         "source_row_count": len(observations),
         "canonical_data": True,
+        # The restricted SQL function is platform evidence without a tenant
+        # predicate; requested report tenant is a research scope, not proof
+        # of customer login/tenant authority.
+        "tenant_source_scope_verified": False,
+        "data_scope": "PLATFORM_MARKET_RESEARCH_ONLY",
         "external_execution": False,
     }
 
@@ -127,12 +139,18 @@ def write_tam_snapshot(
 ) -> Path:
     path = Path(repo_root).resolve() / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink():
+        raise ValueError("unsafe TAM snapshot destination")
     tmp = path.with_suffix(".tmp")
+    if tmp.is_symlink():
+        raise ValueError("unsafe TAM temporary destination")
     tmp.write_text(
         json.dumps(dict(payload), indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    os.chmod(tmp, 0o600)
     tmp.replace(path)
+    os.chmod(path, 0o600)
     return path
 
 
