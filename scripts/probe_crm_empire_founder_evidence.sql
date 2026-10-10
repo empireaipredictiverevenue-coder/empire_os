@@ -78,7 +78,7 @@ WITH target AS (
         AND revoked_at IS NULL
         AND verified_at <= now()
         AND (valid_until IS NULL OR valid_until > now())
-        AND evidence_ref LIKE
+        AND evidence_ref =
           'founder:chat-approved-single-owner-20261010|identity:connected-gmail-profile-reviewed-ownership-pending|tenant:operator-evidence-only-not-legal-proof'
     )::int AS exact_pending_owner_memberships
   FROM public.empire_crm_tenant_memberships

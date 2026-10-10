@@ -185,6 +185,33 @@ def test_pending_owner_must_match_original_evidence_and_exact_identity(existing_
         """)
 
 
+def test_near_match_provenance_must_not_pass_exact_founder_claim(existing_registration):
+    run = existing_registration
+    # A malformed approval reference must never be accepted as exact.
+    # The implementation uses equality, not SQL pattern matching.
+    evidence = (
+        "founder:chat-approved-single-owner-20261010"
+        "|identity:connected-gmail-profile-reviewed-ownership-pending"
+        "|tenant:operator-evidence-only-not-legal-proof"
+    )
+    # A different review string must not match the exact approved value.
+    tampered = evidence.replace("single-owner", "singleXowner")
+    assert tampered != evidence
+    run(f"""
+      INSERT INTO public.empire_crm_tenant_memberships
+        (subject,tenant_id,role,status,evidence_ref,verified_at)
+      VALUES ('founder:phil_livesley','{TENANT}','owner','pending',
+              '{tampered}',now());
+    """)
+    report = _report(run(file=SQL))
+    assert report["crm_memberships"] == 1
+    assert report["pending_owner_membership_count"] == 0
+    assert report["single_approved_pending_owner_recorded"] is False
+    assert report["next_action"] == (
+        "RECONCILE_CRM_MEMBERSHIP_AND_CREDENTIAL_STATE_WITHOUT_ACTIVATION"
+    )
+
+
 def test_extra_member_prevents_single_founder_pending_claim(existing_registration):
     run = existing_registration
     run(f"""
