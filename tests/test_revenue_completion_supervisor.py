@@ -175,6 +175,13 @@ def test_build_snapshot_keeps_failed_planner_as_history_when_runtime_exists(monk
     assert result["tam_diagnostics"]["canonical_source_separate_from_llm_planner"] is True
     assert result["tam_runtime"]["available"] is True
     assert result["tam_runtime"]["opportunity_class_count"] == 1
+    assert result["tam_reader_prerequisites"]["isolated_tam_release_stage"] == (
+        "CANONICAL_RESEARCH_SNAPSHOT_VERIFIED_OBSERVE"
+    )
+    assert result["tam_reader_prerequisites"]["isolated_tam_data_snapshot_verified"] is True
+    assert result["tam_next_evidence_task"] == (
+        "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
+    )
 
 
 

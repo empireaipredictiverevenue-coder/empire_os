@@ -520,6 +520,16 @@ def build_snapshot() -> dict[str, Any]:
     tam_truth = tam_snapshot_truth(tam_runtime)
     tam_runtime_available = tam_truth["available"]
     tam_prerequisites = tam_reader_prerequisites()
+    if tam_runtime_available:
+        # Evidence of a genuine restricted market snapshot takes precedence
+        # over the historical *legacy* materializer's incompatible 028 probe.
+        # Do not equate an available research snapshot to customer login.
+        tam_prerequisites["isolated_tam_release_stage"] = (
+            "CANONICAL_RESEARCH_SNAPSHOT_VERIFIED_OBSERVE"
+        )
+        tam_prerequisites["isolated_tam_data_snapshot_verified"] = True
+    else:
+        tam_prerequisites["isolated_tam_data_snapshot_verified"] = False
     buyers = buyer_status()
     if buyers["genuine_review_ready_count"] > 0:
         next_action = "founder_review_genuine_buyers"
@@ -559,7 +569,9 @@ def build_snapshot() -> dict[str, Any]:
             "canonical_source_separate_from_llm_planner": True,
         },
         "tam_next_evidence_task": (
-            "AWAIT_SEPARATE_PRODUCTION_APPROVAL_FOR_TAM_ROLE_AND_CREDENTIAL"
+            "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
+            if tam_runtime_available
+            else "AWAIT_SEPARATE_PRODUCTION_APPROVAL_FOR_TAM_ROLE_AND_CREDENTIAL"
             if tam_prerequisites["restricted_reader_catalog_check"].get(
                 "held_migration_028_incompatible_with_live_materializer"
             )

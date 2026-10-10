@@ -458,3 +458,77 @@ def test_live_tam_refresh_safe_positive_path_unknown_denominator(
     path=tmp_path/"runtime/tam_market_intelligence/latest.json"
     assert path.is_file() and path.stat().st_mode & 0o777==0o600
     assert tam.build_tam_runtime_snapshot(tmp_path)["available"] is True
+
+
+
+def test_isolated_refresh_hard_scopes_and_excludes_unauthorised_markets(
+    tmp_path,monkeypatch,
+):
+    import json
+    from empire_os import tam_market_runtime as tam
+    monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","empire-platform-research")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_INDUSTRIES","roofing,solar,insurance")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB,US")
+    monkeypatch.setattr(tam,"load_tam_isolated_dsn",lambda: RESTRICTED_DSN)
+    monkeypatch.setattr(
+        tam,"probe_isolated_tam_reader_capability",
+        lambda *_a,**_kw: {"isolated_tam_contract_verified":True}
+    )
+    def record(ident,industry,country):
+        return {
+            "entity_id":ident,"company_name":"Test "+ident,
+            "industry":industry,"country_code":country,
+            "source_ref":"registry:"+ident,
+            "observed_at":"2026-10-10T14:00:00+00:00",
+            "execution_authority":"none",
+        }
+    source=[
+        record("r1","roofing","GB"),
+        record("s1","solar","US"),
+        record("i1","insurance","GB"),
+        record("r2","roofing","DE"),
+        record("f1","finance","US"),
+    ]
+    monkeypatch.setattr(
+        tam,"fetch_tam_market_observations_postgres",
+        lambda *_a,**_kw: source
+    )
+    out=tam.refresh_tam_market_runtime(tmp_path,limit=1000)
+    assert out["raw_source_rows_examined"]==5
+    assert out["out_of_scope_rows_excluded"]==2
+    assert out["source_row_count"]==3
+    assert out["source_population_complete"] is False
+    assert out["approved_research_countries"]==["GB","US"]
+    assert out["approved_research_industries"]==["insurance","roofing","solar"]
+    assert len(out["market_scopes"])==3
+    assert all(x["industry"] in ("roofing","solar","insurance")
+               and x["country_code"] in ("GB","US") for x in out["market_scopes"])
+    saved=json.loads(
+        (tmp_path/"runtime/tam_market_intelligence/latest.json").read_text()
+    )
+    assert "Test r2" not in str(saved)
+    assert "Test f1" not in str(saved)
+    assert saved["outreach_enabled"] is False
+    assert all(x["tam_entity_count"] is None for x in saved["market_scopes"])
+
+
+
+def test_tam_refresh_cli_logs_receipt_not_company_records(monkeypatch,capsys):
+    import sys
+    from empire_os import tam_market_runtime as tam
+    monkeypatch.setattr(tam,"refresh_tam_market_runtime",lambda *_a,**_k:{
+        "source_row_count":1,"market_scope_count":1,
+        "market_scopes":[{"company_name":"Private Company Should Never Print"}],
+        "opportunity_classes":[],
+        "execution_authority":"none",
+        "outreach_enabled":False,
+    })
+    monkeypatch.setattr(sys,"argv",[
+        "tam_market_runtime","--refresh","--limit","1000"
+    ])
+    assert tam.main()==0
+    out=capsys.readouterr().out
+    assert "CANONICAL_SNAPSHOT_WRITTEN" in out
+    assert "Private Company" not in out
+    assert "source_row_count" in out
+    assert "outreach_enabled" in out

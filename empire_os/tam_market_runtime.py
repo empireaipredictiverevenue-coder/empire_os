@@ -384,12 +384,29 @@ def refresh_tam_market_runtime(
         limit=limit,
         connect_factory=connect_factory,
     )
+    # Active market scope is a hard output/data minimisation boundary,
+    # not just a label used to classify new-country opportunities.
+    selected_industries = {v.strip().casefold() for v in active_industries}
+    selected_countries = {v.strip().upper() for v in active_countries}
+    scoped_rows = [
+        row for row in rows
+        if str(row.get("industry") or "").strip().casefold()
+            in selected_industries
+        and str(row.get("country_code") or "").strip().upper()
+            in selected_countries
+    ]
     payload = build_tam_runtime(
-        rows,
+        scoped_rows,
         tenant_id=tenant_id,
         active_industries=active_industries,
         active_countries=active_countries,
     )
+    payload["raw_source_rows_examined"] = len(rows)
+    payload["out_of_scope_rows_excluded"] = len(rows) - len(scoped_rows)
+    payload["approved_research_industries"] = sorted(selected_industries)
+    payload["approved_research_countries"] = sorted(selected_countries)
+    # Source is a bounded global sample, not a comprehensive census.
+    payload["source_population_complete"] = False
     write_tam_snapshot(repo_root, payload)
     return payload
 
@@ -456,7 +473,23 @@ def main() -> int:
         )
     else:
         payload = build_tam_runtime_snapshot(args.repo_root)
-    print(json.dumps(payload, indent=2, sort_keys=True, default=str))
+    if args.refresh:
+        # Service journals must never contain company names, evidence URLs,
+        # contact details, tenant source rows, or credential information.
+        public = {
+            "schema_version": "empire.tam_runtime_refresh_receipt.v1",
+            "mode": "OBSERVE",
+            "status": "CANONICAL_SNAPSHOT_WRITTEN",
+            "source_row_count": payload.get("source_row_count"),
+            "market_scope_count": payload.get("market_scope_count"),
+            "opportunity_class_count": len(payload.get("opportunity_classes") or []),
+            "tam_inferred_from_observed_roster": False,
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        }
+        print(json.dumps(public, sort_keys=True))
+    else:
+        print(json.dumps(payload, indent=2, sort_keys=True, default=str))
     return 0
 
 
