@@ -549,7 +549,8 @@ def run_buyer_scout(
     intent_seed_domain_count = len(intent_seed_domains)
     research_seed_domain_count = len(research_seed_domains)
 
-    ranked_domains = sorted(
+    domain_budget = max(1, min(max_domains, 200))
+    ordered_domains = sorted(
         provenance,
         key=lambda domain: (
             0 if domain in opportunity_seed_domains else (
@@ -562,7 +563,51 @@ def run_buyer_scout(
             -len(provenance[domain]),
             domain,
         ),
-    )[:max(1, min(max_domains, 200))]
+    )
+
+    # Publisher-first A/B evaluation found reviewed official programme URLs
+    # could be recorded as seeds yet disappear behind the domain cap.
+    # Reserve at most 10% of candidate/probe capacity for those *review-only*
+    # seeds. Do not displace bounded opportunity/intent/recovery evidence.
+    reviewed_publisher_domains = sorted({
+        host
+        for row in research_seed_records or []
+        if isinstance(row, Mapping)
+        for host in [_host(str(row.get("website") or row.get("domain") or ""))]
+        if host in provenance and any(
+            str(ref) == "public:publisher_review:" + host
+            for ref in row.get("source_refs") or []
+        )
+    })
+    reserved_budget = min(4, domain_budget // 8, len(reviewed_publisher_domains))
+    preferred = reviewed_publisher_domains[:reserved_budget]
+    reserved_keys = (
+        opportunity_seed_domains | low_yield_canonical_domains
+        | intent_seed_domains
+    )
+    ranked_domains = ordered_domains[:domain_budget]
+    for host in preferred:
+        if host in ranked_domains:
+            continue
+        replaceable = next((
+            value for value in reversed(ranked_domains)
+            if value not in reserved_keys and value not in preferred
+        ), None)
+        if replaceable is None:
+            continue
+        ranked_domains.remove(replaceable)
+        ranked_domains.append(host)
+
+    # Give the approved research *review queue* actual probe attention, not
+    # outbound authority. Critical opportunity/intent seeds still go first.
+    selected_publisher_domains = set(ranked_domains) & set(preferred)
+    ranked_domains = (
+        [d for d in ranked_domains if d in reserved_keys]
+        + [d for d in ranked_domains
+           if d in selected_publisher_domains and d not in reserved_keys]
+        + [d for d in ranked_domains
+           if d not in reserved_keys and d not in selected_publisher_domains]
+    )
 
     candidates: list[dict[str, Any]] = []
     probe_failures: Counter[str] = Counter()
@@ -1127,6 +1172,12 @@ def run_buyer_scout(
         "opportunity_seed_domain_count": opportunity_seed_domain_count,
         "intent_seed_domain_count": intent_seed_domain_count,
         "public_research_seed_domain_count": research_seed_domain_count,
+        "publisher_review_seed_count": len(reviewed_publisher_domains),
+        "publisher_review_included_count": len(selected_publisher_domains),
+        "publisher_review_probed_count": len(
+            selected_publisher_domains & set(probe_domains)
+        ),
+        "publisher_review_claims_are_not_buyer_approval": True,
         "public_research_seed_supplement_used": bool(
             research_seed_domain_count
         ),

@@ -140,3 +140,71 @@ search source health, avoid repeated failed provider retries and leverage
 bounded first-party site evidence without paying for third-party scraping.
 Do not interpret code tests, zero exceptions or existing static seeds
 as productive search yield.
+
+
+## 10 October 2026, ~09:20 UTC — live buyer-search comparison
+
+The live 12-query EmpireOS seed run found **4 fresh domains**, all from
+one local San Antonio water-damage restoration query. Publisher-first
+queries: **0 domains**. Dynamic buyer queries: **0**. This is a
+usable *provider yield* observation, not confirmed network buying demand.
+
+At that snapshot the registry comparison contained **206 unique domain
+aliases**. Three of the four earlier externally reviewed publisher
+programme domains had entered the canonical company registry:
+`elocal.com`, `homevantaleadgroup.com` and `joinglobalwiz.com`.
+`polyares.com` remained in the public research seed but was **excluded
+from the candidate queue**, even though it has an explicit first-party
+publisher application.
+
+**Root cause:** `buyer_acquisition_scout.run_buyer_scout` considered
+public research seeds only after opportunity/canonical/search results and
+then applied a global `max_domains` cap. Publisher candidates could be
+lost before the first-party probe. The resulting zero is not proof that
+the programme is unattractive.
+
+**Fixed method:** At most four explicitly source-tagged
+`public:publisher_review:<exact-host>` domains may occupy
+`max_domains // 8` reserved research slots. These never replace
+opportunity/intent/priority canonical recovery seeds. They are
+prioritised inside the **existing** bounded `max_probes` selection,
+not given new traffic, a new queue, an extra timer or a verified buyer
+status. If the batch is too small, zero reserved slots are allowed.
+The research origin, lack of canonical identity verification and
+blocked outbound authority are preserved. Tests include 50 unrelated
+search hits crowding four first-party publisher programme pages.
+
+### Actual onboarding and compliance comparison (publisher, not advertiser)
+
+| Gate | Polyares | eLocal |
+|---|---|---|
+| Official publisher info | https://www.polyares.com/pay-per-call-affiliate-program | https://www.elocal.com/affiliate-contact/ |
+| Published small-volume pilot | One category, one state, one number; no volume commitment advertised | Experienced publishers; payout cadence depends on agreed minimum monthly call volume |
+| Source category | Owned directory/content traffic is supported, subject to approval | SEO/SEM accepted as an acquisition category, subject to publisher review and campaign rules |
+| First contact route | https://app.polyares.com/register/start — account creation and **acceptance of Terms of Use** required to proceed | https://www.elocal.com/affiliate-contact/ — multi-step affiliate questionnaire with legal identity, phone, address and prior call-running questions |
+| Rate/coverage | Individual category/geography rates in writing after review; call-duration threshold per category | Advertiser bidding and assigned tracking numbers; exact affiliate rate, minimum volume and buyer area are not yet provided |
+| Settlement | Net terms, method, minimum and dispute window defined in later agreement | Published weekly payments conditional on agreed volume; independent signed terms still required |
+| Existing EmpireAI supply | No independently verified billable calls, buyer allocation or signed publisher relationship | No independently verified billable calls, buyer allocation or signed publisher relationship |
+| Founder gate | **Do not create account or accept website Terms** without founder review | **Do not submit legal company identity or accept terms** without founder review |
+
+**Preferred next test:** Ask Polyares to validate *one actual roofing
+buy-box* (a specific state/ZIP subset), exact allowable first-party organic
+traffic source, publisher-specific duration threshold, written billable-call
+rate or formula, duplicate/dispute terms, tracking handoff and settlement.
+The website's built-in sample $25 payout and 60% acceptance are explicitly
+illustrative, NOT a price quote or a revenue prediction. Do not claim we
+already have monthly traffic or calls. No live route should be opened
+until proof.
+
+**eLocal alternative:** Determine realistic minimum monthly call volume,
+what happens to payables below that minimum, source approval requirements,
+effective network margin and the permitted number of parallel publishers.
+The application has mandatory legal and telephone information not verified
+in this research; do not fabricate or submit it.
+
+**Revenue experiment:** When a real publisher buys our traffic, compare
+*accepted payable calls / connected calls*, gross accepted payout,
+rejected-call reasons, net money settled per qualified visit, source
+attribution and payments actually received. Do not use domain novelty
+or aggregate website traffic as the success metric. Preserve buyer-specific
+suppression, legal approval and traffic gates.

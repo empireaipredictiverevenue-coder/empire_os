@@ -563,3 +563,76 @@ def test_public_research_seed_does_not_overwrite_query_accounting(monkeypatch):
     )
     assert result["query_count"] == 4
     assert len(result["queries"]) == 4
+
+
+def test_official_publisher_programmes_get_bounded_fair_probing_without_authority(
+    monkeypatch,
+):
+    # 50 unrelated directory hits used to evict evidence-rich, pre-reviewed
+    # publisher URLs from a 40-domain scout selection.
+    search_hits=[f"contractor{i:03d}.com" for i in range(50)]
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries,num: {q:search_hits for q in queries},
+    )
+    probed=[]
+    def observe(url, **kwargs):
+        probed.append(url)
+        return {"ok": True, "canonical_url": url, "final_url": url,
+                "title": "Publisher Research", "description": "Publisher programme",
+                "business_names": [], "emails": [], "phones": [],
+                "people": [], "pages_checked": [], "evidence_score": 0.10}
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",observe
+    )
+    reviewed=["elocal.com","homevantaleadgroup.com",
+              "joinglobalwiz.com","polyares.com"]
+    seeds=[{
+        "website":f"https://www.{domain}/affiliate-program",
+        "domain":domain,
+        "source_refs":["public:publisher_review:"+domain],
+        "target_buyer_pools":["direct_demand_buyers"],
+    } for domain in reviewed]
+    data=run_buyer_scout(
+        plan(), max_queries=10,max_domains=40,max_probes=20,
+        research_seed_records=seeds,
+    )
+    assert data["domain_count"] == 40
+    assert data["probed_domain_count"] == 20
+    assert data["publisher_review_seed_count"] == 4
+    assert data["publisher_review_included_count"] == 4
+    assert data["publisher_review_probed_count"] == 4
+    assert {x["domain"] for x in data["candidates"]} >= set(reviewed)
+    assert {f"https://{d}" for d in reviewed} <= set(probed)
+    for row in data["candidates"]:
+        if row["domain"] in reviewed:
+            assert row["discovery_source"] == "public_research_seed"
+            assert row["commercial_terms_verified"] is False
+            assert row["outreach_authorized"] is False
+            assert row["canonical_identity_verified"] is False
+    assert data["publisher_review_claims_are_not_buyer_approval"] is True
+    assert data["outbound_sent"] is False
+    assert data["execution_authority"] == "none"
+
+
+def test_tiny_budget_never_displaces_higher_priority_opportunity(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries,num: {q:["contractorfirst.com"] for q in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda *_a,**_k:{"ok":False,"error":"offline_test"},
+    )
+    out=run_buyer_scout(
+        plan(), max_queries=2,max_domains=1,max_probes=1,
+        research_seed_records=[{
+            "website":"https://polyares.com/pay-per-call-affiliate-program",
+            "source_refs":["public:publisher_review:polyares.com"],
+            "target_buyer_pools":["direct_demand_buyers"],
+        }],
+    )
+    assert out["domain_count"]==1
+    assert out["publisher_review_included_count"]==0
+    assert out["publisher_review_probed_count"]==0
+    assert out["outbound_sent"] is False
