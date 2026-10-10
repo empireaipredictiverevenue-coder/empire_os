@@ -202,7 +202,7 @@ def test_postgres_query_compiles_in_disposable_schema(isolated):
 SET ROLE empiredb_migrator;
 ALTER TABLE public.business_entities ADD COLUMN canonical_website text;
 ALTER TABLE public.business_entities ADD COLUMN canonical_phone text;
-CREATE TABLE public.prospects(id uuid PRIMARY KEY,website text);
+CREATE TABLE public.prospects(id uuid PRIMARY KEY,website text,phone text);
 INSERT INTO public.prospects VALUES
  ('10000000-0000-0000-0000-000000000001','https://roof.example'),
  ('10000000-0000-0000-0000-000000000002','https://solar.example'),
@@ -356,3 +356,33 @@ def test_uk_international_vs_domestic_phone_is_reviewed_as_same_business():
         source='recc_solar',sector='solar',country='GB')
     assert report['findings'][0]['state']=='NAME_VARIANT_PHONE_REVIEW'
     assert report['strong_evidence_review_count']==0
+
+
+
+def test_linked_prospect_phone_can_find_name_variant_without_canonical_phone():
+    row=t(name='Solar Holdings Ltd',website='',phone='')
+    row['prospect_phone']='01234567890'
+    observed=source(name='Trading As SolarCo Ltd',website='',phone='+44 1234 567890')
+    report=build_review(targets=[row],observations=[observed],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['target_entities_with_phone_evidence']==0
+    assert report['target_entities_with_linked_prospect_phone']==1
+    assert report['target_prospects_with_linked_phone']==1
+    assert report['potential_matched_observations']==1
+    assert report['name_variant_review_count']==1
+    assert report['strong_evidence_review_count']==0
+    assert report['findings'][0]['state']=='NAME_VARIANT_PHONE_REVIEW'
+    assert report['genuine_acquisition_appended']==0
+
+
+def test_two_prospects_on_one_entity_with_matching_phone_remain_ambiguous():
+    a=t(name='Solar Holdings Ltd',prospect='p1',website='',phone='')
+    a['prospect_phone']='01234567890'
+    b=t(name='Solar Holdings Ltd',prospect='p2',website='',phone='')
+    b['prospect_phone']='01234567890'
+    report=build_review(targets=[a,b],
+        observations=[source(name='Solar Holdings Ltd',website='',phone='+44 1234 567890')],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['potential_matched_observations']==1
+    assert report['findings'][0]['state']=='AMBIGUOUS_PROSPECT_RELATIONSHIP'
+    assert report['genuine_acquisition_appended']==0

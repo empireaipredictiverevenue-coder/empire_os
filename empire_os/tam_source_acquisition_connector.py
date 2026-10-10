@@ -42,7 +42,7 @@ WITH targets AS MATERIALIZED (
 )
 SELECT t.id::text,t.canonical_name,t.canonical_niche,
   t.canonical_website,t.canonical_phone,
-  l.prospect_id::text,p.website
+  l.prospect_id::text,p.website,p.phone
 FROM targets t
 JOIN public.prospect_entity_links l
   ON l.entity_id=t.id AND l.active IS TRUE
@@ -157,6 +157,7 @@ def canonical_targets(dsn: str, *, sector: str, limit: int = 250,
         "entity_id":r[0],"canonical_name":r[1],"sector":r[2],
         "canonical_website":r[3],"canonical_phone":r[4],
         "prospect_id":r[5],"prospect_website":r[6],
+        "prospect_phone":r[7],
     } for r in rows]
 
 
@@ -291,9 +292,10 @@ def build_review(*, targets: Iterable[Mapping], observations: Iterable[Mapping],
             domain=_identity_domain(row.get(field))
             if domain:
                 domain_index[domain].add(key)
-        phone=_phone_key(row.get("canonical_phone"),country)
-        if phone:
-            phone_index[phone].add(key)
+        for field in ("canonical_phone", "prospect_phone"):
+            phone=_phone_key(row.get(field),country)
+            if phone:
+                phone_index[phone].add(key)
 
     observed=list(observations)
     findings=[]
@@ -407,6 +409,14 @@ def build_review(*, targets: Iterable[Mapping], observations: Iterable[Mapping],
         "target_entities_with_phone_evidence":len({
             x["entity_id"] for x in values
             if _phone_key(x.get("canonical_phone"),country)
+        }),
+        "target_entities_with_linked_prospect_phone":len({
+            x["entity_id"] for x in values
+            if _phone_key(x.get("prospect_phone"),country)
+        }),
+        "target_prospects_with_linked_phone":len({
+            x["prospect_id"] for x in values
+            if _phone_key(x.get("prospect_phone"),country)
         }),
         "source_observations_examined":len(observed),
         "source_observations_with_website":sum(bool(

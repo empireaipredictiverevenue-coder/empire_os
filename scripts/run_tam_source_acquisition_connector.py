@@ -116,6 +116,12 @@ def main(argv=None) -> int:
         "target_entities_with_phone_evidence":packet[
             "target_entities_with_phone_evidence"
         ],
+        "target_entities_with_linked_prospect_phone":packet[
+            "target_entities_with_linked_prospect_phone"
+        ],
+        "target_prospects_with_linked_phone":packet[
+            "target_prospects_with_linked_phone"
+        ],
         "source_observations_with_website":packet[
             "source_observations_with_website"
         ],
