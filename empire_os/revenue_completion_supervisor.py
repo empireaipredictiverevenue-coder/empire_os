@@ -196,6 +196,97 @@ def buyer_status(
     }
 
 
+def _tam_market_row_contract(candidate: Mapping[str, Any]) -> bool:
+    """Require independently coherent scope counts and research-only classes."""
+    scopes = candidate.get("market_scopes")
+    classes = candidate.get("opportunity_classes")
+    total = candidate.get("source_row_count")
+    if (not isinstance(scopes, list) or not isinstance(classes, list)
+            or type(total) is not int or not 0 <= total <= 5000
+            or len(scopes) > 5000 or len(classes) > 15000):
+        return False
+    by_scope: dict[tuple[str, str], Mapping[str, Any]] = {}
+    unique_entities = 0
+    for scope in scopes:
+        if not isinstance(scope, Mapping):
+            return False
+        industry, country = scope.get("industry"), scope.get("country_code")
+        count = scope.get("observed_entity_count")
+        tam_count = scope.get("tam_entity_count")
+        state = scope.get("tam_state")
+        if (not isinstance(industry, str) or not industry.strip()
+                or not isinstance(country, str) or len(country) != 2
+                or not country.isascii() or not country.isalpha()
+                or country != country.upper()
+                or type(count) is not int or not 0 <= count <= 5000
+                or state not in ("UNKNOWN", "VERIFIED")):
+            return False
+        if state == "UNKNOWN":
+            if tam_count is not None:
+                return False
+        elif (
+            type(tam_count) is not int or not 0 <= tam_count <= 1_000_000_000
+            or tam_count < count
+            or not isinstance(scope.get("tam_evidence_ref"), str)
+            or not scope["tam_evidence_ref"].strip()
+        ):
+            return False
+        key = (industry.casefold(), country)
+        if key in by_scope:
+            return False
+        by_scope[key] = scope
+        unique_entities += count
+    if unique_entities > total:
+        return False
+    found: set[str] = set()
+    for row in classes:
+        if not isinstance(row, Mapping):
+            return False
+        kind = row.get("opportunity_class")
+        industry = row.get("industry")
+        country = row.get("country_code")
+        key = (
+            (industry.casefold(), country)
+            if isinstance(industry, str) and isinstance(country, str)
+            else None
+        )
+        scope = by_scope.get(key)
+        if (scope is None or kind not in (
+                "new_industry", "new_country", "new_industry_country")
+                or row.get("decision") != "research"
+                or row.get("execution_authority") != "none"
+                or any(row.get(f) is not False for f in (
+                    "buyer_intent_proven","demand_proven",
+                    "commercial_terms_verified","revenue_verified"
+                ))):
+            return False
+        if (
+            (kind in ("new_industry", "new_industry_country")
+             and scope.get("new_industry") is not True)
+            or (kind in ("new_country", "new_industry_country")
+                and scope.get("new_country") is not True)
+        ):
+            return False
+        ref = row.get("opportunity_key")
+        expected = (
+            f"tam:{candidate['tenant_id']}:{kind}:"
+            f"{industry.casefold()}:{country}"
+        )
+        if (ref != expected or ref in found
+                or type(row.get("observed_entity_count")) is not int
+                or row.get("observed_entity_count")
+                    != scope.get("observed_entity_count")
+                or row.get("tam_entity_count") != scope.get("tam_entity_count")
+                or row.get("tam_state") != scope.get("tam_state")):
+            return False
+        refs = row.get("evidence_refs")
+        if (not isinstance(refs,list) or not refs
+                or any(not isinstance(r,str) or not r.strip() for r in refs)):
+            return False
+        found.add(ref)
+    return True
+
+
 def tam_snapshot_truth(
     candidate: Any, *,
     now: datetime | None = None,
@@ -239,8 +330,8 @@ def tam_snapshot_truth(
             and isinstance(candidate.get("opportunity_classes"), list)
             and isinstance(candidate.get("market_scope_count"), int)
             and candidate["market_scope_count"] == len(candidate["market_scopes"])
-            and isinstance(candidate.get("source_row_count"), int)
-            and candidate["source_row_count"] >= 0
+            and type(candidate.get("source_row_count")) is int
+            and _tam_market_row_contract(candidate)
             and all(candidate.get(k) is False for k in required_false)
         )
         if evidence_valid and age is not None:
@@ -582,6 +673,9 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
     # An aggregate payment observation, even if true in the future, does
     # not establish allocation to a specific product or customer.
     money_from_any_stream_proven = False
+    tam_market_truth = tam_snapshot_truth(
+        _read_json(root / "runtime/tam_market_intelligence/latest.json")
+    )
     rows = []
     for key, title, families, next_action in REVENUE_STREAM_CONTRACTS:
         grouped = [family_counts.get(name, {}) for name in families]
@@ -659,6 +753,15 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
         "schema_version": "empire.revenue_stream_portfolio.v1",
         "mode": "OBSERVE", "stream_count": len(rows),
         "sources": source_status,
+        "tam_market_evidence": {
+            "available": tam_market_truth["available"],
+            "reason_code": tam_market_truth["reason_code"],
+            "market_scope_count": tam_market_truth["market_scope_count"],
+            "opportunity_class_count": tam_market_truth["opportunity_class_count"],
+            "tam_inferred_from_observed_roster": False,
+            "buyer_intent_inferred": False,
+            "execution_authority": "none",
+        },
         "catalog_totals": {
             "total": catalog.get("product_count") if catalog else None,
             "active": catalog.get("active_count") if catalog else None,

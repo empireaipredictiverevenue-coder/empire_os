@@ -65,6 +65,9 @@ def test_exact_fourteen_streams_no_unearned_commercial_promotions(tmp_path):
     fixture(tmp_path)
     d=stream_portfolio_status(tmp_path)
     assert d["stream_count"]==14
+    assert d["tam_market_evidence"]["available"] is False
+    assert d["tam_market_evidence"]["reason_code"]=="SNAPSHOT_MISSING"
+    assert d["tam_market_evidence"]["buyer_intent_inferred"] is False
     assert len(by_key(d))==14
     assert set(d["sources"].values())=={"READABLE_SCHEMA_VERIFIED"}
     assert d["catalog_totals"]=={"total":4,"active":3,"binding_terms_ready":2}

@@ -188,7 +188,30 @@ def test_radar_accepts_tam_expansion_as_research_only_source():
         community_intent=None,
         competitor_market=None,
         tam_market={
+            "schema_version": "empire.tam-market-intelligence.v1",
+            "mode": "OBSERVE",
             "generated_at": "2026-10-02T18:55:00+00:00",
+            "source": "empiredb_restricted_tam_reader",
+            "canonical_data": True,
+            "data_scope": "PLATFORM_MARKET_RESEARCH_ONLY",
+            "tenant_source_scope_verified": False,
+            "tenant_id": "empire",
+            "market_scope_count": 1,
+            "market_scopes": [{
+                "industry": "solar", "country_code": "GB",
+                "observed_entity_count": 4,
+                "new_industry": False, "new_country": True,
+                "tam_entity_count": None, "tam_state": "UNKNOWN",
+            }],
+            "source_row_count": 4,
+            "tam_inferred_from_observed_roster": False,
+            "buyer_intent_inferred": False,
+            "demand_inferred": False,
+            "pricing_inferred": False,
+            "revenue_inferred": False,
+            "prospect_created": False,
+            "outreach_enabled": False,
+            "external_execution": False,
             "opportunity_classes": [{
                 "opportunity_key": "tam:empire:new_country:solar:GB",
                 "opportunity_class": "new_country",
@@ -199,6 +222,8 @@ def test_radar_accepts_tam_expansion_as_research_only_source():
                 "tam_state": "UNKNOWN",
                 "evidence_refs": ["acquisition:country:gb"],
                 "decision": "research",
+                "buyer_intent_proven": False, "demand_proven": False,
+                "commercial_terms_verified": False, "revenue_verified": False,
                 "execution_authority": "none",
             }],
             "execution_authority": "none",
@@ -302,3 +327,88 @@ def test_missing_storm_source_stays_unavailable():
 
     assert payload["source_status"]["storm_opportunity"]["available"] is False
     assert payload["candidate_count"] == 0
+
+
+
+def test_tam_radar_rejects_unverified_json_without_creating_opportunity():
+    from datetime import datetime, timezone
+    now=datetime.now(timezone.utc).isoformat()
+    shape={
+        "schema_version":"empire.tam-market-intelligence.v1",
+        "mode":"OBSERVE",
+        "generated_at":now,
+        "source":"empiredb_restricted_tam_reader",
+        "canonical_data":True,
+        "tenant_source_scope_verified":False,
+        "data_scope":"PLATFORM_MARKET_RESEARCH_ONLY",
+        "tenant_id":"research-only",
+        "market_scope_count":1,
+        "market_scopes":[{"industry":"solar","country_code":"GB",
+                          "observed_entity_count":1,"tam_state":"UNKNOWN",
+                          "new_industry":False,"new_country":True,
+                          "tam_entity_count":None}],
+        "source_row_count":1,
+        "opportunity_classes":[{
+            "opportunity_key":"tam:research-only:new_country:solar:GB",
+            "opportunity_class":"new_country","industry":"solar",
+            "country_code":"GB","observed_entity_count":1,
+            "tam_entity_count":None,"tam_state":"UNKNOWN",
+            "evidence_refs":["https://registry.example/firm"],
+            "decision":"research","execution_authority":"none",
+            "buyer_intent_proven":False,"demand_proven":False,
+            "commercial_terms_verified":False,"revenue_verified":False,
+        }],
+        "execution_authority":"none",
+        "tam_inferred_from_observed_roster":False,
+        "buyer_intent_inferred":False,"demand_inferred":False,
+        "pricing_inferred":False,"revenue_inferred":False,
+        "prospect_created":False,"outreach_enabled":False,
+        "external_execution":False,
+    }
+    good=build_opportunity_radar(
+        generated_at=now,market_gps=None,community_intent=None,
+        competitor_market=None,tam_market=shape,
+    )
+    assert good["source_status"]["tam_market"]["available"] is True
+    assert good["candidate_count"]==1
+    assert good["candidates"][0]["opportunity_factory_ready"] is False
+    for changes in (
+        {"source":"imported_search_scrape"},
+        {"canonical_data":False},
+        {"execution_authority":"execute"},
+        {"outreach_enabled":True},
+        {"tenant_source_scope_verified":True},
+        {"data_scope":"CUSTOMER_TENANT_AUTHENTICATED"},
+        {"market_scope_count":99},
+        {"generated_at":"2025-01-01T00:00:00+00:00"},
+    ):
+        bad=build_opportunity_radar(
+            generated_at=now,market_gps=None,community_intent=None,
+            competitor_market=None,tam_market={**shape,**changes},
+        )
+        assert bad["candidate_count"]==0
+        assert bad["source_status"]["tam_market"]["available"] is False
+        assert bad["source_status"]["tam_market"]["reason_code"].startswith(
+            "SNAPSHOT_"
+        )
+        assert bad["automatic_external_execution_allowed"] is False
+        assert bad["revenue_recognition_authority"]=="none"
+
+
+def test_tam_bad_source_does_not_suppress_independent_non_tam_research():
+    now="2026-10-10T12:00:00+00:00"
+    result=build_opportunity_radar(
+        generated_at=now,
+        market_gps=None,
+        community_intent={"pain_solution_briefs":[
+            {"pain_point":"real buyer data problem","opportunity_event":"observed",
+             "evidence_refs":["source:1"]},
+        ]},
+        competitor_market=None,
+        tam_market={"opportunity_classes":[{"opportunity_key":"tam:fake",
+          "evidence_refs":["source:untrusted"],"opportunity_class":"new_country",
+          "industry":"insurance","country_code":"US"}]},
+    )
+    assert result["source_status"]["tam_market"]["available"] is False
+    assert all(x["source"]!="tam_market_intelligence" for x in result["candidates"])
+    assert result["execution_authority"]=="none"

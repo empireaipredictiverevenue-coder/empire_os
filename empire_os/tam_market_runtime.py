@@ -64,6 +64,135 @@ def fetch_tam_market_observations_postgres(
     return [dict(item) for item in payload if isinstance(item, Mapping)]
 
 
+def probe_tam_reader_capability(
+    dsn: str,
+    *,
+    connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Read-only catalog proof using the dedicated restricted EmpireDB login.
+
+    No market rows, secrets, migrations, GRANTs, or privileged fallback.
+    Even a valid function does not imply that a tenant-authenticated SaaS
+    reader or source population is configured.
+    """
+    if not isinstance(dsn, str) or not dsn.strip():
+        raise ValueError("restricted TAM materializer DSN required")
+    try:
+        from psycopg.conninfo import conninfo_to_dict
+        config = conninfo_to_dict(dsn)
+    except Exception:
+        raise ValueError("invalid restricted TAM reader DSN") from None
+    if (
+        config.get("user") != "empire_intelligence_materializer_login"
+        or config.get("dbname") != "empiredb"
+        or config.get("host") not in (
+            "localhost", "127.0.0.1", "::1", "/var/run/postgresql"
+        )
+        or config.get("service") or config.get("options")
+        or set(config) - {"user","password","dbname","host","port","connect_timeout"}
+    ):
+        raise ValueError("dedicated local EmpireDB TAM login required")
+    if connect_factory is None:
+        import psycopg
+        connect_factory = psycopg.connect
+    try:
+        with connect_factory(dsn) as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SET TRANSACTION READ ONLY")
+                cursor.execute("SET LOCAL ROLE empire_intelligence_materializer")
+                cursor.execute("""
+                    SELECT
+                        session_user = 'empire_intelligence_materializer_login',
+                        current_user = 'empire_intelligence_materializer',
+                        to_regprocedure(
+                            'public.get_tam_market_observations(integer)'
+                        ) IS NOT NULL,
+                        COALESCE(
+                            (SELECT prosecdef FROM pg_catalog.pg_proc
+                             WHERE oid = to_regprocedure(
+                                 'public.get_tam_market_observations(integer)'
+                             )),
+                            FALSE
+                        ),
+                        COALESCE(
+                            has_function_privilege(
+                                current_user,
+                                to_regprocedure(
+                                    'public.get_tam_market_observations(integer)'
+                                ),
+                                'EXECUTE'
+                            ),
+                            FALSE
+                        ),
+                        COALESCE(
+                            has_table_privilege(
+                                current_user,
+                                to_regclass('public.prospect_acquisitions'),
+                                'SELECT'
+                            ),
+                            FALSE
+                        ),
+                        COALESCE(
+                            has_table_privilege(
+                                current_user,
+                                to_regclass('public.prospect_entity_links'),
+                                'SELECT'
+                            ),
+                            FALSE
+                        ),
+                        COALESCE(
+                            has_table_privilege(
+                                current_user,
+                                to_regclass('public.business_entities'),
+                                'SELECT'
+                            ),
+                            FALSE
+                        ),
+                        to_regclass('public.prospect_acquisitions') IS NOT NULL,
+                        to_regclass('public.prospect_entity_links') IS NOT NULL,
+                        to_regclass('public.business_entities') IS NOT NULL
+                """)
+                found = cursor.fetchone()
+    except Exception:
+        return {
+            "status":"RESTRICTED_CATALOG_PROBE_UNAVAILABLE",
+            "migration_028_contract_verified":False,
+            "no_data_rows_read":True,
+            "execution_authority":"none",
+        }
+    if not isinstance(found,(list,tuple)) or len(found)!=11:
+        return {
+            "status":"INVALID_RESTRICTED_CATALOG_RESPONSE",
+            "migration_028_contract_verified":False,
+            "no_data_rows_read":True,
+            "execution_authority":"none",
+        }
+    (login, capability, exists, definer, exec_allowed,
+     *grants_and_tables) = found
+    direct_grants = grants_and_tables[:3]
+    source_tables_exist = grants_and_tables[3:]
+    verified = (
+        all(v is True for v in (
+            login, capability, exists, definer, exec_allowed,
+            *source_tables_exist,
+        ))
+        and all(v is False for v in direct_grants)
+    )
+    return {
+        "status":"PASS" if verified else "RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
+        "migration_028_contract_verified":verified,
+        "restricted_login_verified":login is True,
+        "capability_role_verified":capability is True,
+        "function_exists":exists is True,
+        "security_definer_verified":definer is True,
+        "capability_execute_verified":exec_allowed is True,
+        "source_tables_present":all(v is True for v in source_tables_exist),
+        "source_table_direct_read_grants":any(v is True for v in direct_grants),
+        "no_data_rows_read":True,
+        "execution_authority":"none",
+    }
+
+
 def build_tam_runtime(
     rows: Iterable[Mapping[str, Any]],
     *,
@@ -204,7 +333,27 @@ def main() -> int:
     parser.add_argument("--repo-root", default="/srv/empire_os")
     parser.add_argument("--limit", type=int, default=1000)
     parser.add_argument("--refresh", action="store_true")
+    parser.add_argument("--preflight", action="store_true",
+                        help="Inspect restricted catalog capability; never read market rows.")
     args = parser.parse_args()
+    if args.preflight and args.refresh:
+        parser.error("--preflight and --refresh are mutually exclusive")
+
+    if args.preflight:
+        try:
+            env = load_materializer_env()
+            payload = probe_tam_reader_capability(
+                env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"]
+            )
+        except (ValueError, RuntimeError, OSError):
+            payload = {
+                "status":"RESTRICTED_TAM_CREDENTIAL_UNAVAILABLE",
+                "migration_028_contract_verified":False,
+                "no_data_rows_read":True,
+                "execution_authority":"none",
+            }
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return 0 if payload.get("migration_028_contract_verified") is True else 3
 
     if args.refresh:
         payload = refresh_tam_market_runtime(

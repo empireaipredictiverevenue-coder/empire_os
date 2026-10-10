@@ -16,7 +16,7 @@ def _clean(value: Any) -> str:
 
 def _country(value: Any) -> str:
     code = _clean(value).upper()
-    if len(code) != 2 or not code.isalpha():
+    if len(code) != 2 or not code.isascii() or not code.isalpha():
         raise ValueError("country_code must be a two-letter code")
     return code
 

@@ -185,3 +185,12 @@ def test_conflicting_canonical_company_identity_fails_closed_instead_of_merging(
             tenant_id="tenant-1",
             observations=[first,changed],
         )
+
+
+
+def test_market_country_is_iso_ascii_two_letters_not_unicode_lookalike():
+    with pytest.raises(ValueError,match="two-letter"):
+        build_tam_market_intelligence(
+            tenant_id="tenant-1",
+            observations=[observed("e1",country="ÜK")],
+        )

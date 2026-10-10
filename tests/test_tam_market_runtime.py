@@ -189,3 +189,79 @@ def test_tam_snapshot_is_owner_private_and_symlink_safe(tmp_path):
     with pytest.raises(ValueError,match="unsafe TAM snapshot"):
         write_tam_snapshot(tmp_path,{"mode":"OBSERVE"})
     assert target.read_text()=="keep"
+
+
+
+def test_tam_catalog_preflight_is_read_only_and_proves_exact_capability():
+    from empire_os.tam_market_runtime import probe_tam_reader_capability
+
+    class Prober(Cursor):
+        def __init__(self, row):
+            super().__init__(None)
+            self.row=row
+        def fetchone(self):
+            return self.row
+
+    class Session:
+        def __init__(self,row):
+            self.cur=Prober(row)
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def cursor(self): return self.cur
+
+    dsn="postgresql://empire_intelligence_materializer_login:local-secret@localhost/empiredb"
+    valid=(True,True,True,True,True,False,False,False,True,True,True)
+    connection=Session(valid)
+    passed=probe_tam_reader_capability(dsn,connect_factory=lambda _:connection)
+    assert passed["status"]=="PASS"
+    assert passed["migration_028_contract_verified"] is True
+    assert passed["source_table_direct_read_grants"] is False
+    assert passed["no_data_rows_read"] is True
+    queries=[x[0] for x in connection.cur.calls]
+    assert queries[0]=="SET TRANSACTION READ ONLY"
+    assert queries[1]=="SET LOCAL ROLE empire_intelligence_materializer"
+    assert "pg_catalog.pg_proc" in queries[2]
+    assert "get_tam_market_observations(integer)" in queries[2]
+    assert not any("INSERT" in q or "UPDATE" in q or "DELETE" in q
+                   or "CREATE ROLE" in q or "GRANT " in q for q in queries)
+    assert "local-secret" not in str(passed)
+    for bad in (
+        (True,True,False,False,False,False,False,False,True,True,True),
+        (True,True,True,True,False,False,False,False,True,True,True),
+        (True,True,True,True,True,True,False,False,True,True,True),
+        (False,True,True,True,True,False,False,False,True,True,True),
+        (True,True,True,True,True,False,False,False,False,True,True),
+    ):
+        failed=probe_tam_reader_capability(
+            dsn,connect_factory=lambda _,b=bad:Session(b)
+        )
+        assert failed["migration_028_contract_verified"] is False
+        assert failed["execution_authority"]=="none"
+
+
+@pytest.mark.parametrize("invalid",[
+    "postgresql://empiredb_app:secret@localhost/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@remote.example.com/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/otherdb",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/empiredb?options=-c%20search_path%3Dpublic",
+    "",
+])
+def test_tam_catalog_preflight_never_falls_back_to_unsafe_login(invalid):
+    from empire_os.tam_market_runtime import probe_tam_reader_capability
+    with pytest.raises(ValueError):
+        probe_tam_reader_capability(
+            invalid,connect_factory=lambda _: (_ for _ in ()).throw(
+                AssertionError("bad credentials must not be used")
+            )
+        )
+
+
+def test_tam_catalog_connection_failure_is_redacted_and_no_data_read():
+    from empire_os.tam_market_runtime import probe_tam_reader_capability
+    dsn="postgresql://empire_intelligence_materializer_login:secret@localhost/empiredb"
+    def unavailable(_):
+        raise RuntimeError("private password=secret should not appear in response")
+    result=probe_tam_reader_capability(dsn,connect_factory=unavailable)
+    assert result["status"]=="RESTRICTED_CATALOG_PROBE_UNAVAILABLE"
+    assert result["no_data_rows_read"] is True
+    assert "secret" not in str(result)

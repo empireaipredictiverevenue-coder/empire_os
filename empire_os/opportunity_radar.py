@@ -16,6 +16,7 @@ from typing import Any, Mapping
 
 from empire_os.opportunity_revenue_evidence import bridge_factor_evidence
 from empire_os.opportunity_factory_readiness import evaluate_factory_readiness
+from empire_os.revenue_completion_supervisor import tam_snapshot_truth
 
 from empire_os.commercial_opportunity_decay import (
     assess_opportunity_decay,
@@ -534,6 +535,18 @@ def build_opportunity_radar(
         ("storm_opportunity", storm_opportunity, _storm_candidates),
         ("economic_signals", economic_signals, _economic_signal_candidates),
     ):
+        if key == "tam_market":
+            # Reuse the same restricted-source, research-scope and freshness
+            # proof as the founder supervisor. A TAM-shaped JSON object is
+            # not independently authenticated market evidence.
+            tam_check = tam_snapshot_truth(payload, now=now)
+            if not tam_check["available"]:
+                source_status[key] = {
+                    "available": False,
+                    "candidate_count": 0,
+                    "reason_code": tam_check["reason_code"],
+                }
+                continue
         if isinstance(payload, Mapping):
             rows = builder(payload)
             source_rows = (
