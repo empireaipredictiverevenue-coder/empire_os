@@ -55,11 +55,12 @@ def test_restricted_reader_uses_capability_role():
         "execution_authority": "none",
     }])
     rows = fetch_tam_market_observations_postgres(
-        "postgresql://example",
+        "postgresql://empire_intelligence_materializer_login:test-secret@127.0.0.1/empiredb",
         connect_factory=lambda _dsn: connection,
     )
     assert rows[0]["entity_id"] == "e1"
     assert connection.cursor_obj.calls == [
+        ("SET TRANSACTION READ ONLY", ()),
         ("SET LOCAL ROLE empire_intelligence_materializer", ()),
         ("SELECT public.get_tam_market_observations(%s)", (1000,)),
     ]
@@ -120,20 +121,27 @@ def test_runtime_rejects_authoritative_source_row():
 
 
 def test_snapshot_round_trip(tmp_path):
-    payload = {
-        "schema_version": "empire.tam-market-intelligence.v1",
-        "mode": "OBSERVE",
-        "opportunity_classes": [],
-        "execution_authority": "none",
-    }
+    payload = build_tam_runtime(
+        [{
+            "entity_id": "e1", "company_name": "Test Firm",
+            "industry": "solar", "country_code": "GB",
+            "source_ref": "registry:1",
+            "observed_at": "2026-10-10T10:00:00+00:00",
+            "execution_authority": "none",
+        }],
+        tenant_id="research-scope",
+        active_industries=["solar"], active_countries=["GB"],
+    )
     path = write_tam_snapshot(tmp_path, payload)
     assert path == (
-        Path(tmp_path)
-        / "runtime/tam_market_intelligence/latest.json"
+        Path(tmp_path) / "runtime/tam_market_intelligence/latest.json"
     )
     result = build_tam_runtime_snapshot(tmp_path)
     assert result["available"] is True
     assert result["execution_authority"] == "none"
+    assert result["market_scope_count"] == 1
+    assert result["market_scopes"][0]["tam_state"] == "UNKNOWN"
+    assert result["market_scopes"][0]["tam_entity_count"] is None
 
 
 def test_missing_snapshot_fails_closed(tmp_path):
@@ -222,8 +230,16 @@ def test_tam_catalog_preflight_is_read_only_and_proves_exact_capability():
     assert queries[1]=="SET LOCAL ROLE empire_intelligence_materializer"
     assert "pg_catalog.pg_proc" in queries[2]
     assert "get_tam_market_observations(integer)" in queries[2]
-    assert not any("INSERT" in q or "UPDATE" in q or "DELETE" in q
-                   or "CREATE ROLE" in q or "GRANT " in q for q in queries)
+    assert "p.proowner" in queries[2]
+    assert "empiredb_migrator" in queries[2]
+    assert "search_path=" in queries[2]
+    assert "p.provolatile = 's'" in queries[2]
+    assert queries[2].count(
+        "SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER"
+    ) == 3
+    assert all(q.lstrip().split(maxsplit=1)[0].upper() in ("SET","SELECT")
+               for q in queries)
+    assert "SET TRANSACTION READ ONLY" == queries[0]
     assert "local-secret" not in str(passed)
     for bad in (
         (True,True,False,False,False,False,False,False,True,True,True),
@@ -265,3 +281,183 @@ def test_tam_catalog_connection_failure_is_redacted_and_no_data_read():
     assert result["status"]=="RESTRICTED_CATALOG_PROBE_UNAVAILABLE"
     assert result["no_data_rows_read"] is True
     assert "secret" not in str(result)
+
+
+
+RESTRICTED_DSN = (
+    "postgresql://empire_intelligence_materializer_login:"
+    "test-secret@127.0.0.1/empiredb"
+)
+
+
+@pytest.mark.parametrize("dsn",[
+    "postgresql://postgres:secret@localhost/empiredb",
+    "postgresql://empiredb_app:secret@localhost/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@remote.example/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/other",
+    "postgresql://empire_intelligence_materializer_login@localhost/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/empiredb?hostaddr=8.8.8.8",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/empiredb?options=-c%20session_replication_role%3Dreplica",
+    "",
+])
+def test_real_market_reader_fails_closed_on_unsafe_connection(dsn):
+    with pytest.raises(ValueError):
+        fetch_tam_market_observations_postgres(
+            dsn,connect_factory=lambda _: (_ for _ in ()).throw(
+                AssertionError("unsafe DB connection must never be opened")
+            )
+        )
+
+
+@pytest.mark.parametrize("limit",[False,True,-1,0,1.3,"100",5001])
+def test_real_market_reader_rejects_non_integer_or_out_of_range_bound(limit):
+    with pytest.raises(ValueError,match="reader limit"):
+        fetch_tam_market_observations_postgres(
+            RESTRICTED_DSN,limit=limit,
+            connect_factory=lambda _: (_ for _ in ()).throw(
+                AssertionError("invalid limit must never query database")
+            )
+        )
+
+
+@pytest.mark.parametrize("payload",[
+    [1], [{"valid":"one"}, "corrupt"],
+    [{"i":1},{"i":2}],
+    {"entity_id":"wrong format"},
+    None,
+])
+def test_real_market_reader_never_silently_drops_malformed_source_rows(payload):
+    def simulate(_):
+        return Connection(payload)
+    with pytest.raises(ValueError,match="invalid payload"):
+        fetch_tam_market_observations_postgres(
+            RESTRICTED_DSN,limit=1,connect_factory=simulate
+        )
+
+
+def test_real_market_reader_returns_empty_only_if_database_said_empty():
+    result=fetch_tam_market_observations_postgres(
+        RESTRICTED_DSN,connect_factory=lambda _:Connection([])
+    )
+    assert result==[]
+
+
+def test_market_reader_sql_failure_does_not_expose_password_or_chain():
+    def unavailable(_):
+        raise RuntimeError("could not connect with test-secret")
+    with pytest.raises(RuntimeError,match="restricted TAM market read failed") as exc:
+        fetch_tam_market_observations_postgres(
+            RESTRICTED_DSN,connect_factory=unavailable
+        )
+    assert exc.value.__cause__ is None
+    assert "test-secret" not in str(exc.value)
+
+
+
+def test_fake_tam_json_never_claims_canonical_live_success(tmp_path):
+    path=write_tam_snapshot(tmp_path,{
+        "schema_version":"empire.tam-market-intelligence.v1",
+        "available":True,"mode":"OBSERVE","execution_authority":"none",
+        "opportunity_classes":[{"opportunity_key":"tam:fake"}],
+    })
+    assert path.is_file()
+    result=build_tam_runtime_snapshot(tmp_path)
+    assert result["available"] is False
+    assert result["opportunity_classes"] == []
+    assert result["reason_code"]=="SNAPSHOT_CONTRACT_NOT_VERIFIED"
+
+
+def test_untrusted_public_snapshot_or_symlink_does_not_claim_live(tmp_path):
+    payload=build_tam_runtime(
+        [{"entity_id":"a","company_name":"Test","industry":"solar",
+          "country_code":"GB","source_ref":"registry:1",
+          "observed_at":"2026-10-10T10:00:00+00:00"}],
+        tenant_id="research",active_industries=["solar"],
+        active_countries=["GB"],
+    )
+    path=write_tam_snapshot(tmp_path,payload)
+    path.chmod(0o644)
+    assert not build_tam_runtime_snapshot(tmp_path)["available"]
+    path.chmod(0o600)
+    path.unlink()
+    real=tmp_path/"target.json"
+    real.write_text("not tam")
+    path.symlink_to(real)
+    assert not build_tam_runtime_snapshot(tmp_path)["available"]
+
+
+def test_live_tam_refresh_refuses_to_read_rows_until_restricted_catalog_passes(
+    tmp_path,monkeypatch,
+):
+    from empire_os import tam_market_runtime as tam
+    monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","research-platform")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_INDUSTRIES","solar,roofing")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB,US")
+    monkeypatch.setattr(tam,"load_materializer_env",lambda: {
+        "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":RESTRICTED_DSN,
+    })
+    calls=[]
+    def fake_probe(*args,**kwargs):
+        calls.append("preflight")
+        return {"status":"RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
+                "migration_028_contract_verified":False}
+    def forbidden_read(*args,**kwargs):
+        calls.append("READ")
+        raise AssertionError("canonical rows must not be read without approved role/function")
+    monkeypatch.setattr(tam,"probe_tam_reader_capability",fake_probe)
+    monkeypatch.setattr(tam,"fetch_tam_market_observations_postgres",forbidden_read)
+    with pytest.raises(RuntimeError,match="catalog preflight not verified"):
+        tam.refresh_tam_market_runtime(tmp_path)
+    assert calls==["preflight"]
+    assert not (tmp_path/"runtime/tam_market_intelligence/latest.json").exists()
+
+
+def test_live_tam_refresh_requires_explicit_market_scope_before_any_db_call(
+    tmp_path,monkeypatch,
+):
+    from empire_os import tam_market_runtime as tam
+    monkeypatch.delenv("EMPIRE_TAM_ACTIVE_INDUSTRIES",raising=False)
+    monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","research-platform")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB")
+    monkeypatch.setattr(tam,"load_materializer_env",
+        lambda: (_ for _ in ()).throw(AssertionError("no DB config before scope")))
+    with pytest.raises(RuntimeError,match="TAM runtime configuration incomplete"):
+        tam.refresh_tam_market_runtime(tmp_path)
+    assert not (tmp_path/"runtime/tam_market_intelligence/latest.json").exists()
+
+
+def test_live_tam_refresh_safe_positive_path_unknown_denominator(
+    tmp_path,monkeypatch,
+):
+    from empire_os import tam_market_runtime as tam
+    monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","platform-research")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_INDUSTRIES","solar")
+    monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB")
+    monkeypatch.setattr(tam,"load_materializer_env",lambda:{
+        "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":RESTRICTED_DSN,
+    })
+    checks=[]
+    def proof(*args,**kwargs):
+        checks.append("catalog")
+        return {"status":"PASS","migration_028_contract_verified":True}
+    def read(*args,**kwargs):
+        assert checks==["catalog"]
+        checks.append("read")
+        return [{"entity_id":"e1","company_name":"Canonical Ltd",
+                 "industry":"solar","country_code":"GB",
+                 "source_ref":"registry:source:1",
+                 "observed_at":"2026-10-10T11:00:00+00:00",
+                 "execution_authority":"none"}]
+    monkeypatch.setattr(tam,"probe_tam_reader_capability",proof)
+    monkeypatch.setattr(tam,"fetch_tam_market_observations_postgres",read)
+    result=tam.refresh_tam_market_runtime(tmp_path)
+    assert checks==["catalog","read"]
+    assert result["market_scope_count"]==1
+    assert result["market_scopes"][0]["tam_state"]=="UNKNOWN"
+    assert result["market_scopes"][0]["tam_entity_count"] is None
+    assert result["buyer_intent_inferred"] is False
+    assert result["outreach_enabled"] is False
+    assert result["execution_authority"]=="none"
+    path=tmp_path/"runtime/tam_market_intelligence/latest.json"
+    assert path.is_file() and path.stat().st_mode & 0o777==0o600
+    assert tam.build_tam_runtime_snapshot(tmp_path)["available"] is True

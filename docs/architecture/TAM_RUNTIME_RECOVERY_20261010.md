@@ -76,3 +76,20 @@ The founder supervisor now accepts this proof only if it has exact expected sour
 **What is still held:** migration 028 catalog proof has not been observed on the actual unit's next natural run; protected credential values were not accessed or copied. If migration 028 is missing or its role grants are incomplete, only an authorised DBA may deploy it following separate founder approval. The restricted full TAM data read additionally needs explicit market scope and a bound, authorised worker environment; this passive proof does not activate either.
 
 **Next natural service run:** the existing Market GPS timer will attempt the passive catalog check after its normal snapshot. No new timer, service restart or manual on-demand protected credential injection was used. Verify the newly generated `tam_reader_capability_latest.json` has fresh, server-backed provenance **before** claiming the catalog is live, then stage an explicitly authorised bounded data read and Radar handoff. Do not promise TAM market totals or completed activation until all proof exists.
+
+
+## 10 October — canonical TAM data-read fail-closed hardening
+
+The passive catalog check and true live TAM data reader are **different authorities**. The next natural Market GPS invocation has not yet produced its genuine private catalog result; it must not be simulated as live evidence.
+
+The existing `empire_os/tam_market_runtime.py` data-read path is now hardened before any live activation:
+
+- It will accept only the exact dedicated, password-bearing **local EmpireDB** materializer login. Superuser, app, remote host, arbitrary DB, service/options/hostaddr overrides and missing-password connections are refused before opening a session. An invalid reader `limit` fails rather than silently being clamped.
+- The actual source-record SELECT now runs inside `SET TRANSACTION READ ONLY` and `SET LOCAL ROLE empire_intelligence_materializer`; the default connection has a short bounded timeout.
+- A database RPC response with a wrong row shape, a list containing non-mapping elements or more records than the specified bound now fails closed. It cannot silently discard corrupt source rows and understate observed coverage.
+- The `--refresh` path checks **explicit market scope** before seeking credentials. It then runs a **live restricted catalog preflight** with the same dedicated reader connection parameters and refuses to fetch market rows or write a snapshot unless the catalog contract is proved, regardless of any cached Market GPS attestation.
+- The catalog probe now verifies the security-definer function is **owned by the nonlogin migrator role**, its `search_path` is empty, volatility is STABLE, return type is `jsonb`, and the capability has none of the `SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER` permissions on any of the three canonical source tables. Role/function/permissions preflight is read-only, never a migration.
+- The TAM standalone snapshot reader no longer trusts a file's `available:true` claim. It validates owner-private mode, symlink safety, source schema/provenance, no authority, coherent market scopes and timestamp freshness using the **same source validator as the founder supervisor**. Unverified input returns `available:false` and zero opportunity classes.
+- Fixture tests exercise invalid credentials, bounded limits, no silent loss, missing/mismatched scope, blocked preflight, permitted simulated bounded platform research read, retained `UNKNOWN` TAM denominator and no external authority. A positive fake/test path only writes to a temporary test directory, not the production TAM snapshot.
+
+**Activation held:** the live restricted-reader catalog result is still pending and migration 028 remains unapproved for DDL. No migration was run, no service restarted, no protected secrets copied, no unapproved DB market query made and no TAM population estimated.

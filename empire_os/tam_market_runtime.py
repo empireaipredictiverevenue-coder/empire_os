@@ -27,41 +27,73 @@ def _csv_env(name: str) -> tuple[str, ...]:
     )
 
 
+def _validate_restricted_tam_dsn(dsn: str) -> str:
+    """Restrict canonical TAM data reads to the local capability login."""
+    if not isinstance(dsn, str) or not dsn.strip() or len(dsn) > 2048:
+        raise ValueError("restricted TAM materializer DSN required")
+    try:
+        from psycopg.conninfo import conninfo_to_dict
+        config = conninfo_to_dict(dsn)
+    except Exception:
+        raise ValueError("invalid restricted TAM reader DSN") from None
+    if (
+        config.get("user") != "empire_intelligence_materializer_login"
+        or config.get("dbname") != "empiredb"
+        or not config.get("password")
+        or config.get("host") not in (
+            "localhost", "127.0.0.1", "::1", "/var/run/postgresql"
+        )
+        or config.get("service") or config.get("options")
+        or set(config) - {
+            "user", "password", "dbname", "host", "port", "connect_timeout"
+        }
+    ):
+        raise ValueError("dedicated local EmpireDB TAM login required")
+    return dsn.strip()
+
+
 def fetch_tam_market_observations_postgres(
     dsn: str,
     *,
     limit: int = 1000,
     connect_factory: Callable | None = None,
 ) -> list[dict[str, Any]]:
-    clean = str(dsn or "").strip()
-    if not clean:
-        raise ValueError("materializer database dsn required")
-    bounded = max(1, min(int(limit), 5000))
+    clean = _validate_restricted_tam_dsn(dsn)
+    # Do not silently clip requested scope, and reject booleans and floats.
+    if type(limit) is not int or not 1 <= limit <= 5000:
+        raise ValueError("TAM reader limit must be an integer in 1-5000")
     if connect_factory is None:
         try:
             import psycopg
         except ImportError as exc:
             raise RuntimeError("psycopg required for TAM runtime") from exc
-        connect_factory = psycopg.connect
+        connect_factory = lambda configured: psycopg.connect(
+            configured, connect_timeout=5
+        )
 
     try:
         with connect_factory(clean) as connection:
             with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION READ ONLY")
                 cursor.execute(
                     "SET LOCAL ROLE empire_intelligence_materializer"
                 )
                 cursor.execute(
                     "SELECT public.get_tam_market_observations(%s)",
-                    (bounded,),
+                    (limit,),
                 )
                 row = cursor.fetchone()
-    except Exception as exc:
-        raise RuntimeError("restricted TAM market read failed") from exc
+    except Exception:
+        # Prevent leaking DSN/credentials via chained psycopg diagnostics.
+        raise RuntimeError("restricted TAM market read failed") from None
 
-    payload = row[0] if row else []
-    if not isinstance(payload, list):
+    if not isinstance(row, (tuple, list)) or len(row) != 1:
+        raise ValueError("TAM market RPC returned invalid row shape")
+    payload = row[0]
+    if (not isinstance(payload, list) or len(payload) > limit
+            or any(not isinstance(item, Mapping) for item in payload)):
         raise ValueError("TAM market RPC returned invalid payload")
-    return [dict(item) for item in payload if isinstance(item, Mapping)]
+    return [dict(item) for item in payload]
 
 
 def probe_tam_reader_capability(
@@ -75,23 +107,7 @@ def probe_tam_reader_capability(
     Even a valid function does not imply that a tenant-authenticated SaaS
     reader or source population is configured.
     """
-    if not isinstance(dsn, str) or not dsn.strip():
-        raise ValueError("restricted TAM materializer DSN required")
-    try:
-        from psycopg.conninfo import conninfo_to_dict
-        config = conninfo_to_dict(dsn)
-    except Exception:
-        raise ValueError("invalid restricted TAM reader DSN") from None
-    if (
-        config.get("user") != "empire_intelligence_materializer_login"
-        or config.get("dbname") != "empiredb"
-        or config.get("host") not in (
-            "localhost", "127.0.0.1", "::1", "/var/run/postgresql"
-        )
-        or config.get("service") or config.get("options")
-        or set(config) - {"user","password","dbname","host","port","connect_timeout"}
-    ):
-        raise ValueError("dedicated local EmpireDB TAM login required")
+    _validate_restricted_tam_dsn(dsn)
     if connect_factory is None:
         import psycopg
         # The passive catalog check must never block the existing Market GPS
@@ -112,8 +128,17 @@ def probe_tam_reader_capability(
                             'public.get_tam_market_observations(integer)'
                         ) IS NOT NULL,
                         COALESCE(
-                            (SELECT prosecdef FROM pg_catalog.pg_proc
-                             WHERE oid = to_regprocedure(
+                            (SELECT
+                                p.prosecdef
+                                AND p.proowner = (
+                                    SELECT oid FROM pg_catalog.pg_roles
+                                    WHERE rolname = 'empiredb_migrator'
+                                )
+                                AND p.proconfig @> ARRAY['search_path=']::text[]
+                                AND p.provolatile = 's'
+                                AND p.prorettype = 'pg_catalog.jsonb'::regtype
+                             FROM pg_catalog.pg_proc p
+                             WHERE p.oid = to_regprocedure(
                                  'public.get_tam_market_observations(integer)'
                              )),
                             FALSE
@@ -132,7 +157,7 @@ def probe_tam_reader_capability(
                             has_table_privilege(
                                 current_user,
                                 to_regclass('public.prospect_acquisitions'),
-                                'SELECT'
+                                'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
                             ),
                             FALSE
                         ),
@@ -140,7 +165,7 @@ def probe_tam_reader_capability(
                             has_table_privilege(
                                 current_user,
                                 to_regclass('public.prospect_entity_links'),
-                                'SELECT'
+                                'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
                             ),
                             FALSE
                         ),
@@ -148,7 +173,7 @@ def probe_tam_reader_capability(
                             has_table_privilege(
                                 current_user,
                                 to_regclass('public.business_entities'),
-                                'SELECT'
+                                'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER'
                             ),
                             FALSE
                         ),
@@ -173,6 +198,8 @@ def probe_tam_reader_capability(
         }
     (login, capability, exists, definer, exec_allowed,
      *grants_and_tables) = found
+    # PostgreSQL privilege list succeeds if ANY listed direct privilege is
+    # effective, including write/DDL privileges; NONE may be inherited.
     direct_grants = grants_and_tables[:3]
     source_tables_exist = grants_and_tables[3:]
     verified = (
@@ -300,6 +327,15 @@ def refresh_tam_market_runtime(
         raise RuntimeError("TAM runtime configuration incomplete")
 
     env = load_materializer_env()
+    # A mere DSN is not authorization to read company rows. Prove the live
+    # restricted function/role/direct-grant contract immediately before the
+    # first data read, not just from an old supervisor catalog artifact.
+    capability = probe_tam_reader_capability(
+        env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
+        connect_factory=connect_factory,
+    )
+    if capability.get("migration_028_contract_verified") is not True:
+        raise RuntimeError("TAM restricted catalog preflight not verified")
     rows = fetch_tam_market_observations_postgres(
         env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
         limit=limit,
@@ -317,19 +353,32 @@ def refresh_tam_market_runtime(
 
 def build_tam_runtime_snapshot(repo_root: str | Path) -> dict[str, Any]:
     path = Path(repo_root).resolve() / OUTPUT
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    from empire_os.revenue_completion_supervisor import tam_snapshot_truth
+
+    def blocked(reason: str) -> dict[str, Any]:
         return {
             "available": False,
             "schema_version": "empire.tam-market-intelligence.v1",
             "mode": "OBSERVE",
+            "reason_code": reason,
+            "market_scopes": [],
             "opportunity_classes": [],
             "execution_authority": "none",
         }
-    if not isinstance(payload, dict):
-        raise ValueError("invalid TAM runtime snapshot")
-    return {"available": True, **payload}
+
+    try:
+        if (path.is_symlink() or not path.is_file()
+                or path.stat().st_mode & 0o077
+                or path.stat().st_size > 8_000_000):
+            return blocked("CANONICAL_SNAPSHOT_ABSENT_OR_UNSAFE")
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return blocked("CANONICAL_SNAPSHOT_UNREADABLE")
+    truth = tam_snapshot_truth(payload)
+    if not truth["available"]:
+        return blocked(truth["reason_code"])
+    # available belongs to the verified reader, not the JSON itself.
+    return {**payload, "available": True}
 
 
 def main() -> int:
