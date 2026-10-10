@@ -115,20 +115,95 @@ def test_historical_contact_cannot_claim_current_recipient():
         review_public_business_contact(d,cohort_domains={"spcroofs.com"},as_of=AS_OF)
 
 
-def test_canonical_rapport_policy_still_rejects_premature_price_and_cta():
-    plan=plan_outbound_account({
+def test_unknown_person_cannot_enter_rapport_draft_even_with_source_evidence():
+    plan = plan_outbound_account({
+        "company_name": "SPC Construction & Roofing",
+        "company_name_verified": True,
+        "decision_maker": "Unknown",
+        "contact_route": "company_routed",
+        "person_bound": False,
+        "buyer_review_status": "pending",
+    }, evidence=[{
+        "evidence_ref": "spc-first-party-public-website",
+        "summary": "SPC publishes residential and commercial services",
+        "verified": True, "fresh": True, "account_bound": True,
+    }])
+    assert plan["action_type"] == "RESEARCH"
+    assert "decision_maker" in plan["missing_evidence"]
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
+    assert plan["execution_authority"] == "none"
+
+
+def test_qualified_mock_identity_still_gets_rapport_not_pitch():
+    from empire_os.outbound_department import review_outbound_draft
+    fake_person = {
+        "company_name": "SPC Construction & Roofing",
+        "company_name_verified": True,
+        "decision_maker": "Test Reviewer",
+        "contact_route": "company_routed",
+        "person_bound": False,
+        "buyer_review_status": "pending",
+    }
+    evidence = [{
+        "evidence_ref": "spc-first-party-public-website",
+        "summary": "SPC publishes residential and commercial services",
+        "verified": True, "fresh": True, "account_bound": True,
+    }]
+    plan = plan_outbound_account(fake_person, evidence=evidence)
+    assert plan["action_type"] == "DRAFT_RAPPORT_TOUCH"
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
+    assert plan["execution_authority"] == "none"
+    audit = review_outbound_draft(
+        account=fake_person, plan=plan, subject="SPC Construction & Roofing",
+        body=("SPC Construction & Roofing handles residential and commercial "
+              "roofing in DFW. Book a call and see our $1500 pilot."),
+        used_evidence_refs=["spc-first-party-public-website"],
+    )
+    assert "PREMATURE_CTA" in audit["blockers"]
+    assert "PREMATURE_PRICE" in audit["blockers"]
+    assert audit["send_enabled"] is False
+
+
+
+def test_spc_founder_review_copy_passes_existing_policy_without_send_authority():
+    from empire_os.outbound_department import review_outbound_draft
+
+    path=ROOT/"docs/commercial/CONTRACTOR_SPC_RAPPORT_REVIEW_20261010.md"
+    doc=path.read_text()
+    subject=doc.split("**Proposed subject:** ", 1)[1].split("\n", 1)[0].strip()
+    quoted=doc.split("**Proposed subject:** ", 1)[1].split("\n", 1)[1]
+    quoted=quoted.split("## Blocking checklist", 1)[0]
+    body="\n".join(line[2:].strip() for line in quoted.splitlines() if line.startswith("> "))
+    # Simulated fixture ONLY: do not interpret this as a real person or
+    # permission to move the original contractor out of RESEARCH.
+    account={
         "company_name":"SPC Construction & Roofing",
         "company_name_verified":True,
-        "decision_maker":"Unknown",
+        "decision_maker":"Mock Reviewer",
         "contact_route":"company_routed",
+        "contact_email":"info@spcgc.com",
         "person_bound":False,
         "buyer_review_status":"pending",
-    },evidence=[{
-        "evidence_ref":"spc-first-party-public-website",
-        "summary":"SPC publishes residential and commercial services",
+    }
+    evidence=[{
+        "evidence_ref":"https://www.spcroofs.com/residential-roofing-services",
+        "summary":"SPC lists both residential and commercial DFW roofing work",
         "verified":True,"fresh":True,"account_bound":True,
-    }])
+    }]
+    plan=plan_outbound_account(account,evidence=evidence)
     assert plan["action_type"]=="DRAFT_RAPPORT_TOUCH"
+    gate=review_outbound_draft(
+        account=account,plan=plan,subject=subject,body=body,
+        used_evidence_refs=[evidence[0]["evidence_ref"]],
+    )
+    assert gate["eligible"] is True and gate["blockers"]==[]
+    assert gate["send_enabled"] is False
+    assert gate["person_bound"] is False
     assert plan["cta_allowed"] is False
     assert plan["price_allowed"] is False
     assert plan["execution_authority"]=="none"
+    assert "RESEARCH_ONLY" in doc
+    assert "OUTBOUND_AUTHORIZED=false" in doc
+    assert candidate("spcroofs.com")["existing_outbound_rapport_policy"]["next_action"]=="RESEARCH"

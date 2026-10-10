@@ -41,6 +41,15 @@ ROLE_INBOX_PREFIXES = {
     "admin", "contact", "hello", "info", "office", "sales", "support", "team",
 }
 
+# These are status labels, not independently identified real people.
+# A placeholder must never satisfy the decision-maker identity prerequisite.
+UNKNOWN_PERSON_LABELS = frozenset({
+    "unknown", "not known", "unverified", "tbd", "tbc", "n/a",
+    "na", "none", "not identified", "not verified",
+    "to be determined", "to be confirmed",
+    "decision maker", "decision-maker", "owner unknown",
+})
+
 GENERIC_OPENERS = (
     "i hope this email finds you well",
     "i hope you're well",
@@ -269,7 +278,8 @@ def _base_missing(account: Mapping[str, Any]) -> list[str]:
         missing.append("verified_company_name")
     if not _text(account.get("contact_route")):
         missing.append("contact_route")
-    if not _text(account.get("decision_maker")):
+    decision_maker = _text(account.get("decision_maker"))
+    if not decision_maker or decision_maker.casefold() in UNKNOWN_PERSON_LABELS:
         missing.append("decision_maker")
     review_state = _text(account.get("buyer_review_status")).lower()
     if review_state not in {"pending", "approved", "review_ready"} and account.get("verified_prospect") is not True:

@@ -588,3 +588,28 @@ def test_value_established_allows_soft_conversation_openers(cta):
     )
     assert plan["action_type"] == "DRAFT_SOFT_CONVERSATION_OPENER"
     assert "PREMATURE_CTA" not in review["blockers"]
+
+
+
+@pytest.mark.parametrize("placeholder", [
+    "Unknown", "UNVERIFIED", "TBD", "TBC", "N/A",
+    "Not Identified", "decision maker", "To Be Confirmed",
+])
+def test_placeholder_decision_maker_never_qualifies_first_rapport_draft(placeholder):
+    plan=plan_outbound_account(
+        account(decision_maker=placeholder),
+        evidence=[evidence()],
+    )
+    assert plan["action_type"]=="RESEARCH"
+    assert "decision_maker" in plan["missing_evidence"]
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
+    assert plan["execution_authority"]=="none"
+
+
+def test_real_named_decision_maker_still_passes_existing_rapport_plan():
+    plan=plan_outbound_account(account(decision_maker="Trace Finch"),evidence=[evidence()])
+    assert plan["action_type"]=="DRAFT_RAPPORT_TOUCH"
+    assert plan["contact_route"]=="company_routed"
+    assert plan["person_bound"] is False
+    assert plan["execution_authority"]=="none"
