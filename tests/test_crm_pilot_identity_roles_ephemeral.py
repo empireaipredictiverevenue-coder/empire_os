@@ -26,6 +26,30 @@ def test_prepared_roles_are_no_login_and_have_separated_privileges(membership_pg
     run(file=SQL_042)
     run(file=SQL_ROLES)
 
+    # The same read-only readiness query used on production must recognise
+    # the NOLOGIN roles and exact limited grants in disposable PG18.
+    import json
+    readiness_sql = ROOT / "scripts/check_crm_pilot_readiness.sql"
+    readiness_text = readiness_sql.read_text()
+    assert "BEGIN TRANSACTION READ ONLY;" in readiness_text
+    assert "ROLLBACK;" in readiness_text
+    output = run(file=readiness_sql)
+    marker = output.find("{")
+    ending = output.rfind("}")
+    assert marker >= 0 and ending > marker
+    readiness = json.loads(output[marker:ending + 1])
+    assert readiness["auth_identity_role_staged_nologin"] is True
+    assert readiness["membership_identity_role_staged_nologin"] is True
+    assert readiness["auth_role_restricted_grants_verified"] is True
+    assert readiness["membership_role_restricted_grants_verified"] is True
+    assert readiness["dedicated_auth_login_role_present"] is False
+    assert readiness["dedicated_membership_login_role_present"] is False
+    assert readiness["crm_042_login_schema_present"] is True
+    # Fixture is not named empiredb. Never infer production readiness from it.
+    assert readiness["canonical_database"] is False
+    assert readiness["next_action"] == "WRONG_DATABASE_STOP"
+    assert readiness["crm_http_activated"] is False
+
     assert run("""
         SELECT rolname||'|'||rolcanlogin::text||'|'||
                rolinherit::text||'|'||rolsuper::text||'|'||
