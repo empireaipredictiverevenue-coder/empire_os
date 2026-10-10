@@ -67,3 +67,17 @@ def test_nonroot_or_unapproved_does_not_touch_files(monkeypatch,capsys):
     monkeypatch.setattr(module.sys,"argv",["script","--apply","--approved-exact-three-crm-hba-rules"])
     assert module.main()==3
     assert "BLOCKED_ROOT_OPERATOR_REQUIRED" in capsys.readouterr().out
+
+def test_cluster_guard_uses_postgresql_concat_boolean_text_not_psql_short_display(monkeypatch):
+    # pg_is_in_recovery() displays 'f' in a boolean column, but is rendered
+    # 'false' when concatenated with text in production's cluster identity.
+    from types import SimpleNamespace
+    monkeypatch.setattr(module.subprocess,"run", lambda *a, **kw: SimpleNamespace(returncode=0))
+    good=f"empiredb|{module.DATA}|{module.HBA}|false"
+    monkeypatch.setattr(module,"invoke_psql",lambda **kw:good)
+    module.cluster_guard()
+    for wrong in (good[:-5]+"f",good[:-5]+"true", "otherdb|"+good.split("|",1)[1],
+                  f"empiredb|/tmp/other|{module.HBA}|false"):
+        monkeypatch.setattr(module,"invoke_psql",lambda **kw:wrong)
+        with pytest.raises(RuntimeError,match="noncanonical PostgreSQL cluster"):
+            module.cluster_guard()

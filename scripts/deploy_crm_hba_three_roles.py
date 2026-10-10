@@ -105,7 +105,7 @@ def cluster_guard() -> None:
         statement="SELECT current_database()||'|'||current_setting('data_directory')"
                   "||'|'||current_setting('hba_file')||'|'||pg_is_in_recovery()"
     )
-    if rows != f"empiredb|{DATA}|{HBA}|f":
+    if rows != f"empiredb|{DATA}|{HBA}|false":
         raise RuntimeError("noncanonical PostgreSQL cluster")
 
 

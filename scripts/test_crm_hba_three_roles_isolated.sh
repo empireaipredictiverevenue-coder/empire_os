@@ -13,6 +13,13 @@ hba="$(psql -X -w -q -At -d postgres -c 'SHOW hba_file')"
  echo CRM_HBA_FIXTURE=UNEXPECTED_HBA_PATH; exit 3;
 }
 psql -X -w -q -v ON_ERROR_STOP=1 -d postgres -c 'CREATE DATABASE empiredb'
+# This mirrors the production cluster_guard concatenation exactly. PostgreSQL
+# concatenated booleans format as 'false', NOT the psql column display 'f'.
+cluster_identity="$(psql -X -w -q -At -v ON_ERROR_STOP=1 -d empiredb -c "SELECT current_database()||'|'||current_setting('data_directory')||'|'||current_setting('hba_file')||'|'||pg_is_in_recovery()")"
+[[ "$cluster_identity" == "empiredb|$database_dir|$hba|false" ]] || {
+ echo CRM_HBA_FIXTURE=CLUSTER_GUARD_IDENTITY_MISMATCH; exit 3;
+}
+printf 'CRM_HBA_CLUSTER_GUARD_POSTGRES_BOOLEAN_TEXT=PASS\n'
 psql -X -w -q -v ON_ERROR_STOP=1 -d empiredb <<'SQL'
 CREATE ROLE empire_crm_auth_login LOGIN NOINHERIT PASSWORD 'fixture-crm-hello-98765!';
 CREATE ROLE empire_crm_membership_login LOGIN NOINHERIT PASSWORD 'fixture-crm-hello-98765!';
