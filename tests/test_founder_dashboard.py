@@ -2433,3 +2433,25 @@ def test_founder_contractors_displays_catalog_verified_count_not_price_or_contac
     assert "INTERNAL_ONLY" not in str(d)
     assert "150000" not in str(d)
     assert "PRIVATE_RECIPIENT" not in str(d)
+
+
+
+def test_founder_reports_only_aggregate_exact_recipient_history_not_addresses(tmp_path):
+    root=make_root(tmp_path)
+    write_json(root/"runtime/revenue_strike/contractor_founder_review_latest.json",{
+        "schema":"empire.revenue_strike.contractor_founder_review.v1",
+        "mode":"OBSERVE","as_of":"2026-10-10","outbound_authorized":False,
+        "summary":{
+            "historical_contractor_companies":8,
+            "exact_recipient_outbound_intent_checks":2,
+            "exact_recipient_prior_intent_holds":1,
+            "exact_recipient_suppression_holds":1,
+        },
+        "packets":[{"email":"PRIVATE_INBOX@example.org", "prospect":"PRIVATE_PERSON"}],
+    })
+    d=build_founder_dashboard(root)["contractor_revenue_strike"]
+    assert d["exact_recipient_intent_checks"]==2
+    assert d["exact_recipient_prior_intent_holds"]==1
+    assert d["exact_recipient_suppression_holds"]==1
+    assert d["outbound_authorized"] is False
+    assert "PRIVATE_" not in str(d) and "@example.org" not in str(d)

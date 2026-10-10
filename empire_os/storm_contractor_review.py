@@ -302,6 +302,7 @@ def build_contractor_review(cohort: Mapping, sites: Mapping,
 def attach_existing_canonical_contact_history(
     review: Mapping, *, prior_contact_domains: set[str],
     suppressed_emails: set[str],
+    prior_recipient_intents: set[str] | None = None,
 ) -> dict:
     """Re-use EmpireOS's existing read-only buyer-contact-history guard.
 
@@ -316,6 +317,13 @@ def attach_existing_canonical_contact_history(
     for group in (prior_contact_domains, suppressed_emails):
         if len(group) > 100000 or any(not isinstance(x, str) for x in group):
             raise ValueError("CANONICAL_HISTORY_INPUT_UNBOUNDED")
+    if prior_recipient_intents is not None:
+        if (not isinstance(prior_recipient_intents, set)
+                or len(prior_recipient_intents) > 100
+                or any(not isinstance(x, str) or len(x) > 254
+                       or "@" not in x or x != x.strip().lower()
+                       for x in prior_recipient_intents)):
+            raise ValueError("UNVERIFIED_EXACT_RECIPIENT_HISTORY_INPUT")
     from empire_os.claims_exchange.adapters import normalized_domain
     prior = {normalized_domain(d) for d in prior_contact_domains if normalized_domain(d)}
     normalized_suppressed_emails = {str(x).lower() for x in suppressed_emails}
@@ -324,7 +332,7 @@ def attach_existing_canonical_contact_history(
         if "@" in s and normalized_domain(s.partition("@")[2])
     }
     checked = deepcopy(review)
-    previous = suppressed_count = 0
+    previous = suppressed_count = exact_checked = exact_prior = exact_suppressed = 0
     for p in checked["packets"]:
         domain = p["company_domain"]
         source = p.get("business_contact_research") or {}
@@ -350,6 +358,35 @@ def attach_existing_canonical_contact_history(
             isinstance(historical_email, str)
             and historical_email.lower() in normalized_suppressed_emails
         )
+        candidate_emails = [
+            address.lower() for address in (known_business_email, historical_email)
+            if isinstance(address, str) and "@" in address
+        ]
+        # An exact intent match includes drafts/pending_approval as well as
+        # prior sends, avoiding duplicate recipient work across aliases.
+        recipient_lookup_performed = (
+            prior_recipient_intents is not None and bool(candidate_emails)
+        )
+        matched_exact = (
+            sorted(set(candidate_emails) & prior_recipient_intents)
+            if prior_recipient_intents is not None else []
+        )
+        p["exact_recipient_outbound_intent_history_checked"] = recipient_lookup_performed
+        p["exact_recipient_prior_intent_match"] = bool(matched_exact)
+        p["first_party_business_email_prior_intent_match"] = (
+            isinstance(known_business_email, str)
+            and known_business_email.lower() in matched_exact
+        )
+        p["historical_person_email_prior_intent_match"] = (
+            isinstance(historical_email, str)
+            and historical_email.lower() in matched_exact
+        )
+        exact_checked += len(set(candidate_emails)) if recipient_lookup_performed else 0
+        exact_prior += int(bool(matched_exact))
+        exact_suppressed += int(
+            p["first_party_business_email_suppression_match"]
+            or p["historical_person_email_suppression_match"]
+        )
         p["previous_contact_domain_hold"] = has_prior
         p["domain_has_suppressed_contact"] = has_suppression
         p["recipient_level_suppression_verified"] = False
@@ -359,6 +396,7 @@ def attach_existing_canonical_contact_history(
         p["outbound_authorized"] = False
         p["contact_history_state"] = (
             "SUPPRESSED_DOMAIN_CONTACT_HOLD" if has_suppression
+            else "EXACT_RECIPIENT_INTENT_REVIEW_HOLD" if matched_exact
             else "PRIOR_OUTBOUND_DOMAIN_REVIEW_HOLD" if has_prior
             else "NO_DOMAIN_MATCH_RECIPIENT_STILL_UNVERIFIED"
         )
@@ -366,11 +404,16 @@ def attach_existing_canonical_contact_history(
         tasks.add("VERIFY_EXACT_CONTACT_AND_CONSENT_BEFORE_ANY_SEND")
         if has_prior:
             tasks.add("RECONCILE_PREVIOUS_CONTACT_NO_DUPLICATE_OUTREACH")
+        if matched_exact:
+            tasks.add("RECONCILE_EXACT_RECIPIENT_EXISTING_INTENT_NO_DUPLICATE_OUTREACH")
         if has_suppression:
             tasks.add("DO_NOT_CONTACT_SUPPRESSION_REQUIRES_MANUAL_REVIEW")
         p["review_tasks"] = sorted(tasks)
     checked["summary"]["prior_outbound_domain_review_holds"] = previous
     checked["summary"]["suppressed_domain_contact_holds"] = suppressed_count
+    checked["summary"]["exact_recipient_outbound_intent_checks"] = exact_checked
+    checked["summary"]["exact_recipient_prior_intent_holds"] = exact_prior
+    checked["summary"]["exact_recipient_suppression_holds"] = exact_suppressed
     checked["canonical_domain_history_observed"] = True
     checked["individual_recipient_suppression_cleared"] = False
     checked["outbound_authorized"] = False

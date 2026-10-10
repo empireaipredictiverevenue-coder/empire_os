@@ -396,3 +396,49 @@ The actual loopback founder HTTP endpoint
 HTTP 200 with the same rapport/candidate/hold counts. The internal
 catalog-linked extension needs its **own subsequent service-run
 readback** before claiming that specific new field is production live.
+
+## Exact research-recipient outbound-intent history — 10 October 2026
+
+The authorised existing buyer-review one-shot runner, **after** its canonical
+read-only domain/suppression query, now reuses its existing EmpireDB service
+credentials for a separate **bounded, read-only, parameterised** query on
+`public.outbound_intents`. Its source set is derived solely from the
+already-validated first-party business-contact and historical municipal
+SPC research evidence. This currently yields precisely two lookup addresses:
+the general business mailbox `info@spcgc.com`, and the historically
+printed `jshaw@spcgc.com` (not a confirmed current personal contact).
+
+The query is limited to `channel='email'`, using `ANY(%s)` bound
+parameters and a five-second statement timeout inside a
+`SET TRANSACTION READ ONLY` PostgreSQL transaction. It matches **all
+intent statuses**, including `draft` and `pending_approval`, so a
+recipient already being prepared by another EmpireOS workflow cannot be
+treated as new merely because nothing has been sent. This improves on
+the earlier domain-level guard without altering it. There is no new
+systemd service, timer, account, database migration, send, or external
+provider; the existing buyer review still uses its unchanged history
+function and tuples.
+
+The private founder snapshot stores only booleans and aggregated counts:
+`exact_recipient_outbound_intent_checks`,
+`exact_recipient_prior_intent_holds`, and
+`exact_recipient_suppression_holds`. It never logs matched addresses
+or passwords. The public founder overview exposes **only numeric counts**.
+Any past exact-address intent is a duplicate-outreach review HOLD;
+an exact suppression match is a stronger HOLD. A negative result means
+only that no matching record was observed in the checked EmpireDB tables
+at that read time, **not** proof that the mailbox is valid, belongs to the
+person named, accepts unsolicited enquiries, has consent, or is eligible
+for a founder-approved send. In particular, the Bedford municipal
+registration expired in April 2025 and does not verify the historical
+address today.
+
+If the exact lookup is not authorised, times out, cannot validate its
+bounded candidate list, or returns an unexpected address, the
+contractor-specific materialisation is BLOCKED with the preceding private
+snapshot preserved. The existing commercial buyer-review result remains
+separate. On a successful exact match, the only next step remains manual
+canonical-recipient reconciliation and the *existing* rapport-first
+Outbound Department policy; first-touch sales CTA/pricing are still
+disallowed for every contractor. A live authorised service readback is
+necessary before claiming these counts as production verified.

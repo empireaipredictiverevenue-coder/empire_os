@@ -69,6 +69,73 @@ def _canonical_contact_history() -> tuple[set[str], set[str], set[str]]:
     return prior_prospects, prior_domains, suppressed_emails
 
 
+def _canonical_exact_outbound_intents(candidate_emails: set[str]) -> set[str]:
+    """Read-only exact-address duplicate detector for already-public research.
+
+    Queries only supplied bounded addresses. Does not read mail bodies,
+    create outreach intents, clear suppression or return raw data to logs.
+    """
+    from empire_os.storm_contractor_independent_evidence import BUSINESS_EMAIL_PATTERN
+
+    if (not isinstance(candidate_emails, set)
+            or len(candidate_emails) > 30
+            or any(not isinstance(x, str)
+                   or len(x) > 254
+                   or not BUSINESS_EMAIL_PATTERN.fullmatch(x)
+                   for x in candidate_emails)):
+        raise ValueError("INVALID_BOUNDED_CONTRACTOR_EXACT_RECIPIENT_COHORT")
+    if not candidate_emails:
+        return set()
+    dsn = os.getenv("EMPIREDB_DSN", "").strip()
+    if not dsn:
+        raise RuntimeError("EMPIREDB_DSN required for exact contact intent history")
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET TRANSACTION READ ONLY")
+            cur.execute("SET LOCAL statement_timeout = '5s'")
+            cur.execute(
+                """
+                SELECT DISTINCT lower(trim(normalized_recipient))
+                FROM public.outbound_intents
+                WHERE channel = 'email'
+                  AND lower(trim(normalized_recipient)) = ANY(%s)
+                """,
+                (sorted(candidate_emails),),
+            )
+            matches = {str(row[0]) for row in cur.fetchall() if row and row[0]}
+    if not matches <= candidate_emails:
+        raise ValueError("UNTRUSTED_EXACT_RECIPIENT_DB_RESULT")
+    return matches
+
+
+def _review_exact_public_recipient_candidates(review: dict) -> set[str]:
+    """Only already-vetted first-party/historical business contact evidence."""
+    from empire_os.storm_contractor_independent_evidence import BUSINESS_EMAIL_PATTERN
+
+    rows = review.get("packets")
+    if not isinstance(rows, list) or len(rows) > 25:
+        raise ValueError("UNBOUNDED_PUBLIC_RECIPIENT_RESEARCH")
+    candidates: set[str] = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("INVALID_PUBLIC_CONTACT_RESEARCH")
+        source = row.get("business_contact_research") or {}
+        if source.get("state") != "PUBLIC_GENERAL_COMPANY_ROUTE_HISTORICAL_PERSON_HOLD":
+            continue
+        if (source.get("outbound_authorized") is not False
+                or source.get("person_candidate_current_route_verified") is not False
+                or source.get("named_person_to_email_attribution_verified") is not False):
+            raise ValueError("UNTRUSTED_PUBLIC_CONTACT_AUTHORITY")
+        for field in ("first_party_business_contact_email", "historical_person_candidate_email"):
+            value = source.get(field)
+            if not isinstance(value, str) or not BUSINESS_EMAIL_PATTERN.fullmatch(value):
+                raise ValueError("INVALID_PUBLIC_CONTACT_EMAIL_CANDIDATE")
+            candidates.add(value)
+    if len(candidates) > 30:
+        raise ValueError("UNBOUNDED_PUBLIC_EMAIL_CANDIDATES")
+    return candidates
+
+
 def _contractor_source_review_date(utc_now):
     """Public research evidence dates use founder local time (Europe/London).
 
@@ -97,10 +164,15 @@ def refresh_existing_contractor_history(
 
     today = datetime.now(timezone.utc)
     review = run(as_of=_contractor_source_review_date(today), now=today)
+    candidates = _review_exact_public_recipient_candidates(review)
+    # Authenticated read-only lookup is independent of domain-only history.
+    # An unavailable exact lookup fails closed without writing a snapshot.
+    prior_exact = _canonical_exact_outbound_intents(candidates)
     checked = attach_existing_canonical_contact_history(
         review,
         prior_contact_domains=prior_contact_domains,
         suppressed_emails=suppressed_emails,
+        prior_recipient_intents=prior_exact,
     )
     if (checked.get("mode") != "OBSERVE"
             or checked.get("outbound_authorized") is not False
@@ -118,6 +190,9 @@ def refresh_existing_contractor_history(
         "contractor_company_count": checked["summary"]["historical_contractor_companies"],
         "contractor_prior_contact_domain_holds": checked["summary"]["prior_outbound_domain_review_holds"],
         "contractor_suppressed_contact_domain_holds": checked["summary"]["suppressed_domain_contact_holds"],
+        "contractor_exact_recipient_checks": checked["summary"]["exact_recipient_outbound_intent_checks"],
+        "contractor_exact_intent_holds": checked["summary"]["exact_recipient_prior_intent_holds"],
+        "contractor_exact_suppression_holds": checked["summary"]["exact_recipient_suppression_holds"],
         "contractor_named_recipients_cleared": 0,
         "contractor_outbound_authorized": False,
     }
