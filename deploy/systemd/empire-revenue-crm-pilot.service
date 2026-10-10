@@ -13,7 +13,7 @@ Group=ubuntu
 WorkingDirectory=/srv/empire_os
 Environment=PYTHONPATH=/srv/empire_os
 EnvironmentFile=/etc/empire/crm-pilot.env
-ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.revenue_crm_pilot_asgi:app --host 127.0.0.1 --port 8775 --no-proxy-headers
+ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.revenue_crm_pilot_asgi:app --host 127.0.0.1 --port 8783 --no-proxy-headers
 Restart=on-failure
 RestartSec=10
 NoNewPrivileges=true

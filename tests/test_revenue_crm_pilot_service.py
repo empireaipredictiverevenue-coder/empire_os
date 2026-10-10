@@ -83,7 +83,8 @@ def test_privately_provisioned_config_failure_blocks_startup(tmp_path, monkeypat
 
 def test_unit_is_loopback_and_separate_from_legacy_founder_read_api():
     text = UNIT.read_text()
-    assert "127.0.0.1 --port 8775" in text
+    assert "127.0.0.1 --port 8783" in text
+    assert "--port 8775" not in text  # Gmail relay occupies 8775
     assert "--no-proxy-headers" in text
     assert "/etc/empire/crm-pilot.env" in text
     assert "EnvironmentFile=/etc/empire/crm-pilot.env" in text

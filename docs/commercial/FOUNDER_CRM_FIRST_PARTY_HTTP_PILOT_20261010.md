@@ -13,7 +13,7 @@ The running `empire-founder-dashboard-api.service` at localhost:8766 is intentio
 
 - `empire_os/revenue_crm_pilot_service.py` is an extremely small first-party FastAPI wrapper of the **existing** `create_crm_routers_for_hub()` callback. It refuses startup unless `EMPIRE_CRM_PILOT_MODE=APPROVED_READ_ONLY_PILOT` and an explicitly provided private, complete configuration pass the existing security checks.
 - `empire_os/revenue_crm_pilot_asgi.py` is the fail-closed ASGI entrypoint, separate from the full Hub.
-- `deploy/systemd/empire-revenue-crm-pilot.service` is a prepared systemd unit. It binds `127.0.0.1:8775`, with proxy headers disabled, no Hub routes, no outbound/payment authority and no automatic public publication.
+- `deploy/systemd/empire-revenue-crm-pilot.service` is a prepared systemd unit. It binds `127.0.0.1:8783` (8775 belongs to the existing Empire Gmail relay), with proxy headers disabled, no Hub routes, no outbound/payment authority and no automatic public publication.
 - `tests/test_revenue_crm_pilot_service.py` verifies missing/wrong activation mode blocks startup; malformed private config blocks startup; configured fixtures produce existing login and invite routes and authenticated tenant reads that reject forged headers; no signup, unrelated Hub routes, OpenAPI or docs are published.
 
 ## Activation is a separate, founder-gated operations step
@@ -22,7 +22,7 @@ The existing code path requires: an independently verified founder account ident
 
 Runtime dependency configuration requires `/etc/empire/crm-pilot.env` and the JSON `EMPIRE_CRM_PILOT_CONFIG_FILE` that the existing `revenue_crm_pilot_activation` strictly validates. The JSON must include a non-reused Ed25519 signing key stored in a service-readable owner-only file, separate PostgreSQL dedicated identities for authentication/membership/tenant reader, validated tenant UUID mapping and approval evidence. Never log, email, commit or paste these secrets to the repository. The systemd EnvironmentFile can be root-only. The private JSON and signing key must be readable by the service user with owner-only permissions. Do not reuse the shared application DB connection or grant public CRM reader access.
 
-**Do not install/enable the service or expose 8775 through Cloudflare/Caddy until dedicated login roles, tenant DB session bindings, the private config, HTTP identity and a real tenant-isolation test are verified.** The first release should be an internally reachable, authenticated founder-only pilot.
+**Do not install/enable the service or expose 8783 through Cloudflare/Caddy until dedicated login roles, tenant DB session bindings, the private config, HTTP identity and a real tenant-isolation test are verified.** The first release should be an internally reachable, authenticated founder-only pilot.
 
 Founder sign-off and activation checklist, in order:
 
@@ -30,7 +30,7 @@ Founder sign-off and activation checklist, in order:
 2. Provision one approved founder login credential/invitation through the existing offline operator, only after independently verified recipient evidence.
 3. Verify dedicated auth/member/tenant reader database LOGINS and each `session_user` binding without ever printing passwords.
 4. Provision the private signing key and complete private CRM configuration, mode `APPROVED_READ_ONLY_PILOT`; validate with existing `build_pilot_routers`.
-5. Promote this isolated feature commit in a controlled integration release (do not overwrite concurrent modifications), install/enable the separately reviewed loopback-only service.
+5. Integration to the main checkout is now complete at `efc52246` and the unit's Gmail-relay port collision is corrected to loopback 8783 in the follow-up release. Install/enable the reviewed loopback-only service only after credentials, tenant role binding and private configuration are verified.
 6. Prove loopback `/health`, unauthenticated 401, invite acceptance, real authenticated founder login, tenant-scoped buyer/prospect read, cross-tenant denial, no outbound or payment.
 7. Only after those proofs approve and document a protected public ingress, if required. No unauthenticated reverse proxy route.
 
