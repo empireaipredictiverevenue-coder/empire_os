@@ -84,3 +84,13 @@ On receipt, map only evidence-backed buyer terms to the existing queue;
 do not send another follow-up, publish call buttons or reuse a partner's
 terms for another. These are external dependencies, not extra software
 features.
+
+## 10 October — Ringba publisher-role visibility clarification
+
+The Route API observation dated 9 October shows campaign-detail HTTP 200 for the assigned Lead Smart roofing offer, but GET /{accountId}/CallRoutes returned HTTP 403; no routing plan or active buyer route was independently observed. Ringba's public Campaign Management FAQ says **publishers cannot see a campaign's routing plan**: https://support.ringba.com/hc/en-us/articles/17882602101783-Campaigns-Video . Therefore the 403 may be normal publisher visibility, and **zero observed route objects cannot be translated into proof of zero actual buyer routes**. A 403 also does not prove an active route exists.
+
+The existing observer now emits route_visibility: FORBIDDEN_NO_ROUTE_ABSENCE_INFERENCE for 403, independently of routing_runtime_verified=false. The latter remains false, no buyer target, caller-ID path or payable call is invented. Tests cover the 403, accessible empty result and unavailable endpoint; 58 Lead Smart focused tests passed.
+
+Do not request broader API role privileges, use privileged credentials or run repeated forbidden probes merely to infer buyer routing. The next accepted proof is a **Lead Smart-authorised controlled nonbillable end-to-end test** showing genuine number-to-buyer connection and original caller ID as permitted, paired with Seth's explicit written approval of the exact https://empire-ai.co.uk/roofing landing page or requested changes. Preflight buyer timezone America/Chicago including DST, individual ZIP eligibility, original caller-ID/ANI, compliance/source approval and founder publication/traffic authority remain enforced. No call button, real caller traffic or publisher supply may be enabled from this diagnostic.
+
+The live public page was read-only checked on 10 October: HTTP 200, noindex, no tel: links, buyer-review messaging still present. A local materialization check found canonical templates/lead_smart/roofing/page.tsx source while the old runtime/hermes_control/worker_code/.../roofing/page.tsx target was absent. This is an isolated worker-path observation, not evidence that the public production page is gone; coordinate with website owner before touching deployed assets.

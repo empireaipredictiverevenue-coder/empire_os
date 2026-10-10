@@ -94,6 +94,14 @@ def test_campaign_route_structure_is_observed_but_not_runtime_verified(
         >= 1
     )
 
+    assert result["route_visibility"] == {
+        "enumeration_accessible": False,
+        "limited_by_http_403": True,
+        "scope": "FORBIDDEN_NO_ROUTE_ABSENCE_INFERENCE",
+        "buyer_route_absence_proven": False,
+        "buyer_route_live_proven": False,
+        "independent_call_test_required": True,
+    }
     assert (
         result[
             "routing_runtime_verified"
@@ -169,3 +177,42 @@ def test_no_route_structure_does_not_invent_configuration():
     )
 
     assert rows == []
+
+def test_global_routes_empty_does_not_prove_live_connection(monkeypatch):
+    def fake_probe(*, token, url):
+        if "/campaigns/" in url:
+            return {
+                "status": 200, "accessible": True, "error_class": None,
+                "payload": {"id": module.EXPECTED_CAMPAIGN_ID},
+            }
+        return {
+            "status": 200, "accessible": True, "error_class": None,
+            "payload": {"items": []},
+        }
+    monkeypatch.setattr(module, "_probe_get", fake_probe)
+    result = module.observe_routing_objects(token="test", account_id="acct")
+    assert result["route_visibility"]["enumeration_accessible"] is True
+    assert result["route_visibility"]["limited_by_http_403"] is False
+    assert result["route_visibility"]["scope"] == "OBSERVED_PROVIDER_SCOPE"
+    assert result["route_visibility"]["buyer_route_live_proven"] is False
+    assert result["route_visibility"]["buyer_route_absence_proven"] is False
+    assert result["routing_runtime_verified"] is False
+    assert result["traffic_enabled"] is False
+
+
+def test_non403_unavailable_scope_also_fails_closed(monkeypatch):
+    def fake_probe(*, token, url):
+        if "/campaigns/" in url:
+            return {
+                "status": 200, "accessible": True, "error_class": None,
+                "payload": {"id": module.EXPECTED_CAMPAIGN_ID},
+            }
+        return {
+            "status": 404, "accessible": False, "error_class": "NOT_FOUND",
+            "payload": None,
+        }
+    monkeypatch.setattr(module, "_probe_get", fake_probe)
+    result = module.observe_routing_objects(token="test", account_id="acct")
+    assert result["route_visibility"]["scope"] == "UNVERIFIED_API_SCOPE"
+    assert result["route_visibility"]["buyer_route_absence_proven"] is False
+    assert result["routing_enabled"] is False

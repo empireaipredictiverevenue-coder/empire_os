@@ -490,6 +490,24 @@ def observe_routing_objects(
                 ],
         },
 
+        # Ringba explicitly hides campaign routing plans from publisher
+        # users. A 403 is missing visibility, never proof of zero routes.
+        # https://support.ringba.com/hc/en-us/articles/17882602101783-Campaigns-Video
+        "route_visibility": {
+            "enumeration_accessible": global_routes["accessible"],
+            "limited_by_http_403": global_routes["status"] == 403,
+            "scope": (
+                "FORBIDDEN_NO_ROUTE_ABSENCE_INFERENCE"
+                if global_routes["status"] == 403
+                else "OBSERVED_PROVIDER_SCOPE"
+                if global_routes["accessible"]
+                else "UNVERIFIED_API_SCOPE"
+            ),
+            "buyer_route_absence_proven": False,
+            "buyer_route_live_proven": False,
+            "independent_call_test_required": True,
+        },
+
         "campaign_route_object_count":
             len(
                 campaign_route_objects
