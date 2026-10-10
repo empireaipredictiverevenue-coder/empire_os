@@ -4,8 +4,18 @@ set -euo pipefail
 set +x
 umask 077
 fail(){ printf 'TAM_STAGE2_RESULT=BLOCKED reason=%s\n' "$1" >&2; exit 3; }
-[[ $# == 2 && $1 == --activate && $2 == --approved-research-only ]] \
-  || fail EXPLICIT_STAGE2_APPROVAL_REQUIRED
+# Incident-scoped, explicitly invoked recovery after the 2026-10-10
+# failed first read; do not re-run the initial deployment command blindly.
+recover=0
+if [[ $# == 2 && $1 == --recover-first-read &&
+      $2 == --approved-research-only ]]; then
+  recover=1
+elif [[ $# == 2 && $1 == --activate &&
+        $2 == --approved-research-only ]]; then
+  recover=0
+else
+  fail EXPLICIT_STAGE2_APPROVAL_REQUIRED
+fi
 [[ "$(id -u)" == 0 ]] || fail AUTHORISED_ROOT_OPERATOR_REQUIRED
 cd /srv/empire_os
 # Ignore shell PG* overrides; privileged catalog and role actions use
@@ -22,17 +32,33 @@ for f in empire_os/tam_market_runtime.py empire_os/tam_isolated_credential.py \
   git diff --quiet HEAD -- "$f" || fail UNCOMMITTED_RELEASE_FILE
 done
 for tool in openssl install systemctl runuser psql pg_dumpall \
- sha256sum flock git systemd-analyze; do
+ sha256sum flock git systemd-analyze cmp; do
   command -v "$tool" >/dev/null || fail RELEASE_DEPENDENCY_MISSING
 done
 [[ "$(systemctl is-active postgresql@18-main.service)" == active ]] \
  || fail POSTGRES_NOT_READY
-[[ "$(systemctl show empire-tam-market-read.service -p LoadState --value)" == not-found ]] \
- || fail SERVICE_ALREADY_INSTALLED
+if [[ "$recover" == 1 ]]; then
+  [[ "$(systemctl show empire-tam-market-read.service -p LoadState --value)" == loaded ]] \
+    || fail RECOVERY_UNIT_NOT_INSTALLED
+  [[ "$(systemctl show empire-tam-market-read.service -p ActiveState --value)" == failed ]] \
+    || fail RECOVERY_SERVICE_NOT_FAILED
+  [[ "$(systemctl show empire-tam-market-read.service -p Result --value)" == exit-code ]] \
+    || fail RECOVERY_WRONG_FAILURE_CLASS
+  [[ "$(systemctl show empire-tam-market-read.service -p InvocationID --value)" == 1f49cd0c08b747ffb81beabda1206b06 ]] \
+    || fail RECOVERY_UNEXPECTED_FAILED_INVOCATION
+  cmp -s deploy/systemd/empire-tam-market-read.service \
+    /etc/systemd/system/empire-tam-market-read.service \
+    || fail RECOVERY_INSTALLED_UNIT_MISMATCH
+else
+  [[ "$(systemctl show empire-tam-market-read.service -p LoadState --value)" == not-found ]] \
+    || fail SERVICE_ALREADY_INSTALLED
+  [[ ! -e /etc/systemd/system/empire-tam-market-read.service ]] \
+    || fail EXISTING_TAM_UNIT_REQUIRES_REVIEW
+fi
 for file in /etc/empire/tam-market.dsn /etc/empire/tam-market-scope.env \
- /etc/systemd/system/empire-tam-market-read.service \
  runtime/tam_market_intelligence/latest.json; do
- [[ ! -e "$file" && ! -L "$file" ]] || fail PREEXISTING_STAGE2_STATE_REQUIRES_REVIEW
+  [[ ! -e "$file" && ! -L "$file" ]] \
+    || fail PREEXISTING_STAGE2_STATE_REQUIRES_REVIEW
 done
 exec 9>/run/lock/empiredb-tam-stage2.lock
 flock -n -x 9 || fail CONCURRENT_STAGE2_BLOCKED
@@ -127,10 +153,15 @@ printf 'TAM_STAGE2_LOGIN=ISOLATED_SCRAM_AUTH_ENABLED\n'
 
 systemd-analyze verify deploy/systemd/empire-tam-market-read.service \
  >"$run/unit-verify.log" 2>&1 || fail SERVICE_UNIT_INVALID
-install -o root -g root -m 0644 \
- deploy/systemd/empire-tam-market-read.service \
- /etc/systemd/system/empire-tam-market-read.service
-systemctl daemon-reload || fail SERVICE_RELOAD_FAILED
+if [[ "$recover" == 0 ]]; then
+  install -o root -g root -m 0644 \
+    deploy/systemd/empire-tam-market-read.service \
+    /etc/systemd/system/empire-tam-market-read.service
+  systemctl daemon-reload || fail SERVICE_RELOAD_FAILED
+else
+  systemctl reset-failed empire-tam-market-read.service \
+    || fail RECOVERY_SERVICE_RESET_FAILED
+fi
 [[ "$(systemctl is-enabled empire-tam-market-read.service 2>/dev/null ||
  true)" != enabled ]] || fail AUTOMATIC_SERVICE_ENABLEMENT_FORBIDDEN
 systemctl start empire-tam-market-read.service \
@@ -192,6 +223,7 @@ if not (radar["source_status"]["tam_market"].get("available") is True
 print("TAM_STAGE2_RADAR_AND_FOUNDER=RESEARCH_EVIDENCE_VERIFIED")
 PY
 complete=1
+printf 'TAM_STAGE2_RECOVERED_FAILED_FIRST_READ=%s\n' "$recover"
 printf 'TAM_STAGE2_SCOPE=GB,US_roofing,solar,insurance\n'
 printf 'TAM_STAGE2_TIMER=NONE\n'
 printf 'TAM_STAGE2_OUTBOUND_PAYMENTS=NOT_AUTHORISED\n'

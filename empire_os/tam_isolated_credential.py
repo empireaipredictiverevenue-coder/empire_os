@@ -30,9 +30,27 @@ def load_tam_isolated_dsn(
     if directory.is_symlink() or not directory.is_dir():
         raise ValueError("invalid isolated TAM credential directory")
     path = directory / CREDENTIAL_NAME
-    if (path.is_symlink() or not path.is_file()
-            or path.stat().st_mode & 0o077
-            or not 10 <= path.stat().st_size <= 2048):
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("missing or unsafe isolated TAM credential")
+    file_mode = path.stat().st_mode & 0o777
+    dir_mode = directory.stat().st_mode & 0o777
+    delivered_by_systemd = (
+        raw == str(UNIT_CREDENTIAL_DIR)
+        and os.environ.get("CREDENTIALS_DIRECTORY") == str(UNIT_CREDENTIAL_DIR)
+    )
+    # systemd may expose the delivered read-only copy as 0444 inside its
+    # private per-unit credential directory. Never demand the root SOURCE
+    # file's 0400 mode from this copy; never accept another directory.
+    if delivered_by_systemd:
+        unsafe_mode = (
+            bool(file_mode & 0o222)  # no writes by anyone
+            or bool(dir_mode & 0o007)  # no traverse by unrelated users
+        )
+    else:
+        # Explicit/test credentials outside the real systemd unit context
+        # must retain strict owner-only mode.
+        unsafe_mode = bool(file_mode & 0o077)
+    if unsafe_mode or not 10 <= path.stat().st_size <= 2048:
         raise ValueError("missing or unsafe isolated TAM credential")
     try:
         content = path.read_text(encoding="utf-8").strip()

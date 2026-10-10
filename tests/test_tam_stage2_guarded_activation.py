@@ -82,3 +82,33 @@ def test_stage2_scope_is_explicit_market_research_never_customer_login():
 def test_stage2_repo_file_is_not_executable_by_default_until_approved_release():
     mode=SCRIPT.stat().st_mode & 0o777
     assert mode in (0o600,0o644,0o700,0o755)
+
+
+
+def test_recovery_requires_explicit_flag_and_known_failed_invocation():
+    contents=SCRIPT.read_text()
+    assert "--recover-first-read" in contents
+    assert "1f49cd0c08b747ffb81beabda1206b06" in contents
+    assert "RECOVERY_UNEXPECTED_FAILED_INVOCATION" in contents
+    assert "RECOVERY_INSTALLED_UNIT_MISMATCH" in contents
+    assert "RECOVERY_SERVICE_NOT_FAILED" in contents
+    assert "systemctl reset-failed empire-tam-market-read.service" in contents
+    assert 'TAM_STAGE2_RECOVERED_FAILED_FIRST_READ=%s' in contents
+    assert "cmp -s deploy/systemd/empire-tam-market-read.service" in contents
+    # The recovery path must NEVER change the existing unit or retry
+    # without proving its exactly expected failed invocation.
+    assert 'if [[ "$recover" == 0 ]]; then' in contents
+    assert "install -o root -g root -m 0644" in contents
+    assert "SERVICE_ALREADY_INSTALLED" in contents
+
+
+def test_recovery_nonroot_execution_cannot_modify_production():
+    if os.geteuid()==0:
+        pytest.skip("nonroot guard verified when running as ubuntu")
+    result=subprocess.run(
+        ["bash",str(SCRIPT),"--recover-first-read",
+         "--approved-research-only"],
+        capture_output=True,text=True,timeout=5,
+    )
+    assert result.returncode==3
+    assert "AUTHORISED_ROOT_OPERATOR_REQUIRED" in result.stderr

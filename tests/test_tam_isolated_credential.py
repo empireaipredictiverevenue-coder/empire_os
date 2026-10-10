@@ -129,3 +129,44 @@ def test_isolated_catalog_probes_new_login_not_old_materializer():
     assert older.cursor_value.calls[1][0]==(
         "SET LOCAL ROLE empire_intelligence_materializer"
     )
+
+def test_real_systemd_readonly_credential_copy_accepts_0444_private_unit(
+    tmp_path, monkeypatch,
+):
+    from empire_os import tam_isolated_credential as impl
+    private=tmp_path/"private-cred-dir"
+    private.mkdir(mode=0o700)
+    private.chmod(0o700)
+    p=private/CREDENTIAL_NAME
+    p.write_text(DSN+"\n")
+    p.chmod(0o444)
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY",str(UNIT_CREDENTIAL_DIR))
+    monkeypatch.setattr(impl,"UNIT_CREDENTIAL_DIR",private)
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY",str(private))
+    assert impl.load_tam_isolated_dsn()==DSN
+    # Explicit arbitrary paths must still reject the same world-readable file.
+    monkeypatch.delenv("CREDENTIALS_DIRECTORY")
+    with pytest.raises(ValueError,match="unsafe isolated TAM credential"):
+        impl.load_tam_isolated_dsn(private)
+
+
+def test_systemd_credential_copy_denies_writable_or_public_directory(
+    tmp_path,monkeypatch,
+):
+    from empire_os import tam_isolated_credential as impl
+    private=tmp_path/"private-cred-dir"
+    private.mkdir()
+    file=private/CREDENTIAL_NAME
+    file.write_text(DSN)
+    monkeypatch.setattr(impl,"UNIT_CREDENTIAL_DIR",private)
+    monkeypatch.setenv("CREDENTIALS_DIRECTORY",str(private))
+    private.chmod(0o700)
+    file.chmod(0o444)  # systemd read-only delivered copy
+    assert impl.load_tam_isolated_dsn()==DSN
+    file.chmod(0o644)  # owner-writable is forbidden even in private folder
+    with pytest.raises(ValueError,match="unsafe isolated TAM credential"):
+        impl.load_tam_isolated_dsn()
+    file.chmod(0o444)
+    private.chmod(0o705)
+    with pytest.raises(ValueError,match="unsafe isolated TAM credential"):
+        impl.load_tam_isolated_dsn()
