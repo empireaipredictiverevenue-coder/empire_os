@@ -83,6 +83,11 @@ def test_existing_tenant_role_and_entity_evidence_never_claims_human_ownership(e
     assert data["active_owned_entity_bindings"] == 0
     assert data["active_managed_entity_bindings"] == 0
     assert data["crm_memberships"] == 0
+    assert data["pending_owner_membership_count"] == 0
+    assert data["single_approved_pending_owner_recorded"] is False
+    assert data["next_action"] == (
+        "REVIEW_INDEPENDENT_FOUNDER_AND_TENANT_EVIDENCE_BEFORE_FIRST_PENDING_MEMBER"
+    )
     assert data["crm_credential_records"] == 0
     assert data["human_founder_identity_verified"] is False
     assert data["founder_to_tenant_membership_verified"] is False
@@ -107,12 +112,99 @@ def test_founder_probe_never_infers_login_from_membership_or_stale_business_evid
     data = _report(raw)
     assert data["crm_memberships"] == 1
     assert data["active_crm_memberships"] == 1
+    assert data["pending_owner_membership_count"] == 0
+    assert data["single_approved_pending_owner_recorded"] is False
+    assert data["next_action"] == (
+        "RECONCILE_CRM_MEMBERSHIP_AND_CREDENTIAL_STATE_WITHOUT_ACTIVATION"
+    )
     assert data["active_evidenced_entity_bindings"] == 3
     assert data["active_owned_entity_bindings"] == 0
     assert data["human_founder_identity_verified"] is False
     assert data["founder_to_tenant_membership_verified"] is False
     assert "founder:unverified" not in raw
     assert "review-only:subject" not in raw
+
+
+
+
+def test_exact_approved_pending_owner_readback_never_claims_authentication(existing_registration):
+    run = existing_registration
+    # Use the exact evidence from the previously approved single-row release.
+    # This is an EPHEMERAL fixture insert, never a production write.
+    run(f"""
+      INSERT INTO public.empire_crm_tenant_memberships
+        (subject,tenant_id,role,status,evidence_ref,verified_at)
+      VALUES (
+        'founder:phil_livesley','{TENANT}','owner','pending',
+        'founder:chat-approved-single-owner-20261010'
+        ||'|identity:connected-gmail-profile-reviewed-ownership-pending'
+        ||'|tenant:operator-evidence-only-not-legal-proof',
+        now()
+      );
+    """)
+    report = _report(run(file=SQL))
+    assert report["crm_memberships"] == 1
+    assert report["active_crm_memberships"] == 0
+    assert report["crm_credential_records"] == 0
+    assert report["pending_owner_membership_count"] == 1
+    assert report["single_approved_pending_owner_recorded"] is True
+    assert report["next_action"] == (
+        "VERIFY_HUMAN_AND_TENANT_CONTROL_BEFORE_SEPARATE_ACTIVE_MEMBERSHIP_APPROVAL"
+    )
+    assert report["human_founder_identity_verified"] is False
+    assert report["founder_to_tenant_membership_verified"] is False
+    assert report["pilot_activation_authorized"] is False
+    assert report["logins_enabled_by_this_probe"] is False
+    assert report["writes_performed"] is False
+
+
+def test_pending_owner_must_match_original_evidence_and_exact_identity(existing_registration):
+    run = existing_registration
+    for subject, evidence in (
+        ("founder:other_person",
+         "founder:chat-approved-single-owner-20261010"
+         "|identity:connected-gmail-profile-reviewed-ownership-pending"
+         "|tenant:operator-evidence-only-not-legal-proof"),
+        ("founder:phil_livesley", "fixture:unreviewed-pending-owner"),
+    ):
+        run(f"""
+          INSERT INTO public.empire_crm_tenant_memberships
+            (subject,tenant_id,role,status,evidence_ref,verified_at)
+          VALUES ('{subject}','{TENANT}','owner','pending',
+                  '{evidence}',now());
+        """)
+        report = _report(run(file=SQL))
+        assert report["pending_owner_membership_count"] == 0
+        assert report["single_approved_pending_owner_recorded"] is False
+        assert report["next_action"] == (
+            "RECONCILE_CRM_MEMBERSHIP_AND_CREDENTIAL_STATE_WITHOUT_ACTIVATION"
+        )
+        run(f"""
+          DELETE FROM public.empire_crm_tenant_memberships
+          WHERE tenant_id='{TENANT}';
+        """)
+
+
+def test_extra_member_prevents_single_founder_pending_claim(existing_registration):
+    run = existing_registration
+    run(f"""
+      INSERT INTO public.empire_crm_tenant_memberships
+        (subject,tenant_id,role,status,evidence_ref,verified_at)
+      VALUES
+        ('founder:phil_livesley','{TENANT}','owner','pending',
+         'founder:chat-approved-single-owner-20261010'
+         ||'|identity:connected-gmail-profile-reviewed-ownership-pending'
+         ||'|tenant:operator-evidence-only-not-legal-proof',now()),
+        ('other:person','{TENANT}','viewer','pending','fixture:other',now());
+    """)
+    report = _report(run(file=SQL))
+    assert report["pending_owner_membership_count"] == 1
+    assert report["crm_memberships"] == 2
+    assert report["single_approved_pending_owner_recorded"] is False
+    assert report["next_action"] == (
+        "RECONCILE_CRM_MEMBERSHIP_AND_CREDENTIAL_STATE_WITHOUT_ACTIVATION"
+    )
+    assert report["human_founder_identity_verified"] is False
 
 
 def test_founder_evidence_probe_has_no_database_mutation_or_sensitive_output():
@@ -124,6 +216,10 @@ def test_founder_evidence_probe_has_no_database_mutation_or_sensitive_output():
     assert "'tenant_key_independently_verified',false" in sql
     assert "'human_founder_identity_verified',false" in sql
     assert "'pilot_activation_authorized',false" in sql
+    assert "'human_founder_identity_verified',false" in sql
+    assert "'single_approved_pending_owner_recorded'" in sql
+    assert "'pending_owner_membership_count'" in sql
+    assert "WHERE subject='founder:phil_livesley'" in sql
     for forbidden in (
         "INSERT INTO", "DELETE FROM", "UPDATE public.", "CREATE ROLE",
         "CREATE TABLE", "ALTER ROLE", "GRANT ", "password_salt",

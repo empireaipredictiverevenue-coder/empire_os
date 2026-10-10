@@ -69,7 +69,18 @@ WITH target AS (
         AND verified_at <= now()
         AND (valid_until IS NULL OR valid_until > now())
         AND nullif(btrim(evidence_ref),'') IS NOT NULL
-    )::int AS active_memberships
+    )::int AS active_memberships,
+    -- Membership rows remain account-identity evidence, never proof of
+    -- independently authenticated human control of an email or company.
+    count(*) FILTER (
+      WHERE subject='founder:phil_livesley'
+        AND role='owner' AND status='pending'
+        AND revoked_at IS NULL
+        AND verified_at <= now()
+        AND (valid_until IS NULL OR valid_until > now())
+        AND evidence_ref LIKE
+          'founder:chat-approved-single-owner-20261010|identity:connected-gmail-profile-reviewed-ownership-pending|tenant:operator-evidence-only-not-legal-proof'
+    )::int AS exact_pending_owner_memberships
   FROM public.empire_crm_tenant_memberships
   WHERE tenant_id=(SELECT tenant_id FROM target)
 ), credential_scope AS (
@@ -96,6 +107,10 @@ SELECT jsonb_pretty(jsonb_build_object(
   'earliest_entity_binding_created_at',e.earliest_entity_binding_created_at,
   'crm_memberships',m.memberships,
   'active_crm_memberships',m.active_memberships,
+  'pending_owner_membership_count',m.exact_pending_owner_memberships,
+  'single_approved_pending_owner_recorded',
+    (m.memberships=1 AND m.exact_pending_owner_memberships=1
+     AND m.active_memberships=0 AND c.credential_records=0),
   'crm_credential_records',c.credential_records,
   'human_founder_identity_verified',false,
   'founder_to_tenant_membership_verified',false,
@@ -103,7 +118,14 @@ SELECT jsonb_pretty(jsonb_build_object(
   'pilot_activation_authorized',false,
   'logins_enabled_by_this_probe',false,
   'writes_performed',false,
-  'next_action','VERIFY_FOUNDER_IDENTITY_AND_APPROVE_BOUND_MEMBERSHIP_SEPARATELY'
+  'next_action', CASE
+     WHEN m.memberships=1 AND m.exact_pending_owner_memberships=1
+       AND m.active_memberships=0 AND c.credential_records=0
+       THEN 'VERIFY_HUMAN_AND_TENANT_CONTROL_BEFORE_SEPARATE_ACTIVE_MEMBERSHIP_APPROVAL'
+     WHEN m.memberships=0 AND c.credential_records=0
+       THEN 'REVIEW_INDEPENDENT_FOUNDER_AND_TENANT_EVIDENCE_BEFORE_FIRST_PENDING_MEMBER'
+     ELSE 'RECONCILE_CRM_MEMBERSHIP_AND_CREDENTIAL_STATE_WITHOUT_ACTIVATION'
+   END
 ))
 FROM role_scope r CROSS JOIN entity_scope e
   CROSS JOIN member_scope m CROSS JOIN credential_scope c;
