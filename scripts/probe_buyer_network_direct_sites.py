@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from empire_os.buyer_public_research_seed import publisher_review_page_path
 from empire_os.buyer_network_research_rotation import (
     accepted_domain, choose_research_batch, make_research_summary,
     retain_recent_results, RESULT_TTL_SECONDS,
@@ -668,6 +669,10 @@ def probe_candidate(
             "snippets": [],
         }
     pages = []
+    # At most one additional SAME-HOST first-party publisher entry page.
+    # No global path expansion or additional research timer.
+    extra = publisher_review_page_path(domain)
+    probe_paths = PATHS + ((extra,) if extra and extra not in PATHS else ())
 
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=4
@@ -681,7 +686,7 @@ def probe_candidate(
             ):
             path
 
-            for path in PATHS
+            for path in probe_paths
         }
 
         for future in concurrent.futures.as_completed(

@@ -55,6 +55,12 @@ _BASELINE_SEEDS = (
     ("https://bh-network.com/", "public:first_party:bh-network.com"),
     ("https://www.digitalmastermedia.com/", "public:first_party:digitalmastermedia.com"),
     ("https://positioncalls.com/", "public:first_party:positioncalls.com"),
+    # 2026-10-10 publisher-first benchmark discoveries. Source hints only,
+    # never published rates, active buyer capacity or approval evidence.
+    ("https://www.elocal.com/affiliate-contact/", "public:publisher_review:elocal.com"),
+    ("https://www.polyares.com/pay-per-call-affiliate-program", "public:publisher_review:polyares.com"),
+    ("https://homevantaleadgroup.com/for-affiliates", "public:publisher_review:homevantaleadgroup.com"),
+    ("https://joinglobalwiz.com/affiliates", "public:publisher_review:joinglobalwiz.com"),
 )
 
 
@@ -113,6 +119,31 @@ def _dynamic_queries(
     return dedup
 
 
+# Tested publisher-specific searches returned more contactable demand channels
+# than broad lead-buyer keyword matching. Rotate two queries on the existing
+# 30-minute scout; no extra provider, timer, retry loop or external send.
+_PUBLISHER_DISCOVERY_QUERIES = (
+    '"roofing" "pay per call" "publisher" "SEO"',
+    '"home services" "publisher" "organic" "apply"',
+    '"roofing" "publisher" "qualification" "tracking"',
+    '"home services" "calls" "publisher application" "SEO"',
+)
+
+
+def _publisher_queries(*, observed_at: datetime, max_queries: int) -> list[dict[str, Any]]:
+    count = min(max(0, int(max_queries)), 2)
+    slot = int(observed_at.timestamp() // 1800)
+    start = (slot % 2) * 2
+    return [{
+        "query": _PUBLISHER_DISCOVERY_QUERIES[start + i],
+        "buyer_pool": "direct_demand_buyers",
+        "corridor_key": None,
+        "product_code": None,
+        "priority_score": 90,
+        "source": "tested_publisher_first_search",
+    } for i in range(count)]
+
+
 def _volume_queries(
     *,
     observed_at: datetime,
@@ -155,6 +186,7 @@ def build_public_research_seeds(
     results_per_query: int = 5,
     observed_at: datetime | None = None,
     include_volume: bool = True,
+    known_registry_domains: set[str] | None = None,
 ) -> dict[str, Any]:
     now = observed_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -208,9 +240,12 @@ def build_public_research_seeds(
         add_seed(website, source_ref=source_ref)
 
     safe_max = max(1, min(int(max_queries), 60))
-    dynamic_budget = max(1, min(20, safe_max // 3))
-    dynamic = _dynamic_queries(plan, max_queries=dynamic_budget)
-    remaining = max(0, safe_max - len(dynamic))
+    publisher = _publisher_queries(observed_at=now, max_queries=safe_max)
+    remaining_after_publisher = max(0, safe_max - len(publisher))
+    dynamic_budget = max(1, min(20, remaining_after_publisher // 3))
+    dynamic = (_dynamic_queries(plan, max_queries=dynamic_budget)
+               if remaining_after_publisher else [])
+    remaining = max(0, remaining_after_publisher - len(dynamic))
     volume = (
         _volume_queries(
             observed_at=now,
@@ -221,7 +256,7 @@ def build_public_research_seeds(
     )
     queries: list[dict[str, Any]] = []
     seen_queries: set[str] = set()
-    for row in [*dynamic, *volume]:
+    for row in [*publisher, *dynamic, *volume]:
         query = str(row.get("query") or "").strip()
         if not query or query in seen_queries:
             continue
@@ -270,6 +305,15 @@ def build_public_research_seeds(
         "mode": "OBSERVE",
         "generated_at": now.astimezone(timezone.utc).isoformat(),
         "query_count": len(queries),
+        "query_strategy_counts": {
+            "publisher_first": sum(row.get("source") == "tested_publisher_first_search" for row in queries),
+            "dynamic_buyer_target": sum(row.get("buyer_pool") == "direct_demand_buyers" and row.get("source") != "tested_publisher_first_search" for row in queries),
+            "local_volume": sum(row.get("source") == "rotating_volume_wave" for row in queries),
+        },
+        "publisher_first_queries_are_discovery_hints_only": True,
+        "source_method_comparison": compare_seed_methods(
+            seeds, queries, known_registry_domains,
+        ),
         "seed_count": len(seeds),
         "error_count": len(errors),
         "errors": errors,
@@ -297,6 +341,7 @@ def refresh_public_research_seeds(
     if not isinstance(plan, dict):
         plan = {}
 
+    kwargs.setdefault('known_registry_domains', load_known_registry_domains(root))
     payload = build_public_research_seeds(plan, **kwargs)
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -307,3 +352,94 @@ def refresh_public_research_seeds(
     )
     tmp.replace(path)
     return payload
+
+
+def compare_seed_methods(
+    seeds: list[dict[str, Any]],
+    queries: list[dict[str, Any]],
+    known_domains: set[str] | None,
+) -> dict[str, Any]:
+    """Operational search yield comparison, never commercial-outcome learning.
+
+    New domain != verified company, active buyer, approval or revenue.
+    """
+    known = None if known_domains is None else {
+        _host(d) for d in known_domains if _host(d)
+    }
+    query_method = {
+        x["query"]: (
+            "publisher_first" if x.get("source") == "tested_publisher_first_search"
+            else "local_volume" if x.get("source") == "rotating_volume_wave"
+            else "dynamic_buyer"
+        ) for x in queries
+    }
+    pools: dict[str, set[str]] = {}
+    for row in seeds:
+        for query in row.get("source_queries") or []:
+            kind = query_method.get(query)
+            if kind is not None:
+                pools.setdefault(kind, set()).add(row["domain"])
+    reviewed = {
+        row["domain"] for row in seeds
+        if any(
+            tag.startswith("public:publisher_review:")
+            for tag in row.get("source_refs") or []
+        )
+    }
+    return {
+        "status": ("REGISTRY_COMPARISON" if known is not None
+                   else "REGISTRY_BASELINE_UNAVAILABLE"),
+        "known_registry_domain_count": len(known) if known is not None else None,
+        "publisher_programme_page_research_seed_count": len(reviewed),
+        "publisher_programme_page_novel_domains": (
+            sorted(reviewed-known) if known is not None else None
+        ),
+        "query_methods": {
+            method: {
+                "discovered_domains": len(domains),
+                "not_in_registry": (
+                    len(domains-known) if known is not None else None
+                ),
+                "metric_scope": "novelty_not_buyer_qualification",
+                "verified_buyer_approvals": 0,
+                "recognized_revenue": None,
+            }
+            for method, domains in sorted(pools.items())
+        },
+        "outbound_authorized": False,
+        "execution_authority": "none",
+    }
+
+
+def load_known_registry_domains(root: Path) -> set[str] | None:
+    """Missing baseline must not be treated as all-new buyers."""
+    file = root / "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json"
+    try:
+        if not file.is_file() or file.is_symlink() or file.stat().st_size > 2_500_000:
+            return None
+        data = json.loads(file.read_text(encoding="utf-8"))
+        rows = data.get("relationships")
+        if not isinstance(rows, list):
+            return None
+        return {domain for row in rows if isinstance(row, dict)
+                for domain in row.get("identity_domains", []) if isinstance(domain, str)}
+    except (OSError, ValueError, TypeError, AttributeError):
+        return None
+
+
+def publisher_review_page_path(domain: str) -> str | None:
+    """Bounded same-host official entry point for first-party site verification."""
+    host = _host(domain)
+    for page_url, source in _BASELINE_SEEDS:
+        if source != "public:publisher_review:" + host:
+            continue
+        parsed = urlparse(page_url)
+        path = parsed.path.rstrip("/")
+        if parsed.scheme != "https" or _host(page_url) != host:
+            return None
+        segments = path.strip("/").split("/")
+        if path.startswith("/") and all(
+            segment.replace("-", "").isalnum() for segment in segments
+        ):
+            return path
+    return None
