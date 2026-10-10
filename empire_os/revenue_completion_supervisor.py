@@ -290,6 +290,75 @@ def _tam_market_row_contract(candidate: Mapping[str, Any]) -> bool:
     return True
 
 
+def _tam_scoped_sample_contract(candidate: Mapping[str, Any]) -> bool:
+    """Verify the six-cell quota receipt, including honest zero-observation cells."""
+    mode = candidate.get("sampling_method")
+    if mode is None:
+        return True  # Existing live migration 043 snapshot, not scoped v1.
+    if mode != "MARKET_QUOTA_SAMPLED":
+        return False
+    approved_i = candidate.get("approved_research_industries")
+    approved_c = candidate.get("approved_research_countries")
+    coverage = candidate.get("market_scope_sample_coverage")
+    limit = candidate.get("requested_sample_limit")
+    if (
+        not isinstance(approved_i, list)
+        or not isinstance(approved_c, list)
+        or not isinstance(coverage, list)
+        or not approved_i or not approved_c
+        or any(type(x) is not str for x in (*approved_i, *approved_c))
+        or approved_i != sorted(set(approved_i))
+        or approved_c != sorted(set(approved_c))
+        or not set(approved_i) <= {"roofing","solar","insurance"}
+        or not set(approved_c) <= {"GB","US"}
+        or type(limit) is not int or not 1 <= limit <= 1000
+        or candidate.get("source_population_complete") is not False
+        or candidate.get("source_rows_examined_meaning")
+            != "RETURNED_SAMPLE_ROWS_ONLY"
+        or candidate.get("out_of_scope_rows_excluded") != 0
+    ):
+        return False
+    keys = [(i, c) for i in approved_i for c in approved_c]
+    if (
+        type(candidate.get("requested_market_scope_count")) is not int
+        or candidate["requested_market_scope_count"] != len(keys)
+        or len(keys) != len(coverage) or len(keys) > limit
+    ):
+        return False
+    observed = {
+        (s["industry"].casefold(), s["country_code"]):
+        s["observed_entity_count"] for s in candidate["market_scopes"]
+    }
+    seen: set[tuple[str, str]] = set()
+    zeros = 0
+    count = 0
+    for row in coverage:
+        if not isinstance(row, Mapping):
+            return False
+        key = (row.get("industry"), row.get("country_code"))
+        if key not in keys or key in seen:
+            return False
+        seen.add(key)
+        quota = limit // len(keys) + (keys.index(key) < limit % len(keys))
+        value = row.get("selected_count")
+        if (
+            type(row.get("sample_quota")) is not int
+            or row["sample_quota"] != quota
+            or type(value) is not int
+            or not 0 <= value <= quota
+            or value != observed.get(key, 0)
+            or row.get("population_complete") is not False
+        ):
+            return False
+        zeros += value == 0
+        count += value
+    return (
+        count == candidate["source_row_count"]
+        and type(candidate.get("market_scope_zero_observation_count")) is int
+        and zeros == candidate["market_scope_zero_observation_count"]
+    )
+
+
 def tam_snapshot_truth(
     candidate: Any, *,
     now: datetime | None = None,
@@ -335,6 +404,7 @@ def tam_snapshot_truth(
             and candidate["market_scope_count"] == len(candidate["market_scopes"])
             and type(candidate.get("source_row_count")) is int
             and _tam_market_row_contract(candidate)
+            and _tam_scoped_sample_contract(candidate)
             and all(candidate.get(k) is False for k in required_false)
         )
         if evidence_valid and age is not None:
@@ -358,6 +428,16 @@ def tam_snapshot_truth(
             len(candidate["opportunity_classes"]) if passed else 0
         ),
         "source_row_count": candidate["source_row_count"] if passed else None,
+        "sampling_method": (
+            candidate.get("sampling_method") if passed else None
+        ),
+        "requested_market_scope_count": (
+            candidate.get("requested_market_scope_count", 0) if passed else 0
+        ),
+        "market_scope_zero_observation_count": (
+            candidate.get("market_scope_zero_observation_count", 0)
+            if passed else 0
+        ),
         "tam_counts_inferred_from_roster": False,
         "buyer_intent_inferred": False,
         "execution_authority": "none",
@@ -569,7 +649,11 @@ def build_snapshot() -> dict[str, Any]:
             "canonical_source_separate_from_llm_planner": True,
         },
         "tam_next_evidence_task": (
-            "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
+            "RESEARCH_UNOBSERVED_APPROVED_MARKET_SCOPES"
+            if (tam_runtime_available and
+                tam_truth["sampling_method"] == "MARKET_QUOTA_SAMPLED" and
+                tam_truth["market_scope_zero_observation_count"] > 0)
+            else "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
             if tam_runtime_available
             else "AWAIT_SEPARATE_PRODUCTION_APPROVAL_FOR_TAM_ROLE_AND_CREDENTIAL"
             if tam_prerequisites["restricted_reader_catalog_check"].get(
@@ -902,6 +986,12 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
             "available": tam_market_truth["available"],
             "reason_code": tam_market_truth["reason_code"],
             "market_scope_count": tam_market_truth["market_scope_count"],
+            "requested_market_scope_count": tam_market_truth[
+                "requested_market_scope_count"
+            ],
+            "market_scope_zero_observation_count": tam_market_truth[
+                "market_scope_zero_observation_count"
+            ],
             "opportunity_class_count": tam_market_truth["opportunity_class_count"],
             "tam_inferred_from_observed_roster": False,
             "buyer_intent_inferred": False,

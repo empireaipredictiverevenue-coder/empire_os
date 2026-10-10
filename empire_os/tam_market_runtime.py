@@ -103,6 +103,201 @@ def fetch_tam_market_observations_postgres(
     return [dict(item) for item in payload]
 
 
+
+_SCOPED_READER_RPC = "public.get_tam_market_observations_scoped(text[],text[],integer)"
+_SCOPED_SECTORS = frozenset(("roofing", "solar", "insurance"))
+_SCOPED_COUNTRIES = frozenset(("GB", "US"))
+
+
+def _approved_scoped_markets(
+    industries: Iterable[str], countries: Iterable[str],
+    limit: int,
+) -> tuple[list[str], list[str]]:
+    if type(limit) is not int or not 1 <= limit <= 1000:
+        raise ValueError("scoped TAM reader limit must be 1-1000")
+    active_i = list(industries)
+    active_c = list(countries)
+    if (
+        not active_i or not active_c
+        or len(active_i) > 3 or len(active_c) > 2
+        or any(type(v) is not str for v in (*active_i, *active_c))
+        or len(set(active_i)) != len(active_i)
+        or len(set(active_c)) != len(active_c)
+        or not set(active_i) <= _SCOPED_SECTORS
+        or not set(active_c) <= _SCOPED_COUNTRIES
+        or len(active_i) * len(active_c) > limit
+    ):
+        raise ValueError("scoped TAM markets outside approved research scope")
+    return sorted(active_i), sorted(active_c)
+
+
+def probe_isolated_tam_scoped_capability(
+    dsn: str, *, connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Inspect only catalog metadata for separately held migration 044."""
+    _validate_restricted_tam_dsn(dsn, login="empire_tam_market_login")
+    original = probe_isolated_tam_reader_capability(
+        dsn, connect_factory=connect_factory,
+    )
+    if original.get("isolated_tam_contract_verified") is not True:
+        return {
+            "scoped_contract_verified": False,
+            "status": "EXISTING_ISOLATED_TAM_CONTRACT_NOT_VERIFIED",
+            "no_data_rows_read": True,
+            "execution_authority": "none",
+        }
+    if connect_factory is None:
+        import psycopg
+        connect_factory = lambda configured: psycopg.connect(
+            configured, connect_timeout=3
+        )
+    try:
+        with connect_factory(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute("SET LOCAL ROLE empire_tam_market_reader")
+                cur.execute("""
+                    SELECT
+                       to_regprocedure(
+                         'public.get_tam_market_observations_scoped(text[],text[],integer)'
+                       ) IS NOT NULL,
+                       COALESCE((
+                         SELECT p.prosecdef
+                            AND p.proowner=(SELECT oid FROM pg_catalog.pg_roles
+                                           WHERE rolname='empiredb_migrator')
+                            AND p.proconfig @> ARRAY['search_path=""']::text[]
+                            AND p.provolatile='s'
+                            AND p.prorettype='pg_catalog.jsonb'::regtype
+                         FROM pg_catalog.pg_proc p
+                         WHERE p.oid=to_regprocedure(
+                           'public.get_tam_market_observations_scoped(text[],text[],integer)'
+                         )
+                       ),false),
+                       COALESCE(has_function_privilege(
+                         current_user,
+                         to_regprocedure(
+                           'public.get_tam_market_observations_scoped(text[],text[],integer)'
+                         ),'EXECUTE'),false),
+                       COALESCE(has_function_privilege(
+                         'empire_intelligence_materializer',
+                         to_regprocedure(
+                           'public.get_tam_market_observations_scoped(text[],text[],integer)'
+                         ),'EXECUTE'),false),
+                       COALESCE(has_function_privilege(
+                         'empiredb_app',
+                         to_regprocedure(
+                           'public.get_tam_market_observations_scoped(text[],text[],integer)'
+                         ),'EXECUTE'),false)
+                """)
+                result = cur.fetchone()
+    except Exception:
+        result = None
+    passed = (
+        isinstance(result, (tuple, list)) and len(result) == 5
+        and all(v is True for v in result[:3])
+        and all(v is False for v in result[3:])
+    )
+    return {
+        "scoped_contract_verified": passed,
+        "status": "PASS" if passed else "SCOPED_READER_NOT_VERIFIED",
+        "no_data_rows_read": True,
+        "execution_authority": "none",
+    }
+
+
+def fetch_tam_scoped_market_sample(
+    dsn: str, *, industries: Iterable[str], countries: Iterable[str],
+    limit: int = 1000, connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Return bounded scoped rows + explicit zero-evidence market coverage."""
+    dsn = _validate_restricted_tam_dsn(
+        dsn, login="empire_tam_market_login",
+    )
+    approved_i, approved_c = _approved_scoped_markets(
+        industries, countries, limit,
+    )
+    if connect_factory is None:
+        import psycopg
+        connect_factory = lambda configured: psycopg.connect(
+            configured, connect_timeout=5
+        )
+    try:
+        with connect_factory(dsn) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute("SET LOCAL ROLE empire_tam_market_reader")
+                cur.execute(
+                    "SELECT public.get_tam_market_observations_scoped(%s,%s,%s)",
+                    (approved_i, approved_c, limit),
+                )
+                row = cur.fetchone()
+    except Exception:
+        raise RuntimeError("isolated scoped TAM market read failed") from None
+    if (
+        not isinstance(row, (tuple, list)) or len(row) != 1
+        or not isinstance(row[0], Mapping)
+    ):
+        raise ValueError("scoped TAM reader response invalid")
+    doc = dict(row[0])
+    scopes = [(i, c) for i in approved_i for c in approved_c]
+    expected = set(scopes)
+    rows = doc.get("rows")
+    coverage = doc.get("scope_coverage")
+    if (
+        doc.get("schema_version") != "empire.tam-scoped-reader.v1"
+        or doc.get("selection_method") != "MARKET_QUOTA_SAMPLED"
+        or doc.get("source_population_complete") is not False
+        or doc.get("buyer_intent_inferred") is not False
+        or doc.get("tam_inferred_from_roster") is not False
+        or doc.get("execution_authority") != "none"
+        or type(doc.get("requested_limit")) is not int
+        or doc["requested_limit"] != limit
+        or type(doc.get("requested_scope_count")) is not int
+        or doc["requested_scope_count"] != len(scopes)
+        or not isinstance(rows, list) or len(rows) > limit
+        or not isinstance(coverage, list) or len(coverage) != len(scopes)
+    ):
+        raise ValueError("scoped TAM reader response violates research contract")
+    observed: dict[tuple[str, str], int] = {key: 0 for key in scopes}
+    seen_entities: set[tuple[str, str, str]] = set()
+    for record in rows:
+        if not isinstance(record, Mapping):
+            raise ValueError("scoped TAM response has invalid source row")
+        industry, country = record.get("industry"), record.get("country_code")
+        key = (industry, country)
+        if key not in expected or record.get("execution_authority") != "none":
+            raise ValueError("scoped TAM result contains unapproved market")
+        entity = record.get("entity_id")
+        if not isinstance(entity, str) or not entity.strip():
+            raise ValueError("scoped TAM row missing canonical entity identity")
+        token = (industry, country, entity)
+        if token in seen_entities:
+            raise ValueError("scoped TAM sample duplicated a canonical entity")
+        seen_entities.add(token)
+        observed[key] += 1
+    seen: set[tuple[str, str]] = set()
+    for entry in coverage:
+        if not isinstance(entry, Mapping):
+            raise ValueError("scoped TAM coverage invalid")
+        key = (entry.get("industry"), entry.get("country_code"))
+        if key not in expected or key in seen:
+            raise ValueError("scoped TAM coverage missing/duplicate market")
+        seen.add(key)
+        rank = scopes.index(key)
+        quota = limit // len(scopes) + (rank < limit % len(scopes))
+        if (
+            type(entry.get("sample_quota")) is not int
+            or entry["sample_quota"] != quota
+            or type(entry.get("selected_count")) is not int
+            or entry["selected_count"] != observed[key]
+            or observed[key] > quota
+            or entry.get("population_complete") is not False
+        ):
+            raise ValueError("scoped TAM coverage inconsistent with source rows")
+    doc["rows"] = [dict(x) for x in rows]
+    doc["scope_coverage"] = [dict(x) for x in coverage]
+    return doc
+
 def _probe_role_capability(
     dsn: str, *,
     login: str, capability_role: str,
@@ -374,16 +569,35 @@ def refresh_tam_market_runtime(
     # A mere DSN is not authorization to read company rows. Prove the live
     # restricted function/role/direct-grant contract immediately before the
     # first data read, not just from an old supervisor catalog artifact.
-    capability = probe_isolated_tam_reader_capability(
-        dsn, connect_factory=connect_factory,
-    )
-    if capability.get("isolated_tam_contract_verified") is not True:
-        raise RuntimeError("TAM isolated catalog preflight not verified")
-    rows = fetch_tam_market_observations_postgres(
-        dsn,
-        limit=limit,
-        connect_factory=connect_factory,
-    )
+    reader_mode = os.environ.get("EMPIRE_TAM_READER_MODE", "legacy")
+    scoped_sample = None
+    if reader_mode == "scoped_v1":
+        # Migration 044 is separately held. No fallback to the legacy global
+        # sample if it has not been independently deployed and verified.
+        requested_i, requested_c = _approved_scoped_markets(
+            active_industries, active_countries, limit,
+        )
+        capability = probe_isolated_tam_scoped_capability(
+            dsn, connect_factory=connect_factory,
+        )
+        if capability.get("scoped_contract_verified") is not True:
+            raise RuntimeError("TAM scoped catalog preflight not verified")
+        scoped_sample = fetch_tam_scoped_market_sample(
+            dsn, industries=requested_i, countries=requested_c,
+            limit=limit, connect_factory=connect_factory,
+        )
+        rows = scoped_sample["rows"]
+    elif reader_mode == "legacy":
+        capability = probe_isolated_tam_reader_capability(
+            dsn, connect_factory=connect_factory,
+        )
+        if capability.get("isolated_tam_contract_verified") is not True:
+            raise RuntimeError("TAM isolated catalog preflight not verified")
+        rows = fetch_tam_market_observations_postgres(
+            dsn, limit=limit, connect_factory=connect_factory,
+        )
+    else:
+        raise RuntimeError("TAM reader mode not approved")
     # Active market scope is a hard output/data minimisation boundary,
     # not just a label used to classify new-country opportunities.
     selected_industries = {v.strip().casefold() for v in active_industries}
@@ -405,8 +619,25 @@ def refresh_tam_market_runtime(
     payload["out_of_scope_rows_excluded"] = len(rows) - len(scoped_rows)
     payload["approved_research_industries"] = sorted(selected_industries)
     payload["approved_research_countries"] = sorted(selected_countries)
-    # Source is a bounded global sample, not a comprehensive census.
+    # Neither mode is a complete population census.
     payload["source_population_complete"] = False
+    if scoped_sample is not None:
+        payload["sampling_method"] = "MARKET_QUOTA_SAMPLED"
+        payload["requested_sample_limit"] = scoped_sample["requested_limit"]
+        payload["requested_market_scope_count"] = scoped_sample[
+            "requested_scope_count"
+        ]
+        payload["market_scope_sample_coverage"] = scoped_sample[
+            "scope_coverage"
+        ]
+        payload["market_scope_zero_observation_count"] = sum(
+            x["selected_count"] == 0
+            for x in scoped_sample["scope_coverage"]
+        )
+        # This is the number of selected rows returned by the DB, NOT a
+        # count of every candidate examined during SQL query execution.
+        payload["raw_source_rows_examined"] = len(rows)
+        payload["source_rows_examined_meaning"] = "RETURNED_SAMPLE_ROWS_ONLY"
     write_tam_snapshot(repo_root, payload)
     return payload
 
