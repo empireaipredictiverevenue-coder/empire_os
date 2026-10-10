@@ -60,3 +60,19 @@ When the migration and scoped read credentials are approved and proved, finish t
 5. Run the existing Radar once against that snapshot; verify market-scope identity, fresh provenance, no inferred buyer intent, no Factory execution, and an accurate founder readback.
 
 Do **not** requeue the old 2 October Ollama PLAN job or add a parallel TAM agent/timer.
+
+## 10 October 13:25 BST continuation — passive restricted catalog proof
+
+The existing production Market GPS unit already has `LoadCredential=market-gps.dsn:/etc/empire/market-gps.dsn` and a healthy hourly cadence. Its wrapper was present on the host but untracked in Git; this continuation versions the existing wrapper and its previously existing regression tests rather than creating a new TAM timer.
+
+**Safe addition:** after the existing Market GPS snapshot succeeds, the wrapper may run a bounded catalog-only TAM capability inspection using the same credential **only inside the genuine `/run/credentials/empire-market-gps.service` systemd context with `INVOCATION_ID`**. This is a non-blocking read-only query with a three-second connection timeout. It cannot read TAM entity rows, invoke market refresh, apply migrations, change roles, export secrets, or interrupt healthy Market GPS operation. Its private `0600` result is written within the Market GPS unit's already allowed `runtime/market_sweeps/` directory:
+
+`runtime/market_sweeps/tam_reader_capability_latest.json`
+
+The founder supervisor now accepts this proof only if it has exact expected source/schema, verified restricted login/role/function/security-definer/SELECT-denial booleans, no-data-read/no-migration flags, `none` execution authority, owner-private permissions, and a timestamp no older than three hours. A PASS on the read-only catalog proves only the catalog contract **as of the check**, not a tenant login, approved migration, current buyer intent, verified market population or legitimate run of the TAM data reader. The existing `tam_reader_prerequisites` and `tam_next_evidence_task` report this distinction.
+
+**Regression lesson:** a mocked unit test originally wrote an unavailable test-result file into the live runtime. That artifact was identified by timestamp, verified as non-PASS, retracted immediately and its cause fixed. The wrapper now refuses to write production attestation outside the genuine protected systemd execution context; tests prove a fake credential directory and invocation cannot produce evidence. This was **not** presented as live success.
+
+**What is still held:** migration 028 catalog proof has not been observed on the actual unit's next natural run; protected credential values were not accessed or copied. If migration 028 is missing or its role grants are incomplete, only an authorised DBA may deploy it following separate founder approval. The restricted full TAM data read additionally needs explicit market scope and a bound, authorised worker environment; this passive proof does not activate either.
+
+**Next natural service run:** the existing Market GPS timer will attempt the passive catalog check after its normal snapshot. No new timer, service restart or manual on-demand protected credential injection was used. Verify the newly generated `tam_reader_capability_latest.json` has fresh, server-backed provenance **before** claiming the catalog is live, then stage an explicitly authorised bounded data read and Radar handoff. Do not promise TAM market totals or completed activation until all proof exists.

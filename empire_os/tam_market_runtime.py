@@ -94,7 +94,11 @@ def probe_tam_reader_capability(
         raise ValueError("dedicated local EmpireDB TAM login required")
     if connect_factory is None:
         import psycopg
-        connect_factory = psycopg.connect
+        # The passive catalog check must never block the existing Market GPS
+        # oneshot for an unbounded database connection attempt.
+        connect_factory = lambda configured: psycopg.connect(
+            configured, connect_timeout=3
+        )
     try:
         with connect_factory(dsn) as conn:
             with conn.cursor() as cursor:

@@ -15,6 +15,9 @@ DEFAULT_DEFERRED = ROOT / "runtime/hunter/buyer_deferred_enrichment.json"
 DEFAULT_MATERIALIZER = ROOT / "runtime/buyer_review_materializer/latest.json"
 DEFAULT_OUTPUT = ROOT / "runtime/revenue_completion_supervisor/latest.json"
 DEFAULT_TAM_SNAPSHOT = ROOT / "runtime/tam_market_intelligence/latest.json"
+DEFAULT_TAM_READER_CATALOG_PROBE = (
+    ROOT / "runtime/market_sweeps/tam_reader_capability_latest.json"
+)
 
 
 def _now() -> str:
@@ -361,7 +364,88 @@ def tam_snapshot_truth(
     }
 
 
-def tam_reader_prerequisites(env: Mapping[str, str] | None = None) -> dict[str, Any]:
+def tam_restricted_reader_catalog_status(
+    path: Path = DEFAULT_TAM_READER_CATALOG_PROBE,
+    *, now: datetime | None = None,
+) -> dict[str, Any]:
+    """Check only a fresh private artifact from existing Market GPS service.
+
+    This is a read-only catalog attestation, not a migration approval, a TAM
+    tenant authorization, or proof of population/market-size results.
+    """
+    result = {
+        "status": "NOT_YET_OBSERVED",
+        "restricted_catalog_verified": False,
+        "fresh": False,
+        "no_data_rows_read": True,
+        "execution_authority": "none",
+    }
+    try:
+        if (path.is_symlink() or not path.is_file()
+                or path.stat().st_mode & 0o077
+                or path.stat().st_size > 8192):
+            return result
+        doc = _read_json(path)
+    except (OSError, ValueError):
+        return result
+    if not isinstance(doc, Mapping):
+        return result
+    if (doc.get("schema_version")
+            != "empire.tam_restricted_reader_capability_preflight.v1"
+            or doc.get("source")
+            != "existing_market_gps_protected_systemd_credential"
+            or doc.get("mode") != "OBSERVE"
+            or doc.get("execution_authority") != "none"
+            or doc.get("no_data_rows_read") is not True
+            or doc.get("no_migration_applied") is not True
+            or doc.get("no_credential_exported") is not True):
+        result["status"] = "INVALID_READ_ONLY_PROVENANCE"
+        return result
+    try:
+        ts = datetime.fromisoformat(
+            str(doc.get("observed_at")).replace("Z", "+00:00")
+        )
+        if ts.tzinfo is None:
+            raise ValueError("unaware timestamp")
+        age = ((now or datetime.now(timezone.utc)) - ts).total_seconds()
+    except (ValueError, TypeError, OverflowError):
+        result["status"] = "INVALID_CHECK_TIMESTAMP"
+        return result
+    if not 0 <= age <= 3 * 3600:
+        result["status"] = "CATALOG_CHECK_STALE_OR_FUTURE"
+        return result
+    allowed = {
+        "PASS", "RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
+        "RESTRICTED_CATALOG_PROBE_UNAVAILABLE",
+        "INVALID_RESTRICTED_CATALOG_RESPONSE",
+    }
+    status = doc.get("status")
+    if not isinstance(status, str) or status not in allowed:
+        result["status"] = "INVALID_CATALOG_STATUS"
+        return result
+    proven = (
+        status == "PASS"
+        and all(doc.get(k) is True for k in (
+            "migration_028_contract_verified", "restricted_login_verified",
+            "capability_role_verified", "function_exists",
+            "security_definer_verified", "capability_execute_verified",
+            "source_tables_present",
+        ))
+        and doc.get("source_table_direct_read_grants") is False
+    )
+    return {
+        "status": status,
+        "restricted_catalog_verified": proven,
+        "fresh": True,
+        "no_data_rows_read": True,
+        "execution_authority": "none",
+    }
+
+
+def tam_reader_prerequisites(
+    env: Mapping[str, str] | None = None,
+    *, catalog_probe_path: Path = DEFAULT_TAM_READER_CATALOG_PROBE,
+) -> dict[str, Any]:
     """Report protected-reader readiness without exposing identifiers/secrets.
 
     Only values exported into the actual service process count as operational
@@ -369,6 +453,7 @@ def tam_reader_prerequisites(env: Mapping[str, str] | None = None) -> dict[str, 
     configured systemd EnvironmentFile before unprivileged workers can use them.
     """
     config = env if env is not None else os.environ
+    catalog = tam_restricted_reader_catalog_status(catalog_probe_path)
     missing = [
         name for name in (
             "EMPIRE_TAM_TENANT_ID", "EMPIRE_TAM_ACTIVE_INDUSTRIES",
@@ -379,8 +464,15 @@ def tam_reader_prerequisites(env: Mapping[str, str] | None = None) -> dict[str, 
     return {
         "runtime_environment_configured": len(missing) == 0,
         "missing_runtime_environment_keys": missing,
-        "restricted_empiredb_sql_reader_live_verified": False,
-        "migration_028_live_authority": "UNVERIFIED_NOT_AUTHORISED_HERE",
+        "restricted_empiredb_sql_reader_live_verified": catalog[
+            "restricted_catalog_verified"
+        ],
+        "restricted_reader_catalog_check": catalog,
+        "migration_028_live_authority": (
+            "READ_ONLY_CATALOG_CONTRACT_VERIFIED_NO_DDL_AUTHORITY"
+            if catalog["restricted_catalog_verified"]
+            else "UNVERIFIED_NOT_AUTHORISED_HERE"
+        ),
         "auto_planner_retry_authorized": False,
         "service_restart_authorized": False,
         "execution_authority": "none",
@@ -432,7 +524,9 @@ def build_snapshot() -> dict[str, Any]:
             "canonical_source_separate_from_llm_planner": True,
         },
         "tam_next_evidence_task": (
-            "CHECK_RESTRICTED_READER_MIGRATION_028_AND_CONFIGURE_EXPLICIT_TAM_SCOPE"
+            "VERIFY_RESTRICTED_TAM_CATALOG_WITH_PROTECTED_CREDENTIAL"
+            if not tam_prerequisites["restricted_empiredb_sql_reader_live_verified"]
+            else "CONFIGURE_EXPLICIT_TAM_SCOPE_AND_RUN_BOUNDED_READER"
             if not tam_runtime_available
             else "VALIDATE_DOWNSTREAM_RADAR_EVIDENCE_CONSUMPTION"
         ),
