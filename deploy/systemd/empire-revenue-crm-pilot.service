@@ -1,0 +1,32 @@
+[Unit]
+Description=EmpireOS Founder Authenticated CRM Pilot (governed, loopback only)
+After=network-online.target postgresql@18-main.service
+Requires=postgresql@18-main.service
+ConditionPathExists=/etc/empire/crm-pilot.env
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/etc/empire/crm-pilot.env
+ExecStart=/srv/empire_os/.venv/bin/uvicorn empire_os.revenue_crm_pilot_asgi:app --host 127.0.0.1 --port 8775 --no-proxy-headers
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/srv/empire_os
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+UMask=0077
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target
