@@ -266,3 +266,67 @@ def test_missing_sources_produce_no_organic_actions():
     growth = build({})['organic_growth']
     assert growth['traffic_specialist']['action_count'] == 0
     assert growth['conversion_specialist']['action_count'] == 0
+
+
+def test_revenue_multi_pipeline_is_six_lane_review_not_execution():
+    from empire_os.revenue_distribution_review import (
+        build_revenue_multi_pipeline_review,
+    )
+    base = build(snapshots())
+    publisher = {
+        "state": "HUMAN_REVIEW_ONLY",
+        "homeowner_supply_candidates": 10,
+        "contractor_software_affiliate_candidates": 2,
+        "awaiting_response_count": 2,
+        "verified_onboarded_count": 0,
+        "recognized_revenue_cents": 0,
+        "outbound_authorized": True,  # never trust upstream promotion
+        "verified_paid_outcomes": 100,  # must never become verified revenue
+    }
+    base["publisher_supply_recruitment"] = publisher
+    result = build_revenue_multi_pipeline_review(base)
+    assert result["schema_version"] == "empire.revenue_multi_pipeline_review.v1"
+    assert result["independent_pipeline_count"] == 6
+    assert result["canonical_business_database"] == "EmpireDB"
+    assert result["new_service_installed"] is False
+    assert result["automatic_dispatch_authorized"] is False
+    assert result["parallel_queues_not_new_schedulers"] is True
+    rows = {row["pipeline"]: row for row in result["pipelines"]}
+    assert set(rows) == {
+        "buyer_demand", "publisher_supply", "owned_organic",
+        "saas_affiliates", "conversion_fulfilment", "economic_memory",
+    }
+    assert rows["publisher_supply"]["observed_research_counts_not_revenue"]["researched_source_count"] == 10
+    assert rows["saas_affiliates"]["observed_research_counts_not_revenue"]["researched_b2b_referrer_count"] == 2
+    assert rows["economic_memory"]["observed_research_counts_not_revenue"]["publisher_cohort_recognized_revenue_cents"] == 0
+    for row in rows.values():
+        assert row["execution_authority"] == "none"
+        for forbidden in ("live_traffic_authorized", "outbound_authorized",
+                          "terms_or_payout_authorized",
+                          "collected_revenue_verified_here"):
+            assert row[forbidden] is False
+
+
+def test_multi_pipeline_fails_closed_without_publisher_evidence_and_replays():
+    from empire_os.revenue_distribution_review import (
+        build_revenue_multi_pipeline_review,
+    )
+    base = build({})
+    base["publisher_supply_recruitment"] = {"state": "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"}
+    first = build_revenue_multi_pipeline_review(base)
+    assert first == build_revenue_multi_pipeline_review(deepcopy(base))
+    rows = {r["pipeline"]: r for r in first["pipelines"]}
+    assert rows["publisher_supply"]["evidence_state"] == "HOLD_EVIDENCE_UNAVAILABLE"
+    assert rows["saas_affiliates"]["evidence_state"] == "HOLD_EVIDENCE_UNAVAILABLE"
+    assert rows["economic_memory"]["evidence_state"] == "HOLD_PAYMENT_EVIDENCE_UNAVAILABLE"
+    assert rows["publisher_supply"]["observed_research_counts_not_revenue"] == {}
+    assert rows["economic_memory"]["observed_research_counts_not_revenue"]["publisher_cohort_recognized_revenue_cents"] is None
+    assert all(not r["live_traffic_authorized"] for r in first["pipelines"])
+
+
+def test_existing_refresh_includes_multi_pipeline_without_additional_inputs(tmp_path):
+    from empire_os.revenue_distribution_review import build_revenue_multi_pipeline_review
+    result = rd.refresh_revenue_distribution(tmp_path, generated_at=NOW)
+    assert result["multi_pipeline_review"] == build_revenue_multi_pipeline_review(result)
+    assert result["multi_pipeline_review"]["independent_pipeline_count"] == 6
+    assert result == rd.refresh_revenue_distribution(tmp_path, generated_at=NOW)

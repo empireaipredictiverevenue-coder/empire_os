@@ -268,13 +268,13 @@ def test_real_publisher_reply_is_paid_only_not_a_new_revenue_event():
     delivery = json.loads((root / "docs/commercial/PUBLISHER_RECRUITMENT_GMAIL_SEND_EVIDENCE_20261010.json").read_text())
     result = build_publisher_recruitment_summary(prospects, delivery)
     assert result["state"] == "HUMAN_REVIEW_ONLY"
-    assert result["candidate_count"] == 8
+    assert result["candidate_count"] == 12
     assert result["email_submitted_count"] == 4
     assert result["hard_bounce_count"] == 1
     assert result["reply_observed_count"] == 1
     assert result["paid_only_reply_count"] == 1
     assert result["awaiting_response_count"] == 2
-    assert result["unsent_draft_count"] == 4
+    assert result["unsent_draft_count"] == 8
     assert result["recognized_revenue_cents"] == 0
     assert result["verified_onboarded_count"] == 0
     assert result["outbound_authorized"] is False
@@ -284,6 +284,18 @@ def test_real_publisher_reply_is_paid_only_not_a_new_revenue_event():
     assert rows["gettradesmen.uk"]["stage"] == "HARD_BOUNCE_NO_RETRY"
     assert rows["roofpitch.net"]["stage"] == "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED"
     assert rows["solarbriton.co.uk"]["stage"] == "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED"
+    assert rows["roofingmate.com"]["stage"] == "DRAFT_UNSENT"
+    assert rows["roofingcalculators.org"]["stage"] == "DRAFT_UNSENT"
+    assert rows["roofcostdata.com"]["stage"] == "DRAFT_UNSENT"
+    assert rows["trackover.io"]["stage"] == "DRAFT_UNSENT"
+    assert rows["trackover.io"]["revenue_lane"] == "CONTRACTOR_SOFTWARE_AFFILIATE"
+    assert rows["trackover.io"]["requires_verified_buyer_subaffiliate_permission"] is False
+    assert rows["roofcostdata.com"]["revenue_lane"] == "HOMEOWNER_REFERRAL_SUPPLY"
+    assert rows["roofcostdata.com"]["requires_verified_buyer_subaffiliate_permission"] is True
+    assert all(not row["outbound_authorized"] and not row["payout_verified"]
+               for row in rows.values())
+    assert result["homeowner_supply_candidates"] == 10
+    assert result["contractor_software_affiliate_candidates"] == 2
 
     forged = deepcopy(delivery)
     forged["messages"][3]["reply_from"] = "unrelated@example.net"

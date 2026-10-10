@@ -15,6 +15,7 @@ from empire_os.predictive_revenue_formula import CORE_FACTORS, predictive_revenu
 from empire_os.commercial_product_catalog import assess_catalog_item
 from empire_os.revenue_distribution_review import (
     REVIEW_SOURCES, build_human_review_queue, build_publisher_recruitment_summary,
+    build_revenue_multi_pipeline_review,
 )
 from empire_os.traffic_specialist import review_organic_traffic
 from empire_os.conversion_intelligence import (
@@ -344,6 +345,9 @@ def refresh_revenue_distribution(repo_root: Path, *, generated_at: str | None = 
         except (OSError, ValueError):
             recruitment.append(None)
     payload["publisher_supply_recruitment"] = build_publisher_recruitment_summary(*recruitment)
+    # Only an OBSERVE projection of existing sources; no additional producer,
+    # scheduler, external call, database, route or affiliate payout authority.
+    payload["multi_pipeline_review"] = build_revenue_multi_pipeline_review(payload)
     output = repo_root / OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = None

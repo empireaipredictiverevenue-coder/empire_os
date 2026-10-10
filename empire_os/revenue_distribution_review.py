@@ -285,6 +285,7 @@ def build_publisher_recruitment_summary(prospects, delivery):
         "hard_bounce_count": 0, "awaiting_response_count": 0,
         "unsent_draft_count": 0, "verified_reply_count": 0,
         "reply_observed_count": 0, "paid_only_reply_count": 0,
+        "homeowner_supply_candidates": 0, "contractor_software_affiliate_candidates": 0,
         "verified_onboarded_count": 0, "recognized_revenue_cents": 0,
         "outbound_authorized": False, "traffic_authorized": False,
         "publisher_payment_authorized": False, "execution_authority": "none",
@@ -372,11 +373,26 @@ def build_publisher_recruitment_summary(prospects, delivery):
                      else "PAID_ONLY_NO_ZERO_BUDGET_FIT" if contact in paid_only_replies
                      else "GMAIL_SUBMITTED_DELIVERY_UNVERIFIED" if contact in sent
                      else "DRAFT_UNSENT")
+            vertical = candidate.get("vertical")
+            affiliate_lane = (
+                "CONTRACTOR_SOFTWARE_AFFILIATE"
+                if vertical in ("B2B_CONTRACTOR_SOFTWARE", "B2B_LEGAL_TECH")
+                else "HOMEOWNER_REFERRAL_SUPPLY"
+            )
             rows.append({
                 "domain": candidate["domain"],
                 "company": candidate.get("company"),
                 "market": candidate.get("market"),
-                "vertical": candidate.get("vertical"),
+                "vertical": vertical,
+                "revenue_lane": affiliate_lane,
+                "requires_verified_buyer_subaffiliate_permission": (
+                    affiliate_lane == "HOMEOWNER_REFERRAL_SUPPLY"
+                ),
+                "monetization_precondition": (
+                    "VERIFIED_SAAS_SALE_AND_PARTNER_TERMS"
+                    if affiliate_lane == "CONTRACTOR_SOFTWARE_AFFILIATE"
+                    else "BUYER_APPROVED_GEO_SOURCE_AND_COLLECTED_PAYOUT"
+                ),
                 "commercial_role": "TRAFFIC_SUPPLY_RESEARCH_ONLY",
                 "stage": stage,
                 "reply_observed_in_connected_gmail": contact in paid_only_replies,
@@ -399,8 +415,118 @@ def build_publisher_recruitment_summary(prospects, delivery):
             "paid_only_reply_count": len(paid_only_replies),
             "awaiting_response_count": len(sent) - bounce_count - len(paid_only_replies),
             "unsent_draft_count": len(candidates) - len(sent),
+            "homeowner_supply_candidates": sum(
+                row["revenue_lane"] == "HOMEOWNER_REFERRAL_SUPPLY"
+                for row in rows
+            ),
+            "contractor_software_affiliate_candidates": sum(
+                row["revenue_lane"] == "CONTRACTOR_SOFTWARE_AFFILIATE"
+                for row in rows
+            ),
             "items": rows,
         })
     except (ValueError, TypeError, KeyError):
         out["state"] = "HOLD_INVALID_OR_CONFLICTING_EVIDENCE"
     return out
+
+# Signed referral token and conversion-review utilities are offline only.
+# Reuse the current Revenue Distribution review; never launch a new tracker.
+from empire_os.affiliate_tracking import affiliate_tracking_capability
+
+# Six-way visibility over existing producer snapshots. This is a review
+# projection only: neither a new workflow engine nor an authority source.
+REVENUE_PIPELINE_SPECS = (
+    ("buyer_demand", ("buyer_scout", "buyer_acquisition", "buyer_capacity"),
+     "Buyer-specific buy-box, payable event, permitted supply source and terms"),
+    ("publisher_supply", (),
+     "Verified owner, consented source and buyer permission for sub-affiliates"),
+    ("owned_organic", ("search", "aeo", "crawler"),
+     "Approved first-party source, live buyer corridor and separate PPC/PPL route"),
+    ("saas_affiliates", ("catalog",),
+     "Deliverable paid SaaS product, approved affiliate terms and verified sales"),
+    ("conversion_fulfilment", ("exchange", "buyer_capacity", "conversion"),
+     "Partner-specific lead/call intake, lawful consent, acceptance and fulfilment"),
+    ("economic_memory", (),
+     "Collected payment, reversal checks, publisher costs and recognised margin"),
+)
+
+
+def build_revenue_multi_pipeline_review(report):
+    """Overlay six separate source/demand/economic queues onto one OBSERVE spine.
+
+    Every readiness is held until independent real business/operational proof.
+    A visible source, draft or public buyer page never grants traffic authority.
+    """
+    if not isinstance(report, dict):
+        raise ValueError("revenue distribution required")
+    sources = report.get("sources", {})
+    source_map = sources if isinstance(sources, dict) else {}
+    publisher = report.get("publisher_supply_recruitment", {})
+    publisher = publisher if isinstance(publisher, dict) else {}
+    valid_publisher = publisher.get("state") == "HUMAN_REVIEW_ONLY"
+    lanes = []
+    for name, dependencies, needed in REVENUE_PIPELINE_SPECS:
+        observed = {
+            key: source_map.get(key, {}).get("status", "missing_or_invalid")
+            if isinstance(source_map.get(key), dict) else "missing_or_invalid"
+            for key in dependencies
+        }
+        if name in ("publisher_supply", "saas_affiliates"):
+            evidence_state = "REVIEW_ONLY" if valid_publisher else "HOLD_EVIDENCE_UNAVAILABLE"
+        else:
+            evidence_state = "REVIEW_ONLY" if any(
+                state == "available" for state in observed.values()
+            ) else "HOLD_EVIDENCE_UNAVAILABLE"
+        if name == "economic_memory":
+            evidence_state = "HOLD_PAYMENT_EVIDENCE_UNAVAILABLE"
+        counters = {}
+        if name == "publisher_supply" and valid_publisher:
+            counters = {
+                "researched_source_count": publisher.get("homeowner_supply_candidates"),
+                "awaiting_reply_count": publisher.get("awaiting_response_count"),
+                "verified_onboarded_count": publisher.get("verified_onboarded_count"),
+            }
+        elif name == "saas_affiliates" and valid_publisher:
+            counters = {
+                "researched_b2b_referrer_count": publisher.get(
+                    "contractor_software_affiliate_candidates"
+                ),
+                "verified_onboarded_count": publisher.get("verified_onboarded_count"),
+            }
+        elif name == "economic_memory":
+            counters = {
+                "publisher_cohort_recognized_revenue_cents":
+                    publisher.get("recognized_revenue_cents")
+                    if valid_publisher else None,
+                "verified_publisher_paid_outcomes": None,
+            }
+        lanes.append({
+            "pipeline": name,
+            "evidence_state": evidence_state,
+            "source_statuses": observed,
+            "observed_research_counts_not_revenue": counters,
+            "missing_activation_evidence": needed,
+            "live_traffic_authorized": False,
+            "outbound_authorized": False,
+            "terms_or_payout_authorized": False,
+            "collected_revenue_verified_here": False,
+            "execution_authority": "none",
+        })
+    return {
+        "schema_version": "empire.revenue_multi_pipeline_review.v1",
+        "mode": "OBSERVE",
+        "readiness_source": "existing_empire_revenue_distribution_snapshots",
+        "independent_pipeline_count": len(lanes),
+        "canonical_business_database": "EmpireDB",
+        "parallel_queues_not_new_schedulers": True,
+        "compliance_and_economic_truth_shared": True,
+        "new_service_installed": False,
+        "automatic_dispatch_authorized": False,
+        "execution_authority": "none",
+        "affiliate_tracking": affiliate_tracking_capability(
+            researched_sources=publisher.get("candidate_count")
+            if valid_publisher and type(publisher.get("candidate_count")) is int
+            else None,
+        ),
+        "pipelines": lanes,
+    }

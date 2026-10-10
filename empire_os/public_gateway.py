@@ -26,6 +26,12 @@ from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
 from empire_os.lead_smart_public_coverage_api import router as roofing_coverage_router
+from empire_os.affiliate_ingress import (
+    SAFE_RESPONSE_HEADERS as AFFILIATE_SAFE_HEADERS,
+    allowed_gateway_host,
+    create_affiliate_ingress_router,
+    reserved_affiliate_host,
+)
 from empire_os.a2a_discovery import commerce_discovery_manifest
 from empire_os.a2a_runtime import load_a2a_runtime
 from empire_os.aeo_release import released_file as released_aeo_file, released_paths as released_aeo_paths
@@ -71,6 +77,7 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(roofing_coverage_router)
+app.include_router(create_affiliate_ingress_router())
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
 
@@ -118,7 +125,20 @@ def _site_csp(route: str) -> str:
 
 @app.middleware("http")
 async def security_headers(request, call_next):
-    response = await call_next(request)
+    # A separate affiliate Host may use this same FastAPI process only for
+    # explicitly reserved, noncommercial paths. Never expose main-site
+    # checkout, research, A2A, cookie-bearing pages or dynamic APIs there.
+    if (not allowed_gateway_host(request)
+            or reserved_affiliate_host(request)
+            and request.url.path != "/v1/affiliate/status"
+            and not request.url.path.startswith("/r/")):
+        response = JSONResponse(
+            status_code=404,
+            content={"detail": "Not Found"},
+            headers=AFFILIATE_SAFE_HEADERS,
+        )
+    else:
+        response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     if request.url.path.startswith("/avatar/presence"):
@@ -132,6 +152,12 @@ async def security_headers(request, call_next):
             "img-src 'self' data:; media-src 'self' blob:; "
             "object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
         )
+    elif (not allowed_gateway_host(request)
+          or reserved_affiliate_host(request)
+          or request.url.path == "/v1/affiliate/status"
+          or request.url.path.startswith("/r/")):
+        for name, value in AFFILIATE_SAFE_HEADERS.items():
+            response.headers[name] = value
     else:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Content-Security-Policy"] = _site_csp(
@@ -980,6 +1006,10 @@ async def avatar_presence_runtime_css_proxy(request: Request):
 
 @app.websocket("/avatar/presence/ws")
 async def avatar_presence_ws_proxy(websocket: WebSocket):
+    # Affiliate Host never inherits our private avatar WebSocket proxy.
+    if not allowed_gateway_host(websocket) or reserved_affiliate_host(websocket):
+        await websocket.close(code=4404)
+        return
     cookie = str(websocket.headers.get("cookie") or "").strip()
     if not cookie or "empire_avatar_presence=" not in cookie:
         await websocket.close(
