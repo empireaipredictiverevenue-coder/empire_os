@@ -188,3 +188,138 @@ def test_migration_is_no_auto_credentials_or_authority():
     assert "CREATE ROLE " not in sql
     assert "INSERT INTO " not in sql
     assert "PASSWORD " not in sql
+
+
+def test_prepared_042_invite_only_login_and_signed_crm_token(membership_pg):
+    """End-to-end local PG18: credential -> membership -> Ed25519 read JWT."""
+    from datetime import datetime, timezone
+    import time
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives import serialization
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from empire_os.revenue_crm_first_party_login import (
+        hash_invited_password, PostgresCrmPasswordLogin,
+        build_account_bound_membership_lookup, create_crm_login_router,
+    )
+    from empire_os.revenue_crm_signed_auth import (
+        EmpireDbCrmMembershipReader, SignedCrmTenantVerifier,
+    )
+
+    run, sock, port = membership_pg
+    root = Path(__file__).resolve().parents[1]
+    migration42 = root / "migrations/empiredb/042_crm_first_party_login.sql"
+    assert "PREPARED ONLY" in migration42.read_text()
+    run(file=migration42)
+
+    # NO rights for any application by default; 042 applies zero real users.
+    assert run("SELECT count(*) FROM public.empire_crm_login_credentials") == "0"
+    assert run("""SELECT has_table_privilege(
+        'empiredb_app','public.empire_crm_login_credentials','SELECT');""") == "f"
+    run("SELECT count(*) FROM public.empire_crm_login_credentials;",
+        user="crm_unbound_fixture", check=False)
+    assert run("""SELECT relrowsecurity FROM pg_class
+        WHERE oid='public.empire_crm_login_credentials'::regclass;""") == "t"
+
+    # Fixture operator actions ONLY: no production role, secret or membership.
+    import secrets
+    salt = secrets.token_bytes(32)
+    password = "test-only-long-invite-passphrase-123"
+    digest = hash_invited_password(password, salt)
+    subject = "pilot:verified"
+    email = "pilot@example.invalid"
+    run("""
+        CREATE ROLE empire_crm_auth_login LOGIN NOINHERIT;
+        GRANT SELECT ON public.empire_crm_login_credentials
+          TO empire_crm_auth_login;
+        GRANT UPDATE(failed_attempts,locked_until,last_login_at,updated_at)
+          ON public.empire_crm_login_credentials TO empire_crm_auth_login;
+        GRANT EXECUTE ON FUNCTION public.empire_crm_read_member(text,uuid)
+          TO empire_crm_membership_login;
+    """)
+    run(f"""
+        INSERT INTO public.empire_crm_login_credentials
+          (subject,login_email,password_salt,password_digest,status,
+           evidence_ref,password_change_required,verified_at)
+        VALUES ('{subject}','{email}',decode('{salt.hex()}','hex'),
+            decode('{digest.hex()}','hex'),'active','fixture:pilot-proof',false,now());
+        INSERT INTO public.empire_crm_tenant_memberships
+          (tenant_id,subject,role,status,evidence_ref,verified_at)
+        VALUES ('{A}','{subject}','viewer','active','fixture:pilot-proof',now());
+    """)
+    auth_dsn = (f"host={sock} port={port} dbname=crm_membership_fixture "
+                "user=empire_crm_auth_login")
+    membership_dsn = auth_dsn.replace(
+        "user=empire_crm_auth_login", "user=empire_crm_membership_login"
+    )
+    password_login = PostgresCrmPasswordLogin(auth_dsn)
+    member_reader = EmpireDbCrmMembershipReader(membership_dsn)
+    active_member = build_account_bound_membership_lookup(
+        password_login, member_reader,
+    )
+    private_key = Ed25519PrivateKey.generate()
+    public_key = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    app = FastAPI()
+    app.include_router(create_crm_login_router(
+        password_login=password_login,
+        load_membership=active_member,
+        signing_key=private_key, key_id="test-issuer",
+    ))
+    client = TestClient(app)
+    data = {"email": email, "password": password, "tenant_id": A}
+
+    # Signed token was really derived from a user credential and live evidence.
+    success = client.post("/v1/revenue-crm/auth/login", json=data)
+    assert success.status_code == 200, success.text
+    assert success.headers["cache-control"] == "no-store"
+    token = success.json()["access_token"]
+    verifier = SignedCrmTenantVerifier(
+        {"test-issuer": public_key}, load_membership=active_member
+    )
+    assert verifier.authenticate(token) == A
+    assert success.json()["expires_in"] == 300
+
+    # Can't spoof another tenant, even with correct human password.
+    assert client.post("/v1/revenue-crm/auth/login", json={
+        **data, "tenant_id": B,
+    }).status_code == 401
+
+    # Credentialed login, but zero membership after revoke.
+    run(f"""UPDATE public.empire_crm_tenant_memberships
+             SET status='disabled',revoked_at=now()
+             WHERE subject='{subject}' AND tenant_id='{A}';""")
+    assert client.post("/v1/revenue-crm/auth/login", json=data).status_code == 401
+    import pytest
+    with pytest.raises(ValueError, match="membership"):
+        verifier.authenticate(token)
+
+    # Restore fixture membership to prove password failure counter/lockout.
+    run(f"""UPDATE public.empire_crm_tenant_memberships
+             SET status='active',revoked_at=NULL
+             WHERE subject='{subject}' AND tenant_id='{A}';""")
+    for attempt in range(5):
+        bad = client.post("/v1/revenue-crm/auth/login", json={
+            **data, "password": "incorrect-test-password-over-14",
+        })
+        assert bad.status_code == 401
+    assert run(f"""SELECT failed_attempts FROM public.empire_crm_login_credentials
+        WHERE subject='{subject}';""") == "5"
+    # Correct secret does NOT bypass the lockout.
+    assert client.post("/v1/revenue-crm/auth/login", json=data).status_code == 401
+
+    # Disabled identity is not valid even if operator resets failed attempts.
+    run(f"""UPDATE public.empire_crm_login_credentials
+        SET failed_attempts=0,locked_until=NULL,status='disabled'
+        WHERE subject='{subject}';""")
+    assert client.post("/v1/revenue-crm/auth/login", json=data).status_code == 401
+    with pytest.raises(ValueError, match="membership"):
+        verifier.authenticate(token)  # disabled account revokes existing JWT
+
+    # Unbound login has no credential authority even if given a matching DSN.
+    assert PostgresCrmPasswordLogin(
+        auth_dsn.replace("user=empire_crm_auth_login", "user=crm_unbound_fixture")
+    ).authenticate(email, password) is None
+    run(file=migration42,check=False)
