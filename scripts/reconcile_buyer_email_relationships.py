@@ -16,6 +16,7 @@ import tempfile
 from empire_os.commercial_relationship_registry import (
     RelationshipEvidenceError, reconcile,
     attach_partner_inbound_requirements,
+    attach_known_company_public_demand,
 )
 
 from empire_os.commercial_social_intent import build_social_intent_review
@@ -67,6 +68,18 @@ def build(root: Path = ROOT) -> dict:
             "observations": [],
         }
     attach_partner_inbound_requirements(result, reviewed)
+    demand_path = base / "known_company_public_demand_review_latest.json"
+    if demand_path.exists():
+        demand_review = _read_private(
+            demand_path, limit=25000, require_private=True,
+        )
+    else:
+        demand_review = {
+            "schema_version": "empire.public_network_demand_review.v1",
+            "origin": "human_reviewed_public_business_sources",
+            "observations": [],
+        }
+    attach_known_company_public_demand(result, demand_review)
     # This is evidence-only enrichment. A missing collector must not block
     # an already valid Gmail/relationship registry.
     try:

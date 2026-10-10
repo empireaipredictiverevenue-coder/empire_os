@@ -822,3 +822,145 @@ def reconcile(
         "execution_authority": "NONE",
         "relationships": result,
     }
+
+
+# Operational evidence review of company-published recruitment notices.
+# A social post is not a buy-box, company authority proof or outreach approval.
+def classify_publisher_demand_post(excerpt: str) -> str:
+    text = excerpt.lower()
+    buyer = bool(re.search(
+        r"\b(?:actively buying|currently buying|we(?:'re| are) buying|"
+        r"looking for (?:quality |reliable |inbound call )?publishers|"
+        r"onboarding (?:inbound call )?publishers|"
+        r"buying (?:home services |quality )?calls)\b", text,
+    ))
+    if re.search(r"\b(?:not|no longer|stopped)\s+(?:actively\s+)?buying\b", text):
+        buyer = False
+    supplier = bool(re.search(
+        r"\b(?:looking for (?:new |direct )?(?:call )?buyers|"
+        r"looking to (?:sell|find buyers)|"
+        r"(?:we(?:'re| are) )?(?:selling|offering) (?:inbound |quality )?calls|"
+        r"calls available|calls for sale)\b", text,
+    ))
+    if buyer and supplier:
+        return "MIXED_BUY_AND_SELL_CLAIMS"
+    if buyer:
+        return "PUBLIC_PUBLISHER_RECRUITMENT_CLAIM"
+    if supplier:
+        return "PUBLIC_CALL_SUPPLY_PITCH"
+    return "UNCLASSIFIED_NETWORK_PROMOTION"
+
+
+def attach_known_company_public_demand(report: dict[str, Any], reviewed: Mapping[str, Any]) -> dict[str, Any]:
+    """Attach manually reviewed public demand to KNOWN companies, never CRM promotion."""
+    from urllib.parse import urlparse
+    if (not isinstance(reviewed, Mapping)
+            or reviewed.get("schema_version") != "empire.public_network_demand_review.v1"
+            or reviewed.get("origin") != "human_reviewed_public_business_sources"):
+        raise RelationshipEvidenceError("untrusted_public_demand_source")
+    items = reviewed.get("observations")
+    if not isinstance(items, list) or len(items) > 12:
+        raise RelationshipEvidenceError("invalid_public_demand_count")
+    companies = {d: r for r in report["relationships"]
+                 for d in r.get("identity_domains", [])}
+    results = []
+    seen = set()
+    for item in items:
+        if not isinstance(item, Mapping) or set(item) != {
+            "entity_key", "source_url", "observed_date", "post_excerpt",
+            "attribution_type", "caution_codes", "official_site_evidence_url",
+        }:
+            raise RelationshipEvidenceError("invalid_public_demand_shape")
+        domain = item["entity_key"]
+        url = item["source_url"]
+        excerpt = item["post_excerpt"]
+        day = item["observed_date"]
+        site = item["official_site_evidence_url"]
+        if (not isinstance(domain, str) or domain not in companies
+                or companies[domain]["entity_key"] in seen):
+            raise RelationshipEvidenceError("unknown_or_duplicate_known_company")
+        rec = companies[domain]
+        seen.add(rec["entity_key"])
+        if (not isinstance(url, str) or len(url) > 700
+                or not isinstance(excerpt, str) or len(excerpt) > 650
+                or len(excerpt.strip()) < 28
+                or any(ord(c) < 32 for c in excerpt)):
+            raise RelationshipEvidenceError("unsafe_public_demand_evidence")
+        try:
+            parsed = urlparse(url)
+            host = (parsed.hostname or "").lower()
+        except (TypeError, ValueError):
+            raise RelationshipEvidenceError("bad_public_source_url")
+        if (parsed.scheme != "https" or host not in
+                ("www.linkedin.com", "linkedin.com", domain, "www." + domain)):
+            raise RelationshipEvidenceError("wrong_public_source_host")
+        site_host = urlparse(site).hostname if isinstance(site, str) else None
+        if (not isinstance(site, str) or len(site) > 700
+                or urlparse(site).scheme != "https"
+                or site_host not in (domain, "www." + domain)):
+            raise RelationshipEvidenceError("site_corroboration_host_mismatch")
+        if not isinstance(day, str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            raise RelationshipEvidenceError("invalid_public_review_date")
+        try:
+            checked = datetime.strptime(day, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise RelationshipEvidenceError("invalid_public_review_date") from exc
+        generated = when(report.get("generated_at"))
+        if generated is None or checked > generated.date():
+            raise RelationshipEvidenceError("public_review_from_future")
+        if item["attribution_type"] not in (
+            "COMPANY_PAGE", "NAMED_PERSON_SELF_IDENTIFIED",
+        ):
+            raise RelationshipEvidenceError("unreviewed_company_attribution")
+        cautions = item["caution_codes"]
+        allowed = {"EXAMPLE_PHONE_NUMBER_ON_WEBSITE",
+                   "BIDIRECTIONAL_BUYER_AND_SELLER_NETWORK",
+                   "POSSIBLE_TEMPLATE_CONTACT_DETAILS_ON_WEBSITE",
+                   "POST_PUBLICATION_DATE_NOT_INDEPENDENTLY_VERIFIED"}
+        if (not isinstance(cautions, list) or len(cautions) > 3
+                or any(x not in allowed for x in cautions)
+                or len(set(cautions)) != len(cautions)):
+            raise RelationshipEvidenceError("untrusted_public_caution_codes")
+        kind = classify_publisher_demand_post(excerpt)
+        entry = {
+            "entity_key": rec["entity_key"],
+            "domain": domain,
+            "company": rec["company"],
+            "previous_contact_stage": rec["stage"],
+            "previous_outreach_observed": bool(rec.get("last_outbound_at")),
+            "source_url": url,
+            "official_site_evidence_url": site,
+            "observed_date": day,
+            "post_publication_date_verified": False,
+            "excerpt_sha256": sha256(excerpt.encode("utf-8")).hexdigest(),
+            "post_role_class": kind,
+            "source_attribution_type": item["attribution_type"],
+            "caution_codes": cautions,
+            "buyer_campaign_active_confirmed": False,
+            "current_geography_and_price_verified": False,
+            "sender_or_speaker_contact_verified": False,
+            "recontact_requires_suppression_and_founder_review": True,
+            "outbound_authorized": False,
+            "execution_authority": "NONE",
+        }
+        results.append(entry)
+        rec["public_buying_pulse_review"] = entry
+    results.sort(key=lambda x: (
+        0 if x["post_role_class"] == "PUBLIC_PUBLISHER_RECRUITMENT_CLAIM" else 1,
+        x["entity_key"],
+    ))
+    report["known_company_public_demand_review"] = {
+        "schema_version": "empire.known_company_public_demand_review.v1",
+        "mode": "OBSERVE",
+        "reviewed_known_companies": len(results),
+        "explicit_publisher_recruitment_claims": sum(
+            x["post_role_class"] == "PUBLIC_PUBLISHER_RECRUITMENT_CLAIM"
+            for x in results
+        ),
+        "verified_new_buyers": 0,
+        "verified_call_capacity": 0,
+        "outbound_sent": False,
+        "execution_authority": "NONE",
+        "rows": results,
+    }
+    return report

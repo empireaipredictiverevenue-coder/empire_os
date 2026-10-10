@@ -49,3 +49,70 @@ first-party published eligibility until we have **independently confirmed
 buyer replies and payable outcomes**. No publisher has approved EmpireOS
 to send traffic by virtue of a source path, and a domain count is not
 a conversion/precision metric.
+
+
+## 10 October — known-company buyer-demand pulse, not new buyer count
+
+A second research pass discovered **fresh or recently visible publisher recruitment
+claims from companies EmpireOS had already emailed**. The domain count would
+miss them, so the existing commercial registry now accepts a private, bounded
+`known_company_public_demand_review_latest.json` evidence file from
+human-reviewed first-party pages or company-linked LinkedIn profiles.
+
+| Existing company | Independently attributable public evidence | Research classification | Commercial issue |
+|---|---|---|---|
+| 1st Choice Marketing / 1stcm.net | https://www.linkedin.com/in/jason-kashou-1b662186 and official founder corroboration at https://www.1stcm.net/about/ | Public home-services publisher recruitment claimed; roofing is named | Prior September outreach unanswered; no fresh buy-box, terms or approval |
+| MutualCall / mutualcall.com | https://www.linkedin.com/company/mutualcall and https://mutualcall.com/ | Publisher recruitment claimed for roofing, but the same network also **advertises calls for sale to buyers**; do not merge buyer- and seller-facing posts | Prior September outreach unanswered; both directions exist, exact role/campaign must be confirmed |
+| Omni Call Network / omnicallnetwork.com | https://www.linkedin.com/company/omni-call-network and https://omnicallnetwork.com/services | Publisher recruitment claimed for home-services roofing, with SEO described as accepted; other posts seek buyers | Prior September outreach unanswered. Public consumer-service page lists `555-010x` example routing numbers, so it is **not** runtime proof of a working consumer call route |
+
+These posts were reviewed on **2026-10-10**. Their actual publication
+timestamps are **not independently established** by a date-scoped source,
+and the registry records that distinction. A public post is not an accepted
+buy-box, real traffic capacity, valid recipient, partner contract, payable
+call or verified commercial outcome.
+
+### Rules taught to the existing commercial scout
+
+1. **Buyer role polarity**: explicit "buying calls / onboarding publishers"
+   is publisher demand; "we have calls available / looking for buyers" is
+   a supply-side pitch. If both occur in a single excerpt, mark MIXED and
+   hold. Generic network advertisements are not buying intent.
+2. **Existing-contact memory**: match against canonical company/domain
+   identities and retain all prior emailed threads, suppression state,
+   founder review requirements and the unchanged commercial stage. A new
+   social post is not permission to send a duplicate email.
+3. **Evidence quality**: trace a specific company source URL to a same-host
+   official site, preserve source-date uncertainty and distinguish public
+   marketing claims from live tracking, phone and payout verification.
+4. **Comparable yield**: count independently corroborated novel publisher
+   programmes and known-company demand reactivation separately. Neither
+   is a realised revenue measure, and no model should claim conversion
+   superiority until campaign acceptance and paid-call outcomes exist.
+
+### Revised cold-start priorities
+
+**Polyares first for small controlled volume**: official call-publisher
+programme says one category, one state, one tracked number is an appropriate
+test and written rates follow approval:
+https://www.polyares.com/pay-per-call-affiliate-program .
+
+**eLocal next, conditional on supply capacity**: its publisher programme
+expressly conditions weekly publisher payments on an agreed minimum monthly
+call volume and has a more detailed affiliate questionnaire:
+https://www.elocal.com/affiliate-contact/ .
+
+Both remain uncontacted, unapproved research opportunities.
+Known-network reactivation should be via a founder-reviewed, suppression-
+checked single contextual follow-up, not a fresh introduction.
+Warm LeadBank, Validated and Connexis stay ahead for revenue.
+
+
+**Quality caveat (1st Choice):** The company's public homepage
+(https://www.1stcm.net/) contains apparent template/testimonial and
+contact placeholders (for example an illustrative name and a clearly
+nonstandard phone number). Its About page separately names Jason Kashou,
+but neither page proves a buyer's operational routing. Mark as
+`POSSIBLE_TEMPLATE_CONTACT_DETAILS_ON_WEBSITE` for diligence, not
+as a categorical fraud finding. This and Omni's example `555`
+numbers are the kind of false operational proof the research should
+penalise instead of overlooking.

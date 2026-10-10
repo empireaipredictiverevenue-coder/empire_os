@@ -740,3 +740,112 @@ def test_reported_requirement_ledger_file_is_private_and_optional(tmp_path):
     path.chmod(0o600)
     with pytest.raises(RelationshipEvidenceError,match="unknown_or_duplicate_partner_terms"):
         build(root)  # Fixture lacks the required LeadBank canonical relationship
+
+
+def test_network_public_posts_distinguish_buyers_from_sellers():
+    from empire_os.commercial_relationship_registry import classify_publisher_demand_post
+    assert classify_publisher_demand_post(
+        "We are actively buying inbound calls in roofing and HVAC. Looking for publishers."
+    ) == "PUBLIC_PUBLISHER_RECRUITMENT_CLAIM"
+    assert classify_publisher_demand_post(
+        "Customer-initiated inbound calls available. We are offering inbound calls, looking for buyers."
+    ) == "PUBLIC_CALL_SUPPLY_PITCH"
+    assert classify_publisher_demand_post(
+        "We are actively buying calls and also looking for buyers for our calls."
+    ) == "MIXED_BUY_AND_SELL_CLAIMS"
+    assert classify_publisher_demand_post(
+        "We help home-services businesses grow their customer base."
+    ) == "UNCLASSIFIED_NETWORK_PROMOTION"
+    assert classify_publisher_demand_post(
+        "We are not buying calls at the moment."
+    ) == "UNCLASSIFIED_NETWORK_PROMOTION"
+
+
+def _reviewed_known_company_public_post():
+    return {
+        "schema_version":"empire.public_network_demand_review.v1",
+        "origin":"human_reviewed_public_business_sources",
+        "observations":[{
+            "entity_key":"newbuyer.com",
+            "source_url":"https://www.linkedin.com/company/newbuyer",
+            "official_site_evidence_url":"https://newbuyer.com/about",
+            "observed_date":"2026-10-10",
+            "post_excerpt":"We are actively buying home services calls, and looking for reliable publishers with genuine roofing traffic.",
+            "attribution_type":"COMPANY_PAGE",
+            "caution_codes":["POST_PUBLICATION_DATE_NOT_INDEPENDENTLY_VERIFIED"],
+        }],
+    }
+
+
+def test_known_company_recruiting_post_enriches_existing_record_not_buyer_count():
+    from empire_os.commercial_relationship_registry import attach_known_company_public_demand
+    src,queue,qual=sources()
+    report=reconcile(src,queue,qual,now=datetime(2026,10,10,1,0,tzinfo=timezone.utc))
+    original_count=report["relationship_count"]
+    stage=next(x["stage"] for x in report["relationships"] if x["entity_key"]=="no-reply")
+    out=attach_known_company_public_demand(report,_reviewed_known_company_public_post())
+    pulse=out["known_company_public_demand_review"]
+    assert pulse["reviewed_known_companies"]==1
+    assert pulse["explicit_publisher_recruitment_claims"]==1
+    assert pulse["verified_new_buyers"]==0
+    assert pulse["verified_call_capacity"]==0
+    assert pulse["rows"][0]["previous_outreach_observed"] is True
+    assert pulse["rows"][0]["recontact_requires_suppression_and_founder_review"] is True
+    assert pulse["rows"][0]["post_publication_date_verified"] is False
+    assert out["relationship_count"]==original_count
+    assert next(x["stage"] for x in out["relationships"] if x["entity_key"]=="no-reply")==stage
+    assert out["outbound_authorized"] is False
+
+
+@pytest.mark.parametrize("mutation",[
+    lambda d:d["observations"][0].update(entity_key="not-in-CRM.com"),
+    lambda d:d["observations"][0].update(source_url="https://linkedin.com.evil.net/a"),
+    lambda d:d["observations"][0].update(official_site_evidence_url="https://newbuyer.com.evil.org/a"),
+    lambda d:d["observations"][0].update(observed_date="2026-12-01"),
+    lambda d:d["observations"][0].update(post_excerpt="x"),
+    lambda d:d["observations"][0].update(traffic_authorized=True),
+    lambda d:d["observations"][0].update(caution_codes=["APPROVED_BUYER"]),
+    lambda d:d["observations"].append(copy.deepcopy(d["observations"][0])),
+])
+def test_public_demand_import_rejects_untrusted_or_privileged_evidence(mutation):
+    from empire_os.commercial_relationship_registry import attach_known_company_public_demand
+    src,queue,qual=sources()
+    doc=_reviewed_known_company_public_post()
+    mutation(doc)
+    with pytest.raises(RelationshipEvidenceError):
+        attach_known_company_public_demand(
+            reconcile(src,queue,qual,now=datetime(2026,10,10,2,0,tzinfo=timezone.utc)),
+            doc,
+        )
+
+
+def test_private_public_company_demand_integrates_without_sending(tmp_path):
+    root = tmp_path
+    base = root / "runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    src, queue, qual = sources()
+    for name, contents in (
+        ("gmail_relationship_evidence_latest.json",src),
+        ("candidate_queue_latest.json",queue),
+        ("founder_qualification_actions_latest.json",qual),
+    ):
+        f=base/name
+        f.write_text(json.dumps(contents))
+        f.chmod(0o600)
+    file=base/"known_company_public_demand_review_latest.json"
+    file.write_text(json.dumps(_reviewed_known_company_public_post()))
+    file.chmod(0o644)
+    with pytest.raises(RelationshipEvidenceError,match="not_private"):
+        build(root)
+    file.chmod(0o600)
+    result=build(root)
+    data=result["known_company_public_demand_review"]
+    assert data["reviewed_known_companies"] == 1
+    assert data["verified_new_buyers"] == 0
+    assert result["relationship_count"] == 5
+    assert result["outbound_authorized"] is False
+    assert result["outbound_sent"] is False
+    # Evidence attaches to the original named company, not a new CRM row.
+    record=next(x for x in result["relationships"] if x["entity_key"]=="no-reply")
+    assert record["public_buying_pulse_review"]["domain"] == "newbuyer.com"
+    assert record["stage"] == "CONTACTED_AWAITING_RESPONSE"
