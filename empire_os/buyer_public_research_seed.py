@@ -300,6 +300,15 @@ def build_public_research_seeds(
             )
 
     seeds = sorted(by_domain.values(), key=lambda row: row["domain"])
+    observed_from_queries = {
+        row["domain"] for row in seeds if row["source_queries"]
+    }
+    query_result_status = (
+        "NO_SEARCH_QUERIES" if not query_texts
+        else "SEARCH_BACKEND_EXCEPTION" if errors
+        else "FRESH_DOMAIN_RESULTS_OBSERVED" if observed_from_queries
+        else "NO_FRESH_DOMAIN_RESULTS_PROVIDER_HEALTH_UNVERIFIED"
+    )
     return {
         "schema_version": "empire.buyer_public_research_seeds.v1",
         "mode": "OBSERVE",
@@ -311,6 +320,9 @@ def build_public_research_seeds(
             "local_volume": sum(row.get("source") == "rotating_volume_wave" for row in queries),
         },
         "publisher_first_queries_are_discovery_hints_only": True,
+        "fresh_search_domain_count": len(observed_from_queries),
+        "fresh_search_result_status": query_result_status,
+        "search_provider_health_independently_verified": False,
         "source_method_comparison": compare_seed_methods(
             seeds, queries, known_registry_domains,
         ),
@@ -373,7 +385,9 @@ def compare_seed_methods(
             else "dynamic_buyer"
         ) for x in queries
     }
-    pools: dict[str, set[str]] = {}
+    pools: dict[str, set[str]] = {
+        method: set() for method in query_method.values()
+    }
     for row in seeds:
         for query in row.get("source_queries") or []:
             kind = query_method.get(query)

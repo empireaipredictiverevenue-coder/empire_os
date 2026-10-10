@@ -116,3 +116,27 @@ but neither page proves a buyer's operational routing. Mark as
 as a categorical fraud finding. This and Omni's example `555`
 numbers are the kind of false operational proof the research should
 penalise instead of overlooking.
+
+
+### Live-search provider result — 10 October 2026 (not a conversion win)
+
+A bounded two-query run through the existing EmpireOS search fabric
+returned **zero fresh domain results**. Diagnostics included Bing RSS
+timeout/circuit-open, DuckDuckGo HTML/Lite HTTP 202/circuit-open,
+Mojeek HTTP 403/circuit-open and non-relevant Bing HTML/RSS results.
+The seed stage's Python API returned without raising an exception, so its
+prior `error_count=0` was **not** evidence that search providers were healthy.
+
+The existing `buyer_public_research_seed.py` now reports independent
+`fresh_search_domain_count`, `fresh_search_result_status`, query-method
+result counts including explicit zeroes, and
+`search_provider_health_independently_verified=false`. It keeps separately
+the four independently reviewed publisher programme seeds. They were
+**not** discovered by the failed fresh run.
+
+This identifies an actual operational blocker: search fabric availability
+and extraction quality. Future improvement should independently verify
+search source health, avoid repeated failed provider retries and leverage
+bounded first-party site evidence without paying for third-party scraping.
+Do not interpret code tests, zero exceptions or existing static seeds
+as productive search yield.

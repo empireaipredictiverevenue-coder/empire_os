@@ -259,3 +259,35 @@ def test_existing_scout_refresh_reads_actual_canonical_registry_without_writes(t
     path=tmp_path/"runtime/buyer_acquisition/public_research_seeds.json"
     assert path.exists()
     assert json.loads(path.read_text())["source_method_comparison"]==comparison
+
+
+def test_zero_fresh_domains_is_not_reported_as_successful_discovery():
+    from empire_os.buyer_public_research_seed import build_public_research_seeds
+    result=build_public_research_seeds(
+        {},search_fn=lambda q,num:{},
+        max_queries=2,include_volume=False,
+        known_registry_domains={"leadsmartinc.com"},
+        observed_at=datetime(2026,10,10,tzinfo=timezone.utc)
+    )
+    assert result["query_strategy_counts"]["publisher_first"]==2
+    assert result["fresh_search_domain_count"]==0
+    assert result["fresh_search_result_status"]=="NO_FRESH_DOMAIN_RESULTS_PROVIDER_HEALTH_UNVERIFIED"
+    assert result["search_provider_health_independently_verified"] is False
+    assert result["error_count"]==0  # search-fabric returned empty, did not raise
+    assert result["source_method_comparison"]["query_methods"]["publisher_first"]["discovered_domains"]==0
+    assert result["seed_count"]>0  # curated existing seeds, not fresh hits
+    assert result["outbound_sent"] is False
+
+
+def test_real_query_domain_is_separated_from_static_seed_pool():
+    from empire_os.buyer_public_research_seed import build_public_research_seeds
+    result=build_public_research_seeds(
+        {},search_fn=lambda q,num:{q[0]:["newpartner.example"]},
+        max_queries=2,include_volume=False,
+        known_registry_domains=set(),
+        observed_at=datetime(2026,10,10,tzinfo=timezone.utc)
+    )
+    assert result["fresh_search_domain_count"]==1
+    assert result["fresh_search_result_status"]=="FRESH_DOMAIN_RESULTS_OBSERVED"
+    assert result["source_method_comparison"]["query_methods"]["publisher_first"]["discovered_domains"]==1
+    assert result["source_method_comparison"]["query_methods"]["publisher_first"]["verified_buyer_approvals"]==0
