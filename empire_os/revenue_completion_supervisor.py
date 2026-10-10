@@ -257,6 +257,7 @@ PORTFOLIO_SOURCES = {
     "payment": "runtime/orders_payments_revenue_control/orders_payments_revenue_runtime_latest.json",
     "funnel": "runtime/commercial_funnel/latest.json",
     "contractors": "runtime/revenue_strike/contractor_founder_review_latest.json",
+    "claims_research": "runtime/claims_exchange/research_latest.json",
 }
 PORTFOLIO_SCHEMAS = {
     "catalog": "empire.commercial-product-catalog.v1",
@@ -267,6 +268,7 @@ PORTFOLIO_SCHEMAS = {
     "payment": "empire-orders-payments-revenue-runtime-control-v1",
     "funnel": "empire.founder_commercial_funnel.v1",
     "contractors": "empire.revenue_strike.contractor_founder_review.v1",
+    "claims_research": "empire.claims_exchange.existing_sources_preview_v2",
 }
 PORTFOLIO_GATES = (
     "real_counterparty", "current_buy_box_or_customer_need",
@@ -418,6 +420,33 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
     exchange = sources["exchange"]
     smart = sources["lead_smart"]
     contractor = sources["contractors"]
+    claims_research = sources["claims_research"]
+    claims_summary = (
+        claims_research.get("summary")
+        if isinstance(claims_research, Mapping) else None
+    )
+    claims_as_of = (
+        claims_research.get("as_of") if isinstance(claims_research, Mapping) else None
+    )
+    # Published programme pages are research leads, not a carrier buyer.
+    # A historical preview must not imply today's available network capacity.
+    claims_date = None
+    if isinstance(claims_as_of, str):
+        try:
+            claims_date = datetime.fromisoformat(claims_as_of).date()
+        except ValueError:
+            pass
+    claims_age = (
+        (datetime.now(timezone.utc).date() - claims_date).days
+        if claims_date is not None else None
+    )
+    claims_current = (
+        isinstance(claims_summary, Mapping)
+        and type(claims_age) is int and 0 <= claims_age <= 7
+        and claims_research.get("mode") == "OBSERVE"
+        and claims_research.get("outbound_authorized") is False
+        and claims_research.get("execution_authority") == "none"
+    )
     payment = sources["payment"]
     funnel = sources["funnel"]
 
@@ -464,6 +493,10 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
             blockers.append("ENTERPRISE_TARGET_REVIEW_UNAVAILABLE")
         if key in {"insurance_carrier_network", "claims_settlement_regulated"}:
             blockers.append("CARRIER_VENDOR_PROGRAMME_NOT_PROOF_OF_PURCHASE")
+            if not claims_current:
+                blockers.append("CURRENT_CLAIMS_RESEARCH_EVIDENCE_UNAVAILABLE")
+            elif claims_summary.get("founder_review_ready") == 0:
+                blockers.append("NO_INDEPENDENTLY_QUALIFIED_CLAIMS_BUYER")
         if key == "contractor_direct" and contractor is None:
             blockers.append("CONTRACTOR_FOUNDER_REVIEW_UNAVAILABLE")
         stage = ("ENGAGED_AWAITING_VERIFIED_BUY_BOX" if counterparty
@@ -482,6 +515,12 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
                 previous_full_request_count if key == "lead_calls" else 0
             ),
             "new_request_authorized": False,
+            "claims_research_current": (
+                claims_current if key in (
+                    "insurance_carrier_network", "claims_settlement_regulated",
+                    "contractor_direct",
+                ) else None
+            ),
             "blocking_evidence": blockers, "next_evidence_task": next_action,
             "legal_gate_required": key in (
                 "insurance_carrier_network", "claims_settlement_regulated",
@@ -508,6 +547,14 @@ def stream_portfolio_status(root: Path = ROOT) -> dict[str, Any]:
             exchange.get("buyer_seat_count") if exchange else None),
         "exchange_verified_market_price_count": (
             exchange.get("verified_market_price_count") if exchange else None),
+        "claims_research": {
+            "current": claims_current,
+            "as_of": claims_as_of if claims_current else None,
+            "input_candidates": claims_summary.get("input_candidates") if claims_current else None,
+            "founder_review_ready": claims_summary.get("founder_review_ready") if claims_current else None,
+            "matches_for_founder_review": claims_summary.get("matches_for_founder_review") if claims_current else None,
+            "source_programs_are_not_verified_buyers": True,
+        },
         "current_payment_observation": (
             "PRESENT_REQUIRES_INDEPENDENT_ATTRIBUTION" if payment_present
             else "NOT_OBSERVED" if payment_semantics is not None

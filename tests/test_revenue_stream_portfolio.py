@@ -43,6 +43,18 @@ def fixture(root: Path):
     p.parent.mkdir(parents=True,exist_ok=True)
     p.write_text(json.dumps({"schema":PORTFOLIO_SCHEMAS["contractors"],
                              "outbound_authorized":False}))
+    from datetime import datetime, timezone
+    put(root, "claims_research", {
+        "mode": "OBSERVE",
+        "as_of": datetime.now(timezone.utc).date().isoformat(),
+        "outbound_authorized": False,
+        "execution_authority": "none",
+        "summary": {
+            "input_candidates": 179, "founder_review_ready": 0,
+            "matches_for_founder_review": 0,
+            "needs_research": 179, "actual_revenue": 0,
+        },
+    })
 
 
 def by_key(report):
@@ -62,6 +74,10 @@ def test_exact_fourteen_streams_no_unearned_commercial_promotions(tmp_path):
     assert d["exchange_verified_market_price_count"]==0
     assert d["current_payment_observation"]=="NOT_OBSERVED"
     assert d["funnel_recognized_revenue_cents"]==0
+    assert d["claims_research"]["current"] is True
+    assert d["claims_research"]["input_candidates"]==179
+    assert d["claims_research"]["founder_review_ready"]==0
+    assert d["claims_research"]["source_programs_are_not_verified_buyers"] is True
     assert d["external_outbound_authorized"] is False
     assert d["payment_per_stream_attributed"] is False
     assert all(not x["actual_revenue"] for x in d["streams"])
@@ -193,3 +209,46 @@ def test_unverified_message_label_cannot_prove_a_buyer_request(tmp_path):
     }))
     p.chmod(0o600)
     assert _archived_complete_buyer_requests(tmp_path)==0
+
+
+
+def test_claims_preview_missing_or_stale_never_grants_insurance_authority(tmp_path):
+    from datetime import date, timedelta
+    fixture(tmp_path)
+    put(tmp_path, "claims_research", {
+        "mode": "OBSERVE",
+        "as_of": (date.today()-timedelta(days=15)).isoformat(),
+        "outbound_authorized": False, "execution_authority": "none",
+        "summary": {"input_candidates": 1000, "founder_review_ready": 500,
+                    "matches_for_founder_review": 100},
+    })
+    d=stream_portfolio_status(tmp_path)
+    assert d["claims_research"]["current"] is False
+    assert d["claims_research"]["input_candidates"] is None
+    assert d["claims_research"]["founder_review_ready"] is None
+    ins=by_key(d)["insurance_carrier_network"]
+    assert ins["claims_research_current"] is False
+    assert "CURRENT_CLAIMS_RESEARCH_EVIDENCE_UNAVAILABLE" in ins["blocking_evidence"]
+    assert ins["gates"]["real_counterparty"] is False
+    assert ins["new_request_authorized"] is False
+
+
+def test_public_network_research_count_does_not_promote_to_sold_or_regulated_claim(tmp_path):
+    fixture(tmp_path)
+    put(tmp_path, "claims_research", {
+        "mode": "OBSERVE",
+        "as_of": __import__("datetime").date.today().isoformat(),
+        "outbound_authorized": False,"execution_authority": "none",
+        "summary": {"input_candidates": 179, "founder_review_ready": 0,
+                    "matches_for_founder_review": 0, "actual_revenue": 0},
+    })
+    d=stream_portfolio_status(tmp_path)
+    assert d["claims_research"]["input_candidates"]==179
+    for key in ("insurance_carrier_network", "claims_settlement_regulated"):
+        s=by_key(d)[key]
+        assert s["legal_gate_required"] is True
+        assert s["gates"]["real_counterparty"] is False
+        assert s["gates"]["payment_proven"] is False
+        assert s["partner_approved_traffic"] is False
+        assert s["actual_revenue"] is False
+        assert "NO_INDEPENDENTLY_QUALIFIED_CLAIMS_BUYER" in s["blocking_evidence"]
