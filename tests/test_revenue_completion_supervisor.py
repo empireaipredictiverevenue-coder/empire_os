@@ -135,9 +135,20 @@ def test_build_snapshot_keeps_failed_planner_as_history_when_runtime_exists(monk
         "tenant_id": "test-platform",
         "market_scope_count": 1,
         "market_scopes": [{"industry": "roofing", "country_code": "US",
+                           "observed_entity_count": 1,
+                           "new_industry": False, "new_country": True,
                            "tam_state": "UNKNOWN", "tam_entity_count": None}],
         "source_row_count": 1,
-        "opportunity_classes": [{"opportunity_key": "tam:test"}],
+        "opportunity_classes": [{
+            "opportunity_key": "tam:test-platform:new_country:roofing:US",
+            "opportunity_class": "new_country", "industry": "roofing",
+            "country_code": "US", "observed_entity_count": 1,
+            "tam_state": "UNKNOWN", "tam_entity_count": None,
+            "evidence_refs": ["registry:test"], "decision": "research",
+            "buyer_intent_proven": False, "demand_proven": False,
+            "commercial_terms_verified": False, "revenue_verified": False,
+            "execution_authority": "none",
+        }],
         "execution_authority": "none",
         "tam_inferred_from_observed_roster": False,
         "buyer_intent_inferred": False,
@@ -195,7 +206,11 @@ def test_tam_snapshot_truth_refuses_empty_schema_label_stale_and_send_authority(
         "data_scope":"PLATFORM_MARKET_RESEARCH_ONLY",
         "tenant_id":"research-platform",
         "generated_at":now.isoformat(),"market_scope_count":1,
-        "market_scopes":[{"tam_state":"UNKNOWN","tam_entity_count":None}],
+        "market_scopes":[{
+            "industry":"roofing","country_code":"US",
+            "observed_entity_count":1,
+            "tam_state":"UNKNOWN","tam_entity_count":None,
+        }],
         "source_row_count":1,"opportunity_classes":[],
         "execution_authority":"none",
         "tam_inferred_from_observed_roster":False,
@@ -237,14 +252,17 @@ def test_tam_prerequisites_are_boolean_checks_without_secret_values():
         "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":"postgresql://secret:secret@localhost/empiredb",
     }
     ready=tam_reader_prerequisites(good)
-    assert ready["runtime_environment_configured"] is True
+    assert ready["runtime_environment_configured"] is False
+    assert ready["scope_environment_configured"] is True
+    assert ready["isolated_tam_credential_live_verified"] is False
+    assert ready["isolated_tam_release_stage"]=="PREPARED_NOT_PRODUCTION_ACTIVATED"
     assert ready["missing_runtime_environment_keys"]==[]
     assert ready["restricted_empiredb_sql_reader_live_verified"] is False
     assert ready["auto_planner_retry_authorized"] is False
     assert "secret" not in str(ready)
     missing=tam_reader_prerequisites({})
     assert missing["runtime_environment_configured"] is False
-    assert len(missing["missing_runtime_environment_keys"])==4
+    assert len(missing["missing_runtime_environment_keys"])==3
 
 
 

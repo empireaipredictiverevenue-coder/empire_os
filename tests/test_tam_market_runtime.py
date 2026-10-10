@@ -55,13 +55,13 @@ def test_restricted_reader_uses_capability_role():
         "execution_authority": "none",
     }])
     rows = fetch_tam_market_observations_postgres(
-        "postgresql://empire_intelligence_materializer_login:test-secret@127.0.0.1/empiredb",
+        "postgresql://empire_tam_market_login:test-secret@127.0.0.1/empiredb",
         connect_factory=lambda _dsn: connection,
     )
     assert rows[0]["entity_id"] == "e1"
     assert connection.cursor_obj.calls == [
         ("SET TRANSACTION READ ONLY", ()),
-        ("SET LOCAL ROLE empire_intelligence_materializer", ()),
+        ("SET LOCAL ROLE empire_tam_market_reader", ()),
         ("SELECT public.get_tam_market_observations(%s)", (1000,)),
     ]
 
@@ -285,7 +285,7 @@ def test_tam_catalog_connection_failure_is_redacted_and_no_data_read():
 
 
 RESTRICTED_DSN = (
-    "postgresql://empire_intelligence_materializer_login:"
+    "postgresql://empire_tam_market_login:"
     "test-secret@127.0.0.1/empiredb"
 )
 
@@ -293,6 +293,7 @@ RESTRICTED_DSN = (
 @pytest.mark.parametrize("dsn",[
     "postgresql://postgres:secret@localhost/empiredb",
     "postgresql://empiredb_app:secret@localhost/empiredb",
+    "postgresql://empire_intelligence_materializer_login:secret@localhost/empiredb",
     "postgresql://empire_intelligence_materializer_login:secret@remote.example/empiredb",
     "postgresql://empire_intelligence_materializer_login:secret@localhost/other",
     "postgresql://empire_intelligence_materializer_login@localhost/empiredb",
@@ -393,20 +394,18 @@ def test_live_tam_refresh_refuses_to_read_rows_until_restricted_catalog_passes(
     monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","research-platform")
     monkeypatch.setenv("EMPIRE_TAM_ACTIVE_INDUSTRIES","solar,roofing")
     monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB,US")
-    monkeypatch.setattr(tam,"load_materializer_env",lambda: {
-        "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":RESTRICTED_DSN,
-    })
+    monkeypatch.setattr(tam,"load_tam_isolated_dsn",lambda: RESTRICTED_DSN)
     calls=[]
     def fake_probe(*args,**kwargs):
         calls.append("preflight")
         return {"status":"RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
-                "migration_028_contract_verified":False}
+                 "isolated_tam_contract_verified":False}
     def forbidden_read(*args,**kwargs):
         calls.append("READ")
         raise AssertionError("canonical rows must not be read without approved role/function")
-    monkeypatch.setattr(tam,"probe_tam_reader_capability",fake_probe)
+    monkeypatch.setattr(tam,"probe_isolated_tam_reader_capability",fake_probe)
     monkeypatch.setattr(tam,"fetch_tam_market_observations_postgres",forbidden_read)
-    with pytest.raises(RuntimeError,match="catalog preflight not verified"):
+    with pytest.raises(RuntimeError,match="isolated catalog preflight not verified"):
         tam.refresh_tam_market_runtime(tmp_path)
     assert calls==["preflight"]
     assert not (tmp_path/"runtime/tam_market_intelligence/latest.json").exists()
@@ -419,8 +418,8 @@ def test_live_tam_refresh_requires_explicit_market_scope_before_any_db_call(
     monkeypatch.delenv("EMPIRE_TAM_ACTIVE_INDUSTRIES",raising=False)
     monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","research-platform")
     monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB")
-    monkeypatch.setattr(tam,"load_materializer_env",
-        lambda: (_ for _ in ()).throw(AssertionError("no DB config before scope")))
+    monkeypatch.setattr(tam,"load_tam_isolated_dsn",
+        lambda: (_ for _ in ()).throw(AssertionError("no credential before scope")))
     with pytest.raises(RuntimeError,match="TAM runtime configuration incomplete"):
         tam.refresh_tam_market_runtime(tmp_path)
     assert not (tmp_path/"runtime/tam_market_intelligence/latest.json").exists()
@@ -433,13 +432,11 @@ def test_live_tam_refresh_safe_positive_path_unknown_denominator(
     monkeypatch.setenv("EMPIRE_TAM_TENANT_ID","platform-research")
     monkeypatch.setenv("EMPIRE_TAM_ACTIVE_INDUSTRIES","solar")
     monkeypatch.setenv("EMPIRE_TAM_ACTIVE_COUNTRIES","GB")
-    monkeypatch.setattr(tam,"load_materializer_env",lambda:{
-        "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN":RESTRICTED_DSN,
-    })
+    monkeypatch.setattr(tam,"load_tam_isolated_dsn",lambda: RESTRICTED_DSN)
     checks=[]
     def proof(*args,**kwargs):
         checks.append("catalog")
-        return {"status":"PASS","migration_028_contract_verified":True}
+        return {"status":"PASS", "isolated_tam_contract_verified":True}
     def read(*args,**kwargs):
         assert checks==["catalog"]
         checks.append("read")
@@ -448,7 +445,7 @@ def test_live_tam_refresh_safe_positive_path_unknown_denominator(
                  "source_ref":"registry:source:1",
                  "observed_at":"2026-10-10T11:00:00+00:00",
                  "execution_authority":"none"}]
-    monkeypatch.setattr(tam,"probe_tam_reader_capability",proof)
+    monkeypatch.setattr(tam,"probe_isolated_tam_reader_capability",proof)
     monkeypatch.setattr(tam,"fetch_tam_market_observations_postgres",read)
     result=tam.refresh_tam_market_runtime(tmp_path)
     assert checks==["catalog","read"]

@@ -1,0 +1,33 @@
+# HELD / NOT INSTALLED: on-demand TAM-only canonical research reader.
+# Requires separate founder-approved database DDL and protected credential.
+# No .timer; never uses the legacy Market GPS credential or role.
+[Unit]
+Description=EmpireOS isolated TAM canonical market evidence read (OBSERVE)
+After=postgresql.service
+ConditionPathExists=/etc/empire/tam-market.dsn
+ConditionPathExists=/etc/empire/tam-market-scope.env
+ConditionPathIsDirectory=/srv/empire_os/runtime/tam_market_intelligence
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+EnvironmentFile=/etc/empire/tam-market-scope.env
+LoadCredential=tam-market.dsn:/etc/empire/tam-market.dsn
+UMask=0077
+ExecStart=/srv/empire_os/.venv/bin/python -m empire_os.tam_market_runtime --refresh --limit 1000
+TimeoutStartSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/empire_os/runtime/tam_market_intelligence
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+
+[Install]
+# Intentionally no WantedBy or timer. Explicit manual invocation only.

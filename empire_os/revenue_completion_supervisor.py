@@ -489,12 +489,16 @@ def tam_reader_prerequisites(
         name for name in (
             "EMPIRE_TAM_TENANT_ID", "EMPIRE_TAM_ACTIVE_INDUSTRIES",
             "EMPIRE_TAM_ACTIVE_COUNTRIES",
-            "EMPIRE_INTELLIGENCE_MATERIALIZER_DSN",
         ) if not isinstance(config.get(name), str) or not config[name].strip()
     ]
     return {
-        "runtime_environment_configured": len(missing) == 0,
+        "runtime_environment_configured": False,
+        "scope_environment_configured": len(missing) == 0,
         "missing_runtime_environment_keys": missing,
+        # No generic Market GPS credential is sufficient for isolated TAM.
+        "isolated_tam_credential_live_verified": False,
+        "isolated_tam_database_role_live_verified": False,
+        "isolated_tam_release_stage": "PREPARED_NOT_PRODUCTION_ACTIVATED",
         "restricted_empiredb_sql_reader_live_verified": catalog[
             "restricted_catalog_verified"
         ],
@@ -555,7 +559,7 @@ def build_snapshot() -> dict[str, Any]:
             "canonical_source_separate_from_llm_planner": True,
         },
         "tam_next_evidence_task": (
-            "DESIGN_ISOLATED_TAM_CAPABILITY_AND_SEEK_SEPARATE_FOUNDER_APPROVAL"
+            "AWAIT_SEPARATE_PRODUCTION_APPROVAL_FOR_TAM_ROLE_AND_CREDENTIAL"
             if tam_prerequisites["restricted_reader_catalog_check"].get(
                 "held_migration_028_incompatible_with_live_materializer"
             )

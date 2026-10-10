@@ -8,7 +8,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping
 
-from empire_os.intelligence_materializer_env import load_materializer_env
+from empire_os.tam_isolated_credential import load_tam_isolated_dsn
 from empire_os.tam_market_intelligence import (
     MarketEntityObservation,
     TamCountEvidence,
@@ -27,7 +27,9 @@ def _csv_env(name: str) -> tuple[str, ...]:
     )
 
 
-def _validate_restricted_tam_dsn(dsn: str) -> str:
+def _validate_restricted_tam_dsn(
+    dsn: str, *, login: str = "empire_intelligence_materializer_login"
+) -> str:
     """Restrict canonical TAM data reads to the local capability login."""
     if not isinstance(dsn, str) or not dsn.strip() or len(dsn) > 2048:
         raise ValueError("restricted TAM materializer DSN required")
@@ -37,7 +39,10 @@ def _validate_restricted_tam_dsn(dsn: str) -> str:
     except Exception:
         raise ValueError("invalid restricted TAM reader DSN") from None
     if (
-        config.get("user") != "empire_intelligence_materializer_login"
+        login not in (
+            "empire_intelligence_materializer_login",
+            "empire_tam_market_login",
+        ) or config.get("user") != login
         or config.get("dbname") != "empiredb"
         or not config.get("password")
         or config.get("host") not in (
@@ -58,7 +63,9 @@ def fetch_tam_market_observations_postgres(
     limit: int = 1000,
     connect_factory: Callable | None = None,
 ) -> list[dict[str, Any]]:
-    clean = _validate_restricted_tam_dsn(dsn)
+    clean = _validate_restricted_tam_dsn(
+        dsn, login="empire_tam_market_login"
+    )
     # Do not silently clip requested scope, and reject booleans and floats.
     if type(limit) is not int or not 1 <= limit <= 5000:
         raise ValueError("TAM reader limit must be an integer in 1-5000")
@@ -76,7 +83,7 @@ def fetch_tam_market_observations_postgres(
             with connection.cursor() as cursor:
                 cursor.execute("SET TRANSACTION READ ONLY")
                 cursor.execute(
-                    "SET LOCAL ROLE empire_intelligence_materializer"
+                    "SET LOCAL ROLE empire_tam_market_reader"
                 )
                 cursor.execute(
                     "SELECT public.get_tam_market_observations(%s)",
@@ -96,9 +103,9 @@ def fetch_tam_market_observations_postgres(
     return [dict(item) for item in payload]
 
 
-def probe_tam_reader_capability(
-    dsn: str,
-    *,
+def _probe_role_capability(
+    dsn: str, *,
+    login: str, capability_role: str,
     connect_factory: Callable | None = None,
 ) -> dict[str, Any]:
     """Read-only catalog proof using the dedicated restricted EmpireDB login.
@@ -107,7 +114,13 @@ def probe_tam_reader_capability(
     Even a valid function does not imply that a tenant-authenticated SaaS
     reader or source population is configured.
     """
-    _validate_restricted_tam_dsn(dsn)
+    if (login, capability_role) not in (
+        ("empire_intelligence_materializer_login",
+         "empire_intelligence_materializer"),
+        ("empire_tam_market_login", "empire_tam_market_reader"),
+    ):
+        raise ValueError("unsupported TAM capability identity")
+    _validate_restricted_tam_dsn(dsn, login=login)
     if connect_factory is None:
         import psycopg
         # The passive catalog check must never block the existing Market GPS
@@ -119,11 +132,11 @@ def probe_tam_reader_capability(
         with connect_factory(dsn) as conn:
             with conn.cursor() as cursor:
                 cursor.execute("SET TRANSACTION READ ONLY")
-                cursor.execute("SET LOCAL ROLE empire_intelligence_materializer")
+                cursor.execute("SET LOCAL ROLE " + capability_role)
                 cursor.execute("""
                     SELECT
-                        session_user = 'empire_intelligence_materializer_login',
-                        current_user = 'empire_intelligence_materializer',
+                        session_user = %s,
+                        current_user = %s,
                         to_regprocedure(
                             'public.get_tam_market_observations(integer)'
                         ) IS NOT NULL,
@@ -180,23 +193,27 @@ def probe_tam_reader_capability(
                         to_regclass('public.prospect_acquisitions') IS NOT NULL,
                         to_regclass('public.prospect_entity_links') IS NOT NULL,
                         to_regclass('public.business_entities') IS NOT NULL
-                """)
+                """, (login, capability_role))
                 found = cursor.fetchone()
     except Exception:
         return {
             "status":"RESTRICTED_CATALOG_PROBE_UNAVAILABLE",
-            "migration_028_contract_verified":False,
+            ("isolated_tam_contract_verified"
+             if login == "empire_tam_market_login"
+             else "migration_028_contract_verified"):False,
             "no_data_rows_read":True,
             "execution_authority":"none",
         }
     if not isinstance(found,(list,tuple)) or len(found)!=11:
         return {
             "status":"INVALID_RESTRICTED_CATALOG_RESPONSE",
-            "migration_028_contract_verified":False,
+            ("isolated_tam_contract_verified"
+             if login == "empire_tam_market_login"
+             else "migration_028_contract_verified"):False,
             "no_data_rows_read":True,
             "execution_authority":"none",
         }
-    (login, capability, exists, definer, exec_allowed,
+    (login_verified, role_verified, exists, definer, exec_allowed,
      *grants_and_tables) = found
     # PostgreSQL privilege list succeeds if ANY listed direct privilege is
     # effective, including write/DDL privileges; NONE may be inherited.
@@ -204,16 +221,18 @@ def probe_tam_reader_capability(
     source_tables_exist = grants_and_tables[3:]
     verified = (
         all(v is True for v in (
-            login, capability, exists, definer, exec_allowed,
+            login_verified, role_verified, exists, definer, exec_allowed,
             *source_tables_exist,
         ))
         and all(v is False for v in direct_grants)
     )
     return {
         "status":"PASS" if verified else "RESTRICTED_CATALOG_CONTRACT_INCOMPLETE",
-        "migration_028_contract_verified":verified,
-        "restricted_login_verified":login is True,
-        "capability_role_verified":capability is True,
+        ("isolated_tam_contract_verified"
+         if login == "empire_tam_market_login"
+         else "migration_028_contract_verified"):verified,
+        "restricted_login_verified":login_verified is True,
+        "capability_role_verified":role_verified is True,
         "function_exists":exists is True,
         "security_definer_verified":definer is True,
         "capability_execute_verified":exec_allowed is True,
@@ -223,6 +242,29 @@ def probe_tam_reader_capability(
         "execution_authority":"none",
     }
 
+
+
+def probe_tam_reader_capability(
+    dsn: str, *, connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Legacy Market GPS catalog diagnosis; never permits a TAM refresh."""
+    return _probe_role_capability(
+        dsn,
+        login="empire_intelligence_materializer_login",
+        capability_role="empire_intelligence_materializer",
+        connect_factory=connect_factory,
+    )
+
+
+def probe_isolated_tam_reader_capability(
+    dsn: str, *, connect_factory: Callable | None = None,
+) -> dict[str, Any]:
+    """Read-only preflight for the isolated, not-yet-activated TAM credential."""
+    return _probe_role_capability(
+        dsn, login="empire_tam_market_login",
+        capability_role="empire_tam_market_reader",
+        connect_factory=connect_factory,
+    )
 
 def build_tam_runtime(
     rows: Iterable[Mapping[str, Any]],
@@ -326,18 +368,19 @@ def refresh_tam_market_runtime(
     if not tenant_id or not active_industries or not active_countries:
         raise RuntimeError("TAM runtime configuration incomplete")
 
-    env = load_materializer_env()
+    # Only the isolated systemd credential is permissible. No fallback to the
+    # live generic Market GPS materializer; no plaintext environment DSN.
+    dsn = load_tam_isolated_dsn()
     # A mere DSN is not authorization to read company rows. Prove the live
     # restricted function/role/direct-grant contract immediately before the
     # first data read, not just from an old supervisor catalog artifact.
-    capability = probe_tam_reader_capability(
-        env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
-        connect_factory=connect_factory,
+    capability = probe_isolated_tam_reader_capability(
+        dsn, connect_factory=connect_factory,
     )
-    if capability.get("migration_028_contract_verified") is not True:
-        raise RuntimeError("TAM restricted catalog preflight not verified")
+    if capability.get("isolated_tam_contract_verified") is not True:
+        raise RuntimeError("TAM isolated catalog preflight not verified")
     rows = fetch_tam_market_observations_postgres(
-        env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"],
+        dsn,
         limit=limit,
         connect_factory=connect_factory,
     )
@@ -394,10 +437,8 @@ def main() -> int:
 
     if args.preflight:
         try:
-            env = load_materializer_env()
-            payload = probe_tam_reader_capability(
-                env["EMPIRE_INTELLIGENCE_MATERIALIZER_DSN"]
-            )
+            dsn = load_tam_isolated_dsn()
+            payload = probe_isolated_tam_reader_capability(dsn)
         except (ValueError, RuntimeError, OSError):
             payload = {
                 "status":"RESTRICTED_TAM_CREDENTIAL_UNAVAILABLE",
@@ -406,7 +447,7 @@ def main() -> int:
                 "execution_authority":"none",
             }
         print(json.dumps(payload, indent=2, sort_keys=True))
-        return 0 if payload.get("migration_028_contract_verified") is True else 3
+        return 0 if payload.get("isolated_tam_contract_verified") is True else 3
 
     if args.refresh:
         payload = refresh_tam_market_runtime(
