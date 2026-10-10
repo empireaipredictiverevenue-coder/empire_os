@@ -216,3 +216,143 @@ RESET ROLE;
         'BEGIN TRANSACTION READ ONLY;\n'+query+';\nROLLBACK;')
     assert 'ERROR:' not in output
     assert 'Solar GB' not in output
+
+
+def test_name_variant_company_domain_review_never_becomes_strong_auto_identity():
+    report=build_review(targets=[t(name='Solar Co Holdings Ltd')],
+        observations=[source(name='SolarCo Trading')],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['potential_matched_observations']==1
+    assert report['strong_evidence_review_count']==0
+    assert report['name_variant_review_count']==1
+    assert report['findings'][0]['state']=='NAME_VARIANT_DOMAIN_PHONE_REVIEW'
+    assert 'exact_name' not in report['findings'][0]['match_basis']
+    assert report['genuine_acquisition_appended']==0
+
+
+def test_name_variant_phone_only_without_website_is_manual_review():
+    review=build_review(targets=[t(name='Solar Company Holdings',website='')],
+        observations=[source(name='Solar Company Trading',website='')],
+        source='recc_solar',sector='solar',country='GB')
+    assert review['name_variant_review_count']==1
+    assert review['findings'][0]['state']=='NAME_VARIANT_PHONE_REVIEW'
+    assert review['strong_evidence_review_count']==0
+
+
+def test_generic_social_domain_is_not_independent_business_identity():
+    report=build_review(targets=[t(name='Solar Holdings',website='https://facebook.com/sun')],
+        observations=[source(name='Solar Trade',website='https://facebook.com/different',phone='')],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['potential_matched_observations']==0
+
+
+def test_domain_collision_across_different_entities_is_ambiguous():
+    report=build_review(targets=[t(name='Solar Holdings',entity='e1',prospect='p1'),
+        t(name='Solar Trading',entity='e2',prospect='p2')],
+        observations=[source(name='Solar Holdings',phone='')],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['potential_matched_observations']==1
+    assert report['strong_evidence_review_count']==0
+    assert report['findings'][0]['state']=='AMBIGUOUS_IDENTITY'
+
+
+def test_unique_entities_not_equated_with_identity_link_row_count():
+    report=build_review(targets=[t(entity='e1',prospect='p1'),
+        t(entity='e1',prospect='p2'),t(entity='e1',prospect='p2')],
+        observations=[],source='recc_solar',sector='solar',country='GB')
+    assert report['target_relationship_rows_examined']==2
+    assert report['unique_target_entities_examined']==1
+    assert report['unique_target_prospects_examined']==2
+    assert report['target_entities_with_website_evidence']==1
+    assert report['target_entities_with_phone_evidence']==1
+
+
+def test_recc_pagination_reads_selected_page_and_never_next_one(monkeypatch):
+    from empire_os.lead_sources import recc_solar
+    urls=[]
+    def listing(url):
+        urls.append(url)
+        return '<a href="/scheme/members/member-1">Solar Co</a>'
+    def detail(name,url):
+        assert name=='Solar Co'
+        return SimpleNamespace(name=name,niche='solar',country_code='GB',
+            source='recc_solar',url=url,raw={'business_website':'https://solarco.example'},
+            phone='01234567890',metro='United Kingdom')
+    monkeypatch.setattr(recc_solar,'_get',listing)
+    monkeypatch.setattr(recc_solar,'_detail',detail)
+    rows=source_observations(source='recc_solar',sector='solar',country='GB',
+        max_source=1,source_page=2)
+    assert len(rows)==1
+    assert len(urls)==1
+    assert 'page=2' in urls[0]
+    assert rows[0]['source_url'].startswith('https://www.recc.org.uk/scheme/members/')
+
+
+@pytest.mark.parametrize('bad_page',[True, -1,41,1.5,'1'])
+def test_recc_pagination_refuses_invalid_page_before_public_request(bad_page):
+    with pytest.raises(ValueError,match='page'):
+        source_observations(source='recc_solar',sector='solar',country='GB',
+            max_source=1,source_page=bad_page,fetcher=lambda **k: iter(()))
+
+
+def test_overpass_refuses_recc_page_even_when_country_matches():
+    with pytest.raises(ValueError,match='RECC-only'):
+        source_observations(source='overpass_osm',sector='solar',country='GB',
+            metro='London',source_page=1,max_source=1)
+
+
+def test_bounded_recc_three_page_sweep_one_db_read_and_aggregate_receipt(
+    monkeypatch,capsys,tmp_path,
+):
+    from scripts import run_tam_source_acquisition_connector as cli
+    seen={"db":0,"pages":[]}
+    monkeypatch.setattr(cli.os,'geteuid',lambda:0)
+    monkeypatch.setattr(cli,'load_runtime_env',
+        lambda *a,**k:{'EMPIREDB_DSN':'postgresql:///empiredb'})
+    def targets(*a,**k):
+        seen['db']+=1
+        return [t()]
+    monkeypatch.setattr(cli,'canonical_targets',targets)
+    def observations(*,source,sector,country,metro,max_source,source_page):
+        seen['pages'].append(source_page)
+        return [globals()['source'](url=RECC+f'-page-{source_page}')]
+    monkeypatch.setattr(cli,'source_observations',observations)
+    monkeypatch.setattr(cli,'save_private',lambda report: tmp_path/'private.json')
+    assert cli.main(['--observe','--source','recc_solar','--sector','solar',
+           '--country','GB','--source-page','1','--page-count','3',
+           '--max-source','2'])==0
+    receipt=json.loads(capsys.readouterr().out)
+    assert seen['db']==1
+    assert seen['pages']==[1,2,3]
+    assert receipt['source_page_count']==3
+    assert receipt['source_observation_limit_total']==6
+    assert receipt['source_observations_examined']==3
+    assert receipt['potential_matched_observations']==3
+    assert receipt['strong_evidence_review_count']==0
+    assert receipt['manual_review_count']==3
+    assert receipt['database_write'] is False
+    assert receipt['acquisitions_appended']==0
+    assert receipt['outbound_sent'] is False
+    assert 'candidate_name' not in receipt
+
+
+@pytest.mark.parametrize('page_count',[0,-1,4])
+def test_source_cli_cannot_expand_beyond_three_public_pages(page_count):
+    from scripts import run_tam_source_acquisition_connector as cli
+    with pytest.raises(SystemExit) as err:
+        cli.main(['--observe','--source','recc_solar','--sector','solar',
+             '--country','GB','--page-count',str(page_count)])
+    assert err.value.code==2
+
+
+def test_uk_international_vs_domestic_phone_is_reviewed_as_same_business():
+    from empire_os.tam_source_acquisition_connector import _phone_key
+    assert _phone_key('+44 1234 567890','GB')==_phone_key('01234 567890','GB')
+    assert _phone_key('00441234567890','GB')==_phone_key('01234567890','GB')
+    assert _phone_key('123456789','GB')==''
+    assert _phone_key('5555555555','DE')==''
+    report=build_review(targets=[t(name='Solar Ltd',website='',phone='+44 1234 567890')],
+        observations=[source(name='Solar Trading',website='',phone='01234 567890')],
+        source='recc_solar',sector='solar',country='GB')
+    assert report['findings'][0]['state']=='NAME_VARIANT_PHONE_REVIEW'
+    assert report['strong_evidence_review_count']==0

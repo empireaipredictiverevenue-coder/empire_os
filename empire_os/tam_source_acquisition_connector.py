@@ -20,6 +20,7 @@ COUNTRIES = frozenset({"GB", "US"})
 SOURCES = frozenset({"recc_solar", "overpass_osm"})
 MAX_TARGETS = 500
 MAX_SOURCE = 40
+MAX_RECC_PAGE = 40  # at most 41 public listing pages; 40 details/page
 
 TARGET_SQL = """
 WITH targets AS MATERIALIZED (
@@ -57,6 +58,24 @@ def _clean_name(value: Any) -> str:
 def _digits(value: Any) -> str:
     d = re.sub(r"\D", "", str(value or ""))
     return d if 10 <= len(d) <= 15 else ""
+
+
+def _phone_key(value: Any, country: str) -> str:
+    """Normalize *supported* national/international formats, never guess."""
+    digits=_digits(value)
+    if not digits:
+        return ""
+    if country=="GB":
+        if digits.startswith("0044") and len(digits)==14:
+            digits=digits[2:]
+        if digits.startswith("0") and len(digits)==11:
+            digits="44"+digits[1:]
+        return digits if digits.startswith("44") and len(digits)==12 else ""
+    if country=="US":
+        if len(digits)==10:
+            digits="1"+digits
+        return digits if digits.startswith("1") and len(digits)==11 else ""
+    return ""
 
 
 def _host(value: Any) -> str:
@@ -144,21 +163,50 @@ def canonical_targets(dsn: str, *, sector: str, limit: int = 250,
 def source_observations(*, source: str, sector: str, country: str,
                         metro: str | None = None,
                         fetcher: Callable | None = None,
-                        max_source: int = MAX_SOURCE) -> list[dict]:
+                        max_source: int = MAX_SOURCE,
+                        source_page: int = 0) -> list[dict]:
     validate_scope(source=source,sector=sector,country=country,limit=1)
     if type(max_source) is not int or not 1 <= max_source <= MAX_SOURCE:
         raise ValueError("source observation bound invalid")
+    if type(source_page) is not int or not 0 <= source_page <= MAX_RECC_PAGE:
+        raise ValueError("RECC source page outside bounded research scope")
     if source == "recc_solar":
         if metro not in (None, ""):
             raise ValueError("RECC is national, not a metro source")
-        if fetcher is None:
-            from empire_os.lead_sources.recc_solar import run
-            fetcher = run
-        try:
-            iterable=fetcher(metro=None)
-        except Exception:
-            raise RuntimeError("real public-source acquisition probe failed") from None
+        if source_page and fetcher is not None:
+            raise ValueError("custom RECC adapter cannot fake paginated source")
+        if source_page:
+            from empire_os.lead_sources import recc_solar
+            from urllib.parse import urlencode
+            query=urlencode({
+                "technology":"Solar PV", "submitbutton":"submit",
+                "page":str(source_page),
+            })
+            try:
+                listing=recc_solar._get(recc_solar.SEARCH_URL+"?"+query)
+                members=recc_solar._member_links(listing,limit=max_source)
+            except Exception:
+                raise RuntimeError("real paginated RECC listing failed") from None
+            def paged_members():
+                for url,name in members:
+                    try:
+                        item=recc_solar._detail(name,url)
+                    except Exception:
+                        continue
+                    if item is not None:
+                        yield item
+            iterable=paged_members()
+        else:
+            if fetcher is None:
+                from empire_os.lead_sources.recc_solar import run
+                fetcher = run
+            try:
+                iterable=fetcher(metro=None)
+            except Exception:
+                raise RuntimeError("real public-source acquisition probe failed") from None
     else:
+        if source_page:
+            raise ValueError("source pagination is RECC-only")
         from empire_os.geo_registry import market_by_metro
         from empire_os.lead_sources.overpass import METRO_COORDS,run
         market=market_by_metro(metro) if metro else None
@@ -204,72 +252,131 @@ def source_observations(*, source: str, sector: str, country: str,
     return observed
 
 
+def _identity_domain(value: Any) -> str:
+    """Only a business-owned host can corroborate identity."""
+    host = _host(value)
+    if host in {
+        "facebook.com", "instagram.com", "linkedin.com", "x.com",
+        "twitter.com", "youtube.com", "tiktok.com", "wixsite.com",
+        "wordpress.com", "sites.google.com", "linktr.ee",
+    } or host.endswith((".facebook.com", ".instagram.com",
+                        ".linkedin.com", ".wixsite.com",
+                        ".wordpress.com")):
+        return ""
+    return host
+
+
 def build_review(*, targets: Iterable[Mapping], observations: Iterable[Mapping],
                  source: str, sector: str, country: str) -> dict:
     validate_scope(source=source,sector=sector,country=country,limit=1)
-    identities=defaultdict(list)
+    target_rows = {}
     for row in targets:
-        if row.get("sector") != sector:
+        if row.get("sector")!=sector:
             continue
-        name=_clean_name(row.get("canonical_name"))
-        if name and row.get("entity_id") and row.get("prospect_id"):
-            identities[name].append(dict(row))
-    findings=[]
+        entity = str(row.get("entity_id") or "").strip()
+        prospect = str(row.get("prospect_id") or "").strip()
+        name = _clean_name(row.get("canonical_name"))
+        if entity and prospect and name:
+            # Eliminate repeated relationship rows in a join result, but
+            # preserve genuinely distinct prospect/entity associations.
+            key=(entity,prospect)
+            target_rows.setdefault(key,dict(row))
+    values=list(target_rows.values())
+    name_index=defaultdict(set)
+    domain_index=defaultdict(set)
+    phone_index=defaultdict(set)
+    for key,row in target_rows.items():
+        name_index[_clean_name(row["canonical_name"])].add(key)
+        for field in ("canonical_website","prospect_website"):
+            domain=_identity_domain(row.get(field))
+            if domain:
+                domain_index[domain].add(key)
+        phone=_phone_key(row.get("canonical_phone"),country)
+        if phone:
+            phone_index[phone].add(key)
+
     observed=list(observations)
+    findings=[]
     for o in observed:
-        if (o.get("source") != source or o.get("sector")!=sector or
-            o.get("country_code") != country or
-            not _provenance(o.get("source_url"),source)):
+        if (o.get("source")!=source or o.get("sector")!=sector
+                or o.get("country_code")!=country
+                or not _provenance(o.get("source_url"),source)):
             continue
-        names=identities.get(_clean_name(o.get("name")),[])
-        if not names:
+        clean_name=_clean_name(o.get("name"))
+        if not clean_name:
             continue
-        entity_set={r["entity_id"] for r in names}
-        source_domain=_host(o.get("business_website"))
-        canonical_domains={
-            _host(v)
-            for r in names
-            for v in (r.get("canonical_website"),r.get("prospect_website"))
-            if _host(v)
-        }
-        phones={_digits(r.get("canonical_phone")) for r in names}
-        phone=_digits(o.get("phone"))
-        domain_match=bool(source_domain and source_domain in canonical_domains)
-        phone_match=bool(phone and phone in phones)
-        contradictory_domain=bool(source_domain and canonical_domains
-                                  and not domain_match)
-        prospect_set={r["prospect_id"] for r in names}
-        strong=(len(entity_set)==1 and len(prospect_set)==1
-                and (domain_match or phone_match)
-                and not contradictory_domain)
-        state=("STRONG_EVIDENCE_REVIEW" if strong else
-               "AMBIGUOUS_IDENTITY" if len(entity_set)>1 else
-               "AMBIGUOUS_PROSPECT_RELATIONSHIP" if len(prospect_set)>1 else
-               "CONFLICTING_WEBSITE" if contradictory_domain else
-               "NAME_ONLY_REVIEW")
+        source_domain=_identity_domain(o.get("business_website"))
+        phone=_phone_key(o.get("phone"),country)
+        by_name=name_index.get(clean_name,set())
+        by_domain=domain_index.get(source_domain,set()) if source_domain else set()
+        by_phone=phone_index.get(phone,set()) if phone else set()
+        match_keys=by_name|by_domain|by_phone
+        if not match_keys:
+            continue
+        names={target_rows[k]["entity_id"] for k in by_name}
+        domains={target_rows[k]["entity_id"] for k in by_domain}
+        phones={target_rows[k]["entity_id"] for k in by_phone}
+        entities={target_rows[k]["entity_id"] for k in match_keys}
+        prospects={target_rows[k]["prospect_id"] for k in match_keys}
+        has_name=bool(by_name)
+        has_domain=bool(by_domain)
+        has_phone=bool(by_phone)
+
+        conflicting_domain=bool(
+            has_name and source_domain and
+            any(_identity_domain(target_rows[k].get(field))
+                and _identity_domain(target_rows[k].get(field)) != source_domain
+                for k in by_name
+                for field in ("canonical_website","prospect_website"))
+        )
+        contradictory_signals=bool(
+            (names and domains and names != domains)
+            or (names and phones and names != phones)
+            or (domains and phones and domains != phones)
+        )
+        strong=(len(entities)==1 and len(prospects)==1
+                and has_name and (has_domain or has_phone)
+                and not conflicting_domain and not contradictory_signals)
+        if len(entities)!=1:
+            state="AMBIGUOUS_IDENTITY"
+        elif len(prospects)!=1:
+            state="AMBIGUOUS_PROSPECT_RELATIONSHIP"
+        elif contradictory_signals:
+            state="CONFLICTING_IDENTITY_SIGNALS"
+        elif conflicting_domain:
+            state="CONFLICTING_WEBSITE"
+        elif strong:
+            state="STRONG_EVIDENCE_REVIEW"
+        elif has_name:
+            state="NAME_ONLY_REVIEW"
+        elif has_domain and has_phone:
+            state="NAME_VARIANT_DOMAIN_PHONE_REVIEW"
+        elif has_domain:
+            state="NAME_VARIANT_DOMAIN_REVIEW"
+        else:
+            state="NAME_VARIANT_PHONE_REVIEW"
+        basis=(["exact_name"] if has_name else [])
+        basis+=["independent_website_host"] if has_domain else []
+        basis+=["independent_phone"] if has_phone else []
         findings.append({
             "state":state,
-            "match_basis":["exact_name"]+
-                (["independent_website_host"] if domain_match else [])+
-                (["independent_phone"] if phone_match else []),
+            "match_basis":basis,
             "candidate_name":o["name"],
             "country_code":country,
             "sector":sector,
             "source":source,
             "source_url":o["source_url"],
-            "entity_ids":sorted(entity_set),
-            "prospect_ids":sorted(prospect_set),
+            "entity_ids":sorted(entities),
+            "prospect_ids":sorted(prospects),
             "attachment_review_id":sha256(json.dumps({
-                "entity_ids":sorted(entity_set),
-                "prospect_ids":sorted(prospect_set),
+                "entity_ids":sorted(entities),
+                "prospect_ids":sorted(prospects),
                 "source":source,"source_url":o["source_url"],
             },sort_keys=True,separators=(",",":")).encode()).hexdigest(),
             "proposed_source_evidence":{
                 "source":source,"source_url":o["source_url"],
                 "locale":{"country_code":country},
-                "identity_match_basis":["exact_name"]+
-                    (["independent_website_host"] if domain_match else [])+
-                    (["independent_phone"] if phone_match else []),
+                "identity_match_basis":basis,
                 "source_ref_verified_on_public_page":False,
             },
             "external_write_authorized":False,
@@ -283,16 +390,34 @@ def build_review(*, targets: Iterable[Mapping], observations: Iterable[Mapping],
         if (any(matched_by_entity[eid]>1 for eid in finding["entity_ids"])
                 or matched_by_source[finding["source_url"]]>1):
             finding["state"]="AMBIGUOUS_MULTI_SOURCE_OR_ENTITY"
+
     return {
         "schema_version":"empire.tam-source-acquisition-review.v1",
         "generated_at":datetime.now(timezone.utc).isoformat(),
         "mode":"OBSERVE",
         "source":source,"sector":sector,"country_code":country,
-        "target_relationship_rows_examined":sum(len(v) for v in identities.values()),
+        "target_relationship_rows_examined":len(values),
+        "unique_target_entities_examined":len({x["entity_id"] for x in values}),
+        "unique_target_prospects_examined":len({x["prospect_id"] for x in values}),
+        "target_entities_with_website_evidence":len({
+            x["entity_id"] for x in values
+            if _identity_domain(x.get("canonical_website"))
+                or _identity_domain(x.get("prospect_website"))
+        }),
+        "target_entities_with_phone_evidence":len({
+            x["entity_id"] for x in values
+            if _phone_key(x.get("canonical_phone"),country)
+        }),
         "source_observations_examined":len(observed),
+        "source_observations_with_website":sum(bool(
+            _identity_domain(x.get("business_website"))) for x in observed),
+        "source_observations_with_phone":sum(bool(
+            _phone_key(x.get("phone"),country)) for x in observed),
         "potential_matched_observations":len(findings),
         "strong_evidence_review_count":sum(
             f["state"]=="STRONG_EVIDENCE_REVIEW" for f in findings),
+        "name_variant_review_count":sum(
+            f["state"].startswith("NAME_VARIANT_") for f in findings),
         "manual_review_count":sum(f["state"]!="STRONG_EVIDENCE_REVIEW"
                                   for f in findings),
         "findings":findings,

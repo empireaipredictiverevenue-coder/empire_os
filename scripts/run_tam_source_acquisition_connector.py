@@ -56,26 +56,43 @@ def main(argv=None) -> int:
     parser.add_argument("--metro")
     parser.add_argument("--max-targets",type=int,default=250)
     parser.add_argument("--max-source",type=int,default=40)
+    parser.add_argument("--source-page",type=int,default=0)
+    parser.add_argument("--page-count",type=int,default=1)
     args=parser.parse_args(argv)
     validate_scope(source=args.source,sector=args.sector,
                    country=args.country,limit=args.max_targets)
     if not 1 <= args.max_source <= MAX_SOURCE:
         parser.error("source observation limit out of bounds")
+    if (not 1 <= args.page_count <= 3
+            or args.source_page < 0
+            or args.source_page+args.page_count-1 > 40
+            or (args.source != "recc_solar" and args.page_count != 1)):
+        parser.error("bounded source page sweep requires RECC, 1-3 pages")
     if os.geteuid()!=0:
         raise SystemExit("source acquisition connector requires authorised root")
     env=load_runtime_env("/etc/empiredb.env",required=("EMPIREDB_DSN",))
     targets=canonical_targets(env["EMPIREDB_DSN"],
                               sector=args.sector,limit=args.max_targets)
-    observations=source_observations(
-        source=args.source,sector=args.sector,country=args.country,
-        metro=args.metro,max_source=args.max_source,
-    )
+    observations=[]
+    page_counts=[]
+    for page in range(args.source_page,args.source_page+args.page_count):
+        sampled=source_observations(
+            source=args.source,sector=args.sector,country=args.country,
+            metro=args.metro,max_source=args.max_source,
+            source_page=page,
+        )
+        page_counts.append({"page":page,"observations":len(sampled)})
+        observations.extend(sampled)
     packet=build_review(
         targets=targets,observations=observations,
         source=args.source,sector=args.sector,country=args.country,
     )
+    packet["source_page"]=args.source_page
+    packet["source_page_count"]=args.page_count
+    packet["per_page_observations"]=page_counts
     packet["target_query_limit"]=args.max_targets
-    packet["source_observation_limit"]=args.max_source
+    packet["source_observation_limit_per_page"]=args.max_source
+    packet["source_observation_limit_total"]=args.max_source*args.page_count
     packet["target_selection_complete"]=False
     packet["source_selection_complete"]=False
     location=save_private(packet)
@@ -83,6 +100,31 @@ def main(argv=None) -> int:
         "status":"READ_ONLY_SOURCE_MATCH_REVIEW_PREPARED",
         "source":args.source,"sector":args.sector,
         "country":args.country,
+        "source_page":args.source_page,
+        "source_page_count":args.page_count,
+        "source_page_observation_counts":page_counts,
+        "source_observation_limit_total":args.max_source*args.page_count,
+        "unique_target_entities_examined":packet[
+            "unique_target_entities_examined"
+        ],
+        "unique_target_prospects_examined":packet[
+            "unique_target_prospects_examined"
+        ],
+        "target_entities_with_website_evidence":packet[
+            "target_entities_with_website_evidence"
+        ],
+        "target_entities_with_phone_evidence":packet[
+            "target_entities_with_phone_evidence"
+        ],
+        "source_observations_with_website":packet[
+            "source_observations_with_website"
+        ],
+        "source_observations_with_phone":packet[
+            "source_observations_with_phone"
+        ],
+        "name_variant_review_count":packet[
+            "name_variant_review_count"
+        ],
         "target_relationship_rows_examined":packet[
             "target_relationship_rows_examined"
         ],
