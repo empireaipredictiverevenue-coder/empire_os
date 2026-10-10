@@ -21,7 +21,7 @@ BEGIN
     AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
   ) OR NOT EXISTS (SELECT FROM pg_catalog.pg_roles
     WHERE rolname='empire_tam_market_login'
-    AND rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
+    AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
   ) OR NOT pg_catalog.pg_has_role(
     'empire_tam_market_login','empire_tam_market_reader','MEMBER'
   ) THEN

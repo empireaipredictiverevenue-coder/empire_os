@@ -23,6 +23,16 @@ def isolated(execute):
     """)
     execute('empiredb', BOOTSTRAP.read_text())
     execute('empiredb', MIGRATION.read_text())
+    execute('empiredb', '''
+DO $g$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_catalog.pg_authid
+             WHERE rolname='empire_tam_market_login'
+               AND (rolcanlogin OR rolpassword IS NOT NULL)) THEN
+    RAISE EXCEPTION 'staged TAM login has authentication authority';
+  END IF;
+END $g$;
+''')
     return execute
 
 

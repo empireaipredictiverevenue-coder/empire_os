@@ -12,7 +12,7 @@ BEGIN
     WHERE rolname='empire_tam_market_reader' AND NOT rolcanlogin
   ) OR NOT EXISTS (
     SELECT FROM pg_catalog.pg_roles
-    WHERE rolname='empire_tam_market_login' AND rolcanlogin
+    WHERE rolname='empire_tam_market_login' AND NOT rolsuper AND NOT rolbypassrls
   ) THEN
     RAISE EXCEPTION 'isolated TAM roles missing; manual recovery required';
   END IF;
