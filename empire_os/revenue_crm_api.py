@@ -21,6 +21,9 @@ from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
 from empire_os.revenue_crm_journeys import (
     journey_blueprint, preview_crm_journey, preview_segment_distribution,
 )
+from empire_os.revenue_crm_channel_evidence import (
+    ChannelEvidenceError, TrustedChannelEvidence, review_channel_evidence,
+)
 from empire_os.revenue_crm_designs import UnsafeJourneyDesign
 from empire_os.revenue_crm_design_store import (
     JourneyStorageUnavailable, PostgresCrmJourneyDesignStore,
@@ -345,6 +348,7 @@ def create_revenue_crm_router(
     evidence_root: Path = Path("/srv/empire_os"),
     resolve_authenticated_read: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
     resolve_authenticated_design_writer: Callable[[Request], PostgresCrmJourneyDesignStore | None] | None = None,
+    resolve_authenticated_channel_evidence: Callable[[Request, str, str], TrustedChannelEvidence | None] | None = None,
 ) -> APIRouter:
     # A single global Postgres repository is not a multi-tenant HTTP auth
     # boundary. Keep test-only in-memory repositories compatible.
@@ -355,6 +359,9 @@ def create_revenue_crm_router(
     if (resolve_authenticated_design_writer is not None
             and (resolve_authenticated_read is None or repository is not None)):
         raise ValueError("design storage requires authenticated CRM tenant resolver")
+    if (resolve_authenticated_channel_evidence is not None
+            and (resolve_authenticated_read is None or repository is not None)):
+        raise ValueError("channel evidence requires authenticated CRM tenant resolver")
     router = APIRouter(prefix="/v1/revenue-crm")
 
     @router.get("/health")
@@ -678,6 +685,39 @@ def create_revenue_crm_router(
             )
         except ValueError:
             raise HTTPException(status_code=503, detail="crm_segment_source_invalid") from None
+
+    @router.get("/prospects/{prospect_id}/channel-evidence-preview")
+    def crm_channel_evidence_preview(prospect_id: str, request: Request):
+        repo = require_repository(request)
+        row = guarded_crm_read(lambda: repo.prospect(prospect_id))
+        if row is None:
+            raise HTTPException(status_code=404, detail="prospect_not_found")
+        tenant = getattr(repo, "tenant_id", None)
+        if (not isinstance(tenant, str) or not tenant.strip()
+                or not isinstance(row, Mapping)
+                or str(row.get("tenant_id") or "") != tenant):
+            raise HTTPException(status_code=503, detail="crm_channel_tenant_scope_invalid")
+        if (resolve_authenticated_channel_evidence is not None
+                and not isinstance(repo, PostgresRevenueCrmRepository)):
+            raise HTTPException(status_code=503, detail="crm_channel_reader_unavailable")
+        channels = {}
+        for channel in ("email", "sms", "web_push"):
+            try:
+                evidence = (resolve_authenticated_channel_evidence(request, prospect_id, channel)
+                            if resolve_authenticated_channel_evidence is not None else None)
+                channels[channel] = review_channel_evidence(
+                    row, channel=channel, evidence=evidence,
+                    now=datetime.now(timezone.utc),
+                )
+            except (ChannelEvidenceError, ValueError, TypeError, RuntimeError, OSError):
+                raise HTTPException(status_code=503, detail="crm_channel_reader_unavailable") from None
+        return {
+            "schema_version": "empire.crm_channel_evidence_preview.v1",
+            "mode": "OBSERVE", "tenant_id": tenant,
+            "prospect_id": str(row.get("prospect_id")),
+            "channels": channels, "contact_values_disclosed": False,
+            "send_authorized": False, "execution_authority": "none",
+        }
 
     @router.get("/prospects/{prospect_id}/journey-preview")
     def crm_journey_preview(prospect_id: str, request: Request):

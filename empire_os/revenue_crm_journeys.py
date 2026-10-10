@@ -42,6 +42,9 @@ def journey_blueprint() -> dict[str, Any]:
         "visual_editor_route": "/v1/revenue-crm/journeys/designer",
         "visual_editor_mode": "LOCAL_DESIGN_ONLY",
         "workflow_server_persistence": False,
+        "channel_evidence_preview_route": "/v1/revenue-crm/prospects/{prospect_id}/channel-evidence-preview",
+        "canonical_channel_reader_activated": False,
+        "channels_send_enabled": False,
         "nodes": nodes,
         "edges": [
             {"from": STAGES[i], "to": STAGES[i + 1], "condition": "evidence_review_only"}
