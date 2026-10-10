@@ -265,3 +265,68 @@ LeadBank (onboarding promised), Validated (specific buyer requirements
 requested), Connexis (live programme requested). Next-tier companies
 stay in the existing evidence-recovery queue; no new platform, collector
 or timer is required.
+
+
+## 10 October: exact inbound requirements admission (existing buyer scout)
+
+`scripts/reconcile_buyer_email_relationships.py --write` now optionally
+reads `runtime/buyer_network_intelligence/partner_inbound_requirements_latest.json`
+(a private `0600` JSON file, not an email inbox or new service).
+
+This is an **evidence intake only**: each observation must be independently
+reviewed against a real incoming Gmail message, carry the exact existing
+buyer key, known conversation thread, exact inbound message ID, UTC review
+timestamp and at least one bounded structured commercial field. The source
+must identify `connected_gmail_explicit_review`. Observations may report
+the programme format, coverage, eligible jobs, payable qualification,
+operating hours, payout/settlement, source disclosures, routing instructions
+or agreement/form description.
+
+Example *structure only* — do not enter illustrative values as if received:
+
+```json
+{
+  "schema_version": "empire.partner_inbound_requirements.v1",
+  "origin": "connected_gmail_explicit_review",
+  "observations": [
+    {
+      "entity_key": "validated",
+      "gmail_thread_id": "1a0cfb667dca0957",
+      "inbound_message_id": "<actual-new-hex-id-from-Gmail>",
+      "reviewed_at": "<actual-UTC-ISO-8601>",
+      "reported_fields": {
+        "buyer_market_coverage": "<what-Zach-actually-stated>",
+        "qualified_billable_event": "<buyer-exact-wording>"
+      }
+    }
+  ]
+}
+```
+
+**Do not create that file until there is genuinely new inbound evidence.**
+Current production has only Eleonora's document-*promise*, not actual
+programme terms, so all three launch pilots still have `0/9` approvals.
+
+The importer validates private permissions, exact first-party thread and
+record identifiers, allowed commercial field names, bounded text and
+review chronology. It rejects unknown or privileged fields and extra
+authority flags. Only triage fields inside each existing
+`technical_review_packet` update. Original partner route, payout,
+signed agreement, programme format and launch gates remain unchanged.
+
+An old or superseded incoming message is retained as
+`HISTORICAL_REPORTED_REQUIREMENTS_HOLD`; it cannot be interpreted as a
+fresh response and must not repeatedly stall the 30-minute buyer scout.
+The ordinary founder follow-up and suppression approvals are unaffected.
+Reprocessing the same reviewed message is idempotent. A received PDF must
+still undergo independent agreement review, signer verification and
+founder-gated Documenso signing; Gmail descriptions do not prove signing.
+
+**Operational next step after a genuine reply:** use the existing Gmail
+connector to read that specific incoming message and any attachment,
+verify sender/recipient/thread identity, update only its canonical Gmail
+summary row while retaining all 57 unrelated records, create the bounded
+private structured terms observation with real source evidence, run the
+existing reconciler and inspect the resulting private partner packet.
+Never send messages, accept agreements, buy numbers or open routes as part
+of this intake.

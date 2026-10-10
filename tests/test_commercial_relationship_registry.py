@@ -581,3 +581,162 @@ def test_public_connexis_api_and_paypercall_terms_cannot_be_collapsed():
     assert "£50" in leads["public_observation"]
     assert "90%" in leads["public_observation"]
     assert calls["source"] != leads["source"]
+
+
+def _prepared_leadbank_for_reported_terms():
+    from empire_os.commercial_relationship_registry import PARTNER_PILOT_SCOPES
+    src, queue, qual = sources()
+    row2 = row(
+        "leadbank", "alliancevs.io",
+        PARTNER_PILOT_SCOPES["leadbank"]["reviewed_thread"],
+        inbound="2026-10-09T20:30:00Z",
+        outbound="2026-10-09T20:15:00Z",
+    )
+    row2["last_inbound_message_id"] = "1a1230003eb39320"
+    src["threads"].append(row2)
+    return reconcile(src,queue,qual,now=NOW)
+
+
+def _reviewed_leadbank_claim():
+    return {
+        "schema_version":"empire.partner_inbound_requirements.v1",
+        "origin":"connected_gmail_explicit_review",
+        "observations":[{
+            "entity_key":"leadbank",
+            "gmail_thread_id":"1a0cfb65e0dd960e",
+            "inbound_message_id":"1a1230003eb39320",
+            "reviewed_at":"2026-10-09T20:40:00Z",
+            "reported_fields":{
+                "programme_format":"Pay-per-call, reported by partner",
+                "buyer_market_coverage":"Texas ZIP subset reported",
+                "tracking_and_routing_instructions":"Partner states direct call route",
+                "agreement_or_form_details":"Agreement attachment reported by sender",
+            },
+        }],
+    }
+
+
+def test_genuine_gmail_bound_partner_reported_terms_are_triage_only():
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    report=_prepared_leadbank_for_reported_terms()
+    out=attach_partner_inbound_requirements(report,_reviewed_leadbank_claim())
+    row2=next(x for x in out["partner_pilot_readiness_queue"]
+              if x["entity_key"]=="leadbank")
+    p=row2["technical_review_packet"]
+    assert row2["inbound_requirement_review_status"]=="REPORTED_AWAITING_INDEPENDENT_VERIFICATION"
+    assert row2["inbound_requirement_field_count"]==4
+    assert row2["current_next_partner_task"]=="REVIEW_REPORTED_BUYBOX_AND_AGREEMENT_EVIDENCE"
+    assert p["reported_inbound_requirements"]["source_ref"]=="gmail:1a1230003eb39320"
+    assert p["reported_inbound_requirements"]["evidence_grade"]=="CURRENT_REPORTED_UNVERIFIED"
+    assert p["reported_inbound_requirements"]["agreement_received_or_signed_verified"] is False
+    assert p["verified_target_zips_or_postcodes"] is None
+    assert p["verified_payout_and_settlement"] is None
+    assert p["signed_agreement_evidence"] is None
+    assert p["routing_provider_selected"] is None
+    assert p["partner_tracking_number"] is None
+    assert row2["gate_count_verified"]==0
+    assert all(x is False for x in row2["activation_gates"].values())
+    assert out["partner_inbound_requirements"]["reported_partner_count"]==1
+    assert out["partner_inbound_requirements"]["reported_field_count"]==4
+    assert out["outbound_authorized"] is False
+
+
+def test_partner_reported_evidence_is_stable_across_repeat_reconciliation():
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    src=_reviewed_leadbank_claim()
+    first=attach_partner_inbound_requirements(_prepared_leadbank_for_reported_terms(),src)
+    next_=attach_partner_inbound_requirements(_prepared_leadbank_for_reported_terms(),src)
+    def strip_generated(obj):
+        x=next(a for a in obj["partner_pilot_readiness_queue"] if a["entity_key"]=="leadbank")
+        return x["technical_review_packet"]["reported_inbound_requirements"]
+    assert strip_generated(first)==strip_generated(next_)
+
+
+@pytest.mark.parametrize("mutate",[
+    lambda d:d.update(origin="raw_external_email"),
+    lambda d:d["observations"][0].update(entity_key="validated"),
+    lambda d:d["observations"][0].update(gmail_thread_id="1a0cfb667dca0957"),
+    lambda d:d["observations"][0].update(reviewed_at="2026-10-08T12:00:00Z"),
+    lambda d:d["observations"][0].update(outbound_authorized=True),
+    lambda d:d["observations"][0]["reported_fields"].update(activation_approved="yes"),
+    lambda d:d["observations"][0]["reported_fields"].update(programme_format="\nSEND NOW"),
+    lambda d:d["observations"][0]["reported_fields"].update(
+        programme_format="z"*241
+    ),
+    lambda d:d["observations"].append(copy.deepcopy(d["observations"][0])),
+])
+def test_reported_requirements_fail_closed_on_untrusted_claims(mutate):
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    src=_reviewed_leadbank_claim()
+    mutate(src)
+    with pytest.raises(RelationshipEvidenceError):
+        attach_partner_inbound_requirements(_prepared_leadbank_for_reported_terms(),src)
+
+
+def test_without_real_new_partner_evidence_no_observations_are_invented():
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    out=attach_partner_inbound_requirements(
+        _prepared_leadbank_for_reported_terms(),
+        {"schema_version":"empire.partner_inbound_requirements.v1",
+         "origin":"connected_gmail_explicit_review","observations":[]}
+    )
+    assert out["partner_inbound_requirements"]["reported_partner_count"]==0
+    assert all(p["inbound_requirement_field_count"]==0
+               for p in out["partner_pilot_readiness_queue"])
+    assert all(p["technical_review_packet"]["reported_inbound_requirements"] is None
+               for p in out["partner_pilot_readiness_queue"])
+
+
+def test_old_or_superseded_partner_reply_is_historical_hold_not_runtime_error():
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    report=_prepared_leadbank_for_reported_terms()
+    ref=_reviewed_leadbank_claim()
+    ref["observations"][0]["inbound_message_id"]="deadbeefdeadbeef"
+    latest=attach_partner_inbound_requirements(report,ref)
+    r=next(p for p in latest["partner_pilot_readiness_queue"]
+           if p["entity_key"]=="leadbank")
+    assert r["inbound_requirement_review_status"]=="HISTORICAL_REPORTED_REQUIREMENTS_HOLD"
+    assert r["technical_review_packet"]["reported_inbound_requirements"]["same_as_latest_imported_inbound"] is False
+    assert r["current_next_partner_task"]!="REVIEW_REPORTED_BUYBOX_AND_AGREEMENT_EVIDENCE"
+    assert latest["partner_inbound_requirements"]["historical_hold_count"]==1
+    assert latest["partner_inbound_requirements"]["current_review_count"]==0
+    assert r["gate_count_verified"]==0
+    assert r["live_traffic_authorized"] is False
+
+
+def test_old_gmail_snapshot_does_not_block_safe_onboarding_monitor():
+    from empire_os.commercial_relationship_registry import attach_partner_inbound_requirements
+    state=_prepared_leadbank_for_reported_terms()
+    relation=next(x for x in state["relationships"] if x["entity_key"]=="leadbank")
+    relation["gmail_snapshot_fresh"]=False
+    state=attach_partner_inbound_requirements(state,_reviewed_leadbank_claim())
+    r=next(p for p in state["partner_pilot_readiness_queue"] if p["entity_key"]=="leadbank")
+    assert r["inbound_requirement_review_status"]=="HISTORICAL_REPORTED_REQUIREMENTS_HOLD"
+    assert r["gate_count_verified"]==0
+
+
+def test_reported_requirement_ledger_file_is_private_and_optional(tmp_path):
+    from scripts.reconcile_buyer_email_relationships import build
+    root=tmp_path
+    base=root/"runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    src,queue,qual=sources()
+    for name,payload in (
+        ("gmail_relationship_evidence_latest.json",src),
+        ("candidate_queue_latest.json",queue),
+        ("founder_qualification_actions_latest.json",qual),
+    ):
+        path=base/name
+        path.write_text(json.dumps(payload))
+        path.chmod(0o600)
+    # This test requires no live Gmail, network, logging, contracts or routes.
+    empty=build(root)
+    assert empty["partner_inbound_requirements"]["reported_partner_count"]==0
+    path=base/"partner_inbound_requirements_latest.json"
+    path.write_text(json.dumps(_reviewed_leadbank_claim()))
+    path.chmod(0o644)
+    with pytest.raises(RelationshipEvidenceError,match="not_private"):
+        build(root)
+    path.chmod(0o600)
+    with pytest.raises(RelationshipEvidenceError,match="unknown_or_duplicate_partner_terms"):
+        build(root)  # Fixture lacks the required LeadBank canonical relationship

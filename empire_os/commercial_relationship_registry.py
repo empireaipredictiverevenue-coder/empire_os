@@ -197,6 +197,130 @@ def partner_technical_review_packet(
     }
 
 
+# Evidence from reviewed *inbound* Gmail messages only. Never use this
+# observation record to create contacts, accept terms or open live routes.
+PARTNER_REPORTED_FIELDS = frozenset({
+    "programme_format", "buyer_market_coverage", "eligible_jobs",
+    "qualified_billable_event", "buyer_operating_hours",
+    "buyer_payout_and_settlement", "source_or_disclosure_rules",
+    "tracking_and_routing_instructions", "agreement_or_form_details",
+})
+
+
+def attach_partner_inbound_requirements(
+    report: dict[str, Any], observed: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Admit reviewed email claims into EXISTING partner technical packets.
+
+    Email-reported claims are NOT verified commercial requirements. The
+    nine independent launch gates, payouts, route and signing authority
+    are intentionally unchanged. Exact latest Gmail message bindings
+    prevent attachment to stale, spoofed or unrelated buyer threads.
+    """
+    if (not isinstance(observed, Mapping)
+            or observed.get("schema_version") != "empire.partner_inbound_requirements.v1"
+            or observed.get("origin") != "connected_gmail_explicit_review"):
+        raise RelationshipEvidenceError("invalid_inbound_requirement_provenance")
+    items = observed.get("observations")
+    if not isinstance(items, list) or len(items) > len(PARTNER_PILOT_SCOPES):
+        raise RelationshipEvidenceError("invalid_partner_requirement_count")
+    by_partner = {row["entity_key"]: row for row in report["partner_pilot_readiness_queue"]}
+    by_relationship = {row["entity_key"]: row for row in report["relationships"]}
+    if not by_partner.keys() <= PARTNER_PILOT_SCOPES.keys():
+        raise RelationshipEvidenceError("unrecognized_partner_pilot")
+    matched = set()
+    for item in items:
+        if not isinstance(item, Mapping) or set(item) != {
+            "entity_key", "gmail_thread_id", "inbound_message_id",
+            "reviewed_at", "reported_fields",
+        }:
+            raise RelationshipEvidenceError("invalid_reported_terms_shape")
+        key = item["entity_key"]
+        if not isinstance(key, str) or key not in by_partner or key in matched:
+            raise RelationshipEvidenceError("unknown_or_duplicate_partner_terms")
+        matched.add(key)
+        msg_id = item["inbound_message_id"]
+        thread = item["gmail_thread_id"]
+        relation = by_relationship[key]
+        scope = PARTNER_PILOT_SCOPES[key]
+        if (not isinstance(msg_id, str) or not re.fullmatch(r"[0-9a-f]{16,32}", msg_id)
+                or thread != scope["reviewed_thread"]
+                or thread not in relation["gmail_thread_ids"]):
+            raise RelationshipEvidenceError("inbound_terms_unmatched_thread")
+        reviewed = when(item["reviewed_at"])
+        received = when(relation.get("last_inbound_at"))
+        generated = when(report.get("generated_at"))
+        if (reviewed is None or generated is None
+                or (reviewed - generated).total_seconds() > 300):
+            raise RelationshipEvidenceError("inbound_requirement_review_time_invalid")
+        same_latest_message = msg_id == relation.get("last_inbound_message_id")
+        if same_latest_message and (received is None or reviewed < received):
+            raise RelationshipEvidenceError("inbound_requirement_review_before_receipt")
+        current = (
+            same_latest_message and relation.get("gmail_snapshot_fresh") is True
+            and (generated - reviewed).total_seconds() <= 96 * 3600
+        )
+        fields = item["reported_fields"]
+        if not isinstance(fields, Mapping) or not fields or len(fields) > len(PARTNER_REPORTED_FIELDS):
+            raise RelationshipEvidenceError("invalid_reported_requirement_fields")
+        if not set(fields) <= PARTNER_REPORTED_FIELDS:
+            raise RelationshipEvidenceError("unknown_or_privileged_reported_field")
+        if any(not isinstance(v, str) or not v.strip()
+               or len(v) > 240 or any(ord(c) < 32 for c in v)
+               for v in fields.values()):
+            raise RelationshipEvidenceError("invalid_reported_requirement_text")
+        pilot = by_partner[key]
+        packet = pilot["technical_review_packet"]
+        # Populate review-only claims; not verified runtime/policy identity.
+        packet["reported_inbound_requirements"] = {
+            "source_ref": "gmail:" + msg_id,
+            "reviewed_at": reviewed.isoformat(),
+            "evidence_grade": (
+                "CURRENT_REPORTED_UNVERIFIED" if current
+                else "HISTORICAL_REPORTED_UNVERIFIED"
+            ),
+            "same_as_latest_imported_inbound": same_latest_message,
+            "mailbox_snapshot_fresh": relation.get("gmail_snapshot_fresh") is True,
+            "fields": dict(sorted(fields.items())),
+            "commercial_terms_confirmed": False,
+            "agreement_received_or_signed_verified": False,
+            "routing_provider_verified": False,
+            "founder_activation_authorized": False,
+        }
+        if current:
+            pilot["current_next_partner_task"] = "REVIEW_REPORTED_BUYBOX_AND_AGREEMENT_EVIDENCE"
+        pilot["inbound_requirement_field_count"] = len(fields)
+        pilot["inbound_requirement_review_status"] = (
+            "REPORTED_AWAITING_INDEPENDENT_VERIFICATION" if current
+            else "HISTORICAL_REPORTED_REQUIREMENTS_HOLD"
+        )
+        # No activation stage promotion: changing from a promise to
+        # a reported specification must not imply successful onboarding.
+    for key, pilot in by_partner.items():
+        if key not in matched:
+            pilot["inbound_requirement_field_count"] = 0
+            pilot["inbound_requirement_review_status"] = "NO_NEW_VERIFIED_GMAIL_OBSERVATION"
+            pilot["technical_review_packet"]["reported_inbound_requirements"] = None
+    report["partner_inbound_requirements"] = {
+        "schema_version": "empire.partner_inbound_requirements_review.v1",
+        "mode": "OBSERVE",
+        "reported_partner_count": len(matched),
+        "current_review_count": sum(
+            by_partner[k]["inbound_requirement_review_status"]
+            == "REPORTED_AWAITING_INDEPENDENT_VERIFICATION" for k in matched
+        ),
+        "historical_hold_count": sum(
+            by_partner[k]["inbound_requirement_review_status"]
+            == "HISTORICAL_REPORTED_REQUIREMENTS_HOLD" for k in matched
+        ),
+        "reported_field_count": sum(by_partner[k]["inbound_requirement_field_count"] for k in matched),
+        "commercial_activation_authorized": False,
+        "outbound_authorized": False,
+        "execution_authority": "NONE",
+    }
+    return report
+
+
 PARTNER_LAUNCH_GATES = (
     "buyer_buybox_received_and_verified",
     "current_target_geography_verified",

@@ -15,6 +15,7 @@ import tempfile
 
 from empire_os.commercial_relationship_registry import (
     RelationshipEvidenceError, reconcile,
+    attach_partner_inbound_requirements,
 )
 
 from empire_os.commercial_social_intent import build_social_intent_review
@@ -51,6 +52,21 @@ def build(root: Path = ROOT) -> dict:
     prior_path = base / OUTPUT_NAME
     previous = _read_private(prior_path) if prior_path.exists() else {}
     result = reconcile(src, queue, qualification, previous=previous)
+    # This evidence feed is optional until a *genuine* buyer response has
+    # been examined through connected Gmail. A malformed file fails closed:
+    # never discard it and silently claim that no partner terms arrived.
+    terms = base / "partner_inbound_requirements_latest.json"
+    if terms.exists():
+        if terms.stat().st_mode & 0o077:
+            raise RelationshipEvidenceError("inbound_requirement_evidence_not_private")
+        reviewed = _read_private(terms, limit=18000, require_private=True)
+    else:
+        reviewed = {
+            "schema_version": "empire.partner_inbound_requirements.v1",
+            "origin": "connected_gmail_explicit_review",
+            "observations": [],
+        }
+    attach_partner_inbound_requirements(result, reviewed)
     # This is evidence-only enrichment. A missing collector must not block
     # an already valid Gmail/relationship registry.
     try:
