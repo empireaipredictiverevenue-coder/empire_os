@@ -41,3 +41,20 @@ Only after these prerequisites can the authorised DBA apply the already prepared
 The held rollback is at `deploy/empiredb/tam_isolated_rollback_held.sql` and must not be auto-run after a partial release. If the role bootstrap succeeded but the function migration failed, the account is still dormant; inspect before any retry.
 
 **Status: approved stage 1, blocked before production DDL by unavailable DBA preflight and backup evidence.**
+
+
+## TAM 043 — approved stage-1 deployment operator procedure
+
+The founder successfully ran the live, read-only TAM043 preflight as the PostgreSQL DBA, receiving TAM043_STAGE1_READ_ONLY_CATALOG_PREFLIGHT_PASS and ROLLBACK. This confirms the catalog requirements at that time, not a fresh backup or an applied migration.
+
+Stage 1 is packaged in scripts/deploy_empiredb_tam043_stage1.sh. It requires explicit --apply --approved-stage1 and an authorised root DBA. It pins the reviewed SQL and preflight to exact Git objects and SHA256 hashes; rechecks the PostgreSQL 18 primary and application instance, acquires a dedicated release lock, reruns the read-only preflight, verifies backup space, takes fresh private pg_dump and pg_dumpall globals archives, checks pg_restore format/source-table inventory and backup SHA256, then applies the previously approved NOLOGIN-only role bootstrap and isolated function 043 in distinct guarded transactions. It then runs the independent catalog-only postcommit verifier. A failed stage after a role commit must be inspected, not automatically rerun or rolled back.
+
+The postcommit verifier is scripts/verify_empiredb_tam043_stage1.sql. It validates both TAM roles remain NOLOGIN with null passwords, function owner and SECURITY DEFINER/STABLE/jsonb, PostgreSQL 18 canonical empty-search-path representation, function EXECUTE restrictions, zero source-table/column permission, and unchanged legacy Market GPS grants. It reads no company records.
+
+PG18 diagnostic: the function's empty search_path is stored as the catalog element search_path="" (not search_path=). The runtime catalog validator and postcommit verifier were corrected after a disposable database regression caught this difference. The function migration SQL already had the correct SET search_path = ''.
+
+Founder DBA command after the fully tested script is committed:
+
+    cd /srv/empire_os && sudo -n bash scripts/deploy_empiredb_tam043_stage1.sh --apply --approved-stage1
+
+ChatGPT has NOT executed production DDL. Remote terminal policy denies privileged DBA execution, so the authorised founder/operator runs the command, and its actual TAM043_RESULT must be read back before reporting release success. This grants no stage-2 authority: no password, LOGIN, systemd installation/start, market data, outbound, payment, or new automation.

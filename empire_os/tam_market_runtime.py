@@ -147,7 +147,7 @@ def _probe_role_capability(
                                     SELECT oid FROM pg_catalog.pg_roles
                                     WHERE rolname = 'empiredb_migrator'
                                 )
-                                AND p.proconfig @> ARRAY['search_path=']::text[]
+                                AND p.proconfig @> ARRAY['search_path=""']::text[]
                                 AND p.provolatile = 's'
                                 AND p.prorettype = 'pg_catalog.jsonb'::regtype
                              FROM pg_catalog.pg_proc p
