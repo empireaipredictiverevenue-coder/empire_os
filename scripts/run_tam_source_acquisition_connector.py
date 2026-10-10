@@ -17,7 +17,7 @@ from uuid import uuid4
 from empire_os.runtime_env import load_runtime_env
 from empire_os.tam_source_acquisition_connector import (
     canonical_targets, source_observations, build_review,
-    build_first_party_site_review,
+    build_first_party_site_review, build_first_party_discovery_review,
     validate_scope, MAX_TARGETS, MAX_SOURCE,
 )
 
@@ -50,7 +50,7 @@ def save_private(packet: dict, folder: Path=REPORT_DIR) -> Path:
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser()
     parser.add_argument("--observe",action="store_true",required=True)
-    parser.add_argument("--source",choices=("recc_solar","overpass_osm","first_party_site"),
+    parser.add_argument("--source",choices=("recc_solar","overpass_osm","first_party_site","first_party_search"),
                         required=True)
     parser.add_argument("--sector",choices=("solar","roofing"),required=True)
     parser.add_argument("--country",choices=("GB","US"),required=True)
@@ -65,6 +65,10 @@ def main(argv=None) -> int:
                    country=args.country,limit=args.max_targets)
     if not 1 <= args.max_source <= MAX_SOURCE:
         parser.error("source observation limit out of bounds")
+    if args.source=="first_party_search" and (
+            args.max_source > 5 or args.page_count != 1
+            or args.source_page != 0 or args.metro):
+        parser.error("first-party discovery permits at most five entities")
     if args.diagnose_only and args.source!="first_party_site":
         parser.error("--diagnose-only is only for first-party identity eligibility")
     if (args.source=="first_party_site" and
@@ -111,6 +115,33 @@ def main(argv=None) -> int:
             "private_review_file":str(path),
             "country_verified":False,"acquisitions_appended":0,
             "database_write":False,"outbound_sent":False,
+            "execution_authority":"none",
+        },sort_keys=True))
+        return 0
+    if args.source=="first_party_search":
+        packet=build_first_party_discovery_review(
+            targets=targets,max_entities=args.max_source,
+        )
+        packet["target_query_limit"]=args.max_targets
+        packet["target_selection_complete"]=False
+        location=save_private(packet)
+        print(json.dumps({
+            "status":"READ_ONLY_FIRST_PARTY_SEARCH_REVIEW_PREPARED",
+            "source":"first_party_search","country_focus":"GB",
+            "entity_candidates_available":packet["entity_candidates_available"],
+            "entities_selected_for_search":packet["entities_selected_for_search"],
+            "search_errors":packet["search_errors"],
+            "search_candidates_before_cross_entity_filter":packet[
+                "search_candidates_before_cross_entity_filter"],
+            "shared_existing_host_count":packet["shared_existing_host_count"],
+            "entities_skipped_by_search_selector":packet[
+                "entities_skipped_by_search_selector"],
+            "website_probes_attempted":packet["website_probes_attempted"],
+            "verified_company_site_review_count":packet[
+                "verified_company_site_review_count"],
+            "private_review_file":str(location),
+            "country_verified":False,"database_write":False,
+            "acquisitions_appended":0,"outbound_sent":False,
             "execution_authority":"none",
         },sort_keys=True))
         return 0

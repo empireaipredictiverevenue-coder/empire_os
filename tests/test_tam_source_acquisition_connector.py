@@ -202,7 +202,8 @@ def test_postgres_query_compiles_in_disposable_schema(isolated):
 SET ROLE empiredb_migrator;
 ALTER TABLE public.business_entities ADD COLUMN canonical_website text;
 ALTER TABLE public.business_entities ADD COLUMN canonical_phone text;
-CREATE TABLE public.prospects(id uuid PRIMARY KEY,website text,phone text);
+ALTER TABLE public.business_entities ADD COLUMN canonical_metro text;
+CREATE TABLE public.prospects(id uuid PRIMARY KEY,website text,phone text,business_name text);
 INSERT INTO public.prospects VALUES
  ('10000000-0000-0000-0000-000000000001','https://roof.example'),
  ('10000000-0000-0000-0000-000000000002','https://solar.example'),

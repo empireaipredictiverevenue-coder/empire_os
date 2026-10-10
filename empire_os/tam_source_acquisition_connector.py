@@ -18,7 +18,7 @@ from urllib.parse import urlsplit
 
 SECTORS = frozenset({"solar", "roofing"})
 COUNTRIES = frozenset({"GB", "US"})
-SOURCES = frozenset({"recc_solar", "overpass_osm", "first_party_site"})
+SOURCES = frozenset({"recc_solar", "overpass_osm", "first_party_site", "first_party_search"})
 MAX_TARGETS = 500
 MAX_SOURCE = 40
 MAX_RECC_PAGE = 40  # at most 41 public listing pages; 40 details/page
@@ -26,7 +26,7 @@ MAX_RECC_PAGE = 40  # at most 41 public listing pages; 40 details/page
 TARGET_SQL = """
 WITH targets AS MATERIALIZED (
     SELECT e.id, e.canonical_name, e.canonical_niche,
-      e.canonical_website,e.canonical_phone
+      e.canonical_website,e.canonical_phone,e.canonical_metro
     FROM public.business_entities e
     WHERE lower(btrim(e.canonical_niche))=%s
       AND btrim(e.canonical_name)<>''
@@ -43,7 +43,8 @@ WITH targets AS MATERIALIZED (
 )
 SELECT t.id::text,t.canonical_name,t.canonical_niche,
   t.canonical_website,t.canonical_phone,
-  l.prospect_id::text,p.website,p.phone,p.business_name
+  l.prospect_id::text,p.website,p.phone,p.business_name,
+  t.canonical_metro
 FROM targets t
 JOIN public.prospect_entity_links l
   ON l.entity_id=t.id AND l.active IS TRUE
@@ -117,7 +118,7 @@ def validate_scope(*, source: str, sector: str, country: str,
     if (source not in SOURCES or sector not in SECTORS or
         country not in COUNTRIES or type(limit) is not int
         or not 1 <= limit <= MAX_TARGETS or
-        (source in {"recc_solar","first_party_site"}
+        (source in {"recc_solar","first_party_site","first_party_search"}
             and (sector,country)!=("solar","GB"))):
         raise ValueError("source acquisition scope not approved")
 
@@ -160,6 +161,7 @@ def canonical_targets(dsn: str, *, sector: str, limit: int = 250,
         "canonical_website":r[3],"canonical_phone":r[4],
         "prospect_id":r[5],"prospect_website":r[6],
         "prospect_phone":r[7],"prospect_name":r[8],
+        "canonical_metro":r[9],
     } for r in rows]
 
 
@@ -171,8 +173,8 @@ def source_observations(*, source: str, sector: str, country: str,
     validate_scope(source=source,sector=sector,country=country,limit=1)
     if type(max_source) is not int or not 1 <= max_source <= MAX_SOURCE:
         raise ValueError("source observation bound invalid")
-    if source=="first_party_site":
-        raise ValueError("first-party evidence must use the target-bound site probe")
+    if source in {"first_party_site","first_party_search"}:
+        raise ValueError("first-party evidence must use target-bound research")
     if type(source_page) is not int or not 0 <= source_page <= MAX_RECC_PAGE:
         raise ValueError("RECC source page outside bounded research scope")
     if source == "recc_solar":
@@ -669,4 +671,222 @@ def build_first_party_site_review(
         "buyer_intent_inferred": False,
         "execution_authority": "none",
         "tam_population_verified": False,
+    }
+
+
+def build_first_party_discovery_review(
+    *, targets: Iterable[Mapping[str, Any]], max_entities: int = 3,
+    searcher: Callable | None = None, site_probe: Callable | None = None,
+) -> dict[str, Any]:
+    """Find candidate first-party domains independently of polluted website field.
+
+    Search/website signals are review hints, not company verification or
+    authority to choose any one prospect for an acquisition ledger record.
+    """
+    if type(max_entities) is not int or not 1 <= max_entities <= 5:
+        raise ValueError("first-party discovery limited to five entities")
+    if searcher is None:
+        from empire_os.search_fabric.reliable_search import search_reliable_rows
+        searcher=search_reliable_rows
+    if site_probe is None:
+        from empire_os.search_fabric.site_probe import probe_site
+        site_probe=probe_site
+    from empire_os.search_fabric.verification import is_directory_url
+    from empire_os.search_fabric.identity_guard import assess_first_party_identity
+
+    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    original_host_to_entities: dict[str, set[str]] = defaultdict(set)
+    for r in targets:
+        entity=str(r.get("entity_id") or "").strip()
+        prospect=str(r.get("prospect_id") or "").strip()
+        if r.get("sector")!="solar" or not entity or not prospect:
+            continue
+        grouped[entity].append(dict(r))
+        for field in ("prospect_website","canonical_website"):
+            host=_identity_domain(r.get(field))
+            if host:
+                original_host_to_entities[host].add(entity)
+    shared_existing_hosts={
+        host for host,owners in original_host_to_entities.items()
+        if len(owners)>1
+    }
+    selected=[]
+    skipped=Counter()
+    for entity,rows in sorted(grouped.items()):
+        names={_clean_name(r.get("canonical_name")) for r in rows}
+        linked_names={_clean_name(r.get("prospect_name"))
+                      for r in rows if str(r.get("prospect_name") or "").strip()}
+        metros={str(r.get("canonical_metro") or "").strip() for r in rows}
+        if len(names)!=1 or not next(iter(names), ""):
+            skipped["CONFLICTING_OR_EMPTY_CANONICAL_NAMES"]+=1
+            continue
+        if linked_names and linked_names!=names:
+            skipped["CONFLICTING_LINKED_PROSPECT_NAMES"]+=1
+            continue
+        if len(metros)!=1:
+            skipped["CONFLICTING_CANONICAL_METRO"]+=1
+            continue
+        name=str(rows[0].get("canonical_name") or "").strip()
+        metro=next(iter(metros))
+        if not 8<=len(name)<=100 or not 2<=len(_clean_name(name).split())<=12:
+            skipped["INSUFFICIENT_DISTINCTIVE_SEARCH_IDENTITY"]+=1
+            continue
+        if len(selected)<max_entities:
+            selected.append((entity,name,metro,len({
+                str(r["prospect_id"]) for r in rows
+            })))
+    candidate_by_entity={}
+    search_errors=0
+    discovered=0
+    for entity,name,metro,prospect_count in selected:
+        # A recorded metro disambiguates a search but NEVER proves geography.
+        clean_metro=" ".join(re.findall(r"[A-Za-z0-9 -]+",metro))[:60]
+        q=f'"{name}" {clean_metro} solar company official website'
+        try:
+            rows=searcher(q,num=5)
+        except Exception:
+            rows=[]
+            search_errors+=1
+        candidates={}
+        if isinstance(rows,list):
+            for row in rows[:5]:
+                if not isinstance(row,Mapping):
+                    continue
+                url=str(row.get("link") or "").strip()
+                host=_identity_domain(url)
+                if (not host or host in shared_existing_hosts
+                    or (host in original_host_to_entities
+                        and entity not in original_host_to_entities[host])
+                    or is_directory_url(url)
+                    or host in ("recc.org.uk", "openstreetmap.org")
+                    or host.endswith((".recc.org.uk", ".openstreetmap.org"))):
+                    continue
+                try:
+                    parsed=urlsplit(url)
+                    if (parsed.scheme!="https"
+                        or parsed.username or parsed.password
+                        or parsed.port not in (None,443)
+                        or parsed.query or parsed.fragment):
+                        continue
+                except ValueError:
+                    continue
+                if not re.fullmatch(r"[a-z0-9.-]+",host) or "." not in host:
+                    continue
+                if (host.endswith((".local",".internal",".test",".invalid",".onion"))
+                    or host in ("co.uk","org.uk","com","net","org")):
+                    continue
+                try:
+                    ipaddress.ip_address(host)
+                except ValueError:
+                    pass
+                else:
+                    continue
+                candidates.setdefault(host,"https://"+host+"/")
+        discovered+=len(candidates)
+        candidate_by_entity[entity]={
+            "name":name,"metro":metro,"prospect_count":prospect_count,
+            "domains":candidates,
+        }
+    host_to_entities=defaultdict(set)
+    for entity,data in candidate_by_entity.items():
+        for host in data["domains"]:
+            host_to_entities[host].add(entity)
+    findings=[]
+    probes=0
+    for entity,data in candidate_by_entity.items():
+        unique_hosts=[
+            host for host in data["domains"]
+            if len(host_to_entities[host])==1
+        ]
+        # Any multiple plausible hosts are ambiguous. No first-result trust.
+        if len(unique_hosts)!=1:
+            findings.append({
+                "entity_id":entity,
+                "review_state":"AMBIGUOUS_OR_MISSING_DISCOVERED_HOST",
+                "source_url":None,
+                "linked_prospect_count":data["prospect_count"],
+                "proven_country":False,
+                "acquisition_appended":False,
+            })
+            continue
+        host=unique_hosts[0]
+        url=data["domains"][host]
+        try:
+            probes+=1
+            probe=site_probe(url,max_pages=2,request_timeout=4.0,
+                              time_budget_seconds=10.0,public_only=True)
+        except Exception:
+            probe={}
+        safe=(isinstance(probe,Mapping)
+              and probe.get("ok") is True
+              and _identity_domain(probe.get("final_url"))==host
+              and str(probe.get("final_url") or "").startswith("https://")
+              and isinstance(probe.get("pages_checked"),list)
+              and any(isinstance(x,Mapping) and
+                      _identity_domain(x.get("url"))==host
+                      for x in probe["pages_checked"]))
+        accepted=False
+        if safe:
+            try:
+                verdict=assess_first_party_identity(
+                    prospect={
+                        "business_name":data["name"],
+                        "metro":data["metro"],
+                        "niche":"solar",
+                        "website":"",
+                    },
+                    candidate_url=url,probe=dict(probe),
+                )
+                accepted=bool(verdict.get("accepted")) and any(
+                    _clean_name(n)==_clean_name(data["name"])
+                    for n in probe.get("business_names",[])
+                    if isinstance(n,str)
+                )
+            except Exception:
+                accepted=False
+        findings.append({
+            "entity_id":entity,
+            "canonical_name":data["name"],
+            "linked_prospect_count":data["prospect_count"],
+            "review_state":(
+                "DISCOVERED_FIRST_PARTY_NAME_CORROBORATION_REVIEW"
+                if accepted else "DISCOVERED_SITE_IDENTITY_UNVERIFIED"
+            ),
+            "source_url":url if safe else None,
+            "observed_business_names":(
+                [n for n in probe.get("business_names",[])
+                 if isinstance(n,str)][:4]
+                if safe else []
+            ),
+            "proven_country":False,
+            "canonical_resolution_verified":False,
+            "individual_prospect_link_verified":False,
+            "acquisition_appended":False,
+        })
+    return {
+        "schema_version":"empire.tam-first-party-discovery-review.v1",
+        "generated_at":datetime.now(timezone.utc).isoformat(),
+        "mode":"OBSERVE",
+        "source":"first_party_search",
+        "sector":"solar",
+        "country_research_focus":"GB",
+        "entity_candidates_available":len(grouped),
+        "entities_selected_for_search":len(selected),
+        "search_errors":search_errors,
+        "search_candidates_before_cross_entity_filter":discovered,
+        "shared_existing_host_count":len(shared_existing_hosts),
+        "entities_skipped_by_search_selector":dict(sorted(skipped.items())),
+        "website_probes_attempted":probes,
+        "verified_company_site_review_count":sum(
+            x["review_state"]=="DISCOVERED_FIRST_PARTY_NAME_CORROBORATION_REVIEW"
+            for x in findings
+        ),
+        "findings":findings,
+        "database_write":False,
+        "acquisitions_appended":0,
+        "country_verified":False,
+        "outbound_sent":False,
+        "execution_authority":"none",
+        "buyer_intent_inferred":False,
+        "tam_population_verified":False,
     }
