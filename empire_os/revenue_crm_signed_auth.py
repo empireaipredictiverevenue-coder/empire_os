@@ -22,6 +22,8 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from fastapi import Request
 
+from empire_os.saas_scale import TenantMembership
+
 MAX_TOKEN_BYTES = 4096
 MAX_LIFETIME_SECONDS = 900
 ALLOWED_CLOCK_SKEW_SECONDS = 30
@@ -84,8 +86,11 @@ class SignedCrmTenantVerifier:
     def __init__(
         self, public_keys: Mapping[str, bytes | Ed25519PublicKey],
         *,
+        load_membership: Callable[[str, str], TenantMembership | None],
         now: Callable[[], int] | None = None,
     ) -> None:
+        if not callable(load_membership):
+            raise ValueError("trusted CRM membership lookup required")
         if not public_keys:
             raise ValueError("trusted CRM signing public keys required")
         keys: dict[str, Ed25519PublicKey] = {}
@@ -100,6 +105,7 @@ class SignedCrmTenantVerifier:
                 raise ValueError("invalid trusted CRM Ed25519 key")
             keys[key_id] = key
         self._public_keys = keys
+        self._load_membership = load_membership
         self._now = now or (lambda: int(time.time()))
 
     def authenticate(self, token: str) -> str:
@@ -160,16 +166,40 @@ class SignedCrmTenantVerifier:
             raise ValueError("invalid signed CRM tenant ID") from exc
         if tenant != claims["tenant_id"]:
             raise ValueError("noncanonical signed CRM tenant ID")
+
+        # Cryptographic validity alone is NOT active user/tenant authority.
+        # Require a fresh authoritative membership read on every request;
+        # no caller-provided membership objects, booleans or bearer claims.
+        try:
+            membership = self._load_membership(claims["sub"], tenant)
+            permitted = (
+                isinstance(membership, TenantMembership)
+                and membership.user_id == claims["sub"]
+                and membership.tenant_id == tenant
+                and membership.can("read")
+            )
+        except Exception:
+            permitted = False
+        if not permitted:
+            raise ValueError("active canonical CRM membership required")
         return tenant
 
 
 def build_signed_crm_tenant_authenticator(
     trusted_public_keys: Mapping[str, bytes | Ed25519PublicKey],
     *,
+    load_membership: Callable[[str, str], TenantMembership | None],
     now: Callable[[], int] | None = None,
 ) -> Callable[[Request], str | None]:
-    """Opt-in FastAPI request hook for existing CRM repository resolver."""
-    verifier = SignedCrmTenantVerifier(trusted_public_keys, now=now)
+    """Opt-in verified bearer hook; caller must provide authoritative membership.
+
+    The lookup must query a trusted up-to-date identity store keyed by both
+    signed user and signed tenant. It must never trust request-provided roles.
+    If no such store exists in the live runtime, do not mount this hook.
+    """
+    verifier = SignedCrmTenantVerifier(
+        trusted_public_keys, load_membership=load_membership, now=now,
+    )
 
     def authenticate_tenant(request: Request) -> str | None:
         headers = request.headers.getlist("authorization")
