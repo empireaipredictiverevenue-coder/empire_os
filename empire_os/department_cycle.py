@@ -12,6 +12,9 @@ from empire_os.completion_board_dispatcher import dispatch_completion_board
 from empire_os.completion_reconciliation import (
     refresh_completion_reconciliation,
 )
+from empire_os.completion_task_monitor import (
+    MonitorEvidenceError, refresh_completion_task_monitor,
+)
 from empire_os.marketing_agency import observe_marketing_agency
 from empire_os.economic_memory import refresh_economic_memory_snapshot
 from empire_os.completion_progress import refresh_completion_progress
@@ -46,6 +49,19 @@ def run_department_cycle(
         timeout_seconds=timeout_seconds,
     )
     completion_reconciliation = refresh_completion_reconciliation(root)
+    # No additional timer or agent loop: monitor the reconciled tasks during
+    # the department cycle already responsible for this work.
+    try:
+        task_monitor = refresh_completion_task_monitor(root)
+    except (MonitorEvidenceError, ValueError, OSError) as exc:
+        # Monitoring source failure never expands builder authority or
+        # prevents independent department activity; last valid report stays.
+        task_monitor = {
+            "status": "HELD",
+            "reason": str(exc)[:120],
+            "execution_authority": "none",
+            "monitoring_not_dispatch": True,
+        }
     evaluation = evaluate_executive_plan(root)
     economic_memory = refresh_economic_memory_snapshot(root)
     completion_live_proof = run_completion_live_proof(root)
@@ -87,6 +103,21 @@ def run_department_cycle(
             "founder_gates_preserved": completion_dispatch.get(
                 "founder_gates_preserved"
             ),
+        },
+        "task_monitor": {
+            "status": task_monitor.get("status"),
+            "reason": task_monitor.get("reason"),
+            "tracked_pending_count": task_monitor.get("tracked_pending_count"),
+            "new_state_transition_count": task_monitor.get(
+                "new_state_transition_count"
+            ),
+            "attention_count": task_monitor.get("attention_count"),
+            "provider_blocked_count": task_monitor.get("provider_blocked_count"),
+            "code_complete_not_live_count": task_monitor.get(
+                "code_complete_not_live_count"
+            ),
+            "notifications_sent": False,
+            "execution_authority": "none",
         },
         "completion_reconciliation": {
             "status": completion_reconciliation.get("status"),

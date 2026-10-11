@@ -16,6 +16,18 @@ def test_department_cycle_runs_worker_then_evaluation(
             "failed_count": 0,
         }
 
+    def fake_task_monitor(root):
+        calls.append(("task_monitor",))
+        return {
+            "status": "AVAILABLE",
+            "tracked_pending_count": 281,
+            "new_state_transition_count": 0,
+            "attention_count": 8,
+            "provider_blocked_count": 2,
+            "code_complete_not_live_count": 3,
+            "execution_authority": "none",
+        }
+
     def fake_evaluation(root):
         calls.append(("evaluation",))
         return {
@@ -107,6 +119,9 @@ def test_department_cycle_runs_worker_then_evaluation(
     monkeypatch.setattr(module, "run_department_worker", fake_worker)
     monkeypatch.setattr(module, "evaluate_executive_plan", fake_evaluation)
     monkeypatch.setattr(
+        module, "refresh_completion_task_monitor", fake_task_monitor
+    )
+    monkeypatch.setattr(
         module,
         "refresh_economic_memory_snapshot",
         fake_memory,
@@ -139,6 +154,7 @@ def test_department_cycle_runs_worker_then_evaluation(
     )
     assert calls == [
         ("worker", 3, 45),
+        ("task_monitor",),
         ("evaluation",),
         ("economic_memory",),
         ("business_optimization_policy",),
@@ -147,6 +163,9 @@ def test_department_cycle_runs_worker_then_evaluation(
         ("live_queue_truth",),
     ]
     assert result["worker"]["done_count"] == 2
+    assert result["task_monitor"]["status"] == "AVAILABLE"
+    assert result["task_monitor"]["tracked_pending_count"] == 281
+    assert result["task_monitor"]["attention_count"] == 8
     assert result["evaluation"]["evaluation_state"] == "BLOCKED"
     assert result["economic_memory"]["department_episode_count"] == 3
     assert result["economic_memory"]["outcome_conditioned_memory_count"] == 1
@@ -289,3 +308,4 @@ def test_department_cycle_persists_process_and_work_truth(
     assert result["service_health"] == "completed"
     assert result["work_ok"] is False
     assert result["worker"]["failed_count"] == 1
+    assert result["task_monitor"]["status"] == "HELD"
