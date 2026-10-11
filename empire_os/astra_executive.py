@@ -21,6 +21,7 @@ from typing import Any, Mapping, Sequence
 
 from empire_os.agi_memory import build_memory_query
 from empire_os.astra_canonical_company_binding import resolve_company_bindings
+from empire_os.astra_validated_workstream_ranking import rank_validated_workstreams
 from empire_os.control_fabric import default_registry
 from empire_os.departments import (
     default_departments,
@@ -190,6 +191,20 @@ def build_world_state(
         if _clean(x)
     ]
 
+    # Current derived validation may order existing internal evidence work,
+    # never elevate prior lifecycle stages, buyer claims or execution rights.
+    specs = _component_registry()
+    ranking = rank_validated_workstreams(
+        routes,
+        capability_components=CAPABILITY_COMPONENT,
+        component_authorities={
+            key: value.authority for key, value in specs.items()
+        },
+        department_owners={
+            key: departments_for_component(key)
+            for key in CAPABILITY_COMPONENT.values()
+        },
+    )
     route_items = [
         row for row in (routes.get("items") or [])
         if isinstance(row, Mapping)
@@ -234,6 +249,8 @@ def build_world_state(
         ),
         "opportunity_count": int(routes.get("opportunity_count") or 0),
         "opportunity_stage_counts": dict(routes.get("stage_counts") or {}),
+        "validated_workstream_ranking": ranking,
+        "validated_opportunity_count": ranking["validated_opportunity_count"],
         "automatic_internal_evidence_routes": internal_routes,
         "commercial_observation_routes": commercial_routes,
         "next_best_actions": actions,
@@ -785,9 +802,45 @@ def build_plan(
         if len(steps) >= max_steps:
             return tuple(steps)
 
-    # Route missing evidence to the existing capability that owns it.
+    # Within the EXISTING evidence-resolution lane only, place currently
+    # derived VALIDATE/EXPERIMENT candidate blocker work ahead of generic
+    # research. Buyer-state and Quant plan priorities remain untouched.
+    # Ranking is advisory and never enables additional authority.
+    ranked = (world.get("validated_workstream_ranking") or {})
+    priorities = {
+        (
+            _clean(item.get("target_component")),
+            _clean(item.get("blocker")),
+            _clean(item.get("opportunity_key")),
+            _clean(item.get("action")),
+            _clean(item.get("mode")),
+            _clean(item.get("capability")),
+        ): position
+        for position, item in enumerate(ranked.get("route_priorities") or [])
+        if isinstance(item, Mapping)
+    }
+    default_rank = len(priorities)
+    original_routes = world.get("automatic_internal_evidence_routes") or []
+    ordered_routes = [
+        route for _, route in sorted(
+            enumerate(original_routes),
+            key=lambda pair: (
+                priorities.get((
+                    CAPABILITY_COMPONENT.get(
+                        _clean(pair[1].get("capability"))
+                    ),
+                    _clean(pair[1].get("blocker")),
+                    _clean(pair[1].get("opportunity_key")),
+                    _clean(pair[1].get("action")),
+                    _clean(pair[1].get("mode")),
+                    _clean(pair[1].get("capability")),
+                ), default_rank),
+                pair[0],
+            ) if isinstance(pair[1], Mapping) else (default_rank, pair[0]),
+        )
+    ]
     seen: set[tuple[str, str, str]] = set()
-    for route in world.get("automatic_internal_evidence_routes") or []:
+    for route in ordered_routes:
         if not isinstance(route, Mapping):
             continue
         capability = _clean(route.get("capability"))
@@ -901,6 +954,8 @@ def build_executive_snapshot(
         "department_count": len(default_departments()),
         "departments_in_plan": tuple(sorted(department_counts)),
         "department_plan_counts": dict(sorted(department_counts.items())),
+        "validated_workstream_ranking": world["validated_workstream_ranking"],
+        "validated_opportunity_count": world["validated_opportunity_count"],
         "plan_step_count": len(plan),
         "canonical_company_binding_status": identity["status"],
         "canonical_company_binding_count": identity["matched_count"],
