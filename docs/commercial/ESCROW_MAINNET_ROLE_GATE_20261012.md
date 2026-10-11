@@ -40,3 +40,15 @@ The existing one-shot `./.venv/bin/python -m scripts.inspect_self_serve_payment_
 **No mainnet deployment, contract call, token transfer, role grant, wallet change, DB migration, synthetic order or switch activation is authorised by this code release.** Continue collecting genuine buyer-initiated sales enquiries through the already-live public /commercial page. Do not reopen Lead Smart, pricing or the escrow implementation.
 
 To promote mainnet settlement later, the reviewer must supply evidence for each of these exact checks, then execute a separately authorised deployment with rollback/incident plan and perform an independent readback. This document does not constitute an external smart-contract security audit.
+
+## Live production readiness-gate readback — 12 October 2026
+
+- First-party role/backing guard merged and installed as **`d502228a`** into the active production branch; its code remains present even after independent project commits. Rollback ref `refs/heads/backup/pre-escrow-mainnet-role-check-20261012`.
+- Fresh combined tests **310 passed**; postmerge production tests **111 passed**. Solidity `npm test` **13 passing** and `npm audit --omit=dev --audit-level=high` **zero runtime dependency vulnerability findings**. No claim of external security audit or mainnet contract deployment.
+- Exactly the existing checkout service was restarted to load the new zero-write guards. HTTP health: `active/running`, `Result=success`, `NRestarts=0`. Both binding order and payment proposal flags confirmed **OFF**; default settlement remains **direct**; escrow creation automation false. No role grants, BSC transactions or funds movement.
+- Public `/`, `/buy`, `/commercial`, `/predictive-revenue` and `/roofing` all returned HTTP **200**; the four fixed-price catalogue products remain visible and founder-led enquiries continue live.
+- The read-only on-server inspector reported `BSC_PAYMENT_ACTIVATION_HELD`, `BSC_CONFIG_MISSING`, `escrow_backing_solvency_verified=false`, `escrow_expected_onchain_role_holders_verified=false`, `external_smart_contract_security_audit_verified=false`, `role_grant_exclusivity_audited=false`. These are honest **not-yet-tested** statuses, not detected live smart-contract faults.
+- Durable mode-0600 runtime release receipt read-back: `runtime/execution_plane/escrow_mainnet_role_guard_release_20261012.json`. It captures immutable code hash and six distinct remaining activation prerequisites, **founder reapproval not needed** for the previously approved four-product checkout scope.
+- Existing other-agent dirty files were preserved, and a subsequent independent Lead Smart commit remained untouched. No duplicate escrow runtime, migration, third-party processor, live outbound or payment system was created.
+
+**Next owner task is an audited mainnet deployment and operator-identity evidence packet**, not another implementation of escrow or repeated pricing approval. Deployment requires its own distinct financial/security authorization and externally reviewed on-chain proof. Until then sales interest is live and payment collection remains held.
