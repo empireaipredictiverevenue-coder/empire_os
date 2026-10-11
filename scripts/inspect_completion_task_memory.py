@@ -7,7 +7,8 @@ import json
 from pathlib import Path
 
 from empire_os.completion_task_memory import (
-    load_attempt_memory, preflight_task,
+    load_attempt_memory, preflight_task, prior_completion_plan_handoffs,
+    task_key,
 )
 from empire_os.master_execution_ledger import parse_checklist
 
@@ -31,6 +32,19 @@ def report(repo_root: str | Path) -> dict:
             "execution_authority": "none",
         }
 
+    plan_history = prior_completion_plan_handoffs(root)
+    if plan_history["status"] != "AVAILABLE":
+        return {
+            "schema_version": "empire.completion-memory-inspection.v1",
+            "status": "PLAN_HISTORY_INVALID_HOLD",
+            "reason": plan_history.get("reason"),
+            "execution_authority": "none",
+        }
+    pending = [row for row in rows if row.status == "PENDING"]
+    previously_planned = sum(
+        task_key(row.section, row.item) in plan_history["by_task"]
+        for row in pending
+    )
     matches = []
     for row in rows:
         if row.status != "PENDING":
@@ -61,6 +75,10 @@ def report(repo_root: str | Path) -> dict:
         "attempt_event_count": memory["event_count"],
         "remembered_task_count": memory["known_task_count"],
         "held_pending_task_count": len(matches),
+        "historic_plan_handoff_packets": plan_history["historical_plan_packet_count"],
+        "previous_plan_submitted_pending_count": previously_planned,
+        "new_pending_tasks_without_any_plan_handoff": len(pending)-previously_planned,
+        "plan_handoff_is_not_implementation": True,
         "items": matches,
         "external_execution_performed": False,
         "checklist_mutation_performed": False,

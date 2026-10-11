@@ -13,7 +13,8 @@ from empire_os.department_work_queue import DepartmentWorkQueue
 from empire_os.founder_directives import classify_authority
 from empire_os.master_execution_ledger import parse_checklist
 from empire_os.completion_task_memory import (
-    load_attempt_memory, preflight_task, task_key,
+    load_attempt_memory, preflight_task, prior_completion_plan_handoffs,
+    task_key,
 )
 
 
@@ -249,6 +250,27 @@ def dispatch_completion_board(
         }
         _atomic_write(root / OUTPUT, payload)
         return payload
+    prior_plans = prior_completion_plan_handoffs(root)
+    if prior_plans.get("status") != "AVAILABLE":
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "status": "PLAN_HISTORY_INVALID_HOLD",
+            "mode": "OBSERVE",
+            "generated_at": current.isoformat(),
+            "source": str(SOURCE),
+            "source_ref": source_ref,
+            "canonical_total_count": total_count,
+            "canonical_done_count": done_count,
+            "source_pending_count": len(rows),
+            "reason": prior_plans.get("reason"),
+            "queued_packet_count": 0,
+            "packet_count": 0,
+            "execution_authority": "none",
+            "consequential_actions_dispatched": False,
+        }
+        _atomic_write(root / OUTPUT, payload)
+        return payload
+    prior_plan_keys = prior_plans["by_task"]
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     held_unknown: list[dict[str, Any]] = []
 
@@ -264,6 +286,7 @@ def dispatch_completion_board(
     existing = 0
     held_packet_count = 0
     held_task_keys: set[str] = set()
+    held_prior_plan_keys: set[str] = set()
     packets: list[dict[str, Any]] = []
     plan_id = "completion_board_live_v3"
 
@@ -291,17 +314,27 @@ def dispatch_completion_board(
                 if execution_class == "founder_gate"
                 else "completion_review_then_implement_or_verify"
             )
-            held = [
+            memory_held = [
                 row for row in chunk
                 if preflight_task(
                     memory, section=row["section"], item=row["task"]
                 )["decision"] in {"HOLD", "REVIEW_NEW_EVIDENCE"}
             ]
-            held_keys = [row["stable_task_key"] for row in held]
-            held_task_keys.update(held_keys)
+            memory_keys = {row["stable_task_key"] for row in memory_held}
+            held_task_keys.update(memory_keys)
+            plan_held = [
+                row for row in chunk
+                if row["stable_task_key"] in prior_plan_keys
+                and row["stable_task_key"] not in memory_keys
+            ]
+            held_prior_plan_keys.update(
+                row["stable_task_key"] for row in plan_held
+            )
+            held = memory_held + plan_held
+            held_keys = {row["stable_task_key"] for row in held}
             actionable = [
                 row for row in chunk
-                if row["stable_task_key"] not in set(held_keys)
+                if row["stable_task_key"] not in held_keys
             ]
             if not actionable:
                 held_packet_count += 1
@@ -318,7 +351,7 @@ def dispatch_completion_board(
                     ],
                     "held_item_ids": [_text(row.get("id")) for row in held],
                     "memory_held": True,
-                    "memory_hold_reason": "known_unresolved_attempt",
+                    "memory_hold_reason": "known_attempt_or_prior_plan_handoff",
                     "verification_contract_ready": False,
                     "created": False,
                     "action": "HOLD_PRIOR_ATTEMPT",
@@ -429,6 +462,12 @@ def dispatch_completion_board(
         "memory_event_count": memory["event_count"],
         "memory_known_task_count": memory["known_task_count"],
         "memory_held_task_count": len(held_task_keys),
+        "historical_plan_packet_count": prior_plans["historical_plan_packet_count"],
+        "historically_planned_task_count": prior_plans["historically_planned_task_count"],
+        "prior_plan_handoff_held_task_count": len(held_prior_plan_keys),
+        "new_unattempted_plan_task_count": (
+            len(rows) - len(held_task_keys | held_prior_plan_keys)
+        ),
         "memory_held_packet_count": held_packet_count,
         "memory_status": "AVAILABLE",
         "queue_counts": queue.counts(),

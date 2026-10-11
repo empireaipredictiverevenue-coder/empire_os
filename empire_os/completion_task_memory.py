@@ -446,6 +446,10 @@ def preflight_completion_packet(
     if memory.get("status") != "AVAILABLE":
         return {"decision": "HOLD", "reason": "memory_unavailable",
                 "execution_authority": "none"}
+    prior_plans = prior_completion_plan_handoffs(root)
+    if prior_plans.get("status") != "AVAILABLE":
+        return {"decision": "HOLD", "reason": "plan_history_unavailable",
+                "execution_authority": "none"}
     by_line = {row.line: row for row in rows if row.status == "PENDING"}
     for work_id, line in zip(ids, lines):
         if (not isinstance(work_id, str)
@@ -468,6 +472,14 @@ def preflight_completion_packet(
         result = preflight_task(
             memory, section=row.section, item=row.item,
         )
+        if task_key(row.section, row.item) in prior_plans["by_task"]:
+            return {
+                "decision": "HOLD",
+                "reason": "plan_handoff_already_recorded",
+                "held_item_id": work_id,
+                "hold_detail": "prior_plan_not_verified_implementation",
+                "execution_authority": "none",
+            }
         if result["decision"] != "NEW_EVIDENCE_REQUIRED":
             return {
                 "decision": "HOLD",
@@ -478,3 +490,110 @@ def preflight_completion_packet(
             }
     return {"decision": "ALLOW", "checked_item_count": len(ids),
             "execution_authority": "none"}
+
+
+
+def prior_completion_plan_handoffs(repo_root: str | Path) -> dict[str, Any]:
+    """Recover exact semantic PLAN handoffs from the durable EXISTING work queue.
+
+    A department item marked DONE only means its PLAN was handed to Empire
+    Coder. It does not mean that PLAN finished, code exists or production is
+    live. Reuse that history instead of creating the same PLAN with a new ID.
+    """
+    root = Path(repo_root).resolve()
+    directory = root / "runtime/departments/work/done"
+    files = sorted(directory.glob("dept_work_*.json"))
+    if len(files) > 20_000:
+        return {"status": "PLAN_HISTORY_INVALID_HOLD",
+                "reason": "historical_department_work_cap_exceeded"}
+    recognized: dict[str, dict[str, str]] = {}
+    submitted_packets = 0
+
+    try:
+        for path in files:
+            if path.is_symlink() or path.stat().st_size > 256_000:
+                raise AttemptMemoryError("untrusted department work file")
+            packet = json.loads(path.read_text(encoding="utf-8"))
+            if not isinstance(packet, dict):
+                continue
+            if packet.get("plan_id") != "completion_board_live_v3":
+                continue
+            if packet.get("target_component") != "empire_coder":
+                continue
+            if packet.get("status") != "DONE":
+                continue
+            response = packet.get("result")
+            intelligence = packet.get("intelligence_request")
+            if (not isinstance(response, dict)
+                    or response.get("adapter") != "empire_coder_plan_bridge"):
+                # A different DONE adapter is not proof of an existing PLAN.
+                continue
+            job = response.get("coder_job_id")
+            if (not isinstance(job, str)
+                    or re.fullmatch(r"coder_job_[0-9a-f]{32}", job) is None
+                    or response.get("implementation_performed") is not False
+                    or response.get("external_execution_performed") is not False
+                    or response.get("execution_authority") != "none"
+                    or packet.get("authority") != "observe"
+                    or not isinstance(intelligence, dict)):
+                raise AttemptMemoryError("invalid historic plan handoff authority")
+            ids = intelligence.get("item_ids")
+            lines = intelligence.get("checklist_lines")
+            if (not isinstance(ids, list) or not isinstance(lines, list)
+                    or not ids or len(ids) != len(lines) or len(ids) > 40):
+                raise AttemptMemoryError("invalid historical plan bindings")
+            rationale = packet.get("rationale")
+            if not isinstance(rationale, str):
+                raise AttemptMemoryError("missing historical plan rationale")
+            if "Classify each " in rationale:
+                scope = rationale.split("Classify each ", 1)[1]
+                if ". Execution class=" not in scope:
+                    raise AttemptMemoryError("unbound standard plan rationale")
+                scope = scope.split(". Execution class=", 1)[0]
+            elif "Items: " in rationale:
+                scope = rationale.split("Items: ", 1)[1]
+                if ". Stop before any gated action." not in scope:
+                    raise AttemptMemoryError("unbound founder-gated plan rationale")
+                scope = scope.split(". Stop before any gated action.", 1)[0]
+            else:
+                raise AttemptMemoryError("unrecognised historical plan rationale")
+            tokens = scope.split(" | ")
+            if len(tokens) != len(ids):
+                raise AttemptMemoryError("ambiguous historical packet task count")
+            work_id = packet.get("id")
+            if (not isinstance(work_id, str)
+                    or re.fullmatch(r"dept_work_[0-9a-f]{24}", work_id) is None
+                    or path.name != work_id + ".json"):
+                raise AttemptMemoryError("unbound historic work identity")
+
+            for raw, line, legacy_id in zip(tokens, lines, ids):
+                if (not raw.endswith("]") or " [" not in raw
+                        or type(line) is not int
+                        or not isinstance(legacy_id, str)):
+                    raise AttemptMemoryError("unparseable canonical prior task")
+                item, section = raw[:-1].rsplit(" [", 1)
+                expected = "check_" + sha256(
+                    f"{line}|{section}|{item}".encode()
+                ).hexdigest()[:16]
+                if legacy_id != expected:
+                    raise AttemptMemoryError("historical task identity mismatch")
+                stable = task_key(section, item)
+                recognized.setdefault(stable, {
+                    "work_id": work_id,
+                    "coder_job_id": job,
+                    "state": "PLAN_HANDOFF_ONLY",
+                })
+            submitted_packets += 1
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return {"status": "PLAN_HISTORY_INVALID_HOLD",
+                "reason": "corrupt_or_ambiguous_plan_handoff"}
+
+    return {
+        "status": "AVAILABLE",
+        "source": "runtime/departments/work/done",
+        "historical_plan_packet_count": submitted_packets,
+        "historically_planned_task_count": len(recognized),
+        "by_task": recognized,
+        "implementation_verified": False,
+        "execution_authority": "none",
+    }

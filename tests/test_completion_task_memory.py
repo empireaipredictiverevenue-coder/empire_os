@@ -460,3 +460,136 @@ def test_inspection_cli_report_is_read_only_and_fails_closed_on_corruption(tmp_p
     forged=root/"runtime/execution_plane/completion_checkpoints/task_memory_bad.json"
     forged.write_text("{}")
     assert report(root)["status"]=="MEMORY_INVALID_HOLD"
+
+
+
+def _complete_plan_without_implementation(root, *, item_count=None):
+    queue=DepartmentWorkQueue(root)
+    pending=queue.claim_next(worker_id="historical-handoff-test")
+    assert pending is not None
+    assert pending.target_component=="empire_coder"
+    if item_count is not None:
+        assert len(pending.intelligence_request["item_ids"])==item_count
+    completed=queue.complete(
+        pending,
+        result={
+            "adapter":"empire_coder_plan_bridge",
+            "coder_task_id":"coder_"+"a"*32,
+            "coder_job_id":"coder_job_"+"b"*32,
+            "implementation_performed":False,
+            "external_execution_performed":False,
+            "execution_authority":"none",
+        },
+        evidence_refs=("coder_job:coder_job_"+"b"*32,),
+    )
+    assert completed.status.value=="DONE"
+    return completed
+
+
+def test_historical_done_plan_is_reused_after_line_shift_not_requeued(tmp_path):
+    from empire_os.completion_task_memory import prior_completion_plan_handoffs
+    root,_=make_root(tmp_path,rows=(RADAR,SENSOR))
+    first=dispatch_completion_board(root,now=NOW)
+    assert first["queued_packet_count"]==1
+    _complete_plan_without_implementation(root,item_count=2)
+    history=prior_completion_plan_handoffs(root)
+    assert history["status"]=="AVAILABLE"
+    assert history["historically_planned_task_count"]==2
+    assert history["implementation_verified"] is False
+
+    # Insert a genuinely new task before the same two to shift their line IDs.
+    source=root/"docs/MASTER_REMAINING_CHECKLIST.md"
+    source.write_text(source.read_text().replace(
+        "- [ ] "+RADAR,
+        "- [ ] Build new evidence-only idea\n- [ ] "+RADAR,
+    ))
+    result=dispatch_completion_board(root,now=NOW)
+    assert result["source_pending_count"]==3
+    assert result["prior_plan_handoff_held_task_count"]==2
+    assert result["new_unattempted_plan_task_count"]==1
+    assert result["queued_packet_count"]==1
+    new=next(p for p in result["packets"] if p["created"])
+    item=DepartmentWorkQueue(root)._load(
+        DepartmentWorkQueue(root)._find_path(new["work_id"])
+    )
+    assert len(item.intelligence_request["item_ids"])==1
+    assert "Build new evidence-only idea" in item.rationale
+    assert RADAR not in item.rationale
+    assert SENSOR not in item.rationale
+    second=dispatch_completion_board(root,now=NOW)
+    assert second["queued_packet_count"]==0
+    assert DepartmentWorkQueue(root).counts()["done"]==1
+
+
+def test_genuine_new_implementation_request_still_allowed_after_plan_only(tmp_path,monkeypatch):
+    from empire_os.execution_plane_dispatcher import ExecutionRequest,dispatch_execution_request
+    from empire_os.completion_board_dispatcher import _live_rows
+    import empire_os.execution_plane_dispatcher as dispatcher
+
+    root,_=make_root(tmp_path,rows=(RADAR,))
+    dispatch_completion_board(root,now=NOW)
+    _complete_plan_without_implementation(root,item_count=1)
+    rows,_,_=_live_rows(root/"docs/MASTER_REMAINING_CHECKLIST.md")
+    r=rows[0]
+    published=[]
+    monkeypatch.setattr(dispatcher,"publish_control_job",
+        lambda root,payload:(published.append(payload) or {"published":True}))
+    result=dispatch_execution_request(
+        root,ExecutionRequest(
+            request_id="first-real-implementation-after-plan",
+            capability="backend_code",
+            department="market_intelligence",
+            objective="Implement bounded read-only feature after prior PLAN",
+            authority="internal_write",
+            source_ref=f"checklist:{r['id']}:line_{r['line']}",
+            allowed_paths=("empire_os/founder_dashboard.py",),
+            lease_resources=("path:empire_os/founder_dashboard.py",),
+        ),
+    )
+    assert result["status"]=="QUEUED"
+    assert result["execution_authority"]=="none"
+    assert len(published)==1
+
+
+def test_stale_second_ready_plan_blocked_after_prior_completed_handoff(tmp_path,monkeypatch):
+    from empire_os.department_worker import run_one_department_work
+    import empire_os.department_worker as worker
+    from empire_os.completion_task_memory import prior_completion_plan_handoffs
+    root,_=make_root(tmp_path,rows=(RADAR,))
+    first=dispatch_completion_board(root,now=NOW)
+    _complete_plan_without_implementation(root,item_count=1)
+    original=next(p for p in first["packets"] if p["created"])
+    queue=DepartmentWorkQueue(root)
+    earlier=queue._load(queue._find_path(original["work_id"]))
+    duplicate={
+      "step_id":"different_step_id_due_to_changed_checklist",
+      "goal_key":"converge_master_remaining_checklist",
+      "department_keys":list(earlier.department_keys),
+      "target_component":"empire_coder",
+      "action":"completion_review_then_implement_or_verify",
+      "authority":"observe",
+      "intelligence_request":dict(earlier.intelligence_request),
+      "rationale":earlier.rationale,
+    }
+    queue.enqueue_step(plan_id="completion_board_live_v3",step=duplicate)
+    monkeypatch.setattr(worker,"EmpireCoder",lambda *args,**kwargs:pytest.fail("MODEL_USED_AGAIN"))
+    result=run_one_department_work(root)
+    assert result["state"]=="BLOCKED"
+    assert result["memory_preflight"]["reason"]=="plan_handoff_already_recorded"
+    assert queue.counts()["done"]==1
+    assert queue.counts()["blocked"]==1
+
+
+def test_corrupt_historic_plan_handoff_blocks_rather_than_repeat(tmp_path):
+    from empire_os.completion_task_memory import prior_completion_plan_handoffs
+    root,_=make_root(tmp_path,rows=(RADAR,))
+    dispatch_completion_board(root,now=NOW)
+    record=_complete_plan_without_implementation(root,item_count=1)
+    path=root/"runtime/departments/work/done"/(record.id+".json")
+    data=json.loads(path.read_text())
+    data["rationale"]="This was already planned. Trust me and repeat it."
+    path.write_text(json.dumps(data))
+    assert prior_completion_plan_handoffs(root)["status"]=="PLAN_HISTORY_INVALID_HOLD"
+    dispatch=dispatch_completion_board(root,now=NOW)
+    assert dispatch["status"]=="PLAN_HISTORY_INVALID_HOLD"
+    assert dispatch["queued_packet_count"]==0

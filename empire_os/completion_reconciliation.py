@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.completion_task_memory import (
-    load_attempt_memory, preflight_task,
+    load_attempt_memory, preflight_task, prior_completion_plan_handoffs,
+    task_key,
 )
 from empire_os.master_execution_ledger import parse_checklist
 
@@ -147,6 +148,17 @@ def refresh_completion_reconciliation(
         _atomic_write(root / OUTPUT, payload)
         return payload
 
+    plan_history = prior_completion_plan_handoffs(root)
+    if plan_history.get("status") != "AVAILABLE":
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "status": "PLAN_HISTORY_INVALID_HOLD",
+            "reason": "historic_plan_handoff_evidence_unavailable",
+            "execution_authority": "none",
+        }
+        _atomic_write(root / OUTPUT, payload)
+        return payload
+
     checklist_path = root / "docs/MASTER_REMAINING_CHECKLIST.md"
     try:
         checklist_items = parse_checklist(checklist_path)
@@ -193,6 +205,19 @@ def refresh_completion_reconciliation(
                     "HOLD", "REVIEW_NEW_EVIDENCE",
                 } else None
             )
+            previous_plan = (
+                plan_history["by_task"].get(
+                    task_key(known.section, known.item)
+                )
+                if known is not None else None
+            )
+            # A submitted PLAN is NOT implementation, approval, or live proof.
+            if (previous_plan
+                    and attempt_state is None
+                    and execution_class != "founder_gate"
+                    and state in {"NEEDS_WIRING", "REVIEW_REQUIRED",
+                                  "VERIFY_NOT_MATERIALIZED"}):
+                state = "PLAN_HANDOFF_ONLY_BUILD_OR_VERIFY_PENDING"
             # The memory is evidence of *work*, never a live-closure proof.
             # Founder gates remain founder gates regardless of memory.
             if execution_class != "founder_gate":
@@ -226,6 +251,13 @@ def refresh_completion_reconciliation(
                     prior.get("blocker")
                     if isinstance(prior, dict) else None
                 ),
+                "historical_plan_work_id": (
+                    previous_plan.get("work_id") if previous_plan else None
+                ),
+                "historical_plan_job_id": (
+                    previous_plan.get("coder_job_id") if previous_plan else None
+                ),
+                "plan_handoff_is_not_implementation": True,
                 "verification_job_id": (
                     job.get("job_id") if job else None
                 ),
@@ -263,6 +295,8 @@ def refresh_completion_reconciliation(
         "attempt_memory_event_count": memory["event_count"],
         "attempt_memory_known_task_count": memory["known_task_count"],
         "attempt_memory_held_task_count": memory["held_task_count"],
+        "historical_plan_packet_count": plan_history["historical_plan_packet_count"],
+        "historical_plan_task_count": plan_history["historically_planned_task_count"],
         "remediation_candidate_count": len(remediation),
         "live_proof_candidate_count": len(live_proof),
         "founder_gate_count": int(counts.get("FOUNDER_GATE", 0)),
