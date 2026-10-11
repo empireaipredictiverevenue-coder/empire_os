@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.revenue_pulse import StormPulse, build_revenue_pulse
+from empire_os.commercial_loop_reader import read_commercial_loop, CommercialLoopReadError
 from empire_os.revenue_pulse_reader import (
     fetch_current_and_previous_windows_postgres,
 )
@@ -33,12 +34,10 @@ def _parse_time(value: Any) -> datetime | None:
 
 def load_commercial_blocker() -> tuple[str | None, str | None]:
     path = ROOT / "runtime" / "commercial_loop" / "latest.json"
-    if not path.exists():
-        return None, None
     try:
-        data = json.loads(path.read_text())
-    except Exception:
-        return None, None
+        data = read_commercial_loop(path)
+    except CommercialLoopReadError as exc:
+        return "commercial_loop_snapshot_unreadable", str(exc)
     blocker = data.get("highest_priority_blocker")
     blocker_state = data.get("blocker_state")
     if blocker:
@@ -121,7 +120,7 @@ def main() -> int:
         storm=load_storm_pulse(now=now),
     )
     pulse["generated_at"] = now.isoformat()
-    pulse["snapshot_source"] = "canonical_supabase_postgres"
+    pulse["snapshot_source"] = "canonical_empiredb_postgres"
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     tmp = OUT.with_suffix(".tmp")
