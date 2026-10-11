@@ -31,6 +31,7 @@ type OrderResult = {
   order_id?: string;
   payment_request_created?: boolean;
   payment_request_status?: string;
+  payment_instructions_ready?: boolean;
   payment_request_id?: string;
   treasury_address?: string;
   amount_usdt?: string;
@@ -786,10 +787,25 @@ function ProductResult({
         <p className="text-sm text-red-200">
           {result.detail || result.error}
         </p>
-      ) : result.payment_request_created ? (
+      ) : result.payment_request_created && result.payment_request_status === "pending" ? (
+        <div>
+          <div className="text-sm font-semibold text-[#bfdbfe]">
+            Payment request awaiting independent approval
+          </div>
+          <p className="mt-2 text-xs leading-5 text-white/48">
+            Your order has been recorded, but the governed USDT payment request
+            has not yet been approved. Do not send funds. Payment instructions
+            will only be provided after the separate payment-approval check.
+          </p>
+          <div className="mt-3 text-[10px] text-white/30">
+            Order {result.order_id}
+          </div>
+        </div>
+      ) : result.payment_request_created && result.payment_request_status === "approved" &&
+          result.payment_instructions_ready === true && result.treasury_address && result.amount_usdt ? (
         <div>
           <div className="text-sm font-semibold text-emerald-200">
-            Payment request created
+            Approved payment request
           </div>
           <p className="mt-2 text-xs leading-5 text-white/48">
             Send exactly{" "}
@@ -816,11 +832,11 @@ function ProductResult({
       ) : (
         <div>
           <div className="text-sm font-semibold text-[#bfdbfe]">
-            Order created
+            Payment instructions unavailable
           </div>
           <p className="mt-2 text-xs leading-5 text-white/48">
-            The order is recorded. No payment has been counted and no revenue
-            has been recognized.
+            No payable payment request has been verified. Do not send funds.
+            Contact Empire AI to resolve the order before taking any action.
           </p>
           <div className="mt-3 text-[10px] text-white/30">
             Order {result.order_id}

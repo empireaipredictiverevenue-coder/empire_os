@@ -60,6 +60,15 @@ def test_order_endpoint_keeps_proposal_gated(monkeypatch):
     # Only a separate, explicit approval of BOTH binding orders and payment
     # proposals may reach the (mocked) order and payment flow.
     monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED", "ON")
+    monkeypatch.setattr(
+        api, "checkout_bsc_config_snapshot", lambda: {
+            "configured": True, "status": "BSC_CONFIGURED_CHAIN_UNVERIFIED",
+        }
+    )
+    monkeypatch.setattr(api, "verify_checkout_bsc_chain", lambda: {
+        "status": "FRESH_BSC_MAINNET_USDT_ANCHOR",
+        "chain_verified": True,
+    })
     approved = client.post(
         "/v1/orders",
         json={

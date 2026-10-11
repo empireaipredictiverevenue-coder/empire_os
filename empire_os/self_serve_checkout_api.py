@@ -24,6 +24,11 @@ from empire_os.first_party_sales_interest import (
     founder_led_commercial_offers,
     record_founder_led_interest,
 )
+from empire_os.self_serve_payment_readiness import (
+    CheckoutPaymentPreflightHold,
+    checkout_bsc_config_snapshot,
+    verify_checkout_bsc_chain,
+)
 from empire_os.self_serve_checkout import (
     CheckoutError,
     create_payment_request_for_order,
@@ -48,6 +53,7 @@ def _orders_authorized() -> bool:
             "EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED", "OFF"
         ).strip().upper() in {"1", "ON", "TRUE", "YES"}
         and _proposal_authorized()
+        and checkout_bsc_config_snapshot()["configured"] is True
     )
 
 
@@ -113,6 +119,7 @@ def health():
         "service": "empire-self-serve-checkout",
         "payment_proposal_authorized": _proposal_authorized(),
         "binding_order_creation_authorized": _orders_authorized(),
+        "bsc_payment_configuration_status": checkout_bsc_config_snapshot()["status"],
         "founder_led_commercial_interest_enabled": True,
         "payment_execution": False,
         "revenue_recognition": False,
@@ -125,6 +132,7 @@ def catalog():
         **self_serve_catalog(),
         "binding_order_creation_authorized": _orders_authorized(),
         "payment_proposal_authorized": _proposal_authorized(),
+        "bsc_payment_configuration_status": checkout_bsc_config_snapshot()["status"],
     }
 
 
@@ -133,6 +141,9 @@ def create_order(req: CheckoutRequest):
     if not _orders_authorized():
         raise HTTPException(status_code=503, detail="binding_orders_not_authorized")
     try:
+        # Read BSC mainnet chain, canonical USDT precision and a fresh anchor
+        # BEFORE buyer or accepted fulfilment order is written to EmpireDB.
+        verify_checkout_bsc_chain()
         order = prepare_checkout_order(
             product_code=req.product_code,
             business_name=req.business_name,
@@ -146,6 +157,11 @@ def create_order(req: CheckoutRequest):
             order,
             standing_authority=_proposal_authorized(),
         )
+    except CheckoutPaymentPreflightHold as exc:
+        # No RPC URL, treasury, or chain internals leak into public replies.
+        raise HTTPException(
+            status_code=503, detail="bsc_payment_preflight_unavailable"
+        ) from exc
     except CheckoutError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:

@@ -87,6 +87,7 @@ def test_prepare_checkout_order_is_real_catalog_and_idempotent():
     assert first["decision"] == "order_created"
     assert second["decision"] == "existing_order"
     assert first["product"]["amount_cents"] == 19900
+    assert second["payer_wallet"] == params["payer_wallet"].lower()
     assert len(request.buyers) == 1
     assert len(request.orders) == 1
     order = next(iter(request.orders.values()))

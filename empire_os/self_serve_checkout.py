@@ -341,6 +341,7 @@ def prepare_checkout_order(
             "buyer_id": buyer_id,
             "product": public_product(row),
             "terms_sha256": terms_sha,
+            "payer_wallet": wallet,
             "state": existing.get("state"),
             "payment_request_created": False,
             "actual_revenue": False,
@@ -450,13 +451,27 @@ def create_payment_request_for_order(
         operator_authorized=True,
         db=db,
     )
+    status = result.get("status")
+    request_id = str(result.get("request_id") or "")
+    try:
+        from uuid import UUID
+        request_id = str(UUID(request_id))
+    except (ValueError, TypeError) as exc:
+        raise CheckoutError("payment request identifier invalid") from exc
+    if status not in {"pending", "approved"}:
+        raise CheckoutError("payment request not in a payable review state")
+    # An initially proposed request is PENDING and has not passed the
+    # dedicated payment-approver role. Instructing the customer to transfer
+    # USDT to an unapproved request would bypass the operator gate.
+    ready = status == "approved"
     return {
         **dict(order),
         "payment_request_created": True,
-        "payment_request_status": result.get("status"),
-        "payment_request_id": result.get("request_id"),
-        "treasury_address": cfg.treasury_address,
-        "amount_usdt": f"{Decimal(amount_cents) / Decimal(100):f}",
+        "payment_request_status": status,
+        "payment_request_id": request_id,
+        "payment_instructions_ready": ready,
+        "treasury_address": cfg.treasury_address if ready else None,
+        "amount_usdt": (f"{Decimal(amount_cents) / Decimal(100):f}" if ready else None),
         "network": "BSC",
         "chain_id": 56,
         "actual_revenue": False,
