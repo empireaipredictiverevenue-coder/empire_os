@@ -33,6 +33,7 @@ from empire_os.empire_coder_sandbox_runner import (
     EmpireCoderSandboxJob,
     run_empire_coder_sandbox_job,
 )
+from empire_os.completion_task_memory import preflight_checklist_source
 from empire_os.hermes_control import (
     ALLOWED_BASE_BRANCHES,
     DEFAULT_BASE_BRANCH,
@@ -243,14 +244,6 @@ def dispatch_execution_request(
         required_tests=request.required_tests,
         ai_behavior_change=request.ai_behavior_change,
     )
-    _emit_route_event(
-        root,
-        request,
-        routing.worker_key,
-        routing.eligible,
-        routing.reason,
-    )
-
     base = {
         "schema_version": "empire.execution-plane-dispatch.v1",
         "request_id": request.request_id,
@@ -263,6 +256,33 @@ def dispatch_execution_request(
         "production_deploy": False,
         "execution_authority": "none",
     }
+    # Cross-agent attempt memory is evaluated BEFORE publishing a new job
+    # to Hermes, invoking Pi or launching the local mutation backend.
+    # No direct checklist work can silently replay a verified patch or a
+    # documented provider failure under a new request ID.
+    memory_verdict = preflight_checklist_source(root, request.source_ref)
+    if memory_verdict["decision"] not in {
+        "NOT_CHECKLIST_SCOPED", "NEW_EVIDENCE_REQUIRED",
+    }:
+        return {
+            **base,
+            "status": "HELD_BY_ATTEMPT_MEMORY",
+            "reason": (
+                "new_evidence_requires_independent_review"
+                if memory_verdict["decision"] == "REVIEW_NEW_EVIDENCE"
+                else memory_verdict["reason"]
+            ),
+            "worker": None,
+            "task_preflight": memory_verdict,
+        }
+
+    _emit_route_event(
+        root,
+        request,
+        routing.worker_key,
+        routing.eligible,
+        routing.reason,
+    )
     if not routing.eligible or not routing.worker_key:
         return {
             **base,

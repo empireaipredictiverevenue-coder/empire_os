@@ -101,8 +101,12 @@ def _checkpoint_bindings(
     by_item: dict[str, list[str]] = {}
 
     for path in (root / CHECKPOINTS).glob("*.json"):
+        # Attempt memory is intentionally NEVER live closure evidence, even
+        # when a tampered receipt claims LIVE_VERIFY_DONE/DONE or live_verified.
+        if path.name.startswith("task_memory_"):
+            continue
         packet = _read_json(path)
-        if packet is None:
+        if packet is None or packet.get("scope") == "task_attempt_memory":
             continue
         stage = _text(packet.get("stage")).upper()
         state = _text(packet.get("state")).upper()

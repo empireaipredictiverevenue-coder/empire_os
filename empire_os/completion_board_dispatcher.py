@@ -12,6 +12,9 @@ from empire_os.completion_capability_registry import WORKSTREAMS
 from empire_os.department_work_queue import DepartmentWorkQueue
 from empire_os.founder_directives import classify_authority
 from empire_os.master_execution_ledger import parse_checklist
+from empire_os.completion_task_memory import (
+    load_attempt_memory, preflight_task, task_key,
+)
 
 
 SCHEMA_VERSION = "empire.completion_board_dispatch.v3"
@@ -105,6 +108,7 @@ def _live_rows(path: Path) -> tuple[list[dict[str, Any]], int, int]:
         material = f"{row.line}|{row.section}|{row.item}"
         rows.append({
             "id": "check_" + sha256(material.encode("utf-8")).hexdigest()[:16],
+            "stable_task_key": task_key(row.section, row.item),
             "line": row.line,
             "section": row.section,
             "task": row.item,
@@ -223,6 +227,28 @@ def dispatch_completion_board(
 
     rows, done_count, total_count = _live_rows(source_path)
     source_ref = _source_ref(source_path)
+    # A corrupt memory checkpoint must not silently enable repeated work.
+    memory = load_attempt_memory(root, now=current)
+    if memory.get("status") != "AVAILABLE":
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "status": "MEMORY_INVALID_HOLD",
+            "mode": "OBSERVE",
+            "generated_at": current.isoformat(),
+            "source": str(SOURCE),
+            "source_ref": source_ref,
+            "canonical_total_count": total_count,
+            "canonical_done_count": done_count,
+            "source_pending_count": len(rows),
+            "memory_status": memory.get("status"),
+            "reason": memory.get("reason"),
+            "queued_packet_count": 0,
+            "packet_count": 0,
+            "consequential_actions_dispatched": False,
+            "execution_authority": "none",
+        }
+        _atomic_write(root / OUTPUT, payload)
+        return payload
     grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
     held_unknown: list[dict[str, Any]] = []
 
@@ -236,6 +262,8 @@ def dispatch_completion_board(
 
     queued = 0
     existing = 0
+    held_packet_count = 0
+    held_task_keys: set[str] = set()
     packets: list[dict[str, Any]] = []
     plan_id = "completion_board_live_v3"
 
@@ -263,14 +291,48 @@ def dispatch_completion_board(
                 if execution_class == "founder_gate"
                 else "completion_review_then_implement_or_verify"
             )
+            held = [
+                row for row in chunk
+                if preflight_task(
+                    memory, section=row["section"], item=row["task"]
+                )["decision"] in {"HOLD", "REVIEW_NEW_EVIDENCE"}
+            ]
+            held_keys = [row["stable_task_key"] for row in held]
+            held_task_keys.update(held_keys)
+            actionable = [
+                row for row in chunk
+                if row["stable_task_key"] not in set(held_keys)
+            ]
+            if not actionable:
+                held_packet_count += 1
+                packets.append({
+                    "work_id": None,
+                    "step_id": step_id,
+                    "department": department,
+                    "execution_class": execution_class,
+                    "priority": priority,
+                    "item_count": len(chunk),
+                    "item_ids": [_text(row.get("id")) for row in chunk],
+                    "checklist_lines": [
+                        int(row.get("line") or 0) for row in chunk
+                    ],
+                    "held_item_ids": [_text(row.get("id")) for row in held],
+                    "memory_held": True,
+                    "memory_hold_reason": "known_unresolved_attempt",
+                    "verification_contract_ready": False,
+                    "created": False,
+                    "action": "HOLD_PRIOR_ATTEMPT",
+                    "external_execution_allowed": False,
+                })
+                continue
             evidence_refs = [ref for ref in (source_ref,) if ref]
             evidence_refs.extend(
                 f"checklist_line:{int(row.get('line') or 0)}:{_text(row.get('id'))}"
-                for row in chunk
+                for row in actionable
             )
             workstreams = sorted({
                 _text(row.get("workstream"))
-                for row in chunk
+                for row in actionable
                 if _text(row.get("workstream"))
             })
             promotion_contract = _verification_contract(
@@ -290,9 +352,13 @@ def dispatch_completion_board(
                     "task": "completion_review",
                     "execution_class": execution_class,
                     "source": str(SOURCE),
-                    "item_ids": [_text(row.get("id")) for row in chunk],
+                    "item_ids": [_text(row.get("id")) for row in actionable],
+                    "held_item_ids": [_text(row.get("id")) for row in held],
+                    "stable_task_keys": [
+                        row["stable_task_key"] for row in actionable
+                    ],
                     "checklist_lines": [
-                        int(row.get("line") or 0) for row in chunk
+                        int(row.get("line") or 0) for row in actionable
                     ],
                     "workstreams": workstreams,
                     "promotion_contract": promotion_contract,
@@ -312,7 +378,7 @@ def dispatch_completion_board(
                 "rationale": _rationale(
                     department,
                     execution_class,
-                    chunk,
+                    actionable,
                 ),
             }
             work, created = queue.enqueue_step(
@@ -331,6 +397,12 @@ def dispatch_completion_board(
                 "priority": priority,
                 "item_count": len(chunk),
                 "item_ids": [_text(row.get("id")) for row in chunk],
+                "checklist_lines": [
+                    int(row.get("line") or 0) for row in chunk
+                ],
+                "held_item_ids": [_text(row.get("id")) for row in held],
+                "memory_held": False,
+                "actionable_item_count": len(actionable),
                 "workstreams": workstreams,
                 "verification_contract_ready": (
                     promotion_contract is not None
@@ -354,6 +426,11 @@ def dispatch_completion_board(
         "queued_packet_count": queued,
         "existing_packet_count": existing,
         "held_unowned_row_count": len(held_unknown),
+        "memory_event_count": memory["event_count"],
+        "memory_known_task_count": memory["known_task_count"],
+        "memory_held_task_count": len(held_task_keys),
+        "memory_held_packet_count": held_packet_count,
+        "memory_status": "AVAILABLE",
         "queue_counts": queue.counts(),
         "packets": packets,
         "batching_enabled": True,

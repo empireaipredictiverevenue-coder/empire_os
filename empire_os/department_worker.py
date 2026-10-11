@@ -15,6 +15,7 @@ from empire_os.canonical_data_gateway import DataGatewayUnavailable
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.completion_task_memory import preflight_completion_packet
 from empire_os.factory_hybrid_worker_guard_v1 import guard_department_bridge
 from empire_os.department_budget_ledger import DepartmentBudgetLedger
 from empire_os.execution_plane_dispatcher import (
@@ -313,6 +314,32 @@ def _run_one_department_work_impl(
             "queue_counts": queue.counts(),
             "execution_authority": "none",
         }
+
+    # A READY completion packet may have been queued before another agent
+    # persisted a failed/verified attempt. Recheck the current checklist and
+    # shared memory before paying the budget or invoking any model.
+    if (item.plan_id == "completion_board_live_v3"
+            and item.target_component == "empire_coder"):
+        preflight = preflight_completion_packet(
+            root,
+            item.intelligence_request,
+        )
+        if preflight["decision"] == "HOLD":
+            held = queue.block(
+                item,
+                "completion_task_memory_or_source_hold",
+                {"preflight": preflight, "model_called": False,
+                 "execution_authority": "none"},
+            )
+            return {
+                "ok": True,
+                "state": "BLOCKED",
+                "work_id": held.id,
+                "blocker": held.error,
+                "memory_preflight": preflight,
+                "queue_counts": queue.counts(),
+                "execution_authority": "none",
+            }
 
     budget_ledger = DepartmentBudgetLedger(root)
     try:

@@ -4,8 +4,14 @@ from __future__ import annotations
 from collections import Counter
 from datetime import datetime, timezone
 import json
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
+
+from empire_os.completion_task_memory import (
+    load_attempt_memory, preflight_task,
+)
+from empire_os.master_execution_ledger import parse_checklist
 
 SCHEMA_VERSION = "empire.completion_reconciliation.v1"
 DISPATCH = Path("runtime/execution_plane/business_completion_dispatch_latest.json")
@@ -128,6 +134,30 @@ def refresh_completion_reconciliation(
         _atomic_write(root / OUTPUT, payload)
         return payload
 
+    memory = load_attempt_memory(root, now=current)
+    if memory.get("status") != "AVAILABLE":
+        payload = {
+            "schema_version": SCHEMA_VERSION,
+            "status": "MEMORY_INVALID_HOLD",
+            "mode": "OBSERVE",
+            "reason": "shared_attempt_memory_unavailable",
+            "generated_at": current.isoformat(),
+            "execution_authority": "none",
+        }
+        _atomic_write(root / OUTPUT, payload)
+        return payload
+
+    checklist_path = root / "docs/MASTER_REMAINING_CHECKLIST.md"
+    try:
+        checklist_items = parse_checklist(checklist_path)
+    except OSError:
+        checklist_items = []
+    canonical_by_id = {
+        "check_" + sha256(
+            f"{row.line}|{row.section}|{row.item}".encode("utf-8")
+        ).hexdigest()[:16]: row
+        for row in checklist_items if row.status == "PENDING"
+    }
     jobs = _verification_jobs(root)
     items: list[dict[str, Any]] = []
     for packet in dispatch.get("packets") or ():
@@ -150,6 +180,30 @@ def refresh_completion_reconciliation(
                 ),
                 job=job,
             )
+            known = canonical_by_id.get(item_id)
+            prior = (
+                preflight_task(
+                    memory, section=known.section, item=known.item,
+                ) if known is not None else None
+            )
+            attempt_state = (
+                prior.get("reason")
+                if isinstance(prior, dict)
+                and prior.get("decision") in {
+                    "HOLD", "REVIEW_NEW_EVIDENCE",
+                } else None
+            )
+            # The memory is evidence of *work*, never a live-closure proof.
+            # Founder gates remain founder gates regardless of memory.
+            if execution_class != "founder_gate":
+                if attempt_state == "CODE_VERIFIED_NOT_LIVE":
+                    state = "CODE_COMPLETE_NOT_LIVE"
+                elif attempt_state == "PROVIDER_CAPACITY_BLOCKED":
+                    state = "BUILDER_PROVIDER_BLOCKED"
+                elif attempt_state == "REVIEW_REQUIRED":
+                    state = "REVIEW_PRIOR_ATTEMPT"
+                elif attempt_state == "RESOLVED_WITH_NEW_EVIDENCE":
+                    state = "INDEPENDENT_REVIEW_REQUIRED_BEFORE_RETRY"
             items.append({
                 "item_id": item_id,
                 "checklist_line": (
@@ -159,6 +213,19 @@ def refresh_completion_reconciliation(
                 "workstreams": list(packet.get("workstreams") or ()),
                 "execution_class": execution_class,
                 "state": state,
+                "attempt_memory_state": attempt_state,
+                "attempt_memory_id": (
+                    prior.get("last_attempt_id")
+                    if isinstance(prior, dict) else None
+                ),
+                "attempt_memory_commit": (
+                    prior.get("commit")
+                    if isinstance(prior, dict) else None
+                ),
+                "attempt_memory_blocker": (
+                    prior.get("blocker")
+                    if isinstance(prior, dict) else None
+                ),
                 "verification_job_id": (
                     job.get("job_id") if job else None
                 ),
@@ -193,6 +260,9 @@ def refresh_completion_reconciliation(
         "canonical_pending_count": dispatch.get("source_pending_count"),
         "reconciled_item_count": len(items),
         "state_counts": dict(sorted(counts.items())),
+        "attempt_memory_event_count": memory["event_count"],
+        "attempt_memory_known_task_count": memory["known_task_count"],
+        "attempt_memory_held_task_count": memory["held_task_count"],
         "remediation_candidate_count": len(remediation),
         "live_proof_candidate_count": len(live_proof),
         "founder_gate_count": int(counts.get("FOUNDER_GATE", 0)),
