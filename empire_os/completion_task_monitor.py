@@ -40,6 +40,10 @@ PRIORITY_STATES = {
     ),
     "FOUNDER_GATE": (3, "FOUNDER_APPROVAL_REQUIRED",
         "Collect the exact approval evidence; never auto-approve"),
+    "FOUNDER_PRICE_POLICY_APPROVED_FORMAL_CLOSURE_PENDING": (
+        5, "PREVIOUS_FOUNDER_PRICE_APPROVAL_RECORDED",
+        "The founder approved the price policy on 2 October. Do not request pricing approval again. Observe real cost and capacity, then obtain exact formal checklist closeout; catalog and payment remain gated"
+    ),
     "REAL_WORLD_EVIDENCE_REQUIRED": (4, "REAL_WORLD_PROOF_REQUIRED",
         "Collect independent buyer, payment or fulfilment evidence as applicable"),
     "NEEDS_LIVE_PROOF": (5, "LIVE_EVIDENCE_REQUIRED",

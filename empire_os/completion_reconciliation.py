@@ -13,6 +13,10 @@ from empire_os.completion_task_memory import (
     task_key,
 )
 from empire_os.master_execution_ledger import parse_checklist
+from empire_os.digital_avatar_approved_catalog_preview import (
+    AVATAR_PRICING_CHECKLIST_ITEM, AVATAR_PRICING_CHECKLIST_SECTION,
+    has_recorded_price_only_founder_approval,
+)
 
 SCHEMA_VERSION = "empire.completion_reconciliation.v1"
 DISPATCH = Path("runtime/execution_plane/business_completion_dispatch_latest.json")
@@ -171,6 +175,7 @@ def refresh_completion_reconciliation(
         for row in checklist_items if row.status == "PENDING"
     }
     jobs = _verification_jobs(root)
+    approved_avatar_price_only = has_recorded_price_only_founder_approval(root)
     items: list[dict[str, Any]] = []
     for packet in dispatch.get("packets") or ():
         if not isinstance(packet, Mapping):
@@ -211,6 +216,14 @@ def refresh_completion_reconciliation(
                 )
                 if known is not None else None
             )
+            # A recorded earlier founder decision can replace the *need to
+            # ask again*, but NEVER the checklist verification/closeout gate.
+            if (approved_avatar_price_only and known is not None
+                    and known.section == AVATAR_PRICING_CHECKLIST_SECTION
+                    and known.item == AVATAR_PRICING_CHECKLIST_ITEM
+                    and execution_class == "founder_gate"
+                    and state == "FOUNDER_GATE"):
+                state = "FOUNDER_PRICE_POLICY_APPROVED_FORMAL_CLOSURE_PENDING"
             # A submitted PLAN is NOT implementation, approval, or live proof.
             if (previous_plan
                     and attempt_state is None
@@ -299,6 +312,8 @@ def refresh_completion_reconciliation(
         "attempt_memory_held_task_count": memory["held_task_count"],
         "historical_plan_packet_count": plan_history["historical_plan_packet_count"],
         "historical_plan_task_count": plan_history["historically_planned_task_count"],
+        "digital_avatar_price_policy_approval_recorded": approved_avatar_price_only,
+        "digital_avatar_approval_does_not_authorize_catalog_or_payment": True,
         "remediation_candidate_count": len(remediation),
         "live_proof_candidate_count": len(live_proof),
         "founder_gate_count": int(counts.get("FOUNDER_GATE", 0)),
