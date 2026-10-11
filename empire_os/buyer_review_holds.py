@@ -7,6 +7,7 @@ policy does not create any ability to approve, send or modify buyers.
 from __future__ import annotations
 import json
 from pathlib import Path
+from functools import lru_cache
 import re
 from urllib.parse import urlsplit
 from typing import Any
@@ -53,10 +54,46 @@ def load_review_holds(path: str | Path) -> dict[str, dict[str, Any]]:
                 or urlsplit(url).scheme!='https'
                 or (urlsplit(url).hostname or '').removeprefix('www.')!=domain):
                 raise BuyerReviewHoldError('buyer_review_hold_source_invalid')
+        do_not_pursue = item.get('do_not_pursue', False)
+        blocked_recipients = item.get('blocked_recipients', [])
+        if (type(do_not_pursue) is not bool
+            or not isinstance(blocked_recipients,list)
+            or len(blocked_recipients)>20
+            or any(not isinstance(address,str)
+                   or not re.fullmatch(r'[a-z0-9._+%-]+@'+re.escape(domain),address)
+                   for address in blocked_recipients)
+            or (blocked_recipients and not do_not_pursue)):
+            raise BuyerReviewHoldError('buyer_review_hold_exclusion_invalid')
         result[domain]={
             'reason_code':reason,
             'observed_on':str(item.get('observed_on') or ''),
             'resolution_condition':str(item.get('resolution_condition') or '')[:500],
             'review_required':True,
+            'do_not_pursue':do_not_pursue,
+            'blocked_recipients':tuple(blocked_recipients),
         }
     return result
+
+
+DEFAULT_HOLDS = Path(__file__).resolve().parents[1] / 'config/buyer_network_manual_review_holds.json'
+
+
+@lru_cache(maxsize=12)
+def _exclusions_at_version(path: str, mtime_ns: int, size: int) -> frozenset[str]:
+    # Re-evaluate automatically after an atomic founder policy update.
+    holds = load_review_holds(path)
+    return frozenset(domain for domain, record in holds.items()
+                     if record['do_not_pursue'] is True)
+
+
+def do_not_pursue_domains(path: str | Path = DEFAULT_HOLDS) -> frozenset[str]:
+    source = Path(path)
+    if source.is_symlink() or not source.is_file():
+        raise BuyerReviewHoldError('buyer_review_hold_policy_missing_or_unsafe')
+    stat = source.stat()
+    return _exclusions_at_version(str(source), stat.st_mtime_ns, stat.st_size)
+
+
+def is_do_not_pursue_domain(domain: str, *, path: str | Path = DEFAULT_HOLDS) -> bool:
+    host = str(domain or '').strip().lower().rstrip('.').removeprefix('www.')
+    return host in do_not_pursue_domains(path)

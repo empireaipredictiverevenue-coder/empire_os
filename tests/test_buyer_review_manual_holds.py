@@ -211,3 +211,23 @@ def test_corrupted_due_snapshot_does_not_overwrite_founder_packets(tmp_path,monk
     with pytest.raises(DueDiligenceError,match='invalid'):
         mod.main()
     assert original.read_text()=='DONT_OVERWRITE_REVIEW_PACKET'
+
+def test_founder_do_not_pursue_source_contains_verified_restrictions():
+    from empire_os.buyer_review_holds import do_not_pursue_domains, is_do_not_pursue_domain
+    holds = load_review_holds(ROOT / 'config/buyer_network_manual_review_holds.json')
+    row = holds['callvox.pro']
+    assert row['do_not_pursue'] is True
+    assert row['blocked_recipients'] == ('partners@callvox.pro',)
+    assert row['review_required'] is True
+    assert is_do_not_pursue_domain('www.callvox.pro')
+    assert not is_do_not_pursue_domain('polyares.com')
+    assert do_not_pursue_domains() == frozenset({'callvox.pro'})
+
+
+def test_invalid_policy_flag_fails_closed(tmp_path):
+    path = _holds(tmp_path / 'holds.json')
+    payload = json.loads(path.read_text())
+    payload['holds'][0]['do_not_pursue'] = 'false'
+    path.write_text(json.dumps(payload))
+    with pytest.raises(BuyerReviewHoldError, match='exclusion_invalid'):
+        load_review_holds(path)

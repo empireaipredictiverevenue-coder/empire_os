@@ -14,6 +14,22 @@
         "https://paymyreferral.com/contact"
       ],
       "resolution_condition": "Independent proof of current contractual terms, lawful consent pathway and functioning first-party commercial contact or application; explicit founder review to lift HOLD"
+    },
+    {
+      "domain": "callvox.pro",
+      "state": "HOLD",
+      "reason_code": "FOUNDER_DO_NOT_PURSUE_HARD_BOUNCE_CREDIBILITY",
+      "observed_on": "2026-10-10",
+      "review_required": true,
+      "do_not_pursue": true,
+      "blocked_recipients": [
+        "partners@callvox.pro"
+      ],
+      "evidence_urls": [
+        "https://www.callvox.pro/"
+      ],
+      "resolution_condition": "Founder explicit instruction to remove this block, after independently verified company/contact identity; no agent may lift it from an automated signal.",
+      "founder_note": "Founder directed DO NOT PURSUE on 2026-10-10 after SMTP 550 5.1.1 hard bounce and concerns about contact credibility. No email retry, form submission, agent scouting, qualification or outreach."
     }
   ]
 }
