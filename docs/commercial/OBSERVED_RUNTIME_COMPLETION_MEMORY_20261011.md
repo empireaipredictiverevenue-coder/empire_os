@@ -36,3 +36,21 @@ Isolated development checkout: `/var/tmp/empire_observed_runtime_task_reconcilia
 - After merge, perform one exact-readback capture, then reuse existing `refresh_completion_reconciliation` and `refresh_completion_task_monitor` for task-state transition. Do **not** start another agent cycle, the Opportunity Loop, or the Founder API.
 
 **Founder intent:** keep work moving with memory, no repeated engineering loops or Lead Smart re-evaluation.
+
+## Actual production capture and independent readback — 11 October, 20:50 UTC
+
+**Production integration commit:** `60a1b094`, fast-forward on `agent/data-cloud-wave4`, seven bounded files. **478 broad regression tests passed**; final **93 focused tests passed**, including source spoofing, causal time order, immutable receipt chain and one-shot no-replay admission. All 146 pre-existing other-agent files were protected; no service restart, model call, outbound, funds, payment or migration.
+
+A single explicit `scripts.capture_existing_runtime_evidence --apply` execution checked actual first-party Astra, Router/History and resident Founder read-only HTTP responses, then appended exactly these three immutable `TASK_MEMORY_EVENT` receipts:
+
+- **Line 180 / Astra ranking:** `attempt_f9b618b8387f82271d9c0f3c`, previously tested commit `d4599b40`; `RANKED_FROM_CURRENT_DERIVED_VALIDATION` observed with zero validated commercial opportunities, matching current canonical same-cycle Router/History and no authority.
+- **Line 187 / Founder Radar:** `attempt_3416f4afcf29556412970007`, previously tested commit `2a096d9b`; resident HTTP 200 with `CURRENT_DERIVED_HISTORY_OBSERVED` and **18 observed opportunities**, source and stage counts matched; no commercial validation or outreach authority.
+- **Line 190 / Daily Results:** `attempt_281a5d8f31fcf0578ee2cf71`, previously tested commit `eb338c8f`; resident Founder Daily HTTP 200 returned the exact canonical daily report, latest-cycle-only coverage and no claim of verified realised revenue.
+
+Memory now contains **eight** immutable attempts, including the original two separate builder-model holds. The new latest state on each of those three tasks is `RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE`; direct governed dispatch for those task keys remains held, not retried.
+
+Existing `refresh_completion_reconciliation` and `refresh_completion_task_monitor` reported **three genuine, source-bound transitions** from `CODE_COMPLETE_NOT_LIVE` to `RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE`. The existing resident Founder Task Monitor API `/v1/founder-execution-ledger/task-monitor?state=RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE&limit=10` returned **HTTP 200** with **three matching items** and the exact next evidence step **"do not rebuild; exact independent live-closeout checkpoint and checklist verification"**. The agent queue remained unchanged; the canonical checklist still had 281 pending rows.
+
+The standard existing closure reconciler was invoked once with **`apply=False`**. All three tasks have a real completed line-bound **PASS** VERIFY job, but `closure_checkpoint_refs=[]`, so all three correctly remain `NEEDS_LIVE_PROOF / exact_live_closure_checkpoint_required` for formal checkbox closure. It reports **0 eligible exact closures, 0 checklist mutations**. No arbitrary closeout checkpoint was fabricated and no master checklist item was ticked.
+
+**Do not repeat** the engineering, model calls, Founder API restart, history build, or HTTP proof. The only remaining activity for these three items is independently governed exact live-closeout evidence plus authorised checklist reconciliation. All commercial offer, buyer, traffic and payment gates remain held independently. Lead Smart remains owned by its separate workstream.
