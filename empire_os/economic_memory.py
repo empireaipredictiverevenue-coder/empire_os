@@ -770,7 +770,14 @@ def refresh_economic_memory_snapshot(
     tenant_id: str | None = None,
     original_predictions: Mapping[str, Any] | None = None,
     as_of=None,
+    shadow_calibration: bool = False,
 ) -> dict[str, Any]:
+    """Refresh canonical memory; optionally produce a separate shadow benchmark.
+
+    The benchmark is opt-in and has no execution/model-weight authority.
+    """
+    if type(shadow_calibration) is not bool:
+        raise ValueError("shadow_calibration must be boolean")
     root = Path(repo_root).resolve()
     evaluation = _read(root / EXECUTIVE_EVALUATION)
     plan_id = _clean(evaluation.get("plan_id"))
@@ -818,4 +825,13 @@ def refresh_economic_memory_snapshot(
         encoding="utf-8",
     )
     tmp.replace(path)
+    if shadow_calibration:
+        from empire_os.lead_shadow_calibration_benchmark import (
+            refresh_shadow_calibration_snapshot,
+        )
+        refresh_shadow_calibration_snapshot(
+            root, tenant_id=tenant_id,
+            as_of=as_of if as_of is not None else datetime.now(timezone.utc),
+            memory=payload,
+        )
     return payload
