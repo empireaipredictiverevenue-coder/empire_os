@@ -51,3 +51,15 @@ Existing checkout was enhanced only in the bounded release with:
 **Required to complete:** (1) first-party, trusted BSC mainnet JSON-RPC endpoint/verified runtime binding; (2) founder-verified treasury wallet address (do not invent, log or echo private keys); (3) separately governed and verified approver/verifier login transport, least-privilege and restore evidence; (4) single bounded zero-write chain readback + approved role check; (5) flip two switches for four codes only, read-back, verify without creating a fake purchase. Actual customer-submitted order and verified settlement are subsequent independent events.
 
 **Safety:** Any missing dependency keeps public order admission unavailable. No production funds moved, payment requests created, or accepted orders manufactured during this preflight. The existing public founder-led sales enquiry funnel remains live and independent of payment readiness.
+
+## Production guard deployment and readback — 11 October 2026
+
+- Production guarded-checkout commit: aab57c46. Rollback ref: refs/heads/backup/pre-bsc-selfserve-preflight-20261011. All 146 other-agent files preserved; master checklist unchanged.
+- Existing checkout service restarted once, active/running, Result=success, NRestarts=0. Public gateway and founder CRM remain active/running. Both consequential payment switches remain OFF.
+- Checkout health: BSC_CONFIG_MISSING, binding_order_creation_authorized=false, payment_proposal_authorized=false, payment_execution=false, revenue_recognition=false; founder-led interest remains enabled.
+- Live public checkout catalog returns four exact verified product prices ($199, $249, $299, $299); public /buy, /commercial, /predictive-revenue and /roofing all returned HTTP 200.
+- Narrow static export: 23 allowlisted buy/hashed asset paths checked, nine files promoted atomically with rollback manifest /var/tmp/empire_bsc_buy_site_backup_20261011/manifest.json. No other page families changed. Pending payment requests do not display funds-transfer instructions in the new buy UI.
+- Tests: 187 cross-business passes and 31 post-merge passes. Next.js production static export with TypeScript compiled. No failures; one existing Starlette/anyio deprecation warning.
+- Immutable mode-0600 runtime evidence receipt: runtime/execution_plane/self_serve_payment_activation_approved_held_20261011.json. Read-back verified. Founder reapproval required=false; payment activation state APPROVED_HELD_BY_VERIFIED_PRECONDITIONS; payment authority=none.
+- Read-only EmpireDB transaction verified approver/verifier roles are NOLOGIN, each with zero login memberships. Canonical fulfilment orders, BSC payment requests and payment evidence: zero rows. No permissions, credentials, payment requests, treasury funds, or contracts changed.
+- Next preconditions: verified first-party BSC mainnet RPC; founder-verified treasury address; separately governed dedicated approver/verifier identities; fresh chain/token/role proof. Only then enable exact two flags for four products. Do not fake buyer orders or repeat the price/activation approval.
