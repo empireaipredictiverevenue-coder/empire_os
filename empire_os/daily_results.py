@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from zoneinfo import ZoneInfo
@@ -70,6 +70,162 @@ def _stage_count(stages: Mapping[str, Mapping[str, Any]], name: str) -> int | No
     return _first_int(row.get("detail"))
 
 
+def _report_time(raw: Any) -> datetime | None:
+    if not isinstance(raw, str) or len(raw) > 48:
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+
+
+def _report_count(value: Any) -> int | None:
+    return value if type(value) is int and 0 <= value <= 1_000_000 else None
+
+
+def opportunity_daily_results(
+    loop: Mapping[str, Any],
+    routes: Mapping[str, Any],
+    cortex: Mapping[str, Any],
+    *,
+    now: datetime,
+) -> dict[str, Any]:
+    """Daily founder view of the LAST observed cycle, not invented day totals.
+
+    No research-stage status is an independently verified commercial outcome.
+    Missing/stale/ill-typed evidence stays unknown instead of becoming zero.
+    """
+    if now.tzinfo is None:
+        raise ValueError("daily results require a timezone-aware clock")
+    local_day = now.astimezone(LONDON).date()
+    now_utc = now.astimezone(timezone.utc)
+    result: dict[str, Any] = {
+        "schema_version": "empire.daily_results.opportunity_activity.v1",
+        "mode": "OBSERVE",
+        "date": local_day.isoformat(),
+        "coverage": "LATEST_COMPLETED_CYCLE_ONLY_NOT_DAILY_TOTAL",
+        "source_status": "NO_COMPLETE_ON_DATE_OPPORTUNITY_LOOP",
+        "source_freshness": {
+            "loop_current_day": False,
+            "routes_current_day": False,
+            "cortex_current_day": False,
+        },
+        "found": {
+            "observed_candidates_latest_cycle": None,
+            "new_identity_count_latest_cycle": None,
+        },
+        "researched": {
+            "candidates_latest_cycle": None,
+            "new_public_observations_latest_cycle": None,
+        },
+        "advanced": {
+            "derived_stage_transitions_latest_cycle": None,
+            "current_derived_stage_counts": None,
+            "commercial_promotion_verified": False,
+        },
+        "blocked": {"factory_blocked_latest_cycle": None},
+        "proved": {
+            "verified_commercial_outcomes_today": None,
+            "status": "CANONICAL_OUTCOME_EVENT_FEED_NOT_BOUND",
+        },
+        "learned": {
+            "verified_customer_learning_packets_latest_snapshot": None,
+            # An old or untrusted Cortex snapshot cannot prove that model
+            # weights did or did not change during today's window.
+            "model_weights_changed": None,
+        },
+        "forecast_as_realized_revenue": False,
+        "execution_authority": "none",
+        "external_execution_performed": False,
+    }
+    end = _report_time(loop.get("finished_at"))
+    start = _report_time(loop.get("started_at"))
+    valid_loop = (
+        loop.get("schema_version") == "empire.predictive_cloud.opportunity_loop.v2"
+        and loop.get("mode") == "OBSERVE"
+        and loop.get("execution_authority") == "none"
+        and loop.get("automatic_external_execution_allowed") is False
+        and loop.get("ok") is True
+        and start is not None and end is not None
+        and start <= end <= now_utc + timedelta(minutes=5)
+        and end.astimezone(LONDON).date() == local_day
+        and start.astimezone(LONDON).date() == local_day
+    )
+    if valid_loop:
+        result["source_status"] = "OBSERVED_LATEST_ON_DATE_LOOP"
+        result["source_freshness"]["loop_current_day"] = True
+        result["found"]["observed_candidates_latest_cycle"] = _report_count(
+            loop.get("radar_candidate_count")
+        )
+        result["researched"]["candidates_latest_cycle"] = _report_count(
+            loop.get("research_candidate_count")
+        )
+        result["researched"]["new_public_observations_latest_cycle"] = _report_count(
+            loop.get("research_new_observation_count")
+        )
+        result["blocked"]["factory_blocked_latest_cycle"] = _report_count(
+            loop.get("factory_blocked_count")
+        )
+
+        routed_at = _report_time(routes.get("generated_at"))
+        routes_current = (
+            routes.get("schema_version") == "empire.opportunity_evidence_routes.v1"
+            and routes.get("mode") == "OBSERVE"
+            and routes.get("execution_authority") == "none"
+            and routes.get("automatic_external_execution_allowed") is False
+            and routed_at is not None
+            and start <= routed_at <= end + timedelta(minutes=1)
+            and routed_at.astimezone(LONDON).date() == local_day
+        )
+        if routes_current:
+            result["source_freshness"]["routes_current_day"] = True
+            stages = routes.get("stage_counts")
+            if (isinstance(stages, Mapping)
+                    and all(
+                        isinstance(stage, str)
+                        and _report_count(count) is not None
+                        for stage, count in stages.items()
+                    )):
+                result["advanced"]["current_derived_stage_counts"] = dict(stages)
+            history = routes.get("history")
+            if (isinstance(history, Mapping)
+                    and history.get("schema_version") ==
+                        "empire.opportunity_evidence_history.v1"
+                    and history.get("mode") == "OBSERVE"
+                    and history.get("execution_authority") == "none"
+                    and history.get("automatic_external_execution_allowed") is False
+                    and history.get("commercial_stage_independently_verified") is False
+                    and history.get("previous_stage_never_promoted") is True
+                    and _report_time(history.get("generated_at")) == routed_at):
+                result["found"]["new_identity_count_latest_cycle"] = _report_count(
+                    history.get("new_identity_count")
+                )
+                result["advanced"]["derived_stage_transitions_latest_cycle"] = _report_count(
+                    history.get("stage_transition_count_this_cycle")
+                )
+
+    learned_at = _report_time(cortex.get("generated_at"))
+    valid_cortex = (
+        cortex.get("schema_version") == "empire.cortex_learning_snapshot.v1"
+        and cortex.get("mode") == "OBSERVE"
+        and cortex.get("execution_authority") == "none"
+        and cortex.get("forecast_used_as_outcome") is False
+        and cortex.get("model_weight_mutation_authorized") is False
+        and _report_count(cortex.get("synthetic_commercial_label_count")) == 0
+        and learned_at is not None
+        and learned_at <= now_utc + timedelta(minutes=5)
+        and learned_at.astimezone(LONDON).date() == local_day
+    )
+    if valid_cortex:
+        result["source_freshness"]["cortex_current_day"] = True
+        result["learned"]["model_weights_changed"] = False
+        result["learned"][
+            "verified_customer_learning_packets_latest_snapshot"
+        ] = _report_count(cortex.get("verified_customer_learning_count"))
+    return result
+
+
 def build_daily_results(
     repo_root: Path,
     *,
@@ -92,6 +248,13 @@ def build_daily_results(
     trust = _read(runtime / "trust" / "latest.json")
     legal_mass_tort = _read(runtime / "legal_mass_tort" / "latest.json")
     revenue_pulse = _read(runtime / "revenue_pulse" / "latest.json")
+    opportunity_loop = _read(runtime / "opportunity_radar" / "loop_latest.json")
+    opportunity_routes = _read(
+        runtime / "opportunity_factory" / "evidence_routes_latest.json"
+    )
+    cortex_learning = _read(
+        runtime / "cortex_learning" / "cortex_learning_latest.json"
+    )
     spatial_physical_runtime = build_spatial_physical_runtime(repo_root)
     control_fabric = _read(runtime / "control_fabric" / "latest.json")
     conversation_recovery = _read(runtime / "conversation_recovery" / "latest.json")
@@ -144,6 +307,10 @@ def build_daily_results(
             "realized_gp_events": funnel["realized_gp_events"],
         },
         "commercial_funnel": funnel,
+        "opportunity_daily": opportunity_daily_results(
+            opportunity_loop, opportunity_routes, cortex_learning,
+            now=current,
+        ),
         "acquisition": {
             "source": acquisition.get("source"),
             "metro": acquisition.get("metro"),
