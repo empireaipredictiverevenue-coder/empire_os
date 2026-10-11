@@ -66,7 +66,7 @@ def test_prospect_list_requires_trusted_tenant_and_static_filtered_view():
     assert cursor.calls == [
         ("SET TRANSACTION READ ONLY", None),
         ("SET LOCAL ROLE " + ROLE, None),
-        ("SET LOCAL statement_timeout = '4000ms'", None),
+        ("SET LOCAL statement_timeout = '8000ms'", None),
         ("SELECT public.empire_current_tenant_id()", None),
         (PROSPECT_LIST_SQL, (TENANT, 10)),
     ]
@@ -81,6 +81,8 @@ def test_buyer_list_must_be_tenant_bound_and_bounded():
     result = repo.buyers(limit=25)
     assert result[0]["available_capacity"] == 4
     assert cursor.calls[-1] == (BUYER_LIST_SQL, (TENANT, 25))
+    assert ("SET LOCAL statement_timeout = '4000ms'", None) in cursor.calls
+    assert ("SET LOCAL statement_timeout = '8000ms'", None) not in cursor.calls
     assert "WHERE tenant_id = %s" in BUYER_LIST_SQL
 
 
@@ -95,6 +97,7 @@ def test_single_prospect_filters_tenant_and_prospect_even_when_empty():
     repo, cursor = repository([], ["tenant_id", "prospect_id"])
     assert repo.prospect(PROSPECT) is None
     assert cursor.calls[-1] == (PROSPECT_ONE_SQL, (TENANT, PROSPECT))
+    assert ("SET LOCAL statement_timeout = '8000ms'", None) in cursor.calls
     assert "WHERE tenant_id = %s AND prospect_id = %s" in PROSPECT_ONE_SQL
 
 

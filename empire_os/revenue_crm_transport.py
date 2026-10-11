@@ -102,7 +102,13 @@ class PostgresRevenueCrmRepository:
                 with connection.cursor() as cursor:
                     cursor.execute("SET TRANSACTION READ ONLY")
                     cursor.execute("SET LOCAL ROLE " + ROLE)
-                    cursor.execute("SET LOCAL statement_timeout = '4000ms'")
+                    # Prospect view is an expensive read-only scan/sort on live EmpireDB.
+                    # Keep buyers at 4s; allow prospects one bounded 8s budget.
+                    cursor.execute(
+                        "SET LOCAL statement_timeout = '8000ms'"
+                        if sql in (PROSPECT_LIST_SQL, PROSPECT_ONE_SQL)
+                        else "SET LOCAL statement_timeout = '4000ms'"
+                    )
                     # Trusted tenant foundation resolves session_user, never
                     # a caller-supplied GUC or email/domain relationship.
                     cursor.execute("SELECT public.empire_current_tenant_id()")

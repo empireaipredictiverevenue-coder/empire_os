@@ -63,7 +63,8 @@ def post(path: str, payload: dict, token: str | None=None) -> tuple[int,dict]:
 def get_authenticated(path: str,bearer: str) -> int:
     if path not in ("/v1/revenue-crm/prospects","/v1/revenue-crm/buyers"):
         raise ValueError("unsupported local CRM read")
-    connection=HTTPConnection("127.0.0.1",8783,timeout=8)
+    # Allow transport's bounded 8s prospect SQL budget plus HTTP overhead.
+    connection=HTTPConnection("127.0.0.1",8783,timeout=12)
     try:
         connection.request("GET",path+"?limit=1",headers={"Authorization":"Bearer "+bearer})
         response=connection.getresponse()
@@ -73,14 +74,45 @@ def get_authenticated(path: str,bearer: str) -> int:
         connection.close()
 
 
+def verify_existing_login() -> int:
+    """Post-redemption verification only; never reads or redeems invitation."""
+    password=getpass.getpass("Existing CRM founder password: ")
+    if not 14 <= len(password) <= 256:
+        print("CRM_FOUNDER_EXISTING_LOGIN=INVALID_PASSWORD_LENGTH")
+        return 2
+    status,reply=post("/v1/revenue-crm/auth/login",{
+        "email":EMAIL,"password":password,"tenant_id":TENANT,
+    })
+    password=""
+    if status!=200 or not isinstance(reply.get("access_token"),str):
+        print("CRM_FOUNDER_EXISTING_LOGIN=LOGIN_NOT_VERIFIED")
+        return 4
+    bearer=reply["access_token"]
+    print("CRM_FOUNDER_EXISTING_LOGIN=PASSWORD_AUTHENTICATED")
+    prospect_status=get_authenticated("/v1/revenue-crm/prospects",bearer)
+    buyer_status=get_authenticated("/v1/revenue-crm/buyers",bearer)
+    # Status codes only. Never expose bearer, data, password, or SQL errors.
+    print("CRM_FOUNDER_PROSPECT_HTTP="+str(prospect_status))
+    print("CRM_FOUNDER_BUYER_HTTP="+str(buyer_status))
+    if prospect_status==200 and buyer_status==200:
+        print("CRM_FOUNDER_SETUP=FIRST_PARTY_LOGIN_VERIFIED")
+        return 0
+    print("CRM_FOUNDER_SETUP=AUTHENTICATED_READ_STILL_FAIL_CLOSED")
+    return 4
+
+
 def main() -> int:
-    if sys.argv[1:] != ["--interactive-first-login"]:
+    if sys.argv[1:] not in (
+        ["--interactive-first-login"],["--verify-existing-login"],
+    ):
         print("CRM_FOUNDER_SETUP=BLOCKED_EXACT_FLAG_REQUIRED")
         return 3
     if os.geteuid()!=pwd.getpwnam("ubuntu").pw_uid or not sys.stdin.isatty():
         print("CRM_FOUNDER_SETUP=BLOCKED_SSH_TTY_AND_OWNER_REQUIRED")
         return 3
     try:
+        if sys.argv[1:]==["--verify-existing-login"]:
+            return verify_existing_login()
         record=invitation()
         print("Setting up your EmpireOS CRM founder login.")
         print("The password is entered privately and never shown or saved in chat.")
