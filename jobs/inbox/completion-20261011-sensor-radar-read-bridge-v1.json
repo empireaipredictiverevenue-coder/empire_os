@@ -1,0 +1,24 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/opportunity_radar.py",
+    "tests/test_opportunity_sensor_mesh_bridge.py",
+    "docs/architecture/opportunity_sensor_mesh_bridge_20261011.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-11T16:58:05.536331+00:00",
+  "job_id": "completion-20261011-sensor-radar-read-bridge-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:opportunity_sensor_mesh_20261011",
+    "path:empire_os/opportunity_radar.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Implement the smallest evidence-only part of EmpireOS master checklist line 264: remaining Sensor Mesh domains into the EXISTING Opportunity Radar. Production Truth First. Inspect opportunity_radar.py, spatial_physical_runtime.py, opportunity_source_convergence.py, current source snapshots, and existing Radar tests/contract before editing. Reuse build_spatial_physical_runtime and current Radar's observation pipeline: add a bounded read-only spatial/physical *source coverage* or verified-source candidate projection only if concrete first-party schema, identity, timestamp and evidence refs support it. Preserve canonical opportunity keys, tenant isolation, stage UNKNOWN and compatibility with existing source classes. Modeled storm multipliers, unavailable satellite imagery, unauthenticated public signals or source-health stats are NOT verified buyer intent, sellable leads, pricing, paid-call or revenue evidence. If no canonical source evidence supports a candidate, report sensor status as UNAVAILABLE/UNKNOWN and add zero candidates; do not invent sensor observations or spin up providers. Add strict negative tests and one positive synthetic observation (only if source contract permits). Make smallest changes in opportunity_radar.py, new tests and an architecture delta. No new mesh agents, pollers, SQL/migrations, production writes, service restarts, outbound, paid traffic, or capital. Run tests in isolated worktree; governed proposal only.",
+  "pytest_targets": [
+    "tests/test_opportunity_sensor_mesh_bridge.py",
+    "tests/test_opportunity_radar.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
