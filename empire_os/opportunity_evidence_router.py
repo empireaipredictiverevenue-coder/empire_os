@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.opportunity_lifecycle import derive_opportunity_lifecycle
+from empire_os.opportunity_history import build_opportunity_history
 
 
 RADAR = Path("runtime/opportunity_radar/latest.json")
@@ -126,12 +127,31 @@ def build_evidence_routes(
     radar: Mapping[str, Any],
     intake: Mapping[str, Any],
 ) -> dict[str, Any]:
-    candidates = {
-        _clean(row.get("opportunity_key")): row
-        for row in (radar.get("candidates") or [])
+    candidate_rows = [
+        row for row in (radar.get("candidates") or [])
         if isinstance(row, Mapping)
         and _clean(row.get("opportunity_key"))
+    ]
+    candidate_keys = [
+        _clean(row.get("opportunity_key")) for row in candidate_rows
+    ]
+    if len(set(candidate_keys)) != len(candidate_keys):
+        # The old dictionary comprehension silently kept the last record
+        # when two tenants/sources reused one opportunity key.
+        raise ValueError("DUPLICATE_RADAR_OPPORTUNITY_KEY_HELD")
+    candidates = {
+        key: row for key, row in zip(candidate_keys, candidate_rows)
     }
+    intake_rows = [
+        row for row in (intake.get("items") or [])
+        if isinstance(row, Mapping)
+    ]
+    intake_keys = [
+        _clean(row.get("opportunity_key")) for row in intake_rows
+    ]
+    if (any(not key for key in intake_keys)
+            or len(set(intake_keys)) != len(intake_keys)):
+        raise ValueError("AMBIGUOUS_FACTORY_INTAKE_IDENTITY_HELD")
 
     routed: list[dict[str, Any]] = []
     capability_counts: Counter[str] = Counter()
@@ -139,9 +159,7 @@ def build_evidence_routes(
     auto_internal = 0
     commercial_observation = 0
 
-    for row in intake.get("items") or []:
-        if not isinstance(row, Mapping):
-            continue
+    for row in intake_rows:
         key = _clean(row.get("opportunity_key"))
         candidate = candidates.get(key) or {}
         lifecycle = derive_opportunity_lifecycle(candidate, row)
@@ -167,6 +185,7 @@ def build_evidence_routes(
         routed.append({
             "opportunity_key": key,
             "opportunity_class": _clean(row.get("opportunity_class")),
+            "tenant_id": _clean(candidate.get("tenant_id")) or None,
             "lifecycle": lifecycle.as_dict(),
             "route_count": len(routes),
             "routes": routes,
@@ -193,11 +212,18 @@ def build_evidence_routes(
 
 
 def refresh_evidence_routes(repo_root: Path) -> dict[str, Any]:
+    # Preserve history in the SAME atomic router output, not another
+    # runtime/database/agent. A malformed old record must not silently
+    # reset lifecycle provenance or overwrite the previous output.
+    path = repo_root / OUTPUT
+    previous = _read(path) if path.is_file() else None
+    if path.is_file() and not previous:
+        raise ValueError("OPPORTUNITY_HISTORY_PREVIOUS_OUTPUT_UNREADABLE")
     payload = build_evidence_routes(
         _read(repo_root / RADAR),
         _read(repo_root / INTAKE),
     )
-    path = repo_root / OUTPUT
+    payload["history"] = build_opportunity_history(payload, previous)
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(
