@@ -31,3 +31,13 @@ The existing task-monitor and completion-checkpoint stores still show these task
 4. Formal checklist closure must be based on independent exact verification evidence, not this document alone. Preserve concurrently owned modifications to `docs/MASTER_REMAINING_CHECKLIST.md`, and keep its 281 pending items until authorised precise closure.
 
 **Operating discipline:** Production Truth First, inspect before patching, one bounded change, no repeat loops, fail closed, verify with actual runtime, use existing EmpireDB, Astra and first-party infrastructure.
+
+## Approved one-service restart and live API verification (11 October, 20:17 UTC)
+
+Founder expressly approved one controlled restart of `empire-founder-dashboard-api.service`. Only this service was restarted; no CRM restart, other service restart, migration, payment, outreach or timer change.
+
+- Previous process: PID 3968886; post-restart process: PID **4061993**; service `active/running`, result `success`, `NRestarts=0`. Initial socket connection refused during ordinary startup; existing readiness retry returned read-only `/health` HTTP 200.
+- **Actual resident Founder API** `GET http://127.0.0.1:8766/v1/founder-dashboard/overview`: HTTP **200**, `opportunity_radar.lifecycle_evidence.schema_version=empire.founder_radar_lifecycle_evidence.v1`, `status=CURRENT_ROUTER_WITHOUT_HISTORY`, `router_stage_counts={QUALIFY:17}`, `history_verified_for_cycle=false`, `commercial_validation_verified=false`, `outreach_authorized=false`, `execution_authority=none`.
+- **Actual resident Task Monitor API** `GET http://127.0.0.1:8766/v1/founder-execution-ledger/task-monitor?limit=3`: HTTP **200**, `available=true`, `tracked_pending_count=281`, `attention_count=8`, `returned_item_count=3`, `read_only=true`, `execution_authority=none`.
+- Real readbacks were independently parsed and asserted against required schema and authority values. The Founder API activation gate is **satisfied**; do **not** restart this service again to repeat the same check.
+- The Opportunity Router's **history evidence is still pending from the normal existing timer**. Its absence is a separate data-source gate, not evidence of a failed Founder restart. This record does not itself fulfil the separate checklist VERIFY + exact closure-checkpoint gate; do not autonomously mark any business task DONE.
