@@ -18,6 +18,7 @@ TASK_SKILLS = {
     'predictive_forecast': ('predictive', ('empire-forecast-validation',)),
     'revenue_reconciliation': ('finance', ('empire-revenue-reconciliation',)),
     'engineering_review': ('engineering', ('empire-engineering-verification',)),
+    'revenue_readiness': ('sales', ('empire-revenue-readiness',)),
     'skill_authoring': ('innovator', ('empire-skill-authoring',)),
     'product_catalog_verification': ('product', ('empire-product-catalog-verification',)),
     'fulfilment_verification': ('operations_fulfilment', ('empire-fulfilment-verification',)),
@@ -80,6 +81,7 @@ DEPARTMENT_TASKS = {
 # No substring/fuzzy matching: user-controlled task text cannot expand authority.
 COMPONENT_TASKS = {
     'commercial_product_catalog': 'product_catalog_verification',
+    'campaign_revenue_readiness': 'revenue_readiness',
     'predictive_cloud_opportunity_loop': 'predictive_forecast',
     'predictive_intelligence': 'predictive_forecast',
     'predictive_cloud_status': 'predictive_forecast',
