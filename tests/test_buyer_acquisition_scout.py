@@ -636,3 +636,29 @@ def test_tiny_budget_never_displaces_higher_priority_opportunity(monkeypatch):
     assert out["publisher_review_included_count"]==0
     assert out["publisher_review_probed_count"]==0
     assert out["outbound_sent"] is False
+
+
+def test_founder_do_not_pursue_holds_search_canonical_and_research_seeds(monkeypatch):
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {query: ["callvox.pro"] for query in queries},
+    )
+    def never_probe(*args, **kwargs):
+        raise AssertionError("founder-excluded domain must never be probed")
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site", never_probe
+    )
+    output = run_buyer_scout(
+        plan(), max_queries=1, max_domains=2, max_probes=2,
+        canonical_seed_records=[{
+            "website": "https://callvox.pro",
+            "icp_profile_key": "high_ticket_home_service",
+        }],
+        research_seed_records=[{
+            "website": "https://callvox.pro/publishers",
+            "target_buyer_pools": ["direct_demand_buyers"],
+        }],
+    )
+    assert output["candidate_count"] == 0
+    assert output["outbound_sent"] is False
+    assert output["database_write_performed"] is False

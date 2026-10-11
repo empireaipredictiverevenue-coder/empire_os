@@ -72,3 +72,13 @@ def test_no_execution_authority():
 
     assert '"OUTBOUND_ENABLED": "0"' in text
     assert '"LIVE_OUTBOUND": "0"' in text
+
+
+def test_founder_do_not_pursue_domain_is_not_extracted_from_stale_search():
+    module = load_module()
+    found = module.domains_from_text(
+        "https://www.callvox.pro/publishers "
+        "https://polyares.com/pay-per-call-affiliate-program"
+    )
+    assert "callvox.pro" not in found
+    assert found == {"polyares.com"}

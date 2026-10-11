@@ -9,6 +9,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
 
 from empire_os.buyer_network_integration import (
     BuyerNetworkIntegration,
@@ -131,7 +132,7 @@ def extract_observed_domains(payload: Any) -> set[str]:
 
         domain = normalise_domain(value)
 
-        if domain:
+        if domain and not is_do_not_pursue_domain(domain):
             domains.add(domain)
 
     return domains

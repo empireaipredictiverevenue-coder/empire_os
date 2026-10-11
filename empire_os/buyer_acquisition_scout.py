@@ -22,6 +22,7 @@ from empire_os.buyer_acquisition_team import (
     commercial_research_profile, direct_buyer_profile,
 )
 from empire_os.buyer_claim_provenance import classify_buyer_source_pages
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
 from empire_os.buyer_flow_recovery import NON_PROSPECT_DISCOVERY_HOSTS
 from empire_os.scout_low_yield_recovery import select_low_yield_canonical_domains
 from empire_os.buyer_discovery import (
@@ -363,6 +364,8 @@ def run_buyer_scout(
             host = _host(domain)
             if not host:
                 continue
+            if is_do_not_pursue_domain(host):
+                continue
             if host in NON_PROSPECT_DISCOVERY_HOSTS:
                 rejected_search_infrastructure.add(host)
                 continue
@@ -404,7 +407,7 @@ def run_buyer_scout(
             continue
         row = dict(raw)
         host = _host(str(row.get("website") or ""))
-        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS:
+        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS or is_do_not_pursue_domain(host):
             if host in NON_PROSPECT_DISCOVERY_HOSTS:
                 rejected_search_infrastructure.add(host)
             continue
@@ -491,7 +494,7 @@ def run_buyer_scout(
             continue
         row = dict(raw)
         host = _host(str(row.get("website") or row.get("domain") or ""))
-        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS:
+        if not host or host in NON_PROSPECT_DISCOVERY_HOSTS or is_do_not_pursue_domain(host):
             if host in NON_PROSPECT_DISCOVERY_HOSTS:
                 rejected_search_infrastructure.add(host)
             continue

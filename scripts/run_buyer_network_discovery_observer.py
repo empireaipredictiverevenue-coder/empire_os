@@ -7,6 +7,7 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
 
 
 ROOT = Path("/srv/empire_os")
@@ -196,7 +197,7 @@ def domains_from_text(
         if domain.startswith("www."):
             domain = domain[4:]
 
-        if domain in IGNORE_DOMAINS:
+        if domain in IGNORE_DOMAINS or is_do_not_pursue_domain(domain):
             continue
 
         found.add(domain)
