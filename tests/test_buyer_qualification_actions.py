@@ -54,6 +54,17 @@ def _case(root:Path,*,verified:bool=True, bad:int=0):
              'checked_links':[],'critical_broken_links':[],
              'outbound_authorized':False,
          } for d in (d1,d2)]}
+    (directory/'founder_research_decisions_20261009.json').write_text(json.dumps({
+        'schema_version':'empire.founder_research_decisions.v1',
+        'mode':'OBSERVE','source':'explicit_founder_chat_decision',
+        'execution_authority':'none',
+        'outbound_authorized':False,'outbound_sent':False,
+        'traffic_authorized':False,'commercial_terms_approved':False,
+        'qualification_override':False,'manual_hold_override':False,
+        'db_write_authorized':False,
+        'decisions':[{'domain':domain,'decision':'CONTINUE_RESEARCH'} for domain in
+                     ('astoriacompany.com','rvnu.com','buythecalls.com')],
+    }))
     (directory/'due_diligence_latest.json').write_text(json.dumps(due))
     if bad==1:
         data['shortlist']['shortlist_count']=1000

@@ -22,6 +22,7 @@ from typing import Any
 
 from empire_os.buyer_review_holds import load_review_holds
 from empire_os.buyer_first_party_due_diligence import load_due_diligence
+from empire_os.buyer_founder_research_decisions import load_research_decisions
 
 ROOT = Path('/srv/empire_os')
 BASE = Path('runtime/buyer_network_intelligence')
@@ -84,6 +85,7 @@ def _snapshots(root: Path):
 def plan(root: Path = ROOT) -> dict[str,Any]:
     root=Path(root).resolve()
     snapshots, hashes = _snapshots(root)
+    research_decisions = load_research_decisions(root/BASE)
     holds = load_review_holds(root/'config/buyer_network_manual_review_holds.json')
     due_path = root/BASE/'due_diligence_latest.json'
     due_reviews, due_holds = load_due_diligence(due_path, now_epoch=time.time())
@@ -152,6 +154,7 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
                 manual_hold['resolution_condition'] if manual_hold is not None else None
             ),
             'queue_status':str(item.get('queue_status') or 'WATCH')[:50],
+            'founder_research_decision': ('CONTINUE_RESEARCH' if domain in research_decisions else None),
             'founder_priority':score,
             'verticals':[v for v in item.get('verticals',[]) if isinstance(v,str) and len(v)<50][:8],
             'site_corroborated_buyer_role':direct.get('buyer_role') is True and direct.get('corroborated') is True,
@@ -161,6 +164,18 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'missing_evidence':gaps,
             'next_evidence_actions':[EVIDENCE_TASKS.get(g,
                 'Independent commercial evidence and founder-review confirmation required.') for g in gaps],
+            'existing_first_party_source_urls': ([
+                page['final_url'] for page in direct.get('pages',[])
+                if isinstance(page,dict) and page.get('status')=='PASS'
+                and isinstance(page.get('final_url'),str)
+                and page['final_url'].startswith(('https://'+domain+'/', 'https://'+domain))
+            ][:8] if domain in research_decisions else []),
+            'targeted_recovery_requirements': ([
+                {'evidence_key':g, 'required_proof':EVIDENCE_TASKS[g],
+                 'acceptable_source':'first_party_document_or_authenticated_commercial_evidence',
+                 'status':'UNVERIFIED', 'auto_approve':False}
+                for g in gaps if g in EVIDENCE_TASKS
+            ] if domain in research_decisions else []),
             'commercial_terms_verified':False,
             'canonical_contact_or_reply_verified':False,
             'outbound_authorized':False,
@@ -183,6 +198,7 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         'source_sha256':hashes,
         'network_candidate_count':len(current_domains),
         'shortlisted_count':len(actions),
+        'founder_continue_research_count':sum(x['founder_research_decision']=='CONTINUE_RESEARCH' for x in actions),
         'first_party_due_diligence_current_count':sum(
             x['first_party_due_diligence'].get('freshness') == 'CURRENT'
             for x in actions
