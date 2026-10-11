@@ -137,8 +137,8 @@ def test_both_authority_flags_do_not_override_missing_bsc_configuration(monkeypa
 def test_full_configured_flags_but_failed_rpc_hold_before_buyer_or_order(monkeypatch):
     monkeypatch.setenv("EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED","ON")
     monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED","ON")
-    monkeypatch.setattr(checkout_api,"checkout_bsc_config_snapshot",
-        lambda:{"configured":True,"status":"BSC_CONFIGURED_CHAIN_UNVERIFIED"})
+    monkeypatch.setattr(checkout_api,"_settlement_snapshot",
+        lambda:{"configured":True,"mode":"direct","status":"BSC_CONFIGURED_CHAIN_UNVERIFIED"})
     monkeypatch.setattr(checkout_api,"verify_checkout_bsc_chain",
         lambda: (_ for _ in ()).throw(CheckoutPaymentPreflightHold("bsc_chain_head_stale")))
     monkeypatch.setattr(checkout_api,"prepare_checkout_order",
@@ -151,15 +151,15 @@ def test_full_configured_flags_but_failed_rpc_hold_before_buyer_or_order(monkeyp
 def test_verified_chain_preflight_runs_before_mock_order(monkeypatch):
     monkeypatch.setenv("EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED","ON")
     monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED","ON")
-    monkeypatch.setattr(checkout_api,"checkout_bsc_config_snapshot",
-                        lambda:{"configured":True,"status":"BSC_CONFIGURED_CHAIN_UNVERIFIED"})
+    monkeypatch.setattr(checkout_api,"_settlement_snapshot",
+                        lambda:{"configured":True,"mode":"direct","status":"BSC_CONFIGURED_CHAIN_UNVERIFIED"})
     seq=[]
     monkeypatch.setattr(checkout_api,"verify_checkout_bsc_chain",
                         lambda:seq.append("CHAIN_VERIFIED_BEFORE_DB"))
     monkeypatch.setattr(checkout_api,"prepare_checkout_order",
                         lambda **kwargs:(seq.append("CREATE_ORDER_AFTER_CHAIN"),{"order_id":"mock"})[1])
     monkeypatch.setattr(checkout_api,"create_payment_request_for_order",
-                        lambda order,standing_authority:(seq.append("PROPOSE_AFTER_ORDER"),{
+                        lambda order,standing_authority,settlement_mode:(seq.append("PROPOSE_AFTER_ORDER"),{
                             "payment_request_created":False,"payment_request_status":"pending",
                             "actual_revenue":False,
                         })[1])

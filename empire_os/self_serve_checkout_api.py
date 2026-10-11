@@ -24,6 +24,13 @@ from empire_os.first_party_sales_interest import (
     founder_led_commercial_offers,
     record_founder_led_interest,
 )
+from empire_os.self_serve_escrow_bridge import (
+    escrow_config_snapshot,
+    escrow_mainnet_activation_flag,
+    settlement_mode,
+    verify_escrow_checkout_contract,
+    verify_escrow_operator_memberships,
+)
 from empire_os.self_serve_payment_readiness import (
     CheckoutPaymentPreflightHold,
     checkout_bsc_config_snapshot,
@@ -45,23 +52,43 @@ app = FastAPI(
 )
 
 
-def _orders_authorized() -> bool:
-    # Enabling the safe first-party sales enquiry path cannot accidentally
-    # create a binding/accepted fulfilment order with payment authority OFF.
-    return (
-        os.getenv(
-            "EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED", "OFF"
-        ).strip().upper() in {"1", "ON", "TRUE", "YES"}
-        and _proposal_authorized()
-        and checkout_bsc_config_snapshot()["configured"] is True
-    )
-
-
 def _proposal_authorized() -> bool:
     return os.getenv(
         "EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED",
         "OFF",
     ).strip().upper() in {"1", "ON", "TRUE", "YES"}
+
+
+def _settlement_snapshot() -> dict[str, Any]:
+    try:
+        mode = settlement_mode()
+    except CheckoutPaymentPreflightHold:
+        return {
+            "mode": "unsupported",
+            "configured": False,
+            "status": "UNSUPPORTED_CHECKOUT_SETTLEMENT_MODE",
+        }
+    if mode == "escrow":
+        result = escrow_config_snapshot()
+        if result["configured"] and not escrow_mainnet_activation_flag():
+            return {
+                "mode": "escrow", "configured": False,
+                "status": "ESCROW_MAINNET_ACTIVATION_HELD",
+            }
+        return {"mode": mode, **result}
+    return {"mode": mode, **checkout_bsc_config_snapshot()}
+
+
+def _orders_authorized() -> bool:
+    # Both founder flags AND the selected mode's deployment admission are
+    # needed. A configured RPC or a historic escrow build is never enough.
+    return (
+        os.getenv(
+            "EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED", "OFF"
+        ).strip().upper() in {"1", "ON", "TRUE", "YES"}
+        and _proposal_authorized()
+        and _settlement_snapshot()["configured"] is True
+    )
 
 
 class PredictiveRevenueInterestRequest(BaseModel):
@@ -119,7 +146,9 @@ def health():
         "service": "empire-self-serve-checkout",
         "payment_proposal_authorized": _proposal_authorized(),
         "binding_order_creation_authorized": _orders_authorized(),
-        "bsc_payment_configuration_status": checkout_bsc_config_snapshot()["status"],
+        "bsc_payment_configuration_status": _settlement_snapshot()["status"],
+        "checkout_settlement_mode": _settlement_snapshot()["mode"],
+        "escrow_creation_automated": False,
         "founder_led_commercial_interest_enabled": True,
         "payment_execution": False,
         "revenue_recognition": False,
@@ -132,7 +161,8 @@ def catalog():
         **self_serve_catalog(),
         "binding_order_creation_authorized": _orders_authorized(),
         "payment_proposal_authorized": _proposal_authorized(),
-        "bsc_payment_configuration_status": checkout_bsc_config_snapshot()["status"],
+        "bsc_payment_configuration_status": _settlement_snapshot()["status"],
+        "checkout_settlement_mode": _settlement_snapshot()["mode"],
     }
 
 
@@ -143,7 +173,14 @@ def create_order(req: CheckoutRequest):
     try:
         # Read BSC mainnet chain, canonical USDT precision and a fresh anchor
         # BEFORE buyer or accepted fulfilment order is written to EmpireDB.
-        verify_checkout_bsc_chain()
+        mode = settlement_mode()
+        if mode == "escrow":
+            verify_escrow_checkout_contract()
+            # No money or accepted-order write until independent approval
+            # and escrow verifier roles have operative DB login memberships.
+            verify_escrow_operator_memberships()
+        else:
+            verify_checkout_bsc_chain()
         order = prepare_checkout_order(
             product_code=req.product_code,
             business_name=req.business_name,
@@ -152,10 +189,12 @@ def create_order(req: CheckoutRequest):
             payer_wallet=req.payer_wallet,
             terms_accepted=req.terms_accepted,
             idempotency_key=req.idempotency_key,
+            settlement_mode=mode,
         )
         return create_payment_request_for_order(
             order,
             standing_authority=_proposal_authorized(),
+            settlement_mode=mode,
         )
     except CheckoutPaymentPreflightHold as exc:
         # No RPC URL, treasury, or chain internals leak into public replies.

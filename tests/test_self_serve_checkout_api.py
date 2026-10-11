@@ -32,7 +32,7 @@ def test_order_endpoint_keeps_proposal_gated(monkeypatch):
     monkeypatch.setattr(
         api,
         "create_payment_request_for_order",
-        lambda order, standing_authority: {
+        lambda order, standing_authority, settlement_mode: {
             **order,
             "payment_request_created": standing_authority,
         },
@@ -61,8 +61,8 @@ def test_order_endpoint_keeps_proposal_gated(monkeypatch):
     # proposals may reach the (mocked) order and payment flow.
     monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED", "ON")
     monkeypatch.setattr(
-        api, "checkout_bsc_config_snapshot", lambda: {
-            "configured": True, "status": "BSC_CONFIGURED_CHAIN_UNVERIFIED",
+        api, "_settlement_snapshot", lambda: {
+            "configured": True, "mode": "direct", "status": "BSC_CONFIGURED_CHAIN_UNVERIFIED",
         }
     )
     monkeypatch.setattr(api, "verify_checkout_bsc_chain", lambda: {

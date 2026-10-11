@@ -152,3 +152,64 @@ def test_payment_request_stays_gated_without_standing_authority():
     assert result["payment_request_created"] is False
     assert result["payment_request_status"] == "standing_authority_required"
     assert result["actual_revenue"] is False
+
+
+def test_escrow_order_terms_bind_mode_and_reject_idempotent_cross_mode_retry():
+    request = FakeRequest()
+    args = dict(
+        product_code="competitor_search_gap",
+        business_name="Example Ltd", email="buyer@example.com",
+        target_domain="example.com",
+        payer_wallet="0x" + "1"*40,
+        terms_accepted=True,
+        idempotency_key="mode-bound-escrow-20261012",
+        request=request,
+    )
+    first = checkout.prepare_checkout_order(**args,settlement_mode="escrow")
+    assert first["settlement_mode"] == "escrow"
+    assert next(iter(request.orders.values()))["commercial_payload"]["settlement_mode"] == "escrow"
+    assert next(iter(request.orders.values()))["commercial_payload"]["terms"]["settlement_mode"] == "escrow"
+    again = checkout.prepare_checkout_order(**args,settlement_mode="escrow")
+    assert again["decision"] == "existing_order"
+    assert again["terms_sha256"] == first["terms_sha256"]
+    assert len(request.buyers)==1 and len(request.orders)==1
+    with pytest.raises(checkout.CheckoutError,match="idempotency key belongs to different order"):
+        checkout.prepare_checkout_order(**args,settlement_mode="direct")
+    assert len(request.buyers)==1 and len(request.orders)==1
+
+
+def test_existing_escrow_order_does_not_repropose_with_a_new_block_or_expiry(monkeypatch):
+    monkeypatch.setattr(checkout,"get_block_anchor",lambda *args,**kwargs:
+                        pytest.fail("AN_EXISTING_ORDER_STARTED_A_NEW_CHAIN_ANCHOR"))
+    monkeypatch.setattr(checkout,"submit_payment_proposal",lambda *args,**kwargs:
+                        pytest.fail("AN_EXISTING_ORDER_SENT_A_NEW_PAYMENT_PROPOSAL"))
+    replay = checkout.create_payment_request_for_order(
+        {
+            "decision":"existing_order",
+            "order_id":"11111111-1111-1111-1111-111111111111",
+            "settlement_mode":"escrow",
+            "payer_wallet":"0x"+"1"*40,
+            "product":{"amount_cents":19900},
+        },
+        standing_authority=True, settlement_mode="escrow",
+    )
+    assert replay["payment_request_created"] is False
+    assert replay["payment_request_status"] == "existing_order_review_required"
+    assert replay["next_payment_step"] == "REVIEW_EXISTING_PAYMENT_REQUEST"
+    assert replay["payment_instructions_ready"] is False
+    assert replay["treasury_address"] is None
+    assert replay["amount_usdt"] is None
+    assert replay["actual_revenue"] is False
+
+
+def test_invalid_settlement_mode_rejected_before_any_db_write():
+    request=FakeRequest()
+    with pytest.raises(checkout.CheckoutError,match="unsupported settlement mode"):
+        checkout.prepare_checkout_order(
+            product_code="competitor_search_gap",
+            business_name="Example Ltd",email="buyer@example.com",
+            target_domain="example.com",payer_wallet="0x"+"1"*40,
+            terms_accepted=True,idempotency_key="invalid-mode-key-20261012",
+            settlement_mode="unknown",request=request,
+        )
+    assert not request.buyers and not request.orders

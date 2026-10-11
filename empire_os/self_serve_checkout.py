@@ -20,7 +20,12 @@ from urllib.parse import quote
 from uuid import NAMESPACE_URL, uuid5
 
 from empire_os.bsc_usdt_verifier import BscUsdtConfig, get_block_anchor
-from empire_os.payment_governance import build_payment_proposal, submit_payment_proposal
+from empire_os.bsc_escrow_verifier import BscEscrowConfig
+from empire_os.payment_governance import (
+    build_payment_proposal,
+    build_escrow_proposal,
+    submit_payment_proposal,
+)
 from empire_os.sb import request_json
 
 
@@ -185,7 +190,10 @@ def _terms_payload(
     business_name: str,
     target_domain: str,
     payer_wallet: str,
+    settlement_mode: str = "direct",
 ) -> dict[str, Any]:
+    if settlement_mode not in {"direct", "escrow"}:
+        raise CheckoutError("unsupported settlement mode")
     return {
         "schema_version": "empire.self-serve-terms.v1",
         "product_code": row.get("product_code"),
@@ -201,6 +209,7 @@ def _terms_payload(
         "payer_wallet": payer_wallet,
         "settlement_asset": "USDT",
         "settlement_network": "BSC",
+        "settlement_mode": settlement_mode,
         "chain_id": 56,
     }
 
@@ -284,11 +293,14 @@ def prepare_checkout_order(
     payer_wallet: str,
     terms_accepted: bool,
     idempotency_key: str,
+    settlement_mode: str = "direct",
     request: Request = request_json,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     if terms_accepted is not True:
         raise CheckoutError("terms acceptance required")
+    if settlement_mode not in {"direct", "escrow"}:
+        raise CheckoutError("unsupported settlement mode")
     code = _clean_text(product_code, label="product_code", max_length=100).lower()
     business = _clean_text(business_name, label="business_name", max_length=200)
     buyer_email = _email(email)
@@ -321,6 +333,7 @@ def prepare_checkout_order(
         business_name=business,
         target_domain=domain,
         payer_wallet=wallet,
+        settlement_mode=settlement_mode,
     )
     terms_sha = _terms_hash(terms)
     order_id = _order_id(key)
@@ -342,6 +355,7 @@ def prepare_checkout_order(
             "product": public_product(row),
             "terms_sha256": terms_sha,
             "payer_wallet": wallet,
+            "settlement_mode": settlement_mode,
             "state": existing.get("state"),
             "payment_request_created": False,
             "actual_revenue": False,
@@ -380,6 +394,7 @@ def prepare_checkout_order(
             "payer_wallet": wallet,
             "settlement_asset": "USDT",
             "settlement_network": "BSC",
+            "settlement_mode": settlement_mode,
             "actual_revenue": False,
         },
     }
@@ -400,6 +415,7 @@ def prepare_checkout_order(
         "terms_sha256": terms_sha,
         "state": "accepted",
         "payer_wallet": wallet,
+        "settlement_mode": settlement_mode,
         "payment_request_created": False,
         "actual_revenue": False,
     }
@@ -410,10 +426,30 @@ def create_payment_request_for_order(
     *,
     standing_authority: bool,
     db: Any | None = None,
-    config: BscUsdtConfig | None = None,
+    config: BscUsdtConfig | BscEscrowConfig | None = None,
     rpc_call=None,
     now: datetime | None = None,
+    settlement_mode: str = "direct",
 ) -> dict[str, Any]:
+    if settlement_mode not in {"direct", "escrow"}:
+        raise CheckoutError("unsupported settlement mode")
+    if order.get("settlement_mode", settlement_mode) != settlement_mode:
+        raise CheckoutError("order settlement mode mismatch")
+    if order.get("decision") == "existing_order":
+        # Existing SQL requires the original block number and expiry when
+        # idempotently replaying a payment request. A new anchor/expiry
+        # changes the financial terms and would fail or imply a new offer.
+        # Hold for dedicated review instead of silently reproposing it.
+        return {
+            **dict(order),
+            "payment_request_created": False,
+            "payment_request_status": "existing_order_review_required",
+            "payment_instructions_ready": False,
+            "next_payment_step": "REVIEW_EXISTING_PAYMENT_REQUEST",
+            "treasury_address": None,
+            "amount_usdt": None,
+            "actual_revenue": False,
+        }
     if standing_authority is not True:
         return {
             **dict(order),
@@ -431,27 +467,48 @@ def create_payment_request_for_order(
         raise CheckoutError("order price missing") from exc
     if amount_cents < 1 or amount_cents > MAX_SELF_SERVE_USD_CENTS:
         raise CheckoutError("order outside self-serve payment limit")
-    cfg = config or BscUsdtConfig.from_env()
+    if settlement_mode == "escrow":
+        cfg = config or BscEscrowConfig.from_env()
+        if not isinstance(cfg, BscEscrowConfig):
+            raise CheckoutError("escrow configuration type mismatch")
+    else:
+        cfg = config or BscUsdtConfig.from_env()
+        if not isinstance(cfg, BscUsdtConfig):
+            raise CheckoutError("direct payment configuration type mismatch")
     anchor = get_block_anchor(cfg, rpc_call=rpc_call)
     order_id = _clean_text(order.get("order_id"), label="order_id", max_length=36)
     payer = _wallet(order.get("payer_wallet"))
-    plan = build_payment_proposal(
-        fulfilment_order_id=order_id,
-        amount_usdt=Decimal(amount_cents) / Decimal(100),
-        payer_address=payer,
-        treasury_address=cfg.treasury_address,
-        min_block_number=int(anchor["block_number"]),
-        expires_at=current + timedelta(hours=24),
-        idempotency_key=f"checkout-pay:{order_id}",
-        actor="self-serve-checkout",
-        now=current,
-    )
+    common = {
+        "fulfilment_order_id": order_id,
+        "amount_usdt": Decimal(amount_cents) / Decimal(100),
+        "payer_address": payer,
+        "min_block_number": int(anchor["block_number"]),
+        "expires_at": current + timedelta(hours=24),
+        "actor": "self-serve-checkout",
+        "now": current,
+    }
+    if settlement_mode == "escrow":
+        plan = build_escrow_proposal(
+            **common,
+            beneficiary_address=cfg.beneficiary,
+            idempotency_key=f"checkout-escrow:{order_id}",
+        )
+    else:
+        plan = build_payment_proposal(
+            **common,
+            treasury_address=cfg.treasury_address,
+            idempotency_key=f"checkout-pay:{order_id}",
+        )
     result = submit_payment_proposal(
         plan,
         operator_authorized=True,
         db=db,
     )
     status = result.get("status")
+    if settlement_mode == "escrow" and result.get("settlement_mode") != "escrow":
+        raise CheckoutError("escrow proposal settlement mode not confirmed")
+    if settlement_mode == "direct" and result.get("settlement_mode", "direct") != "direct":
+        raise CheckoutError("direct proposal settlement mode not confirmed")
     request_id = str(result.get("request_id") or "")
     try:
         from uuid import UUID
@@ -463,13 +520,23 @@ def create_payment_request_for_order(
     # An initially proposed request is PENDING and has not passed the
     # dedicated payment-approver role. Instructing the customer to transfer
     # USDT to an unapproved request would bypass the operator gate.
-    ready = status == "approved"
+    # Approved *escrow* requests are still not payable: a separately
+    # verified, on-chain EscrowCreated proof must exist before funding.
+    ready = status == "approved" and settlement_mode == "direct"
     return {
         **dict(order),
+        "settlement_mode": settlement_mode,
         "payment_request_created": True,
         "payment_request_status": status,
         "payment_request_id": request_id,
         "payment_instructions_ready": ready,
+        "escrow_creation_verified": False if settlement_mode == "escrow" else None,
+        "next_payment_step": (
+            "INDEPENDENT_ESCROW_CREATION_PROOF_REQUIRED"
+            if settlement_mode == "escrow" and status == "approved" else
+            "HUMAN_PAYMENT_REQUEST_APPROVAL_REQUIRED"
+            if status == "pending" else "APPROVED_DIRECT_PAYMENT_INSTRUCTIONS"
+        ),
         "treasury_address": cfg.treasury_address if ready else None,
         "amount_usdt": (f"{Decimal(amount_cents) / Decimal(100):f}" if ready else None),
         "network": "BSC",
