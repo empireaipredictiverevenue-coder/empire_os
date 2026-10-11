@@ -110,7 +110,7 @@ def test_roofing_page_is_consumer_initiated_and_zip_gated():
 
 
 
-def test_roofing_cta_mirrors_every_production_launch_gate_and_fails_closed():
+def test_frozen_roofing_cta_remains_disabled_with_additional_backend_legal_gate():
     from empire_os.lead_smart_launch_readiness import build_launch_readiness
 
     text = source()
@@ -125,7 +125,11 @@ def test_roofing_cta_mirrors_every_production_launch_gate_and_fails_closed():
         "founder_live_traffic_authorized": "FOUNDER_LIVE_TRAFFIC_AUTHORIZED",
     }
     readiness = build_launch_readiness(tracking={}, zip_gate={}, routing={})
-    assert set(readiness["gates"]) == set(all_flags)
+    # Preserve the buyer-approved static source. Its eight constants stay
+    # false; the readiness backend now additionally blocks on legal release.
+    assert set(readiness["gates"]) == set(all_flags) | {"legal_release_verified", "pilot_stop_verified"}
+    assert readiness["gates"]["legal_release_verified"] is False
+    assert readiness["call_cta_enabled"] is False
 
     compact = normalized(text)
     for flag in all_flags.values():
@@ -163,8 +167,11 @@ def test_roofing_page_mounts_read_only_zip_preview():
     assert 'method: "POST"' in client
     assert 'cache: "no-store"' in client
     assert "Date.parse(item.source_expires_at)" in client
-    assert 'item.call_authorized !== false' in client
-    assert 'item.execution_authority !== "NONE"' in client
+    assert 'item.call_authorized === false' in client
+    assert 'item.call_authorized === true' in client
+    assert 'action="/roofing/pilot-handoff"' in client
+    assert 'item.execution_authority === "NONE"' in client
+    assert 'item.execution_authority === "LIVE_TRAFFIC"' in client
     assert "a listed zip does not guarantee" in client.lower()
     assert "daylight saving applies" in client.lower()
     assert 'href="tel:' not in client

@@ -239,13 +239,20 @@ def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
                 "caller_id_pass_through_verified": False,
                 "rtb_enabled": False,
             },
-            # Buyer confirms the submitted page is still awaiting review.
+            # Buyer approval covers the revised screenshots, not the older
+            # deployed page, provider proof, legal approval or founder authority.
             "landing_review_report": {
-                "status": "AWAITING_SETH_REVIEW",
+                "status": "BUYER_VISUAL_APPROVED_FROZEN_CANDIDATE",
                 "url": "https://empire-ai.co.uk/roofing",
-                "source_ref": "gmail:1a12229d9d3ffe75",
-                "approved": False,
+                "source_ref": "gmail:1a12bc009d04fcc9",
+                "submission_source_ref": "gmail:1a12a7950bfc40c3",
+                "thread_id": "1a0d9ce883c87d4a",
+                "approved_at": "2026-10-11T16:16:06Z",
+                "reported_by": "Lead Smart Support Agent",
+                "reviewed_source_sha256": "faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43cccb",
+                "approved": True,
                 "call_button_must_remain_disabled": True,
+                "founder_launch_authorized": False,
             },
             # 2026-10-09: Seth reported everything *should* be active.
             # Buyer assertion is not equivalent to a connected-call proof.

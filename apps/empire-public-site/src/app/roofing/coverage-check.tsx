@@ -10,13 +10,14 @@ type CoverageResponse = {
   call_authorized: boolean;
   execution_authority: string;
   buyer_route_verified: boolean;
+  handoff_form_action?: string;
 };
 
 type CheckResult =
   | { kind: "idle" }
   | { kind: "invalid" }
   | { kind: "unavailable" }
-  | { kind: "covered"; zip: string }
+  | { kind: "covered"; zip: string; callReady: boolean }
   | { kind: "not-listed"; zip: string };
 
 function validPreview(value: unknown): value is CoverageResponse {
@@ -25,9 +26,17 @@ function validPreview(value: unknown): value is CoverageResponse {
   if (
     item.schema_version !== "empire.lead_smart.zip_check_response.v1" ||
     item.status !== "GUIDANCE_ONLY" ||
-    item.call_authorized !== false ||
-    item.execution_authority !== "NONE" ||
-    item.buyer_route_verified !== false ||
+    !(
+      (item.call_authorized === false &&
+       item.execution_authority === "NONE" &&
+       item.buyer_route_verified === false &&
+       item.handoff_form_action === undefined) ||
+      (item.call_authorized === true &&
+       item.execution_authority === "LIVE_TRAFFIC" &&
+       item.buyer_route_verified === true &&
+       item.coverage_guidance === "LISTED_IN_RECENT_COVERAGE" &&
+       item.handoff_form_action === "/roofing/pilot-handoff")
+    ) ||
     !["LISTED_IN_RECENT_COVERAGE", "NOT_LISTED_IN_RECENT_COVERAGE"].includes(item.coverage_guidance ?? "") ||
     typeof item.source_expires_at !== "string"
   ) return false;
@@ -60,7 +69,7 @@ export default function RoofingCoverageCheck() {
       if (!validPreview(data)) throw new Error("unverified or expired coverage");
       setResult(
         data.coverage_guidance === "LISTED_IN_RECENT_COVERAGE"
-          ? { kind: "covered", zip: submitted }
+          ? { kind: "covered", zip: submitted, callReady: data.call_authorized === true }
           : { kind: "not-listed", zip: submitted }
       );
     } catch {
@@ -119,6 +128,14 @@ export default function RoofingCoverageCheck() {
             {result.kind === "not-listed" &&
               `ZIP ${result.zip} was not listed in the current guidance snapshot. No call route is enabled.`}
             {result.kind === "idle" && "No phone number will be enabled by this preview."}
+            {result.kind === "covered" && result.callReady && (
+              <form method="post" action="/roofing/pilot-handoff" className="mt-3">
+                <input type="hidden" name="zip" value={result.zip} />
+                <button type="submit" className="rounded-xl bg-[#075ec6] px-5 py-3 font-bold text-white">
+                  Continue to roofing call option
+                </button>
+              </form>
+            )}
           </div>
           <p className="mt-3 text-xs text-[#547092]">Your property ZIP is sent to Empire AI for an immediate read-only coverage check. This form does not request your name, telephone number, or contact details.</p>
         </div>

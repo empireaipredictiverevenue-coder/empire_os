@@ -2,11 +2,21 @@ import type { Metadata } from "next";
 import RoofingCoverageCheck from "./coverage-check";
 import { ArrowRight, Check, ChevronRight, Droplets, FileText, House, MapPin, MessageSquareText, Phone, ShieldCheck, Wind } from "lucide-react";
 
+// SEO-ready but deliberately withheld from indexing until every activation
+// gate, buyer landing review and live-service evidence is independently met.
 export const metadata: Metadata = {
-  title: "Roofing Service Help",
+  title: "Roof Replacement & Installation | Roofing ZIP Check",
   description:
-    "Information for homeowners looking for roofing service availability in their area.",
+    "Planning a roof replacement or installation? Check recent service-area guidance by ZIP. Independent contractor availability varies and is not guaranteed.",
+  alternates: { canonical: "/roofing" },
   robots: { index: false, follow: false },
+  openGraph: {
+    title: "Roof Replacement & Installation Service Availability",
+    description: "Review roofing service-area guidance for roof replacement and installation enquiries. Contractor availability varies by ZIP.",
+    url: "/roofing",
+    type: "website",
+  },
+  twitter: { card: "summary" },
 };
 
 const TRACKING_NUMBER_E164 = "+18883579305";
@@ -44,20 +54,20 @@ const CALL_ROUTE_ENABLED =
 
 const roofingNeeds = [
   [
-    "Roof leak or water entry",
+    "Roof replacement or reroofing enquiry",
+    "Provide the property ZIP code and explain the existing roof and replacement scope.",
+  ],
+  [
+    "New roof installation enquiry",
+    "Share the property location and proposed new-roof installation details.",
+  ],
+  [
+    "Roof leak repair or water entry",
     "Describe where the issue is visible and when you first noticed it.",
   ],
   [
-    "Storm or wind damage",
+    "Storm-damaged roof inspection",
     "Explain what changed after the weather event and the current condition of the property.",
-  ],
-  [
-    "Missing or damaged roofing materials",
-    "Provide a short description of the visible roofing issue.",
-  ],
-  [
-    "Roof replacement enquiry",
-    "Provide the property location and basic project information.",
   ],
 ];
 
@@ -81,10 +91,10 @@ const steps = [
 
 export default function RoofingServicePage() {
   const needs = [
-    { name: roofingNeeds[0][0], info: roofingNeeds[0][1], Icon: Droplets, tone: "from-[#d9edff] to-[#c7ecff]", ink: "text-[#0757ca]" },
-    { name: roofingNeeds[1][0], info: roofingNeeds[1][1], Icon: Wind, tone: "from-[#d5fbff] to-[#b4f2f9]", ink: "text-[#004caa]" },
-    { name: roofingNeeds[2][0], info: roofingNeeds[2][1], Icon: FileText, tone: "from-[#dbfff1] to-[#c1f6e1]", ink: "text-[#07595c]" },
-    { name: roofingNeeds[3][0], info: roofingNeeds[3][1], Icon: House, tone: "from-[#d8efff] to-[#bde7ff]", ink: "text-[#064bc0]" },
+    { name: roofingNeeds[0][0], info: roofingNeeds[0][1], Icon: House, tone: "from-[#d9edff] to-[#c7ecff]", ink: "text-[#0757ca]" },
+    { name: roofingNeeds[1][0], info: roofingNeeds[1][1], Icon: FileText, tone: "from-[#d5fbff] to-[#b4f2f9]", ink: "text-[#004caa]" },
+    { name: roofingNeeds[2][0], info: roofingNeeds[2][1], Icon: Droplets, tone: "from-[#dbfff1] to-[#c1f6e1]", ink: "text-[#07595c]" },
+    { name: roofingNeeds[3][0], info: roofingNeeds[3][1], Icon: Wind, tone: "from-[#d8efff] to-[#bde7ff]", ink: "text-[#064bc0]" },
   ];
   const stepIcons = [MessageSquareText, MapPin, Phone];
 
@@ -116,10 +126,10 @@ export default function RoofingServicePage() {
           <div className="max-w-[650px]">
             <p className="text-xs font-extrabold uppercase tracking-[0.23em] text-[#0667df] sm:text-sm">Roofing service information</p>
             <h1 className="mt-5 max-w-[660px] text-[42px] font-extrabold leading-[1.02] tracking-[-0.055em] text-[#061633] sm:text-[60px] lg:text-[69px]">
-              Need help with a roofing issue?
+              Planning a roof replacement or installation?
             </h1>
             <p className="mt-6 max-w-[610px] text-[17px] leading-[1.65] text-[#345078] sm:text-[19px]">
-              Tell us what is happening and where the property is located. Service availability depends on location and current provider capacity.
+              Check whether your property's ZIP code appears in recent roofing coverage guidance for roof installation or replacement. Other roofing issues may be considered, but a local contractor or live call route is not guaranteed.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               {CALL_ROUTE_ENABLED ? (
@@ -191,6 +201,32 @@ export default function RoofingServicePage() {
         </div>
       </section>
 
+      <section aria-labelledby="roofing-homeowner-questions" className="border-b border-[#dce8f6] bg-white">
+        <div className="mx-auto max-w-[1260px] px-5 py-14 sm:px-8">
+          <p className="text-xs font-extrabold uppercase tracking-[0.21em] text-[#086be5]">Roofing service questions</p>
+          <h2 id="roofing-homeowner-questions" className="mt-3 max-w-3xl text-3xl font-extrabold tracking-[-0.04em] text-[#081a38] sm:text-4xl">
+            Understand the next step before choosing a contractor.
+          </h2>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            <article className="rounded-2xl border border-[#dce8f6] bg-[#f7fbff] p-6">
+              <h3 className="text-lg font-bold text-[#091c3b]">How can I check roof replacement services near me?</h3>
+              <p className="mt-3 text-sm leading-7 text-[#405b7e]">Enter the property's five-digit ZIP code to see whether it appears in recent coverage guidance. This does not confirm a local roofer, available appointment or live call route.</p>
+            </article>
+            <article className="rounded-2xl border border-[#dce8f6] bg-[#f7fbff] p-6">
+              <h3 className="text-lg font-bold text-[#091c3b]">Does storm damage mean I need a new roof?</h3>
+              <p className="mt-3 text-sm leading-7 text-[#405b7e]">Storm conditions alone cannot establish the condition of a particular roof. Explain the visible issue and ask an appropriately licensed and insured professional to assess the property.</p>
+            </article>
+            <article className="rounded-2xl border border-[#dce8f6] bg-[#f7fbff] p-6">
+              <h3 className="text-lg font-bold text-[#091c3b]">Can I request a roof installation or replacement call?</h3>
+              <p className="mt-3 text-sm leading-7 text-[#405b7e]">Calls are not currently enabled on this preview. A later call option would require service-area, routing, buyer and operating-hours checks. You would choose whether to place the call.</p>
+            </article>
+          </div>
+          <p className="mt-6 text-xs leading-6 text-[#547092]">
+            These answers describe the service-check process; they are not a promise of contractor availability or roofing outcomes.
+          </p>
+        </div>
+      </section>
+
       <section className="bg-[#f8fbff]">
         <div className="mx-auto grid max-w-[1260px] gap-8 px-5 py-14 sm:px-8 lg:grid-cols-[.93fr_1.07fr] lg:items-center">
           <div>
@@ -242,6 +278,10 @@ export default function RoofingServicePage() {
             ))}
           </div>
           <p className="mt-5 text-xs leading-6 text-[#acc8e9]">Service availability, contractor participation, call qualification and coverage may vary by location and program. No publication authority · no live traffic · no commercial terms inferred.</p>
+          <nav aria-label="Service policies" className="mt-5 flex flex-wrap gap-x-6 gap-y-3 text-xs text-[#d5ebff]">
+            <a className="underline decoration-[#62dcff]/60 underline-offset-4 hover:text-white" href="/privacy">Privacy Policy</a>
+            <a className="underline decoration-[#62dcff]/60 underline-offset-4 hover:text-white" href="/terms">Terms &amp; Conditions</a>
+          </nav>
         </div>
       </footer>
     </main>

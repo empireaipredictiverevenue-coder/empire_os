@@ -14,8 +14,9 @@ REPORT = {
     "monday_friday": "08:00-18:00",
     "saturday_sunday": "10:00-16:00",
 }
-# Neither zone is inferred as approved; the buyer must explicitly confirm.
-ALLOWED_ZONES = {"America/Chicago", "Etc/GMT+6"}
+# The buyer confirmed America/Chicago on 9 October, with US daylight saving.
+# A fixed UTC-6 offset is NOT equivalent to that rule during US summer.
+ALLOWED_ZONES = {"America/Chicago"}
 MAX_CONFIRMATION_AGE_SECONDS = 30 * 86400
 
 
@@ -63,7 +64,10 @@ def evaluate_buyer_hours(
     start_hour, end_hour = (8, 18) if local.weekday() < 5 else (10, 16)
     minute_of_day = 60 * local.hour + local.minute
     within_window = start_hour * 60 <= minute_of_day < end_hour * 60
-    verified = contract_matches and confirmation_valid and within_window
+    # Confirmed hours POLICY is independent of whether the clock is inside
+    # this particular operating window. Caller routing remains fail-closed.
+    hours_policy_confirmed = contract_matches and confirmation_valid
+    verified = hours_policy_confirmed and within_window
     return {
         "schema_version": "empire.lead_smart.operating_hours_gate.v1",
         "reported_policy_matches": contract_matches,
@@ -71,6 +75,8 @@ def evaluate_buyer_hours(
         "timezone_assumption": zone_name if not confirmation_valid else None,
         "buyer_zone_name": zone_name if confirmation_valid else None,
         "within_reported_window": within_window,
+        "hours_policy_confirmed": hours_policy_confirmed,
+        "buyer_window_open_now": within_window if hours_policy_confirmed else False,
         "evaluated_at": now.isoformat(),
         "operating_hours_verified": verified,
         "source_ref": (

@@ -35,8 +35,10 @@ def build_launch_readiness(
     timezone_confirmation: Mapping[str, Any] | None = None,
     caller_id_pass_through_verified: bool = False,
     buyer_landing_page_approved: bool = False,
+    legal_release_verified: bool = False,
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
+    pilot_stop_verified: bool = False,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
@@ -87,6 +89,10 @@ def build_launch_readiness(
     )
 
     gates = {
+        "legal_release_verified": legal_release_verified is True,
+        # A launch is never live-ready on approval alone: a bounded pilot
+        # needs an independently proven stop mechanism and monitoring owner.
+        "pilot_stop_verified": pilot_stop_verified is True,
         "operating_hours_verified": hours["operating_hours_verified"],
 
         "caller_id_pass_through_verified": (
@@ -104,15 +110,11 @@ def build_launch_readiness(
 
         "buyer_landing_page_approved": buyer_landing_page_approved is True,
 
-        "landing_publication_authorized":
-            bool(
-                landing_publication_authorized
-            ),
+        # Approval is an explicit boolean, never truthiness of external input.
+        # In particular, "false" and integer 1 cannot grant launch authority.
+        "landing_publication_authorized": landing_publication_authorized is True,
 
-        "founder_live_traffic_authorized":
-            bool(
-                founder_live_traffic_authorized
-            ),
+        "founder_live_traffic_authorized": founder_live_traffic_authorized is True,
     }
 
     blockers = [
@@ -145,6 +147,11 @@ def build_launch_readiness(
             gates,
 
         "operating_hours": hours,
+
+        # Distinguish independently confirmed buyer policy from a currently
+        # open call window. The live operating-hours gate still REQUIRES BOTH.
+        "operating_hours_policy_confirmed": hours["hours_policy_confirmed"],
+        "buyer_window_open_now": hours["buyer_window_open_now"],
 
         "blockers":
             blockers,

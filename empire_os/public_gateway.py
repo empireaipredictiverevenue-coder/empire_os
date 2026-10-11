@@ -26,6 +26,7 @@ from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
 from empire_os.lead_smart_public_coverage_api import router as roofing_coverage_router
+from empire_os.lead_smart_pilot_call_api import router as roofing_pilot_handoff_router
 from empire_os.affiliate_ingress import (
     SAFE_RESPONSE_HEADERS as AFFILIATE_SAFE_HEADERS,
     allowed_gateway_host,
@@ -78,6 +79,7 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(roofing_coverage_router)
+app.include_router(roofing_pilot_handoff_router)
 app.include_router(create_affiliate_ingress_router())
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 
@@ -192,6 +194,96 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
     else:
         return None
     return candidate if candidate.is_file() else None
+
+
+_STATIC_REVIEWED_ROUTES = {
+    "privacy": "privacy.html",
+    "terms": "terms.html",
+    "roofing/replacement-vs-repair": "roofing/replacement-vs-repair.html",
+    "roofing/installation-checklist": "roofing/installation-checklist.html",
+}
+# This existing gateway is the only publishing surface. Absent an explicitly
+# approved, exact-content release record, staged assets must return 404.
+_STATIC_RELEASE_RECEIPT = Path(
+    "/srv/empire_os/runtime/public_website/reviewed_content_release.json"
+)
+_DRAFT_COPY_MARKERS = (
+    "Founder/legal review draft",
+    "not an approved or effective policy",
+    "Research draft",
+    "This is a working draft",
+)
+
+
+def _approved_static_content_path(
+    route: str,
+    *,
+    site_root: Path | None = None,
+    receipt_path: Path | None = None,
+) -> Path | None:
+    """Fail-closed admission for legal pages and homeowner educational guides.
+
+    A manifest is a deployment receipt, NOT a way to generate an approval.
+    No receipt is created by this code. It must be issued after founder
+    sign-off, final legal/editorial review, and exact exported page inspection.
+    """
+    filename = _STATIC_REVIEWED_ROUTES.get(route)
+    if not filename:
+        return None
+    page = (site_root or SITE_OUT) / filename
+    try:
+        receipt = json.loads(
+            (receipt_path or _STATIC_RELEASE_RECEIPT).read_text(encoding="utf-8")
+        )
+        if (
+            not isinstance(receipt, dict)
+            or receipt.get("schema_version") != "empire.public-reviewed-content.v1"
+            or receipt.get("founder_publication_authorized") is not True
+            or receipt.get("founder_approval_ref") in (None, "")
+            or receipt.get("legal_review_complete") is not True
+            or receipt.get("legal_review_ref") in (None, "")
+            or receipt.get("privacy_request_handling_verified") is not True
+            or receipt.get("source_lane") != "OWNED_FIRST_PARTY_US_HOMEOWNER"
+            or receipt.get("indexation_enabled") is not False
+            or receipt.get("live_call_enabled") is not False
+            or receipt.get("execution_authority") != "none"
+        ):
+            return None
+        digests = receipt.get("approved_page_sha256")
+        if not isinstance(digests, dict) or route not in digests:
+            return None
+        if route.startswith("roofing/"):
+            if (
+                not receipt.get("buyer_landing_page_approved") is True
+                or not receipt.get("buyer_approval_ref")
+                or receipt.get("content_quality_review_complete") is not True
+                or not receipt.get("content_quality_review_ref")
+                or not all(p in digests for p in ("privacy", "terms"))
+            ):
+                return None
+        for review_route in ("privacy", "terms") if route.startswith("roofing/") else (route,):
+            if review_route not in digests:
+                return None
+            policy_path = (site_root or SITE_OUT) / _STATIC_REVIEWED_ROUTES[review_route]
+            policy_html = policy_path.read_text(encoding="utf-8")
+            if (
+                any(marker in policy_html for marker in _DRAFT_COPY_MARKERS)
+                or hashlib.sha256(policy_html.encode("utf-8")).hexdigest()
+                != digests[review_route]
+            ):
+                return None
+        html = page.read_text(encoding="utf-8")
+        expected = digests[route]
+        if not isinstance(expected, str) or not re.fullmatch(r"[a-f0-9]{64}", expected):
+            return None
+        if (
+            any(marker in html for marker in _DRAFT_COPY_MARKERS)
+            or hashlib.sha256(html.encode("utf-8")).hexdigest() != expected
+        ):
+            return None
+        return page
+    except (OSError, UnicodeDecodeError, TypeError, ValueError, json.JSONDecodeError):
+        return None
 
 
 def _public_site_urls(root: Path | None = None) -> list[str]:
@@ -892,6 +984,51 @@ def roofing_page():
     if path is None:
         return JSONResponse({"error": "roofing_page_unavailable"}, status_code=404)
     return FileResponse(path, media_type="text/html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
+
+@app.get("/privacy")
+def public_privacy_policy():
+    path = _approved_static_content_path("privacy")
+    if path is None:
+        return JSONResponse(
+            {"error": "policy_not_released"}, status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    return FileResponse(path, media_type="text/html", headers={
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow",
+    })
+
+
+@app.get("/terms")
+def public_website_terms():
+    path = _approved_static_content_path("terms")
+    if path is None:
+        return JSONResponse(
+            {"error": "terms_not_released"}, status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    return FileResponse(path, media_type="text/html", headers={
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow",
+    })
+
+
+@app.get("/roofing/{guide_slug}")
+def public_roofing_guide(guide_slug: str):
+    # Explicit finite allowlist; no user-controlled filesystem path.
+    if guide_slug not in {"replacement-vs-repair", "installation-checklist"}:
+        return JSONResponse(
+            {"error": "roofing_guide_not_released"}, status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    path = _approved_static_content_path("roofing/" + guide_slug)
+    if path is None:
+        return JSONResponse(
+            {"error": "roofing_guide_not_released"}, status_code=404,
+            headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
+        )
+    return FileResponse(path, media_type="text/html", headers={
+        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow",
+    })
+
 
 @app.get("/roofing-hero.webp")
 def roofing_hero():

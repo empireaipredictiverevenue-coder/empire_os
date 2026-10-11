@@ -1,0 +1,78 @@
+{
+  "schema_version": "empire.lead_smart.founder_launch_intent_record.v1",
+  "recorded_at_utc": "2026-10-11T22:42:10Z",
+  "source": "founder instruction in current ChatGPT conversation",
+  "founder_instruction": "go and i approve launch",
+  "decision": "FOUNDER_APPROVES_EXISTING_LEAD_SMART_ROOFING_LAUNCH_SCOPE",
+  "scope": {
+    "buyer": "Lead Smart",
+    "campaign": "CA8278ed3f26e9495b881fe3833174d007",
+    "vertical": "US roofing installation/replacement",
+    "route": "existing Direct",
+    "acquisition": "Empire-owned first-party organic/SEO only",
+    "assets": [
+      "/roofing",
+      "/roofing/replacement-vs-repair",
+      "/roofing/installation-checklist"
+    ],
+    "pilot": "proposed supervised first weekday 10:00-12:00 America/Chicago, maximum five inbound attempts or window-end; requires actual enforced stop mechanism"
+  },
+  "explicitly_not_authorized": [
+    "new paid traffic",
+    "paid inference",
+    "RTB route expansion",
+    "unapproved outbound",
+    "new test calls",
+    "modifying frozen buyer-approved roofing page",
+    "invented legal receipts or unverified contracts",
+    "unbounded rollout"
+  ],
+  "authorisation_interpretation": "founder intent/approval recorded; runtime launch authorization may be admitted only through verified existing gates; not a substitute for final exact-content legal approval",
+  "verified_current_gates": {
+    "effective_privacy_terms_release": false,
+    "buyer_landing_approved": true,
+    "buyer_end_to_end_test": "buyer-written attestation, independent detailed export missing",
+    "original_ani_at_buyer_target_verified": false,
+    "tracking_fresh": false,
+    "coverage_fresh": false,
+    "routing_runtime_verified": false,
+    "Chicago_window_open": false,
+    "enforced_five_call_stop_verified": false
+  },
+  "observed_runtime": {
+    "gateway_active": true,
+    "cloudflare_tunnel_active": true,
+    "local_routes": {
+      "roofing": 200,
+      "roofing_replacement_vs_repair": 404,
+      "roofing_installation_checklist": 404,
+      "privacy": 404,
+      "terms": 404
+    },
+    "edge_roofing_http": 200,
+    "effective_legal_release_receipt_present": false
+  },
+  "simulation": {
+    "evaluated_at_utc": "2026-10-11T22:42:10Z",
+    "founder_live_traffic_authorized_input": true,
+    "buyer_landing_approved_input": true,
+    "legal_release_verified_input": false,
+    "landing_publication_authorized_input": false,
+    "result": "PREACTIVATION",
+    "execution_authority": "NONE",
+    "blockers": [
+      "legal_release_verified",
+      "operating_hours_verified",
+      "caller_id_pass_through_verified",
+      "tracking_verified",
+      "zip_targeting_verified",
+      "routing_runtime_verified",
+      "landing_publication_authorized"
+    ]
+  },
+  "actual_deployment_performed": false,
+  "calls_enabled": false,
+  "indexing_enabled": false,
+  "traffic_enabled": false,
+  "operator_instruction": "Do not create a production release/approval token from this record. Close factual gates and run the existing exact-content admission before any go-live."
+}

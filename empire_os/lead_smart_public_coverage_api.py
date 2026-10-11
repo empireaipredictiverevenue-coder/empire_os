@@ -8,10 +8,13 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.routing import APIRoute
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from empire_os.lead_smart_pilot_call_api import call_available, ROUTE as PILOT_HANDOFF_ROUTE
 from empire_os.lead_smart_homeowner_eligibility import (
     PreviewEvidenceError,
     buyer_hours_preview,
@@ -19,13 +22,41 @@ from empire_os.lead_smart_homeowner_eligibility import (
 )
 
 COVERAGE_ROOT = Path("/srv/empire_os/runtime/revenue/lead_smart/coverage")
-router = APIRouter()
 
 NO_STORE = {
     "Cache-Control": "no-store, max-age=0",
     "X-Robots-Tag": "noindex, nofollow",
     "Referrer-Policy": "no-referrer",
 }
+
+
+class PrivateZipValidationRoute(APIRoute):
+    """Keep rejected input out of this public route's validation response."""
+
+    def get_route_handler(self):
+        original_handler = super().get_route_handler()
+
+        async def private_validation(request: Request):
+            try:
+                return await original_handler(request)
+            except RequestValidationError:
+                # Do not serialize exception errors or body: both can contain
+                # unexpected personal fields. Other gateway routes are untouched.
+                return JSONResponse(
+                    status_code=422,
+                    content={
+                        "schema_version": "empire.lead_smart.zip_check_response.v1",
+                        "status": "INVALID_REQUEST",
+                        "call_authorized": False,
+                        "execution_authority": "NONE",
+                    },
+                    headers=NO_STORE,
+                )
+
+        return private_validation
+
+
+router = APIRouter(route_class=PrivateZipValidationRoute)
 
 
 class RoofingZipRequest(BaseModel):
@@ -45,6 +76,7 @@ def check_roofing_zip(zip_code: str, *, root: Path | None = None) -> dict:
     )
     in_coverage = zip_code in set(manifest["covered_zips"])
     hours = buyer_hours_preview()
+    live_site_handoff = in_coverage and call_available(zip_code)
 
     return {
         "schema_version": "empire.lead_smart.zip_check_response.v1",
@@ -57,9 +89,10 @@ def check_roofing_zip(zip_code: str, *, root: Path | None = None) -> dict:
         "within_reported_hours": hours["within_reported_window"],
         "time_zone_interpretation_verified":
             hours["timezone_interpretation_verified"],
-        "buyer_route_verified": False,
-        "call_authorized": False,
-        "execution_authority": "NONE",
+        "buyer_route_verified": live_site_handoff,
+        "call_authorized": live_site_handoff,
+        "execution_authority": "LIVE_TRAFFIC" if live_site_handoff else "NONE",
+        **({"handoff_form_action": PILOT_HANDOFF_ROUTE} if live_site_handoff else {}),
     }
 
 
