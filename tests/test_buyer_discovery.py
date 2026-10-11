@@ -1328,3 +1328,13 @@ def test_generic_software_mrr_lane_binds_to_search_growth_command():
         },
         "economic_buyer",
     ) == "search_growth_command"
+
+def test_founder_exclusion_refuses_ready_candidate_review():
+    from types import SimpleNamespace
+    from empire_os.buyer_discovery import build_candidate_review_plan
+    import pytest
+    with pytest.raises(ValueError, match='founder_do_not_pursue_buyer_domain'):
+        build_candidate_review_plan(
+            SimpleNamespace(website='https://callvox.pro/'),
+            {'review_ready': True}, idempotency_key='blocked-review',
+        )

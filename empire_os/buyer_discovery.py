@@ -13,6 +13,7 @@ from uuid import UUID
 from urllib.parse import urlparse
 
 from empire_os.first_party_evidence_contract import first_party_contact_decision
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
 from empire_os.buyer_allocation import buyer_activation_decision
 from empire_os.locale_intelligence import resolve_locale
 from empire_os.market_pricing import (
@@ -1223,6 +1224,8 @@ def build_buyer_readiness_dossier(
 
 def build_candidate_review_plan(candidate: BuyerCandidate, contact_plan: Mapping[str, Any], *,
                                 idempotency_key: str) -> dict[str, Any]:
+    if is_do_not_pursue_domain(urlparse(candidate.website).hostname or ""):
+        raise ValueError("founder_do_not_pursue_buyer_domain")
     if not contact_plan.get("review_ready"):
         raise ValueError("verified review-ready contact required")
     email = _text(contact_plan.get("preferred_email")).lower()

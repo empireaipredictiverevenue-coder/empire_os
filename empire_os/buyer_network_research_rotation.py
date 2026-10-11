@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Mapping
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
 import re
 
 INVALID_DOMAINS = frozenset({
@@ -30,7 +31,8 @@ RESULT_TTL_SECONDS = 7 * 24 * 3600
 def accepted_domain(domain: str) -> bool:
     d = (domain or "").strip().lower().rstrip(".")
     if (not d or d in INVALID_DOMAINS or d in NON_BUYER_DOMAINS
-            or d.startswith(("empire.", "localhost."))):
+            or d.startswith(("empire.", "localhost."))
+            or is_do_not_pursue_domain(d)):
         return False
     if d.endswith((".local", ".internal", ".test", ".example", ".localhost")):
         return False

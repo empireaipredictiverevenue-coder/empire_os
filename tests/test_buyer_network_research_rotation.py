@@ -107,3 +107,19 @@ def test_results_deduplicated_and_expire_without_fabricating_revenue():
     assert summary["direct_buyer_payment_proven"] is False
     assert summary["outbound_sent"] is False
     assert summary["execution_authority"] == "NONE"
+
+def test_founder_excluded_domain_not_selected_from_stale_network_queue():
+    assert not accepted_domain('callvox.pro')
+    assert not accepted_domain('www.callvox.pro')
+    queue = {'candidates': [
+        {'domain': 'callvox.pro', 'status': 'VERIFY_REQUIREMENTS', 'score': 999},
+        {'domain': 'polyares.com', 'status': 'WATCH', 'score': 1},
+    ]}
+    selected, counts = choose_research_batch(queue, {}, now_epoch=NOW)
+    assert [x['domain'] for x in selected] == ['polyares.com']
+    assert counts['invalid'] == 1
+    fresh = retain_recent_results([], [
+        {'domain': 'callvox.pro', 'observed_epoch': NOW, 'corroborated': True},
+        {'domain': 'polyares.com', 'observed_epoch': NOW, 'corroborated': True},
+    ], now_epoch=NOW)
+    assert [x['domain'] for x in fresh] == ['polyares.com']
