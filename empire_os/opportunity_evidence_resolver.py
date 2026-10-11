@@ -13,6 +13,10 @@ from pathlib import Path
 import re
 from typing import Any, Mapping
 
+from empire_os.opportunity_commercial_source_health import (
+    assess_sources, diagnostic_for_claim,
+)
+
 ROUTES = Path("runtime/opportunity_factory/evidence_routes_latest.json")
 RADAR = Path("runtime/opportunity_radar/latest.json")
 ATTESTATIONS = Path("runtime/opportunity_evidence/canonical_attestations_latest.json")
@@ -151,11 +155,13 @@ def resolve(
     radar: Mapping[str, Any],
     attestations: Mapping[str, Any] | None = None,
     now: datetime | None = None,
+    source_health: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise ValueError("offset-aware clock required")
     now = now.astimezone(timezone.utc)
+    health = source_health if isinstance(source_health, Mapping) else assess_sources(root, now)
     candidates = {
         str(row["opportunity_key"]): row
         for row in (radar.get("candidates") or [])
@@ -167,11 +173,15 @@ def resolve(
     reasons: Counter[str] = Counter()
     matches_needing_review = 0
     total = 0
+    unscoped_opportunities = 0
     for item in routes.get("items") or []:
         if not isinstance(item, Mapping):
             continue
         key = item.get("opportunity_key")
         candidate = candidates.get(str(key)) or {"opportunity_key": key}
+        tenant_bound = isinstance(candidate.get("tenant_id"), str) and bool(candidate.get("tenant_id"))
+        if not tenant_bound:
+            unscoped_opportunities += 1
         requirements = []
         for route in item.get("routes") or []:
             if not isinstance(route, Mapping):
@@ -206,6 +216,8 @@ def resolve(
                 "source_capability": route.get("capability"),
                 "public_search_can_prove_commercial_claim": False,
                 "evidence_state": status,
+                "source_diagnostic": diagnostic_for_claim(health, claim),
+                "tenant_binding_status": "TENANT_BOUND" if tenant_bound else "MISSING_TENANT_SCOPE",
                 "verified_normalized_score": None,
                 "next_action": (
                     "review_original_canonical_event_and_verifier"
@@ -230,6 +242,8 @@ def resolve(
         "source_attestations_examined": len(proofs),
         "content_hash_matches_needing_authenticity_review": matches_needing_review,
         "reason_counts": dict(sorted(reasons.items())),
+        "unscoped_opportunity_count": unscoped_opportunities,
+        "commercial_source_health": health,
         "items": rows,
         "normalized_scores_written": 0,
         "commercial_facts_auto_verified": 0,

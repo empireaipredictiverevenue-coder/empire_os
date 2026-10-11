@@ -120,3 +120,19 @@ def test_read_only_input_materialization_never_modifies_originals(tmp_path):
     assert result["unresolved_requirements"] == 5
     assert (tmp_path / "runtime/opportunity_factory/evidence_resolution_latest.json").exists()
     assert claim_for("buyer_intent_normalized_score_required") == "buyer_intent"
+
+
+def test_unscoped_opportunity_remains_diagnostic_without_score_promotion(tmp_path):
+    routes, radar = sample()
+    radar["candidates"][0].pop("tenant_id")
+    result = resolve(tmp_path, routes=routes, radar=radar, attestations={},
+                     now=datetime(2026, 10, 9, tzinfo=timezone.utc))
+    assert result["unscoped_opportunity_count"] == 1
+    assert all(
+        row["tenant_binding_status"] == "MISSING_TENANT_SCOPE"
+        and row["verified_normalized_score"] is None
+        for item in result["items"] for row in item["requirements"]
+    )
+    assert result["commercial_facts_auto_verified"] == 0
+    assert result["factory_promotion_authorized"] is False
+    assert result["execution_authority"] == "none"

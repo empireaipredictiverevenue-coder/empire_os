@@ -165,3 +165,55 @@ def test_unavailable_predictive_cohort_does_not_fill_probability():
     )
     assert row["quant_inputs"]["probability_success"] is None
     assert row["probability_modeled_from_verified_outcomes"] is False
+
+
+def test_live_refresh_suppresses_stale_market_economics_and_buyer_proxies(tmp_path):
+    from datetime import datetime, timedelta, timezone
+    import json
+    from pathlib import Path
+    from empire_os.opportunity_evidence_normalizer import (
+        refresh_normalized_signals,
+        _market_snapshot_freshness,
+        MARKET_GPS, RADAR,
+    )
+
+    def put(rel, content):
+        f = tmp_path / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(json.dumps(content))
+    now = datetime.now(timezone.utc)
+    put(RADAR, {"candidates": [market_candidate()]})
+    old = dict(market_gps(),
+               generated_at=(now - timedelta(days=10)).isoformat(),
+               mode="OBSERVE", execution_authority="none")
+    put(MARKET_GPS, old)
+    result = refresh_normalized_signals(tmp_path)
+    assert result["market_gps_source_freshness"] == "SOURCE_STALE"
+    assert result["market_gps_used_for_current_scores"] is False
+    assert result["total_normalized_scores"] == 0
+    assert result["items"][0]["normalized_signals"]["buyer_intent"] is None
+    assert result["items"][0]["normalized_signals"]["margin_potential"] is None
+    assert result["market_gps_stale_or_missing_is_negative_demand_evidence"] is False
+    assert result["execution_authority"] == "none"
+    old["generated_at"] = now.isoformat()
+    put(MARKET_GPS, old)
+    fresh = refresh_normalized_signals(tmp_path)
+    assert fresh["market_gps_used_for_current_scores"] is True
+    assert fresh["total_normalized_scores"] == 5
+    assert fresh["market_gps_source_freshness"] == "CURRENT_RESEARCH_INPUT_ONLY"
+    old["generated_at"] = (now + timedelta(days=1)).isoformat()
+    put(MARKET_GPS, old)
+    future = refresh_normalized_signals(tmp_path)
+    assert future["market_gps_source_freshness"] == "SOURCE_FUTURE_DATED"
+    assert future["total_normalized_scores"] == 0
+
+
+def test_undated_market_snapshot_is_not_eligible_for_current_scores(tmp_path):
+    from empire_os.opportunity_evidence_normalizer import _market_snapshot_freshness
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    assert _market_snapshot_freshness({}, now) == "SOURCE_MISSING"
+    assert _market_snapshot_freshness({"markets": []}, now) == "SOURCE_UNDATED"
+    assert _market_snapshot_freshness(
+        {"generated_at": "2026-10-09T13:45:00"}, now
+    ) == "SOURCE_UNDATED"

@@ -10,7 +10,7 @@ LLM prose.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -437,14 +437,46 @@ def build_normalized_signal_batch(
     }
 
 
+def _market_snapshot_freshness(
+    market: Mapping[str, Any], now: datetime
+) -> str:
+    """Seven-day Market GPS window cannot authorize older current scoring."""
+    if not market:
+        return "SOURCE_MISSING"
+    raw = market.get("generated_at")
+    if not isinstance(raw, str):
+        return "SOURCE_UNDATED"
+    try:
+        stamped = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return "SOURCE_BAD_TIMESTAMP"
+    if stamped.tzinfo is None:
+        return "SOURCE_UNDATED"
+    age = now - stamped.astimezone(timezone.utc)
+    if age < -timedelta(minutes=5):
+        return "SOURCE_FUTURE_DATED"
+    if age > timedelta(days=7):
+        return "SOURCE_STALE"
+    if market.get("execution_authority") not in (None, "none"):
+        return "SOURCE_UNSAFE_AUTHORITY"
+    return "CURRENT_RESEARCH_INPUT_ONLY"
+
+
 def refresh_normalized_signals(repo_root: Path) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    market = _read(repo_root / MARKET_GPS)
+    freshness = _market_snapshot_freshness(market, now)
     payload = build_normalized_signal_batch(
         _read(repo_root / RADAR),
-        market_gps=_read(repo_root / MARKET_GPS),
+        market_gps=market if freshness == "CURRENT_RESEARCH_INPUT_ONLY" else {},
         predictive_intelligence=_read(
             repo_root / PREDICTIVE_INTELLIGENCE
         ),
     )
+    payload["market_gps_source_freshness"] = freshness
+    payload["stale_market_gps_scores_released"] = False
+    payload["market_gps_used_for_current_scores"] = freshness == "CURRENT_RESEARCH_INPUT_ONLY"
+    payload["market_gps_stale_or_missing_is_negative_demand_evidence"] = False
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
