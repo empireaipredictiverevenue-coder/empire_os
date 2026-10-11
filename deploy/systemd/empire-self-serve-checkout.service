@@ -9,8 +9,10 @@ User=ubuntu
 Group=ubuntu
 WorkingDirectory=/srv/empire_os
 EnvironmentFile=/etc/empire_os.env
+EnvironmentFile=/etc/empiredb.env
 Environment=PYTHONPATH=/srv/empire_os
 Environment=EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED=OFF
+Environment=EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED=OFF
 ExecStart=/srv/empire_os/.venv/bin/python -m uvicorn empire_os.self_serve_checkout_api:app --host 127.0.0.1 --port 8098 --workers 1
 Restart=always
 RestartSec=5

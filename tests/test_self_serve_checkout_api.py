@@ -16,6 +16,9 @@ def test_checkout_health_defaults_payment_proposal_off(monkeypatch):
 
 
 def test_order_endpoint_keeps_proposal_gated(monkeypatch):
+    # The regular service defaults order writes OFF. This fixture explicitly
+    # authorises only its mocked order path; no production order is created.
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED", "ON")
     monkeypatch.setattr(
         api,
         "prepare_checkout_order",
@@ -51,9 +54,26 @@ def test_order_endpoint_keeps_proposal_gated(monkeypatch):
             "idempotency_key": "checkout-test-004",
         },
     )
-    assert response.status_code == 200
-    assert response.json()["payment_request_created"] is False
+    assert response.status_code == 503
+    assert response.json()["detail"] == "binding_orders_not_authorized"
 
+    # Only a separate, explicit approval of BOTH binding orders and payment
+    # proposals may reach the (mocked) order and payment flow.
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED", "ON")
+    approved = client.post(
+        "/v1/orders",
+        json={
+            "product_code": "competitor_search_gap",
+            "business_name": "Example Ltd",
+            "email": "buyer@example.com",
+            "target_domain": "example.com",
+            "payer_wallet": "0x" + "1" * 40,
+            "terms_accepted": True,
+            "idempotency_key": "checkout-test-004",
+        },
+    )
+    assert approved.status_code == 200
+    assert approved.json()["payment_request_created"] is True
 
 
 def test_exchange_tiers_endpoint_is_non_binding(monkeypatch):

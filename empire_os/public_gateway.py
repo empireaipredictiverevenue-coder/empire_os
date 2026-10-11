@@ -21,7 +21,7 @@ import httpx
 from fastapi import Body, FastAPI, Query, Request, WebSocket
 from websockets.asyncio.client import connect as presence_ws_connect
 from websockets.exceptions import ConnectionClosed
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
@@ -38,6 +38,7 @@ from empire_os.aeo_release import released_file as released_aeo_file, released_p
 from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
+from empire_os.owned_campaign_http import LIMITER as FIRST_PARTY_INTAKE_LIMITER
 
 GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
@@ -177,6 +178,8 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
         candidate = base / "industries.html"
     elif clean == "buy":
         candidate = base / "buy.html"
+    elif clean == "commercial":
+        candidate = base / "commercial.html"
     elif clean == "predictive-revenue":
         candidate = base / "predictive-revenue.html"
     elif clean == "roofing":
@@ -200,6 +203,8 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
         urls.append(f"{PUBLIC_BASE_URL}/industries")
     if (base / "buy.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/buy")
+    if (base / "commercial.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/commercial")
     if (base / "predictive-revenue.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/predictive-revenue")
     from empire_os.owned_campaign_release import released_paths
@@ -573,6 +578,61 @@ async def checkout_exchange_interest_proxy(request: Request):
     )
 
 
+@app.get("/v1/checkout/commercial/offers")
+async def checkout_commercial_offers_proxy():
+    # Public metadata only: no checkout/payment/activation authority.
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            response = await client.get(
+                f"{CHECKOUT_INTERNAL_URL}/v1/commercial/offers"
+            )
+    except httpx.HTTPError:
+        return JSONResponse({"error": "commercial_offers_unavailable"},
+                            status_code=503)
+    return Response(
+        response.content, status_code=response.status_code,
+        media_type="application/json",
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/v1/checkout/commercial/interests")
+async def checkout_commercial_interest_proxy(request: Request):
+    # Reuse existing first-party rate-limiting and same-origin rules.
+    # IP-derived state is ephemeral abuse protection, never a buyer identity.
+    deny = {"Cache-Control": "no-store"}
+    if (request.headers.get("origin") != PUBLIC_BASE_URL
+            or request.headers.get("sec-fetch-site", "same-origin")
+            not in {"same-origin", "none"}):
+        return JSONResponse({"error": "same_origin_required"},
+                            status_code=403, headers=deny)
+    if request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+        return JSONResponse({"error": "json_required"},
+                            status_code=415, headers=deny)
+    peer = request.client.host if request.client else "unknown"
+    if not FIRST_PARTY_INTAKE_LIMITER.allow(peer, "enquiry"):
+        return JSONResponse({"error": "rate_limited"},
+                            status_code=429, headers=deny)
+    raw = await request.body()
+    if len(raw) > 12_000:
+        return JSONResponse({"error": "commercial_enquiry_too_large"},
+                            status_code=413, headers=deny)
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            response = await client.post(
+                f"{CHECKOUT_INTERNAL_URL}/v1/commercial/interests",
+                content=raw, headers={"Content-Type": "application/json"},
+            )
+    except httpx.HTTPError:
+        return JSONResponse({"error": "commercial_enquiry_unavailable"},
+                            status_code=503, headers=deny)
+    return Response(
+        response.content, status_code=response.status_code,
+        media_type="application/json",
+        headers=deny,
+    )
+
+
 @app.get("/v1/checkout/predictive-revenue/products")
 async def checkout_predictive_revenue_products_proxy():
     try:
@@ -857,6 +917,25 @@ def predictive_revenue_page():
             {"error": "public_site_page_unavailable"},
             status_code=404,
         )
+    return FileResponse(path, media_type="text/html")
+
+
+@app.get("/contact")
+@app.get("/consultancy")
+@app.get("/digital-avatar")
+@app.get("/sales")
+def founder_led_sales_redirect():
+    # Known legacy/navigational commercial paths now resolve to a single
+    # safe first-party consent-bound enquiry journey.
+    return RedirectResponse("/commercial", status_code=308)
+
+
+@app.get("/commercial")
+def commercial_page():
+    path = _site_html_path("commercial")
+    if path is None:
+        return JSONResponse({"error": "commercial_page_unavailable"},
+                            status_code=404)
     return FileResponse(path, media_type="text/html")
 
 

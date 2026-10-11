@@ -22,6 +22,8 @@ type Product = {
 type Catalog = {
   products: Product[];
   count: number;
+  binding_order_creation_authorized: boolean;
+  payment_proposal_authorized: boolean;
   settlement: { asset: string; network: string; chain_id: number };
 };
 
@@ -294,6 +296,9 @@ export default function BuyPage() {
             <div className="text-[10px] font-semibold tracking-[0.16em] text-[#93c5fd]">ENTERPRISE</div>
             <div className="mt-1 text-sm text-white/70">Deploy Predictive Revenue across the business.</div>
           </div>
+          <a href="/commercial" className="mt-3 mr-3 inline-flex rounded-full border border-cyan-300/30 bg-cyan-300/[.06] px-4 py-2.5 text-[9px] font-semibold tracking-[0.12em] text-cyan-200 transition hover:border-cyan-300/60 md:mt-0">
+            CONSULTANCY / DIGITAL AVATAR
+          </a>
           <a href="/predictive-revenue" className="mt-3 inline-flex rounded-full border border-[#60a5fa]/35 bg-[#2563eb]/15 px-4 py-2.5 text-[9px] font-semibold tracking-[0.12em] text-[#dbeafe] transition hover:border-[#7dd3fc]/60 hover:text-white md:mt-0">
             DEPLOY PREDICTIVE REVENUE
           </a>
@@ -336,9 +341,9 @@ export default function BuyPage() {
                 Skip the sales call.
               </h2>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-white/50">
-                Choose a verified product, settle in USDT on BNB Smart Chain,
-                then EmpireOS starts the fulfilment workflow after verified
-                payment.
+                Choose a verified intelligence product. When the governed payment
+                route is unavailable, request a founder-reviewed proposal instead.
+                Fulfilment only follows independently verified settlement.
               </p>
 
               <div className="mt-8 grid gap-3">
@@ -388,7 +393,22 @@ export default function BuyPage() {
             </section>
 
             <section className="lg:pt-8">
-              <form
+              {!catalog?.binding_order_creation_authorized ? (
+                <div className="rounded-3xl border border-white/[0.09] bg-[#07142f]/80 p-6 md:p-8">
+                  <div className="text-xs font-semibold tracking-[0.14em] text-white/45">
+                    FOUNDER-LED SALES
+                  </div>
+                  <h3 className="mt-4 text-2xl font-semibold">Request your intelligence proposal</h3>
+                  <p className="mt-4 text-sm leading-7 text-white/50">
+                    These products have verified catalogue prices. Binding checkout
+                    and on-chain payment requests remain independently gated.
+                    You can still enquire today; no wallet or payment is required.
+                  </p>
+                  <a href="/commercial" className="mt-7 inline-flex min-h-13 items-center rounded-xl bg-[#eaf2ff] px-6 text-xs font-bold tracking-[0.11em] text-[#07132c]">
+                    REQUEST A PROPOSAL
+                  </a>
+                </div>
+              ) : <form
                 onSubmit={submitProduct}
                 className="rounded-3xl border border-white/[0.09] bg-[#07142f]/80 p-6 shadow-[0_30px_100px_rgba(0,0,0,.3)] backdrop-blur-xl md:p-8"
               >
@@ -461,7 +481,7 @@ export default function BuyPage() {
                 <div className="mt-5 text-center text-[10px] leading-5 text-white/28">
                   USDT · BNB Smart Chain · verified settlement only
                 </div>
-              </form>
+              </form>}
             </section>
           </div>
         ) : (

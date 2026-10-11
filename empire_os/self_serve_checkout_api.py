@@ -19,6 +19,11 @@ from empire_os.predictive_revenue_self_serve import (
     PredictiveRevenueInterestError,
     record_predictive_revenue_interest,
 )
+from empire_os.first_party_sales_interest import (
+    CommercialInterestError,
+    founder_led_commercial_offers,
+    record_founder_led_interest,
+)
 from empire_os.self_serve_checkout import (
     CheckoutError,
     create_payment_request_for_order,
@@ -33,6 +38,17 @@ app = FastAPI(
     redoc_url=None,
     openapi_url=None,
 )
+
+
+def _orders_authorized() -> bool:
+    # Enabling the safe first-party sales enquiry path cannot accidentally
+    # create a binding/accepted fulfilment order with payment authority OFF.
+    return (
+        os.getenv(
+            "EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED", "OFF"
+        ).strip().upper() in {"1", "ON", "TRUE", "YES"}
+        and _proposal_authorized()
+    )
 
 
 def _proposal_authorized() -> bool:
@@ -53,6 +69,19 @@ class PredictiveRevenueInterestRequest(BaseModel):
     desired_outcome: str = Field(min_length=1, max_length=1200)
     systems: list[str] = Field(default_factory=list, max_length=20)
     idempotency_key: str = Field(min_length=8, max_length=128)
+
+
+class FounderLedCommercialInterestRequest(BaseModel):
+    product_code: str = Field(min_length=1, max_length=120)
+    business_name: str = Field(min_length=1, max_length=200)
+    email: str = Field(min_length=3, max_length=320)
+    domain: str = Field(min_length=3, max_length=253)
+    industry: str = Field(min_length=1, max_length=120)
+    geography: str = Field(min_length=1, max_length=160)
+    desired_outcome: str = Field(min_length=12, max_length=1200)
+    contact_consent: bool
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    website: str = Field(default="", max_length=300)
 
 
 class ExchangeInterestRequest(BaseModel):
@@ -83,6 +112,8 @@ def health():
         "status": "online",
         "service": "empire-self-serve-checkout",
         "payment_proposal_authorized": _proposal_authorized(),
+        "binding_order_creation_authorized": _orders_authorized(),
+        "founder_led_commercial_interest_enabled": True,
         "payment_execution": False,
         "revenue_recognition": False,
     }
@@ -90,11 +121,17 @@ def health():
 
 @app.get("/v1/catalog")
 def catalog():
-    return self_serve_catalog()
+    return {
+        **self_serve_catalog(),
+        "binding_order_creation_authorized": _orders_authorized(),
+        "payment_proposal_authorized": _proposal_authorized(),
+    }
 
 
 @app.post("/v1/orders")
 def create_order(req: CheckoutRequest):
+    if not _orders_authorized():
+        raise HTTPException(status_code=503, detail="binding_orders_not_authorized")
     try:
         order = prepare_checkout_order(
             product_code=req.product_code,
@@ -174,4 +211,35 @@ def predictive_revenue_interest(req: PredictiveRevenueInterestRequest):
         raise HTTPException(
             status_code=503,
             detail=f"predictive_revenue_intake_unavailable:{type(exc).__name__}",
+        ) from exc
+
+
+@app.get("/v1/commercial/offers")
+def commercial_offers():
+    return founder_led_commercial_offers()
+
+
+@app.post("/v1/commercial/interests")
+def commercial_interest(req: FounderLedCommercialInterestRequest):
+    if req.contact_consent is not True or req.website:
+        raise HTTPException(status_code=422, detail="specific_contact_consent_required")
+    try:
+        return record_founder_led_interest(
+            product_code=req.product_code,
+            business_name=req.business_name,
+            email=req.email,
+            domain=req.domain,
+            industry=req.industry,
+            geography=req.geography,
+            desired_outcome=req.desired_outcome,
+            contact_consent=req.contact_consent,
+            idempotency_key=req.idempotency_key,
+            website=req.website,
+        )
+    except CommercialInterestError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        # Database/connector internals are not customer-facing information.
+        raise HTTPException(
+            status_code=503, detail="commercial_enquiry_temporarily_unavailable"
         ) from exc

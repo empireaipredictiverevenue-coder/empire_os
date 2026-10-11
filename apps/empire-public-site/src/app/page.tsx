@@ -172,8 +172,8 @@ export default function Home() {
             <a href="/trust" className="hidden rounded-full border border-white/[0.09] bg-[#07142f]/70 px-4 py-2.5 text-[9px] font-semibold tracking-[0.14em] text-white/55 backdrop-blur-2xl transition hover:border-[#60a5fa]/35 hover:text-white md:inline-flex">
               TRUST
             </a>
-            <a href="mailto:founder@empire-ai.co.uk" className="group inline-flex items-center gap-2 rounded-full border border-[#60a5fa]/35 bg-[#2563eb]/15 px-4 py-2.5 text-[9px] font-semibold tracking-[0.12em] text-[#dbeafe] shadow-[0_0_30px_rgba(37,99,235,.12)] backdrop-blur-2xl transition hover:border-[#7dd3fc]/60 hover:bg-[#2563eb]/22">
-              START A CONVERSATION
+            <a href="/commercial" className="group inline-flex items-center gap-2 rounded-full border border-[#60a5fa]/35 bg-[#2563eb]/15 px-4 py-2.5 text-[9px] font-semibold tracking-[0.12em] text-[#dbeafe] shadow-[0_0_30px_rgba(37,99,235,.12)] backdrop-blur-2xl transition hover:border-[#7dd3fc]/60 hover:bg-[#2563eb]/22">
+              REQUEST A PROPOSAL
               <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" />
             </a>
           </div>
