@@ -4,7 +4,7 @@ from __future__ import annotations
 from collections import Counter
 import json
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -349,11 +349,151 @@ def _commercial_catalog(
     }
 
 
+def _radar_lifecycle_evidence(
+    loop_raw: dict[str, Any] | None,
+    routes_raw: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Project same-cycle Opportunity Router truth; never promote old stages.
+
+    This adds only read-only evidence to the existing Founder Dashboard.
+    No PII, new API, external side effects or independent commercial proof.
+    """
+    held = {
+        "schema_version": "empire.founder_radar_lifecycle_evidence.v1",
+        "status": "UNKNOWN_SOURCE_UNVERIFIED",
+        "mode": "OBSERVE",
+        "router_stage_counts": None,
+        "new_identity_count_latest_cycle": None,
+        "reappeared_count_latest_cycle": None,
+        "derived_stage_transitions_latest_cycle": None,
+        "history_verified_for_cycle": False,
+        "commercial_validation_verified": False,
+        "outreach_authorized": False,
+        "execution_authority": "none",
+    }
+
+    def aware(value: Any) -> datetime | None:
+        if not isinstance(value, str) or len(value) > 48:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo else None
+
+    def count(value: Any) -> int | None:
+        return value if type(value) is int and 0 <= value <= 1_000_000 else None
+
+    if not isinstance(loop_raw, dict) or not isinstance(routes_raw, dict):
+        return held
+    completed = aware(loop_raw.get("finished_at"))
+    started = aware(loop_raw.get("started_at"))
+    routed = aware(routes_raw.get("generated_at"))
+    if (loop_raw.get("schema_version") != "empire.predictive_cloud.opportunity_loop.v2"
+            or loop_raw.get("mode") != "OBSERVE"
+            or loop_raw.get("ok") is not True
+            or loop_raw.get("execution_authority") != "none"
+            or loop_raw.get("automatic_external_execution_allowed") is not False
+            or routes_raw.get("schema_version") != "empire.opportunity_evidence_routes.v1"
+            or routes_raw.get("mode") != "OBSERVE"
+            or routes_raw.get("execution_authority") != "none"
+            or routes_raw.get("automatic_external_execution_allowed") is not False
+            or started is None or completed is None or routed is None
+            or not started <= routed <= completed + timedelta(minutes=2)
+            or not started <= completed):
+        return held
+
+    stages = routes_raw.get("stage_counts")
+    rows = routes_raw.get("items")
+    opportunity_count = count(routes_raw.get("opportunity_count"))
+    if (not isinstance(stages, dict)
+            or not isinstance(rows, list) or len(rows) > 500
+            or opportunity_count is None or len(rows) != opportunity_count
+            or any(not isinstance(row, dict) for row in rows)
+            or any(not isinstance(stage, str)
+                   or count(value) is None
+                   for stage, value in stages.items())
+            or sum(stages.values()) != opportunity_count):
+        return held
+    keys = [row.get("opportunity_key") for row in rows]
+    if (any(not isinstance(key, str) or not key for key in keys)
+            or len(set(keys)) != len(keys)):
+        return held
+    observed_stages = Counter()
+    for row in rows:
+        lifecycle = row.get("lifecycle")
+        if (not isinstance(lifecycle, dict)
+                or not isinstance(lifecycle.get("current_stage"), str)
+                or not lifecycle.get("current_stage")):
+            return held
+        observed_stages[lifecycle["current_stage"]] += 1
+    if dict(observed_stages) != stages:
+        return held
+
+    out = {
+        **held,
+        "status": "CURRENT_ROUTER_WITHOUT_HISTORY",
+        "router_observed_at": routed.isoformat(),
+        "router_opportunity_count": opportunity_count,
+        "router_stage_counts": dict(stages),
+    }
+    history = routes_raw.get("history")
+    if not isinstance(history, dict):
+        return out
+    if (history.get("schema_version") != "empire.opportunity_evidence_history.v1"
+            or history.get("mode") != "OBSERVE"
+            or history.get("execution_authority") != "none"
+            or history.get("automatic_external_execution_allowed") is not False
+            or history.get("commercial_stage_independently_verified") is not False
+            or history.get("previous_stage_never_promoted") is not True
+            or aware(history.get("generated_at")) != routed):
+        return out
+    entries = history.get("entries")
+    tracked = count(history.get("tracked_identity_count"))
+    if (not isinstance(entries, list)
+            or tracked is None or len(entries) != tracked or tracked > 500
+            or any(not isinstance(entry, dict) for entry in entries)):
+        return out
+    active = {entry.get("opportunity_key"): entry for entry in entries
+              if entry.get("active_in_latest_cycle") is True}
+    if (len(active) != opportunity_count
+            or set(active) != set(keys)):
+        return out
+    for row in rows:
+        entry = active[row["opportunity_key"]]
+        lifecycle = row.get("lifecycle")
+        if (entry.get("opportunity_class") != row.get("opportunity_class")
+                or entry.get("tenant_id") != row.get("tenant_id")
+                or entry.get("execution_authority") != "none"
+                or entry.get("missed_cycles") != 0
+                or entry.get("stage_source") != "DERIVED_FROM_ROUTE_NOT_COMMERCIAL_PROOF"
+                or aware(entry.get("last_seen_at")) != routed
+                or not isinstance(lifecycle, dict)
+                or entry.get("last_observed_stage") != lifecycle.get("current_stage")):
+            return out
+    new = count(history.get("new_identity_count"))
+    appeared = count(history.get("reappeared_count"))
+    transitions = count(history.get("stage_transition_count_this_cycle"))
+    if (new is None or appeared is None or transitions is None
+            or new > opportunity_count or appeared > opportunity_count
+            or transitions > opportunity_count):
+        return out
+    return {
+        **out,
+        "status": "CURRENT_DERIVED_HISTORY_OBSERVED",
+        "new_identity_count_latest_cycle": new,
+        "reappeared_count_latest_cycle": appeared,
+        "derived_stage_transitions_latest_cycle": transitions,
+        "history_verified_for_cycle": True,
+    }
+
+
 def _opportunity_radar_runtime(
     loop_raw: dict[str, Any] | None,
     loop_path: Path,
     intake_raw: dict[str, Any] | None,
     intake_path: Path,
+    evidence_routes_raw: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if loop_raw is None:
         return {
@@ -465,6 +605,9 @@ def _opportunity_radar_runtime(
             loop_raw.get("ai_plan_queued_count") or 0
         ),
         "stage_counts": stage_counts,
+        "lifecycle_evidence": _radar_lifecycle_evidence(
+            loop_raw, evidence_routes_raw,
+        ),
         "blocker_counts": ranked_blockers,
         "highest_priority_evidence_gap": highest,
         "top_blocked_candidates": blocked_candidates[:8],
@@ -1232,6 +1375,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
     opportunity_value_path = (
         runtime / "opportunity_factory" / "value_latest.json"
     )
+    opportunity_routes_path = (
+        runtime / "opportunity_factory" / "evidence_routes_latest.json"
+    )
     predictive_intelligence_path = (
         runtime / "predictive_intelligence" / "latest.json"
     )
@@ -1315,6 +1461,7 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
             opportunity_loop_path,
             _read_json(opportunity_intake_path),
             opportunity_intake_path,
+            _read_json(opportunity_routes_path),
         ),
         "opportunity_value": _opportunity_value(
             _read_json(opportunity_value_path),
