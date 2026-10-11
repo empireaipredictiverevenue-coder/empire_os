@@ -41,3 +41,6 @@ supabase/.temp/
 !tests/fixtures/owned_campaign_runtime/
 !tests/fixtures/owned_campaign_runtime/runtime/
 !tests/fixtures/owned_campaign_runtime/runtime/**
+
+# TypeScript incremental build caches (generated, never source)
+*.tsbuildinfo
