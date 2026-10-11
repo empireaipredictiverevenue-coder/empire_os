@@ -83,7 +83,7 @@ def refreshed_summary(
     clock = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     if index.get("schema_version") != SCHEMA:
         raise RelationshipEvidenceError("INVALID_GMAIL_INDEX_SCHEMA")
-    if index.get("source") != "connected_gmail_connector_read_only":
+    if index.get("source") not in ("connected_gmail_connector_read_only", "empire_gmail_api_readonly"):
         raise RelationshipEvidenceError("GMAIL_CONNECTOR_PROVENANCE_REQUIRED")
     polled_at = when(index.get("collected_at"))
     if polled_at is None or not 0 <= (clock-polled_at).total_seconds() <= 600:
@@ -198,7 +198,7 @@ def main() -> int:
         if args.write:
             atomic_private_write(ROOT/SOURCE, updated)
     except (OSError,ValueError,TypeError,json.JSONDecodeError) as exc:
-        print(json.dumps({"status":"BLOCKED","reason_code":type(exc).__name__,
+        print(json.dumps({"status":"BLOCKED","reason_code":str(exc) if isinstance(exc, RelationshipEvidenceError) else type(exc).__name__,
                           "outbound_authorized":False}))
         return 2
     print(json.dumps({"status":"PASS","written":args.write,**summary},

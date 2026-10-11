@@ -130,3 +130,14 @@ def test_multi_address_or_injected_sender_cannot_be_treated_as_known_buyer():
     assert _addr("Kieran kieran@connex.is\r\nReply-To: fake@evil.example")==""
     assert _addr("Director kieran@connex.is")=="kieran@connex.is"
     assert _addr("From <KIERAN@CONNEX.IS>")=="kieran@connex.is"
+
+
+def test_first_party_readonly_gmail_source_is_accepted_without_outbound_authority():
+    old, index = inputs()
+    index["source"] = "empire_gmail_api_readonly"
+    updated, summary = refreshed_summary(old, index, now=NOW)
+    assert summary["outbound_authorized"] is False
+    assert summary["known_threads_checked"] == 4
+    assert len(updated["partial_updated_thread_ids"]) == 4
+    assert updated["captured_at"] == old["captured_at"]
+    assert all(item["gmail_thread_id"] in THREADS for item in updated["threads"][:4])
