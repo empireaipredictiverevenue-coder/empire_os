@@ -223,6 +223,8 @@ def refresh_completion_reconciliation(
             if execution_class != "founder_gate":
                 if attempt_state == "CODE_VERIFIED_NOT_LIVE":
                     state = "CODE_COMPLETE_NOT_LIVE"
+                elif attempt_state == "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE":
+                    state = "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE"
                 elif attempt_state == "PROVIDER_CAPACITY_BLOCKED":
                     state = "BUILDER_PROVIDER_BLOCKED"
                 elif attempt_state == "REVIEW_REQUIRED":

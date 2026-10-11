@@ -26,6 +26,7 @@ MAX_EVENTS = 2048
 MAX_BYTES = 32768
 STATES = frozenset({
     "CODE_VERIFIED_NOT_LIVE",
+    "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE",
     "PROVIDER_CAPACITY_BLOCKED",
     "REVIEW_REQUIRED",
     "RESOLVED_WITH_NEW_EVIDENCE",
@@ -110,6 +111,17 @@ def _identity_payload(
                 or not any(v.startswith("feature_branch:") for v in refs)
                 or blocker is not None or reopens is not None):
             raise AttemptMemoryError("commit, tests and feature branch required")
+    elif attempt_state == "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE":
+        if (not isinstance(commit, str)
+                or re.fullmatch(r"[0-9a-f]{8,40}", commit) is None
+                or f"commit:{commit}" not in refs
+                or not isinstance(reopens, str)
+                or re.fullmatch(r"attempt_[0-9a-f]{24}", reopens) is None
+                or blocker is not None
+                or not any(v.startswith("runtime:") for v in refs)
+                or not any(v.startswith("verification:") for v in refs)
+                    and not any(v.startswith("runtime:astra_sha256_") for v in refs)):
+            raise AttemptMemoryError("prior code, runtime and reopening evidence required")
     elif attempt_state == "PROVIDER_CAPACITY_BLOCKED":
         if (commit is not None or reopens is not None
                 or blocker not in PROVIDER_BLOCKERS
@@ -210,6 +222,13 @@ def load_attempt_memory(
             ))
             previous: dict[str, Any] | None = None
             for receipt in ordered:
+                if receipt["attempt_state"] == "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE":
+                    if (previous is None
+                            or previous["attempt_state"] != "CODE_VERIFIED_NOT_LIVE"
+                            or receipt["reopens"] != previous["attempt_id"]
+                            or receipt["commit"] != previous["commit"]
+                            or _timestamp(receipt["recorded_at"]) <= _timestamp(previous["recorded_at"])):
+                        raise AttemptMemoryError("runtime observation not bound to tested code")
                 if receipt["attempt_state"] == "RESOLVED_WITH_NEW_EVIDENCE":
                     if (previous is None
                             or previous["attempt_state"] not in HOLD_STATES
@@ -301,7 +320,24 @@ def record_attempt(
         if (not previous or previous.get("attempt_id") != reopens
                 or previous.get("attempt_state") not in HOLD_STATES):
             raise AttemptMemoryError("resolution must reopen latest held attempt")
-    if attempt_state == "CODE_VERIFIED_NOT_LIVE":
+    if attempt_state == "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE":
+        if (previous is None
+                or previous.get("attempt_state") != "CODE_VERIFIED_NOT_LIVE"
+                or previous.get("attempt_id") != reopens
+                or previous.get("commit") != commit
+                or _timestamp(previous.get("recorded_at")) is None
+                or current <= _timestamp(previous.get("recorded_at"))):
+            raise AttemptMemoryError("must bind to prior verified feature commit")
+        # Never accept user-authored runtime evidence as proof. Recompute the
+        # source hashes and loopback API readback now; fail closed on changes.
+        from empire_os.completion_runtime_evidence import (
+            observe_existing_runtime,
+        )
+        observation = observe_existing_runtime(root, item, now=current)
+        if evidence_refs != [f"commit:{commit}", *observation["evidence_refs"]]:
+            raise AttemptMemoryError("observed runtime source evidence mismatched")
+    if attempt_state in {"CODE_VERIFIED_NOT_LIVE",
+                         "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE"}:
         assert commit is not None
         check = subprocess.run(
             ["git", "cat-file", "-t", commit],

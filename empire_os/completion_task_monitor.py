@@ -34,6 +34,10 @@ PRIORITY_STATES = {
         "Inspect the exact failed verification evidence before a bounded repair"),
     "CODE_COMPLETE_NOT_LIVE": (2, "DEPLOYMENT_EVIDENCE_REQUIRED",
         "Review the existing tested commit, then obtain governed production runtime proof"),
+    "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE": (
+        4, "FORMAL_CHECKLIST_CLOSEOUT_REQUIRED",
+        "Runtime observation is already recorded; do not rebuild. Require exact independent live-closeout checkpoint and checklist verification"
+    ),
     "FOUNDER_GATE": (3, "FOUNDER_APPROVAL_REQUIRED",
         "Collect the exact approval evidence; never auto-approve"),
     "REAL_WORLD_EVIDENCE_REQUIRED": (4, "REAL_WORLD_PROOF_REQUIRED",
@@ -242,7 +246,8 @@ def build_completion_task_monitor(
             "priority_order": priority,
             "attention_reason": reason,
             "attention_required": urgent or stale_in_stage or state in {
-                "CODE_COMPLETE_NOT_LIVE", "FOUNDER_GATE", "REVIEW_PRIOR_ATTEMPT",
+                "CODE_COMPLETE_NOT_LIVE", "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE",
+                "FOUNDER_GATE", "REVIEW_PRIOR_ATTEMPT",
                 "INDEPENDENT_REVIEW_REQUIRED_BEFORE_RETRY",
             },
             "signals": signals,
