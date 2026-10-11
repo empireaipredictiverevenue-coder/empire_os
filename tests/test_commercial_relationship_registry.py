@@ -849,3 +849,167 @@ def test_private_public_company_demand_integrates_without_sending(tmp_path):
     record=next(x for x in result["relationships"] if x["entity_key"]=="no-reply")
     assert record["public_buying_pulse_review"]["domain"] == "newbuyer.com"
     assert record["stage"] == "CONTACTED_AWAITING_RESPONSE"
+
+
+def test_founder_review_queue_is_complete_and_draft_only():
+    source, queue, qualification = sources()
+    for i in range(35):
+        source['threads'].append(row(
+            f'pending-{i}', f'pending-{i}.example.com', f'{i + 100:016x}',
+            outbound='2026-09-25T12:00:00Z',
+        ))
+    result = reconcile(source, queue, qualification, now=NOW)
+    review = result['founder_action_queue']
+    assert result['founder_review_required_count'] == len(review)
+    assert len(review) > 25
+    assert result['founder_action_queue_truncated'] is False
+    assert all(item['outbound_authorized'] is False for item in review)
+    assert result['founder_actions_are_draft_only'] is True
+    assert result['next_actions_automatic_sends'] is False
+
+
+def test_founder_reported_external_contact_does_not_forge_email_or_buyer_acceptance():
+    from scripts.reconcile_buyer_email_relationships import (
+        attach_founder_reported_external_contacts,
+    )
+
+    report = reconcile(*sources(), now=NOW)
+    evidence = {
+        "schema_version": "empire.founder_reported_external_contacts.v1",
+        "origin": "founder_direct_confirmation_in_chat",
+        "observations": [{
+            "domain": "onlydiscovered.com",
+            "reported_date": "2026-10-10",
+            "direction": "founder_sent_first_enquiry",
+            "channel": "external_contact_method_unverified",
+            "delivery_confirmed": False,
+            "reply_confirmed": False,
+            "buyer_programme_approved": False,
+            "products_requested": ["PAY_PER_CALL"],
+            "future_followup_topic": ["PAY_PER_LEAD", "PAY_PER_CALL"],
+            "next_action": "WAIT_FIRST_REPLY_THEN_DISCUSS_PPL_NO_DUPLICATE_INTRODUCTION",
+        }],
+    }
+    attach_founder_reported_external_contacts(report, evidence)
+    found = next(r for r in report["relationships"]
+                 if r["entity_key"] == "onlydiscovered.com")
+    assert found["stage"] == "RESEARCH_ONLY"  # no invented verified send
+    assert found["last_outbound_at"] is None
+    assert found["next_founder_action"] == (
+        "WAIT_FOUNDER_REPORTED_RESPONSE_NO_DUPLICATE_INTRO"
+    )
+    assert found["founder_reported_external_contact"]["delivery_verified"] is False
+    assert found["outbound_authorized"] is False
+    assert report["outbound_sent"] is False
+    assert report["founder_reported_external_contact_count"] == 1
+    evidence["observations"][0]["delivery_confirmed"] = True
+    with pytest.raises(RelationshipEvidenceError, match="unsupported_founder_contact_assertion"):
+        attach_founder_reported_external_contacts(
+            reconcile(*sources(), now=NOW), evidence
+        )
+
+
+def test_dual_format_ppl_and_ppc_require_separate_verified_buyer_authority():
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_PILOT_SCOPES, partner_technical_review_packet,
+    )
+    for key, spec in PARTNER_PILOT_SCOPES.items():
+        # Even an authenticated publisher reply or public programme terms
+        # do not establish a PPL intake, buyer postback or a payable call.
+        row = {
+            "last_inbound_message_id": "1a125653fbace2d6",
+            "gmail_thread_ids": [spec["reviewed_thread"]],
+        }
+        packet = partner_technical_review_packet(key, spec, row)
+        formats = packet["publisher_format_review"]
+        assert formats["status"] == "BOTH_FORMATS_PROPOSED_NOT_BUYER_APPROVED"
+        assert set(formats).issuperset({"PAY_PER_CALL", "PAY_PER_LEAD"})
+        call = formats["PAY_PER_CALL"]
+        lead = formats["PAY_PER_LEAD"]
+        assert call["partner_specific_offer_confirmed"] is False
+        assert call["billable_call_duration_and_rules"] is None
+        assert call["verified_number_and_route"] is False
+        assert call["live_call_traffic_enabled"] is False
+        assert lead["partner_specific_offer_confirmed"] is False
+        assert lead["lead_price_exclusive_or_shared_terms"] is None
+        assert lead["accepted_lead_and_duplicate_rules"] is None
+        assert lead["approved_lead_field_and_api_contract"] is None
+        assert lead["consumer_disclosure_and_consent_approved"] is False
+        assert lead["canonical_empiredb_consumer_intake_verified"] is False
+        assert lead["buyer_acceptance_and_rejection_receipts_verified"] is False
+        assert lead["live_form_capture_enabled"] is False
+        assert lead["lead_delivery_enabled"] is False
+        assert formats["cross_format_same_consumer_deduplication_verified"] is False
+        assert formats["double_monetization_authorized"] is False
+        assert formats["launch_authorized"] is False
+        assert packet["selected_partner_offer_format"] is None
+        assert packet["traffic_enabled"] is False
+        assert packet["execution_authority"] == "NONE"
+
+
+@pytest.mark.parametrize("direction,channel,action", [
+    ("founder_sent_first_enquiry", "website_contact_form",
+     "WAIT_FIRST_REPLY_THEN_DISCUSS_PPL_NO_DUPLICATE_INTRODUCTION"),
+    ("founder_submitted_application", "website_application_form",
+     "AWAIT_APPLICATION_RESPONSE_NO_DUPLICATE_CONTACT"),
+])
+def test_founder_web_form_and_application_are_not_duplicate_email_or_buyer_approval(
+    direction, channel, action,
+):
+    from scripts.reconcile_buyer_email_relationships import (
+        attach_founder_reported_external_contacts,
+    )
+    report = reconcile(*sources(), now=NOW)
+    item = {
+        "domain": "onlydiscovered.com",
+        "reported_date": "2026-10-10",
+        "direction": direction,
+        "channel": channel,
+        "delivery_confirmed": False,
+        "reply_confirmed": False,
+        "buyer_programme_approved": False,
+        "products_requested": ["PAY_PER_CALL"],
+        "future_followup_topic": ["PAY_PER_LEAD", "PAY_PER_CALL"],
+        "next_action": action,
+    }
+    evidence = {
+        "schema_version": "empire.founder_reported_external_contacts.v1",
+        "origin": "founder_direct_confirmation_in_chat",
+        "observations": [item],
+    }
+    attach_founder_reported_external_contacts(report, evidence)
+    found = next(x for x in report["relationships"]
+                 if x["entity_key"] == "onlydiscovered.com")
+    assert found["stage"] == "RESEARCH_ONLY"
+    assert found["last_outbound_at"] is None
+    assert found["gmail_thread_ids"] == []
+    assert found["founder_reported_external_contact"]["channel"] == channel
+    assert found["founder_reported_external_contact"]["next_action"] == action
+    assert found["founder_reported_external_contact"]["delivery_verified"] is False
+    assert found["outbound_authorized"] is False
+    assert found["commercial_buyer_approved"] is False
+    assert report["founder_reported_external_contact_count"] == 1
+    # A founder report must never be upgraded to independent delivery proof.
+    item["delivery_confirmed"] = True
+    with pytest.raises(RelationshipEvidenceError, match="unsupported_founder_contact_assertion"):
+        attach_founder_reported_external_contacts(
+            reconcile(*sources(), now=NOW), evidence
+        )
+
+def test_founder_do_not_pursue_overrides_stale_gmail_followup():
+    src, queue, qual = sources()
+    src['threads'].append(row('callvox.pro', 'callvox.pro', 'aaaaaaaaaaaa1111',
+                              outbound='2026-10-09T15:00:00Z'))
+    queue['candidates'].append({'domain': 'callvox.pro', 'status': 'WATCH'})
+    queue['candidate_count'] = len(queue['candidates'])
+    report = reconcile(src, queue, qual, now=NOW,
+                       do_not_pursue_domains=frozenset({'callvox.pro'}))
+    records = [x for x in report['relationships'] if x['entity_key']=='callvox.pro']
+    assert len(records) == 1
+    held = records[0]
+    assert held['do_not_pursue'] is True
+    assert held['stage'] == 'EVIDENCE_HOLD'
+    assert held['next_founder_action'] == 'DO_NOT_PURSUE_NO_CONTACT'
+    assert held['founder_review_required'] is False
+    assert held['auto_send_authorized'] is False
+    assert all(x['entity_key'] != 'callvox.pro' for x in report['founder_action_queue'])

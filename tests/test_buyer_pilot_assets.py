@@ -223,3 +223,80 @@ def test_private_partner_preview_materializer_does_not_publish_or_leak(tmp_path)
     p.symlink_to(tmp_path/"templates/lead_smart/roofing/roofing-hero.webp")
     with pytest.raises(ValueError, match="unsafe_private_preview_destination"):
         materialize_partner_private_reviews(tmp_path,{"partner_pilot_readiness_queue":rows})
+
+
+def test_offline_buyer_preview_has_two_separate_noncollecting_products():
+    from empire_os.buyer_pilot_assets import (
+        build_partner_landing_review, render_partner_landing_review_html,
+    )
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_LAUNCH_GATES, PARTNER_PILOT_SCOPES, partner_technical_review_packet,
+    )
+    for key, spec in PARTNER_PILOT_SCOPES.items():
+        packet = partner_technical_review_packet(
+            key, spec, {"last_inbound_message_id": None, "gmail_thread_ids": []}
+        )
+        pilot = {
+            "entity_key": key, "company": key,
+            "activation_gates": {gate: False for gate in PARTNER_LAUNCH_GATES},
+            "technical_review_packet": packet,
+        }
+        review = build_partner_landing_review(pilot)
+        a = review["two_product_pilot_review"]
+        assert a["PAY_PER_CALL"]["route_enabled"] is False
+        assert a["PAY_PER_LEAD"]["consumer_fields_collected"] is False
+        assert a["PAY_PER_LEAD"]["form_enabled"] is False
+        assert a["PAY_PER_LEAD"]["delivery_enabled"] is False
+        assert a["same_enquiry_double_sale_approved"] is False
+        assert a["canonical_consumer_lead_receipt_verified"] is False
+        markup = render_partner_landing_review_html(review)
+        assert "Pay Per Call — under review" in markup
+        assert "Pay Per Lead — under review" in markup
+        assert "Consent text/evidence" in markup
+        assert "duplicate call/form enquiry" in markup
+        assert "<form" not in markup.lower()
+        assert "tel:" not in markup.lower()
+        assert "<script" not in markup.lower()
+        assert "http://" not in markup.lower()
+        assert "https://" not in markup.lower()
+        assert 'disabled aria-disabled="true"' in markup
+
+
+def test_offline_product_review_rejects_true_capture_and_delivery_flags():
+    import copy
+    import pytest
+    from empire_os.buyer_pilot_assets import (
+        build_partner_landing_review, render_partner_landing_review_html,
+    )
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_LAUNCH_GATES, PARTNER_PILOT_SCOPES, partner_technical_review_packet,
+    )
+    spec = PARTNER_PILOT_SCOPES["connexis"]
+    packet = partner_technical_review_packet(
+        "connexis", spec,
+        {"last_inbound_message_id": None, "gmail_thread_ids": []},
+    )
+    pilot = {
+        "entity_key": "connexis", "company": "Connexis",
+        "activation_gates": {gate: False for gate in PARTNER_LAUNCH_GATES},
+        "technical_review_packet": packet,
+    }
+    clean = build_partner_landing_review(pilot)
+    for product, field in (
+        ("PAY_PER_LEAD", "live_form_capture_enabled"),
+        ("PAY_PER_LEAD", "lead_delivery_enabled"),
+        ("PAY_PER_CALL", "live_call_traffic_enabled"),
+    ):
+        unsafe = copy.deepcopy(pilot)
+        unsafe["technical_review_packet"]["publisher_format_review"][product][field] = True
+        with pytest.raises(ValueError, match="live_format_authority_forbidden"):
+            build_partner_landing_review(unsafe)
+    for product, field in (
+        ("PAY_PER_LEAD", "form_enabled"),
+        ("PAY_PER_LEAD", "delivery_enabled"),
+        ("PAY_PER_CALL", "route_enabled"),
+    ):
+        unsafe = copy.deepcopy(clean)
+        unsafe["two_product_pilot_review"][product][field] = True
+        with pytest.raises(ValueError, match="private_review_rejects_enabled"):
+            render_partner_landing_review_html(unsafe)

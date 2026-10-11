@@ -10,6 +10,7 @@ from hashlib import sha256
 import json
 import re
 from typing import Any, Mapping
+from empire_os.buyer_review_holds import do_not_pursue_domains as founder_do_not_pursue_domains
 
 
 class RelationshipEvidenceError(ValueError):
@@ -236,6 +237,32 @@ def partner_technical_review_packet(
         "general_public_programme_bound_to_this_account": False,
         "applicable_payout_model_confirmed_by_partner": False,
         "selected_partner_offer_format": None,
+        # Two independent revenue formats. A public affiliate page or a
+        # call-buyer reply cannot authorize consumer form capture or API
+        # delivery. Existing legacy SQLite PPL paths are not canonical.
+        "publisher_format_review": {
+            "status": "BOTH_FORMATS_PROPOSED_NOT_BUYER_APPROVED",
+            "PAY_PER_CALL": {
+                "partner_specific_offer_confirmed": False,
+                "billable_call_duration_and_rules": None,
+                "verified_number_and_route": False,
+                "live_call_traffic_enabled": False,
+            },
+            "PAY_PER_LEAD": {
+                "partner_specific_offer_confirmed": False,
+                "lead_price_exclusive_or_shared_terms": None,
+                "accepted_lead_and_duplicate_rules": None,
+                "approved_lead_field_and_api_contract": None,
+                "consumer_disclosure_and_consent_approved": False,
+                "canonical_empiredb_consumer_intake_verified": False,
+                "buyer_acceptance_and_rejection_receipts_verified": False,
+                "live_form_capture_enabled": False,
+                "lead_delivery_enabled": False,
+            },
+            "cross_format_same_consumer_deduplication_verified": False,
+            "double_monetization_authorized": False,
+            "launch_authorized": False,
+        },
         "contract_signing_channel_confirmed": False,
         "web_or_portal_acceptance_authorized": False,
         "lead_smart_route_or_number_inherited": False,
@@ -597,7 +624,13 @@ def reconcile(
     *,
     now: datetime | None = None,
     previous: Mapping[str, Any] | None = None,
+    do_not_pursue_domains: frozenset[str] | None = None,
 ) -> dict[str, Any]:
+    # Founder policy is authoritative even when the agent consumes stale Gmail
+    # or buyer-queue snapshots. It never creates outbound authority.
+    exclusions = (founder_do_not_pursue_domains()
+                  if do_not_pursue_domains is None
+                  else frozenset(do_not_pursue_domains))
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise RelationshipEvidenceError("naive_now")
@@ -696,7 +729,10 @@ def reconcile(
     for key, record in registry.items():
         inc = record["last_inbound_at"]
         out = record["last_outbound_at"]
-        if record["qualification_tier"] in ("MANUAL_EVIDENCE_HOLD", "AUTOMATED_EVIDENCE_HOLD"):
+        founder_excluded = any(domain in exclusions for domain in record["identity_domains"])
+        if founder_excluded:
+            stage = "EVIDENCE_HOLD"
+        elif record["qualification_tier"] in ("MANUAL_EVIDENCE_HOLD", "AUTOMATED_EVIDENCE_HOLD"):
             stage = "EVIDENCE_HOLD"
         elif record["bounced_addresses"] and not inc:
             stage = "DELIVERY_HOLD"
@@ -721,6 +757,10 @@ def reconcile(
             now=now, gmail_snapshot_fresh=record_mail_fresh,
             linked_gmail=bool(record['gmail_thread_ids']),
         )
+        if founder_excluded:
+            founder_action = "DO_NOT_PURSUE_NO_CONTACT"
+            needs_review = False
+            action_reason = "FOUNDER_DO_NOT_PURSUE_HARD_BOUNCE_CREDIBILITY"
         result.append({
             "entity_key": key, "company": record["company"],
             "identity_domains": sorted(record["identity_domains"]),
@@ -741,6 +781,7 @@ def reconcile(
             "founder_review_required": needs_review,
             "founder_action_reason": action_reason,
             "auto_send_authorized": False,
+            "do_not_pursue": founder_excluded,
             "new_inbound_since_last_snapshot": bool(new_reply),
             "discovery_status": record["discovery_status"],
             "qualification_tier": record["qualification_tier"],
@@ -804,6 +845,7 @@ def reconcile(
         "gmail_source_sha256": sha256(raw).hexdigest(),
         "discovery_queue_generated_at": queue.get("generated_at"),
         "relationship_count": len(result),
+        "founder_do_not_pursue_count": sum(bool(r["do_not_pursue"]) for r in result),
         "linked_gmail_thread_count": sum(len(r["gmail_thread_ids"]) for r in result),
         "stage_counts": counts,
         "founder_review_required_count": len(review_queue),
@@ -812,8 +854,8 @@ def reconcile(
         "partner_pilot_readiness_queue": partner_pilot_readiness(result),
         "partner_pilot_readiness_is_activation_authority": False,
         "warm_business_queue_truncated": len(warm)>8,
-        "founder_action_queue": review_queue[:25],
-        "founder_action_queue_truncated": len(review_queue)>25,
+        "founder_action_queue": review_queue,
+        "founder_action_queue_truncated": False,
         "founder_actions_are_draft_only": True,
         "next_actions_automatic_sends": False,
         "new_inbound_relationships_since_prior_snapshot": newly_received,

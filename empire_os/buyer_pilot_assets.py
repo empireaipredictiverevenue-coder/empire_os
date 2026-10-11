@@ -224,6 +224,19 @@ def build_partner_landing_review(pilot: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("preview_cannot_include_live_route")
     if packet.get("signed_agreement_evidence") is not None:
         raise ValueError("signed_contract_cannot_be_assumed_for_review")
+    formats = packet.get("publisher_format_review")
+    if formats is not None:
+        # The registry may contain future buyer evidence; that can never
+        # silently convert this offline illustration into consumer intake.
+        if (not isinstance(formats, Mapping)
+                or formats.get("launch_authorized") is not False
+                or formats.get("double_monetization_authorized") is not False
+                or not isinstance(formats.get("PAY_PER_LEAD"), Mapping)
+                or not isinstance(formats.get("PAY_PER_CALL"), Mapping)
+                or formats["PAY_PER_LEAD"].get("live_form_capture_enabled") is not False
+                or formats["PAY_PER_LEAD"].get("lead_delivery_enabled") is not False
+                or formats["PAY_PER_CALL"].get("live_call_traffic_enabled") is not False):
+            raise ValueError("live_format_authority_forbidden_in_private_preview")
     desc = PARTNER_PREVIEW_DESCRIPTORS[key]
     gates = pilot.get("activation_gates")
     if (not isinstance(gates, Mapping) or not gates
@@ -241,6 +254,33 @@ def build_partner_landing_review(pilot: Mapping[str, Any]) -> dict[str, Any]:
         "proposed_vertical_not_buyer_approved": desc["vertical"],
         "proposed_region_not_buyer_approved": desc["region"],
         "service_topics": list(desc["needs"]),
+        "two_product_pilot_review": {
+            "PAY_PER_CALL": {
+                "offer_requested_not_approved": True,
+                "proposed_event": "Consumer-initiated inbound call",
+                "buyer_to_confirm": [
+                    "Approved ZIP/postcode, job types, hours and daily cap",
+                    "Call duration, quality, duplicates and chargeable event",
+                    "Tracking number, real buyer route, payout and settlement",
+                ],
+                "route_enabled": False,
+            },
+            "PAY_PER_LEAD": {
+                "offer_requested_not_approved": True,
+                "proposed_event": "Consumer-initiated contact form enquiry",
+                "buyer_to_confirm": [
+                    "Approved lead fields, homeowner/job checks and ZIP/postcode",
+                    "Lead price, exclusive/shared basis, caps and returns",
+                    "Consent text/evidence, API contract and acceptance receipts",
+                ],
+                "consumer_fields_collected": False,
+                "form_enabled": False,
+                "delivery_enabled": False,
+            },
+            "same_enquiry_double_sale_approved": False,
+            "canonical_consumer_lead_receipt_verified": False,
+            "buyer_programme_confirmed": False,
+        },
         "self_owned_illustration": desc["image"],
         "review_notice": "PRIVATE REVIEW — buyer approval, geographic coverage and call routing pending",
         "customer_notice": (
@@ -278,6 +318,18 @@ def render_partner_landing_review_html(review: Mapping[str, Any]) -> str:
         raise ValueError("preview_execution_authority_must_be_none")
     if review.get("entity_key") not in PARTNER_PREVIEW_DESCRIPTORS:
         raise ValueError("unknown_private_landing_partner")
+    formats = review.get("two_product_pilot_review")
+    if (not isinstance(formats, Mapping)
+            or formats.get("buyer_programme_confirmed") is not False
+            or formats.get("same_enquiry_double_sale_approved") is not False
+            or formats.get("canonical_consumer_lead_receipt_verified") is not False
+            or not isinstance(formats.get("PAY_PER_CALL"), Mapping)
+            or not isinstance(formats.get("PAY_PER_LEAD"), Mapping)
+            or formats["PAY_PER_CALL"].get("route_enabled") is not False
+            or formats["PAY_PER_LEAD"].get("form_enabled") is not False
+            or formats["PAY_PER_LEAD"].get("delivery_enabled") is not False
+            or formats["PAY_PER_LEAD"].get("consumer_fields_collected") is not False):
+        raise ValueError("private_review_rejects_enabled_products")
     image = review.get("self_owned_illustration")
     if image not in (None, "roofing-hero.webp"):
         raise ValueError("untrusted_preview_media")
@@ -285,6 +337,27 @@ def render_partner_landing_review_html(review: Mapping[str, Any]) -> str:
     topic_html = "".join(
         '<div class="need"><span class="bullet">✓</span>' + escape(str(item)) + '</div>'
         for item in review["service_topics"]
+    )
+    def product_panel(key: str, label: str) -> str:
+        details = formats[key]
+        fields = details.get("buyer_to_confirm")
+        if (details.get("offer_requested_not_approved") is not True
+                or not isinstance(fields, list)
+                or not 1 <= len(fields) <= 8
+                or any(not isinstance(item, str) or len(item) > 160
+                       for item in fields)):
+            raise ValueError("invalid_offline_product_requirements")
+        items = "".join(
+            '<div class="need"><span class="bullet">•</span>'
+            + escape(item) + '</div>' for item in fields
+        )
+        return ('<section class="panel"><h2>' + escape(label) +
+                ' — under review</h2><p>' +
+                escape(str(details.get("proposed_event") or "")) +
+                '</p>' + items + '</section>')
+    products_html = (
+        product_panel("PAY_PER_CALL", "Pay Per Call")
+        + product_panel("PAY_PER_LEAD", "Pay Per Lead")
     )
     backdrop = (
         '<img class="hero-image" src="roofing-hero.webp" alt="Roofing service example">'
@@ -345,6 +418,8 @@ footer {{ padding:36px 30px; border-top: 1px solid #d7e5f5; font-size: 13px; lin
 <p>Property location, hours, coverage, eligibility and consent requirements must be independently approved before any live campaign.</p>
 </section>
 </div>
+<div class="wrapper cols">{products_html}</div>
+<div class="wrapper"><p><strong>Commercial hold:</strong> No live consumer data capture, buyer delivery, call routing or billing. Both programmes and the treatment of a duplicate call/form enquiry require separate written approval.</p></div>
 </main>
 <footer class="wrapper">{e("customer_notice")} This page is an unpublished, offline preview for internal buyer review only.</footer>
 </body>

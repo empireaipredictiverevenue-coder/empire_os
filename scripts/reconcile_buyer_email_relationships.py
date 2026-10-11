@@ -8,6 +8,7 @@ proven before ongoing mailbox collection can be marked automated.
 from __future__ import annotations
 
 import argparse
+from datetime import date
 import json
 import os
 from pathlib import Path
@@ -45,6 +46,75 @@ def _read_private(
     return payload
 
 
+def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> None:
+    """Annotate self-reported external outreach, never equate it to Gmail proof."""
+    if (evidence.get("schema_version")
+            != "empire.founder_reported_external_contacts.v1"
+            or evidence.get("origin") != "founder_direct_confirmation_in_chat"):
+        raise RelationshipEvidenceError("invalid_founder_contact_source")
+    observations = evidence.get("observations")
+    if not isinstance(observations, list) or len(observations) > 20:
+        raise RelationshipEvidenceError("invalid_founder_contact_observations")
+    by_domain = {
+        domain: row for row in report["relationships"]
+        for domain in row.get("identity_domains", [])
+    }
+    seen = set()
+    reviewed = []
+    for item in observations:
+        if not isinstance(item, dict):
+            raise RelationshipEvidenceError("invalid_founder_contact_item")
+        domain = item.get("domain")
+        if not isinstance(domain, str) or domain not in by_domain or domain in seen:
+            raise RelationshipEvidenceError("unknown_or_duplicate_founder_contact")
+        seen.add(domain)
+        try:
+            reported_date = date.fromisoformat(item["reported_date"]).isoformat()
+        except (KeyError, TypeError, ValueError) as exc:
+            raise RelationshipEvidenceError("invalid_founder_contact_date") from exc
+        allowed_contact_flows = {
+            ("founder_sent_first_enquiry", "external_contact_method_unverified"):
+                "WAIT_FIRST_REPLY_THEN_DISCUSS_PPL_NO_DUPLICATE_INTRODUCTION",
+            ("founder_sent_first_enquiry", "website_contact_form"):
+                "WAIT_FIRST_REPLY_THEN_DISCUSS_PPL_NO_DUPLICATE_INTRODUCTION",
+            ("founder_submitted_application", "website_application_form"):
+                "AWAIT_APPLICATION_RESPONSE_NO_DUPLICATE_CONTACT",
+        }
+        contact_flow = (item.get("direction"), item.get("channel"))
+        if (allowed_contact_flows.get(contact_flow) != item.get("next_action")
+                or item.get("delivery_confirmed") is not False
+                or item.get("reply_confirmed") is not False
+                or item.get("buyer_programme_approved") is not False
+                or item.get("products_requested") != ["PAY_PER_CALL"]
+                or item.get("future_followup_topic") != ["PAY_PER_LEAD", "PAY_PER_CALL"]):
+            raise RelationshipEvidenceError("unsupported_founder_contact_assertion")
+        row = by_domain[domain]
+        contact = {
+            "domain": domain,
+            "reported_date": reported_date,
+            "channel": item["channel"],
+            "direction": item["direction"],
+            "next_action": item["next_action"],
+            "source": "FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED",
+            "delivery_verified": False,
+            "reply_verified": False,
+            "buyer_approved": False,
+            "next_after_response": "DISCUSS_PAY_PER_LEAD_AND_PAY_PER_CALL",
+            "outbound_authorized": False,
+        }
+        row["founder_reported_external_contact"] = contact
+        if row["stage"] == "RESEARCH_ONLY":
+            row["next_founder_action"] = (
+                "AWAIT_FOUNDER_REPORTED_APPLICATION_RESPONSE_NO_DUPLICATE_CONTACT"
+                if item["direction"] == "founder_submitted_application"
+                else "WAIT_FOUNDER_REPORTED_RESPONSE_NO_DUPLICATE_INTRO"
+            )
+            row["founder_action_reason"] = "FOUNDER_REPORTED_CONTACT_UNVERIFIED"
+        reviewed.append(contact)
+    report["founder_reported_external_contact_queue"] = reviewed
+    report["founder_reported_external_contact_count"] = len(reviewed)
+
+
 def build(root: Path = ROOT) -> dict:
     base = Path(root).resolve() / RELATIVE
     src = _read_private(base / SOURCE_NAME, require_private=True)
@@ -53,6 +123,17 @@ def build(root: Path = ROOT) -> dict:
     prior_path = base / OUTPUT_NAME
     previous = _read_private(prior_path) if prior_path.exists() else {}
     result = reconcile(src, queue, qualification, previous=previous)
+    # User-reported external website/email contact is NOT verified Gmail send
+    # history. Preserve it as a separate no-duplicate-contact hint only.
+    founder_contact_path = base / "founder_reported_external_contacts_latest.json"
+    if founder_contact_path.exists():
+        founder_contacts = _read_private(
+            founder_contact_path, limit=16_000, require_private=True,
+        )
+        attach_founder_reported_external_contacts(result, founder_contacts)
+    else:
+        result["founder_reported_external_contact_queue"] = []
+        result["founder_reported_external_contact_count"] = 0
     # This evidence feed is optional until a *genuine* buyer response has
     # been examined through connected Gmail. A malformed file fails closed:
     # never discard it and silently claim that no partner terms arrived.
