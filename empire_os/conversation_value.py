@@ -69,7 +69,7 @@ def _fresh_why_now(
     *,
     now: datetime,
     max_age_hours: int = 24 * 30,
-) -> dict[str, str] | None:
+) -> dict[str, Any] | None:
     nested = evidence.get("why_now")
     row = dict(nested) if isinstance(nested, Mapping) else {}
     summary = _usable(
@@ -101,7 +101,10 @@ def _fresh_why_now(
         "summary": summary,
         "evidence_ref": evidence_ref,
         "observed_at": observed_at.isoformat(),
-        "signal_type": signal_type or "market signal",
+        "signal_type": signal_type or "unknown",
+        "freshness": {"age_hours": round(age_hours, 3), "max_age_hours": max_age_hours},
+        "confidence": row.get("confidence", evidence.get("why_now_confidence")),
+        "observed_inferred": row.get("observed_inferred", "unknown"),
     }
 
 
@@ -179,6 +182,8 @@ def build_first_touch_copy(
         business_name=business,
         reason_now=reason_now or "",
         proof=proof_for_copy or "",
+        evidence=evidence,
+        now=now,
         contact_title=_usable(review.get("contact_title")) or None,
         territory=metro,
     )
@@ -276,10 +281,10 @@ def build_followup_copy(
 
     if step == 1:
         useful_detail = (
-            f"The trigger I mentioned is still the useful part: {trigger['summary']}"
+            f"One useful check against the observed signal: {trigger['summary']}"
             if trigger is not None
             else (
-                f"I pulled the first practical angles I’d pressure-test for "
+                f"Here are the first practical angles I’d propose checking for "
                 f"{business} in {metro}."
             )
         )
