@@ -1,0 +1,24 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/department_work_queue.py",
+    "tests/test_department_queue_trace_lifecycle.py",
+    "docs/architecture/department_queue_trace_lifecycle_20261011.md"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-11T16:57:29.394802+00:00",
+  "job_id": "completion-20261011-otel-queue-trace-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "domain:department_queue_otel_20261011",
+    "path:empire_os/department_work_queue.py"
+  ],
+  "max_runtime_seconds": 1200,
+  "prompt": "Execute bounded EmpireOS master checklist task line 824, OTEL trace continuity for queue \u2192 route \u2192 lease \u2192 worker \u2192 verify \u2192 proposal. Production truth first: inspect empire_os/department_work_queue.py, department_worker.py, telemetry.py, otel_telemetry.py, execution_plane_dispatcher.py, and existing tests/telemetry before modifying. Do not duplicate instrumentation already present. Add the smallest code for first-party local JSONL, metadata-only, fail-open-to-business (telemetry failure cannot stop work) trace continuity for enqueue, lease/claim, blocked/review/done/fail. Preserve deterministic work IDs and lease semantics, never emit raw objectives, emails, user identifiers, access tokens, metadata or PII. Use ONLY existing first-party telemetry structures; external OTLP/Langfuse exporter must NOT be activated and must not be required. Never change department worker authority, budget, execution, queue ordering or existing execution-plane dispatch. Add tests for lifecycle ordering, missing telemetry sink fail-safe, no sensitive fields, and no false execution completion. Write bounded architecture delta, test in isolated worktree and publish reviewable proposal only. No production merge/deploy, outbound, SQL, service restart, model training, funds or environment secrets. If duplicate feature already exists fully, record proof and abstain from needless changes.",
+  "pytest_targets": [
+    "tests/test_department_queue_trace_lifecycle.py",
+    "tests/test_department_work_queue.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
