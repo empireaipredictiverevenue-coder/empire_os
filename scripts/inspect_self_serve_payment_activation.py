@@ -11,6 +11,10 @@ import os
 from unittest.mock import patch
 
 from empire_os.runtime_env import load_runtime_env
+from empire_os.bsc_escrow_verifier import BscEscrowConfig
+from empire_os.escrow_mainnet_role_readiness import (
+    EscrowRoleConfig, role_config_snapshot, verify_escrow_runtime_roles_and_backing,
+)
 from empire_os.self_serve_escrow_bridge import (
     escrow_config_snapshot,
     escrow_mainnet_activation_flag,
@@ -45,10 +49,16 @@ def inspection(*, probe_chain: bool = False) -> dict:
     chain_verified = False
     escrow_runtime_verified = False
     escrow_operator_memberships_verified = False
+    escrow_onchain_expected_roles_verified = False
+    escrow_backing_verified = False
     anchor_age_seconds = None
     if config["configured"]:
+        role_config = (role_config_snapshot(env) if checkout_mode == "escrow"
+                       else {"configured":True,"status":"not_applicable"})
         if checkout_mode == "escrow" and not mainnet_gate:
             status = "ESCROW_MAINNET_ACTIVATION_HELD"
+        elif not role_config["configured"]:
+            status = role_config["status"]
         else:
             status = "CHAIN_READ_NOT_YET_VERIFIED"
             if probe_chain:
@@ -56,12 +66,27 @@ def inspection(*, probe_chain: bool = False) -> dict:
                     try:
                         if checkout_mode == "escrow":
                             result = verify_escrow_checkout_contract()
-                            chain_verified = result["escrow_runtime_verified"]
                             escrow_runtime_verified = result["escrow_runtime_verified"]
+                            onchain = verify_escrow_runtime_roles_and_backing(
+                                deployment=BscEscrowConfig.from_env(),
+                                roles=EscrowRoleConfig.from_env(),
+                            )
+                            escrow_onchain_expected_roles_verified = (
+                                onchain["expected_role_holders_verified"] == 4
+                            )
+                            escrow_backing_verified = (
+                                onchain["escrow_backing_solvency_pass"] is True
+                            )
                             role_result = verify_escrow_operator_memberships()
                             escrow_operator_memberships_verified = (
                                 role_result["status"] ==
                                 "ESCROW_OPERATOR_MEMBERSHIPS_PRESENT_READ_ONLY"
+                            )
+                            chain_verified = (
+                                escrow_runtime_verified
+                                and escrow_onchain_expected_roles_verified
+                                and escrow_backing_verified
+                                and escrow_operator_memberships_verified
                             )
                         else:
                             result = verify_checkout_bsc_chain()
@@ -88,6 +113,10 @@ def inspection(*, probe_chain: bool = False) -> dict:
         "chain_verified": chain_verified,
         "escrow_contract_runtime_verified": escrow_runtime_verified,
         "escrow_operator_memberships_verified": escrow_operator_memberships_verified,
+        "escrow_expected_onchain_role_holders_verified": escrow_onchain_expected_roles_verified,
+        "escrow_backing_solvency_verified": escrow_backing_verified,
+        "role_grant_exclusivity_audited": False,
+        "external_smart_contract_security_audit_verified": False,
         "escrow_mainnet_activation_permission_present": mainnet_gate,
         "block_age_seconds": anchor_age_seconds,
         "dedicated_payment_approver_automatically_authorized": False,

@@ -41,6 +41,11 @@ def config_env():
         "BSC_ESCROW_RUNTIME_SHA256": CODE_HASH,
         "BSC_USDT_TOKEN_CONTRACT": BSC_USDT_CONTRACT,
         "BSC_MIN_CONFIRMATIONS": "12",
+        "BSC_ESCROW_ADMIN_ADDRESS": "0x" + "1"*40,
+        "BSC_ESCROW_REQUESTER_ADDRESS": "0x" + "2"*40,
+        "BSC_ESCROW_ARBITER_ADDRESS": "0x" + "3"*40,
+        "BSC_ESCROW_PAUSER_ADDRESS": "0x" + "4"*40,
+        "BSC_ESCROW_DECISION_DELAY_SECONDS": "7200",
     }
 
 
@@ -231,6 +236,8 @@ def test_escrow_api_dispatch_verifies_chain_before_creating_any_order(monkeypatc
     seen=[]
     monkeypatch.setattr(api,"verify_escrow_checkout_contract",
                         lambda:seen.append("ESCROW_CHAIN_CODE_AND_IDENTITIES_PASS"))
+    monkeypatch.setattr(api,"verify_escrow_runtime_roles_and_backing",
+        lambda deployment,roles:seen.append("ESCROW_CHAIN_ROLE_DELAY_BACKING_PASS"))
     monkeypatch.setattr(api,"verify_escrow_operator_memberships",
         lambda:seen.append("INDEPENDENT_OPERATOR_ROLES_PRESENT"))
     monkeypatch.setattr(api,"prepare_checkout_order",lambda **kw:(
@@ -244,6 +251,7 @@ def test_escrow_api_dispatch_verifies_chain_before_creating_any_order(monkeypatc
     assert response.json()["actual_revenue"] is False
     assert seen==[
         "ESCROW_CHAIN_CODE_AND_IDENTITIES_PASS",
+        "ESCROW_CHAIN_ROLE_DELAY_BACKING_PASS",
         "INDEPENDENT_OPERATOR_ROLES_PRESENT",
         "PREPARE_ORDER_WITH_escrow",
         "PROPOSE_EXISTING_ESCROW_RPC_escrow",
@@ -373,6 +381,11 @@ def test_readonly_monitor_recognizes_mock_verified_escrow_but_never_authorizes_p
     env["EMPIRE_SELF_SERVE_ESCROW_MAINNET_APPROVED"]="ON"
     monkeypatch.setattr(observer,"load_runtime_env",lambda path:env)
     seen=[]
+    monkeypatch.setattr(observer,"verify_escrow_runtime_roles_and_backing",
+        lambda deployment,roles:(seen.append("ONCHAIN_ROLE_DELAY_SOLVENCY"),{
+            "expected_role_holders_verified":4,
+            "escrow_backing_solvency_pass":True,
+        })[1])
     monkeypatch.setattr(observer,"verify_escrow_operator_memberships",lambda:(
         seen.append("OPERATOR_ROLE_READONLY_PROOF"),{
             "status":"ESCROW_OPERATOR_MEMBERSHIPS_PRESENT_READ_ONLY",
@@ -384,9 +397,12 @@ def test_readonly_monitor_recognizes_mock_verified_escrow_but_never_authorizes_p
             "block_age_seconds":0.2,
         })[1])
     result=observer.inspection(probe_chain=True)
-    assert seen==["READ_ONLY_CHAIN_PROOF","OPERATOR_ROLE_READONLY_PROOF"]
+    assert seen==["READ_ONLY_CHAIN_PROOF","ONCHAIN_ROLE_DELAY_SOLVENCY","OPERATOR_ROLE_READONLY_PROOF"]
     assert result["status"]=="BSC_PREFLIGHT_PASS"
     assert result["escrow_operator_memberships_verified"] is True
+    assert result["escrow_expected_onchain_role_holders_verified"] is True
+    assert result["escrow_backing_solvency_verified"] is True
+    assert result["external_smart_contract_security_audit_verified"] is False
     assert result["escrow_contract_runtime_verified"] is True
     assert result["checkout_settlement_mode"]=="escrow"
     assert result["enable_payment_flags"] is False
@@ -450,10 +466,55 @@ def test_unprovisioned_escrow_operator_roles_block_checkout_before_any_order_wri
     for k,v in config_env().items():monkeypatch.setenv(k,v)
     calls=[]
     monkeypatch.setattr(api,"verify_escrow_checkout_contract",lambda:calls.append("CONTRACT_VERIFIED"))
+    monkeypatch.setattr(api,"verify_escrow_runtime_roles_and_backing",
+        lambda deployment,roles:calls.append("ESCROW_ROLES_AND_BACKING_VERIFIED"))
     monkeypatch.setattr(api,"verify_escrow_operator_memberships",lambda:(
         _ for _ in ()).throw(CheckoutPaymentPreflightHold("escrow_operator_roles_unprovisioned")))
     monkeypatch.setattr(api,"prepare_checkout_order",lambda **kw:pytest.fail("ESCROW_ACCEPTED_ORDER_WITHOUT_OPERATOR"))
     result=TestClient(api.app).post("/v1/orders",json=checkout_body())
     assert result.status_code==503
     assert result.json()["detail"]=="bsc_payment_preflight_unavailable"
-    assert calls==["CONTRACT_VERIFIED"]
+    assert calls==["CONTRACT_VERIFIED","ESCROW_ROLES_AND_BACKING_VERIFIED"]
+
+
+
+def test_escrow_onchain_role_mismatch_blocks_before_buyer_mutation(monkeypatch):
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_SETTLEMENT_MODE","escrow")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED","ON")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED","ON")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_ESCROW_MAINNET_APPROVED","ON")
+    for k,v in config_env().items(): monkeypatch.setenv(k,v)
+    events=[]
+    monkeypatch.setattr(api,"verify_escrow_checkout_contract",
+                        lambda:events.append("DEVELOPED_CONTRACT_FINGERPRINT_VERIFIED"))
+    monkeypatch.setattr(api,"verify_escrow_runtime_roles_and_backing",
+        lambda deployment,roles:(
+            _ for _ in ()).throw(
+                CheckoutPaymentPreflightHold("escrow_expected_role_holder_unverified")
+            ))
+    monkeypatch.setattr(api,"verify_escrow_operator_memberships",
+                        lambda:pytest.fail("DB_ROLES_CHECK_AFTER_FAILED_ONCHAIN_ROLE_PROOF"))
+    monkeypatch.setattr(api,"prepare_checkout_order",
+                        lambda **kwargs:pytest.fail("DB_WRITE_AFTER_FAILED_ONCHAIN_ROLE_PROOF"))
+    result=TestClient(api.app).post("/v1/orders",json=checkout_body())
+    assert result.status_code==503
+    assert result.json()["detail"]=="bsc_payment_preflight_unavailable"
+    assert "role" not in str(result.json())
+    assert events==["DEVELOPED_CONTRACT_FINGERPRINT_VERIFIED"]
+
+
+def test_missing_admin_signer_role_config_holds_before_mainnet_reads(monkeypatch):
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_SETTLEMENT_MODE","escrow")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED","ON")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED","ON")
+    monkeypatch.setenv("EMPIRE_SELF_SERVE_ESCROW_MAINNET_APPROVED","ON")
+    for k,v in config_env().items():monkeypatch.setenv(k,v)
+    monkeypatch.delenv("BSC_ESCROW_ADMIN_ADDRESS",raising=False)
+    monkeypatch.setattr(api,"verify_escrow_checkout_contract",
+                        lambda:pytest.fail("NETWORK_PROBE_WITHOUT_ADMIN_PROVENANCE"))
+    monkeypatch.setattr(api,"prepare_checkout_order",
+                        lambda **kwargs:pytest.fail("ORDER_CREATED_WITHOUT_ADMIN_PROVENANCE"))
+    result=TestClient(api.app).post("/v1/orders",json=checkout_body())
+    assert result.status_code==503
+    assert result.json()["detail"]=="binding_orders_not_authorized"
+    assert TestClient(api.app).get("/health").json()["bsc_payment_configuration_status"] == "ESCROW_ROLE_OWNER_CONFIGURATION_MISSING_OR_INVALID"

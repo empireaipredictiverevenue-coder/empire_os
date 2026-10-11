@@ -24,6 +24,12 @@ from empire_os.first_party_sales_interest import (
     founder_led_commercial_offers,
     record_founder_led_interest,
 )
+from empire_os.bsc_escrow_verifier import BscEscrowConfig
+from empire_os.escrow_mainnet_role_readiness import (
+    EscrowRoleConfig,
+    role_config_snapshot,
+    verify_escrow_runtime_roles_and_backing,
+)
 from empire_os.self_serve_escrow_bridge import (
     escrow_config_snapshot,
     escrow_mainnet_activation_flag,
@@ -70,11 +76,16 @@ def _settlement_snapshot() -> dict[str, Any]:
         }
     if mode == "escrow":
         result = escrow_config_snapshot()
-        if result["configured"] and not escrow_mainnet_activation_flag():
+        if not result["configured"]:
+            return {"mode": mode, **result}
+        if not escrow_mainnet_activation_flag():
             return {
                 "mode": "escrow", "configured": False,
                 "status": "ESCROW_MAINNET_ACTIVATION_HELD",
             }
+        roles = role_config_snapshot()
+        if not roles["configured"]:
+            return {"mode": mode, **roles}
         return {"mode": mode, **result}
     return {"mode": mode, **checkout_bsc_config_snapshot()}
 
@@ -176,6 +187,13 @@ def create_order(req: CheckoutRequest):
         mode = settlement_mode()
         if mode == "escrow":
             verify_escrow_checkout_contract()
+            # Verify distinct administrator / requester / arbiter / pauser
+            # holders, approved decision delay and contract backing before
+            # any buyer or accepted-order row can be written.
+            verify_escrow_runtime_roles_and_backing(
+                deployment=BscEscrowConfig.from_env(),
+                roles=EscrowRoleConfig.from_env(),
+            )
             # No money or accepted-order write until independent approval
             # and escrow verifier roles have operative DB login memberships.
             verify_escrow_operator_memberships()
