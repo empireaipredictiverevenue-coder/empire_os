@@ -457,3 +457,14 @@ def publisher_review_page_path(domain: str) -> str | None:
         ):
             return path
     return None
+
+
+def publisher_review_page_paths(domain: str) -> tuple[str, ...]:
+    """A bounded, independently reviewed first-party PPC/PPL page pair."""
+    primary = publisher_review_page_path(domain)
+    if primary is None:
+        return ()
+    # Exact Polyares first-party PPL programme page, not a general URL crawl.
+    if _host(domain) == "polyares.com":
+        return (primary, "/pay-per-lead-affiliate-program")
+    return (primary,)

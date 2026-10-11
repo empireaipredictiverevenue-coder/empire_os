@@ -144,16 +144,24 @@ def test_publisher_first_site_probe_fetches_exact_official_page_without_sprawl()
             "url":f"https://{host}{path}",
             "final_url":f"https://{host}{path}",
             "status":"PASS","http_status":200,
-            "text":"Become a publisher. Pay per call. Contact us. Roofing.",
+            "text":("Become a publisher. Pay per lead. Contact us. Roofing."
+                    if path == "/pay-per-lead-affiliate-program"
+                    else "Become a publisher. Pay per call. Contact us. Roofing."),
         }
     mod.public_dns_only=lambda domain: True
     mod.fetch_one=fake_fetch
     for domain,path in expected.items():
         called.clear()
         out=mod.probe_candidate({"domain":domain,"status":"VERIFY_REQUIREMENTS"})
-        assert out["pages_attempted"]==len(mod.PATHS)+1
+        expected_extras = 2 if domain == "polyares.com" else 1
+        assert out["pages_attempted"]==len(mod.PATHS)+expected_extras
         assert called.count((domain,path))==1
-        assert len({p for _,p in called})==len(mod.PATHS)+1
+        assert len({p for _,p in called})==len(mod.PATHS)+expected_extras
+        if domain == "polyares.com":
+            assert called.count((domain,"/pay-per-lead-affiliate-program"))==1
+            assert out["publisher_formats_advertised_not_approved"] == [
+                "PAY_PER_LEAD", "PAY_PER_CALL"
+            ]
         assert out["buyer_role"] is True
         assert out["corroborated"] is True
         assert out["evidence"]["publisher_program"] is True

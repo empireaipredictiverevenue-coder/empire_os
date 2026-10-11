@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from empire_os.buyer_public_research_seed import publisher_review_page_path
+from empire_os.buyer_public_research_seed import publisher_review_page_paths
 from empire_os.buyer_network_research_rotation import (
     accepted_domain, choose_research_batch, make_research_summary,
     retain_recent_results, RESULT_TTL_SECONDS,
@@ -109,6 +109,8 @@ SIGNALS = {
     "active_demand": (
         "pay per call",
         "pay-per-call",
+        "pay per lead",
+        "pay-per-lead",
         "inbound calls",
         "qualified calls",
         "qualified call",
@@ -138,6 +140,8 @@ SIGNALS = {
 
     "economics": (
         "payout",
+        "pay per accepted lead",
+        "paid per accepted lead",
         "revshare",
         "revenue share",
         "cost per call",
@@ -669,10 +673,10 @@ def probe_candidate(
             "snippets": [],
         }
     pages = []
-    # At most one additional SAME-HOST first-party publisher entry page.
+    # At most two reviewed SAME-HOST publisher pages (Polyares PPL + PPC).
     # No global path expansion or additional research timer.
-    extra = publisher_review_page_path(domain)
-    probe_paths = PATHS + ((extra,) if extra and extra not in PATHS else ())
+    extra = publisher_review_page_paths(domain)
+    probe_paths = PATHS + tuple(path for path in extra if path not in PATHS)
 
     with concurrent.futures.ThreadPoolExecutor(
         max_workers=4
@@ -868,6 +872,13 @@ def probe_candidate(
 
         "buyer_role":
             buyer_role,
+
+        "publisher_formats_advertised_not_approved": [
+            product for product, terms in (
+                ("PAY_PER_LEAD", ("pay per lead", "pay-per-lead")),
+                ("PAY_PER_CALL", ("pay per call", "pay-per-call")),
+            ) if any(term in body_text.lower() for term in terms)
+        ],
 
         "positive_category_count":
             positive_count,
