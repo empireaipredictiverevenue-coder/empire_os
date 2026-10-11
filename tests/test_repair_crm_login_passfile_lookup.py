@@ -117,3 +117,29 @@ def test_security_controls_static():
     assert "ALTER ROLE" not in s and "CREATE ROLE" not in s
     assert "INSERT INTO" not in s and "UPDATE " not in s
     assert "pg_reload_conf(" not in s
+
+
+def test_resume_from_exact_prior_failed_attempt_backup(monkeypatch,tmp_path,capsys):
+    _,src=isolated(monkeypatch,tmp_path)
+    m.BACKUP.write_bytes(original())
+    m.BACKUP.chmod(0o600)
+    before=m.BACKUP.read_bytes()
+    monkeypatch.setattr(m,"_reviewed_source",lambda:True)
+    monkeypatch.setattr(m,"_verify",lambda:True)
+    monkeypatch.setattr(m.sys,"argv",["script","--apply","--approved-passfile-lookup-only"])
+    assert m.main()==0
+    assert "PREEXISTING_EXACT_MATCH_VERIFIED" in capsys.readouterr().out
+    assert m.BACKUP.read_bytes()==before
+    assert m.inspect(src.read_bytes())=="REPAIRED_SIX_ROWS"
+
+
+def test_mismatched_backup_fails_closed_without_modification(monkeypatch,tmp_path):
+    _,src=isolated(monkeypatch,tmp_path)
+    m.BACKUP.write_bytes(b"unrelated-existing-backup")
+    m.BACKUP.chmod(0o600)
+    monkeypatch.setattr(m,"_reviewed_source",lambda:True)
+    monkeypatch.setattr(m,"_verify",lambda:True)
+    monkeypatch.setattr(m.sys,"argv",["script","--apply","--approved-passfile-lookup-only"])
+    assert m.main()==4
+    assert src.read_bytes()==original()
+    assert m.BACKUP.read_bytes()==b"unrelated-existing-backup"

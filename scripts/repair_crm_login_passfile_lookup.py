@@ -207,10 +207,19 @@ def main() -> int:
             if state == "REPAIRED_SIX_ROWS":
                 print("CRM_PASSFILE_RESULT=ALREADY_REPAIRED_NO_CHANGES")
                 return 0 if _verify() else 4
-            if BACKUP.exists() or BACKUP.is_symlink():
-                raise RuntimeError("existing backup demands manual reconciliation")
+            if BACKUP.is_symlink():
+                raise RuntimeError("private backup symlink unsafe")
             new = patched(original)
-            _write_exclusive(BACKUP, original)
+            if BACKUP.exists():
+                if (not BACKUP.is_file()
+                    or BACKUP.stat().st_uid != pwd.getpwnam("ubuntu").pw_uid
+                    or stat.S_IMODE(BACKUP.stat().st_mode) != 0o600
+                    or BACKUP.read_bytes() != original):
+                    raise RuntimeError("old backup does not match original passfile")
+                print("CRM_PASSFILE_BACKUP=PREEXISTING_EXACT_MATCH_VERIFIED")
+            else:
+                _write_exclusive(BACKUP, original)
+                print("CRM_PASSFILE_BACKUP=CREATED_EXACT_ORIGINAL")
             if hashlib.sha256(BACKUP.read_bytes()).digest() != hashlib.sha256(original).digest():
                 raise RuntimeError("original backup digest incorrect")
             if PASSFILE.read_bytes() != original:
