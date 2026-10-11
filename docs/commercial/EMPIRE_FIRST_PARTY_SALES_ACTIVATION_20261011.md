@@ -49,3 +49,32 @@ Runtime readbacks must verify:
 6. Existing public /buy and /predictive-revenue remain HTTP 200; Lead Smart-owned pages unchanged.
 
 **Reality check:** publishing a real enquiry funnel does not generate a buyer or cash by itself. The next independent step is genuine buyer conversations, scoped commercial proposals, approved payment-request capability and verified fulfilment—not rebuilding another sales platform.
+
+
+## Live production activation evidence — 11 October 2026, evening UTC
+
+**Code release:** \`0caf7b94\` on \`agent/data-cloud-wave4\`, previous production code saved at \`refs/heads/backup/pre-founder-led-sales-activation-20261011\`. Exactly 13 sales-related source/test/doc files merged cleanly, zero Git conflicts, **146 unrelated other-agent uncommitted/untracked files preserved**. No other department work or Lead Smart files modified.
+
+**Backend:** One controlled restart of only \`empire-self-serve-checkout.service\`. The existing canonical EmpireDB reader environment file \`/etc/empiredb.env\` was injected through a narrow new systemd drop-in:
+\`/etc/systemd/system/empire-self-serve-checkout.service.d/20-empiredb-reader.conf\`.
+Both \`EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED=OFF\` and \`EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED=OFF\` are explicitly set. The checkout service is active/running, result success, \`NRestarts=0\`, its health returns \`binding_order_creation_authorized=false\`, \`payment_proposal_authorized=false\`, \`founder_led_commercial_interest_enabled=true\`, \`payment_execution=false\`.
+
+**Backend verified readbacks:**
+- \`GET http://127.0.0.1:8098/v1/catalog\` HTTP 200 and **four verified exact fixed-price products**: Competitor Search Gap $199, Search Opportunity Map $249, Technical Search Audit $299, US Solar Opportunity Map $299. Nothing unavailable in those four.
+- \`GET /v1/commercial/offers\` HTTP 200, **10** founder-reviewed price-policy/enquiry paths: 4 fixed-price intelligence, 3 consultancy, 3 Digital Avatar. No binding commercial terms or auto-checkout from this endpoint.
+- Existing \`/v1/predictive-revenue/products\` **5** and \`/v1/exchange/tiers\` **4** retained.
+- A valid-shaped **negative only** local checkout POST returned **503** with \`binding_orders_not_authorized\`, before any order/DB write. A consent-denied negative local enquiry POST returned **422** \`specific_contact_consent_required\`, before any prospect/DB write. The same conditions were covered by live gateway unit/functional tests using stubs. **No synthetic positive/prospect or payable order was created in production**.
+
+**Website:** The compiled Next.js static export was built in the isolated checkout with TypeScript validation. Exactly **35** explicitly allowlisted sales export assets/pages were inspected; **26** actually changed in \`apps/empire-public-site/out\` after hash checks, with 18 hashed assets checked. Every prior sales page was backed up in \`/var/tmp/empire_sales_site_backup_20261011/manifest.json\`; **zero** existing immutable asset collisions. Other pages (roofing, Lead Smart, industry, trust, assets) were untouched.
+
+**Public Gateway:** One controlled restart of only \`empire-public-gateway.service\`. Health HTTP 200, active/running, result success, \`NRestarts=0\`. All real public \`https://empire-ai.co.uk\` readbacks:
+- \`/\`, \`/buy\`, \`/predictive-revenue\`, \`/commercial\`, \`/trust\`, \`/industries\`, \`/roofing\` -> HTTP **200**.
+- \`/contact\`, \`/consultancy\`, \`/digital-avatar\`, \`/sales\` -> HTTP **308** redirect to \`https://empire-ai.co.uk/commercial\`.
+- \`/v1/checkout/catalog\`, \`/v1/checkout/commercial/offers\`, \`/v1/checkout/predictive-revenue/products\`, \`/v1/checkout/exchange/tiers\` -> HTTP **200**, with exact 4, 10, 5 and 4 product/interest options, **19 distinct buyer-facing entry-point offers** total (not 19 purchasable checkouts).
+- Live backend and public JSON explicitly confirm \`binding_order_creation_authorized=false\`, \`payment_proposal_authorized=false\`, \`payment_authority=none\`, \`checkout_authorized=false\` for founder-led offers. The third active CRM service remained running and untouched.
+
+**Regression evidence:** Prior to source merge, **203 passed** across checkout, public gateway, consent, canonical gateway and sales integration. Production checkout/public gateway scoped post-merge source regression **61 passed**. One pre-existing dependency deprecation warning, no test failures.
+
+**Truth classification:** \`BUYER_INITIATED_INBOUND_SALES_ENQUIRY=LIVE_VERIFIED\`. \`FOUR_VERIFIED_ONE_TIME_PRODUCT_PRICES_VISIBLE=LIVE_VERIFIED\`. \`SALES_ENQUIRY_TO_CANONICAL_EMPIREDB=LIVE_CODE_AND_CONFIGURATION_READY_NO_SYNTHETIC_PRODUCTION_PROSPECT_INSERTED\`; the successful actual buyer-created prospect is still unobserved. \`BINDING_ORDER_AND_BSC_USDT_PAYMENT=SEPARATELY_HELD\`. \`REALIZED_REVENUE=NOT_INFERRED\`. The next real proof is a genuine customer enquiry and qualification, followed by exact, separately authorised product checkout/payment proposal/fulfilment verification.
+
+**Founder objective preserved:** the *sales entry point* is active across the business. Do not replan or rebuild this route; only check meaningful new buyer events and the separate binding-order/payment gate. No repeat CRM, Lead Smart, or duplicate sales runtime.
