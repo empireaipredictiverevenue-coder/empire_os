@@ -36,3 +36,10 @@ The script requires root only to launch an existing local PostgreSQL `postgres` 
 - New source diagnostic is standalone and has no new service, migration, timer, dependency or daemon.
 - Live website gateway protection commit `11f67279` is still **not deployed** until an independently approved restart. Neither this diagnostic nor current CRM health automatically deploys it.
 - The existing CRM transport module currently has changes belonging to another engineer and must **not** be overwritten or combined with this diagnostic.
+
+
+## Operator result 12 October 2026 — verified no source acquisitions
+
+Founder ran the exact privileged, read-only command in the local Ubuntu shell and supplied its sanitized JSON. Status `NO_SALES_ACQUISITION_IN_CANONICAL_SOURCE`: commercial acquisition rows **0**, Predictive Revenue acquisition rows **0**, total sales acquisition rows **0**, distinct matching sales prospects **0**, evidenced unlinked rows **0**, and founder binding missing/ambiguous rows **0**. The query reported `database_writes=false`, `customer_rows_disclosed=false`, `outbound_sent=false`, and `payment_action=false`.
+
+**Conclusion for these two narrowly defined acquisition sources:** there are no genuine source receipts to backfill or link into founder CRM. No CRM permission change, tenant-link creation, new source-intake runtime, synthetic customer or corrective data mutation is justified by this result. An actual future enquiry-to-founder path still needs independent evidence. **Founder confirms the flagship website is unfinished; ASTRA owns final completion** per `docs/architecture/ASTRA_EMPIRE_AI_WEBSITE_FINAL_COMPLETION_20261012.md`. Do not classify the marketing website as finished merely because its existing pages return HTTP 200.
