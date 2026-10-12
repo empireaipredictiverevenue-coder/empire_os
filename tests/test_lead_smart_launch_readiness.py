@@ -45,7 +45,7 @@ def timezone_confirmation(now=NOW, zone="America/Chicago"):
     }
 
 
-def readiness(*, track=None, zip_state=None, route=None, authority=False, publication=False, now=NOW, tz=None, operating_hours=None, caller_id=False, buyer_page=False, legal=False, pilot_stop=True):
+def readiness(*, track=None, zip_state=None, route=None, authority=False, publication=False, now=NOW, tz=None, operating_hours=None, caller_id=False, buyer_page=False, legal=False, pilot_stop=True, recording=True):
     return build_launch_readiness(
         tracking=tracking() if track is None else track,
         zip_gate=zip_gate() if zip_state is None else zip_state,
@@ -55,6 +55,7 @@ def readiness(*, track=None, zip_state=None, route=None, authority=False, public
         caller_id_pass_through_verified=caller_id,
         buyer_landing_page_approved=buyer_page,
         legal_release_verified=legal,
+        recording_notice_and_retention_verified=recording,
         landing_publication_authorized=publication,
         founder_live_traffic_authorized=authority,
         pilot_stop_verified=pilot_stop,
@@ -357,3 +358,27 @@ def test_founder_decision_is_consumed_only_at_exact_campaign_scope(tmp_path):
     record["scope"]["acquisition"] = "paid media"
     path.write_text(json.dumps(record))
     assert founder_launch_approved(tmp_path) is False
+
+
+def test_site_legal_release_cannot_substitute_for_call_recording_governance():
+    ready_without_recording = readiness(
+        route=routing(True), authority=True, publication=True,
+        tz=timezone_confirmation(), caller_id=True, buyer_page=True,
+        legal=True, recording=False,
+    )
+    assert ready_without_recording["blockers"] == [
+        "recording_notice_and_retention_verified"
+    ]
+    assert ready_without_recording["launch_ready"] is False
+    assert ready_without_recording["call_cta_enabled"] is False
+    assert ready_without_recording["execution_authority"] == "NONE"
+
+
+def test_recording_claim_string_cannot_grant_launch_authority():
+    candidate = readiness(
+        route=routing(True), authority=True, publication=True,
+        tz=timezone_confirmation(), caller_id=True, buyer_page=True,
+        legal=True, recording="true",
+    )
+    assert candidate["gates"]["recording_notice_and_retention_verified"] is False
+    assert candidate["launch_ready"] is False

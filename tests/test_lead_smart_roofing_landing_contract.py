@@ -127,8 +127,12 @@ def test_frozen_roofing_cta_remains_disabled_with_additional_backend_legal_gate(
     readiness = build_launch_readiness(tracking={}, zip_gate={}, routing={})
     # Preserve the buyer-approved static source. Its eight constants stay
     # false; the readiness backend now additionally blocks on legal release.
-    assert set(readiness["gates"]) == set(all_flags) | {"legal_release_verified", "pilot_stop_verified"}
+    assert set(readiness["gates"]) == set(all_flags) | {
+        "legal_release_verified", "pilot_stop_verified",
+        "recording_notice_and_retention_verified",
+    }
     assert readiness["gates"]["legal_release_verified"] is False
+    assert readiness["gates"]["recording_notice_and_retention_verified"] is False
     assert readiness["call_cta_enabled"] is False
 
     compact = normalized(text)

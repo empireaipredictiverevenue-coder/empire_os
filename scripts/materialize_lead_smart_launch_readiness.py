@@ -154,6 +154,11 @@ def compute_live_launch_readiness(
 
         legal_release_verified=effective_legal_release_verified(),
 
+        # Seth reports Ringba recording ENABLED. A proposed privacy notice
+        # is not consent/retention/access/deletion evidence; no authoritative
+        # verification receipt exists. Fail closed until independently proved.
+        recording_notice_and_retention_verified=False,
+
         # The approved source is already published in production. This proof
         # is independently checked against the frozen exported HTML digest.
         # It does NOT grant calls while legal/provider/stop gates are held.

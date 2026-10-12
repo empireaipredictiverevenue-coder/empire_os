@@ -76,6 +76,7 @@ def test_request_live_readiness_recomputed_from_primary_evidence_not_old_snapsho
     assert result["gates"]["routing_runtime_verified"] is True
     assert result["gates"]["landing_publication_authorized"] is True
     assert "legal_release_verified" in result["blockers"]
+    assert "recording_notice_and_retention_verified" in result["blockers"]
     assert "pilot_stop_verified" in result["blockers"]
 
 

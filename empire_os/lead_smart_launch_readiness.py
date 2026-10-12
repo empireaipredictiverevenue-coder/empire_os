@@ -36,6 +36,7 @@ def build_launch_readiness(
     caller_id_pass_through_verified: bool = False,
     buyer_landing_page_approved: bool = False,
     legal_release_verified: bool = False,
+    recording_notice_and_retention_verified: bool = False,
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
     pilot_stop_verified: bool = False,
@@ -90,6 +91,11 @@ def build_launch_readiness(
 
     gates = {
         "legal_release_verified": legal_release_verified is True,
+        # Releasing a site privacy policy does NOT confirm Ringba/buyer
+        # recording consent, access, retention and deletion governance.
+        "recording_notice_and_retention_verified": (
+            recording_notice_and_retention_verified is True
+        ),
         # A launch is never live-ready on approval alone: a bounded pilot
         # needs an independently proven stop mechanism and monitoring owner.
         "pilot_stop_verified": pilot_stop_verified is True,
