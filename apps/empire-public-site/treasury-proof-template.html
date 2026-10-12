@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta http-equiv="Cache-Control" content="no-store">
+  <title>Empire AI — Treasury ownership proof</title>
+  <style>
+    :root {color-scheme:dark;font-family:Inter,system-ui,-apple-system,Segoe UI,sans-serif}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 70% 0%,#112755 0,#090f20 48%,#060910 100%);color:#e9f1ff}
+    main{max-width:760px;margin:auto;padding:clamp(24px,6vw,64px) 20px}
+    .brand{font-size:13px;font-weight:800;letter-spacing:.22em;text-transform:uppercase;color:#66d5ff}
+    h1{font-size:clamp(32px,5vw,48px);line-height:1.06;letter-spacing:-.04em;margin:27px 0 14px}
+    .sub{color:#acbed6;font-size:16px;line-height:1.65}.panel{background:rgba(18,32,58,.82);border:1px solid #2a436b;border-radius:20px;padding:26px;margin-top:24px;box-shadow:0 18px 54px #0004}
+    label{display:block;color:#c9dbf5;font-size:13px;font-weight:700;letter-spacing:.04em;margin-bottom:9px}
+    code,textarea{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}
+    .wallet{font-size:13px;overflow-wrap:anywhere;color:#93e5ff}.time{font-size:13px;color:#b1c1d5}
+    textarea{width:100%;resize:vertical;min-height:215px;border:1px solid #345071;border-radius:12px;padding:15px;background:#080f1e;color:#dcecff;font-size:12px;line-height:1.7}
+    button{border:0;border-radius:11px;background:#51cfff;color:#081328;font-size:15px;font-weight:800;padding:13px 18px;cursor:pointer;margin-top:16px;margin-right:8px}
+    button.secondary{background:#23395a;color:#edf7ff}.hint{font-size:13px;color:#96aac4;line-height:1.7}
+    .status{font-size:13px;margin:13px 0 0;color:#a8dbed;white-space:pre-wrap}.warning{color:#ffdc96;font-weight:650}
+    #signature{display:none;margin-top:24px}
+    a{color:#74d9ff}
+  </style>
+</head>
+<body><main>
+  <div class="brand">Empire AI &nbsp;/&nbsp; Secure treasury verification</div>
+  <h1>Verify control of the existing BSC wallet.</h1>
+  <p class="sub">This is a one-time, gas-free message signature. It does not send cryptocurrency, create token approvals, connect checkout payments or grant any financial permissions.</p>
+  <section class="panel">
+    <label>Wallet address already recorded in EmpireOS</label>
+    <p class="wallet" id="wallet"></p>
+    <p class="time" id="expiry"></p>
+    <label for="message">Exact message to sign (read-only)</label>
+    <textarea id="message" readonly></textarea>
+    <button id="sign" type="button">Connect wallet &amp; sign message</button>
+    <p class="status" id="status">No wallet requested yet.</p>
+    <div id="signature">
+      <label for="result">Signature (copy this; never share your seed phrase)</label>
+      <textarea id="result" readonly rows="5" style="min-height:110px"></textarea>
+      <button class="secondary" id="copy" type="button">Copy signature</button>
+      <p class="hint">Send only this signature back to the EmpireOS verification process. The signature is not transmitted by this page.</p>
+    </div>
+  </section>
+  <p class="hint warning">Do not sign if your wallet shows any transaction, token spending approval, gas fee, contract interaction, or a different message.</p>
+  <p class="hint">This page has no server-side form or signature upload. If your wallet is a multisignature smart contract wallet rather than an ordinary EVM account, stop: it requires a separate EIP-1271 verification path.</p>
+</main>
+<script>
+"use strict";
+const proof = __ESCROW_CHALLENGE_JSON__;
+const status=document.getElementById("status");
+const result=document.getElementById("result");
+const target=String(proof.candidate_wallet);
+document.getElementById("wallet").textContent=target;
+document.getElementById("expiry").textContent="Expires: "+new Date(proof.expires_at).toLocaleString("en-GB",{timeZone:"Europe/London",dateStyle:"full",timeStyle:"short"})+" UK";
+document.getElementById("message").value=proof.message;
+const setStatus=(value)=>{status.textContent=value};
+document.getElementById("sign").addEventListener("click",async()=>{
+  document.getElementById("signature").style.display="none";
+  result.value="";
+  if(Date.now()>Date.parse(proof.expires_at)){setStatus("Challenge expired. Generate a fresh one before signing.");return;}
+  if(!window.ethereum || typeof window.ethereum.request!=="function"){
+    setStatus("No compatible EVM wallet detected in this browser. Open this page in your wallet's browser or enable its browser extension.");return;
+  }
+  try{
+    const accounts=await window.ethereum.request({method:"eth_requestAccounts"});
+    const account=Array.isArray(accounts)&&accounts[0];
+    if(typeof account!=="string"||account.toLowerCase()!==target.toLowerCase()){
+      setStatus("Wrong wallet selected. Select the existing EmpireOS receiving address shown above. No signature requested.");return;
+    }
+    setStatus("Inspect the exact message in your wallet before choosing Sign.");
+    const signature=await window.ethereum.request({method:"personal_sign",params:[proof.message,account]});
+    if(typeof signature!=="string"||!/^0x[0-9a-fA-F]{130}$/.test(signature))throw new Error("Wallet returned an unsupported signature.");
+    result.value=signature;
+    document.getElementById("signature").style.display="block";
+    setStatus("Signed locally. No transaction was sent and this page has not uploaded your signature.");
+  }catch(error){
+    setStatus("Signature unavailable or declined. "+(error&&error.code===4001?"You declined the wallet request.":"No payment operation was attempted."));
+  }
+});
+document.getElementById("copy").addEventListener("click",async()=>{
+  try{await navigator.clipboard.writeText(result.value);setStatus("Signature copied. No network submission occurred.");}
+  catch{result.focus();result.select();setStatus("Select and copy the signature manually.");}
+});
+</script>
+</body></html>
