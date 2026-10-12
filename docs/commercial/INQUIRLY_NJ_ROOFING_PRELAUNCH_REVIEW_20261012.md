@@ -52,3 +52,22 @@ Respond to Inquirly Affiliate Operations' 12 October message (`gmail:1a130c83746
 Review `https://empire-ai.co.uk/roofing` as our **prelaunch example page** (no active call CTA, not an Inquirly-branded page). Can Inquirly consider a new UK sole-trader publisher with **no historic US network payment statements**? Are ZIPs 07001–07005 currently live for **consumer-initiated roofing installation/replacement** under either their call or form-lead programme? Which published ZIP list is authoritative, and what are the exact call/lead qualifications, recording notice and integration requirements for a 5-enquiry candidate pilot?
 
 Only when confirmed should EmpireOS prepare **a separate Inquirly-specific landing/release receipt, tracking and buyer route**, without reusing Lead Smart's Ringba number or multi-buyer duplicate attribution. All live actions remain founder-gated.
+
+
+## 12 October evening — connected Gmail and independent pilot integration
+
+Founder approved and sent the Inquirly reviewed source email in the existing thread:
+- Exact Gmail sent ID: \`1a1313213d12d010\`; thread: \`1a0d9ef44c7f77d0\`.
+- Andy's buyer reply: \`1a130c837466d185\`.
+- No subsequent buyer reply in the fresh 12 October connected Gmail recheck, and the send itself is not buyer/source approval.
+
+**Fixed stale pipeline identity:** the first-party private Gmail relationship source previously held \`inquirly.com\` as \`CONTACTED_AWAITING_RESPONSE\` with no recorded inbound. That was historical import lag, not a genuine lack of reply. The existing read-only Gmail collector and its verified-metadata importer now monitor this already-known original Inquirly thread, in the same bounded five-thread cycle as Lead Smart/LeadBank/Validated/Connexis. The single run of \`scripts/run_buyer_gmail_evidence_cycle.py\` returned \`PASS\` for poll, import and reconciliation, \`outbound_authorized=false\`. **58 original relationship rows and their original 9 October global capture date were preserved**; the 12 October refresh updates only the five monitored threads.
+
+The existing \`partner_pilot_readiness_queue\` contains a new separate \`inquirly.com\` review packet, with candidate corridor \`US_NJ_ROOFING_INSTALL_REPLACEMENT_FIRST_PARTY_ORGANIC_REVIEW\`. Inquirly's **candidate** ZIPs are NOT promoted to verified buyer geography. The buyer-specific tracking number, route/destination, billable event, payout, consent, agreement, licence and payment fields are null/unverified; all nine launch gates are false; founder live-traffic authority, form intake and call routing remain false. No double monetisation of the same consumer enquiry, no inherited Lead Smart buyer term, number or call route.
+
+Existing private-preview materializer was extended by its supported per-partner descriptor (no new generator or service). Private review output:
+\`runtime/buyer_network_intelligence/partner_private_reviews/inquirly.com/{index.html,review.json,roofing-hero.webp}\` (0700 directory; 0600 files). Verified HTML has no form, live CTA, \`tel:\`, external URLs, tracking scripts or hidden data collection. It is not a public page or accepted campaign; it does not replace the buyer-facing source proposal already sent.
+
+**Exact next external evidence:** Andy's written confirmation that organic-source preview is acceptable, the current authoritative roofing ZIP buy-box (especially 07001–07005), qualification/caps, publisher legal terms, consent/recording rules and partner-specific attribution. Do not send duplicate follow-ups or enable £ spend while awaiting it. Continue verified independent revenue conversations in parallel.
+
+Regression proof: 120 buyer/Gmail/relationship/private-preview tests passed on 12 October, with no outbound, DB migration, service restart, route mutation, live traffic, numbers purchased or monetary events.

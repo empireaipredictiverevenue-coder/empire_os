@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded Gmail metadata reader for four known buyer threads; never sends mail."""
+"""Bounded Gmail metadata reader for reviewed buyer threads; never sends mail."""
 from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
@@ -19,7 +19,8 @@ def collect(service, *, now=None, known_domains=None, additional_threads=None, a
     known_domains = known_domains or {}
     threads = []
     names = {'lead-smart':'Lead Smart', 'leadbank':'LeadBank',
-             'validated':'Validated / Home Services Lead Group', 'connexis':'Connexis'}
+             'validated':'Validated / Home Services Lead Group', 'connexis':'Connexis',
+             'inquirly.com':'inquirly.com'}
     monitored=dict(THREADS)
     for tid,key in (additional_threads or {}).items():
         if tid not in monitored and isinstance(tid,str) and isinstance(key,str):
@@ -68,7 +69,7 @@ def collect(service, *, now=None, known_domains=None, additional_threads=None, a
     return {'schema_version':SCHEMA,'source':'empire_gmail_api_readonly',
             'collected_at':(now or datetime.now(timezone.utc)).isoformat(),
             'original_message_bodies':'remain_in_gmail_not_copied_to_server',
-            'scope':'four_existing_warm_partner_threads','threads':threads}
+            'scope':'reviewed_existing_warm_partner_threads','threads':threads}
 
 
 def main():

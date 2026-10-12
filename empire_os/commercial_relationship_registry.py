@@ -63,6 +63,19 @@ PARTNER_PILOT_SCOPES = {
             "tracking_transfer_or_delivery_contract",
         ],
     },
+    "inquirly.com": {
+        "corridor": "US_NJ_ROOFING_INSTALL_REPLACEMENT_FIRST_PARTY_ORGANIC_REVIEW",
+        "reviewed_thread": "1a0d9ef44c7f77d0",
+        "partner_request_ref": "gmail:1a130c837466d185",
+        "founder_reply_ref": "gmail:1a1313213d12d010",
+        "next_partner_evidence": [
+            "confirm_live_roofing_buybox_and_current_authoritative_zip_file",
+            "approve_07001_to_07005_or_supply_exact_alternative",
+            "qualified_payable_call_or_form_event_and_buyer_hours_caps",
+            "publisher_source_no_prior_commissions_exemption_and_signed_terms",
+            "partner_specific_tracking_routing_recording_consent_and_dedupe",
+        ],
+    },
     "connexis": {
         "corridor": "UK_OR_US_HOME_SERVICES_FIRST_PARTY_ORGANIC_PROPOSAL",
         "reviewed_thread": "1a0d9fa5b944630a",
@@ -87,6 +100,7 @@ LAST_CONSOLIDATED_BUYER_REQUEST = {
     "leadbank": "1a122fc6010e3b5b",
     "validated": "1a122fc70c9614c1",
     "connexis": "1a122fc85a098bea",
+    "inquirly.com": "1a127a9c44858b8c",
 }
 
 SINGLE_PASS_BUYER_QUESTION_GROUPS = (
@@ -277,6 +291,16 @@ PARTNER_REVIEWED_RESPONSE_EVIDENCE = {
 # advertised programme only. They are NOT a current campaign buy-box,
 # individually offered payout, accepted contract or granted API permission.
 PARTNER_PUBLIC_PROGRAMME_REFERENCES = {
+    "inquirly.com": (
+        {
+            "source": "https://inquirly.com/affiliate-category-coverage/",
+            "checked_date": "2026-10-12",
+            "reference_type": "PUBLIC_ROOFING_PROGRAMME_AND_COVERAGE",
+            "public_observation": "The public roofing calls and form-lead ZIP downloads contain different row counts from the webpage summary; five NJ ZIPs overlap with separate historical Empire roofing observations.",
+            "not_corroborated": "Currently enabled buyer capacity, active accepted ZIPs, specific source approval, payable per-call rate, signed commercial terms, commission history or working route.",
+            "next_question": "Which roofing ZIP dataset is currently authoritative and may we propose first-party consumer-initiated replacement/installation enquiries for NJ ZIPs 07001–07005?",
+        },
+    ),
     "leadbank": (),
     "validated": (
         {
@@ -575,6 +599,8 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
                 if key == "connexis"
                 else "CONFIRM_VALIDATED_AFFILIATE_TERMS_AND_BUYBOX"
                 if key == "validated"
+                else "AWAIT_INQUIRLY_NJ_BUYBOX_LANDING_REVIEW_NO_REPEAT"
+                if key == "inquirly.com"
                 else "WAIT_CURRENT_BUYBOX_AND_SOURCE_APPROVAL"
             ),
             "proposed_corridor_not_buyer_approved": spec["corridor"],

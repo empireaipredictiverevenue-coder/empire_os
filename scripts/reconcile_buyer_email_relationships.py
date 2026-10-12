@@ -23,6 +23,7 @@ from empire_os.commercial_relationship_registry import (
 from empire_os.commercial_social_intent import build_social_intent_review
 from empire_os.public_intent_affiliation import load_evidence as load_public_affiliation
 from empire_os.buyer_pilot_assets import (
+    PARTNER_PREVIEW_DESCRIPTORS,
     build_partner_landing_review, render_partner_landing_review_html,
 )
 from hashlib import sha256
@@ -333,7 +334,7 @@ def materialize_partner_private_reviews(root: Path, registry: dict) -> dict:
     self-owned artwork, never partner-specific trading/approval assumptions.
     """
     pilots = registry.get("partner_pilot_readiness_queue")
-    if not isinstance(pilots, list) or len(pilots) > 3:
+    if not isinstance(pilots, list) or len(pilots) > len(PARTNER_PREVIEW_DESCRIPTORS):
         raise RelationshipEvidenceError("unexpected_partner_pilot_count")
     base = root / RELATIVE / "partner_private_reviews"
     if base.is_symlink():

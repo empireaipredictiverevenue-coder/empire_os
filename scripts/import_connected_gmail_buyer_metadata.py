@@ -31,6 +31,9 @@ THREADS = {
     "1a0cfb65e0dd960e": "leadbank",
     "1a0cfb667dca0957": "validated",
     "1a0d9fa5b944630a": "connexis",
+    # Already linked in the historical 58-thread summary; Andy's 12 Oct
+    # buyer reply requires monitoring, not new identity discovery.
+    "1a0d9ef44c7f77d0": "inquirly.com",
 }
 HEX = re.compile(r"^[0-9a-f]{16,32}$")
 EMAIL = re.compile(r"^[a-z0-9._+%-]+@[a-z0-9.-]+\.[a-z]{2,24}$")

@@ -6,9 +6,11 @@ from scripts.import_connected_gmail_buyer_metadata import THREADS, refreshed_sum
 
 NOW=datetime(2026,10,10,12,0,tzinfo=timezone.utc)
 NAMES={"lead-smart":"Lead Smart","leadbank":"LeadBank",
-"validated":"Validated / Home Services Lead Group","connexis":"Connexis"}
+"validated":"Validated / Home Services Lead Group","connexis":"Connexis",
+"inquirly.com":"inquirly.com"}
 DOMAINS={"lead-smart":"leadsmartinc.com","leadbank":"alliancevs.io",
-"validated":"validatedlg.ai","connexis":"connex.is"}
+"validated":"validatedlg.ai","connexis":"connex.is",
+"inquirly.com":"inquirly.com"}
 
 def inputs():
     old={"schema_version":"empire.buyer_mail_relationship_summary.v1",
@@ -41,19 +43,19 @@ def inputs():
       "next_action_code":"REVIEW_ONLY","bounced_addresses":[]})
     return old,index
 
-def test_import_updates_only_four_and_preserves_historical_staleness():
+def test_import_updates_only_reviewed_threads_and_preserves_historical_staleness():
     old,index=inputs();before=deepcopy(old)
     result,summary=refreshed_summary(old,index,now=NOW)
     assert old==before
     assert result["captured_at"]==before["captured_at"]
-    assert len(result["threads"])==5
-    assert len(result["partial_updated_thread_ids"])==4
-    assert summary["new_history_directions"]==8
+    assert len(result["threads"])==len(THREADS)+1
+    assert len(result["partial_updated_thread_ids"])==len(THREADS)
+    assert summary["new_history_directions"]==2*len(THREADS)
     assert summary["outbound_authorized"] is False
     q=reconcile(result,{"candidate_count":0,"candidates":[]},
                 {"shortlisted_count":0,"targets":[]},now=NOW)
     assert q["gmail_snapshot_fresh"] is False
-    assert q["partial_gmail_thread_count_fresh"]==4
+    assert q["partial_gmail_thread_count_fresh"]==len(THREADS)
     rows={x["entity_key"]:x for x in q["relationships"]}
     assert all(rows[k]["gmail_snapshot_fresh"] for k in NAMES)
     assert not rows["historical-other"]["gmail_snapshot_fresh"]
@@ -121,7 +123,7 @@ def test_unbracketed_provider_sender_metadata_updates_latest_sent_history():
     row=next(x for x in result["threads"] if x["entity_key"]=="lead-smart")
     assert row["last_outbound_message_id"]==target["messages"][0]["id"]
     assert row["last_inbound_message_id"]==target["messages"][-1]["id"]
-    assert summary["new_history_directions"]==8
+    assert summary["new_history_directions"]==2*len(THREADS)
 
 
 def test_multi_address_or_injected_sender_cannot_be_treated_as_known_buyer():
@@ -137,7 +139,24 @@ def test_first_party_readonly_gmail_source_is_accepted_without_outbound_authorit
     index["source"] = "empire_gmail_api_readonly"
     updated, summary = refreshed_summary(old, index, now=NOW)
     assert summary["outbound_authorized"] is False
-    assert summary["known_threads_checked"] == 4
-    assert len(updated["partial_updated_thread_ids"]) == 4
+    assert summary["known_threads_checked"] == len(THREADS)
+    assert len(updated["partial_updated_thread_ids"]) == len(THREADS)
     assert updated["captured_at"] == old["captured_at"]
-    assert all(item["gmail_thread_id"] in THREADS for item in updated["threads"][:4])
+    assert all(item["gmail_thread_id"] in THREADS for item in updated["threads"][:len(THREADS)])
+
+
+def test_inquirly_existing_verified_thread_is_monitored_and_never_authorizes_traffic():
+    old,index=inputs()
+    updated, summary=refreshed_summary(old,index,now=NOW)
+    prior=next(x for x in old["threads"] if x["entity_key"]=="inquirly.com")
+    after=next(x for x in updated["threads"] if x["entity_key"]=="inquirly.com")
+    assert after["gmail_thread_id"]=="1a0d9ef44c7f77d0"
+    assert after["last_inbound_message_id"]
+    assert prior["last_inbound_message_id"] is None
+    assert summary["outbound_authorized"] is False
+    report=reconcile(updated,{"candidate_count":0,"candidates":[]},
+                     {"shortlisted_count":0,"targets":[]},now=NOW)
+    row=next(x for x in report["relationships"] if x["entity_key"]=="inquirly.com")
+    assert row["gmail_snapshot_fresh"] is True
+    assert row["last_inbound_message_id"]==after["last_inbound_message_id"]
+    assert report["outbound_authorized"] is False

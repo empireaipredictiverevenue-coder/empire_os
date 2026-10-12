@@ -300,3 +300,35 @@ def test_offline_product_review_rejects_true_capture_and_delivery_flags():
         unsafe["two_product_pilot_review"][product][field] = True
         with pytest.raises(ValueError, match="private_review_rejects_enabled"):
             render_partner_landing_review_html(unsafe)
+
+
+def test_inquirly_private_review_never_claims_active_zip_route_or_form():
+    from empire_os.buyer_pilot_assets import (
+        build_partner_landing_review,render_partner_landing_review_html,
+    )
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_LAUNCH_GATES,PARTNER_PILOT_SCOPES,partner_technical_review_packet,
+    )
+    spec=PARTNER_PILOT_SCOPES["inquirly.com"]
+    packet=partner_technical_review_packet(
+        "inquirly.com",spec,{
+            "gmail_thread_ids":[spec["reviewed_thread"]],
+            "last_inbound_message_id":"1a130c837466d185",
+        })
+    pilot={
+        "entity_key":"inquirly.com","company":"inquirly.com",
+        "technical_review_packet":packet,
+        "activation_gates":{x:False for x in PARTNER_LAUNCH_GATES},
+    }
+    review=build_partner_landing_review(pilot)
+    html=render_partner_landing_review_html(review)
+    assert review["tracking_number"] is None
+    assert review["published"] is False
+    assert review["call_action_enabled"] is False
+    assert review["lead_form_enabled"] is False
+    assert review["two_product_pilot_review"]["PAY_PER_CALL"]["route_enabled"] is False
+    assert review["two_product_pilot_review"]["PAY_PER_LEAD"]["form_enabled"] is False
+    assert "07001" in html and "not approved" in html.lower()
+    for x in ("<form","tel:","https://","http://"):
+        assert x not in html.lower()
+    assert "noindex,nofollow,noarchive" in html

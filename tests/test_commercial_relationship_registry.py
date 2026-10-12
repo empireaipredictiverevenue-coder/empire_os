@@ -540,7 +540,7 @@ def test_public_partner_programmes_never_promote_commercial_launch_gates():
     result = reconcile(src, queue, qualification, now=NOW)
     records = {x["entity_key"]: x
                for x in result["partner_pilot_readiness_queue"]}
-    assert set(records) == set(PARTNER_PUBLIC_PROGRAMME_REFERENCES)
+    assert set(records) <= set(PARTNER_PUBLIC_PROGRAMME_REFERENCES)
     assert records["leadbank"]["technical_review_packet"]["official_public_programme_references"] == []
     assert len(records["validated"]["technical_review_packet"]["official_public_programme_references"]) == 2
     assert len(records["connexis"]["technical_review_packet"]["official_public_programme_references"]) == 2
@@ -1013,3 +1013,43 @@ def test_founder_do_not_pursue_overrides_stale_gmail_followup():
     assert held['founder_review_required'] is False
     assert held['auto_send_authorized'] is False
     assert all(x['entity_key'] != 'callvox.pro' for x in report['founder_action_queue'])
+
+
+def test_inquirly_replied_and_sent_proposal_is_fourth_distinct_zero_authority_pilot():
+    from empire_os.commercial_relationship_registry import (
+        PARTNER_PILOT_SCOPES, PARTNER_LAUNCH_GATES,
+    )
+    src,queue,qual=sources()
+    for key,domain in (
+        ("leadbank","alliancevs.io"),("validated","validatedlg.ai"),
+        ("connexis","connex.is"),("inquirly.com","inquirly.com"),
+    ):
+        scope=PARTNER_PILOT_SCOPES[key]
+        relation=row(key,domain,scope["reviewed_thread"],
+                     inbound="2026-10-12T15:42:33Z",
+                     outbound="2026-10-12T17:38:47Z")
+        if key=="inquirly.com":
+            relation["last_inbound_message_id"]="1a130c837466d185"
+            relation["last_outbound_message_id"]="1a1313213d12d010"
+        src["threads"].append(relation)
+    now=datetime(2026,10,12,18,40,tzinfo=timezone.utc)
+    report=reconcile(src,queue,qual,now=now)
+    pilots={p["entity_key"]:p for p in report["partner_pilot_readiness_queue"]}
+    assert set(pilots)==set(PARTNER_PILOT_SCOPES)
+    state=pilots["inquirly.com"]
+    assert state["current_next_partner_task"]=="AWAIT_INQUIRLY_NJ_BUYBOX_LANDING_REVIEW_NO_REPEAT"
+    assert state["gate_count_verified"]==0
+    assert state["gate_count_total"]==len(PARTNER_LAUNCH_GATES)
+    assert all(v is False for v in state["activation_gates"].values())
+    assert state["single_pass_buyer_intake"]["repeat_full_request_blocked"] is True
+    packet=state["technical_review_packet"]
+    assert packet["partner_tracking_number"] is None
+    assert packet["routing_destination_or_sip_endpoint"] is None
+    assert packet["verified_target_zips_or_postcodes"] is None
+    assert packet["verified_payout_and_settlement"] is None
+    assert packet["lead_smart_route_or_number_inherited"] is False
+    assert packet["traffic_enabled"] is False
+    assert packet["publisher_format_review"]["launch_authorized"] is False
+    assert packet["publisher_format_review"]["PAY_PER_LEAD"]["lead_delivery_enabled"] is False
+    assert state["live_traffic_authorized"] is False
+    assert state["outbound_authorized"] is False

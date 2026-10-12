@@ -203,7 +203,7 @@ def test_auto_linked_thread_is_polled_and_updated_again_next_cycle():
     assert rows[0]['automatic_discovery_link'] is True
     assert rows[0]['buyer_signal_events'][0]['event_code']=="RECORDING_ENABLED_REPORTED"
     assert TID in updated['partial_updated_thread_ids']
-    assert summary['known_threads_checked']==5
+    assert summary['known_threads_checked']==len(index['threads'])+1
     assert not summary['outbound_authorized']
 
 

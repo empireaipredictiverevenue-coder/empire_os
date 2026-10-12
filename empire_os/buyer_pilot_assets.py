@@ -173,6 +173,14 @@ def build_lead_smart_pilot_assets(
 # source template verbatim: it contains a Lead Smart-specific disclosure,
 # tracking number and programme-specific qualification assumptions.
 PARTNER_PREVIEW_DESCRIPTORS = {
+    "inquirly.com": {
+        "vertical": "Roof replacement or roof installation — buyer approval pending",
+        "region": "Candidate NJ ZIPs 07001–07005 — not approved",
+        "image": "roofing-hero.webp",
+        "headline": "Considering a new roof?",
+        "summary": "Review a homeowner-initiated roofing service enquiry concept. Coverage and approved service options are not confirmed.",
+        "needs": ("Roof replacement", "New roof installation", "Roofing job eligibility"),
+    },
     "leadbank": {
         "vertical": "Roofing installation or replacement",
         "region": "United States — exact ZIP coverage to be approved",
