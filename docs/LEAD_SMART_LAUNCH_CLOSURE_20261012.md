@@ -1,0 +1,45 @@
+# Lead Smart — launch closure and production truth, 12 October 2026
+
+This is the authoritative continuation of the existing unified release; do not reopen completed buyer visual approval, founder scope approval or ZIP refresh.
+
+## Completed and verified
+- Existing first-party EmpireOS public gateway production merge deployed from a hash-preconditioned, rollback-capable surgical stage. Older conflicting operating-hours helper and readiness tests reconciled. 108 targeted production tests passed. Gateway restarted once successfully, with independent origin status checks. No gateway commercial pages removed.
+- New `POST /roofing/pilot-handoff` is installed; it currently returns HTTP 503 with no `tel:` link because traffic is not admitted. The atomic site-handoff limiter enforces five **site handoffs**, not an upstream cap on a manually redialled telephone number. Actual supervised pilot control has not been activated.
+- Exact source SHA256 of approved roofing page, both copies: `faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43cccb`. Source and 37 associated static assets deployed as a surgical change; whole-site build was not substituted for unrelated commercial pages. Local `GET /roofing` 200 and public edge 200 with buyer-approved title, noindex, no open `tel:`. All six referenced JavaScript chunks tested HTTP 200 both at local origin and public edge. Rollback backup: `/var/tmp/lead_smart_approved_page_backup_20261012`.
+- Fresh producer coverage observed 11 Oct 23:03:38 UTC, 27,100 ZIPs. Three production coverage artifacts independently SHA-verified against candidate and backed up `/var/tmp/lead_smart_coverage_pre_refresh_20261011`. Production ZIP API returns `GUIDANCE_ONLY`.
+- Buyer visual approval `gmail:1a12bc009d04fcc9` tied to exact frozen source in production `empire_os/buyer_supply_policy.py`; hash-checked single-hunk correction from older unapproved policy, backup `/var/tmp/lead_smart_buyer_policy_before_20261012.py`. Founder scope approval record now in production `docs/evidence/lead_smart_founder_launch_intent_20261011.json`.
+- `scripts.materialize_lead_smart_launch_readiness` refreshed the existing production readiness report; founder scope, buyer page and ZIP targeting are passing. Mode **PREACTIVATION**, authority **NONE**, call CTA false.
+
+## Factual external/provider update
+- Prior buyer `gmail:1a12d06897ca9ac3` said Seth completed an end-to-end test.
+- Our follow-up `gmail:1a12d433f1994a00` requested exact enabled buyer route/ANI and recording terms.
+- Reply `gmail:1a12d44d7e2f46a8` confirmed **recording enabled** and **test ended before connection, with no recording**. This retracts the implication that a completed buyer leg was independently evidenced. The affiliate reporting view is insufficient to inspect restricted buyer CallRoutes.
+- Follow-up `gmail:1a12d47934923a1d` requested a buyer-admin **configuration** attestation of enabled Direct target/ANI plus disabling recordings for five-call pilot, or real notice/consent/retention/owner arrangements. Do not send another identical query while awaiting the answer.
+- Official Ringba Recording FAQ (updated 9 April 2026) states recording retention is indefinite while the account remains open, and individual access via shared recording URLs is not tracked: https://support.ringba.com/hc/en-us/articles/29804960197527-Call-Recording . Account-specific retention and legal responsibilities still require confirmation.
+
+## Legal
+- Existing full-site `/privacy` and `/terms` route return 404 with noindex, because existing exported documents contain draft/review markers and no exact-content legal release receipt exists. Do **not** treat founder general launch approval as exact legal text approval.
+- Proposed source-grounded full-site notices prepared as `docs/LEAD_SMART_PRIVACY_POLICY_FINAL_REVIEW_20261012.md` and `docs/LEAD_SMART_TERMS_FINAL_REVIEW_20261012.md`. Incorporate confirmed sole-trader business, Bolton contact address, verified incoming `founder@empire-ai.co.uk` forwarding test, buyer recording confirmation, and Ringba's retention FAQ. They expressly remain review copies and are **not** enacted policies. Verify the trader's full legal name and data-controller, provider transfer/data-retention/recording details before final approval.
+- ICO transparency guidance: https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/individual-rights/the-right-to-be-informed/what-privacy-information-should-we-provide/
+
+## Remaining live gates: do not re-litigate completed work
+1. Buyer admin supplies the enabled Direct buyer destination and original ANI configuration plus an actual recording choice and caller notice/retention/deletion arrangements. The last 'test' did not connect to a buyer.
+2. Final exact legal/owner notices receive qualified/founder signoff, exact exported SHA release receipt, and site verification. Until then do not expose a recorded-call route to homeowners.
+3. Refresh authenticated Ringba number/route evidence through authorised provider reader (no protected-secret bypass), establish a monitored 10:00–12:00 America/Chicago weekday pilot with actual stop ownership, and only then authorise restricted call CTA/indexation through the existing release controls.
+
+No paid traffic, RTB expansion, fabricated acceptance, revenue recognition, extra caller tests, or unsafe recording claims. The commercial objective remains the first genuine accepted and settled payable inbound call.
+
+## 12 Oct 2026 09:35 BST continuation: launch gate is now request-scoped
+
+The previous materialized `launch_readiness/latest.json` is a historical report, **not a per-call authority token**. The live `call_available` and final handoff reservation must both recompute the release gate from exact current Ringba tracking, ZIP activation and routing snapshots, current America/Chicago clock and source-approved landing publication, current legal export admission, founder scope, current ANI proof policy and existing five-site-handoff control. This requires no agent timer, no extra service, no writes, no new provider calls.
+
+Also recognise the already-published **buyer-approved** static landing page as a **separate** checked publication gate only if the frozen source copies are SHA256 `faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43cccb` and deployed `roofing.html` is `3b79c7856d2a9135900d797631693c75277947a78af47d10e1b9d6d4dff47997`, matching Seth's `gmail:1a12bc009d04fcc9` and recorded founder scope. **Publication does not bypass the required legal/ANI/routing/stop gates.**
+
+344 `tests/test_lead_smart*` tests passed in candidate; final production deployment and tests must be separately verified before calling this live. No new Seth reply since `gmail:1a12d44d7e2f46a8`; previous request `gmail:1a12d47934923a1d` remains outstanding. Do not resend it.
+
+
+## 12 October 2026 additional production completion
+- Production code commit `2f1c2786` deploys request-scoped computed live readiness. The two call-site checks no longer trust historical `launch_readiness/latest.json`, and the published buyer-approved roofing export is exact-hash-checked. Candidate tests: **344 passed**. Production targeted tests: **122 passed**, gateway restarted, origin roofing/commercial both 200, call handoff 503; no real call admitted. No new agent timer/runtime.
+- One official public coverage observation at **2026-10-12T08:46:10.628938Z** verified **27,100 ZIPs**, latest observed provider row update **2026-10-11T14:00:41.597557Z**. Intelligence and ZIP activation refreshed by atomic production receipt-backed replacement of exactly 3 existing coverage artifacts; backup `/var/tmp/lead_smart_coverage_refresh_backup_20261012`. The source hash remains `279fa020dc7162684cc08a7f3f9fbc239c61a06a657ecdf36bfd44abceac7db0`. No provider routing proof resulted.
+- Currently passing gates: ZIP targeting, frozen buyer page approval, signed-off landing publication by actual HTML/source hashes, founder launch scope. Call remains disabled. Blocked: effective legal policy, five-call operator control, Chicago buyer hours if outside window, original ANI, fresh authenticated tracking and actual buyer route. **Do not ask founder to approve those completed gates again or resend Seth the same email**.
+- The draft Privacy and Terms files adjacent to this handoff are **review copies only**. No approved live legal export, no consent or recording guarantee. Last buyer reply `gmail:1a12d44d7e2f46a8`: recording enabled and Seth's alleged test hung up before connection. Last follow-up `gmail:1a12d47934923a1d`: buyer-side configured target/ANI plus recording disable or actual notice/retention requested. No later reply on this run.
