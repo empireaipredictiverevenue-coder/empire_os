@@ -46,3 +46,13 @@ The explicit option performs **read-only** BSC `eth_chainId`, `eth_blockNumber`,
 - Founder-approved four-product scope does **not** constitute authorization to make a new mainnet deployment, grant operator permissions or move customer funds.
 
 **Release meaning:** Code complete, security-read-only proof available, NOT a mainnet deployment, NOT payment activation, NOT a replacement external security audit. Existing sales enquiries remain live.
+
+
+## Production code-and-live-preflight proof — 12 October 2026
+
+- Production code-only fast-forward: **2c45d8ff** on `agent/data-cloud-wave4`; exact four new escrow history files, no conflict with 146 concurrently owned uncommitted files, rollback ref `refs/heads/backup/pre-escrow-role-history-20261012`.
+- Same-parent production integration regression **332 passed**, postmerge subset **99 passed**. The 16 initial cases were strengthened into **22 new scanner/inspector-focused tests**; the larger integration test numbers include these.
+- Safe read-only inspection against live canonical environment: `ESCROW_ROLE_HISTORY_HELD`, reason `ESCROW_MAINNET_CONFIG_MISSING`. Neither a mainnet deployment receipt nor configured live operator addresses exist. This is a **missing-evidence hold**, not an assertion that any on-chain contract failed the checks.
+- Checkout and public gateway services remain active; no restart was required because this is an explicit operator-invoked, read-only scanner, not a request or payment hot-path change. No inbound sales or catalogue routes changed.
+- Immutable 0600 runtime record: `runtime/execution_plane/escrow_role_history_release_20261012.json`, source SHA-256 and readback verified, financial authority remains none and conditional four-product approval retained.
+- **Next evidence required:** audited mainnet deployment receipt and approved role/beneficiary identities before using `--verify-history`. Independently reviewed contract audit and operational role credentials still remain external launch gates. Do not revisit pricing, checkout-to-escrow coding or repeat the role-history implementation.
