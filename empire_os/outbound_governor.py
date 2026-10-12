@@ -5,6 +5,8 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Mapping
+from empire_os.buyer_review_holds import is_do_not_pursue_domain
+from empire_os.commercial_outbound_holds import (commercial_outbound_hold, CommercialOutboundHoldError)
 
 POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
 ALLOWED_CHANNELS = {"email"}
@@ -84,6 +86,15 @@ def evaluate_outbound(
         hard.append("unsupported_channel")
     if not _valid_email(review.get("recipient")):
         hard.append("invalid_recipient")
+    elif is_do_not_pursue_domain(str(review["recipient"]).rsplit("@", 1)[-1]):
+        hard.append("founder_do_not_pursue_recipient_domain")
+    if _valid_email(review.get("recipient")):
+        try:
+            commercial = commercial_outbound_hold(str(review["recipient"]))
+            if commercial["blocked"]:
+                hard.append("commercial_fit_no_repeat_outbound")
+        except CommercialOutboundHoldError:
+            evidence.append("commercial_fit_review_unavailable")
     if not str(review.get("subject") or "").strip():
         repairable.append("missing_subject")
     repairable.extend(_body_checks(str(review.get("body_text") or "")))

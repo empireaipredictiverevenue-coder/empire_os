@@ -17,6 +17,10 @@ Record exact approvals: action, target, recipient, sender, scope, conditions and
 Use authorized read-only inspection first. Inspect scripts for side effects before calling them. If access is unavailable, state the limitation and request one bounded evidence capture. Do not claim an email was sent, a page deployed, a buyer accepted, or revenue realised from a draft, screenshot, local test or historical summary.
 
 
+## Cross-agent outbound commercial-fit guard
+
+Do not prepare/send a second performance recruitment message to a domain whose recognised reply is already \`HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL\` (for example RoofPitch). The existing shared Governor plus Gmail/Postal/Resend send-adapter checks consult \`empire_os/commercial_outbound_holds.py\` at decision and physical-send boundaries; no agent-level enthusiasm, outbound approvals or previously drafted message may override this no-repeat state. Treat unreadable commercial evidence as HOLD/ESCALATE, not eligible. The hold is not legal opt-out evidence, and it does not preclude a **separate founder-reviewed** commercial decision. Do not claim that server-side code controls manually sent Gmail messages.
+
 ## Automatically distinguish supply from demand
 
 A new reply is not necessarily a new lead buyer. Reconcile the observed correspondent domain against the existing first-party supplier/publisher portfolio before opening buyer-demand actions. An explicitly reported "sponsored posts, guest posts and link placements only" response belongs in publisher-supply review with \`HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL\`; do not pitch a performance revenue-sharing deal again by default. Treat historical publisher research as a **role hypothesis**, not verified inventory, agreement or authority to purchase media. Reuse the existing \`new_engaged_publisher_supply_review_queue\` and original Gmail message IDs, never duplicate the acquisition or email-sending pipeline.

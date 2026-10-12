@@ -13,6 +13,7 @@ from urllib import error, request
 from urllib.parse import urlsplit
 
 from empire_os.outbound_provider import OutboundProviderError, send_with_resend
+from empire_os.commercial_outbound_holds import (require_no_commercial_hold, CommercialOutboundHoldError)
 
 
 class OutboundEmailTransport(Protocol):
@@ -64,6 +65,11 @@ class PostalEmailTransport:
         recipients = payload.get("to")
         if not isinstance(recipients, list) or len(recipients) != 1:
             raise OutboundProviderError("Postal transport requires one recipient")
+        # Final delivery-layer check even for direct calls bypassing Governor.
+        try:
+            require_no_commercial_hold(recipients[0])
+        except CommercialOutboundHoldError as exc:
+            raise OutboundProviderError("commercial_fit_outbound_held") from exc
 
         reply_values = payload.get("reply_to")
         if not isinstance(reply_values, list) or len(reply_values) != 1:

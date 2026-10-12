@@ -11,6 +11,7 @@ import re
 from email.utils import parseaddr
 from uuid import UUID
 from typing import Any, Callable
+from empire_os.commercial_outbound_holds import (require_no_commercial_hold, CommercialOutboundHoldError)
 
 
 class OutboundProviderError(RuntimeError):
@@ -55,6 +56,11 @@ def build_resend_send(
     if claim.get("actual_revenue") is not False or claim.get("channel") != "email":
         raise OutboundProviderError("safe email send claim required")
     recipient = _email(claim.get("recipient"))
+    # Recheck after DB claim, immediately before any transport can send.
+    try:
+        require_no_commercial_hold(recipient)
+    except CommercialOutboundHoldError as exc:
+        raise OutboundProviderError("commercial_fit_outbound_held") from exc
     sender_address = _email(sender)
     sender_domain = sender_address.rsplit("@", 1)[-1]
     if required_sender_domain:
@@ -306,6 +312,13 @@ def send_with_resend(payload: dict[str, Any], *, api_key: str,
         raise OutboundProviderError("Resend API key required")
     if not isinstance(payload, dict) or not payload.get("_sender_address"):
         raise OutboundProviderError("validated Resend payload required")
+    recipients=payload.get("to")
+    if not isinstance(recipients,list) or len(recipients)!=1:
+        raise OutboundProviderError("one validated outbound recipient required")
+    try:
+        require_no_commercial_hold(_email(recipients[0]))
+    except CommercialOutboundHoldError as exc:
+        raise OutboundProviderError("commercial_fit_outbound_held") from exc
     # LIVE RESEND RETIRED: the founder requires the owned professional mailbox.
     # Injected test doubles still exercise payload/signature semantics, but
     # production must not import/call an actual third-party Resend transport.

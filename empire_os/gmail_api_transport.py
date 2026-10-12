@@ -153,6 +153,15 @@ def send_with_gmail_api(
         credentials = load_gmail_credentials(token_file)
         service = build_gmail_service(credentials)
 
+    # Re-read the commercial reply state at the physical send boundary.
+    from empire_os.commercial_outbound_holds import (
+        require_no_commercial_hold, CommercialOutboundHoldError,
+    )
+    try:
+        require_no_commercial_hold(message["To"])
+    except CommercialOutboundHoldError as exc:
+        raise OutboundProviderError("commercial_fit_outbound_held") from exc
+
     raw = base64.urlsafe_b64encode(
         message.as_bytes()
     ).decode("ascii")
