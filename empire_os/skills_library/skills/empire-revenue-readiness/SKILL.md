@@ -16,6 +16,15 @@ Record exact approvals: action, target, recipient, sender, scope, conditions and
 
 Use authorized read-only inspection first. Inspect scripts for side effects before calling them. If access is unavailable, state the limitation and request one bounded evidence capture. Do not claim an email was sent, a page deployed, a buyer accepted, or revenue realised from a draft, screenshot, local test or historical summary.
 
+
+## One-email buyer requirements rule
+
+**Before asking an engaged buyer for anything**, consult `docs/commercial/BUYER_ONBOARDING_SINGLE_REQUEST_20261010.md`, especially the 12 October mandatory single-email contract. Extract all already-known requirements from the complete thread and current documents. Build one evidence matrix with field, buyer owner, exact acceptable proof, `ANSWERED_REPORTED / PROVEN / UNANSWERED / CONTRADICTED / NOT_APPLICABLE`, and original evidence reference.
+
+Ask all genuinely missing **buyer-owned** launch items in **one concise consolidated email**, not 20 incremental requests: buy-box/source/caps, actual payable event/payout/settlement, enabled receiving buyer and original caller-ID routing, call recording/notice/access/retention/deletion, and contracts/onboarding/technical owner. Existing PDF or redacted admin screenshot can satisfy multiple fields. Ask for YES/NO/N/A, never API secrets, raw ANI or recordings. Do not solicit internal EmpireOS tasks from the buyer.
+
+On response, update existing evidence records, do not restart the checklist or ask answered questions again. Permit only one scoped gap clarification when actual missing/contradictory buyer proof remains; otherwise escalate to their named owner or progress another qualified relationship. If a request for the exact fields is already outstanding, **DO NOT SEND AGAIN**. Sending still requires independent authority, suppression and mailbox checks. A verbal or email assurance is not provider routing proof, legal approval or recognised revenue. Preserve the first-party production-truth and gated controls.
+
 ## Build the readiness matrix
 
 Read [references/readiness-packet.md](references/readiness-packet.md) for the reusable output and pilot criteria.

@@ -23,3 +23,23 @@ def test_campaign_text_cannot_select_or_authorize_skill(tmp_path):
     result=recommend_work_item_skills({'department_keys':['unknown'], 'target_component':'campaign_revenue_readiness_send_and_pay'},root=tmp_path)
     assert result['skill_recommendations'][0]['status']=='unmapped_department'
     assert result['execution_authority']=='none'
+
+
+def test_live_revenue_readiness_skill_requires_one_nonduplicated_buyer_request():
+    root=Path('empire_os/skills_library/skills/empire-revenue-readiness')
+    skill=(root/'SKILL.md').read_text()
+    matrix=Path('docs/commercial/BUYER_ONBOARDING_SINGLE_REQUEST_20261010.md').read_text()
+    assert 'One-email buyer requirements rule' in skill
+    assert 'DO NOT SEND AGAIN' in skill
+    assert 'existing evidence records' in skill
+    for required in (
+        'Mandatory one-email launch contract',
+        'ANSWERED_REPORTED',
+        'CONTRADICTED',
+        'one concise delta',
+        'Buyer technical',
+        'Lead Smart current delta',
+        'gmail:1a12d47934923a1d',
+        'Recording/privacy',
+    ):
+        assert required in matrix

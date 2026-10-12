@@ -69,3 +69,57 @@
 - **Continuity:** `runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json` remains the existing automated review queue. Its latest evidence is snapshot-derived, not live Gmail polling. A connected Gmail scan does not mean the EmpireOS server has independent direct Gmail login or a configured own-IMAP mailbox.
 
 **Business completion standard:** one buyer-specific accepted buy-box + terms + legal source/consent + correctly tracked/routed eligible event + approved launch + verifiable payable conversion and reconciliation. Read-only evidence, approved campaign enrollment and a draft email are not realised revenue.
+
+
+## Mandatory one-email launch contract (12 October 2026)
+
+This **enforces** the existing 10 October single-request policy. The earlier Lead Smart row above is historical: Seth approved the revised buyer page on 11 October; it is now published. Founder scope approval and the 27,100-ZIP production refresh are also complete. Do not request these again.
+
+**Do this once for each genuinely engaged buyer BEFORE committing to a launch date:**
+
+1. **Extract existing answers first.** Read the complete current thread, existing agreements, buyer specifications and runtime observations. Mark each below as `ANSWERED_REPORTED`, `PROVEN`, `UNANSWERED`, `CONTRADICTED` or `NOT_APPLICABLE` with exact message/document references. Never reask the first two categories.
+2. **One consolidated buyer email.** Ask only for `UNANSWERED/CONTRADICTED` items that are genuinely buyer-controlled; group them in one numbered reply with a **yes/no/not-available** response and a source document/redacted screenshot where necessary. Permit one attached existing programme PDF/spec instead of retyping the facts. Do not ask for secrets, raw caller ANI, call recordings or customer personal data.
+3. **Keep our own work off the buyer's plate.** Deployment, source checks, website legal drafting, campaign landing hashes, payment wiring, integration tests, SEO, supervised monitoring, internal stop control, CRM and founder approval are **EmpireOS-owned**, not questions for Seth.
+4. **After their reply, update the same matrix.** Accept evidence once; branch only on genuine contradictions. Never send a status/thanks email that contains new technical questions. If one indispensable proof is still missing, send at most **one concise delta** with its exact owner and acceptable artifact; otherwise escalate through the named technical owner or advance another already engaged buyer, preserving the hold. The one follow-up is not permission for unapproved or duplicate outbound.
+5. **Measure the process:** initial request count, repeated-question count (target **0**), time from first engaged reply to complete buyer packet, verified proof coverage, blocker owner, and time to first eligible commercial event. No recurring timer, new provider, message automation or outbound authority introduced.
+
+### Required evidence to request up front
+
+| Contract | Exact buyer questions | Sufficient buyer answer / proof | Owner |
+| --- | --- | --- | --- |
+| **Buy box and source** | Campaign, specific payable vertical/service, accepted geo ZIPs, hours with DST, capacities/caps, accepted Empire-owned organic/SEO source, banned traffic | Named current campaign rules plus explicit owned-source acceptance | Buyer commercial |
+| **Payable event and money** | Required connected seconds, IVR/ZIP steps, live agent status, unique/repeat rules, invalid reasons, payout **for this route**, currency, rate variability, settlement timing, disputes and reconciliation | Contract/IO or programme offer and reporting definitions for exact ID (not public bid ranges) | Buyer commercial/payments |
+| **Live routing and attribution** | Campaign and tracking number, enabled Direct buyer/target and caller ANI preservation, target evidence, test-call interpretation, call/status event columns, source/subsource, retry and escalation path | Dated redacted provider admin screenshot/configuration or provider-authoritative event matching exact campaign; no raw phone numbers | Buyer technical |
+| **Call privacy and recording** | Recording **on/off**; which party decides/controls it; caller notice/consent and where delivered; access and sharing; retention/deletion process; international parties and state-specific conditions | Written real configuration/roles and reviewed disclosure or confirmed disabled recording for the pilot, with legal assessment where applicable | Buyer compliance + Empire legal |
+| **Paperwork and launch** | Legal contracting entity, insertion order/MVA/onboarding requirements, reviewer/technical contact and support path | Current partner docs and named operator | Buyer partner manager |
+
+**An onboarding email can collect facts; it cannot independently verify buyer-side routing, certify US recording law or create binding terms.** Store proof status and references separately. Send policies for final review only after the factual data-flow and recording answers are known. The first real connected call is verified **during a separately approved limited pilot**, not fabricated from a hung-up test.
+
+### Reusable single-pass buyer message — for the NEXT engaged partner
+
+**Subject:** Empire AI — one reply to finalise our first inbound-call pilot
+
+> Hi [name],
+>
+> To get the first campaign running without a long email chain, could you send your current programme/spec and answer only the missing points below? A redacted screenshot, agreement or a link to your approved onboarding pack is fine. Please mark anything unavailable **N/A** and name the person who can confirm it.
+>
+> **1. Campaign and eligible traffic:** exact live programme/campaign ID, jobs and ZIPs accepted, hours/timezone and caps; confirm Empire-owned first-party organic/SEO traffic and our landing/source are permitted.
+>
+> **2. Payable event and settlement:** call/IVR/connected-seconds rule, repeats/rejections, exact campaign payout or variable-rate basis, currency, settlement and disputes.
+>
+> **3. Routing and attribution:** assigned tracking number, enabled buyer target, original caller-ID pass-through, exact call-status/postback/report evidence fields, and your technical escalation contact. A dated, redacted configuration screenshot is enough; please send **no personal caller data or credentials**.
+>
+> **4. Recording/privacy:** is recording enabled? If yes, who controls it, what pre-call/in-call notice and consent is used, who can access it, and the actual retention/deletion process? If a capped trial can run **without recording**, please confirm that instead.
+>
+> **5. Documents:** current agreement/IO and any required partner forms plus the person authorised to approve the pilot.
+>
+> We will handle our website, internal controls, compliance review and technical checks. One consolidated reply or your existing onboarding pack is sufficient; then we'll send one precise pilot confirmation.
+>
+> Thanks, Phil — Founder, Empire AI
+
+### Lead Smart current delta — **DO NOT SEND AGAIN**
+
+- **Already answered and verified:** Seth's landing review `gmail:1a12bc009d04fcc9`; founder launch scope; installed roofing page and ZIP checker; 27,100 public provider ZIPs; America/Chicago hours; Direct IVR ZIP; consumer organic channel approved.
+- **Last buyer reply:** `gmail:1a12d44d7e2f46a8` states recording **ON** and that Seth hung up **before connection**. It proves **neither** an enabled connected buyer leg nor actual ANI at that buyer destination.
+- **Already requested:** `gmail:1a12d47934923a1d` asks the admin to evidence the enabled Direct target, original ANI preservation, and recording disablement for a capped pilot **or** actual recording notice/retention/access/deletion. No duplicate new email while this is pending.
+- **EmpireOS-only:** publish legally approved exact content when settled; maintain the first-party gating and five-site-handoff control; verify authenticated tracking and the provider connection before enabling calls. Do not make Lead Smart repeat our own execution steps.
