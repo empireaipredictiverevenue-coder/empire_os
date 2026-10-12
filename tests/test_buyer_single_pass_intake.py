@@ -163,3 +163,55 @@ def test_lead_smart_relationship_row_exposes_blocked_duplicate_request():
     assert guard["outbound_authorized"] is False
     assert guard["repeat_full_request_allowed"] is False
     assert len(guard["outstanding_buyer_questions"])==2
+
+
+
+def test_founder_live_queue_reuses_lead_smart_sent_delta_instead_of_old_visual_review():
+    from empire_os.commercial_relationship_registry import reconcile
+    now=datetime(2026,10,12,9,0,tzinfo=timezone.utc)
+    data={
+        "schema_version":"empire.buyer_mail_relationship_summary.v1",
+        "origin":"connected_gmail_connector_read_only",
+        "mailbox":"flavag83@gmail.com",
+        "captured_at":"2026-10-12T08:59:00Z",
+        "threads":[{
+            "entity_key":"lead-smart","company":"Lead Smart",
+            "identity_domains":["leadsmartinc.com"],
+            "gmail_thread_id":"1a0d9ce883c87d4a",
+            "last_inbound_at":"2026-10-11T23:20:44Z",
+            "last_inbound_message_id":"1a12d44d7e2f46a8",
+            "last_outbound_at":"2026-10-11T23:21:44Z",
+            "last_outbound_message_id":"1a12d47934923a1d",
+            "bounced_addresses":[],
+            "next_action_code":"LANDING_APPROVAL_AND_ROUTE_PROOF"
+        }]
+    }
+    report=reconcile(data,{"candidate_count":0,"candidates":[]},
+                     {"shortlisted_count":0,"targets":[]},now=now,
+                     do_not_pursue_domains=frozenset())
+    expected="WAIT_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT"
+    relation=report["relationships"][0]
+    assert relation["next_founder_action"]==expected
+    assert relation["founder_action_reason"]=="SCOPED_BUYER_REQUEST_ALREADY_SENT"
+    assert relation["outbound_authorized"] is False
+    assert report["founder_action_queue"]==[]
+    assert report["warm_business_action_queue"][0]["next_founder_action"]==expected
+    for row in (relation,report["warm_business_action_queue"][0]):
+        assert row["buyer_onboarding_duplicate_guard"]["request_provenance"]=="gmail:1a12d47934923a1d"
+        assert row["buyer_onboarding_duplicate_guard"]["outbound_authorized"] is False
+
+
+def test_seven_day_founder_review_does_not_reopen_complete_buyer_questionnaire():
+    from empire_os.commercial_relationship_registry import reconcile
+    now=NOW+timedelta(days=8)
+    src=source("leadbank","alliancevs.io","abcd1234abcd1234")
+    src["captured_at"]=now.isoformat()
+    report=reconcile(src,{"candidate_count":0,"candidates":[]},
+                     {"shortlisted_count":0,"targets":[]},now=now,
+                     do_not_pursue_domains=frozenset())
+    row=report["relationships"][0]
+    assert row["stage"]=="AWAITING_BUYER"
+    assert row["next_founder_action"]=="REVIEW_ANSWERED_FIELDS_ONLY_NO_REPEAT_QUESTIONNAIRE"
+    assert row["founder_review_required"] is True
+    assert row["buyer_onboarding_duplicate_guard"]["request_provenance"]=="gmail:1a122fc6010e3b5b"
+    assert report["founder_action_queue"][0]["outbound_authorized"] is False

@@ -563,6 +563,32 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
         })
     return rows
 
+def _apply_reviewed_request_to_action(
+    key: str, guard: Mapping[str, Any],
+    *, current_action: str, current_reason: str,
+    current_review_required: bool,
+) -> tuple[str, str, bool]:
+    """Keep the founder queue aligned with previously reviewed buyer email.
+
+    Never turn an old 'request info / landing approval' hint into permission
+    for an identical send. Leave suppression/hold and mailbox-freshness
+    decisions intact; only replace known obsolete partner-action prompts.
+    """
+    if not guard.get("request_provenance"):
+        return current_action, current_reason, current_review_required
+    if key == "lead-smart":
+        if current_action == "REVIEW_BUYER_LANDING_APPROVAL_AND_ROUTE":
+            return ("REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+                    "SCOPED_BUYER_REQUEST_ALREADY_SENT", True)
+        if current_action == "WAIT_BUYER_RESPONSE":
+            return ("WAIT_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+                    "SCOPED_BUYER_REQUEST_ALREADY_SENT", False)
+    if key in PARTNER_PILOT_SCOPES and current_action == "REVIEW_PENDING_BUYER_REQUEST":
+        return ("REVIEW_ANSWERED_FIELDS_ONLY_NO_REPEAT_QUESTIONNAIRE",
+                "COMPLETE_BUYER_REQUEST_ALREADY_SENT", True)
+    return current_action, current_reason, current_review_required
+
+
 FOUNDER_FOLLOWUP_REVIEW_SECONDS = 7 * 24 * 3600
 
 
@@ -840,6 +866,17 @@ def reconcile(
             now=now, gmail_snapshot_fresh=record_mail_fresh,
             linked_gmail=bool(record['gmail_thread_ids']),
         )
+        reviewed_request = reviewed_request_duplicate_guard(
+            key, {
+                "gmail_thread_ids": record["gmail_thread_ids"],
+                "last_outbound_message_id": record["last_outbound_message_id"],
+                "gmail_snapshot_fresh": record_mail_fresh,
+            }
+        )
+        founder_action, action_reason, needs_review = _apply_reviewed_request_to_action(
+            key, reviewed_request, current_action=founder_action,
+            current_reason=action_reason, current_review_required=needs_review,
+        )
         if founder_excluded:
             founder_action = "DO_NOT_PURSUE_NO_CONTACT"
             needs_review = False
@@ -870,13 +907,7 @@ def reconcile(
             "qualification_tier": record["qualification_tier"],
             "founder_priority": record["founder_priority"],
             "gmail_snapshot_fresh": record_mail_fresh,
-            "buyer_onboarding_duplicate_guard": reviewed_request_duplicate_guard(
-                key, {
-                    "gmail_thread_ids": record["gmail_thread_ids"],
-                    "last_outbound_message_id": record["last_outbound_message_id"],
-                    "gmail_snapshot_fresh": record_mail_fresh,
-                }
-            ),
+            "buyer_onboarding_duplicate_guard": reviewed_request,
             "commercial_buyer_approved": False,
             "suppression_evidence_complete": False,
             "outbound_authorized": False,
@@ -894,6 +925,7 @@ def reconcile(
         {
             "entity_key": item['entity_key'], "company": item['company'],
             "stage": item['stage'], "next_founder_action": item['next_founder_action'],
+            "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
             "gmail_url": item['gmail_url'],
             "last_inbound_at": item['last_inbound_at'],
             "last_outbound_at": item['last_outbound_at'],
@@ -911,6 +943,7 @@ def reconcile(
         {
             "entity_key": item["entity_key"], "company": item["company"],
             "stage": item["stage"], "next_founder_action": item["next_founder_action"],
+            "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
             "reason": item["founder_action_reason"],
             "last_inbound_at": item["last_inbound_at"],
             "last_outbound_at": item["last_outbound_at"],
