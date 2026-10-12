@@ -70,7 +70,11 @@ document.getElementById("sign").addEventListener("click",async()=>{
       setStatus("Wrong wallet selected. Select the existing EmpireOS receiving address shown above. No signature requested.");return;
     }
     setStatus("Inspect the exact message in your wallet before choosing Sign.");
-    const signature=await window.ethereum.request({method:"personal_sign",params:[proof.message,account]});
+    // EIP-1193 personal_sign expects 0x-prefixed UTF-8 *bytes*, not a
+    // raw human-readable string. Wallets can otherwise sign different data.
+    const messageHex="0x"+Array.from(new TextEncoder().encode(proof.message),
+      byte=>byte.toString(16).padStart(2,"0")).join("");
+    const signature=await window.ethereum.request({method:"personal_sign",params:[messageHex,account]});
     if(typeof signature!=="string"||!/^0x[0-9a-fA-F]{130}$/.test(signature))throw new Error("Wallet returned an unsupported signature.");
     result.value=signature;
     document.getElementById("signature").style.display="block";
