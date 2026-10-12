@@ -178,3 +178,17 @@ def test_privileged_child_imports_expected_root_module_not_direct_script_path():
     assert '"-m","scripts.provision_bsc_financial_operator_logins",operation' in source
     assert 'cwd=ROOT' in source
     assert 'capture_output=True' in source
+
+
+def test_privileged_child_and_role_backup_pin_canonical_empiredb_socket_and_port():
+    import inspect
+    child = inspect.getsource(provisioning._postgres_child)
+    backup = inspect.getsource(provisioning._backup_global_roles)
+    assert '"PGHOST": SOCKET' in child
+    assert '"PGPORT": "5432"' in child
+    assert '"PGDATABASE": DB' in child
+    assert '"PYTHONPATH": str(ROOT)' in child
+    assert 'env={' in child
+    assert '"-h",SOCKET,"-p","5432","-U","postgres"' in backup
+    assert '"PGHOST": SOCKET' in backup
+    assert '"PGDATABASE": DB' in backup

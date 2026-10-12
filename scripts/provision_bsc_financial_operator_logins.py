@@ -54,6 +54,14 @@ def _postgres_child(operation: str, payload: dict | None = None) -> dict:
         input=None if payload is None else json.dumps(payload,sort_keys=True),
         capture_output=True,text=True,timeout=35,
         cwd=ROOT,
+        env={
+            "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "PYTHONPATH": str(ROOT),
+            "HOME": "/var/lib/postgresql",
+            "PGHOST": SOCKET,
+            "PGPORT": "5432",
+            "PGDATABASE": DB,
+        },
     )
     if result.returncode:
         raise RuntimeError("privileged operator transaction/canonical catalog unavailable")
@@ -130,8 +138,16 @@ def _backup_global_roles() -> Path:
     fd=os.open(destination,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
     with os.fdopen(fd,"wb") as out:
         result=subprocess.run(
-            ["runuser","-u","postgres","--","pg_dumpall","-w","--globals-only"],
+            ["runuser","-u","postgres","--","pg_dumpall",
+             "-w","-h",SOCKET,"-p","5432","-U","postgres","--globals-only"],
             stdout=out,stderr=subprocess.DEVNULL,timeout=75,
+            env={
+                "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "HOME": "/var/lib/postgresql",
+                "PGHOST": SOCKET,
+                "PGPORT": "5432",
+                "PGDATABASE": DB,
+            },
         )
         out.flush();os.fsync(out.fileno())
     if result.returncode or destination.stat().st_size<50:
