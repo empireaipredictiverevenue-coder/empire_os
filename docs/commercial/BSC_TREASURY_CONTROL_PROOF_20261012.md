@@ -10,7 +10,7 @@
 
 ## First-party ownership challenge (EIP-191)
 
-The founder can connect an EVM wallet to the self-hosted `https://empire-ai.co.uk/treasury-proof.html` page. The page requires the **exact wallet already recorded**, shows the complete nonce/domain/chain-bound message, and requests only `personal_sign`. It performs **no** transaction, ERC20 approval, wallet switching, signature upload or server-side POST. No third-party API library is downloaded.
+The founder can connect an EVM wallet to the self-hosted `https://empire-ai.co.uk/_next/treasury-proof.html` page. The page requires the **exact wallet already recorded**, shows the complete nonce/domain/chain-bound message, and requests only `personal_sign`. It performs **no** transaction, ERC20 approval, wallet switching, signature upload or server-side POST. No third-party API library is downloaded.
 
 The backend-independent verifier `scripts/verify_bsc_treasury_control.mjs` uses the **existing pinned ethers package** from `contracts/escrow/node_modules` and recovers the EIP-191 public signer. It will accept **only** the existing candidate address and the exact `empire-ai.co.uk` signing message with a cryptographically random nonce, chain ID 56, issue timestamp and 48-hour expiry. Invalid, wrong-wallet, altered or expired signatures fail closed.
 
@@ -31,6 +31,18 @@ The signature is not a mnemonic, password or key. Do not print it into shell his
 **One-time challenge limits:** The nonce cannot be overwritten, and its proof expires after 48 hours. If unsigned by expiry, generate a new date-named challenge and replace the stale static signing page via the exact review/backup process, not through an unbounded agent loop.
 
 **Limitation:** EIP-191 `verifyMessage` proves EOA private-key control at signing time only. It does **not** prove legal or corporate beneficial ownership or approval as the escrow beneficiary, nor does it support multisignature smart-contract wallets. ERC-1271 contract-wallet verification requires separate read-only on-chain evidence and an approved RPC.
+
+## Production gateway publication readback (12 October 2026)
+
+The public FastAPI gateway allows only explicit landing-page routes, so `/treasury-proof.html` returns **404** even when staged in `out/`. Do not circulate that unserved path. The already-existing `/_next` StaticFiles route supports external JavaScript and does not require a gateway restart.
+
+The live, externally HTTP-200 verified first-party signing page is:
+
+**`https://empire-ai.co.uk/_next/treasury-proof.html`**
+
+It loads its one self-hosted JavaScript file `/_next/treasury-proof-signing-20261012.js` (HTTP 200) with no third-party SDK or signature submission. The gateway's actual CSP is `script-src 'self'`, so an inline script cannot execute; the staging HTML was deliberately repackaged with a same-origin external script. Content-type, CSP, page/JS hashes and no-payment flags were checked after publishing. This exact instance expires **2026-10-14T09:29:41.560Z**; the HTML must be regenerated through a distinct nonce/expiry review after that, never silently reused.
+
+The challenge is at `runtime/execution_plane/bsc_treasury_control_challenge_20261012.json` (0600). The immutable launch evidence is at `runtime/execution_plane/bsc_treasury_control_signing_release_20261012.json` (0600). Its state is `AWAITING_FOUNDER_SIGNATURE` and **not** `EOA_CONTROL_VERIFIED`. Once the founder supplies a wallet-generated message signature, verify it via the existing `verify` CLI before marking any owner-control proof verified.
 
 ## Launch gates unaffected
 
