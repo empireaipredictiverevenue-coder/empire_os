@@ -70,6 +70,18 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
     end = _moment(control.get("ends_at"))
     if not (0 < (end-start).total_seconds() <= 7200 and start <= now < end):
         raise HandoffHeld()
+    # The buyer's GENERAL available hours are wider. The first supervised
+    # revenue pilot is deliberately narrower: Chicago weekdays 10:00-12:00.
+    # Exact start/end must BOTH lie inside that pilot window, even if a
+    # founder/config writer accidentally chooses a weekend or a longer slot.
+    chicago = ZoneInfo("America/Chicago")
+    local_start = start.astimezone(chicago)
+    local_end = end.astimezone(chicago)
+    if (local_start.weekday() >= 5
+            or local_start.date() != local_end.date()
+            or not 600 <= local_start.hour * 60 + local_start.minute < 720
+            or not 600 < local_end.hour * 60 + local_end.minute <= 720):
+        raise HandoffHeld()
     # Deliberately bound the ledger to the selected window.
     return f"{CAMPAIGN}:{start.isoformat()}:{end.isoformat()}", end
 
