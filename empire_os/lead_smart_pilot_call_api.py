@@ -13,9 +13,9 @@ from empire_os.lead_smart_site_handoff import (
     site_handoff_available,
 )
 from empire_os.lead_smart_homeowner_eligibility import generate_from_files, PreviewEvidenceError
+from scripts.materialize_lead_smart_launch_readiness import compute_live_launch_readiness
 
 BASE = Path("/srv/empire_os/runtime/revenue/lead_smart")
-READINESS = BASE / "launch_readiness/latest.json"
 ROUTE = "/roofing/pilot-handoff"
 HEADERS = {
     "Cache-Control": "no-store, max-age=0",
@@ -51,9 +51,9 @@ def call_available(zip_code: str) -> bool:
             return False
         return site_handoff_available(
             zip_code, config_path=CONFIG, ledger_path=LEDGER,
-            readiness=_json(READINESS), eligible_zip=True,
+            readiness=compute_live_launch_readiness(), eligible_zip=True,
         )
-    except (HandoffHeld, OSError, ValueError, TypeError, PreviewEvidenceError):
+    except (HandoffHeld, OSError, ValueError, TypeError, KeyError, AttributeError, PreviewEvidenceError):
         return False
 
 
@@ -81,9 +81,9 @@ async def public_roofing_pilot_handoff(request: Request):
         # Consume one permit atomically; re-check all gates under lock.
         phone_uri = reserve_site_handoff(
             zip_code, config_path=CONFIG, ledger_path=LEDGER,
-            readiness=_json(READINESS), eligible_zip=_in_current_coverage(zip_code),
+            readiness=compute_live_launch_readiness(), eligible_zip=_in_current_coverage(zip_code),
         )
-    except (HandoffHeld, OSError, ValueError, PreviewEvidenceError, TypeError):
+    except (HandoffHeld, OSError, ValueError, KeyError, AttributeError, PreviewEvidenceError, TypeError):
         return JSONResponse({"status": "UNAVAILABLE"}, status_code=503, headers=HEADERS)
     # No auto-dial: the homeowner deliberately taps the final tel: link.
     return HTMLResponse(
