@@ -29,6 +29,7 @@ def test_actual_role_write_path_has_exact_pair_and_noninherited_set_option():
     assert "CREATE ROLE {} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB" in text
     assert "NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD {}" in text
     assert "GRANT {} TO {} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE" in text
+    assert "GRANT CONNECT ON DATABASE {} TO {}" in text
     assert "psycopg" in text
     assert "cur.execute" in text
     assert "GRANT ALL" not in text

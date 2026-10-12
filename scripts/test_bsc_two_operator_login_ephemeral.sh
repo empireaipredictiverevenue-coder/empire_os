@@ -12,6 +12,7 @@ hba="$(psql -X -w -At -d postgres -c 'SHOW hba_file')"
 [[ "$data_dir" == /tmp/pg_virtualenv.*/data/18/regress ]] || exit 72
 [[ "$hba" == /tmp/pg_virtualenv.*/postgresql/18/regress/pg_hba.conf ]] || exit 73
 psql -X -w -v ON_ERROR_STOP=1 -d postgres -q -c 'CREATE DATABASE empiredb'
+psql -X -w -v ON_ERROR_STOP=1 -d postgres -q -c 'REVOKE ALL PRIVILEGES ON DATABASE empiredb FROM PUBLIC'
 PYTHONPATH=. /srv/empire_os/.venv/bin/python - "$hba" <<'PY'
 from pathlib import Path
 import sys,subprocess
@@ -41,6 +42,27 @@ assert r.returncode==0, "EPHEMERAL_ONLY_LOGIN_DDL_FAILURE"
 print("EPHEMERAL_ROLE_AND_MEMBERSHIP_TRANSACTION=COMMITTED_ISOLATED_ONLY")
 PY
 psql -X -w -q -At -v ON_ERROR_STOP=1 -d empiredb -c 'SELECT pg_reload_conf()' | grep -qx t
+# Reproduce the actual EmpireDB policy: PUBLIC has no CONNECT.
+# A valid role membership and SCRAM login is still not sufficient.
+for login in empire_payment_approver_login empire_escrow_verifier_login;do
+  password="ephemeral-only-operator-password-$login-never-production"
+  if PGPASSWORD="$password" psql -X -w -q -At -h "$PGHOST" -p "$PGPORT" -U "$login" -d empiredb -c 'SELECT 1' >/dev/null 2>&1;then
+    echo "EPHEMERAL_UNEXPECTED_CONNECT_BEFORE_DATABASE_GRANT";exit 76
+  fi
+done
+echo "EPHEMERAL_PREGRANT_CONNECT_DENIED_AS_PRODUCTION=YES"
+# Exactly two CONNECT grants; neither CREATE nor TEMP, no financial RPC.
+psql -X -w -v ON_ERROR_STOP=1 -d postgres -q -c 'GRANT CONNECT ON DATABASE empiredb TO empire_payment_approver_login, empire_escrow_verifier_login'
+echo "EPHEMERAL_TWO_DATABASE_CONNECT_GRANTS_ONLY=APPLIED"
+# Verify role privileges are still CONNECT only -- no CREATE or TEMPORARY.
+for login in empire_payment_approver_login empire_escrow_verifier_login;do
+  acl="$(psql -X -w -At -d postgres -c "SELECT
+    has_database_privilege('$login','empiredb','CONNECT')::int::text||'|'||
+    has_database_privilege('$login','empiredb','CREATE')::int::text||'|'||
+    has_database_privilege('$login','empiredb','TEMP')::int::text")"
+  [[ "$acl" == "1|0|0" ]] || { echo "EPHEMERAL_DB_ACL_WIDENED_ABORT";exit 77;}
+done
+echo "EPHEMERAL_DB_GRANTS_EXACT_CONNECT_ONLY=PASS"
 for spec in empire_payment_approver_login:empire_payment_approver empire_escrow_verifier_login:empire_escrow_verifier;do
   login="$(printf '%s' "$spec" | cut -d: -f1)"
   group="$(printf '%s' "$spec" | cut -d: -f2)"

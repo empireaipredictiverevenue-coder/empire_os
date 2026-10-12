@@ -91,6 +91,7 @@ def classify(
     application_bits: Mapping[str, bool],
     canonical_db: bool = True,
     existing_private_credential_vault: bool = False,
+    database_privileges: Mapping[str, tuple[bool, bool, bool]] | None = None,
 ) -> dict[str, Any]:
     """Pure fail-closed assessment from trusted PostgreSQL read-only catalog."""
     hba = list(hba)
@@ -125,11 +126,27 @@ def classify(
     no_roles_yet = not members
     hba_ready = all(effective_scram_rule(hba, role) for role in LOGIN_ROLES)
     parsed_hba_ok = bool(hba) and all(r.get("error") is None for r in hba)
+    dbpriv = database_privileges or {}
+    dbpriv_valid = all(
+        login in dbpriv and isinstance(dbpriv[login], tuple)
+        and len(dbpriv[login]) == 3
+        and all(type(x) is bool for x in dbpriv[login])
+        for login in login_exists
+    )
+    unsafe_dbpriv = any(
+        dbpriv.get(login, (False, False, False))[1:] != (False, False)
+        for login in login_exists
+    )
+    connect_count = sum(dbpriv.get(login, (False, False, False))[0] is True for login in login_exists)
     base = canonical_db and groups_ok and app_role_safe and function_rights_ok and app_separate and parsed_hba_ok
     if not base:
         status = "BLOCKED_DB_AUTHORITY_OR_ROLE_INVARIANT"
     elif login_exists and not login_safe:
         status = "BLOCKED_PARTIAL_OR_UNSAFE_OPERATOR_LOGINS"
+    elif login_exists and not dbpriv_valid:
+        status = "BLOCKED_DATABASE_PRIVILEGE_CATALOG_UNAVAILABLE"
+    elif unsafe_dbpriv:
+        status = "BLOCKED_UNSAFE_DATABASE_CREATE_OR_TEMP_GRANT"
     elif members and not membership_exact:
         status = "BLOCKED_UNEXPECTED_FINANCIAL_ROLE_MEMBERSHIP"
     elif existing_private_credential_vault and not login_complete:
@@ -138,7 +155,11 @@ def classify(
         status = "PREPARE_EXACT_TWO_LOCAL_SCRAM_HBA_RULES"
     elif not login_exists and no_roles_yet and hba_ready:
         status = "READY_FOR_SEPARATELY_APPROVED_TWO_LOGIN_PROVISIONING"
-    elif login_safe and membership_exact and hba_ready:
+    elif login_safe and membership_exact and hba_ready and connect_count == 0:
+        status = "OPERATOR_IDENTITIES_REQUIRE_EXACT_TWO_DATABASE_CONNECT_GRANTS"
+    elif login_safe and membership_exact and hba_ready and connect_count == 1:
+        status = "BLOCKED_PARTIAL_DATABASE_CONNECT_GRANTS"
+    elif login_safe and membership_exact and hba_ready and connect_count == 2:
         status = "OPERATOR_IDENTITIES_CATALOG_READY_AUTHENTICATION_TEST_REQUIRED"
     else:
         status = "BLOCKED_UNSAFE_OPERATOR_DEPLOYMENT_SEQUENCE"
@@ -156,6 +177,8 @@ def classify(
         "dedicated_login_attributes_safe": bool(login_safe),
         "exact_noninherited_set_role_memberships": bool(membership_exact),
         "no_financial_role_memberships": no_roles_yet,
+        "operator_db_connect_grant_count": connect_count,
+        "no_operator_database_create_or_temp_privileges": dbpriv_valid and not unsafe_dbpriv,
         "private_operator_vault_already_present": existing_private_credential_vault,
         "credential_values_read_or_printed": False,
         "financial_operator_authenticated": False,
@@ -211,6 +234,15 @@ def inspect_catalog(conn_factory: Callable, *, vault_exists: bool = False) -> di
                                 (signature,role,signature))
                     exists, permitted = cur.fetchone()
                     query_roles[(role,signature)] = bool(exists and permitted)
+            dbpriv = {}
+            for login in LOGIN_ROLES:
+                if login in roles:
+                    cur.execute("""
+                        SELECT has_database_privilege(%s,%s,'CONNECT'),
+                               has_database_privilege(%s,%s,'CREATE'),
+                               has_database_privilege(%s,%s,'TEMP')
+                    """, (login, DB, login, DB, login, DB))
+                    dbpriv[login] = tuple(cur.fetchone())
             app_bits = {}
             for signature in (
                 "public.approve_bsc_payment_request(uuid,text,text)",
@@ -226,4 +258,5 @@ def inspect_catalog(conn_factory: Callable, *, vault_exists: bool = False) -> di
         function_bits=query_roles, application_bits=app_bits,
         canonical_db=db==DB and not recovery,
         existing_private_credential_vault=vault_exists,
+        database_privileges=dbpriv,
     )

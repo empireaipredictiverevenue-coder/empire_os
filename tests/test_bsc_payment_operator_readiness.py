@@ -41,8 +41,9 @@ def base(*, with_logins=False, with_grants=False, with_hba=False):
         "public.record_bsc_escrow_creation(uuid,jsonb)":False,
         "public.record_bsc_escrow_lifecycle(uuid,text,jsonb)":False,
     }
+    dbpriv={login:(True,False,False) for login in LOGIN_ROLES} if with_logins else {}
     return dict(roles=roles,memberships=members,hba=hba,function_bits=bits,
-                application_bits=app,canonical_db=True)
+                application_bits=app,canonical_db=True,database_privileges=dbpriv)
 
 
 def test_live_like_catalog_identifies_exact_missing_HBA_and_does_not_authorize_payment():
@@ -174,3 +175,44 @@ def test_inspector_never_returns_passwords_or_financial_credentials():
     assert "password" not in encoded
     assert "secret" not in encoded
     assert report["credential_values_read_or_printed"] is False
+
+
+
+def test_preexisting_correct_financial_logins_but_no_database_connect_are_not_operational():
+    data=base(with_logins=True,with_grants=True,with_hba=True)
+    data["database_privileges"]={name:(False,False,False) for name in LOGIN_ROLES}
+    report=classify(**data)
+    assert report["status"]=="OPERATOR_IDENTITIES_REQUIRE_EXACT_TWO_DATABASE_CONNECT_GRANTS"
+    assert report["operator_db_connect_grant_count"]==0
+    assert report["financial_operator_authenticated"] is False
+    assert report["financial_authority_activated"] is False
+
+
+def test_partially_applied_db_connect_grants_are_held():
+    data=base(with_logins=True,with_grants=True,with_hba=True)
+    data["database_privileges"]={
+        LOGIN_ROLES[0]:(True,False,False),
+        LOGIN_ROLES[1]:(False,False,False),
+    }
+    result=classify(**data)
+    assert result["status"]=="BLOCKED_PARTIAL_DATABASE_CONNECT_GRANTS"
+    assert result["operator_db_connect_grant_count"]==1
+
+
+@pytest.mark.parametrize("wrong",[
+    (True,True,False),
+    (True,False,True),
+    (False,False,True),
+    (True,True,True),
+])
+def test_unsafe_database_create_or_temp_privilege_rejected_even_with_connect(wrong):
+    data=base(with_logins=True,with_grants=True,with_hba=True)
+    data["database_privileges"][LOGIN_ROLES[0]]=wrong
+    result=classify(**data)
+    assert result["status"]=="BLOCKED_UNSAFE_DATABASE_CREATE_OR_TEMP_GRANT"
+
+
+def test_missing_database_acl_evidence_must_never_be_treated_as_authenticated():
+    data=base(with_logins=True,with_grants=True,with_hba=True)
+    data.pop("database_privileges")
+    assert classify(**data)["status"]=="BLOCKED_DATABASE_PRIVILEGE_CATALOG_UNAVAILABLE"

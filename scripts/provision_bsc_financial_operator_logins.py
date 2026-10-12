@@ -103,6 +103,12 @@ def _internal_apply(payload: dict) -> None:
             cur.execute(sql.SQL(
                 "GRANT {} TO {} WITH INHERIT FALSE, SET TRUE, ADMIN FALSE"
             ).format(sql.Identifier(group),sql.Identifier(login)))
+            # First-party EmpireDB only admits explicitly named database
+            # logins. A dedicated SQL LOGIN cannot authenticate without CONNECT.
+            # privilege, regardless of SCRAM/HBA and membership correctness.
+            # No CREATE, TEMP, schema, table or function rights are granted.
+            cur.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}").format(
+                sql.Identifier(DB),sql.Identifier(login)))
         # Every statement above commits atomically on context exit.
     # No caller-supplied SQL or discretionary grants.
 
