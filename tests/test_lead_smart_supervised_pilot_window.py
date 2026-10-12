@@ -70,3 +70,22 @@ def test_fails_closed_on_invalid_operator_and_unapproved_control(tmp_path):
     control["enabled"]=False
     with pytest.raises(HandoffHeld):
         _control(control,local(12,11))
+
+def test_prepared_operator_template_never_counts_as_live_approval(tmp_path):
+    from pathlib import Path
+    template = (
+        Path(__file__).resolve().parents[1]
+        / "docs/evidence/lead_smart_supervised_pilot_DISABLED_TEMPLATE_20261012.json"
+    )
+    control = json.loads(template.read_text())
+    assert control["enabled"] is False
+    assert control["max_site_handoffs"] == 5
+    assert control["stop_method"] == "atomic_site_handoff_gate"
+    assert control["starts_at"] is None
+    assert control["ends_at"] is None
+    assert verified_site_handoff_control(
+        config_path=template,
+        ledger_path=tmp_path/"site_handoffs.json",
+        now=local(12,11),
+    ) is False
+    assert not (tmp_path/"site_handoffs.json").exists()

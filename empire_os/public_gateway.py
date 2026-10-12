@@ -212,6 +212,11 @@ _DRAFT_COPY_MARKERS = (
     "not an approved or effective policy",
     "Research draft",
     "This is a working draft",
+    # The 12 October final-review packet has different explicit status
+    # markers; exact SHA receipts must never promote a proposed notice.
+    "Status: PROPOSED",
+    "NOT EFFECTIVE OR PUBLISHED",
+    "final review copy",
 )
 
 
