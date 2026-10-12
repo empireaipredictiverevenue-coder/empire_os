@@ -186,11 +186,10 @@ def research_network_after_scout(
             linked = runner(
                 [
                     sys.executable,
-                    str(root / "scripts/reconcile_buyer_email_relationships.py"),
-                    "--write",
+                    "-m", "scripts.run_buyer_gmail_evidence_cycle",
                 ],
                 cwd=root, env=env, capture_output=True,
-                text=True, timeout=35, check=False,
+                text=True, timeout=120, check=False,
             )
             registry_code = linked.returncode
         except subprocess.TimeoutExpired:
@@ -209,7 +208,7 @@ def research_network_after_scout(
                 "PASS" if registry_code == 0 else
                 "TIMEOUT" if registry_code == 124 else "BLOCKED"
             ),
-            "mailbox_ingest_in_this_cycle": False,
+            "mailbox_ingest_in_this_cycle": registry_code == 0,
             "outbound_sent": False,
             "execution_authority": "NONE",
         }

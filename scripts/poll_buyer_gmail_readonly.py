@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from email.utils import parseaddr
+from empire_os.buyer_mail_semantics import recognize_message_payload
 from scripts.import_connected_gmail_buyer_metadata import THREADS, ROOT, INDEX, SCHEMA
 from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
@@ -13,14 +14,17 @@ READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
 TOKEN = ROOT / 'runtime/secrets/buyer-gmail-readonly-token.json'
 
 
-def collect(service, *, now=None):
-    from googleapiclient.errors import HttpError
+def collect(service, *, now=None, known_domains=None):
+    known_domains = known_domains or {}
     threads = []
     names = {'lead-smart':'Lead Smart', 'leadbank':'LeadBank',
              'validated':'Validated / Home Services Lead Group', 'connexis':'Connexis'}
     for tid, key in THREADS.items():
-        response = service.users().threads().get(userId='me', id=tid, format='metadata',
-                    metadataHeaders=['From','To','Cc','Subject','Date']).execute()
+        # Full payload read ONLY in memory. Persist event codes and message IDs,
+        # never the raw email text, sender secrets or personal caller details.
+        response = service.users().threads().get(
+            userId='me', id=tid, format='full',
+        ).execute()
         records = response.get('messages')
         if not isinstance(records, list) or not 1 <= len(records) <= 80:
             raise ValueError('INCOMPLETE_GMAIL_THREAD')
@@ -30,11 +34,27 @@ def collect(service, *, now=None):
                        if h.get('name','').lower() in ('from','to','cc','subject')}
             millis = int(item['internalDate'])
             date = datetime.fromtimestamp(millis/1000,timezone.utc).strftime('%Y-%m-%dT%H:%M:%S')
-            messages.append({'id':item['id'], 'date':date,
+            labels=item.get('labelIds',[])
+            sender = parseaddr(headers.get('from',''))[1].strip().lower()
+            expected_domains = set(known_domains.get(key, ()))
+            buyer_sender = (
+                sender.count('@') == 1
+                and sender.split('@',1)[1] in expected_domains
+                and 'SENT' not in labels and 'DRAFT' not in labels
+                and 'SPAM' not in labels and 'TRASH' not in labels
+            )
+            founder_sender = sender == 'flavag83@gmail.com' and 'SENT' in labels
+            events = (recognize_message_payload(
+                item.get('payload') or {}, outbound=founder_sender,
+            ) if buyer_sender or founder_sender else [])
+            row={'id':item['id'], 'date':date,
                 'from':headers.get('from',''), 'to':[a.strip() for a in headers.get('to','').split(',') if a.strip()],
                 'cc':[a.strip() for a in headers.get('cc','').split(',') if a.strip()],
-                'subject':headers.get('subject',''), 'labels':item.get('labelIds',[]),
-                'has_attachment':False, 'attachment_names':[]})
+                'subject':headers.get('subject',''), 'labels':labels,
+                'has_attachment':False, 'attachment_names':[]}
+            if events:
+                row['recognized_codes']=events
+            messages.append(row)
         threads.append({'partner':names[key], 'thread_id':tid, 'message_count':len(messages),
                         'truncated':False, 'messages':messages})
     return {'schema_version':SCHEMA,'source':'empire_gmail_api_readonly',
@@ -64,16 +84,23 @@ def main():
             atomic_private_write(TOKEN, json.loads(creds.to_json()))
         if not creds.valid:
             raise ValueError('READONLY_OAUTH_NOT_VALID')
-        result=collect(build('gmail','v1',credentials=creds,cache_discovery=False))
-        # Validate the entire candidate against the existing buyer evidence
-        # contract before replacing the private index. Never write partial data.
         from scripts.import_connected_gmail_buyer_metadata import _private, SOURCE, refreshed_summary
         original = _private(ROOT/SOURCE, 2500000)
+        known_domains = {
+            row["entity_key"]: row["identity_domains"]
+            for row in original.get("threads", [])
+            if row.get("gmail_thread_id") in THREADS
+        }
+        result=collect(build('gmail','v1',credentials=creds,cache_discovery=False),
+                       known_domains=known_domains)
+        # Validate the entire candidate against the existing buyer evidence
+        # contract before replacing the private index. Never write partial data.
         refreshed_summary(original, result)
         if args.write:
             atomic_private_write(ROOT/INDEX,result)
         print(json.dumps({'status':'PASS','written':args.write,'threads':len(result['threads']),
                           'messages':sum(x['message_count'] for x in result['threads']),
+                          'recognized_claim_events':sum(len(m.get('recognized_codes',[])) for x in result['threads'] for m in x['messages']),
                           'outbound_authorized':False}))
         return 0
     except Exception as exc:

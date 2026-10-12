@@ -11,6 +11,7 @@ import json
 import re
 from typing import Any, Mapping
 from empire_os.buyer_review_holds import do_not_pursue_domains as founder_do_not_pursue_domains
+from empire_os.buyer_mail_semantics import EVENT_CODES
 
 
 class RelationshipEvidenceError(ValueError):
@@ -171,6 +172,50 @@ def reviewed_request_duplicate_guard(
     threads = relationship.get("gmail_thread_ids")
     if not isinstance(threads, (list, tuple, set, frozenset)):
         threads = ()
+    # New engagements do not need hand-coded message IDs. Use a bounded,
+    # authenticated Gmail SENT event discovered by the existing reader.
+    all_events = relationship.get("buyer_signal_events", [])
+    if not isinstance(all_events, list):
+        all_events = []
+    eligible = [
+        item for item in all_events if isinstance(item, Mapping)
+        and item.get("direction") == "outbound"
+        and item.get("evidence_grade") == "EMAIL_REPORTED_UNVERIFIED"
+        and item.get("event_code") in (
+            "COMPLETE_BUYER_REQUIREMENTS_SENT", "PILOT_TECHNICAL_REQUIREMENTS_SENT",
+        )
+        and isinstance(item.get("message_id"), str)
+        and HEX_ID.fullmatch(item["message_id"])
+    ]
+    eligible.sort(key=lambda item: (item.get("observed_at") or "", item["message_id"]))
+    recognized = (
+        next((item for item in reversed(eligible)
+              if item["event_code"]=="PILOT_TECHNICAL_REQUIREMENTS_SENT"),None)
+        if key == "lead-smart"
+        else next((item for item in reversed(eligible)
+                   if item["event_code"]=="COMPLETE_BUYER_REQUIREMENTS_SENT"),None)
+    )
+    if recognized is not None:
+        ref="gmail:"+recognized["message_id"]
+        return {
+            "schema_version":"empire.buyer_requirements_duplicate_guard.v1",
+            "status": (
+                "SPECIFIC_ROUTING_RECORDING_REQUEST_ALREADY_SENT"
+                if key=="lead-smart" else "PRIOR_FULL_REQUEST_SENT"
+            ),
+            "repeat_full_request_allowed":False,
+            "request_provenance":ref,
+            "outstanding_buyer_questions": (
+                list(LEAD_SMART_PENDING_TECHNICAL_REQUEST["outstanding_question_groups"])
+                if key=="lead-smart" else list(SINGLE_PASS_BUYER_QUESTION_GROUPS)
+            ),
+            "last_outbound_is_independent_proof_of_send": (
+                recognized["message_id"] == relationship.get("last_outbound_message_id")
+            ),
+            "source_snapshot_fresh":relationship.get("gmail_snapshot_fresh") is True,
+            "buyer_answer_complete":False,"outbound_authorized":False,
+            "execution_authority":"NONE",
+        }
     if key in PARTNER_PILOT_SCOPES:
         spec = PARTNER_PILOT_SCOPES[key]
         match = spec["reviewed_thread"] in threads
@@ -713,6 +758,31 @@ def _thread_row(row: Any, *, now: datetime) -> dict[str, Any]:
     hint = row.get("next_action_code", "REVIEW_ONLY")
     if hint not in ALLOWED_HINTS:
         raise RelationshipEvidenceError("unapproved_next_action_code")
+    events = row.get("buyer_signal_events", [])
+    if not isinstance(events,list) or len(events)>120:
+        raise RelationshipEvidenceError("invalid_buyer_recognition_count")
+    safe_events = []
+    seen_events = set()
+    for event in events:
+        if not isinstance(event,dict) or set(event)!={
+            "message_id","event_code","observed_at","evidence_grade","direction",
+        }:
+            raise RelationshipEvidenceError("invalid_buyer_recognition_record")
+        mid = event["message_id"]
+        code = event["event_code"]
+        moment = when(event["observed_at"])
+        direction = event["direction"]
+        if (not isinstance(mid,str) or not HEX_ID.fullmatch(mid)
+                or code not in EVENT_CODES or moment is None
+                or (moment-now).total_seconds()>300
+                or event["evidence_grade"]!="EMAIL_REPORTED_UNVERIFIED"
+                or direction not in ("inbound","outbound")
+                or (code in ("PILOT_TECHNICAL_REQUIREMENTS_SENT",
+                             "COMPLETE_BUYER_REQUIREMENTS_SENT"))!=(direction=="outbound")
+                or (mid,code) in seen_events):
+            raise RelationshipEvidenceError("untrusted_buyer_recognition")
+        seen_events.add((mid,code))
+        safe_events.append(dict(event))
     return {
         "entity_key": key, "company": _str(row.get("company"), 150),
         "identity_domains": sorted(set(identities)),
@@ -723,6 +793,7 @@ def _thread_row(row: Any, *, now: datetime) -> dict[str, Any]:
         "last_outbound_message_id": outbound_id,
         "bounced_addresses": sorted(set(bounce_addresses)),
         "next_action_code": hint,
+        "buyer_signal_events": safe_events,
     }
 
 
@@ -788,7 +859,11 @@ def reconcile(
             "next_action_codes": set(), "discovery_status": None,
             "qualification_tier": None,
             "founder_priority": 0,
+            "buyer_signal_events": [],
         })
+        target["buyer_signal_events"].extend(item["buyer_signal_events"])
+        if len(target["buyer_signal_events"])>300:
+            raise RelationshipEvidenceError("too_many_buyer_recognition_events")
         target["identity_domains"].update(item["identity_domains"])
         target["gmail_thread_ids"].add(item["gmail_thread_id"])
         target["bounced_addresses"].update(item["bounced_addresses"])
@@ -871,6 +946,7 @@ def reconcile(
                 "gmail_thread_ids": record["gmail_thread_ids"],
                 "last_outbound_message_id": record["last_outbound_message_id"],
                 "gmail_snapshot_fresh": record_mail_fresh,
+                "buyer_signal_events": record.get("buyer_signal_events", []),
             }
         )
         founder_action, action_reason, needs_review = _apply_reviewed_request_to_action(
@@ -907,6 +983,13 @@ def reconcile(
             "qualification_tier": record["qualification_tier"],
             "founder_priority": record["founder_priority"],
             "gmail_snapshot_fresh": record_mail_fresh,
+            # Deterministic recognition reports what a buyer *said*, not
+            # verified legal consent, actual routing, pricing or call success.
+            "automatically_recognized_buyer_events": sorted(
+                record.get("buyer_signal_events", []),
+                key=lambda x: (x["observed_at"], x["message_id"], x["event_code"]),
+            ),
+            "recognized_buyer_events_are_verified": False,
             "buyer_onboarding_duplicate_guard": reviewed_request,
             "commercial_buyer_approved": False,
             "suppression_evidence_complete": False,
@@ -926,6 +1009,7 @@ def reconcile(
             "entity_key": item['entity_key'], "company": item['company'],
             "stage": item['stage'], "next_founder_action": item['next_founder_action'],
             "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
+            "automatically_recognized_buyer_events": item["automatically_recognized_buyer_events"],
             "gmail_url": item['gmail_url'],
             "last_inbound_at": item['last_inbound_at'],
             "last_outbound_at": item['last_outbound_at'],
@@ -944,6 +1028,7 @@ def reconcile(
             "entity_key": item["entity_key"], "company": item["company"],
             "stage": item["stage"], "next_founder_action": item["next_founder_action"],
             "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
+            "automatically_recognized_buyer_events": item["automatically_recognized_buyer_events"],
             "reason": item["founder_action_reason"],
             "last_inbound_at": item["last_inbound_at"],
             "last_outbound_at": item["last_outbound_at"],

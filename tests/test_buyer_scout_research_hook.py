@@ -24,12 +24,11 @@ def test_existing_scout_invokes_governed_evidence_without_new_timer(tmp_path):
     assert options["env"]["LIVE_OUTBOUND"] == "0"
     assert options["env"]["EMPIRE_EXECUTION_AUTHORITY"] == "OBSERVE"
     second_args, second_opts = seen[1]
-    assert second_args[1] == str(tmp_path / "scripts/reconcile_buyer_email_relationships.py")
-    assert second_args[-1] == "--write"
-    assert second_opts["timeout"] <= 35
+    assert second_args[1:] == ["-m", "scripts.run_buyer_gmail_evidence_cycle"]
+    assert second_opts["timeout"] <= 120
     assert second_opts["env"]["OUTBOUND_ENABLED"] == "0"
     assert result["relationship_registry"] == "PASS"
-    assert result["mailbox_ingest_in_this_cycle"] is False
+    assert result["mailbox_ingest_in_this_cycle"] is True
     assert result["outbound_sent"] is False
 
 

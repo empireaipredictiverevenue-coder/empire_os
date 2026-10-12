@@ -24,7 +24,8 @@ def run(*, root=ROOT, invoke=None):
     fd = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     env = os.environ.copy()
     env.update(EMPIRE_MODE="OBSERVE", OUTBOUND_ENABLED="0",
-               EMPIRE_OUTBOUND_ENABLED="0", LIVE_OUTBOUND="0")
+               EMPIRE_OUTBOUND_ENABLED="0", LIVE_OUTBOUND="0",
+               PYTHONPATH=str(root))
     with os.fdopen(fd, "r+") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)

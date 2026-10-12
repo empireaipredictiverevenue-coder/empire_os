@@ -7,7 +7,7 @@ class Response:
 
 class Threads:
     def get(self, **kwargs):
-        assert kwargs['format'] == 'metadata'
+        assert kwargs['format'] == 'full'
         return Response()
 
 class Users:

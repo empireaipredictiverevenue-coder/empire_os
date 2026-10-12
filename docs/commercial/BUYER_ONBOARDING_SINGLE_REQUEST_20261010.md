@@ -71,6 +71,16 @@
 **Business completion standard:** one buyer-specific accepted buy-box + terms + legal source/consent + correctly tracked/routed eligible event + approved launch + verifiable payable conversion and reconciliation. Read-only evidence, approved campaign enrollment and a draft email are not realised revenue.
 
 
+## Automated evidence recognition, production 12 October 2026
+
+The existing authorised Gmail **read-only** connection now supports unattended recognition in the existing 30-minute buyer-scout reconciliation. The existing sequence is `run_buyer_gmail_evidence_cycle.py`: bounded Gmail read → verified metadata import → relationship/founder-queue reconciliation. It recognises explicit buyer statements about landing approval, caller ID, route-live claims, recording on/off and test calls ending before connection, plus the founder's complete onboarding / scoped technical requests. New recognised events carry the authenticated thread/message ID, event code, time and `EMAIL_REPORTED_UNVERIFIED` evidence grade; raw email bodies are processed only in memory and **never copied to the registry**.
+
+The existing fixed-scope reader currently covers **four already-linked warm buyer Gmail threads** (Lead Smart, LeadBank, Validated and Connexis), NOT every new or cold buyer automatically. Within those threads future complete-request sends can be detected from message content without manually entering new Gmail message IDs. The historical message-ID map remains a source-checked fallback for older records. Unknown or unlinked thread identities require separate identity verification before being added to the bounded polling scope.
+
+**Automatic recognition is not independent verification:** approval emails do not prove live target configuration, ring time, connected ANI, legal/consent compliance, recording retention or actual payable calls. All applicable external provider, legal, founder and commercial gates remain separately enforced. New replies and contradictions update the existing evidence queue, not the send queue. Duplicate-request and outbound-suppression rules still apply.
+
+Live evidence check: on 12 October the pipeline processed 59 Gmail messages from the four linked threads, all three stages passed, Lead Smart produced nine current reported events and remained `WAIT_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT`; outbound count was zero.
+
 ## Mandatory one-email launch contract (12 October 2026)
 
 This **enforces** the existing 10 October single-request policy. The earlier Lead Smart row above is historical: Seth approved the revised buyer page on 11 October; it is now published. Founder scope approval and the 27,100-ZIP production refresh are also complete. Do not request these again.

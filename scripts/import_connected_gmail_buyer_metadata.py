@@ -16,6 +16,7 @@ from pathlib import Path
 import re
 
 from empire_os.commercial_relationship_registry import RelationshipEvidenceError, when
+from empire_os.buyer_mail_semantics import EVENT_CODES
 from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
 ROOT = Path("/srv/empire_os")
@@ -127,6 +128,7 @@ def refreshed_summary(
         domains = set(known[tid]["identity_domains"])
         latest = {"inbound":(None,None),"outbound":(None,None)}
         ids = set()
+        recognized = []
         for m in msgs:
             if not isinstance(m,dict) or not HEX.fullmatch(str(m.get("id") or "")) or m["id"] in ids:
                 raise RelationshipEvidenceError("INVALID_OR_DUPLICATE_GMAIL_MESSAGE_ID")
@@ -150,9 +152,28 @@ def refreshed_summary(
                 direction="inbound"
             else:
                 continue
+            event_codes = m.get("recognized_codes", [])
+            if (not isinstance(event_codes, list) or len(event_codes)>len(EVENT_CODES)
+                    or len(event_codes)!=len(set(event_codes))
+                    or any(not isinstance(code,str) or code not in EVENT_CODES
+                           for code in event_codes)):
+                raise RelationshipEvidenceError("INVALID_BUYER_RECOGNITION_EVENT")
+            for code in event_codes:
+                if (code in ("PILOT_TECHNICAL_REQUIREMENTS_SENT",
+                             "COMPLETE_BUYER_REQUIREMENTS_SENT")) != (direction=="outbound"):
+                    raise RelationshipEvidenceError("RECOGNITION_EVENT_DIRECTION_MISMATCH")
+                recognized.append({
+                    "message_id":m["id"], "event_code":code,
+                    "observed_at":ts.isoformat(),
+                    "evidence_grade":"EMAIL_REPORTED_UNVERIFIED",
+                    "direction":direction,
+                })
             if latest[direction][0] is None or ts>latest[direction][0]:
                 latest[direction]=(ts,m["id"])
         target=originals[tid]
+        # Replace only this reviewed thread's bounded recognised claim codes.
+        # Claimed calls/ANI/recording are NEVER provider-side verification.
+        target["buyer_signal_events"] = recognized[:120]
         for direction,(ts,msg_id) in latest.items():
             if ts is None:
                 continue

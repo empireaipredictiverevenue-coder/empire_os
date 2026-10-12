@@ -17,6 +17,10 @@ Record exact approvals: action, target, recipient, sender, scope, conditions and
 Use authorized read-only inspection first. Inspect scripts for side effects before calling them. If access is unavailable, state the limitation and request one bounded evidence capture. Do not claim an email was sent, a page deployed, a buyer accepted, or revenue realised from a draft, screenshot, local test or historical summary.
 
 
+## Automatic Gmail evidence recognition
+
+Before manually rereading a known partner conversation, consume the **existing read-only buyer registry's `automatically_recognized_buyer_events`** and its underlying exact Gmail message/thread references. The authorised four-thread intake runs on the existing buyer-scout cycle and recognises explicit approval, recording, reported routing/ANI, incomplete test calls, full onboarding requests and follow-up requests. A newly recognised event is `EMAIL_REPORTED_UNVERIFIED`, never independently confirmed launch authority. Read the exact original message when ambiguity or conflict appears; never infer a verified call, recording consent, payout or commercial acceptance from a recognised phrase. New/unlinked threads must undergo identity linking before the bounded collector may ingest them. Do not create another poller, agent or timer.
+
 ## One-email buyer requirements rule
 
 **Before asking an engaged buyer for anything**, consult `docs/commercial/BUYER_ONBOARDING_SINGLE_REQUEST_20261010.md`, especially the 12 October mandatory single-email contract. Extract all already-known requirements from the complete thread and current documents. Build one evidence matrix with field, buyer owner, exact acceptable proof, `ANSWERED_REPORTED / PROVEN / UNANSWERED / CONTRADICTED / NOT_APPLICABLE`, and original evidence reference.
