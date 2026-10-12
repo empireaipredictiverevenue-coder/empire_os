@@ -7,6 +7,7 @@ grant provider authority, or save caller data.
 from __future__ import annotations
 
 import base64
+from html.parser import HTMLParser
 import re
 from typing import Any, Mapping
 
@@ -21,6 +22,7 @@ EVENT_CODES = frozenset({
     "CALLER_ID_PASSTHROUGH_REPORTED",
     "PILOT_TECHNICAL_REQUIREMENTS_SENT",
     "COMPLETE_BUYER_REQUIREMENTS_SENT",
+    "PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED",
 })
 
 def _decode(data: Any) -> str:
@@ -42,6 +44,57 @@ def _body_parts(part: Mapping[str, Any], depth: int = 0) -> list[str]:
     for child in (part.get("parts") or [])[:15]:
         if isinstance(child, Mapping):
             chunks.extend(_body_parts(child, depth + 1))
+    return chunks
+
+
+class _VisibleEmailHTML(HTMLParser):
+    """Visible text only: ignore scripts, styles and quoted reply blocks."""
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.content=[]
+        self.hidden=[]
+    def handle_starttag(self, tag, attrs):
+        fields=dict(attrs)
+        classes=str(fields.get("class") or "").lower().split()
+        ignored=(tag.lower() in ("script","style","noscript","blockquote","template")
+                 or bool(set(classes) & {
+                    "gmail_quote","yahoo_quoted","protonmail_quote",
+                    "moz-cite-prefix","gmail_attr",
+                 }))
+        if self.hidden:
+            self.hidden.append(tag.lower())
+        elif ignored:
+            self.hidden=[tag.lower()]
+        elif tag.lower() in ("p","div","br","li","hr","tr"):
+            self.content.append("\n")
+    def handle_endtag(self, tag):
+        if self.hidden:
+            if tag.lower()==self.hidden[-1]:
+                self.hidden.pop()
+        elif tag.lower() in ("p","div","li","tr"):
+            self.content.append("\n")
+    def handle_data(self, data):
+        if not self.hidden and len(self.content)<1500:
+            self.content.append(data[:4000])
+    def text(self):
+        return "".join(self.content)[:12000]
+
+
+def _html_visible_parts(part: Mapping[str, Any], depth: int = 0) -> list[str]:
+    if depth>4:
+        return []
+    if part.get("mimeType")=="text/html":
+        raw=_decode((part.get("body") or {}).get("data"))
+        if not raw:
+            return []
+        parser=_VisibleEmailHTML()
+        parser.feed(raw)
+        parser.close()
+        return [parser.text()]
+    chunks=[]
+    for child in (part.get("parts") or [])[:15]:
+        if isinstance(child, Mapping):
+            chunks.extend(_html_visible_parts(child,depth+1))
     return chunks
 
 
@@ -80,6 +133,9 @@ def classify_visible_claims(visible: str, *, outbound: bool = False) -> list[str
                     and not re.search(r"\b(not approved|approval (?:still )?pending)\b",
                                       approved.group(0))):
                 events.add("LANDING_VISUAL_APPROVED_REPORTED")
+            if (re.search(r"\b(?:we|i|our team)\s+only\s+(?:do|offer|accept|provide)\b",line)
+                    and re.search(r"\b(?:sponsored posts?|guest posts?|link placements?)\b",line)):
+                events.add("PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED")
             if re.search(r"\b(recording|recordings)\b",line):
                 if re.search(r"\b(are|is|remain|currently) (enabled|on)\b|\brecording(?:s)? enabled\b",line):
                     events.add("RECORDING_ENABLED_REPORTED")
@@ -118,6 +174,8 @@ def recognize_message_payload(payload: Mapping[str, Any], *, outbound: bool = Fa
     parts = _body_parts(payload)
     if not parts and payload.get("mimeType") == "text/plain":
         parts = [_decode((payload.get("body") or {}).get("data"))]
+    if not parts:
+        parts=_html_visible_parts(payload)
     if not parts:
         return []
     return classify_visible_claims("\n".join(parts), outbound=outbound)

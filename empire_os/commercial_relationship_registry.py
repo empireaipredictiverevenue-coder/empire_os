@@ -1000,6 +1000,42 @@ def reconcile(
             "EVIDENCE_HOLD": 2, "DELIVERY_HOLD": 3,
             "CONTACTED_AWAITING_RESPONSE": 4, "RESEARCH_ONLY": 5}
     result.sort(key=lambda r: (rank[r["stage"]], -r["founder_priority"], r["company"]))
+    unlinked = source.get("buyer_new_thread_review", [])
+    if not isinstance(unlinked,list) or len(unlinked)>48:
+        raise RelationshipEvidenceError("invalid_unlinked_buyer_thread_review")
+    safe_review=[]
+    seen_unlinked=set()
+    for row in unlinked:
+        if (not isinstance(row,Mapping)
+                or not {"thread_id","domain","last_buyer_reply_id",
+                              "status","source","outbound_authorized","execution_authority"} <= set(row)
+                or set(row)-{"thread_id","domain","last_buyer_reply_id",
+                              "status","source","outbound_authorized","execution_authority",
+                              "reported_constraint"}):
+            raise RelationshipEvidenceError("untrusted_unlinked_buyer_review_row")
+        tid=row["thread_id"]
+        domain=row["domain"]
+        mid=row["last_buyer_reply_id"]
+        if (not isinstance(tid,str) or not HEX_ID.fullmatch(tid)
+                or tid in seen_unlinked or not isinstance(mid,str) or not HEX_ID.fullmatch(mid)
+                or not isinstance(domain,str) or not VALID_DOMAIN.fullmatch(domain)
+                or domain in ("gmail.com","yahoo.com","outlook.com","hotmail.com")
+                or row["status"] not in (
+                    "REVIEW_IDENTITY_NO_SEND","REVIEW_MONITORING_CAP_NO_SEND",
+                    "HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT",
+                )
+                or row.get("reported_constraint") not in (
+                    None,"SPONSORED_PLACEMENTS_ONLY_REPORTED"
+                )
+                or (row["status"]=="HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT") != (
+                    row.get("reported_constraint")=="SPONSORED_PLACEMENTS_ONLY_REPORTED"
+                )
+                or row["source"]!="EXACT_TWO_WAY_DMARC_ALIGNED_EMAIL_REPORTED"
+                or row["outbound_authorized"] is not False
+                or row["execution_authority"]!="NONE"):
+            raise RelationshipEvidenceError("invalid_unlinked_buyer_review_identity")
+        seen_unlinked.add(tid)
+        safe_review.append(dict(row))
     raw = json.dumps(source, sort_keys=True, separators=(",", ":")).encode()
     counts = {stage: sum(r["stage"] == stage for r in result) for stage in rank}
     # Warm two-way correspondence is a separate, compact founder signal.
@@ -1053,6 +1089,9 @@ def reconcile(
         "gmail_source_sha256": sha256(raw).hexdigest(),
         "discovery_queue_generated_at": queue.get("generated_at"),
         "relationship_count": len(result),
+        "new_engaged_buyer_identity_review_count":len(safe_review),
+        "new_engaged_buyer_identity_review_queue":safe_review,
+        "new_engaged_buyer_review_outbound_authorized":False,
         "founder_do_not_pursue_count": sum(bool(r["do_not_pursue"]) for r in result),
         "linked_gmail_thread_count": sum(len(r["gmail_thread_ids"]) for r in result),
         "stage_counts": counts,

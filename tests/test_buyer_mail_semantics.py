@@ -52,7 +52,7 @@ def test_raw_gmail_payload_never_returned_and_plain_mime_supported():
     data=base64.urlsafe_b64encode(body.encode()).decode().rstrip("=")
     msg={"mimeType":"multipart/alternative","parts":[{"mimeType":"text/plain","body":{"data":data}}]}
     assert recognize_message_payload(msg) == ["RECORDING_ENABLED_REPORTED"]
-    assert recognize_message_payload({"mimeType":"text/html","body":{"data":data}}) == []
+    assert recognize_message_payload({"mimeType":"text/html","body":{"data":data}}) == ["RECORDING_ENABLED_REPORTED"]
     assert "Recordings" not in json.dumps(recognize_message_payload(msg))
 
 
@@ -167,3 +167,16 @@ def test_new_engaged_buyer_full_requirement_request_needs_no_hardcoded_ids():
     assert guard["request_provenance"]=="gmail:0123456789abcdef"
     assert guard["repeat_full_request_allowed"] is False
     assert guard["outbound_authorized"] is False
+
+
+def test_html_only_publisher_response_reports_paid_placements_without_quoted_history():
+    body=(
+        '<html><body><div>Hi Phil,</div><div>We only do sponsored posts, guest posts, '
+        'and link placements in existing content as part of collaborations.</div>'
+        '<blockquote>Our landing page is approved and route live.</blockquote>'
+        '<div class="gmail_quote">You have our sign-off; you\'re approved and can go live.</div>'
+        '<script>We approved your calls.</script></body></html>'
+    )
+    encoded=base64.urlsafe_b64encode(body.encode()).decode().rstrip('=')
+    events=recognize_message_payload({"mimeType":"text/html","body":{"data":encoded}})
+    assert events==["PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED"]

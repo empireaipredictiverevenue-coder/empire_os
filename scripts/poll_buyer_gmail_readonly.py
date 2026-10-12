@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from email.utils import parseaddr
 from empire_os.buyer_mail_semantics import recognize_message_payload
+from empire_os.buyer_thread_discovery import discover
 from scripts.import_connected_gmail_buyer_metadata import THREADS, ROOT, INDEX, SCHEMA
 from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
@@ -14,12 +15,18 @@ READ_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
 TOKEN = ROOT / 'runtime/secrets/buyer-gmail-readonly-token.json'
 
 
-def collect(service, *, now=None, known_domains=None):
+def collect(service, *, now=None, known_domains=None, additional_threads=None, additional_names=None):
     known_domains = known_domains or {}
     threads = []
     names = {'lead-smart':'Lead Smart', 'leadbank':'LeadBank',
              'validated':'Validated / Home Services Lead Group', 'connexis':'Connexis'}
-    for tid, key in THREADS.items():
+    monitored=dict(THREADS)
+    for tid,key in (additional_threads or {}).items():
+        if tid not in monitored and isinstance(tid,str) and isinstance(key,str):
+            monitored[tid]=key
+    if len(monitored)>24:
+        raise ValueError("GMAIL_MONITORING_SCOPE_TOO_LARGE")
+    for tid, key in monitored.items():
         # Full payload read ONLY in memory. Persist event codes and message IDs,
         # never the raw email text, sender secrets or personal caller details.
         response = service.users().threads().get(
@@ -55,7 +62,8 @@ def collect(service, *, now=None, known_domains=None):
             if events:
                 row['recognized_codes']=events
             messages.append(row)
-        threads.append({'partner':names[key], 'thread_id':tid, 'message_count':len(messages),
+        partner=(additional_names or {}).get(tid) or names.get(key,key)
+        threads.append({'partner':partner, 'thread_id':tid, 'message_count':len(messages),
                         'truncated':False, 'messages':messages})
     return {'schema_version':SCHEMA,'source':'empire_gmail_api_readonly',
             'collected_at':(now or datetime.now(timezone.utc)).isoformat(),
@@ -86,13 +94,35 @@ def main():
             raise ValueError('READONLY_OAUTH_NOT_VALID')
         from scripts.import_connected_gmail_buyer_metadata import _private, SOURCE, refreshed_summary
         original = _private(ROOT/SOURCE, 2500000)
-        known_domains = {
-            row["entity_key"]: row["identity_domains"]
-            for row in original.get("threads", [])
-            if row.get("gmail_thread_id") in THREADS
+        known_domains = {}
+        for row in original.get("threads", []):
+            if (row.get("gmail_thread_id") in THREADS
+                    or row.get("automatic_discovery_link") is True):
+                key = row["entity_key"]
+                known_domains.setdefault(key,set()).update(row["identity_domains"])
+        extra={
+            row["gmail_thread_id"]:row["entity_key"]
+            for row in original.get("threads",[])
+            if row.get("automatic_discovery_link") is True
         }
-        result=collect(build('gmail','v1',credentials=creds,cache_discovery=False),
-                       known_domains=known_domains)
+        extra_names={
+            row["gmail_thread_id"]:row["company"]
+            for row in original.get("threads",[])
+            if row.get("automatic_discovery_link") is True
+        }
+        service=build('gmail','v1',credentials=creds,cache_discovery=False)
+        result=collect(service,known_domains=known_domains,
+                       additional_threads=extra,additional_names=extra_names)
+        prior_index={}
+        if (ROOT/INDEX).is_file():
+            try:
+                prior_index=_private(ROOT/INDEX,900000)
+            except (OSError, ValueError):
+                prior_index={}
+        prior_discovery=prior_index.get("discovery") or {}
+        result["discovery"]=discover(
+            service,original,cursor=prior_discovery.get("next_cursor",0),
+        )
         # Validate the entire candidate against the existing buyer evidence
         # contract before replacing the private index. Never write partial data.
         refreshed_summary(original, result)
@@ -101,6 +131,10 @@ def main():
         print(json.dumps({'status':'PASS','written':args.write,'threads':len(result['threads']),
                           'messages':sum(x['message_count'] for x in result['threads']),
                           'recognized_claim_events':sum(len(m.get('recognized_codes',[])) for x in result['threads'] for m in x['messages']),
+                          'new_thread_candidates_checked':result['discovery']['checked_thread_count'],
+                          'new_known_buyer_threads_found':result['discovery']['known_buyer_threads'],
+                          'new_unknown_identity_review_found':result['discovery']['unlinked_review_count'],
+                          'new_thread_discovery_incomplete':result['discovery']['incomplete_scan'],
                           'outbound_authorized':False}))
         return 0
     except Exception as exc:

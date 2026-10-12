@@ -17,6 +17,14 @@ Record exact approvals: action, target, recipient, sender, scope, conditions and
 Use authorized read-only inspection first. Inspect scripts for side effects before calling them. If access is unavailable, state the limitation and request one bounded evidence capture. Do not claim an email was sent, a page deployed, a buyer accepted, or revenue realised from a draft, screenshot, local test or historical summary.
 
 
+## Automatically distinguish supply from demand
+
+A new reply is not necessarily a new lead buyer. Reconcile the observed correspondent domain against the existing first-party supplier/publisher portfolio before opening buyer-demand actions. An explicitly reported "sponsored posts, guest posts and link placements only" response belongs in publisher-supply review with \`HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL\`; do not pitch a performance revenue-sharing deal again by default. Treat historical publisher research as a **role hypothesis**, not verified inventory, agreement or authority to purchase media. Reuse the existing \`new_engaged_publisher_supply_review_queue\` and original Gmail message IDs, never duplicate the acquisition or email-sending pipeline.
+
+## Automatic discovery of additional buyer threads
+
+Use the existing scoped Gmail collector's rotating recent-SENT discovery, not a new crawler or timer. Treat two-way reply, matching founder-addressed recipient and Google-authenticated DMARC alignment as evidence of a real conversation, **not** a verified commercial buyer. Additional threads for a uniquely pre-established partner can be included in the existing conversation registry; unknown-company threads belong in \`new_engaged_buyer_identity_review_queue\` with no outbound authority or arbitrary CRM account creation. The 12-thread scan is partial, and an unknown-domain hold cannot be promoted from email content alone. Keep prior message IDs and previous replies rather than restarting onboarding.
+
 ## Automatic Gmail evidence recognition
 
 Before manually rereading a known partner conversation, consume the **existing read-only buyer registry's `automatically_recognized_buyer_events`** and its underlying exact Gmail message/thread references. The authorised four-thread intake runs on the existing buyer-scout cycle and recognises explicit approval, recording, reported routing/ANI, incomplete test calls, full onboarding requests and follow-up requests. A newly recognised event is `EMAIL_REPORTED_UNVERIFIED`, never independently confirmed launch authority. Read the exact original message when ambiguity or conflict appears; never infer a verified call, recording consent, payout or commercial acceptance from a recognised phrase. New/unlinked threads must undergo identity linking before the bounded collector may ingest them. Do not create another poller, agent or timer.

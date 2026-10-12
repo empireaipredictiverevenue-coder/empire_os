@@ -17,6 +17,7 @@ import re
 
 from empire_os.commercial_relationship_registry import RelationshipEvidenceError, when
 from empire_os.buyer_mail_semantics import EVENT_CODES
+from empire_os.buyer_thread_discovery import _anchors, DOMAIN, BLOCKED_DOMAINS
 from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
 ROOT = Path("/srv/empire_os")
@@ -90,7 +91,14 @@ def refreshed_summary(
     if polled_at is None or not 0 <= (clock-polled_at).total_seconds() <= 600:
         raise RelationshipEvidenceError("GMAIL_CONNECTOR_POLL_NOT_CURRENT")
     rows = index.get("threads")
-    if not isinstance(rows, list) or len(rows) != len(THREADS):
+    additional = {
+        row["gmail_thread_id"]:row["entity_key"]
+        for row in old.get("threads",[])
+        if isinstance(row,dict) and row.get("automatic_discovery_link") is True
+    }
+    expected={**THREADS, **additional}
+    if (not isinstance(rows, list) or len(rows) != len(expected)
+            or len(expected)>24):
         raise RelationshipEvidenceError("INCOMPLETE_KNOWN_BUYER_THREAD_SCAN")
     src_rows = old.get("threads")
     if not isinstance(src_rows, list) or len(src_rows)>500:
@@ -99,16 +107,16 @@ def refreshed_summary(
         raise RelationshipEvidenceError("INVALID_ORIGINAL_GMAIL_SOURCE")
     known = {}
     for entry in src_rows:
-        if isinstance(entry, dict) and entry.get("gmail_thread_id") in THREADS:
+        if isinstance(entry, dict) and entry.get("gmail_thread_id") in expected:
             tid = entry["gmail_thread_id"]
-            if tid in known or entry.get("entity_key") != THREADS[tid]:
+            if tid in known or entry.get("entity_key") != expected[tid]:
                 raise RelationshipEvidenceError("DUPLICATE_OR_MISMATCHED_ORIGINAL_THREAD")
             known[tid] = entry
-    if set(known) != set(THREADS):
+    if set(known) != set(expected):
         raise RelationshipEvidenceError("MISSING_KNOWN_ORIGINAL_BUYER_THREADS")
     updated = deepcopy(old)
     originals = {t["gmail_thread_id"]: t for t in updated["threads"]
-                 if isinstance(t, dict) and t.get("gmail_thread_id") in THREADS}
+                 if isinstance(t, dict) and t.get("gmail_thread_id") in expected}
     found = set()
     totals = 0
     changes = 0
@@ -116,7 +124,7 @@ def refreshed_summary(
         if not isinstance(thread, dict):
             raise RelationshipEvidenceError("INVALID_THREAD_RECORD")
         tid = thread.get("thread_id")
-        if tid not in THREADS or tid in found or thread.get("truncated") is not False:
+        if tid not in expected or tid in found or thread.get("truncated") is not False:
             raise RelationshipEvidenceError("UNTRUSTED_OR_PARTIAL_THREAD")
         if thread.get("partner") != known[tid]["company"]:
             raise RelationshipEvidenceError("PARTNER_THREAD_LABEL_MISMATCH")
@@ -186,14 +194,159 @@ def refreshed_summary(
                 target["last_"+direction+"_message_id"]=msg_id
             elif target.get("last_"+direction+"_message_id")!=msg_id:
                 raise RelationshipEvidenceError("CONFLICTING_GMAIL_MESSAGE_AT_SAME_TIME")
-    if found!=set(THREADS):
+    if found!=set(expected):
         raise RelationshipEvidenceError("MISSING_EXPECTED_BUYER_THREAD")
+    # Discovery is advisory unless an exact anchored two-way prior
+    # relationship exists. Unknown company identities are review-only and
+    # cannot grant outbound, terms or activation authority.
+    discovery=index.get("discovery")
+    linked_now=[]
+    new_unlinked=[]
+    if discovery is not None:
+        if (not isinstance(discovery,dict)
+                or discovery.get("schema_version")!="empire.buyer_new_thread_discovery.v1"
+                or discovery.get("scope")!="RECENT_SENT_TWO_WAY_ONLY"
+                or discovery.get("outbound_authorized") is not False
+                or discovery.get("execution_authority")!="NONE"):
+            raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY")
+        observed=when(discovery.get("captured_at"))
+        if observed is None or abs((observed-polled_at).total_seconds())>300:
+            raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_TIME")
+        candidates=discovery.get("candidates")
+        if not isinstance(candidates,list) or len(candidates)>12:
+            raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_COUNT")
+        anchored=_anchors(old)
+        known_thread_ids={
+            r.get("gmail_thread_id") for r in updated["threads"]
+            if isinstance(r,dict)
+        }
+        seen_new=set()
+        for item in candidates:
+            if not isinstance(item,dict):
+                raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_ROW")
+            tid=item.get("thread_id")
+            domain=item.get("domain")
+            if (not isinstance(tid,str) or not HEX.fullmatch(tid)
+                    or tid in seen_new
+                    or not isinstance(domain,str) or not DOMAIN.fullmatch(domain)
+                    or domain in BLOCKED_DOMAINS
+                    or item.get("provider_auth_dmarc_aligned") is not True
+                    or item.get("outbound_authorized") is not False
+                    or item.get("buyer_approved") is not False):
+                raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_IDENTITY")
+            seen_new.add(tid)
+            sent_id=item.get("founder_sent_id")
+            reply_id=item.get("buyer_reply_id")
+            sent_at=when(item.get("founder_sent_at"))
+            reply_at=when(item.get("buyer_reply_at"))
+            if (not isinstance(sent_id,str) or not HEX.fullmatch(sent_id)
+                    or not isinstance(reply_id,str) or not HEX.fullmatch(reply_id)
+                    or sent_id==reply_id or sent_at is None or reply_at is None
+                    or (sent_at-clock).total_seconds()>300
+                    or (reply_at-clock).total_seconds()>300):
+                raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_PROVENANCE")
+            recognized=item.get("recognized_events")
+            if not isinstance(recognized,list) or len(recognized)>120:
+                raise RelationshipEvidenceError("INVALID_NEW_BUYER_DISCOVERY_EVENTS")
+            events=[]
+            event_keys=set()
+            for event in recognized:
+                if not isinstance(event,dict) or set(event)!={
+                    "message_id","event_code","observed_at","evidence_grade","direction"
+                }:
+                    raise RelationshipEvidenceError("INVALID_DISCOVERED_EVENT_SHAPE")
+                e_mid=event["message_id"]
+                e_code=event["event_code"]
+                e_when=when(event["observed_at"])
+                direction=event["direction"]
+                if (not isinstance(e_mid,str) or not HEX.fullmatch(e_mid)
+                        or e_code not in EVENT_CODES or e_when is None
+                        or (e_when-clock).total_seconds()>300
+                        or event["evidence_grade"]!="EMAIL_REPORTED_UNVERIFIED"
+                        or direction not in ("inbound","outbound")
+                        or (e_code in ("PILOT_TECHNICAL_REQUIREMENTS_SENT",
+                                     "COMPLETE_BUYER_REQUIREMENTS_SENT")) != (direction=="outbound")
+                        or (e_mid,e_code) in event_keys):
+                    raise RelationshipEvidenceError("INVALID_DISCOVERED_EVENT_PROVENANCE")
+                event_keys.add((e_mid,e_code))
+                events.append(dict(event))
+            known_identity=anchored.get(domain)
+            if known_identity and item.get("entity_key")==known_identity[0] and item.get("company")==known_identity[1]:
+                linked_capacity=sum(
+                    x.get("automatic_discovery_link") is True
+                    for x in updated["threads"] if isinstance(x,dict)
+                )
+                if (tid not in known_thread_ids and len(updated["threads"])<500
+                        and linked_capacity<20):
+                    updated["threads"].append({
+                        "gmail_thread_id":tid, "entity_key":known_identity[0],
+                        "company":known_identity[1], "identity_domains":[domain],
+                        "last_inbound_at":reply_at.isoformat(),
+                        "last_inbound_message_id":reply_id,
+                        "last_outbound_at":sent_at.isoformat(),
+                        "last_outbound_message_id":sent_id,
+                        "bounced_addresses":[], "next_action_code":"REVIEW_ONLY",
+                        "buyer_signal_events":events,
+                        "automatic_discovery_link":True,
+                    })
+                    linked_now.append(tid)
+                    known_thread_ids.add(tid)
+                elif tid not in known_thread_ids:
+                    new_unlinked.append({
+                        "thread_id":tid, "domain":domain,
+                        "last_buyer_reply_id":reply_id,
+                        "status":"REVIEW_MONITORING_CAP_NO_SEND",
+                        "source":"EXACT_TWO_WAY_DMARC_ALIGNED_EMAIL_REPORTED",
+                        "outbound_authorized":False,"execution_authority":"NONE",
+                    })
+            elif item.get("status")=="NEW_DOMAIN_REQUIRES_IDENTITY_REVIEW" and item.get("entity_key") is None and item.get("company") is None:
+                paid_only=any(
+                    e["event_code"]=="PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED"
+                    and e["direction"]=="inbound" for e in events
+                )
+                new_unlinked.append({
+                    "thread_id":tid, "domain":domain,
+                    "last_buyer_reply_id":reply_id,
+                    "status":(
+                        "HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT" if paid_only
+                        else "REVIEW_IDENTITY_NO_SEND"
+                    ),
+                    "reported_constraint":(
+                        "SPONSORED_PLACEMENTS_ONLY_REPORTED" if paid_only else None
+                    ),
+                    "source":"EXACT_TWO_WAY_DMARC_ALIGNED_EMAIL_REPORTED",
+                    "outbound_authorized":False, "execution_authority":"NONE",
+                })
+            else:
+                raise RelationshipEvidenceError("NEW_DISCOVERY_IDENTITY_CONFLICT")
+    # Persist bounded review-only unknown identities; never create a CRM row
+    # or treat them as clients until identity is independently checked.
+    previous_review=old.get("buyer_new_thread_review",[])
+    if not isinstance(previous_review,list) or len(previous_review)>48:
+        raise RelationshipEvidenceError("INVALID_PREVIOUS_BUYER_REVIEW")
+    review_by_tid={
+        row["thread_id"]:row for row in previous_review
+        if isinstance(row,dict) and isinstance(row.get("thread_id"),str)
+        and HEX.fullmatch(row["thread_id"])
+    }
+    review_by_tid.update({row["thread_id"]:row for row in new_unlinked})
+    updated["buyer_new_thread_review"] = list(review_by_tid.values())[-48:]
+    updated["buyer_discovery_status"]={
+        "schema_version":"empire.buyer_new_thread_discovery_status.v1",
+        "last_scan_at":polled_at.isoformat() if discovery is not None else None,
+        "known_threads_linked":len(linked_now),
+        "unlinked_identity_review_count":len(updated["buyer_new_thread_review"]),
+        "scan_incomplete":(discovery.get("incomplete_scan") if discovery is not None else True),
+        "outbound_authorized":False,"execution_authority":"NONE",
+    }
+    found.update(linked_now)
     # Never falsify the original capture of the other ~53 historical threads.
     updated["partial_update_at"]=polled_at.isoformat()
     updated["partial_updated_thread_ids"]=sorted(found)
     updated["connected_gmail_bridge"]={
         "schema_version":"empire.connected_gmail_metadata_bridge.v1",
-        "checked_known_threads":len(found),
+        "checked_known_threads":len(found)-len(linked_now),
+        "newly_discovered_two_way_links":len(linked_now),
         "checked_message_count":totals,
         "collected_at":polled_at.isoformat(),
         "read_only":True,
@@ -213,7 +366,7 @@ def main() -> int:
     args=ap.parse_args()
     try:
         base=ROOT/REL
-        index=_private(ROOT/INDEX,400000)
+        index=_private(ROOT/INDEX,900000)
         source=_private(ROOT/SOURCE,2500000)
         updated, summary=refreshed_summary(source,index)
         if args.write:

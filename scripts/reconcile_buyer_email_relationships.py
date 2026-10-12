@@ -115,6 +115,65 @@ def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> N
     report["founder_reported_external_contact_count"] = len(reviewed)
 
 
+def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
+    """Match previously researched supply companies, without authority."""
+    rows=report.get("new_engaged_buyer_identity_review_queue",[])
+    if not isinstance(rows,list):
+        raise RelationshipEvidenceError("invalid_new_engaged_review")
+    source=root/"docs/commercial/PUBLISHER_SUPPLY_RECRUITMENT_EVIDENCE_20261010.json"
+    known={}
+    if source.is_file() and not source.is_symlink():
+        d=json.loads(source.read_text(encoding="utf-8"))
+        if d.get("schema_version")!="empire.publisher_supply_recruitment_evidence.v1":
+            raise RelationshipEvidenceError("invalid_publisher_role_source")
+        for item in d.get("items",[]):
+            if (isinstance(item,dict)
+                    and item.get("role")=="TRAFFIC_SUPPLY_HYPOTHESIS"
+                    and isinstance(item.get("domain"),str)
+                    and isinstance(item.get("company"),str)):
+                known[item["domain"]]=item["company"]
+    remaining=[]
+    supply=[]
+    for row in rows:
+        if row["domain"] not in known:
+            remaining.append(row)
+            continue
+        paid_only=(
+            row.get("status")=="HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT"
+            and row.get("reported_constraint")=="SPONSORED_PLACEMENTS_ONLY_REPORTED"
+        )
+        supply.append({
+            "thread_id":row["thread_id"],
+            "last_reply_id":row["last_buyer_reply_id"],
+            "domain":row["domain"],
+            "company":known[row["domain"]],
+            "role_hypothesis":"TRAFFIC_SUPPLY_HYPOTHESIS_NOT_VERIFIED",
+            "reported_constraint":(
+                "SPONSORED_PLACEMENTS_ONLY_REPORTED" if paid_only else None
+            ),
+            "next_action":(
+                "HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL" if paid_only
+                else "REVIEW_PUBLISHER_REPLY_NO_SEND"
+            ),
+            "publisher_supply_accepted":False,
+            "buyer_demand_verified":False,
+            "outbound_authorized":False,
+            "execution_authority":"NONE",
+        })
+    report["new_engaged_buyer_identity_review_queue"]=remaining
+    report["new_engaged_buyer_identity_review_count"]=len(remaining)
+    report["new_engaged_publisher_supply_review_queue"]=supply
+    report["new_engaged_publisher_supply_review_count"]=len(supply)
+    report["new_engaged_commercial_role_classification"]={
+        "schema_version":"empire.engaged_commercial_role_classification.v1",
+        "role_source":"FIRST_PARTY_PUBLISHER_RECRUITMENT_EVIDENCE",
+        "unlinked_buyers":len(remaining),
+        "supplier_hypotheses":len(supply),
+        "outbound_authorized":False,
+        "execution_authority":"NONE",
+    }
+
+
 def build(root: Path = ROOT) -> dict:
     base = Path(root).resolve() / RELATIVE
     src = _read_private(base / SOURCE_NAME, require_private=True)
@@ -149,6 +208,7 @@ def build(root: Path = ROOT) -> dict:
             "observations": [],
         }
     attach_partner_inbound_requirements(result, reviewed)
+    annotate_new_engaged_commercial_roles(result, root=root)
     demand_path = base / "known_company_public_demand_review_latest.json"
     if demand_path.exists():
         demand_review = _read_private(

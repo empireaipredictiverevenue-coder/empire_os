@@ -71,6 +71,24 @@
 **Business completion standard:** one buyer-specific accepted buy-box + terms + legal source/consent + correctly tracked/routed eligible event + approved launch + verifiable payable conversion and reconciliation. Read-only evidence, approved campaign enrollment and a draft email are not realised revenue.
 
 
+## Commercial role learning from replies (12 October 2026)
+
+Role classification uses **existing EmpireOS first-party evidence** rather than declaring all replied-to messages "buyer demand". A new two-way Gmail conversation from \`roofpitch.net\` matched our existing \`PUBLISHER_SUPPLY_RECRUITMENT_EVIDENCE_20261010.json\` source, whose own role is explicitly a **TRAFFIC_SUPPLY_HYPOTHESIS**, not an approved publisher. Exact inbound Gmail reply \`1a1286f08693e96d\` says they **only provide sponsored posts, guest posts and link placements**. The runtime now records deterministic \`PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED\` (not signed commercial terms), classifies the record in the private \`new_engaged_publisher_supply_review_queue\` instead of the buyer-demand queue, and returns \`HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL\`. Our own organic/performance pilot does not assume a paid-placement agreement. No message was sent.
+
+This reply was HTML-only, so the existing email recogniser now extracts visible HTML text **without executing embedded content**, excluding scripts, styles, blockquotes and quoted history, in addition to plain-text MIME. Both response formats remain untrusted claims, never activation permission.
+
+The bounded Gmail scanning remains **partial**: production initially surfaced 40 recent previously sent thread candidates and examined only 12 in one run, discovering this single genuine reply. The existing rotating cursor continues coverage; no full-mailbox or all-ICP coverage claim. Both newly linked historical buyer threads and review-only supply candidates must preserve message provenance and stop-repeat rules.
+
+## Automatic new conversation discovery, 12 October 2026
+
+The *existing* buyer-scout/Gmail cycle now scans a strictly bounded rotating slice of recent founder-sent Gmail threads (maximum two pages of 100 sent-message references, and 12 full two-way candidate threads evaluated per cycle; no new timer). It **does not** treat a sent email as engagement. A candidate must have an actual incoming reply from the exact mailbox previously addressed by the founder in that same Gmail thread; source/domain must pass Gmail's own aligned DMARC authentication result, and free-mail domains, spam/trash, one-way conversations and ambiguous identities are excluded from automatic linking.
+
+An additional thread can join an **existing prior two-way buyer relationship** only if the identity domain maps to exactly one existing company and all evidence/source bindings match. Its correspondence events remain **EMAIL_REPORTED_UNVERIFIED**, and it is re-read in subsequent cycles, capped at 20 automatically linked extra threads. No new counterpart can be granted legal, buyer, pricing, outreach, caller-ID, recording, funds or traffic authority through this link.
+
+A genuine two-way correspondent whose company identity is not yet anchored goes to the **private review-only queue** (\`new_engaged_buyer_identity_review_queue\`) with only domain, Gmail thread/reply references and no raw bodies, passwords, phone numbers or send authority. The review queue can distinguish a missing independent company identity from "no reply". The automatic scan is deliberately partial, so \`incomplete_scan\` must never be represented as an exhaustive mailbox inspection. Missing/unsafe provider evidence leaves existing identities and the current permissions unchanged.
+
+This is **discovery + classification** in the current buyer pipeline, not automatic business verification or unapproved messaging. Linked Gmail message IDs remain the evidence anchors. Cold/new partners with unknown domains require independent identity proof before being admitted as buyers.
+
 ## Automated evidence recognition, production 12 October 2026
 
 The existing authorised Gmail **read-only** connection now supports unattended recognition in the existing 30-minute buyer-scout reconciliation. The existing sequence is `run_buyer_gmail_evidence_cycle.py`: bounded Gmail read → verified metadata import → relationship/founder-queue reconciliation. It recognises explicit buyer statements about landing approval, caller ID, route-live claims, recording on/off and test calls ending before connection, plus the founder's complete onboarding / scoped technical requests. New recognised events carry the authenticated thread/message ID, event code, time and `EMAIL_REPORTED_UNVERIFIED` evidence grade; raw email bodies are processed only in memory and **never copied to the registry**.
