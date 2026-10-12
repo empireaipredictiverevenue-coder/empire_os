@@ -754,20 +754,27 @@ async def checkout_predictive_revenue_products_proxy():
 
 @app.post("/v1/checkout/predictive-revenue/interests")
 async def checkout_predictive_revenue_interest_proxy(request: Request):
+    # Browser-initiated enterprise interest is first-party, not a public
+    # unauthenticated write relay. Reuse the existing ephemeral limiter and
+    # admission policy, without expanding checkout/payment authority.
+    deny = {"Cache-Control": "no-store"}
+    if (request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            != "application/json"):
+        return JSONResponse({"error": "application_json_required"},
+                            status_code=415, headers=deny)
+    if (request.headers.get("origin") != PUBLIC_BASE_URL
+            or request.headers.get("sec-fetch-site", "same-origin")
+            not in {"same-origin", "none"}):
+        return JSONResponse({"error": "same_origin_required"},
+                            status_code=403, headers=deny)
+    peer = request.client.host if request.client else "unknown"
+    if not FIRST_PARTY_INTAKE_LIMITER.allow(peer, "enquiry"):
+        return JSONResponse({"error": "rate_limited"},
+                            status_code=429, headers=deny)
     raw = await request.body()
-    if len(raw) > 65_536:
-        return JSONResponse(
-            {"error": "checkout_payload_too_large"},
-            status_code=413,
-        )
-    if "application/json" not in request.headers.get(
-        "content-type",
-        ""
-    ).lower():
-        return JSONResponse(
-            {"error": "application_json_required"},
-            status_code=415,
-        )
+    if len(raw) > 12_000:
+        return JSONResponse({"error": "checkout_payload_too_large"},
+                            status_code=413, headers=deny)
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
@@ -776,17 +783,13 @@ async def checkout_predictive_revenue_interest_proxy(request: Request):
                 headers={"Content-Type": "application/json"},
             )
     except httpx.HTTPError:
-        return JSONResponse(
-            {"error": "predictive_revenue_checkout_unavailable"},
-            status_code=503,
-        )
+        return JSONResponse({"error": "predictive_revenue_checkout_unavailable"},
+                            status_code=503, headers=deny)
     return Response(
         content=response.content,
         status_code=response.status_code,
-        media_type=response.headers.get(
-            "content-type",
-            "application/json",
-        ),
+        media_type=response.headers.get("content-type", "application/json"),
+        headers=deny,
     )
 
 
