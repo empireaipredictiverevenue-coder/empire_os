@@ -2,7 +2,7 @@
 """One-shot READ-ONLY BSC financial operator admission preflight.
 
 Run on EmpireOS: sudo -n -u postgres /srv/empire_os/.venv/bin/python
-scripts/inspect_bsc_payment_operator_readiness.py
+-m scripts.inspect_bsc_payment_operator_readiness
 
 Does NOT authenticate a financial operator, create role passwords, grant roles,
 modify HBA, or activate checkout. No secrets are printed.

@@ -50,7 +50,7 @@ def safe_password_pair() -> dict[str, str]:
 def _postgres_child(operation: str, payload: dict | None = None) -> dict:
     result=subprocess.run(
         ["runuser","-u","postgres","--",sys.executable,
-         str(Path(__file__).resolve()),operation],
+         "-m","scripts.provision_bsc_financial_operator_logins",operation],
         input=None if payload is None else json.dumps(payload,sort_keys=True),
         capture_output=True,text=True,timeout=35,
         cwd=ROOT,

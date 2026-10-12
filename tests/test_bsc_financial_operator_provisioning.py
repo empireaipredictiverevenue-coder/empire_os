@@ -170,3 +170,11 @@ def test_additive_hba_rejects_duplicate_role_and_preserves_original_tail():
     assert patched.count(b"empire_escrow_verifier_login")==1
     with pytest.raises(ValueError):
         hba.additive_hba_patch(patched)
+
+
+def test_privileged_child_imports_expected_root_module_not_direct_script_path():
+    import inspect
+    source=inspect.getsource(provisioning._postgres_child)
+    assert '"-m","scripts.provision_bsc_financial_operator_logins",operation' in source
+    assert 'cwd=ROOT' in source
+    assert 'capture_output=True' in source

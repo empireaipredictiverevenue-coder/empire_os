@@ -20,6 +20,8 @@ New read-only `scripts/inspect_bsc_payment_operator_readiness.py` and `empire_os
 
 A bounded, independently authorisable **two-part activation** uses the existing first-party Postgres mechanisms:
 
+**All following commands run from** `cd /srv/empire_os`, using the module form `python -m scripts.<name>` so Python reliably resolves the shared first-party security libraries.
+
 **Part A — exact HBA rules only:** `scripts/prepare_bsc_operator_hba.py` adds exactly:
 
 ```text
@@ -32,13 +34,13 @@ Both rules are prepended ahead of generic peer auth; all original `pg_hba.conf` 
 Read-only command, already successful:
 
 ```bash
-sudo -n /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/prepare_bsc_operator_hba.py --preflight
+sudo -n /srv/empire_os/.venv/bin/python -m scripts.prepare_bsc_operator_hba --preflight
 ```
 
 The write command **requires its own exact approval marker**. Do not run without explicit founder permission:
 
 ```bash
-sudo -n /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/prepare_bsc_operator_hba.py --apply --approved-exact-two-bsc-financial-hba-rules
+sudo -n /srv/empire_os/.venv/bin/python -m scripts.prepare_bsc_operator_hba --apply --approved-exact-two-bsc-financial-hba-rules
 ```
 
 **Part B — two distinct PostgreSQL login identities, never checkout privileges:** `scripts/provision_bsc_financial_operator_logins.py` generates separate cryptographically random 48+ character secrets and the reusable first-party `scram_verifier()` from the established CRM login provisioning code. Under PostgreSQL's own operating user it creates exactly `empire_payment_approver_login` and `empire_escrow_verifier_login`, both **LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS**, and grants each precisely **one** respective existing permission role with `INHERIT FALSE, SET TRUE, ADMIN FALSE` in a single database transaction. A separate root-owned, mode-0700 directory holds two **separate mode-0600 secret passfiles**. No secrets in argv, logs, git, public gateways, chat messages, checkout service env or unprivileged Ubuntu files.
@@ -48,13 +50,13 @@ The script includes a root-only global-role rollback backup, source-hash check a
 Read-only command (currently correctly held until Part A):
 
 ```bash
-sudo -n /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/provision_bsc_financial_operator_logins.py --preflight
+sudo -n /srv/empire_os/.venv/bin/python -m scripts.provision_bsc_financial_operator_logins --preflight
 ```
 
 Separate, explicit founder-approved write command for Part B, **only after Part A fully verifies**:
 
 ```bash
-sudo -n /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/provision_bsc_financial_operator_logins.py --apply --approved-two-bsc-financial-operator-logins
+sudo -n /srv/empire_os/.venv/bin/python -m scripts.provision_bsc_financial_operator_logins --apply --approved-two-bsc-financial-operator-logins
 ```
 
 These are internal financial SQL identities, not customer authentication credentials and not authorisation for anybody to approve a specific payment, record fabricated on-chain events, sign a contract or spend USDT.
