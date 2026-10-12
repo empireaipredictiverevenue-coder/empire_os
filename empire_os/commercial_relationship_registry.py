@@ -101,20 +101,36 @@ SINGLE_PASS_BUYER_QUESTION_GROUPS = (
 def single_pass_intake_status(key: str, relationship: Mapping[str, Any]) -> dict[str, Any]:
     """Report proof of a previously sent comprehensive request, never send."""
     expected = LAST_CONSOLIDATED_BUYER_REQUEST[key]
+    thread_matches = (
+        PARTNER_PILOT_SCOPES[key]["reviewed_thread"]
+        in relationship.get("gmail_thread_ids", [])
+    )
     source_matches = (
-        expected == relationship.get("last_outbound_message_id")
-        and PARTNER_PILOT_SCOPES[key]["reviewed_thread"]
-            in relationship.get("gmail_thread_ids", [])
+        thread_matches
+        and expected == relationship.get("last_outbound_message_id")
         and when(relationship.get("last_outbound_at")) is not None
     )
+    # The founder's complete request has an independently reviewed Gmail ID
+    # in this precise partner thread. A newer inbound reply or a different
+    # latest outbound message must NOT erase that earlier reviewed send.
+    # The import itself only proves it when its latest message is the match.
+    reviewed_prior_request = thread_matches
     return {
         "schema_version": "empire.partner_single_pass_intake_status.v1",
         "question_groups": list(SINGLE_PASS_BUYER_QUESTION_GROUPS),
         "past_full_information_request_proven_in_import": source_matches,
-        "last_full_request_evidence_ref": "gmail:" + expected if source_matches else None,
+        "past_full_request_known_from_reviewed_history": reviewed_prior_request,
+        "repeat_full_request_blocked": True,
+        "repeat_block_reason": (
+            "PRIOR_COMPLETE_REQUEST_IN_REVIEWED_THREAD"
+            if reviewed_prior_request else "BUYER_THREAD_HISTORY_NOT_RECONCILED"
+        ),
+        "last_full_request_evidence_ref": (
+            "gmail:" + expected if reviewed_prior_request else None
+        ),
         "next_action": (
             "WAIT_PARTNER_ANSWERS_NO_DUPLICATE_REQUEST"
-            if source_matches else "RECONCILE_EXISTING_EMAIL_HISTORY_BEFORE_ASKING"
+            if reviewed_prior_request else "RECONCILE_EXISTING_EMAIL_HISTORY_BEFORE_ASKING"
         ),
         "source_mailbox": "flavag83@gmail.com",
         "source_snapshot_fresh": relationship.get("gmail_snapshot_fresh") is True,
@@ -124,6 +140,73 @@ def single_pass_intake_status(key: str, relationship: Mapping[str, Any]) -> dict
         "outbound_authorized": False,
         "contract_authorized": False,
         "traffic_authorized": False,
+        "execution_authority": "NONE",
+    }
+
+
+# Later Lead Smart correspondence is separately reviewed and already sent.
+# This is a SCOPED DELTA (not the original complete onboarding pack) and
+# must never be misreported as proof of a connected buyer call or clean ANI.
+LEAD_SMART_PENDING_TECHNICAL_REQUEST = {
+    "entity_key": "lead-smart",
+    "reviewed_thread": "1a0d9ce883c87d4a",
+    "last_scoped_request_ref": "gmail:1a12d47934923a1d",
+    "buyer_latest_answer_ref": "gmail:1a12d44d7e2f46a8",
+    "outstanding_question_groups": [
+        "enabled_direct_buyer_destination_and_original_ani",
+        "recording_disabled_for_pilot_or_actual_notice_access_retention_deletion",
+    ],
+}
+
+
+def reviewed_request_duplicate_guard(
+    key: str, relationship: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Prevent duplicate full questionnaires and a second Lead Smart delta.
+
+    A verified thread binding and previous human-reviewed Gmail message are
+    required. Stale imports do not become fresh. Unknown threads are HELD
+    pending review, not presumed eligible for new messaging.
+    """
+    threads = relationship.get("gmail_thread_ids")
+    if not isinstance(threads, (list, tuple, set, frozenset)):
+        threads = ()
+    if key in PARTNER_PILOT_SCOPES:
+        spec = PARTNER_PILOT_SCOPES[key]
+        match = spec["reviewed_thread"] in threads
+        ref = "gmail:" + LAST_CONSOLIDATED_BUYER_REQUEST[key] if match else None
+        outstanding = list(SINGLE_PASS_BUYER_QUESTION_GROUPS) if match else []
+        stage = "PRIOR_FULL_REQUEST_SENT" if match else "THREAD_RECONCILIATION_REQUIRED"
+    elif key == LEAD_SMART_PENDING_TECHNICAL_REQUEST["entity_key"]:
+        spec = LEAD_SMART_PENDING_TECHNICAL_REQUEST
+        match = spec["reviewed_thread"] in threads
+        ref = spec["last_scoped_request_ref"] if match else None
+        outstanding = list(spec["outstanding_question_groups"]) if match else []
+        stage = "SPECIFIC_ROUTING_RECORDING_REQUEST_ALREADY_SENT" if match else "THREAD_RECONCILIATION_REQUIRED"
+    else:
+        return {
+            "schema_version": "empire.buyer_requirements_duplicate_guard.v1",
+            "status": "UNREVIEWED_RELATIONSHIP",
+            "repeat_full_request_allowed": False,
+            "request_provenance": None,
+            "outstanding_buyer_questions": [],
+            "outbound_authorized": False,
+            "execution_authority": "NONE",
+        }
+    return {
+        "schema_version": "empire.buyer_requirements_duplicate_guard.v1",
+        "status": stage,
+        "repeat_full_request_allowed": False,
+        "request_provenance": ref,
+        "outstanding_buyer_questions": outstanding,
+        "last_outbound_is_independent_proof_of_send": (
+            bool(match) and ref == "gmail:" + str(
+                relationship.get("last_outbound_message_id") or ""
+            )
+        ),
+        "source_snapshot_fresh": relationship.get("gmail_snapshot_fresh") is True,
+        "buyer_answer_complete": False,
+        "outbound_authorized": False,
         "execution_authority": "NONE",
     }
 
@@ -787,6 +870,13 @@ def reconcile(
             "qualification_tier": record["qualification_tier"],
             "founder_priority": record["founder_priority"],
             "gmail_snapshot_fresh": record_mail_fresh,
+            "buyer_onboarding_duplicate_guard": reviewed_request_duplicate_guard(
+                key, {
+                    "gmail_thread_ids": record["gmail_thread_ids"],
+                    "last_outbound_message_id": record["last_outbound_message_id"],
+                    "gmail_snapshot_fresh": record_mail_fresh,
+                }
+            ),
             "commercial_buyer_approved": False,
             "suppression_evidence_complete": False,
             "outbound_authorized": False,
