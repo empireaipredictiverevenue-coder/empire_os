@@ -232,6 +232,17 @@ def make_packet(
             0, domain_members[row["company_domain"]] - 1
         ) if row["company_domain"] else 0
 
+    # Zero is a real observation, not missing telemetry. Keep the main
+    # counters explicit when all candidates are on backoff or evidence hold.
+    for key in (
+        "total", "unresolved", "due_now", "parked",
+        "eligible_after_backoff", "high_priority",
+        "high_priority_parked", "high_priority_eligible",
+        "status_pending", "status_deferred", "status_running",
+        "status_resolved",
+    ):
+        summary.setdefault(key, 0)
+
     return {
         "schema_version": SCHEMA,
         "generated_at": current.isoformat(),

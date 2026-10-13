@@ -101,7 +101,19 @@ def test_empty_queue_never_conjures_buyer_readiness():
     r = make_packet({}, source_sha256="0" * 64, now=NOW)
     assert r["high_priority_total"] == 0
     assert r["packets"] == []
+    assert r["counts"]["total"] == 0
+    assert r["counts"]["due_now"] == 0
+    assert r["counts"]["parked"] == 0
+    assert r["counts"]["status_resolved"] == 0
     assert r["outbound_sent"] is False
+
+
+def test_all_parked_reports_explicit_zero_due():
+    p = _row("Parked buyer", reason="no_contact_evidence", attempts=40)
+    r = make_packet({"parked": p}, source_sha256="0" * 64, now=NOW)
+    assert r["counts"]["due_now"] == 0
+    assert r["counts"]["parked"] == 1
+    assert r["counts"]["high_priority_eligible"] == 0
 
 
 def test_source_hash_and_private_write_with_no_queue_mutation(tmp_path):
