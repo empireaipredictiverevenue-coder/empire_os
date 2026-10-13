@@ -18,6 +18,8 @@ CREATE ROLE empiredb_readonly NOLOGIN NOINHERIT;
 CREATE ROLE empire_payment_approver NOLOGIN NOINHERIT;
 CREATE ROLE empire_bsc_verifier NOLOGIN NOINHERIT;
 CREATE ROLE fake_existing_reader NOLOGIN NOINHERIT;
+CREATE ROLE empiredb_migrator_login LOGIN INHERIT;
+GRANT empiredb_migrator TO empiredb_migrator_login WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 CREATE DATABASE direct_bsc_capability_fixture;
 SQL
 pg <<'SQL' >/dev/null
@@ -54,9 +56,38 @@ CREATE TABLE public.bsc_payment_evidence (
  confirmations integer NOT NULL
 );
 GRANT USAGE,CREATE ON SCHEMA public TO empiredb_migrator;
-GRANT SELECT,REFERENCES ON public.fulfilment_orders,public.bsc_payment_requests
- TO empiredb_migrator;
-GRANT SELECT ON public.bsc_payment_evidence TO empiredb_migrator;
+ALTER TABLE public.fulfilment_orders OWNER TO empiredb_migrator;
+ALTER TABLE public.bsc_payment_requests OWNER TO empiredb_migrator;
+ALTER TABLE public.bsc_payment_evidence OWNER TO empiredb_migrator;
+ALTER TABLE public.fulfilment_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bsc_payment_requests ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.bsc_payment_evidence ENABLE ROW LEVEL SECURITY;
+CREATE POLICY fulfilment_orders_app_select
+ ON public.fulfilment_orders FOR SELECT TO empiredb_app USING (true);
+CREATE POLICY bsc_payment_requests_app_select
+ ON public.bsc_payment_requests FOR SELECT TO empiredb_app USING (true);
+CREATE POLICY bsc_payment_evidence_app_select
+ ON public.bsc_payment_evidence FOR SELECT TO empiredb_app USING (true);
+-- Disposable reproduction of live metadata counts: orders 23, requests 10,
+-- evidence 9. All extra fixture policies are SELECT for the existing app.
+DO $fixture$
+DECLARE
+ i integer;
+BEGIN
+ FOR i IN 1..22 LOOP
+   EXECUTE pg_catalog.format(
+     'CREATE POLICY fixture_orders_%s ON public.fulfilment_orders FOR SELECT TO empiredb_app USING (true)', i);
+ END LOOP;
+ FOR i IN 1..9 LOOP
+   EXECUTE pg_catalog.format(
+     'CREATE POLICY fixture_requests_%s ON public.bsc_payment_requests FOR SELECT TO empiredb_app USING (true)', i);
+ END LOOP;
+ FOR i IN 1..8 LOOP
+   EXECUTE pg_catalog.format(
+     'CREATE POLICY fixture_evidence_%s ON public.bsc_payment_evidence FOR SELECT TO empiredb_app USING (true)', i);
+ END LOOP;
+END
+$fixture$;
 ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator IN SCHEMA public
  GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO empiredb_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator IN SCHEMA public
@@ -74,7 +105,7 @@ log="$(mktemp)"
 if pg -f migrations/empiredb/049_direct_bsc_buyer_status_private_reader.sql >"$log" 2>&1; then
  rm -f "$log";echo "EPHEMERAL_REVERSE_MIGRATOR_MEMBER_ACCEPTED=UNSAFE";exit 72
 fi
-grep -q 'DIRECT049_ROLE_MEMBERSHIP_OR_PRIVILEGE_UNSAFE' "$log" ||
+grep -q 'DIRECT049_UNEXPECTED_MIGRATOR_INCOMING_MEMBERSHIP' "$log" ||
  { tail -15 "$log";rm -f "$log";echo "EPHEMERAL_ROLE_DENIAL_NOT_VERIFIED";exit 73; }
 rm -f "$log"
 [[ "$(psql -X -w -At -d postgres -c \
@@ -82,10 +113,19 @@ rm -f "$log"
  { echo "EPHEMERAL_FAILED_MIGRATION_LEFT_PRIVILEGE_ROLE=UNSAFE";exit 74; }
 psql -X -w -v ON_ERROR_STOP=1 -d postgres -c \
  "REVOKE empiredb_migrator FROM fake_existing_reader" >/dev/null
-echo "EPHEMERAL_REVERSE_MIGRATOR_MEMBERSHIP_FAIL_CLOSED=PASS"
+echo "EPHEMERAL_UNEXPECTED_SECOND_MIGRATOR_MEMBER_FAIL_CLOSED=PASS"
+echo "EPHEMERAL_PRODUCTION_MIGRATOR_LOGIN_MEMBERSHIP_PRESERVED=YES"
 
 pg -f migrations/empiredb/049_direct_bsc_buyer_status_private_reader.sql >/dev/null
 echo "EPHEMERAL_INTERNAL_049_ROLE_AND_FUNCTION_CREATED=PASS"
+
+post_report="$(pg -f scripts/inspect_direct_bsc_private_reader_049_postcommit.sql)"
+post_passes="$(printf '%s\n' "$post_report" |
+  grep -Ec '^([01][0-9])_[a-z0-9_]+\|PASS$' || true)"
+[[ "$post_passes" == 12 ]] ||
+  { echo "EPHEMERAL_049_POSTCOMMIT_SECURITY_CHECKS_NOT_ALL_PASS";
+    printf '%s\n' "$post_report" | grep -E '^(0[1-9]|1[0-2])_'; exit 84; }
+echo "EPHEMERAL_049_TWELVE_NAMED_POSTCOMMIT_SECURITY_CHECKS=PASS"
 
 # The dedicated NOLOGIN role can execute the restricted function, and has
 # no direct SELECT privilege on the buyer order, payment or capability tables.
@@ -131,6 +171,22 @@ direct_privs="$(pg -At -c "SELECT has_table_privilege('empire_direct_checkout_st
 [[ "$direct_privs" == '0|0|0|0' ]] ||
  { echo "EPHEMERAL_READER_BROAD_TABLE_OR_APP_FUNCTION_GRANT=UNSAFE";exit 77; }
 echo "EPHEMERAL_ROLE_HAS_NO_DIRECT_TABLE_READ_AND_APP_EXECUTE=PASS"
+
+# Live migrator LOGIN remains legitimate for schema migrations, but FORCE RLS
+# does not give it the new isolated owner policy or STATUS function access.
+migrator_rows="$(pg -At -c "
+BEGIN;
+SET LOCAL ROLE empiredb_migrator_login;
+SELECT count(*) FROM public.direct_bsc_buyer_capabilities;
+ROLLBACK;")"
+printf '%s\n' "$migrator_rows" | grep -qx '0' ||
+ { echo "EPHEMERAL_MIGRATOR_LOGIN_READ_CAPABILITY_ROWS_UNSAFE";exit 82; }
+migrator_exec="$(pg -At -c "
+SELECT has_function_privilege('empiredb_migrator_login',
+'public.read_direct_bsc_buyer_status(text)','EXECUTE')::int")"
+[[ "$migrator_exec" == 0 ]] ||
+ { echo "EPHEMERAL_MIGRATOR_LOGIN_CAN_EXECUTE_BUYER_READER_UNSAFE";exit 83; }
+echo "EPHEMERAL_MIGRATOR_LOGIN_STILL_PRESENT_BUT_CANNOT_READ_OR_EXECUTE=PASS"
 
 # Independent canonical price check is enforced by the DB query as well as
 # the private Python projector: manipulating a payable amount yields no row.
