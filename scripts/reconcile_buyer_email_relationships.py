@@ -133,9 +133,84 @@ def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
                     and isinstance(item.get("domain"),str)
                     and isinstance(item.get("company"),str)):
                 known[item["domain"]]=item["company"]
+    # Referrals from an already-evidenced publisher/affiliate programme
+    # are neither purchasers of Empire AI products nor traffic suppliers.
+    # Bind by exact Gmail thread + domain, anchored by a recorded original
+    # authenticated reply. Later replies on that same thread remain a referral
+    # relationship without manually rewriting an evidence file.
+    referral_path = (
+        root / "docs/commercial/ENGAGED_AFFILIATE_PARTNER_ROLE_EVIDENCE_20261013.json"
+    )
+    referral_roles = {}
+    if referral_path.exists():
+        if referral_path.is_symlink() or not referral_path.is_file():
+            raise RelationshipEvidenceError("invalid_affiliate_role_source_path")
+        if referral_path.stat().st_size > 16_000:
+            raise RelationshipEvidenceError("affiliate_role_source_too_large")
+        evidence = json.loads(referral_path.read_text(encoding="utf-8"))
+        if (not isinstance(evidence, dict)
+                or evidence.get("schema_version")
+                != "empire.engaged_affiliate_referral_role_evidence.v1"
+                or evidence.get("origin")
+                != "founder_application_and_connected_gmail_review"
+                or not isinstance(evidence.get("items"), list)
+                or len(evidence["items"]) > 12):
+            raise RelationshipEvidenceError("invalid_affiliate_role_source")
+        for item in evidence["items"]:
+            if (not isinstance(item, dict)
+                    or set(item) != {
+                        "company", "domain", "role", "thread_id",
+                        "last_reply_id", "first_party_source", "role_hypothesis",
+                        "referral_terms_approved", "traffic_activated",
+                        "buyer_software_demand_verified", "outbound_authorized",
+                    }
+                    or item["role"] != "UK_HOME_IMPROVEMENT_AFFILIATE"
+                    or item["role_hypothesis"]
+                    != "AFFILIATE_REFERRAL_PROGRAMME_NOT_EMPIRE_SOFTWARE_CUSTOMER"
+                    or not isinstance(item["company"], str)
+                    or not 1 <= len(item["company"]) <= 120
+                    or not isinstance(item["domain"], str)
+                    or not isinstance(item["thread_id"], str)
+                    or not isinstance(item["last_reply_id"], str)
+                    or len(item["thread_id"]) not in range(16, 33)
+                    or len(item["last_reply_id"]) not in range(16, 33)
+                    or item["first_party_source"]
+                    != "docs/commercial/MYJOBQUOTE_FIRST_REVENUE_LINK_PILOT_20261013.md"
+                    or any(item[k] is not False for k in (
+                        "referral_terms_approved", "traffic_activated",
+                        "buyer_software_demand_verified", "outbound_authorized",
+                    ))):
+                raise RelationshipEvidenceError("invalid_affiliate_role_evidence")
+            key = (
+                item["domain"].lower(),
+                item["thread_id"],
+            )
+            if (key in referral_roles or
+                    not all(c in "0123456789abcdef" for c in key[1]+item["last_reply_id"])):
+                raise RelationshipEvidenceError("duplicate_or_invalid_affiliate_role")
+            referral_roles[key] = item
     remaining=[]
     supply=[]
+    referral=[]
     for row in rows:
+        key=(row["domain"], row["thread_id"])
+        if key in referral_roles:
+            known_referral=referral_roles[key]
+            # Keep relationship provenance, but never promote a partner
+            # welcome to software-buyer demand, terms, or live referrals.
+            referral.append({
+                "domain": row["domain"], "thread_id":row["thread_id"],
+                "last_reply_id":row["last_buyer_reply_id"],
+                "company": known_referral["company"],
+                "role_hypothesis": known_referral["role_hypothesis"],
+                "next_action":"AWAIT_AFFILIATE_TERMS_NO_REPEAT_EMAIL",
+                "partner_source_approval_verified":False,
+                "referral_terms_approved":False,
+                "traffic_activated":False,
+                "buyer_software_demand_verified":False,
+                "outbound_authorized":False, "execution_authority":"NONE",
+            })
+            continue
         if row["domain"] not in known:
             remaining.append(row)
             continue
@@ -165,11 +240,14 @@ def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
     report["new_engaged_buyer_identity_review_count"]=len(remaining)
     report["new_engaged_publisher_supply_review_queue"]=supply
     report["new_engaged_publisher_supply_review_count"]=len(supply)
+    report["new_engaged_affiliate_referral_review_queue"]=referral
+    report["new_engaged_affiliate_referral_review_count"]=len(referral)
     report["new_engaged_commercial_role_classification"]={
         "schema_version":"empire.engaged_commercial_role_classification.v1",
         "role_source":"FIRST_PARTY_PUBLISHER_RECRUITMENT_EVIDENCE",
         "unlinked_buyers":len(remaining),
         "supplier_hypotheses":len(supply),
+        "affiliate_referral_hypotheses":len(referral),
         "outbound_authorized":False,
         "execution_authority":"NONE",
     }

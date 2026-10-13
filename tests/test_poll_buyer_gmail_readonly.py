@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from scripts.poll_buyer_gmail_readonly import collect, READ_SCOPE
+from scripts.poll_buyer_gmail_readonly import collect, READ_SCOPE, THREADS
 
 class Response:
     def execute(self):
@@ -18,7 +18,8 @@ class Service:
 
 def test_reader_metadata_contract():
     result = collect(Service(), now=datetime(2026, 10, 10, tzinfo=timezone.utc))
-    assert len(result['threads']) == 4
-    assert sum(t['message_count'] for t in result['threads']) == 4
+    assert len(result['threads']) == len(THREADS)
+    assert sum(t['message_count'] for t in result['threads']) == len(THREADS)
+    assert set(t['thread_id'] for t in result['threads']) == set(THREADS)
     assert 'body' not in result['threads'][0]['messages'][0]
     assert READ_SCOPE.endswith('gmail.readonly')

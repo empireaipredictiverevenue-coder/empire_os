@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "buyer_software_demand_verified": false,
+      "company": "MyJobQuote",
+      "domain": "myjobquote.co.uk",
+      "first_party_source": "docs/commercial/MYJOBQUOTE_FIRST_REVENUE_LINK_PILOT_20261013.md",
+      "last_reply_id": "1a134dc80c6a49e7",
+      "outbound_authorized": false,
+      "referral_terms_approved": false,
+      "role": "UK_HOME_IMPROVEMENT_AFFILIATE",
+      "role_hypothesis": "AFFILIATE_REFERRAL_PROGRAMME_NOT_EMPIRE_SOFTWARE_CUSTOMER",
+      "thread_id": "1a134dc80c6a49e7",
+      "traffic_activated": false
+    }
+  ],
+  "observed_date": "2026-10-13",
+  "origin": "founder_application_and_connected_gmail_review",
+  "schema_version": "empire.engaged_affiliate_referral_role_evidence.v1"
+}
