@@ -579,39 +579,44 @@ async def checkout_catalog_proxy():
 
 @app.post("/v1/checkout/orders")
 async def checkout_order_proxy(request: Request):
-    raw = await request.body()
-    if len(raw) > 32_768:
-        return JSONResponse(
-            {"error": "checkout_payload_too_large"},
-            status_code=413,
-        )
-    if "application/json" not in request.headers.get(
-        "content-type",
-        ""
-    ).lower():
-        return JSONResponse(
-            {"error": "application_json_required"},
-            status_code=415,
-        )
+    # Financial order admission is NOT an unauthenticated arbitrary POST relay.
+    # Use the existing first-party abuse controls before reaching EmpireDB.
+    # The real checkout remains separately held by its payment/order gates.
+    headers = {"Cache-Control": "no-store"}
+    if (request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+            != "application/json"):
+        return JSONResponse({"error": "application_json_required"},
+                            status_code=415, headers=headers)
+    if (request.headers.get("origin") != PUBLIC_BASE_URL
+            or request.headers.get("sec-fetch-site", "same-origin")
+            not in {"same-origin", "none"}):
+        return JSONResponse({"error": "same_origin_required"},
+                            status_code=403, headers=headers)
+    peer = request.client.host if request.client else "unknown"
+    if not FIRST_PARTY_INTAKE_LIMITER.allow(peer, "enquiry"):
+        return JSONResponse({"error": "rate_limited"},
+                            status_code=429, headers=headers)
+    raw = bytearray()
+    async for chunk in request.stream():
+        if len(chunk) > 12_000 - len(raw):
+            return JSONResponse({"error": "checkout_payload_too_large"},
+                                status_code=413, headers=headers)
+        raw.extend(chunk)
     try:
         async with httpx.AsyncClient(timeout=20.0) as client:
             response = await client.post(
                 f"{CHECKOUT_INTERNAL_URL}/v1/orders",
-                content=raw,
+                content=bytes(raw),
                 headers={"Content-Type": "application/json"},
             )
     except httpx.HTTPError:
-        return JSONResponse(
-            {"error": "checkout_unavailable"},
-            status_code=503,
-        )
+        return JSONResponse({"error": "checkout_unavailable"},
+                            status_code=503, headers=headers)
     return Response(
         content=response.content,
         status_code=response.status_code,
-        media_type=response.headers.get(
-            "content-type",
-            "application/json",
-        ),
+        media_type="application/json",
+        headers=headers,
     )
 
 
