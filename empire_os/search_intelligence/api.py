@@ -287,7 +287,7 @@ def create_search_router(
     @router.get("/health")
     def health():
         return {
-            **search_health(),
+            **search_health(search_console_status=search_console.status()),
             "repository_available": repository is not None,
             "api_contract_version": "search-v1",
         }
@@ -400,7 +400,7 @@ def create_search_router(
     @router.get("/summary")
     def summary():
         base = {
-            **search_health(),
+            **search_health(search_console_status=search_console.status()),
             "repository_available": repository is not None,
             "api_contract_version": "search-v1",
         }
