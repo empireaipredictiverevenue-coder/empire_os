@@ -13,7 +13,12 @@ MIGRATOR_FLAG_NAMES = (
     "can_login", "inherits_membership", "superuser", "create_database",
     "create_role", "replication", "bypass_rls",
 )
-EXPECTED_MIGRATOR_FLAGS = (False,) * len(MIGRATOR_FLAG_NAMES)
+# Production's existing 2026-10-13 membership is intentional:
+# migrator NOLOGIN, INHERIT, member of exactly one NOLOGIN tenant-reader
+# with INHERIT/SET but no ADMIN. Never broaden this to arbitrary members.
+EXPECTED_MIGRATOR_FLAGS = (False, True, False, False, False, False, False)
+EXPECTED_READER_FLAGS = (False,) * len(MIGRATOR_FLAG_NAMES)
+EXPECTED_MEMBERSHIP = (("empiredb_tenant_reader", True, True, False, True),)
 
 
 def classify(facts: dict) -> dict:
@@ -39,18 +44,29 @@ def classify(facts: dict) -> dict:
         if valid_flags else ["missing_or_unreadable_migrator"]
     )
     migrator = valid_flags and flags == EXPECTED_MIGRATOR_FLAGS
+    reader_flags = facts.get("tenant_reader")
+    reader_restricted = (
+        isinstance(reader_flags, tuple) and
+        reader_flags == EXPECTED_READER_FLAGS and
+        all(type(flag) is bool for flag in reader_flags)
+    )
+    exact_direct_membership = facts.get("migrator_memberships") == EXPECTED_MEMBERSHIP
+    no_reader_transitive_memberships = facts.get("tenant_reader_memberships") == ()
     tables = facts.get("parent_tables") == (True, True)
     privileges = facts.get("privileges") == (True, True, True, True, True)
     targets_absent = facts.get("targets_absent") == (True, True)
     checks = {
         "canonical_empiredb": canonical,
         "restricted_migrator": migrator,
+        "tenant_reader_role_restricted": reader_restricted,
+        "exact_existing_tenant_reader_membership": exact_direct_membership,
+        "no_transitive_reader_memberships": no_reader_transitive_memberships,
         "canonical_parent_tables": tables,
         "parent_fk_and_read_permissions": privileges,
         "new_table_and_guard_function_absent": targets_absent,
     }
     return {
-        "schema_version": "empire.direct-bsc-buyer-capability-migration-preflight.v1",
+        "schema_version": "empire.direct-bsc-buyer-capability-migration-preflight.v2",
         "mode": "READ_ONLY",
         "migrator_attributes": migrator_attributes,
         "migrator_mismatched_flags": mismatched_flags,
@@ -82,6 +98,32 @@ def inspect() -> dict:
         """)
         flags = cur.fetchone()
         cur.execute("""
+          SELECT granted.rolname, m.inherit_option, m.set_option,
+                 m.admin_option,
+                 pg_catalog.pg_has_role('empiredb_migrator',granted.oid,'USAGE')
+          FROM pg_catalog.pg_auth_members m
+          JOIN pg_catalog.pg_roles member ON member.oid=m.member
+          JOIN pg_catalog.pg_roles granted ON granted.oid=m.roleid
+          WHERE member.rolname='empiredb_migrator'
+          ORDER BY granted.rolname
+        """)
+        migrator_memberships = tuple(tuple(row) for row in cur.fetchall())
+        cur.execute("""
+          SELECT rolcanlogin,rolinherit,rolsuper,rolcreatedb,
+                 rolcreaterole,rolreplication,rolbypassrls
+          FROM pg_catalog.pg_roles WHERE rolname='empiredb_tenant_reader'
+        """)
+        tenant_reader = cur.fetchone()
+        cur.execute("""
+          SELECT granted.rolname
+          FROM pg_catalog.pg_auth_members m
+          JOIN pg_catalog.pg_roles member ON member.oid=m.member
+          JOIN pg_catalog.pg_roles granted ON granted.oid=m.roleid
+          WHERE member.rolname='empiredb_tenant_reader'
+          ORDER BY granted.rolname
+        """)
+        tenant_reader_memberships = tuple(row[0] for row in cur.fetchall())
+        cur.execute("""
           SELECT pg_catalog.to_regclass('public.fulfilment_orders') IS NOT NULL,
                  pg_catalog.to_regclass('public.bsc_payment_requests') IS NOT NULL
         """)
@@ -102,6 +144,9 @@ def inspect() -> dict:
         conn.rollback()
     return classify(dict(database=database, user=user, standby=standby,
                          migrator=tuple(flags) if flags else None,
+                         migrator_memberships=migrator_memberships,
+                         tenant_reader=tuple(tenant_reader) if tenant_reader else None,
+                         tenant_reader_memberships=tenant_reader_memberships,
                          parent_tables=parent_tables,
                          privileges=privileges,
                          targets_absent=targets_absent))

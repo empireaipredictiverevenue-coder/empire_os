@@ -15,6 +15,42 @@ BEGIN
   IF current_user <> 'empiredb_migrator' THEN
     RAISE EXCEPTION 'DIRECT047_WRONG_MIGRATOR';
   END IF;
+  -- Mirror the strict read-only preflight inside the same migration
+  -- transaction. Preserve the existing intentional tenant-reader inheritance;
+  -- NEVER allow extra role memberships or any financial-role inheritance.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles r
+    WHERE r.rolname='empiredb_migrator'
+      AND NOT r.rolcanlogin AND r.rolinherit AND NOT r.rolsuper
+      AND NOT r.rolcreatedb AND NOT r.rolcreaterole
+      AND NOT r.rolreplication AND NOT r.rolbypassrls
+  ) OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles r
+    WHERE r.rolname='empiredb_tenant_reader'
+      AND NOT r.rolcanlogin AND NOT r.rolinherit AND NOT r.rolsuper
+      AND NOT r.rolcreatedb AND NOT r.rolcreaterole
+      AND NOT r.rolreplication AND NOT r.rolbypassrls
+  ) OR (
+    SELECT count(*) FROM pg_catalog.pg_auth_members m
+    JOIN pg_catalog.pg_roles member ON member.oid=m.member
+    WHERE member.rolname='empiredb_migrator'
+  ) <> 1 OR NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members m
+    JOIN pg_catalog.pg_roles member ON member.oid=m.member
+    JOIN pg_catalog.pg_roles granted ON granted.oid=m.roleid
+    WHERE member.rolname='empiredb_migrator'
+      AND granted.rolname='empiredb_tenant_reader'
+      AND m.inherit_option AND m.set_option AND NOT m.admin_option
+      AND pg_catalog.pg_has_role(
+        'empiredb_migrator',granted.oid,'USAGE'
+      )
+  ) OR EXISTS (
+    SELECT 1 FROM pg_catalog.pg_auth_members m
+    JOIN pg_catalog.pg_roles member ON member.oid=m.member
+    WHERE member.rolname='empiredb_tenant_reader'
+  ) THEN
+    RAISE EXCEPTION 'DIRECT047_UNREVIEWED_MIGRATOR_INHERITED_AUTHORITY';
+  END IF;
   IF pg_catalog.to_regclass('public.direct_bsc_buyer_capabilities') IS NOT NULL THEN
     RAISE EXCEPTION 'DIRECT047_CAPABILITY_REGISTER_EXISTS_RECONCILE';
   END IF;

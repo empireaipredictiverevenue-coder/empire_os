@@ -116,3 +116,44 @@ original seven-flag acceptance rule. A non-inheriting NOLOGIN migrator is the
 preflight green. Review the actual attribute(s), existing deliberate
 migration authority, dependent role memberships and separate founder
 approval before any remediation or migration.
+
+
+## 13 October 2026 — production membership audited; exact-profile correction
+
+The founder supplied the read-only production pg_catalog result:
+
+- `empiredb_migrator`: NOLOGIN, INHERIT TRUE, NOSUPERUSER,
+  NOCREATEDB, NOCREATEROLE, NOBYPASSRLS.
+- **Exactly one direct role membership**:
+  `empiredb_tenant_reader`; INHERIT TRUE, SET TRUE, ADMIN FALSE;
+  inherited privileges YES. No other direct memberships.
+- Do not modify or revoke this existing intentional membership. It is not
+  evidence of compromise and may support unrelated EmpireDB operations.
+
+The original 047 preflight mistakenly assumed NOINHERIT for the migrator.
+The revised **v2 read-only preflight** enforces the actually audited profile
+instead: migrator INHERIT TRUE + EXACTLY one inherited
+`empiredb_tenant_reader` membership with exact per-membership options,
+restricted NOLOGIN/NOINHERIT tenant reader and **zero** memberships owned
+by that tenant reader. Extra direct or transitive groups fail closed.
+All previous canonical DB, FK/source privilege and object-absence checks
+remain mandatory.
+
+The proposed 047 SQL now repeats the same profile and membership checks
+*inside the migration transaction*, preventing a stale preflight from allowing
+unexpected later role grants.
+
+Independent verification:
+- Python tests including additional arbitrary-role, inherited financial
+  role, admin-option, privilege-escalation and missing-role negative tests.
+- In a disposable PostgreSQL 18 instance: intentionally add a second
+  finance-role membership -> **exact migration aborts, table absent**;
+  remove the test-only role membership -> exact migration succeeds.
+- Existing cross-order, replay, revocation, force-RLS tests remain PASS.
+- Production 5432 NOT accessed by those migration tests.
+- Still NO PRODUCTION MIGRATION, NO LOGIN GRANTS, NO LIVE PAYMENT.
+
+Run the revised, **read-only** v2 preflight as `postgres` before any
+separately approved production migration. Its result may still be HELD
+if the tenant reader has unknown attribute/role drift not visible in the
+founder's first output. Do not silently bypass such a gate.

@@ -10,7 +10,9 @@ data_dir="$(psql -X -w -At -d postgres -c 'SHOW data_directory')"
 [[ "$data_dir" == /tmp/pg_virtualenv.*/data/18/regress ]] || exit 71
 
 psql -X -w -v ON_ERROR_STOP=1 -d postgres <<'SQL' >/dev/null
-CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT;
+CREATE ROLE empiredb_migrator NOLOGIN INHERIT;
+CREATE ROLE empiredb_tenant_reader NOLOGIN NOINHERIT;
+GRANT empiredb_tenant_reader TO empiredb_migrator WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 CREATE ROLE empiredb_app NOLOGIN NOINHERIT;
 CREATE DATABASE direct_bsc_capability_fixture;
 SQL
@@ -28,6 +30,32 @@ GRANT USAGE,CREATE ON SCHEMA public TO empiredb_migrator;
 GRANT SELECT,REFERENCES ON public.fulfilment_orders,public.bsc_payment_requests
   TO empiredb_migrator;
 SQL
+
+# Negative case: an additional inherited finance group must abort the exact
+# migration BEFORE it creates any register/function. Only in isolated PG18.
+psql -X -w -v ON_ERROR_STOP=1 -d postgres <<'SQL' >/dev/null
+CREATE ROLE empire_payment_approver NOLOGIN NOINHERIT;
+GRANT empire_payment_approver TO empiredb_migrator
+  WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
+SQL
+deny_log="$(mktemp)"
+if psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
+  -f migrations/empiredb/047_direct_bsc_buyer_status_capability.sql >"$deny_log" 2>&1; then
+  rm -f "$deny_log"
+  echo "EPHEMERAL_UNEXPECTED_FINANCIAL_MEMBERSHIP_ALLOWED=UNSAFE";exit 79
+fi
+if ! grep -q 'DIRECT047_UNREVIEWED_MIGRATOR_INHERITED_AUTHORITY' "$deny_log"; then
+  rm -f "$deny_log"
+  echo "EPHEMERAL_UNEXPECTED_MEMBERSHIP_NOT_PROVEN=HELD";exit 80
+fi
+rm -f "$deny_log"
+absent="$(psql -X -w -At -d direct_bsc_capability_fixture -c \
+ "SELECT to_regclass('public.direct_bsc_buyer_capabilities') IS NULL")"
+[[ "$absent" == "t" ]] || { echo "EPHEMERAL_FAILED_MIGRATION_WROTE_TABLE=UNSAFE";exit 81; }
+psql -X -w -v ON_ERROR_STOP=1 -d postgres -c \
+ "REVOKE empire_payment_approver FROM empiredb_migrator" >/dev/null
+echo "EPHEMERAL_UNEXPECTED_FINANCIAL_MEMBERSHIP_FAIL_CLOSED=PASS"
+
 psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
   -f migrations/empiredb/047_direct_bsc_buyer_status_capability.sql >/dev/null
 flags="$(psql -X -w -At -d direct_bsc_capability_fixture -c "
