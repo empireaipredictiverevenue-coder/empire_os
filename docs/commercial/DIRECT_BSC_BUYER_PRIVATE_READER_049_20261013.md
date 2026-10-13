@@ -139,3 +139,54 @@ If a legitimate production login can SET/INHERIT the migrator, prefer a
 and separately approved, narrowly audited ACL/RLS policy rather than
 removing the other system's role privileges or weakening this gate.
 This is a possible future design, not an approved or installed change.
+
+
+## 13 October — actual production migrator-login authority confirmed
+
+Second founder-executed 049 catalog preflight returned:
+`migrator_incoming_member_details=[{"role":"empiredb_migrator_login",
+"can_login":true,"inherit_option":true,"set_option":true,
+"admin_option":false,"superuser":false}]`.
+The transitive login-path list contained `empiredb_migrator_login`.
+All other 049 prerequisite booleans were true, but status remained
+`HELD_PRIVATE_READER_049_GATES`, exit 2. **No production changes.**
+
+**Do not revoke or rewrite `empiredb_migrator_login` membership.**
+It is a functioning existing migration control-plane identity; changing
+it could disrupt unrelated database work. Do NOT treat this role as
+appropriate for buyer-status SECURITY DEFINER privilege: a policy
+directed at `empiredb_migrator` also provides a policy path to its
+inheriting/login member.
+
+**Revised architectural boundary:** 049 v1 remains deliberately held.
+The contemplated v2 would use a *new* purpose-specific NOLOGIN
+SECURITY DEFINER owner with no outgoing/incoming memberships, explicit
+narrow column privileges and RLS that names only that owner; the
+separate status-reader role gets only EXECUTE, and receives no login
+membership or endpoint. This is a design candidate, not a reviewed
+or installed migration. Before any SQL rewrite or founder approval,
+verify whether parent tables `fulfilment_orders`,
+`bsc_payment_requests` and `bsc_payment_evidence` have RLS
+enabled/forced and inspect their existing policy target roles and
+select scope. A purpose-specific owner must not receive BYPASSRLS or
+implicit broad access to other finance tables.
+
+`scripts/inspect_direct_bsc_reader_parent_contract.py --preflight`
+performs this one read-only catalog inventory (owners, policy command,
+RLS expressions, inherited migrator membership and default table ACLs).
+It exposes no buyer, wallet, payment, or token records. Output label
+`CATALOG_OBSERVED_REVIEW_REQUIRED` is **NOT** readiness or migration
+approval. Exact terminal command:
+
+```bash
+cd /srv/empire_os
+set +e
+sudo -n -u postgres ./.venv/bin/python \
+ -m scripts.inspect_direct_bsc_reader_parent_contract --preflight
+echo "READER_PARENT_RLS_EXIT=$?"
+```
+
+Until those parent table policies are independently reviewed, preserve
+the sealed 047/048 table, 049 uninstalled, no private status login,
+no customer endpoint, no payment activation. No need to rerun any
+previous migration or altered old 049 preflight.
