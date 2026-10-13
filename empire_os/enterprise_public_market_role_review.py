@@ -30,7 +30,26 @@ PUBLIC_MARKET_ROLE_RESEARCH: dict[str, dict[str, Any]] = {
         "reason": "Home-services multi-brand expansion creates a testable forecasting and integration use case",
         "suggested_product_codes_for_review_only": ["predictive_revenue_diagnostic"],
         "related_seed_account_keys_for_dedup_review_only": ["blackstone_operating_team"],
-        "next_research_action": "Validate revenue forecasting pain, group-level systems, potential Blackstone account overlap and relevant commercial owner",
+        "public_contact_routes_for_review_only": [
+            {
+                "published_email": "Partnerships@championsgh.com",
+                "source_url": "https://championsgroupholdings.com/contact/",
+                "route_context": "Home-services partner enquiry form requests service trade and truck count",
+                "software_vendor_fit_verified": False,
+                "person_bound": False,
+                "recipient_suppression_cleared": False,
+                "outreach_authorized": False,
+            },
+        ],
+        "observed_buyer_roles_for_review_only": [
+            {"name": "Laura Koester", "title": "Chief Marketing Officer",
+             "source_url": "https://championsgroupholdings.com/our-leadership/",
+             "person_email_binding_verified": False},
+            {"name": "Frank DiMarco", "title": "Chief Executive Officer",
+             "source_url": "https://championsgroupholdings.com/our-leadership/",
+             "person_email_binding_verified": False},
+        ],
+        "next_research_action": "Verify CFO/CMO business need and an appropriate vendor route; the published partnerships inbox may concern trade acquisitions, not software purchases",
     },
     "technomile.com": {
         "role_hypothesis": "COMPETITIVE_PRODUCT_OVERLAP",

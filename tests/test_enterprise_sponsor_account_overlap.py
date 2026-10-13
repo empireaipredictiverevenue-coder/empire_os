@@ -23,6 +23,20 @@ def test_champions_related_blackstone_seed_is_not_a_duplicate():
     assert result["outreach_authorized"] is False
 
 
+def test_public_champions_partnership_inbox_is_not_an_authorised_ai_buyer_route():
+    from empire_os.enterprise_public_market_role_review import market_role_review
+
+    role = market_role_review("championsgroupholdings.com")
+    route = role["public_contact_routes_for_review_only"][0]
+    assert route["published_email"].lower() == "partnerships@championsgh.com"
+    assert route["source_url"] == "https://championsgroupholdings.com/contact/"
+    assert route["person_bound"] is False
+    assert route["software_vendor_fit_verified"] is False
+    assert route["recipient_suppression_cleared"] is False
+    assert route["outreach_authorized"] is False
+    assert all(p["person_email_binding_verified"] is False for p in role["observed_buyer_roles_for_review_only"])
+
+
 def test_unknown_related_account_never_claims_authority():
     result = review_related_seed_accounts("example.org")
     assert result["status"] == "NO_KNOWN_CURATED_SPONSOR_OVERLAP"
