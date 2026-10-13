@@ -28,6 +28,9 @@ STEPS = (
     "observe_buyer_first_party_due_diligence.py",
     # Read-only snapshots -> 0600 founder review actions; no outreach.
     "build_buyer_qualification_actions.py",
+    # Reuse the same scout cadence to build private evidence-triggered
+    # recovery actions. Never create another scheduler or send list.
+    "build_buyer_recovery_action_desk.py",
 )
 
 
@@ -54,8 +57,13 @@ def run(
         args = [sys.executable, str(root / "scripts" / name)]
         if plan_only:
             args.append("--plan-only")
-        elif name == "build_buyer_qualification_actions.py":
-            args.append("--write")
+        elif name in {
+            "build_buyer_qualification_actions.py",
+            "build_buyer_recovery_action_desk.py",
+        }:
+            args.extend(("--write", "--repo-root", str(root))
+                        if name == "build_buyer_recovery_action_desk.py"
+                        else ("--write",))
         try:
             completed = call(
                 args, cwd=root, env=env, text=True, capture_output=True,
@@ -129,6 +137,10 @@ def run(
         "founder_qualification_snapshot_refresh_attempted": (
             not plan_only
             and any(r["script"] == "build_buyer_qualification_actions.py" for r in results)
+        ),
+        "buyer_recovery_desk_refresh_attempted": (
+            not plan_only
+            and any(r["script"] == "build_buyer_recovery_action_desk.py" for r in results)
         ),
         "execution_authority": "NONE",
     }

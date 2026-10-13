@@ -37,6 +37,8 @@ def test_bounded_cycle_reuses_existing_stages_without_outbound(tmp_path):
     assert [Path(args[0][1]).name for args in called] == list(task.STEPS)
     assert Path(called[1][0][1]).name == 'observe_buyer_first_party_due_diligence.py'
     assert called[2][0][-1] == "--write"
+    assert called[3][0][2:] == ["--write", "--repo-root", str(tmp_path)]
+    assert result["buyer_recovery_desk_refresh_attempted"] is True
     assert result['first_party_due_diligence_refresh_attempted'] is True
     assert result["founder_qualification_snapshot_refresh_attempted"] is True
     assert result["founder_review_automatic_approval"] is False
@@ -94,3 +96,22 @@ def test_cycle_failure_stops_before_promotion(tmp_path):
     assert len(seen) == 1
     assert result["steps"][0]["stderr_type"] == "PRESENT"
     assert "blocked" not in str(result)
+
+
+def test_prior_stage_failure_prevents_recovery_desk_stage(tmp_path):
+    class Error:
+        returncode = 3
+        stdout = "blocked"
+        stderr = "private"
+    calls = []
+    def runner(args, **kwargs):
+        calls.append(Path(args[1]).name)
+        return FakeDone() if len(calls) < 2 else Error()
+    directory = tmp_path / "runtime/buyer_network_intelligence"
+    directory.mkdir(parents=True)
+    result = task.run(root=tmp_path, call=runner)
+    assert result["status"] == "FAILED"
+    assert calls == list(task.STEPS[:2])
+    assert result["buyer_recovery_desk_refresh_attempted"] is False
+    assert result["execution_authority"] == "NONE"
+    assert result["outbound_sent"] is False

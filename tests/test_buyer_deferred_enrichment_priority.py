@@ -68,10 +68,8 @@ def test_due_deprioritises_retry_saturated_site_failure(tmp_path):
     data["evidence-rich"]["attempts"] = 1
     (tmp_path / "deferred.json").write_text(json.dumps(data))
     due = q.due(limit=2)
-    assert [row["prospect_id"] for row in due] == [
-        "evidence-rich",
-        "saturated",
-    ]
+    assert [row["prospect_id"] for row in due] == ["evidence-rich"]
+    assert q.snapshot()["evidence_parked_count"] == 1
 
 
 def test_claim_due_prevents_duplicate_worker_claims(tmp_path):
@@ -532,3 +530,108 @@ def test_defer_again_updates_recovery_prerequisite(tmp_path):
     import json
     row = json.loads((tmp_path / "deferred.json").read_text())["p1"]
     assert row["next_prerequisite"] == "first_party_site_reachable"
+
+def test_retry_exhaustion_parks_both_cold_and_hot_until_evidence(tmp_path):
+    import json
+
+    q = _queue(tmp_path)
+    q.enqueue({
+        "prospect_id": "cold", "reason": "site_timeout",
+        "website": "https://cold.example",
+    })
+    q.enqueue({
+        "prospect_id": "hot", "reason": "no_bound_contact",
+        "website": "https://hot.example",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder"}],
+    })
+    path = tmp_path / "deferred.json"
+    data = json.loads(path.read_text())
+    data["cold"]["attempts"] = 8
+    data["hot"]["attempts"] = 32
+    path.write_text(json.dumps(data))
+    assert q.due(limit=5) == []
+    assert q.claim_due(limit=5, worker_id="no-repeat") == []
+    snap = q.snapshot()
+    assert snap["evidence_parked_count"] == 2
+    assert snap["due_now"] == 0
+    # Nothing is discarded, silently approved, or marked resolved.
+    data = json.loads(path.read_text())
+    assert {data[k]["status"] for k in ("cold", "hot")} == {"pending"}
+
+    # Recurring discovery of identical or untrusted data does not reawaken.
+    assert q.enqueue({"prospect_id": "cold", "reason": "site_timeout",
+                      "website": "https://cold.example"})
+    assert q.enqueue({"prospect_id": "hot", "reason": "no_bound_contact",
+                      "website": "https://hot.example",
+                      "target_people": [{"name": "Jane Buyer",
+                                         "title": "Founder",
+                                         "evidence_url": "https://elsewhere.example/team"}]})
+    assert q.snapshot()["evidence_parked_count"] == 2
+
+
+def test_distinct_same_host_person_evidence_reopens_exhausted_hot(tmp_path):
+    import json
+
+    q = _queue(tmp_path)
+    original = {
+        "prospect_id": "hot", "reason": "no_bound_contact",
+        "website": "https://company.example",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder",
+                           "evidence_url": "https://company.example/about"}],
+    }
+    q.enqueue(original)
+    path = tmp_path / "deferred.json"
+    data = json.loads(path.read_text())
+    data["hot"]["attempts"] = 50
+    path.write_text(json.dumps(data))
+    assert q.due() == []
+
+    changed = {
+        **original,
+        "target_people": [{"name": "John Buyer", "title": "CEO",
+                           "evidence_url": "https://company.example/leadership"}],
+    }
+    assert q.enqueue(changed)
+    assert [x["prospect_id"] for x in q.due()] == ["hot"]
+    assert json.loads(path.read_text())["hot"]["attempts"] == 0
+    assert q.snapshot()["evidence_parked_count"] == 0
+
+    # Exhaustion after that bounded opportunity is not cleared by repeats.
+    q.defer_again("hot", reason="no_bound_contact",
+                  attempts=40, retry_minutes=5)
+    assert q.enqueue(changed)
+    assert json.loads(path.read_text())["hot"]["attempts"] == 40
+    assert q.due(now=datetime.now(timezone.utc) + timedelta(minutes=7)) == []
+
+
+def test_new_verified_route_during_exhausted_running_lease_recovers(tmp_path):
+    import json
+
+    q = _queue(tmp_path)
+    original = {
+        "prospect_id": "leased", "reason": "no_bound_contact",
+        "website": "https://company.example",
+        "target_people": [{"name": "Jane Buyer", "title": "Founder"}],
+    }
+    q.enqueue(original)
+    q.claim_due(limit=1, worker_id="existing")
+    path = tmp_path / "deferred.json"
+    data = json.loads(path.read_text())
+    data["leased"]["attempts"] = 35
+    path.write_text(json.dumps(data))
+
+    assert q.enqueue({**original, "company_contact_routes": [
+        {"channel": "email", "value": "team@company.example",
+         "verified": True},
+    ]})
+    during = json.loads(path.read_text())["leased"]
+    assert during["status"] == "running"
+    assert during["pending_evidence_wake_at"]
+    assert q.claim_due(limit=1, worker_id="other") == []
+
+    q.defer_again("leased", reason="no_bound_contact",
+                  attempts=36, retry_minutes=1440)
+    after = json.loads(path.read_text())["leased"]
+    assert after["attempts"] == 0
+    assert q.due(limit=1)[0]["prospect_id"] == "leased"
+    assert q.snapshot()["evidence_refresh_pending_count"] == 0

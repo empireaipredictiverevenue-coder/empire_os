@@ -212,6 +212,23 @@ def _recovery_lane(item: Mapping[str, Any]) -> str:
     return "identity_recovery"
 
 
+# Retry ceilings apply only to repeated enrichment, never to outbound
+# authority. Evidence-backed re-ingestion resets exhaustion explicitly.
+MAX_RETRIES_WITHOUT_NEW_EVIDENCE = 8
+MAX_HOT_CONTACT_RETRIES_WITHOUT_NEW_EVIDENCE = 32
+
+
+def _parked_without_new_evidence(item: Mapping[str, Any]) -> bool:
+    """Do not repeatedly probe an exhausted record without fresh evidence."""
+    attempts = max(0, int(item.get("attempts") or 0))
+    limit = (
+        MAX_HOT_CONTACT_RETRIES_WITHOUT_NEW_EVIDENCE
+        if _recovery_lane(item) == "hot_contact_recovery"
+        else MAX_RETRIES_WITHOUT_NEW_EVIDENCE
+    )
+    return attempts >= limit
+
+
 def _recovery_prerequisite(reason: Any) -> str:
     value = str(reason or "").strip()
     return {
@@ -565,6 +582,13 @@ class BuyerDeferredEnrichmentQueue:
                     company_contact_routes
                     or list(existing.get("company_contact_routes") or [])
                 ),
+                # Only a distinct same-host person or verified new route
+                # can revive an exhausted attempt budget. Repeated identical
+                # scout syncs never erase unsuccessful prior attempts.
+                "attempts": (
+                    0 if material_new_evidence and not preserve_running_lease
+                    else int(existing.get("attempts") or 0)
+                ),
                 "priority_score": max(existing_priority, requested_priority),
                 "priority_reason": (
                     str(item.get("priority_reason") or "").strip()
@@ -589,6 +613,8 @@ class BuyerDeferredEnrichmentQueue:
             if not isinstance(item, dict):
                 continue
             if str(item.get("status") or "") not in {"pending", "deferred"}:
+                continue
+            if _parked_without_new_evidence(item):
                 continue
             retry_at = _parse(item.get("next_retry_at"))
             if retry_at is not None and retry_at > current:
@@ -638,6 +664,8 @@ class BuyerDeferredEnrichmentQueue:
                         })
                         status = "deferred"
                 if status not in {"pending", "deferred"}:
+                    continue
+                if _parked_without_new_evidence(row):
                     continue
                 retry_at = _parse(row.get("next_retry_at"))
                 if retry_at is not None and retry_at > current:
@@ -689,7 +717,12 @@ class BuyerDeferredEnrichmentQueue:
             row.update({
                 "reason": reason,
                 "next_prerequisite": _recovery_prerequisite(reason),
-                "attempts": max(int(attempts), int(row.get("attempts") or 0)),
+                # New verified evidence may have arrived during an active
+                # lease. Preserve that wake-up after the old worker exits.
+                "attempts": (
+                    0 if evidence_wake is not None
+                    else max(int(attempts), int(row.get("attempts") or 0))
+                ),
                 "status": "deferred",
                 "last_attempt_at": _iso(now),
                 "updated_at": _iso(now),
@@ -793,6 +826,7 @@ class BuyerDeferredEnrichmentQueue:
         current = _now()
         pending_ages: list[float] = []
         due_now = 0
+        evidence_parked_count = 0
         evidence_wakes_24h = 0
         evidence_refresh_pending = 0
         for row in deferred.values():
@@ -811,9 +845,12 @@ class BuyerDeferredEnrichmentQueue:
                             max(0.0, (current - created).total_seconds() / 3600)
                         )
                 if status in {"pending", "deferred"}:
-                    retry_at = _parse(row.get("next_retry_at"))
-                    if retry_at is None or retry_at <= current:
-                        due_now += 1
+                    if _parked_without_new_evidence(row):
+                        evidence_parked_count += 1
+                    else:
+                        retry_at = _parse(row.get("next_retry_at"))
+                        if retry_at is None or retry_at <= current:
+                            due_now += 1
                 elif status == "running":
                     lease_end = _parse(row.get("lease_expires_at"))
                     if lease_end is not None and lease_end <= current:
@@ -845,6 +882,7 @@ class BuyerDeferredEnrichmentQueue:
             "deferred_total": len(deferred),
             "deferred_by_status": counts,
             "due_now": due_now,
+            "evidence_parked_count": evidence_parked_count,
             "evidence_wakes_last_24h": evidence_wakes_24h,
             "evidence_refresh_pending_count": evidence_refresh_pending,
             "oldest_pending_hours": round(oldest_pending_hours, 2),
