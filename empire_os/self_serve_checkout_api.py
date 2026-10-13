@@ -209,11 +209,17 @@ def create_order(req: CheckoutRequest):
             idempotency_key=req.idempotency_key,
             settlement_mode=mode,
         )
-        return create_payment_request_for_order(
+        result = create_payment_request_for_order(
             order,
             standing_authority=_proposal_authorized(),
             settlement_mode=mode,
         )
+        # First-party status receipt is optional and DEFAULT OFF.
+        # A failure never repeats an already-committed payment request.
+        from empire_os.direct_bsc_buyer_checkout_release import (
+            add_status_receipt_if_released,
+        )
+        return add_status_receipt_if_released(result)
     except CheckoutPaymentPreflightHold as exc:
         # No RPC URL, treasury, or chain internals leak into public replies.
         raise HTTPException(
@@ -316,3 +322,9 @@ def commercial_interest(req: FounderLedCommercialInterestRequest):
         raise HTTPException(
             status_code=503, detail="commercial_enquiry_temporarily_unavailable"
         ) from exc
+
+# Mount the buyer-held status endpoint ONLY when the separately authorised
+# first-party release is supplied with verified systemd credentials.
+# Normal production imports remain unchanged, with no status route.
+from empire_os.direct_bsc_buyer_checkout_release import mount_status_if_released
+mount_status_if_released(app)

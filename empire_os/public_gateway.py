@@ -620,6 +620,57 @@ async def checkout_order_proxy(request: Request):
     )
 
 
+
+@app.post("/v1/checkout/payment-status")
+async def checkout_buyer_payment_status_proxy(request: Request):
+    """Buyer-held status only; no payment status by order UUID/email."""
+    headers = {
+        "Cache-Control": "no-store, max-age=0",
+        "Pragma": "no-cache",
+        "Referrer-Policy": "no-referrer",
+        "X-Content-Type-Options": "nosniff",
+    }
+    if (request.headers.get("content-type","").split(";",1)[0].strip().lower()
+            != "application/json"):
+        return JSONResponse({"error":"application_json_required"},
+                            status_code=415,headers=headers)
+    if (request.headers.get("origin") != PUBLIC_BASE_URL
+            or request.headers.get("sec-fetch-site","same-origin")
+            not in {"same-origin","none"}):
+        return JSONResponse({"error":"same_origin_required"},
+                            status_code=403,headers=headers)
+    peer=request.client.host if request.client else "unknown"
+    if not FIRST_PARTY_INTAKE_LIMITER.allow(peer,"buyer_status"):
+        return JSONResponse({"error":"buyer_status_unavailable"},
+                            status_code=429,headers=headers)
+    body=bytearray()
+    async for part in request.stream():
+        if len(part)>160-len(body):
+            return JSONResponse({"error":"buyer_status_unavailable"},
+                                status_code=413,headers=headers)
+        body.extend(part)
+    try:
+        # Never place bearer tokens in URLs, process logs or query params.
+        async with httpx.AsyncClient(timeout=8.0) as client:
+            upstream=await client.post(
+                f"{CHECKOUT_INTERNAL_URL}/v1/checkout/payment-status",
+                content=bytes(body),
+                headers={"Content-Type":"application/json",
+                         "Origin":PUBLIC_BASE_URL,
+                         "Sec-Fetch-Site":"same-origin"},
+            )
+        if (upstream.status_code not in {200,403,404,415,429,503}
+                or len(upstream.content)>1000
+                or "application/json" not in upstream.headers.get("content-type","")):
+            raise ValueError("unexpected status response")
+        return Response(
+            content=upstream.content,status_code=upstream.status_code,
+            media_type="application/json",headers=headers,
+        )
+    except Exception:
+        return JSONResponse({"error":"buyer_status_unavailable"},
+                            status_code=503,headers=headers)
+
 @app.get("/v1/checkout/exchange/tiers")
 async def checkout_exchange_tiers_proxy():
     try:

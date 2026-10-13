@@ -37,6 +37,8 @@ type OrderResult = {
   payment_request_status?: string;
   payment_instructions_ready?: boolean;
   payment_request_id?: string;
+  buyer_status_token_delivered?: boolean;
+  buyer_status_token?: string;
   treasury_address?: string;
   amount_usdt?: string;
   network?: string;
@@ -494,7 +496,12 @@ export default function BuyPage() {
                 </button>
 
                 {result ? (
-                  <ProductResult result={result} copyTreasury={copyTreasury} />
+                  <>
+                    <ProductResult result={result} copyTreasury={copyTreasury} />
+                    {result.buyer_status_token_delivered && result.buyer_status_token ? (
+                      <BuyerPaymentStatus token={result.buyer_status_token} />
+                    ) : null}
+                  </>
                 ) : null}
 
                 <div className="mt-5 text-center text-[10px] leading-5 text-white/28">
@@ -788,6 +795,81 @@ function SharedIdentityFields({
           placeholder="company.com"
         />
       </label>
+    </div>
+  );
+}
+
+function BuyerPaymentStatus({ token }: { token: string }) {
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [instructions, setInstructions] = useState<{
+    amount_usdt: string;
+    treasury_address: string;
+  } | null>(null);
+
+  async function checkStatus() {
+    if (pending) return;
+    setPending(true);
+    setMessage("");
+    setInstructions(null);
+    try {
+      const response = await fetch("/v1/checkout/payment-status", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token }),
+      });
+      if (!response.ok) throw new Error("status_unavailable");
+      const body = await response.json();
+      if (body.status === "approved_payment_instructions" &&
+          body.payment_instructions_ready === true &&
+          typeof body.amount_usdt === "string" &&
+          /^0x[0-9a-f]{40}$/.test(body.treasury_address || "") &&
+          body.network === "BSC" && body.asset === "USDT" &&
+          body.chain_id === 56) {
+        setInstructions({
+          amount_usdt: body.amount_usdt,
+          treasury_address: body.treasury_address,
+        });
+        setMessage("Your payment request has passed independent approval.");
+      } else if (body.status === "awaiting_human_approval") {
+        setMessage("Still awaiting independent payment approval. Do not send USDT.");
+      } else if (body.status === "payment_evidence_recorded") {
+        setMessage("On-chain payment evidence is recorded for review.");
+      } else {
+        setMessage("No payable instructions are available. Contact Empire AI with your order reference.");
+      }
+    } catch {
+      setMessage("Payment status is temporarily unavailable. Do not send USDT.");
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <div className="mt-4 rounded-xl border border-[#60a5fa]/25 bg-[#60a5fa]/[0.04] p-4">
+      <p className="text-xs text-white/55">
+        Secure buyer-status access is available for this new order while this page remains open.
+        Your access token is never placed in a URL.
+      </p>
+      <button type="button" onClick={checkStatus} disabled={pending}
+        className="mt-3 rounded-xl border border-[#93c5fd]/40 px-4 py-2.5 text-xs font-semibold text-[#bfdbfe] disabled:opacity-50">
+        {pending ? "CHECKING STATUS…" : "CHECK PAYMENT STATUS"}
+      </button>
+      {message ? <p role="status" className="mt-3 text-xs leading-5 text-white/60">{message}</p> : null}
+      {instructions ? (
+        <div className="mt-3 rounded-lg border border-[#93c5fd]/20 p-3">
+          <p className="text-xs text-white/70">
+            Independently approved: {instructions.amount_usdt} USDT on BSC.
+          </p>
+          <code className="mt-2 block break-all text-xs text-[#bfdbfe]">
+            {instructions.treasury_address}
+          </code>
+          <p className="mt-2 text-[11px] text-white/45">
+            Verify the network, amount, and wallet before sending. Payment is not complete until independently confirmed on-chain.
+          </p>
+        </div>
+      ) : null}
     </div>
   );
 }
