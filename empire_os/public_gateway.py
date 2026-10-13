@@ -1089,6 +1089,17 @@ def commercial_page():
     return FileResponse(path, media_type="text/html")
 
 
+@app.get("/checkout", include_in_schema=False)
+def checkout_entrypoint():
+    # Existing first-party buyer checkout, not a separate payment gateway.
+    # The /buy page and its canonical API continue enforcing payment gates.
+    return RedirectResponse(
+        url="/buy",
+        status_code=307,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/buy")
 def buy_page():
     path = _site_html_path("buy")

@@ -389,3 +389,12 @@ def test_recall_lifecycle_proxy_forwards_only_verification_headers(monkeypatch):
     assert lowered["webhook-signature"] == "v1,AAAA"
     assert "authorization" not in lowered
     assert captured["timeout"] == 5.0
+
+
+def test_checkout_entrypoint_is_same_origin_buy_page_only():
+    response = client.get("/checkout", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/buy"
+    assert response.headers["cache-control"] == "no-store"
+    # No checkout is activated merely by adding this discovery URL.
+    assert client.get("/checkout").status_code == 200
