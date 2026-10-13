@@ -14,6 +14,8 @@ def main() -> int:
         "seed_target_count": payload["seed_target_count"],
         "eligible_rolling_candidate_count": payload["eligible_rolling_candidate_count"],
         "rolling_addition_count": payload["rolling_addition_count"],
+        "fit_review_count": payload["fit_review_count"],
+        "commercially_qualified_count": payload["commercially_qualified_count"],
         "total_enterprise_candidate_count": payload["total_enterprise_candidate_count"],
         "outreach_authorized": payload["outreach_authorized"],
     }, indent=2, sort_keys=True))

@@ -30,12 +30,17 @@ NOISE_TOKENS = (
     "architecture/décoration",
     "get smarter delivering",
     "the business impact platform",
+    "local news, sports",
+    "global industry association",
 )
+
 
 # These are observed editorial/search-result domains, not verified buyers.
 NON_BUYER_DOMAINS = frozenset({
     "newsbreak.com", "peprofessional.com", "pulse2.com",
     "pr.capitalpress.com", "investors.beyond.com",
+    "forbes.com", "aijourn.com", "aol.com", "github.com",
+    "financialcontent.com", "pr.hermistonherald.com",
 })
 
 BUYER_TYPE_WEIGHT = {
@@ -59,8 +64,11 @@ def _valid_domain(value: Any) -> bool:
 
 def _website_matches_domain(website: Any, domain: str) -> bool:
     try:
-        host = (urlparse(_clean(website)).hostname or "").lower()
-    except Exception:
+        parsed = urlparse(_clean(website))
+        if parsed.scheme not in {"http", "https"} or parsed.username or parsed.password:
+            return False
+        host = (parsed.hostname or "").lower()
+    except ValueError:
         return False
     return host == domain or host.endswith("." + domain)
 
@@ -81,6 +89,40 @@ def _score(row: Mapping[str, Any]) -> int:
     if len(emails) >= 2:
         score += 1
     return score
+
+
+def assess_commercial_readiness(row: Mapping[str, Any]) -> dict[str, Any]:
+    """Prioritise research for human verification; never infer buying intent.
+
+    Promotion proposals contain inferred fit, not authenticated commercial
+    demand, and cannot grant outbound or revenue authority.
+    """
+    product_values = row.get("target_product_codes")
+    products = [str(v).strip() for v in product_values if str(v).strip()] if isinstance(product_values, (list, tuple)) else []
+    domain = _clean(row.get("domain")).lower()
+    person_values = row.get("target_people_for_enrichment")
+    people = person_values if isinstance(person_values, (list, tuple)) else []
+    corroborated_people = [
+        person for person in people
+        if isinstance(person, Mapping)
+        and _clean(person.get("name"))
+        and _website_matches_domain(person.get("evidence_url"), domain)
+    ]
+    missing = []
+    if not products:
+        missing.append("PRODUCT_MAPPING_REQUIRED")
+    if not corroborated_people:
+        missing.append("FIRST_PARTY_PERSON_EVIDENCE_REQUIRED")
+    missing.append("BUYING_INTENT_NOT_VERIFIED")
+    return {
+        "state": "FIT_REVIEW" if products and corroborated_people else "RESEARCH_ONLY",
+        "product_mapping_present": bool(products),
+        "first_party_person_observed": bool(corroborated_people),
+        "verified_buying_intent": False,
+        "commercially_qualified": False,
+        "missing_evidence": missing,
+        "outreach_authorized": False,
+    }
 
 
 def build_rolling_enterprise_pool(
@@ -140,6 +182,7 @@ def build_rolling_enterprise_pool(
             "first_party_email_count": len(raw.get("first_party_emails_preserved_for_identity_resolution") or []),
             "source": "buyer_scout_promotion_plan",
             "classification": "ROLLING_ENTERPRISE_RESEARCH_CANDIDATE",
+            "commercial_readiness": assess_commercial_readiness(raw),
             "review_ready": False,
             "outreach_authorized": False,
             "payment_action": False,
@@ -158,6 +201,10 @@ def build_rolling_enterprise_pool(
         "rolling_addition_limit": limit,
         "eligible_rolling_candidate_count": len(candidates),
         "rolling_addition_count": len(selected),
+        "fit_review_count": sum(
+            row["commercial_readiness"]["state"] == "FIT_REVIEW" for row in selected
+        ),
+        "commercially_qualified_count": 0,
         "total_enterprise_candidate_count": len(TARGETS) + len(selected),
         "rolling_candidates": selected,
         "outreach_authorized": False,

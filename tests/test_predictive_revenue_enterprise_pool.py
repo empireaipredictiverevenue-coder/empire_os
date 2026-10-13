@@ -41,6 +41,8 @@ def test_pool_quarantines_observed_editorial_noise():
         proposal("Private Equity Professional — Private Equity's News Leader", "peprofessional.com"),
         proposal("Bed Bath & Beyond, Inc. - Investor Relations", "investors.beyond.com"),
         proposal("NewsBreak", "newsbreak.com"),
+        proposal("Forbes", "forbes.com", products=["managed_service"]),
+        proposal("GPCA global industry association", "globalprivatecapital.org", products=["private_capital_rollup"]),
         proposal("Acme Revenue Platform", "acme.com"),
     ]}
     out = build_rolling_enterprise_pool(plan)
