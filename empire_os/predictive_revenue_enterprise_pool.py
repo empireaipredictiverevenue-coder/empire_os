@@ -21,7 +21,22 @@ NOISE_TOKENS = (
     "search results",
     "media directory",
     "best press release",
+    "investor relations",
+    "business news",
+    "agriculture news",
+    "news leader",
+    "news, profiles",
+    "statistics & reports",
+    "architecture/décoration",
+    "get smarter delivering",
+    "the business impact platform",
 )
+
+# These are observed editorial/search-result domains, not verified buyers.
+NON_BUYER_DOMAINS = frozenset({
+    "newsbreak.com", "peprofessional.com", "pulse2.com",
+    "pr.capitalpress.com", "investors.beyond.com",
+})
 
 BUYER_TYPE_WEIGHT = {
     "qualified_end_buyer": 5,
@@ -96,6 +111,8 @@ def build_rolling_enterprise_pool(
         if name.casefold() in seed_names:
             continue
         if not _valid_domain(domain) or domain in seen_domains:
+            continue
+        if domain in NON_BUYER_DOMAINS:
             continue
         if not _website_matches_domain(website, domain):
             continue

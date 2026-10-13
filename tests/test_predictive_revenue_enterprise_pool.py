@@ -34,3 +34,15 @@ def test_pool_rejects_search_and_press_release_noise():
     assert "search.google" not in domains
     assert "abnewswire.com" not in domains
     assert "acme.com" in domains
+
+
+def test_pool_quarantines_observed_editorial_noise():
+    plan = {"proposals": [
+        proposal("Private Equity Professional — Private Equity's News Leader", "peprofessional.com"),
+        proposal("Bed Bath & Beyond, Inc. - Investor Relations", "investors.beyond.com"),
+        proposal("NewsBreak", "newsbreak.com"),
+        proposal("Acme Revenue Platform", "acme.com"),
+    ]}
+    out = build_rolling_enterprise_pool(plan)
+    assert [row["domain"] for row in out["rolling_candidates"]] == ["acme.com"]
+    assert out["outreach_authorized"] is False
