@@ -3,7 +3,9 @@
 import argparse
 import json
 import os
+import stat
 import sys
+from pathlib import Path
 
 from empire_os.payment_governance import (
     PaymentGovernanceError, approve_payment_request, cancel_payment_request,
@@ -28,12 +30,73 @@ def emit(value):
     print(json.dumps(value, indent=2, sort_keys=True, default=str))
 
 
+# Production operator access is not a service credential and is never added to
+# public checkout env, logged, or passed as a password-bearing DSN in argv.
+_ROOT_APPROVER_PASSFILE = Path(
+    "/var/lib/empire-bsc-payment-operators/empire_payment_approver_login.pgpass"
+)
+_ROOT_APPROVER_DSN = (
+    "host=/var/run/postgresql port=5432 dbname=empiredb "
+    "user=empire_payment_approver_login connect_timeout=5"
+)
+
+
+def _local_root_approver_transport():
+    """Load the existing segregated operator login, only inside a root process."""
+    if os.geteuid() != 0:
+        raise PaymentGovernanceError("root local operator required")
+    path = _ROOT_APPROVER_PASSFILE
+    directory = path.parent
+    try:
+        ds = directory.lstat()
+        ps = path.lstat()
+        if (not stat.S_ISDIR(ds.st_mode) or
+                not stat.S_ISREG(ps.st_mode) or
+                ds.st_uid != 0 or ps.st_uid != 0 or ps.st_gid != 0 or
+                stat.S_IMODE(ds.st_mode) != 0o700 or
+                stat.S_IMODE(ps.st_mode) != 0o600):
+            raise ValueError("operator secret permissions invalid")
+        fields = path.read_text(encoding="utf-8").rstrip("\n").split(":", 4)
+        if (len(fields) != 5 or fields[:4] != [
+            "/var/run/postgresql", "5432", "empiredb",
+            "empire_payment_approver_login"
+        ] or len(fields[4]) < 48):
+            raise ValueError("operator secret identity invalid")
+    except (OSError, ValueError) as exc:
+        raise PaymentGovernanceError("protected operator credential unavailable") from None
+
+    # The password remains in process memory, never in environment, argv,
+    # logs or the public application.
+    import psycopg
+    secret = fields[4]
+    return PostgresRoleRpc(
+        _ROOT_APPROVER_DSN, "empire_payment_approver",
+        connect_factory=lambda dsn: psycopg.connect(dsn, password=secret),
+    )
+
+
+def _load_live_direct_chain_config():
+    """The manual approver uses the exact installed public BSC chain config."""
+    from scripts.deploy_direct_bsc_readonly_checkout import (
+        TARGET, EXPECTED, RPC, TREASURY,
+    )
+    try:
+        if TARGET.is_symlink() or TARGET.read_bytes() != EXPECTED:
+            raise ValueError("installed BSC checkout config drift")
+    except (OSError, ValueError):
+        raise PaymentGovernanceError("reviewed BSC chain configuration required") from None
+    os.environ["BSC_RPC_URL"] = RPC
+    os.environ["BSC_TREASURY_ADDRESS"] = TREASURY
+    os.environ["BSC_MIN_CONFIRMATIONS"] = "12"
+
+
 def main(argv=None):
     args = parser().parse_args(argv)
     dsn = os.getenv("EMPIRE_PAYMENT_APPROVER_DSN", "").strip()
-    if not dsn:
-        raise PaymentGovernanceError("EMPIRE_PAYMENT_APPROVER_DSN is required")
-    rpc = PostgresRoleRpc(dsn, "empire_payment_approver")
+    rpc = (PostgresRoleRpc(dsn, "empire_payment_approver")
+           if dsn else _local_root_approver_transport())
+    if args.action == "approve":
+        _load_live_direct_chain_config()
     review = review_payment_request(args.request_id, role_rpc=rpc)
     if args.action == "review":
         emit(review); return 0
