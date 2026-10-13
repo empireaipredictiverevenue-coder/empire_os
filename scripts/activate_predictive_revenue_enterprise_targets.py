@@ -16,6 +16,7 @@ from empire_os.lead_sources import LeadCandidate
 from empire_os.qualification_worker_v2 import fetch_prospect, qualify_prospect
 
 
+REPO_ROOT = Path("/srv/empire_os")
 OUT = Path(
     "/srv/empire_os/runtime/predictive_revenue/"
     "enterprise_activation_latest.json"
@@ -45,7 +46,8 @@ def _target_by_name() -> dict[str, object]:
 
 
 def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
-    root = Path("/srv/empire_os")
+    root = REPO_ROOT
+    pool_path = root / "runtime/predictive_revenue/enterprise_pool_latest.json"
     location_path = (
         root / "runtime/predictive_revenue/"
         "enterprise_location_enrichment_latest.json"
@@ -53,11 +55,19 @@ def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
     promotion_path = (
         root / "runtime/buyer_acquisition/promotion_plan_latest.json"
     )
-    if not location_path.exists() or not promotion_path.exists():
+    if not all(path.exists() for path in (pool_path, location_path, promotion_path)):
         return []
 
+    pool = json.loads(pool_path.read_text(encoding="utf-8"))
     location = json.loads(location_path.read_text(encoding="utf-8"))
     promotion = json.loads(promotion_path.read_text(encoding="utf-8"))
+    # Location snapshots may lag behind the latest filtered enterprise pool.
+    # A removed research candidate must not re-enter canonical acquisition.
+    current_members = {
+        str(row.get("domain") or "").strip().lower(): row
+        for row in (pool.get("rolling_candidates") or [])
+        if isinstance(row, dict)
+    }
     by_domain = {
         str(row.get("domain") or "").strip().lower(): row
         for row in (promotion.get("proposals") or [])
@@ -68,13 +78,23 @@ def _rolling_candidates() -> list[tuple[LeadCandidate, dict]]:
     for item in location.get("candidates") or []:
         if not isinstance(item, dict) or item.get("location_verified") is not True:
             continue
+        domain = str(item.get("domain") or "").strip().lower()
+        current = current_members.get(domain)
+        proposal = by_domain.get(domain)
+        if not current or not proposal:
+            continue
+        if any(
+            str(item.get(key) or "").strip() != str(current.get(key) or "").strip()
+            for key in ("candidate_id", "website", "account_name")
+        ):
+            continue
+        if str(proposal.get("candidate_id") or "").strip() != str(item.get("candidate_id") or "").strip():
+            continue
         location = location_from_addresses(
             list(item.get("location_evidence_addresses") or [])
         )
         if not location:
             continue
-        domain = str(item.get("domain") or "").strip().lower()
-        proposal = by_domain.get(domain) or {}
         emails = [
             str(v).strip()
             for v in (
