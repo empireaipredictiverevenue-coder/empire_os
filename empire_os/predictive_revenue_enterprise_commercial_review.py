@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from empire_os.predictive_revenue_enterprise_location import location_from_addresses
+from empire_os.enterprise_public_market_role_review import market_role_review
 
 
 def _key(row: Mapping[str, Any]) -> tuple[str, str]:
@@ -61,6 +62,8 @@ def build_review(
         seen.add(key)
         readiness = current.get("commercial_readiness") or {}
         fit = readiness.get("state") == "FIT_REVIEW"
+        market_role = market_role_review(key[0])
+        role_lane = market_role["review_lane"]
         product_codes = list(current.get("target_product_codes") or [])
         source_prospect_ids = proposal.get("source_prospect_ids") or []
         blockers = [
@@ -79,10 +82,18 @@ def build_review(
             "location": place["metro"],
             "location_source": row.get("location_source"),
             "fit_state": "FIT_REVIEW" if fit else "RESEARCH_ONLY",
+            "market_role_review": market_role,
             "product_codes_research_only": product_codes,
             "observed_first_party_person": readiness.get("first_party_person_observed") is True,
             "source_prospect_binding_present": bool(source_prospect_ids),
-            "priority": "REVIEW_PRODUCT_FIT_AND_BUYER_ROLE" if fit else "COMPLETE_RESEARCH_EVIDENCE",
+            "priority": (
+                "VALIDATE_OPERATING_CUSTOMER_USE_CASE"
+                if role_lane == "CUSTOMER_DISCOVERY" else
+                "RESEARCH_COMPETITIVE_OR_PARTNER_ROLE"
+                if role_lane == "COMPETITOR_OR_PARTNER_RESEARCH" else
+                "REVIEW_PRODUCT_FIT_AND_BUYER_ROLE" if fit else
+                "COMPLETE_RESEARCH_EVIDENCE"
+            ),
             "blockers": blockers,
             "person_email_binding_verified": False,
             "prior_contact_status": "UNKNOWN_RECHECK_REQUIRED",
@@ -91,7 +102,15 @@ def build_review(
             "commercially_qualified": False,
             "outreach_authorized": False,
         })
-    packets.sort(key=lambda r: (r["fit_state"] != "FIT_REVIEW", r["domain"]))
+    lane_order = {
+        "CUSTOMER_DISCOVERY": 0,
+        "GENERAL_RESEARCH": 1,
+        "COMPETITOR_OR_PARTNER_RESEARCH": 2,
+    }
+    packets.sort(key=lambda r: (
+        lane_order.get(r["market_role_review"]["review_lane"], 3),
+        r["fit_state"] != "FIT_REVIEW", r["domain"],
+    ))
     return {
         "schema_version": "empire.predictive-revenue-enterprise-commercial-review.v1",
         "mode": "OBSERVE",
@@ -99,6 +118,12 @@ def build_review(
         "research_pool_count": len(candidates),
         "location_verified_current_count": len(packets),
         "fit_review_current_count": sum(r["fit_state"] == "FIT_REVIEW" for r in packets),
+        "customer_discovery_review_count": sum(
+            r["market_role_review"]["review_lane"] == "CUSTOMER_DISCOVERY" for r in packets
+        ),
+        "competitive_overlap_review_count": sum(
+            r["market_role_review"]["review_lane"] == "COMPETITOR_OR_PARTNER_RESEARCH" for r in packets
+        ),
         "commercially_qualified_count": 0,
         "packets": packets,
         "database_write_performed": False,

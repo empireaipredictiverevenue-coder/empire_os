@@ -54,6 +54,8 @@ def main() -> int:
     print(json.dumps({"status": "REVIEW_PACKET_READY", "research_pool_count": data["research_pool_count"],
                       "location_verified_current_count": data["location_verified_current_count"],
                       "fit_review_current_count": data["fit_review_current_count"],
+                      "customer_discovery_review_count": data["customer_discovery_review_count"],
+                      "competitive_overlap_review_count": data["competitive_overlap_review_count"],
                       "commercially_qualified_count": data["commercially_qualified_count"],
                       "outreach_authorized": False, "database_write_performed": False}, sort_keys=True))
     return 0

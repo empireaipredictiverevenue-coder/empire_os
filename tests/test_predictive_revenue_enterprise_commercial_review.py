@@ -97,3 +97,48 @@ def test_script_writes_private_review_snapshot_without_side_effects(tmp_path):
     assert out["location_verified_current_count"] == 1
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert json.loads(path.read_text())["outreach_authorized"] is False
+
+
+def test_public_market_role_analysis_separates_customer_and_competitors():
+    from empire_os.enterprise_public_market_role_review import market_role_review
+
+    customer = market_role_review("championsgroupholdings.com")
+    assert customer["review_lane"] == "CUSTOMER_DISCOVERY"
+    assert customer["suggested_product_codes_for_review_only"] == ["predictive_revenue_diagnostic"]
+    assert customer["related_seed_account_keys_for_dedup_review_only"] == ["blackstone_operating_team"]
+    assert customer["observations"][0]["source_url"].startswith("https://championsgroupholdings.com/")
+    for domain in ("technomile.com", "exlservice.com"):
+        overlap = market_role_review(domain)
+        assert overlap["review_lane"] == "COMPETITOR_OR_PARTNER_RESEARCH"
+        assert overlap["suggested_product_codes_for_review_only"] == []
+        assert overlap["observations"]
+        assert overlap["verified_buying_intent"] is False
+        assert overlap["outreach_authorized"] is False
+    unknown = market_role_review("unrecognised.example")
+    assert unknown["review_lane"] == "GENERAL_RESEARCH"
+    assert unknown["verified_buying_intent"] is False
+
+
+def test_public_role_reorders_review_without_changing_scout_product_mapping():
+    pool, locations, promotion = fixtures()
+    names = ["exlservice.com", "technomile.com", "championsgroupholdings.com"]
+    for name in names:
+        candidate = dict(pool["rolling_candidates"][0], domain=name,
+                         candidate_id=name, account_name=name,
+                         website=f"https://{name}/", target_product_codes=[])
+        place = dict(locations["candidates"][0], domain=name,
+                     candidate_id=name, account_name=name, website=f"https://{name}/")
+        pool["rolling_candidates"].append(candidate)
+        locations["candidates"].append(place)
+        promotion["proposals"].append({"domain": name, "candidate_id": name,
+                                       "source_prospect_ids": []})
+    out = build_review(pool, locations, promotion)
+    assert out["customer_discovery_review_count"] == 1
+    assert out["competitive_overlap_review_count"] == 2
+    assert out["packets"][0]["domain"] == "championsgroupholdings.com"
+    customer = out["packets"][0]
+    assert customer["priority"] == "VALIDATE_OPERATING_CUSTOMER_USE_CASE"
+    assert customer["product_codes_research_only"] == []
+    assert customer["market_role_review"]["suggested_product_codes_for_review_only"] == ["predictive_revenue_diagnostic"]
+    assert out["commercially_qualified_count"] == 0
+    assert out["outreach_authorized"] is False
