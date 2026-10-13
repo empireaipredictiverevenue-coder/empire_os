@@ -42,3 +42,17 @@ A fresh connected Gmail read after the operator check found exactly two messages
 The connected Gmail account profile was `flavag83@gmail.com`, **not** an independently verified authenticated Empire AI professional-mailbox sending identity. Gmail draft readiness does not certify a chosen `From` alias. The user-preferred first-party founder sender is not implicitly established by the Gmail connection. **Do not send either draft or automatically lift hold.** Require independently verified approved sender identity, latest suppression/opt-out/bounce/cadence checks at send time, and founder approval for these precise follow-ups. The existing two Gmail draft IDs remain unchanged.
 
 **Resolution:** canonical suppression lookup PASS for the bounded two-address cohort; separate sender and external-send authority remain HELD. No additional suppression script rerun, database write, mailbox send or production deployment is necessary to record this decision.
+
+## Founder-authorised external send — 13 October 2026 (supersedes earlier HOLD for these two Gmail follow-ups)
+The founder explicitly requested **"do it and get them sent"** after the exact canonical no-suppression-match review for these two original Gmail conversations. The first-party mailbox readiness was independently checked immediately before sending: both local and live Founder API `owned_imap` probes reported `CONFIGURATION_REQUIRED`. The existing EmpireOS governed first-party sender is **NOT** provisioned or activated.
+
+As a bounded existing-thread fallback, ChatGPT's already-connected and authenticated `flavag83@gmail.com` Gmail account sent only the two **previously drafted**, founder-authorised person-bound follow-ups. These were manual connected-Gmail sends, **NOT** owned professional-mailbox sends and **NOT** new EmpireOS DB claims. No default future Gmail fallback or standing outbound authority was granted.
+
+| Contact | Recipient | Gmail SENT message ID | Existing thread | Sent UTC | Proof |
+| --- | --- | --- | --- | --- | --- |
+| Redwood / Richard Lewis | `richard@redwoodservices.com` | `1a1372a5182b98f3` | `1a0d5cdf953936f4` | 2026-10-13 21:28:02 | Gmail `SENT` label; reply recipient `flavag83@gmail.com` |
+| Sila / Kyle Martin | `kmartin@sila.com` | `1a1372a5eb93ebc4` | `1a0d5ce150bb1a71` | 2026-10-13 21:28:06 | Gmail `SENT` label; reply recipient `flavag83@gmail.com` |
+
+**Critical interpretation:** A Gmail SENT label proves accepted send, **not delivery, a substantive buyer reply, interest, signed commercial terms, payment or revenue**. The outbound source-of-truth for these two messages is connected Gmail; existing EmpireDB per-recipient intent/event counts were taken **before** these manual sends, so do **not** claim those send records were automatically synchronized or create duplicate new intents. Original older unsent standalone drafts may remain; do not send them.
+
+**Next real trigger:** an independently authenticated positive reply in either existing thread, a later bounce/opt-out, or a materially changed evidence state. Do not resend, schedule repeat chasers or activate live financial authority. Professional `phil@mail.empire-ai.co.uk` sender still requires its own authenticated first-party provisioning.
