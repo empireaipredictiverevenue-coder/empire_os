@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from empire_os.predictive_revenue_enterprise_location import location_from_addresses
 from empire_os.enterprise_public_market_role_review import market_role_review
+from empire_os.enterprise_account_relationship_review import review_related_seed_accounts
 
 
 def _key(row: Mapping[str, Any]) -> tuple[str, str]:
@@ -63,6 +64,7 @@ def build_review(
         readiness = current.get("commercial_readiness") or {}
         fit = readiness.get("state") == "FIT_REVIEW"
         market_role = market_role_review(key[0])
+        sponsor_overlap = review_related_seed_accounts(key[0])
         role_lane = market_role["review_lane"]
         product_codes = list(current.get("target_product_codes") or [])
         source_prospect_ids = proposal.get("source_prospect_ids") or []
@@ -75,6 +77,8 @@ def build_review(
             blockers.append("PRODUCT_OR_FIRST_PARTY_PERSON_REVIEW_REQUIRED")
         if not source_prospect_ids:
             blockers.append("CANONICAL_PROSPECT_LINK_UNAVAILABLE")
+        if sponsor_overlap["status"] != "NO_KNOWN_CURATED_SPONSOR_OVERLAP":
+            blockers.append("SPONSOR_ACCOUNT_HISTORY_AND_TRANSACTION_REVIEW_REQUIRED")
         packets.append({
             "account_name": current.get("account_name"),
             "domain": key[0],
@@ -83,6 +87,7 @@ def build_review(
             "location_source": row.get("location_source"),
             "fit_state": "FIT_REVIEW" if fit else "RESEARCH_ONLY",
             "market_role_review": market_role,
+            "sponsor_account_overlap_review": sponsor_overlap,
             "product_codes_research_only": product_codes,
             "observed_first_party_person": readiness.get("first_party_person_observed") is True,
             "source_prospect_binding_present": bool(source_prospect_ids),
