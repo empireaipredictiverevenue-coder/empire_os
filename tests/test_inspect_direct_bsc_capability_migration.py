@@ -53,3 +53,40 @@ def test_no_schema_migration_or_write_methods_in_catalog_inspector():
                       "GRANT CONNECT ON DATABASE", "ALTER TABLE public.",
                       "COMMIT;"):
         assert forbidden not in src
+
+
+def test_diagnostic_exposes_only_safe_role_attribute_booleans():
+    facts = safe()
+    facts["migrator"] = (False, True, False, False, False, False, False)
+    result = preflight.classify(facts)
+    assert result["status"] == "HELD_SCHEMA_OR_AUTHORITY_DRIFT"
+    assert result["migrator_mismatched_flags"] == ["inherits_membership"]
+    assert result["migrator_attributes"]["inherits_membership"] is True
+    assert result["migrator_attributes"]["superuser"] is False
+    assert result["migration_applied"] is False
+
+
+def test_unsafe_superuser_remains_held_even_with_other_preflight_checks_green():
+    facts = safe()
+    facts["migrator"] = (False, False, True, False, False, False, False)
+    result = preflight.classify(facts)
+    assert result["restricted_migrator"] is False
+    assert result["migrator_mismatched_flags"] == ["superuser"]
+    assert result["status"] == "HELD_SCHEMA_OR_AUTHORITY_DRIFT"
+
+
+@pytest.mark.parametrize("unsafe", (None, (), (False,), (0,)*7))
+def test_missing_or_malformed_migrator_role_diagnostic_fail_closed(unsafe):
+    facts = safe()
+    facts["migrator"] = unsafe
+    result = preflight.classify(facts)
+    assert result["status"] == "HELD_SCHEMA_OR_AUTHORITY_DRIFT"
+    assert result["migrator_attributes"] is None
+    assert result["migrator_mismatched_flags"] == ["missing_or_unreadable_migrator"]
+
+
+def test_exact_expected_migrator_only_profile_remains_unchanged():
+    result = preflight.classify(safe())
+    assert result["restricted_migrator"] is True
+    assert result["migrator_mismatched_flags"] == []
+    assert result["status"] == "READY_FOR_SEPARATELY_APPROVED_CAPABILITY_MIGRATION"

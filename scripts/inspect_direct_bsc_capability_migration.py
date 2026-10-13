@@ -9,17 +9,36 @@ import os
 import sys
 
 
+MIGRATOR_FLAG_NAMES = (
+    "can_login", "inherits_membership", "superuser", "create_database",
+    "create_role", "replication", "bypass_rls",
+)
+EXPECTED_MIGRATOR_FLAGS = (False,) * len(MIGRATOR_FLAG_NAMES)
+
+
 def classify(facts: dict) -> dict:
     canonical = (
         facts.get("database") == "empiredb"
         and facts.get("user") == "postgres"
         and facts.get("standby") is False
     )
-    migrator = facts.get("migrator") == (
-        False, False, False, False, False, False, False
+    flags = facts.get("migrator")
+    valid_flags = (
+        isinstance(flags, tuple) and
+        len(flags) == len(MIGRATOR_FLAG_NAMES) and
+        all(type(value) is bool for value in flags)
     )
-    # migrator flags:
-    # can_login, inherit, super, create_db, create_role, replication, bypass_rls
+    # Explain the exact mismatch without granting or relaxing any authority.
+    migrator_attributes = (
+        dict(zip(MIGRATOR_FLAG_NAMES, flags)) if valid_flags else None
+    )
+    mismatched_flags = (
+        [name for name, actual, expected in
+         zip(MIGRATOR_FLAG_NAMES, flags, EXPECTED_MIGRATOR_FLAGS)
+         if actual is not expected]
+        if valid_flags else ["missing_or_unreadable_migrator"]
+    )
+    migrator = valid_flags and flags == EXPECTED_MIGRATOR_FLAGS
     tables = facts.get("parent_tables") == (True, True)
     privileges = facts.get("privileges") == (True, True, True, True, True)
     targets_absent = facts.get("targets_absent") == (True, True)
@@ -33,6 +52,8 @@ def classify(facts: dict) -> dict:
     return {
         "schema_version": "empire.direct-bsc-buyer-capability-migration-preflight.v1",
         "mode": "READ_ONLY",
+        "migrator_attributes": migrator_attributes,
+        "migrator_mismatched_flags": mismatched_flags,
         "status": (
             "READY_FOR_SEPARATELY_APPROVED_CAPABILITY_MIGRATION"
             if all(checks.values()) else "HELD_SCHEMA_OR_AUTHORITY_DRIFT"

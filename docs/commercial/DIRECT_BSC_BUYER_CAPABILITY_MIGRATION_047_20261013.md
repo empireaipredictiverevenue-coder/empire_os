@@ -91,3 +91,28 @@ transaction replay/reorg checks, and separately authorised controlled service
 restarts with rollback proof.
 
 **Money stays OFF until the entire approved buyer payment flow is verified.**
+
+
+## 13 October 2026 — production migrator preflight held
+
+Founder-read-only production output from
+`scripts.inspect_direct_bsc_capability_migration --preflight`:
+
+- canonical DB, both payment/order parent tables, FK + SELECT permissions:
+  **PASS**
+- proposed capability table and trigger function absent: **PASS**
+- migrator exact NOLOGIN/NOINHERIT/no-privileged-attributes check: **HELD**
+- result: `HELD_SCHEMA_OR_AUTHORITY_DRIFT`; **047 NOT APPLIED**.
+
+The exact mismatched role attribute was not disclosed by the original
+inspector. Source-only diagnostic enhancement now returns
+`migrator_attributes` and `migrator_mismatched_flags` from pg_catalog, with
+READ ONLY transaction, no credentials, no role writes, no changes to the
+original seven-flag acceptance rule. A non-inheriting NOLOGIN migrator is the
+*expected* profile, not an observed production fact. Don't assume that
+`rolinherit=true` is the only mismatch without a new catalog read.
+
+**Do not ALTER ROLE, GRANT, REVOKE or run migration 047** to make the
+preflight green. Review the actual attribute(s), existing deliberate
+migration authority, dependent role memberships and separate founder
+approval before any remediation or migration.
