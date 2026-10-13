@@ -35,6 +35,7 @@ SQL
 # migration BEFORE it creates any register/function. Only in isolated PG18.
 psql -X -w -v ON_ERROR_STOP=1 -d postgres <<'SQL' >/dev/null
 CREATE ROLE empire_payment_approver NOLOGIN NOINHERIT;
+CREATE ROLE empire_bsc_verifier NOLOGIN NOINHERIT;
 GRANT empire_payment_approver TO empiredb_migrator
   WITH INHERIT TRUE, SET TRUE, ADMIN FALSE;
 SQL
@@ -66,6 +67,16 @@ acl="$(psql -X -w -At -d direct_bsc_capability_fixture -c "
 SELECT has_table_privilege('empiredb_app','public.direct_bsc_buyer_capabilities','SELECT')::int")"
 [[ "$acl" == "0" ]] || { echo 'EPHEMERAL_DIRECT_APP_TABLE_ACCESS=UNSAFE';exit 73; }
 echo "EPHEMERAL_CAPABILITY_MIGRATION_AND_DENY_DEFAULT=PASS"
+
+# Run the exact catalog-only postcommit forensic inspector on the PG18
+# disposable migration, proving all nine checks PASS on a known-safe state.
+catalog_report="$(psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
+  -f scripts/inspect_direct_bsc_capability_047_postcommit.sql)"
+valid_count="$(printf '%s\n' "$catalog_report" |
+  grep -Ec '^[[:space:]]*0[1-9]_[[:alnum:]_]+[[:space:]]*\\|[[:space:]]*PASS[[:space:]]*$' || true)"
+[[ "$valid_count" == 9 ]] ||
+  { echo 'EPHEMERAL_NINE_SECURITY_CHECKS_NOT_ALL_PASS'; exit 82; }
+echo "EPHEMERAL_NINE_NAMED_POSTCOMMIT_CHECKS=PASS"
 
 psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture <<'SQL' >/dev/null
 INSERT INTO public.fulfilment_orders VALUES
@@ -109,6 +120,13 @@ echo "EPHEMERAL_CROSS_ORDER_REPLAY_IMMUTABLE_REVOCATION=PASS"
 # holds even against privilege accidents; no similar production GRANT.
 psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
   -c "GRANT USAGE ON SCHEMA public TO empiredb_app; GRANT SELECT ON public.direct_bsc_buyer_capabilities TO empiredb_app" >/dev/null
+unsafe_report="$(psql -X -w -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
+  -f scripts/inspect_direct_bsc_capability_047_postcommit.sql)"
+if ! printf '%s\n' "$unsafe_report" | grep -Eq \
+  '^[[:space:]]*03_app_select_denied[[:space:]]*\|[[:space:]]*FAIL[[:space:]]*$'; then
+  echo "EPHEMERAL_UNSAFE_APP_GRANT_NOT_DETECTED";exit 83
+fi
+echo "EPHEMERAL_UNSAFE_APP_GRANT_EXPLICITLY_DETECTED=PASS"
 seen="$(psql -X -w -At -v ON_ERROR_STOP=1 -d direct_bsc_capability_fixture \
   -c 'BEGIN; SET LOCAL ROLE empiredb_app; SELECT count(*) FROM public.direct_bsc_buyer_capabilities; ROLLBACK;' | grep -x '0' || true)"
 [[ "$seen" == "0" ]] || { echo "EPHEMERAL_FORCE_RLS_DENY_UNSAFE";exit 78; }
