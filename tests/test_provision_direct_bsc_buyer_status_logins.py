@@ -90,7 +90,7 @@ def test_existing_env_not_overwritten_and_new_secret_file_0600(tmp_path):
 def test_provisioner_source_has_readback_and_no_public_feature():
     s=Path(p.__file__).read_text()
     for necessary in (
-        "existing_contracts_verified()", "checkout_still_off()",
+        "existing_contracts_verified()", "checkout_financial_execution_held()",
         "SET TRANSACTION READ ONLY",
         "SET LOCAL ROLE ",
         "secrets.token_urlsafe(42)",
@@ -146,3 +146,64 @@ def test_ascii_role_names_support_real_postgres_encoding_without_relaxation():
     assert p._role_name(b"\xff")==""
     assert p._role_name(None)==""
     assert p._role_name(True)==""
+
+
+def _health_flags(**overrides):
+    h = {
+        "status":"online",
+        "checkout_settlement_mode":"direct",
+        "payment_proposal_authorized":False,
+        "binding_order_creation_authorized":False,
+        "payment_execution":False,
+        "revenue_recognition":False,
+    }
+    h.update(overrides)
+    return h
+
+
+def test_order_admission_requires_exact_independent_release_proof():
+    p.validate_checkout_admission(_health_flags(), controlled_release_verified=False)
+    p.validate_checkout_admission(
+        _health_flags(payment_proposal_authorized=True,
+                      binding_order_creation_authorized=True),
+        controlled_release_verified=True,
+    )
+    with pytest.raises(ValueError, match="unverified"):
+        p.validate_checkout_admission(
+            _health_flags(payment_proposal_authorized=True,
+                          binding_order_creation_authorized=True),
+            controlled_release_verified=False,
+        )
+
+
+@pytest.mark.parametrize("bad",(
+    {"status":"offline"},
+    {"checkout_settlement_mode":"escrow"},
+    {"payment_execution":True},
+    {"revenue_recognition":True},
+    {"payment_execution":None},
+    {"binding_order_creation_authorized":True},
+    {"payment_proposal_authorized":True},
+    {"binding_order_creation_authorized":"ON"},
+    {"payment_proposal_authorized":"ON"},
+))
+def test_checkout_payment_activation_or_inconsistent_flags_hold(bad):
+    with pytest.raises(ValueError):
+        p.validate_checkout_admission(
+            _health_flags(**bad),controlled_release_verified=True)
+
+
+def test_untrusted_controlled_release_configuration_is_rejected(tmp_path, monkeypatch):
+    candidate=tmp_path/"40-direct-bsc-controlled-release.conf"
+    candidate.write_text(
+        "# Founder-approved four-product direct BSC order admission.\n"
+        "Environment=EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED=ON\n"
+        "Environment=EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED=ON\n"
+    )
+    monkeypatch.setattr(p,"CONTROLLED_ORDER_RELEASE",candidate)
+    # Temporary user-owned file is not an audited root-owned systemd release.
+    assert p._verified_controlled_order_release() is False
+    symlink=tmp_path/"fake.conf"
+    symlink.symlink_to(candidate)
+    monkeypatch.setattr(p,"CONTROLLED_ORDER_RELEASE",symlink)
+    assert p._verified_controlled_order_release() is False

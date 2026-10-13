@@ -202,7 +202,65 @@ def existing_contracts_verified() -> None:
             raise ValueError("installed buyer role security contract drift")
 
 
-def checkout_still_off() -> None:
+CONTROLLED_ORDER_RELEASE = Path(
+    "/etc/systemd/system/empire-self-serve-checkout.service.d/"
+    "40-direct-bsc-controlled-release.conf"
+)
+
+
+def _verified_controlled_order_release() -> bool:
+    """Accept only the already-deployed root-owned, active release drop-in."""
+    import stat
+    path = CONTROLLED_ORDER_RELEASE
+    try:
+        if path.is_symlink() or not path.is_file():
+            return False
+        metadata = path.stat()
+        if (not stat.S_ISREG(metadata.st_mode) or metadata.st_uid != 0
+                or metadata.st_mode & 0o022):
+            return False
+        body = path.read_text(encoding="utf-8")
+        lines = body.splitlines()
+        if "# Founder-approved four-product direct BSC order admission." not in lines:
+            return False
+        for name in (
+            "EMPIRE_SELF_SERVE_PAYMENT_PROPOSAL_AUTHORIZED",
+            "EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED",
+        ):
+            if lines.count("Environment=" + name + "=ON") != 1:
+                return False
+        process = subprocess.run(
+            ["systemctl","show","empire-self-serve-checkout.service",
+             "-p","DropInPaths","--value"],
+            stdout=subprocess.PIPE,stderr=subprocess.PIPE,
+            text=True,check=False,timeout=5,
+        )
+        return (process.returncode == 0
+                and str(path) in process.stdout.split())
+    except Exception:
+        return False
+
+
+def validate_checkout_admission(
+    snapshot: dict, *, controlled_release_verified: bool
+) -> None:
+    """Order admission is not payment execution or revenue recognition."""
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("status") != "online"
+            or snapshot.get("checkout_settlement_mode") != "direct"
+            or snapshot.get("payment_execution") is not False
+            or snapshot.get("revenue_recognition") is not False):
+        raise ValueError("payment or revenue authority not held")
+    proposal = snapshot.get("payment_proposal_authorized")
+    orders = snapshot.get("binding_order_creation_authorized")
+    if proposal is False and orders is False:
+        return
+    if proposal is True and orders is True and controlled_release_verified is True:
+        return
+    raise ValueError("unverified or inconsistent checkout order release")
+
+
+def checkout_financial_execution_held() -> None:
     import urllib.request
     try:
         request=urllib.request.Request("http://127.0.0.1:8098/health")
@@ -210,15 +268,17 @@ def checkout_still_off() -> None:
             result=json.load(response)
     except Exception:
         raise ValueError("local checkout health unavailable") from None
-    if not (
-        result.get("status")=="online"
-        and result.get("checkout_settlement_mode")=="direct"
-        and result.get("payment_proposal_authorized") is False
-        and result.get("binding_order_creation_authorized") is False
-        and result.get("payment_execution") is False
-        and result.get("revenue_recognition") is False
-    ):
-        raise ValueError("checkout gates must remain off")
+    active = (
+        isinstance(result,dict)
+        and result.get("payment_proposal_authorized") is True
+        and result.get("binding_order_creation_authorized") is True
+    )
+    validate_checkout_admission(
+        result,
+        controlled_release_verified=(
+            _verified_controlled_order_release() if active else False
+        ),
+    )
 
 
 def apply() -> dict:
@@ -228,7 +288,7 @@ def apply() -> dict:
         raise ValueError("existing credential file must be reconciled")
     os.chdir("/srv/empire_os")
     existing_contracts_verified()
-    checkout_still_off()
+    checkout_financial_execution_held()
     env=load_runtime_env("/etc/empiredb.env")
     base=str(env.get("EMPIREDB_DSN") or "")
     passwords={
@@ -252,7 +312,7 @@ def apply() -> dict:
     verify_login(issuer_dsn,ISSUE_ROLE,FUNCTIONS[ISSUE_LOGIN],FUNCTIONS[READ_LOGIN])
     values={READ_KEY:reader_dsn,ISSUE_KEY:issuer_dsn}
     body="".join(k+"="+json.dumps(v)+"\n" for k,v in values.items())
-    checkout_still_off()
+    checkout_financial_execution_held()
     _write_env(ENV_FILE,body)
     return {
         "status":"two_login_connections_verified",

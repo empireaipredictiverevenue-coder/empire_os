@@ -67,5 +67,23 @@ login identities, generated secrets and protected env file.
 4. Independent BSC chain/USDT/treasury/confirmations and paid
    fulfilment proofs before collection or realised revenue claims.
 
-No payment gates, mail systems, orders or public services were
+No payment execution, mail systems, orders or public services were
 activated here.
+
+## Observed authorised pending-order release
+
+On 13 October at 19:49:52 UTC, checkout restarted with the
+root-owned, non-world-writable active systemd override
+`40-direct-bsc-controlled-release.conf`, containing the comment
+`Founder-approved four-product direct BSC order admission`.
+Checkout now reports `payment_proposal_authorized=true` and
+`binding_order_creation_authorized=true`, while `payment_execution=false`,
+`revenue_recognition=false` and BSC chain unverified. This is pending
+order admission, not observed revenue or settlement.
+
+The provisioning admission check now accepts this *specific* already
+authorised release, only after verifying the root-owned file, exact
+switch lines and active systemd DropInPaths. It also accepts both
+proposal/order flags OFF. It rejects mismatched flags, missing release
+proof or any payment_execution/revenue_recognition activation.
+No runtime flags were changed by this source patch.
