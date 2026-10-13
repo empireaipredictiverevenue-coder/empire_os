@@ -800,6 +800,18 @@ function ProductResult({
           <div className="mt-3 text-[10px] text-white/30">
             Order {result.order_id}
           </div>
+          <a
+            className="mt-4 inline-flex rounded-xl border border-white/15 px-5 py-3 text-xs font-semibold text-[#bfdbfe] transition hover:bg-white/10"
+            href={`mailto:reply@mail.empire-ai.co.uk?subject=${encodeURIComponent(
+              `Empire AI checkout order ${result.order_id || ""}`,
+            )}`}
+          >
+            Email Empire AI about this order
+          </a>
+          <p className="mt-3 text-xs leading-5 text-white/40">
+            Keep your order reference. We will only give payment instructions
+            after independent approval. Do not transfer USDT before then.
+          </p>
         </div>
       ) : result.payment_request_created && result.payment_request_status === "approved" &&
           result.payment_instructions_ready === true && result.treasury_address && result.amount_usdt ? (
