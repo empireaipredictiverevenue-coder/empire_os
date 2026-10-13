@@ -88,3 +88,20 @@ def test_optional_attestation_path_in_snapshot_builder(tmp_path):
     assert result["domain_history_observation_count"] == 1
     assert result["packets"][0]["suppression_status"] == "UNKNOWN_SEND_TIME_CHECK_REQUIRED"
     assert result["outreach_authorized"] is False
+
+
+def test_website_history_does_not_clear_different_published_mailbox_domain():
+    review, readback = evidence()
+    review["packets"][0]["market_role_review"] = {
+        "public_contact_routes_for_review_only": [
+            {"published_email": "Partnerships@championsgh.com"}
+        ]
+    }
+    amended = apply_operator_domain_readback(
+        review, readback, expected_domains=["example.com"]
+    )
+    packet = amended["packets"][0]
+    assert packet["uninspected_published_contact_domains"] == ["championsgh.com"]
+    assert "PUBLISHED_CONTACT_DOMAIN_HISTORY_UNCHECKED" in packet["blockers"]
+    assert packet["outreach_authorized"] is False
+    assert packet["suppression_status"] == "UNKNOWN_SEND_TIME_CHECK_REQUIRED"

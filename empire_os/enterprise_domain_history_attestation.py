@@ -61,6 +61,25 @@ def apply_operator_domain_readback(
         if domain not in results or packet.get("outreach_authorized") is not False:
             raise ValueError("UNMATCHED_DOMAIN_REVIEW_PACKET")
         entry = results[domain]
+        # A website domain is not necessarily the published recipient's email domain.
+        # Domain-history evidence cannot silently extend to a different mailbox domain.
+        routes = (packet.get("market_role_review") or {}).get("public_contact_routes_for_review_only") or []
+        uninspected = set()
+        if not isinstance(routes, (list, tuple)):
+            raise ValueError("INVALID_PUBLISHED_CONTACT_ROUTES")
+        for route in routes:
+            if not isinstance(route, Mapping):
+                raise ValueError("INVALID_PUBLISHED_CONTACT_ROUTE")
+            address = str(route.get("published_email") or "").strip().lower()
+            if address:
+                if address.count("@") != 1:
+                    raise ValueError("INVALID_PUBLISHED_CONTACT_ADDRESS")
+                contact_domain = address.rsplit("@", 1)[-1]
+                if contact_domain not in results:
+                    uninspected.add(contact_domain)
+        packet["uninspected_published_contact_domains"] = sorted(uninspected)
+        if uninspected:
+            packet["blockers"].append("PUBLISHED_CONTACT_DOMAIN_HISTORY_UNCHECKED")
         packet["domain_history_observation"] = {
             "source": "FOUNDER_PASTED_CANONICAL_READBACK",
             "scope": "DOMAIN_ONLY",
