@@ -157,3 +157,31 @@ Run the revised, **read-only** v2 preflight as `postgres` before any
 separately approved production migration. Its result may still be HELD
 if the tenant reader has unknown attribute/role drift not visible in the
 founder's first output. Do not silently bypass such a gate.
+
+
+## 13 October 2026 — exact-approval operator staged, not run
+
+`scripts/deploy_empiredb_direct_bsc_buyer_capability_047.sh` is a
+root-only, one-shot **separately founder-approved** production operator for
+this migration alone. It has no preflight write mode. The founder must
+approve the precise action **migration 047 sealed register creation** before
+its `--apply --approved-047-sealed-buyer-capability-only` switch may be
+used. The October 13 read-only catalog result met v2's requirements;
+that is not permission to run this operator.
+
+The operator requires the exact committed SQL + catalog inspector blobs,
+canonical PostgreSQL cluster and matching production application DSN,
+exclusive migration lock, a fresh v2 read-only role/inheritance preflight,
+root-only disk-space and timestamp checks, full pg_dump custom archive,
+global-role dump, pg_restore table listing and verified SHA256 backups.
+After the SQL transaction, it readbacks RLS forced ON, absent policies,
+app and finance roles lacking SELECT, exact SECURITY DEFINER owner,
+public function EXECUTE revoked, bound trigger, and actual running
+checkout payment flags still OFF. Failure after COMMIT is an incident
+requiring manual readback; never blindly rerun or assume rollback.
+No full restore rehearsal is claimed. It does not restart services,
+alter passwords/roles, enable public buyer status or activate payments.
+
+The command itself is reserved until the founder's **separate approval**,
+and all operator regression tests use rejected flags/inspection only.
+No production deploy invocation has taken place.
