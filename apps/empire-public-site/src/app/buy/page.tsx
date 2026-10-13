@@ -8,7 +8,11 @@ import {
   ShieldCheck,
   Zap,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  reuseCheckoutOrderAttempt,
+  type CheckoutOrderAttempt,
+} from "@/lib/checkout-order-attempt";
 
 type Product = {
   product_code: string;
@@ -115,6 +119,10 @@ export default function BuyPage() {
   const [accepted, setAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<OrderResult | null>(null);
+  // A failed response may still represent a committed order on the server.
+  // Keep the same key for retries of unchanged terms; don't store buyer
+  // details or identifiers outside this page's in-memory lifetime.
+  const orderAttemptRef = useRef<CheckoutOrderAttempt | null>(null);
 
   const [exchange, setExchange] = useState<ExchangeCatalog | null>(null);
   const [exchangeError, setExchangeError] = useState("");
@@ -179,22 +187,32 @@ export default function BuyPage() {
     if (!product || submitting) return;
     setSubmitting(true);
     setResult(null);
-    const idempotencyKey =
-      globalThis.crypto?.randomUUID?.() ||
-      `checkout-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
     try {
+      const fields = {
+        product_code: product.product_code,
+        business_name: businessName,
+        email,
+        target_domain: domain,
+        payer_wallet: wallet,
+        terms_accepted: accepted,
+      };
+      const attempt = reuseCheckoutOrderAttempt(
+        orderAttemptRef.current,
+        { ...fields, amount_cents: product.amount_cents },
+        () => {
+          if (!globalThis.crypto?.randomUUID) {
+            throw new Error("secure_checkout_key_unavailable");
+          }
+          return globalThis.crypto.randomUUID();
+        },
+      );
+      orderAttemptRef.current = attempt;
       const response = await fetch("/v1/checkout/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          product_code: product.product_code,
-          business_name: businessName,
-          email,
-          target_domain: domain,
-          payer_wallet: wallet,
-          terms_accepted: accepted,
-          idempotency_key: idempotencyKey,
+          ...fields,
+          idempotency_key: attempt.idempotencyKey,
         }),
       });
       const body = await response.json();
