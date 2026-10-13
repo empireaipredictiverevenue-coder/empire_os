@@ -274,28 +274,34 @@ def public_readback(m: dict):
     return {"new_page": 200, "new_assets": 2, "sha256_verified": True}
 
 
-def apply(m: dict) -> dict:
-    if os.geteuid() != 0:
+def apply(m: dict, *, publish_only_if_backend_live: bool = False) -> dict:
+    if not publish_only_if_backend_live and os.geteuid() != 0:
         raise ReleaseHeld("ROOT_OPERATOR_REQUIRED_FOR_EXACT_SERVICE_RESTART")
     if (STAGE / "receipt.json").exists():
         raise ReleaseHeld("PRIOR_RELEASE_RECEIPT_EXISTS")
     health_before = current_health()
     catalog_before = existing_catalog_proofs()
-    proc = subprocess.run(
-        ["systemctl", "restart", SERVICE], capture_output=True, text=True,
-        check=False, timeout=30
-    )
-    if proc.returncode != 0:
-        raise ReleaseHeld("EXACT_CHECKOUT_RESTART_FAILED_PAGE_UNCHANGED")
-    health_after = None
-    for _ in range(16):
-        try:
-            health_after = current_health()
-            break
-        except (ReleaseHeld, URLError, OSError, ValueError):
-            time.sleep(0.5)
-    if health_after is None:
-        raise ReleaseHeld("CHECKOUT_DID_NOT_RETURN_HEALTHY_PAGE_UNCHANGED")
+    if publish_only_if_backend_live:
+        # The runtime was separately restarted by another operator.
+        # Verify the same controls and negative consent before page publication.
+        # This mode NEVER restarts the service.
+        health_after = current_health()
+    else:
+        proc = subprocess.run(
+            ["systemctl", "restart", SERVICE], capture_output=True, text=True,
+            check=False, timeout=30
+        )
+        if proc.returncode != 0:
+            raise ReleaseHeld("EXACT_CHECKOUT_RESTART_FAILED_PAGE_UNCHANGED")
+        health_after = None
+        for _ in range(16):
+            try:
+                health_after = current_health()
+                break
+            except (ReleaseHeld, URLError, OSError, ValueError):
+                time.sleep(0.5)
+        if health_after is None:
+            raise ReleaseHeld("CHECKOUT_DID_NOT_RETURN_HEALTHY_PAGE_UNCHANGED")
     for field in (
         "payment_proposal_authorized", "binding_order_creation_authorized",
         "payment_execution", "revenue_recognition", "checkout_settlement_mode",
@@ -338,7 +344,7 @@ def apply(m: dict) -> dict:
         "original_page_sha256": m["old_page_sha256"],
         "published_page_sha256": m["new_page_sha256"],
         "new_immutable_assets": 2,
-        "checkout_service_restarted": True,
+        "checkout_service_restarted": not publish_only_if_backend_live,
         "payment_authority_unchanged": True,
         "checkout_catalogs": catalog_before,
         "live_negative_api_proofs": negative,
@@ -359,12 +365,14 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--publish-only-if-backend-live", action="store_true")
     parser.add_argument(APPROVAL, action="store_true")
+    parser.add_argument("--approved-single-predictive-consent-page", action="store_true")
     args = parser.parse_args()
     try:
         m = eligible_manifest()
         health = current_health()
-        if not args.apply:
+        if not args.apply and not args.publish_only_if_backend_live:
             print(json.dumps({
                 "status": "READ_ONLY_RELEASE_PREFLIGHT_PASS",
                 "mode": "OBSERVE",
@@ -375,14 +383,19 @@ def main() -> int:
                 "outbound_sent": False,
             }, sort_keys=True))
             return 0
-        if not getattr(args, APPROVAL.lstrip("-").replace("-", "_")):
-            raise ReleaseHeld("EXACT_FOUNDER_APPROVAL_FLAG_REQUIRED")
+        if args.apply and args.publish_only_if_backend_live:
+            raise ReleaseHeld("CONFLICTING_DEPLOYMENT_MODES")
+        if args.apply and not getattr(args, APPROVAL.lstrip("-").replace("-", "_")):
+            raise ReleaseHeld("EXACT_FOUNDER_RESTART_APPROVAL_FLAG_REQUIRED")
+        if (args.publish_only_if_backend_live
+                and not args.approved_single_predictive_consent_page):
+            raise ReleaseHeld("EXACT_FOUNDER_PAGE_APPROVAL_FLAG_REQUIRED")
         lock = STAGE / "operator_release.lock"
         if lock.is_symlink():
             raise ReleaseHeld("UNSAFE_RELEASE_LOCK")
         with lock.open("a+") as fp:
             fcntl.flock(fp.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-            result = apply(m)
+            result = apply(m, publish_only_if_backend_live=args.publish_only_if_backend_live)
         print(json.dumps(result, sort_keys=True))
         return 0
     except Exception as exc:

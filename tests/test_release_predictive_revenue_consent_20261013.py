@@ -134,3 +134,63 @@ def test_unprivileged_operator_cannot_restart(monkeypatch):
     monkeypatch.setattr(release.os, "geteuid", lambda: 1000)
     with pytest.raises(release.ReleaseHeld, match="ROOT_OPERATOR_REQUIRED"):
         release.apply({})
+
+
+def test_publish_only_reuses_live_consent_backend_without_restarting_service(
+    monkeypatch, tmp_path
+):
+    root = tmp_path / "site"
+    stage = tmp_path / "stage"
+    (root / "_next/static/css").mkdir(parents=True)
+    (root / "_next/static/chunks/app/predictive-revenue").mkdir(parents=True)
+    (stage / "after").mkdir(parents=True)
+    old, new = b"old public html", b"new consent html"
+    (root / release.PAGE).write_bytes(old)
+    (stage / "after" / release.PAGE).write_bytes(new)
+    assets = {}
+    for asset in (
+        "_next/static/css/unique-consent.css",
+        "_next/static/chunks/app/predictive-revenue/unique-consent.js",
+    ):
+        payload = asset.encode()
+        source = stage / "assets" / asset
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(payload)
+        assets[asset] = {"sha256": release.sha(payload), "live_present": False}
+    manifest = {
+        "old_page_sha256": release.sha(old),
+        "new_page_sha256": release.sha(new),
+        "assets": assets,
+    }
+    monkeypatch.setattr(release, "LIVE", root)
+    monkeypatch.setattr(release, "STAGE", stage)
+    monkeypatch.setattr(release, "current_health", lambda: {
+        "payment_proposal_authorized": True,
+        "binding_order_creation_authorized": True,
+        "payment_execution": False,
+        "revenue_recognition": False,
+        "checkout_settlement_mode": "direct",
+        "bsc_payment_configuration_status": "BSC_CONFIGURED_CHAIN_UNVERIFIED",
+        "founder_led_commercial_interest_enabled": True,
+    })
+    monkeypatch.setattr(release, "existing_catalog_proofs", lambda: {
+        "/v1/catalog": 4, "/v1/predictive-revenue/products": 5
+    })
+    monkeypatch.setattr(release, "invalid_api_proofs", lambda: {
+        "missing_consent": 422, "false_consent": 422,
+        "bot_honeypot": 422, "gateway_false_consent": 422,
+    })
+    monkeypatch.setattr(release, "eligible_manifest", lambda: manifest)
+    monkeypatch.setattr(release, "public_readback", lambda _: {
+        "new_page": 200, "new_assets": 2, "sha256_verified": True
+    })
+    monkeypatch.setattr(release.subprocess, "run",
+                        lambda *a, **kw: pytest.fail("no systemctl restart permitted"))
+    receipt = release.apply(manifest, publish_only_if_backend_live=True)
+    assert receipt["status"] == "PREDICTIVE_REVENUE_CONSENT_LIVE_VERIFIED"
+    assert receipt["checkout_service_restarted"] is False
+    assert receipt["payment_authority_unchanged"] is True
+    assert (root / release.PAGE).read_bytes() == new
+    assert (stage / "receipt.json").is_file()
+    for key in assets:
+        assert (root / key).is_file()
