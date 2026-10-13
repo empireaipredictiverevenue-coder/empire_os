@@ -831,6 +831,35 @@ function ProductResult({
             after independent approval. Do not transfer USDT before then.
           </p>
         </div>
+      ) : result.payment_request_status === "existing_order_review_required" &&
+          result.order_id ? (
+        <div role="status">
+          <div className="text-sm font-semibold text-[#bfdbfe]">
+            Your order is already recorded
+          </div>
+          <p className="mt-2 text-xs leading-5 text-white/48">
+            We found the original order from your earlier attempt. No new
+            payment request was created by this retry. The existing order and
+            any associated payment request need independent review. Do not
+            submit a replacement order or transfer USDT before receiving
+            separately approved payment instructions.
+          </p>
+          <div className="mt-3 break-all font-mono text-[10px] text-white/45">
+            Order reference: {result.order_id}
+          </div>
+          <a
+            className="mt-4 inline-flex rounded-xl border border-white/15 px-5 py-3 text-xs font-semibold text-[#bfdbfe] transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#93c5fd]"
+            href={`mailto:reply@mail.empire-ai.co.uk?subject=${encodeURIComponent(
+              `Empire AI existing checkout order ${result.order_id}`,
+            )}`}
+          >
+            Email Empire AI with this order reference
+          </a>
+          <p className="mt-3 text-xs leading-5 text-white/40">
+            Keep this reference for follow-up. No payment instructions are
+            available from a repeated order submission.
+          </p>
+        </div>
       ) : result.payment_request_created && result.payment_request_status === "approved" &&
           result.payment_instructions_ready === true && result.treasury_address && result.amount_usdt ? (
         <div>
