@@ -29,11 +29,23 @@ The nearest existing Empire AI offer for a discussion is `predictive_revenue_dia
 
 - **Laura Koester — CMO**: https://www.linkedin.com/in/laurakoester2
 - **No verified direct Laura email.** Do not generate `laura@...`, infer a pattern from third-party partial addresses, or represent a LinkedIn profile as contact consent.
-- Draft short professional note:
+### Relationship-first founder messages — manual, unsent
 
-> Hi Laura — I saw Champions Group's continued expansion across home-services brands. I'm building Empire AI, which focuses on connecting marketing demand, booked jobs and realised revenue into clearer forecasting and growth decisions. I'm curious whether cross-brand conversion visibility is something your team is actively looking at. If relevant, I can share a short, specific diagnostic outline. — Phil
+**Connection request:**
 
-Do not state Champions has a revenue problem or that Empire AI has proven savings there. Send only through a supported, appropriate channel after founder review; do not automate sending or scrape LinkedIn.
+> Hi Laura, I came across Champions Group and the work you're doing across home services. I'm building a business myself and always enjoy connecting with people growing ambitious companies. Thought it would be good to connect. — Phil
+
+**Only after connection acceptance:**
+
+> Thanks for connecting, Laura. I've been looking at how home-services groups grow while keeping their individual brands strong. Champions looks like an interesting business to be part of. Always good to connect with people building things in this space. How's your week going?
+
+**Only if a genuine conversation develops:**
+
+> Something I've been interested in lately is how growing groups share what works across different brands without losing what makes each one successful. Is that something you find yourself thinking about at Champions, or does each brand largely do its own thing?
+
+**Relationship protocol:** No automated follow-up cadence, mass personalisation, fabricated familiarity, unsolicited deck, diagnostic price, or meeting ask. Continue only after authentic engagement. If no response, do not run a timed follow-up sequence. Talk about Empire AI's products only if the other person expresses a relevant interest.
+
+Do not state Champions has a revenue problem or that Empire AI has proven savings there. Messages remain founder-reviewed and subject to applicable channel and contact gates. Do not automate sending or scrape LinkedIn.
 
 ## Published mailbox route — *not* appropriate default for a software pitch
 
