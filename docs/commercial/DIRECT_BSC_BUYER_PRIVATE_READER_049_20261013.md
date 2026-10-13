@@ -93,3 +93,49 @@ separately approved controlled deployment.
 **Do not tell buyers to send USDT before independent human approval.**
 Checkout proposal, order activation, blockchain transfer and revenue
 recognition remain OFF.
+
+
+## 13 October 2026 — live preflight v1 HELD: existing incoming migrator membership
+
+The founder executed the unmodified canonical read-only 049 preflight and
+returned:
+
+- canonical_empiredb, source tables, migrator source SELECTs,
+  forced-RLS owner-only sealed capability table: **PASS**
+- dedicated reader role and function absent: **PASS**
+- `migrator_has_zero_incoming_memberships`: **FALSE**
+- status: `HELD_PRIVATE_READER_049_GATES`; exit code 2
+- migration 049 **NOT APPLIED**, no reader login, no endpoint, money OFF.
+
+This is different from the **outgoing** `empiredb_migrator →
+empiredb_tenant_reader` membership previously inspected for 047.
+An **incoming** membership means another role is a member *of*
+`empiredb_migrator`. No role name or SET/INHERIT authority was returned in
+the original 049 preflight, so a security interpretation or role alteration
+would be guesswork.
+
+The original fail-closed condition is deliberately preserved. The source
+inspector was enhanced to return `migrator_incoming_member_details`
+(granted member role name, LOGIN/SUPERUSER, inherited, SET, ADMIN flags)
+and `non_superuser_logins_with_migrator_membership` (transitive MEMBER
+paths only), all from the PostgreSQL system catalog in a READ ONLY
+transaction. It never reads contact, customer, payment, token or secret
+rows. Its result is not an authorisation to alter any membership or apply
+migration 049.
+
+Next exact user-side, read-only check:
+
+```bash
+cd /srv/empire_os
+set +e
+sudo -n -u postgres ./.venv/bin/python \
+  -m scripts.inspect_direct_bsc_private_reader_049 --preflight
+echo "PRIVATE_READER049_PREFLIGHT_EXIT=$?"
+```
+
+The new result remains HELD until the actual role lineage is reconciled.
+If a legitimate production login can SET/INHERIT the migrator, prefer a
+**distinct purpose-owned NOLOGIN security definer with no memberships**
+and separately approved, narrowly audited ACL/RLS policy rather than
+removing the other system's role privileges or weakening this gate.
+This is a possible future design, not an approved or installed change.

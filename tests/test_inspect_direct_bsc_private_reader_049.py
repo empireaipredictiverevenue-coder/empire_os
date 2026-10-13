@@ -61,3 +61,53 @@ def test_requires_exact_readonly_approval_and_refuses_mutation(capsys):
         "DELETE FROM public.", "CREATE FUNCTION public."
     ):
         assert forbidden not in src
+
+
+def test_incoming_roles_reported_without_changing_strict_hold():
+    record = safe()
+    record["migrator_incoming_memberships"] = 1
+    record["migrator_incoming_member_details"] = [{
+        "role": "existing_infrastructure_operator",
+        "can_login": False,
+        "superuser": False,
+        "inherit_option": False,
+        "set_option": True,
+        "admin_option": False,
+    }]
+    record["non_superuser_login_paths"] = ["existing_application_login"]
+    report = gate.classify(record)
+    assert report["status"] == "HELD_PRIVATE_READER_049_GATES"
+    assert report["migrator_has_zero_incoming_memberships"] is False
+    assert report["migrator_incoming_member_details"][0]["role"] == (
+        "existing_infrastructure_operator"
+    )
+    assert report["non_superuser_logins_with_migrator_membership"] == [
+        "existing_application_login"
+    ]
+    assert report["migration_049_applied"] is False
+    assert report["reader_login_assigned"] is False
+
+
+def test_non_inheriting_membership_still_blocks_migration_not_assumed_safe():
+    record = safe()
+    record["migrator_incoming_memberships"] = 1
+    record["migrator_incoming_member_details"] = [{
+        "role": "operator",
+        "can_login": False,
+        "superuser": False,
+        "inherit_option": False,
+        "set_option": False,
+        "admin_option": False,
+    }]
+    assert gate.classify(record)["status"] == "HELD_PRIVATE_READER_049_GATES"
+
+
+def test_catalog_diagnostic_does_not_query_private_customer_data():
+    src = inspect.getsource(gate)
+    assert "pg_catalog.pg_auth_members" in src
+    assert "pg_catalog.pg_roles" in src
+    assert "SET TRANSACTION READ ONLY" in src
+    assert "pg_catalog.pg_has_role" in src
+    assert "FROM public.buyers" not in src
+    assert "FROM public.fulfilment_orders" not in src
+    assert "FROM public.direct_bsc_buyer_capabilities" not in src

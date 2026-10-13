@@ -30,6 +30,18 @@ def classify(f: dict) -> dict:
             if all(checks.values()) else "HELD_PRIVATE_READER_049_GATES"
         ),
         **checks,
+        # Names and boolean role attributes only: never credentials, DSNs,
+        # buyer records, contact data, or full database catalogue.
+        "migrator_incoming_member_details": (
+            f.get("migrator_incoming_member_details")
+            if isinstance(f.get("migrator_incoming_member_details"), list)
+            else []
+        ),
+        "non_superuser_logins_with_migrator_membership": (
+            f.get("non_superuser_login_paths")
+            if isinstance(f.get("non_superuser_login_paths"), list)
+            else []
+        ),
         "migration_049_applied": False,
         "reader_login_assigned": False,
         "buyer_status_endpoint_activated": False,
@@ -69,11 +81,36 @@ def inspect() -> dict:
         """)
         role_absent, function_absent = cur.fetchone()
         cur.execute("""
-          SELECT count(*) FROM pg_catalog.pg_auth_members m
+          SELECT member.rolname,member.rolcanlogin,member.rolsuper,
+                 m.inherit_option,m.set_option,m.admin_option
+          FROM pg_catalog.pg_auth_members m
           JOIN pg_catalog.pg_roles granted ON granted.oid=m.roleid
+          JOIN pg_catalog.pg_roles member ON member.oid=m.member
           WHERE granted.rolname='empiredb_migrator'
+          ORDER BY member.rolname
         """)
-        incoming = cur.fetchone()[0]
+        incoming_details = [
+            {
+                "role": row[0],
+                "can_login": row[1],
+                "superuser": row[2],
+                "inherit_option": row[3],
+                "set_option": row[4],
+                "admin_option": row[5],
+            }
+            for row in cur.fetchall()
+        ]
+        incoming = len(incoming_details)
+        cur.execute("""
+          SELECT r.rolname
+          FROM pg_catalog.pg_roles r
+          JOIN pg_catalog.pg_roles target
+            ON target.rolname='empiredb_migrator'
+          WHERE r.rolcanlogin AND NOT r.rolsuper
+            AND pg_catalog.pg_has_role(r.oid,target.oid,'MEMBER')
+          ORDER BY r.rolname
+        """)
+        login_paths = [row[0] for row in cur.fetchall()]
         cur.execute("""
           SELECT pg_catalog.to_regclass('public.fulfilment_orders') IS NOT NULL,
                  pg_catalog.to_regclass('public.bsc_payment_requests') IS NOT NULL,
@@ -96,6 +133,8 @@ def inspect() -> dict:
         "reader_role_absent": role_absent,
         "reader_function_absent": function_absent,
         "migrator_incoming_memberships": incoming,
+        "migrator_incoming_member_details": incoming_details,
+        "non_superuser_login_paths": login_paths,
         "tables": tables,
         "selects": selects,
     })
