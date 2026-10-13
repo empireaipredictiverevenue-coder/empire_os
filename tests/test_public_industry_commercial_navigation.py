@@ -1,6 +1,9 @@
 """Industry-to-commerce paths: verified offer routing, no invented checkout."""
 from pathlib import Path
 from html.parser import HTMLParser
+import os
+
+import pytest
 
 from empire_os import public_gateway
 
@@ -54,14 +57,17 @@ class _Anchors(HTMLParser):
                 self.hrefs.append(href)
 
 
-def test_isolated_static_build_links_if_available():
-    out = ROOT / "apps/empire-public-site/out/industries"
-    if not out.is_dir():
-        return
+def test_explicit_isolated_static_build_links():
+    # The production export is intentionally not rebuilt by a source-only
+    # integration. Audit a named preview export, never the live old HTML.
+    preview_root = os.environ.get("EMPIRE_INDUSTRY_PREVIEW_EXPORT_ROOT")
+    if not preview_root:
+        pytest.skip("No isolated preview export selected; production HTML stays unchanged")
+    out = Path(preview_root).resolve() / "industries"
+    assert out.is_dir(), "Selected preview export is missing its industries directory"
     for slug in INDUSTRIES:
         path = out / f"{slug}.html"
-        if not path.is_file():
-            continue
+        assert path.is_file(), f"Preview missing {slug} industry HTML"
         parser = _Anchors()
         parser.feed(path.read_text(encoding="utf-8"))
         assert "/buy" in parser.hrefs
