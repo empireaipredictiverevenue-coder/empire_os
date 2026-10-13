@@ -36,6 +36,9 @@ def parser() -> argparse.ArgumentParser:
         default=os.getenv("EMPIRE_OUTBOUND_GOVERNOR_MODE", "OBSERVE"),
     )
     p.add_argument("--execute", action="store_true")
+    # Environment flags and mailbox readiness never constitute founder authority.
+    # The production timer deliberately omits this CLI-only activation gate.
+    p.add_argument("--founder-activate", action="store_true")
     return p
 
 
@@ -119,11 +122,15 @@ def main(argv=None) -> int:
     provider_ready = _provider_ready()
     # Timers may request --execute; without a verified owned mailbox / sender
     # that request MUST NOT create approvals, claims or live delivery events.
-    execution_enabled = bool(args.execute and provider_ready)
+    execution_enabled = bool(
+        args.execute and args.founder_activate and provider_ready
+    )
+    # Independent hardstop: a systemd timer with --execute and even mistaken
+    # true auto-flags must not claim, approve, or send without this manual gate.
     policy = OutboundGovernorPolicy(
-        mode=args.mode if provider_ready else "OBSERVE",
-        allow_auto_approval=auto_approve if provider_ready else False,
-        allow_auto_send=auto_send if provider_ready else False,
+        mode=args.mode if execution_enabled else "OBSERVE",
+        allow_auto_approval=auto_approve if execution_enabled else False,
+        allow_auto_send=auto_send if execution_enabled else False,
     )
     sender_rpc = _sender_rpc()
     work = sender_rpc("list_outbound_governor_work", {"p_limit": args.limit})
@@ -228,6 +235,7 @@ def main(argv=None) -> int:
         "mode": policy.mode,
         "execute": execution_enabled,
         "execution_requested": bool(args.execute),
+        "founder_activation_present": bool(args.founder_activate),
         "owned_mailbox_gate": "CLOSED" if not provider_ready else "OPEN",
         "execution_blocked_reason": (
             "owned_mailbox_and_authorized_sender_unverified"
