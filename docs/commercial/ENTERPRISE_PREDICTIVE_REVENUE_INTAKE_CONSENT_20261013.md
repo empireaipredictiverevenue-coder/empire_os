@@ -45,3 +45,22 @@ This improves the ability to make a **lawful, attributable response** to a quali
 **Next exact gated action:** founder-authorised coordinated restart of only `empire-self-serve-checkout.service` to load merged consent validation, verify invalid-only consent/honeypot POSTs return 422 and service health unchanged, then atomically promote exactly the staged `predictive-revenue.html` and its two non-colliding hashed assets, inspect external HTML and assets, and preserve old-page backups. If any service/API negative-path precondition fails, do not publish the new page; if post-publication checks fail, restore only the exact prior page after SHA match. Protect any newer ASTRA owner updates and checkout functionality from overwrite. No synthetic valid buyer submission, CRM entry, outbound, payment, paid spend or legal/index publication is authorised.
 
 **Status remains:** fix CODE_COMPLETE / main branch committed / fully built / stage checked / **not yet live**.
+
+## Founder approval and one-command operator release (13 October 2026, later)
+The founder explicitly approved **only** the `empire-self-serve-checkout.service` restart and the one-page Predictive Revenue consent publication, including rejection checks, public readback and rollback. A direct privileged restart via Remote Desktop Commander was **denied by its command policy**, not performed. The remote session must not repackage or circumvent that restriction. The local Ubuntu operator may run this already-approved exact action.
+
+The bounded operator `scripts/release_predictive_revenue_consent_20261013.py` is prepared on the canonical repo and may be invoked **once** using the exact approval flag. The immutable original stage manifest's `backend_restart_authorized=false` and `public_page_promotion_authorized=false` describe the *pre-approval preparation state* and are deliberately not rewritten. The exact local operator flag implements this newly received founder approval.
+
+```bash
+cd /srv/empire_os &&
+sudo -n ./.venv/bin/python \
+  -m scripts.release_predictive_revenue_consent_20261013 \
+  --apply \
+  --approved-single-predictive-consent-page-and-checkout-restart
+```
+
+**Safety behavior, validated before execution:** check exact staged/live hashes, approved source-commit ancestry and immutable assets; compare original checkout payment/order/settlement flags and exact 4+5 catalogue before/after; restart exactly checkout once; verify all four **invalid-only** consent/honeypot negative API requests, using a deliberately nonexistent product code and `example.invalid` (no valid customer/prospect); install only the two new immutable assets and atomically promote exactly `predictive-revenue.html`; check each public content SHA against the stage; save a private JSON receipt under the existing protected stage. On failure **before** the page change, keep the old page; if publication verification fails, restore it only if still identical to the candidate we installed. Never revert another agent's later changes.
+
+The operator's `--check` already returned `READ_ONLY_RELEASE_PREFLIGHT_PASS`. The expanded scoped release + consent suite reports **69 PASS**, one pre-existing Starlette/AnyIO deprecation warning. The earlier 17-page build and TypeScript checks also passed. **No privileged restart or public consent-page promotion has been claimed at this stage.**
+
+After local execution, independently verify the printed `status` equals `PREDICTIVE_REVENUE_CONSENT_LIVE_VERIFIED`, `payment_authority_unchanged=true`, new frontend/assets public SHA verified and each invalid API case 422. A `RELEASE_HELD` result is **not** success; do not rerun automatically or promote files separately. No new outbound, marketing spend, contract, prospect record, wallet action or BSC payment is part of this release.
