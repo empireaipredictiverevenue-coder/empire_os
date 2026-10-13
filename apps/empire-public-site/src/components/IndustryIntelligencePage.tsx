@@ -68,8 +68,8 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
               Explore intelligence
               <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
             </a>
-            <a href="mailto:founder@empire-ai.co.uk" className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-5 text-xs font-extrabold text-white/70">
-              Talk to Empire
+            <a href="/commercial" className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-5 text-xs font-extrabold text-white/70">
+              Discuss a scoped proposal
             </a>
           </div>
         </div>
@@ -182,6 +182,20 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
                 </p>
               </article>
             ))}
+            <div className="col-span-full mt-4 flex flex-col gap-4 rounded-2xl border border-[#00E5FF]/25 bg-[#00E5FF]/[0.04] p-6 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-xl text-xs leading-6 text-white/60">
+                These are possible industry research applications, not a claim that
+                every example is available to purchase. Check current catalogue
+                scope and pricing before requesting work.
+              </p>
+              <a
+                href="/buy"
+                className="inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full border border-[#00E5FF]/45 bg-[#00E5FF]/10 px-5 text-xs font-bold text-[#B8F8FF] transition hover:bg-[#00E5FF]/20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#00E5FF]"
+              >
+                View listed intelligence products
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </a>
+            </div>
           </div>
         </div>
       </section>
@@ -208,8 +222,8 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
           See the market earlier.
           <span className="block bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] bg-clip-text text-transparent">Act with better evidence.</span>
         </h2>
-        <a href="mailto:founder@empire-ai.co.uk" className="group mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] px-6 text-xs font-extrabold text-black">
-          Start a conversation
+        <a href="/commercial" className="group mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] px-6 text-xs font-extrabold text-black">
+          Request a nonbinding proposal
           <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
         </a>
       </section>
