@@ -1,0 +1,71 @@
+# Direct BSC buyer status — dedicated issuer/reader logins (staged)
+13 October 2026 · **SOURCE ONLY; NO CREDENTIALS OR PRODUCTION ROLE WRITES**
+
+## Production truth
+- Founder-executed migration 049 v2: COMMITTED, 12/12 postcommit controls PASS.
+- Founder-executed migration 050 v1: COMMITTED, 10/10 postcommit controls PASS.
+- Checkout health: online; payment proposal, binding orders, payment execution
+  and revenue recognition all OFF. Chain configured, independently unverified.
+- Two 049/050 restricted NOLOGIN roles exist; no dedicated LOGIN yet.
+- Buyer status HTTP component staged, but not included in public gateway.
+
+## What is built, not applied
+`scripts/provision_direct_bsc_buyer_status_logins.py` provisions ONLY
+`empire_direct_checkout_status_reader_login` and
+`empire_direct_checkout_status_issuer_login` with freshly generated
+**different** secrets. Each login is LOGIN NOINHERIT NOBYPASSRLS,
+non-superuser, has exactly one corresponding NOLOGIN membership with
+INHERIT FALSE and SET TRUE. No table grants, checkout activation or
+public endpoints. Existing roles and grants are preserved.
+
+Before any role write, operator verifies exact 049/050 independent
+catalog proofs, the checkout OFF state, canonical local EmpireDB on
+port 5432 and absence of an existing env file. Refuses remote
+`hostaddr` override or noncanonical port. Secrets supplied only on
+psql stdin; never printed or placed in command arguments. After role
+creation, distinct database authentication tests inspect the actual
+`session_user`, explicit SET ROLE, capability SELECT/INSERT denial,
+cross-role execute denial and own-function permission. Only after
+verification does it write the two DSNs to
+`/etc/empire_direct_bsc_buyer_status.env` (0600). An ambiguous
+partial failure must be investigated by catalog readback; **do not
+repeat**. No live token is issued by provisioning.
+
+**No account/credential production deployment is approved yet.** The
+standalone command without flags prints STAGED and makes no changes.
+The separate explicit installer token is
+`--apply --approved-isolated-bsc-status-logins-only`, which must NOT be
+used until separate founder permission for exactly the two limited
+login identities, generated secrets and protected env file.
+
+## Independent validation
+- Python tests in
+  `tests/test_provision_direct_bsc_buyer_status_logins.py` cover
+  default OFF, exact approval, canonical DSN, distinct password-role
+  matching, env overwrite refusal, installed-role readback and
+  byte/string-normalised role identity without weakening permissions.
+- The isolated PostgreSQL 18 harness
+  `scripts/test_direct_bsc_buyer_status_logins_ephemeral.sh`
+  recreates migrations 047–050 in temporary cluster, uses disposable
+  passwords, verifies two LOGIN connections, role switching, absence of
+  broad rights and denial of cross-role or second provisioning. Port
+  5432 is never touched.
+- A genuine bug was found and fixed **before activation**: the
+  initial provisioner reused the issuer password for both roles.
+  The SQL now indexes `passwords[login]`, with explicit regression.
+- Disposable PostgreSQL in SQL_ASCII can return role names as bytes.
+  ASCII decoding for exact role comparisons was added; no role or
+  privilege requirement was relaxed.
+
+## Remaining checkout integration
+1. Separate founder approval to create exactly two PostgreSQL LOGINs
+   and write their root-only DSNs.
+2. Secure first-party key custody, buyer identity binding, one-time
+   status token delivery and revocation workflow; no unsolicited sends.
+3. Authenticated, abuse-controlled release of already-tested status
+   handler behind HTTPS with tokens only in POST body.
+4. Independent BSC chain/USDT/treasury/confirmations and paid
+   fulfilment proofs before collection or realised revenue claims.
+
+No payment gates, mail systems, orders or public services were
+activated here.
