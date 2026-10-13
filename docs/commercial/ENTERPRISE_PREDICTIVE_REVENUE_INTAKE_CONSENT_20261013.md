@@ -64,3 +64,17 @@ sudo -n ./.venv/bin/python \
 The operator's `--check` already returned `READ_ONLY_RELEASE_PREFLIGHT_PASS`. The expanded scoped release + consent suite reports **69 PASS**, one pre-existing Starlette/AnyIO deprecation warning. The earlier 17-page build and TypeScript checks also passed. **No privileged restart or public consent-page promotion has been claimed at this stage.**
 
 After local execution, independently verify the printed `status` equals `PREDICTIVE_REVENUE_CONSENT_LIVE_VERIFIED`, `payment_authority_unchanged=true`, new frontend/assets public SHA verified and each invalid API case 422. A `RELEASE_HELD` result is **not** success; do not rerun automatically or promote files separately. No new outbound, marketing spend, contract, prospect record, wallet action or BSC payment is part of this release.
+
+## FINAL production verification — 13 October 2026, 22:17 UTC (supersedes operator procedure above)
+**Status: PREDICTIVE_REVENUE_CONSENT_LIVE_VERIFIED.** A separate checkout-service restart had already occurred at **22:11:42 UTC** through another production process (PID `1510854`), and the new backend returned exact, safe consent rejections. We therefore **did not execute another restart** and did not use the blocked privileged remote command.
+
+A scoped page-only release was executed with:
+`./.venv/bin/python -m scripts.release_predictive_revenue_consent_20261013 --publish-only-if-backend-live --approved-single-predictive-consent-page`.
+
+- Exact release receipt: `/var/tmp/empire_predictive_consent_release_20261013/receipt.json`; completed at `2026-10-13T22:17:53Z`, status `PREDICTIVE_REVENUE_CONSENT_LIVE_VERIFIED`, `checkout_service_restarted=false`, `payment_authority_unchanged=true`, `outbound_sent=false`, `payment_execution=false`.
+- The **only** replaced HTML was `apps/empire-public-site/out/predictive-revenue.html` (SHA-256 `f3e746a956ed9d69cf9abef65d0aa9677f41a27de1bb59ff8cd4245b71869bcc`). Exactly two immutable supporting assets were published under existing `/_next/static`, both hash-verified.
+- Four invalid-only contracts returned HTTP **422**: missing consent, false consent, filled honeypot, and false consent via the public gateway. All use a nonexistent offer code and `example.invalid`; **no valid buyer/CRM prospect was created by tests**. The existing 4-item checkout catalogue and 5-item enterprise catalogue were preserved.
+- Independent external readback: `https://empire-ai.co.uk/predictive-revenue` HTTP **200**, exactly **one** consent checkbox, matching explicit text and canonical URL. Both supporting assets match staged SHA-256; `/commercial` and `/buy` remained HTTP 200. The checkout service stayed at PID `1510854`, with payment execution and revenue recognition **false**.
+- Original page backed up at `/var/tmp/empire_predictive_consent_release_20261013/before/predictive-revenue.html`, with verified original hash. Existing full release manifest and new private release receipt retained for audit and rollback.
+
+**STOP: The earlier sudo restart-and-publish command is now obsolete; do not run it.** The release is complete. Next trigger is a real buyer-submitted, consented enquiry—not another test submission, mailbox send, binding contract, token transaction or artificial revenue entry.
