@@ -58,7 +58,7 @@ def test_all_subjects_stay_held_even_when_not_suppressed():
     for value in result["recipients"].values():
         assert value["recipient_send_authorized"] is False
         assert value["decision"] == "HOLD_PRIOR_GMAIL_CONTACT_AND_FOUNDER_SEND_GATES"
-    assert c.reader.statements[0] == "BEGIN READ ONLY"
+    assert c.reader.statements[0] == "SET TRANSACTION READ ONLY"
     assert c.reader.statements[1].startswith("SET LOCAL statement_timeout")
     assert c.reader.statements[-1] == "ROLLBACK"
     assert c.reader.parameters[2] == (list(subject.RECIPIENTS),)

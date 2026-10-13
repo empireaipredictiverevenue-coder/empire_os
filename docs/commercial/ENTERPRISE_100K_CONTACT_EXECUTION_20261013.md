@@ -15,7 +15,7 @@
 The existing outbound governor already treats unknown suppression as a hold. The separate `runtime/control_plane/consent_suppression_effectiveness_latest.json` observation says `semantic_effectiveness=INEFFECTIVE_IDENTITY_BINDING` while `safety_effectiveness=EFFECTIVE_FAIL_CLOSED`. Neither is address-level clearance.
 
 **One-shot narrow read-only canonical recipient check** is staged at `scripts/inspect_enterprise_followup_recipients_readonly.py`:
-- Exact two-person allowlist, parameterised SQL, a single `BEGIN READ ONLY` PostgreSQL transaction and four-second statement timeout.
+- Exact two-person allowlist, parameterised SQL, a single `SET TRANSACTION READ ONLY` PostgreSQL transaction and four-second statement timeout.
 - Reports only exact/domain suppression hits and per-recipient canonical intent/delivery-event counts, with known Gmail prior-contact and draft flags.
 - Missing DB credentials, incomplete rows, unknown status or SQL error **fail closed**. It NEVER marks send authorised even with zero suppression hits, because separate Gmail recent-reply, actual sender identity, approved founder send, existing outbound governor and recipient route checks remain.
 - Run under an approved already-configured EmpireDB reader/operator; do not embed passwords/DSNs in source or logs and do not source protected credentials from this review-only file.

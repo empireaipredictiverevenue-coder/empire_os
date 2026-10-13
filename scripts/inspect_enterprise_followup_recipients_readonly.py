@@ -56,7 +56,7 @@ def check(
         connect_factory = psycopg.connect
     with connect_factory(dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute("BEGIN READ ONLY")
+            cur.execute("SET TRANSACTION READ ONLY")
             cur.execute("SET LOCAL statement_timeout = '4000ms'")
             cur.execute(SQL, (list(RECIPIENTS),))
             rows = cur.fetchall()
