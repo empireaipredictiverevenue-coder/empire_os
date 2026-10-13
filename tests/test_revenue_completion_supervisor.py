@@ -287,3 +287,56 @@ def test_current_tam_queue_activity_outweighs_older_failed_history(tmp_path):
     assert result["operational_state"]=="ACTIVE_PLAN_JOB"
     assert result["terminal_failure_history_count"]==1
     assert result["last_terminal_failure_reason"]=="MODEL_INFERENCE_TIMEOUT"
+
+
+def test_supervisor_due_count_excludes_repeated_saturated_retries(tmp_path):
+    deferred = tmp_path / "deferred.json"
+    materializer = tmp_path / "materializer.json"
+    from datetime import datetime, timedelta, timezone
+    expired = (datetime.now(timezone.utc) - timedelta(days=2)).isoformat()
+    _write(deferred, {
+        "site": {
+            "status": "deferred", "reason": "site_timeout",
+            "priority_score": 95, "attempts": 8,
+            "next_retry_at": expired,
+        },
+        "person": {
+            "status": "pending", "reason": "no_bound_contact",
+            "priority_score": 95, "attempts": 32,
+            "target_people": [{"name": "Jane Buyer", "title": "Founder"}],
+            "next_retry_at": expired,
+        },
+        "fresh": {
+            "status": "pending", "reason": "no_contact_evidence",
+            "priority_score": 40, "attempts": 2,
+            "next_retry_at": expired,
+        },
+    })
+    _write(materializer, {})
+    r = buyer_status(deferred, materializer)
+    assert r["due_now"] == 1
+    assert r["evidence_parked_count"] == 2
+    assert r["high_priority_parked_count"] == 2
+    assert r["genuine_review_ready_count"] == 0
+    assert r["retry_saturated"] == 2
+
+
+def test_supervisor_next_action_avoids_repeated_parked_searches(
+    monkeypatch, tmp_path,
+):
+    import empire_os.revenue_completion_supervisor as supervisor
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_RUNTIME", tmp_path/"coder")
+    monkeypatch.setattr(supervisor, "DEFAULT_TAM_SNAPSHOT", tmp_path/"no-tam.json")
+    monkeypatch.setattr(supervisor, "buyer_status", lambda: {
+        "genuine_review_ready_count": 0,
+        "evidence_rich_high_priority": 17,
+        "due_now": 0,
+        "evidence_parked_count": 2051,
+        "backlog_health": "CRITICAL",
+    })
+    r = supervisor.build_snapshot()
+    assert r["next_action"] == "await_automatic_first_party_evidence_refresh"
+    assert r["buyers"]["evidence_parked_count"] == 2051
+    assert "buyer_enrichment_backlog_critical" in r["blockers"]
+    assert r["outbound_sent"] is False
+    assert r["execution_authority"] == "none"

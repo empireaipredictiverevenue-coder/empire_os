@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.buyer_deferred_enrichment import _parked_without_new_evidence
 
 ROOT = Path("/srv/empire_os")
 DEFAULT_TAM_RUNTIME = ROOT / "runtime/coder_tam_lane"
@@ -131,6 +132,8 @@ def buyer_status(
     now = datetime.now(timezone.utc)
     pending_ages: list[float] = []
     due_now = 0
+    evidence_parked_count = 0
+    high_priority_parked_count = 0
     for row in rows:
         status = str(row.get("status") or "")
         if status == "pending":
@@ -141,6 +144,11 @@ def buyer_status(
             if created is not None:
                 pending_ages.append(max(0.0, (now - created).total_seconds() / 3600))
         if status in {"pending", "deferred"}:
+            if _parked_without_new_evidence(row):
+                evidence_parked_count += 1
+                if int(row.get("priority_score") or 0) >= 80:
+                    high_priority_parked_count += 1
+                continue
             retry_text = str(row.get("next_retry_at") or "").strip()
             try:
                 retry_at = datetime.fromisoformat(retry_text.replace("Z", "+00:00")) if retry_text else None
@@ -185,6 +193,8 @@ def buyer_status(
         "status_counts": dict(sorted(statuses.items())),
         "reason_counts": dict(reasons.most_common()),
         "due_now": due_now,
+        "evidence_parked_count": evidence_parked_count,
+        "high_priority_parked_count": high_priority_parked_count,
         "oldest_pending_hours": round(oldest_pending_hours, 2),
         "stale_pending_count": stale_pending_count,
         "backlog_health": backlog_health,
@@ -613,6 +623,13 @@ def build_snapshot() -> dict[str, Any]:
     buyers = buyer_status()
     if buyers["genuine_review_ready_count"] > 0:
         next_action = "founder_review_genuine_buyers"
+    elif (
+        buyers["evidence_rich_high_priority"] > 0
+        and buyers.get("due_now") == 0
+    ):
+        # The existing scout/contact sync can collect new evidence.
+        # Do not suggest repeating enrichment of exhausted or cooling rows.
+        next_action = "await_automatic_first_party_evidence_refresh"
     elif buyers["evidence_rich_high_priority"] > 0:
         next_action = "continue_targeted_buyer_enrichment"
     else:
