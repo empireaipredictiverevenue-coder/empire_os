@@ -23,3 +23,18 @@
 - This is an operator handoff, not a claim that Commander's WebSocket transport is now repaired.
 
 **Command policy:** keep using the existing systemd-managed Desktop Commander through the authorised connector for strictly bounded actions; distinguish a successful `ping` from actual command success. Do not spawn a third `desktop-commander remote` as an attempted repair.
+
+## Verified cutover outcome — 13 October 2026, 19:50–19:53 UTC
+
+**The previously documented retirement hold has been resolved by explicit founder approval and a controlled operator cutover. This outcome supersedes the pre-cutover status above.**
+
+- Owner-approved closure: exact old, read-only inspection sessions (historical PIDs 1310964, 2380185, 3282372) were individually terminated after reviewing available output. The separate idle `pi` smoke session (3948256) was terminated only after confirming the working directory and its `getlead_blitz_v1` Git branch `candidate/getlead-blitz-waterfall-convergence-v2` at commit `e18d5d88` had zero tracked modifications. No application migration, outbound, payments or product releases were running under those old session commands.
+- Private, mode-`0600` preserved session audit: `/home/ubuntu/empire_agents/commander_cutover_20261013/legacy_terminal_session_audit.json`. This is a metadata/readback record, not a replayable full `pi` conversation transcript.
+- The unmanaged September `npx` launcher (historical PID 610282) was retired by exact PID. The founder separately verified and gracefully signalled the legacy worker (historical PID 610308) only if its command line matched the known `~/.npm/_npx/4b4c857f6efdfb61/...` installation.
+- The founder used `systemctl try-restart empire-desktop-commander.service`, returning `active`. New **managed** main PID 1206369, worker PID 1206429, starting 2026-10-13 19:50:48 UTC. Independent remote `ping` and `start_process` succeeded.
+- Independent `/proc` checks show both old launcher/worker PIDs and all four legacy terminal PIDs absent. Exactly two Desktop Commander Node processes remain (one managed main, one managed child), both running the `~/.nvm/.../lib/node_modules/@wonderwhy-er/desktop-commander/dist/index.js` distribution. No `npx` remote agent remains.
+- After the managed restart, **19 remote tool calls succeeded in being received with zero independently matched `❌ Channel error:` records** in the fresh managed-service journal window. A naive grep of raw journal contained false positives because tool-call arguments echoed the words `Channel error:`; strict prefix matching corrected the count. Short-window verification is not a lifetime uptime SLA.
+- `empire-ops-mcp.service`, `empire-remote-commander-tunnel.service`, `empire-search-intelligence-api.service`, `empire-buyer-acquisition-scout.timer` and `empire-revenue-completion-supervisor.timer` remained active on the independent readback. The Search Console **true** status was confirmed via the same existing API. Nothing was changed in Cloudflare, DNS, database, site, checkout, search credentials, email or user traffic.
+- Existing main repository tracked work and isolated ASTRA worktrees were preserved. No new timer, agent or supervisor was added.
+
+**Outcome:** `CUTOVER_COMPLETE_INITIAL_REMOTE_VERIFICATION_PASS`. Keep the existing systemd-managed Remote Commander as the sole agent. If a future connector transport fault recurs, review the fresh service log and ping/command evidence before a narrowly approved fix. Do not reinstall or spawn another remote instance.
