@@ -28,3 +28,17 @@ The existing outbound governor already treats unknown suppression as a hold. The
 5. Only after completed verification and independent financial release may a binding contract, approved payment request, fulfillment and reconciled revenue be reported. The £100k target means **recognised GBP recurring monthly revenue**, not a one-time USD deployment.
 
 **Execution authority:** NONE for new sends, database mutation, payment, deployment, live traffic and contractual acceptance. The update to Gmail drafts is review-only and separate from server-run automatic outbound.
+
+## Live 13 October recipient and Gmail recheck — founder operator evidence
+The founder executed the unchanged bounded first-party `scripts.inspect_enterprise_followup_recipients_readonly` against canonical EmpireDB with the protected operator environment. Output schema `empire.enterprise_followup_recipient_preflight.v1`; source `CANONICAL_EMPIREDB`; `transaction=READ_ONLY`; `database_writes=false`; `outbound_sent=false`; `founder_send_authorized=false`; `mailbox_authentication_verified=false`.
+
+| Recipient | Exact/domain suppression match | Canonical prior email intents | Canonical send/reply events | Result |
+| --- | --- | ---: | ---: | --- |
+| `richard@redwoodservices.com` | **false** | 1 | 1 | `HOLD_PRIOR_GMAIL_CONTACT_AND_FOUNDER_SEND_GATES` |
+| `kmartin@sila.com` | **false** | 1 | 1 | `HOLD_PRIOR_GMAIL_CONTACT_AND_FOUNDER_SEND_GATES` |
+
+A fresh connected Gmail read after the operator check found exactly two messages in **each** original thread: 24 September `SENT` and 13 October `DRAFT`; no buyer inbound reply in those threads. Separate full-address Gmail searches found no additional buyer reply. Gmail delivery-status search returned unrelated bounce reports but none explicitly naming these two recipients; this is **not** proof of mailbox delivery.
+
+The connected Gmail account profile was `flavag83@gmail.com`, **not** an independently verified authenticated Empire AI professional-mailbox sending identity. Gmail draft readiness does not certify a chosen `From` alias. The user-preferred first-party founder sender is not implicitly established by the Gmail connection. **Do not send either draft or automatically lift hold.** Require independently verified approved sender identity, latest suppression/opt-out/bounce/cadence checks at send time, and founder approval for these precise follow-ups. The existing two Gmail draft IDs remain unchanged.
+
+**Resolution:** canonical suppression lookup PASS for the bounded two-address cohort; separate sender and external-send authority remain HELD. No additional suppression script rerun, database write, mailbox send or production deployment is necessary to record this decision.
