@@ -13,6 +13,16 @@ source <(sed '/^# Deliberately make a login/,$d' \
 pg -f migrations/empiredb/049_direct_bsc_buyer_status_private_reader.sql >/dev/null
 pg -f migrations/empiredb/050_direct_bsc_buyer_status_private_issuer.sql >/dev/null
 echo 'EPHEMERAL_047_TO_050_BASELINE=PASS'
+for entry in "049|12|scripts/inspect_direct_bsc_reader_049_after_050.sql" \
+             "050|10|scripts/inspect_direct_bsc_private_issuer_050_postcommit.sql"; do
+ IFS='|' read -r ver expected proof <<< "$entry"
+ report="$(pg -f "$proof")"
+ total="$(printf '%s\n' "$report" | grep -Ec '^(0[1-9]|1[0-2])_[a-z0-9_]+\|PASS$' || true)"
+ [[ "$total" == "$expected" ]] || {
+  echo "EPHEMERAL_EXISTING_049_050_READBACK_UNSAFE"; exit 72;
+ }
+ echo "EPHEMERAL_${ver}_AFTER_050_SECURITY_READBACK=PASS"
+done
 # The role provisioner grants CONNECT on canonical database name. Reproduce
 # that name only in this disposable cluster; fixture finance rows stay separate.
 psql -X -w -v ON_ERROR_STOP=1 -d postgres -c 'CREATE DATABASE empiredb' >/dev/null

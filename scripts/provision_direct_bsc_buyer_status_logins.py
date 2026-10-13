@@ -180,13 +180,14 @@ def _write_env(path: Path, content: str) -> None:
 def existing_contracts_verified() -> None:
     """Pure catalog readback before any credential/role mutation."""
     for version,total,path in (
-        ("049",12,"scripts/inspect_direct_bsc_private_reader_049_postcommit.sql"),
+        ("049-after-050",12,"scripts/inspect_direct_bsc_reader_049_after_050.sql"),
         ("050",10,"scripts/inspect_direct_bsc_private_issuer_050_postcommit.sql"),
     ):
         if not Path(path).is_file():
             raise ValueError("existing private role verification missing")
         checked=subprocess.run(
             ["runuser","-u","postgres","--","psql","-X","-w",
+             "-h","/var/run/postgresql","-p","5432","-U","postgres",
              "-v","ON_ERROR_STOP=1","-d","empiredb","-f",path],
             text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,
             timeout=20,check=False,
@@ -300,7 +301,8 @@ def apply() -> dict:
     sql=provision_sql(passwords)
     # Postgres system login reads SQL from stdin, never prints passwords.
     p=subprocess.run(
-        ["runuser","-u","postgres","--","psql","-X","-q",
+        ["runuser","-u","postgres","--","psql","-X","-q","-w",
+         "-h","/var/run/postgresql","-p","5432","-U","postgres",
          "-v","ON_ERROR_STOP=1","-d","empiredb"],
         input=sql,text=True,stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,timeout=45,check=False,

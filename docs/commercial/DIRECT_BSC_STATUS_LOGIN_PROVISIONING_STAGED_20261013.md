@@ -87,3 +87,33 @@ switch lines and active systemd DropInPaths. It also accepts both
 proposal/order flags OFF. It rejects mismatched flags, missing release
 proof or any payment_execution/revenue_recognition activation.
 No runtime flags were changed by this source patch.
+
+## Approved dedicated-login rollout — 049+050 compatibility correction
+
+On 13 October the founder expressly authorised *exactly two restricted
+PostgreSQL LOGIN identities and a protected local DSN file*, without
+customer-facing routes, payment execution or revenue recognition.
+
+The historical 049-only postcommit verifier assumes its original
+one capability RLS policy and 11 payment-request policies; migration
+050 intentionally introduced a second capability policy and a 12th
+request policy. Therefore the original 049 verifier MUST NOT be run
+unmodified as a gate after 050.
+
+New `scripts/inspect_direct_bsc_reader_049_after_050.sql` preserves the
+12 original independent security predicates while expecting the
+documented post-050 policy totals (2 and 12). The distinct 050
+postcommit proof still checks 10 separate controls, including its exact
+policy and issuer function identities.
+
+The provisioner now runs the two version-correct read-only proofs
+before any LOGIN creation, pins privileged psql to
+`/var/run/postgresql`, port `5432`, and refuses stale or ambiguous
+role/credential state. Disposable PostgreSQL 18 independently verified
+12/12 and 10/10 readbacks followed by both dedicated LOGIN
+authentications, strict role isolation and second-apply denial.
+
+Do not repeat a role provisioning command following any ambiguous
+post-commit error. Check catalog roles, membership and presence of the
+root-only env file first. No public endpoint or payments are activated
+by this separately authorised work.

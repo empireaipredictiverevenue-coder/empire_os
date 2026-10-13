@@ -112,7 +112,7 @@ def test_readback_refuses_any_failed_or_missing_check(monkeypatch,tmp_path):
     monkeypatch.chdir(tmp_path)
     (tmp_path/"scripts").mkdir()
     paths=[
-      "inspect_direct_bsc_private_reader_049_postcommit.sql",
+      "inspect_direct_bsc_reader_049_after_050.sql",
       "inspect_direct_bsc_private_issuer_050_postcommit.sql",
     ]
     for path in paths:
@@ -207,3 +207,25 @@ def test_untrusted_controlled_release_configuration_is_rejected(tmp_path, monkey
     symlink.symlink_to(candidate)
     monkeypatch.setattr(p,"CONTROLLED_ORDER_RELEASE",symlink)
     assert p._verified_controlled_order_release() is False
+
+
+def test_original_049_security_evidence_immutable_and_050_compatible_readback():
+    legacy=(Path(__file__).resolve().parents[1]/
+      "scripts/inspect_direct_bsc_private_reader_049_postcommit.sql").read_text()
+    composed=(Path(__file__).resolve().parents[1]/
+      "scripts/inspect_direct_bsc_reader_049_after_050.sql").read_text()
+    assert "BEGIN READ ONLY;" in composed and "ROLLBACK;" in composed
+    assert "(SELECT count(*)=1 FROM pg_catalog.pg_policy pol" in legacy
+    assert "(SELECT count(*)=2 FROM pg_catalog.pg_policy pol" in composed
+    assert "('bsc_payment_requests',11)" in legacy
+    assert "('bsc_payment_requests',12)" in composed
+    assert "049-after-050" in Path(p.__file__).read_text()
+    assert "FROM public.bsc_payment_requests" not in composed
+    assert "UPDATE public." not in composed
+
+
+def test_postgres_operator_is_pinned_to_5432_unix_socket():
+    src=Path(p.__file__).read_text()
+    assert src.count('"-h","/var/run/postgresql","-p","5432","-U","postgres"')==2
+    assert src.count('"-d","empiredb"')==2
+    assert "returncode" in src
