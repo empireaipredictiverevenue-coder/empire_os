@@ -84,6 +84,71 @@ def test_any_failure_is_redacted_and_heard_without_side_effects(monkeypatch):
     assert state["service_changes"] is False
 
 
+
+
+def test_bsc_settings_are_from_active_root_owned_dropin_not_env_files(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    import subprocess
+    original=Path.stat
+    p=tmp_path/"30-direct-bsc-readonly.conf"
+    p.write_text(
+        "[Service]\n"
+        "# staged direct checkout baseline\n"
+        'Environment="BSC_RPC_URL=https://bsc-dataseed.bnbchain.org"\n'
+        'Environment="BSC_TREASURY_ADDRESS=0x1339b487046B0ad924a10c20b1791608EA8595a8"\n'
+        'Environment="BSC_MIN_CONFIRMATIONS=12"\n'
+        "Environment=EMPIRE_SELF_SERVE_BINDING_ORDERS_AUTHORIZED=OFF\n"
+    )
+    p.chmod(0o644)
+    monkeypatch.setattr(diag,"BSC_DROPIN",p)
+    def safe_stat(self,*a,**k):
+        result=original(self,*a,**k)
+        if self==p:return SimpleNamespace(st_uid=0,st_mode=result.st_mode)
+        return result
+    monkeypatch.setattr(Path,"stat",safe_stat)
+    class Result:
+        returncode=0
+        stdout=str(p)+"\n"
+    monkeypatch.setattr(subprocess,"run",lambda *a,**k:Result())
+    data=diag._systemd_bsc_env()
+    assert data["BSC_MIN_CONFIRMATIONS"]=="12"
+    assert data["BSC_TREASURY_ADDRESS"].startswith("0x1339")
+    assert set(data)=={
+        "BSC_RPC_URL","BSC_TREASURY_ADDRESS","BSC_MIN_CONFIRMATIONS"
+    }
+    p.write_text(p.read_text()+"Environment=BSC_MIN_CONFIRMATIONS=9\n")
+    with pytest.raises(ValueError,match="duplicate"):
+        diag._systemd_bsc_env()
+    p.write_text("[Service]\nEnvironment=BSC_MIN_CONFIRMATIONS=12\n")
+    with pytest.raises(ValueError,match="missing"):
+        diag._systemd_bsc_env()
+    p.unlink()
+    p.symlink_to(tmp_path/"elsewhere")
+    with pytest.raises(ValueError):
+        diag._systemd_bsc_env()
+
+
+def test_inactive_or_changed_systemd_dropin_fail_closed(tmp_path,monkeypatch):
+    from types import SimpleNamespace
+    import subprocess
+    p=tmp_path/"30-direct-bsc-readonly.conf"
+    p.write_text('[Service]\nEnvironment="BSC_RPC_URL=https://rpc.example"\n'
+                 'Environment="BSC_TREASURY_ADDRESS=0x1339b487046B0ad924a10c20b1791608EA8595a8"\n'
+                 'Environment="BSC_MIN_CONFIRMATIONS=12"\n')
+    monkeypatch.setattr(diag,"BSC_DROPIN",p)
+    original=Path.stat
+    def root_stat(self,*a,**k):
+        result=original(self,*a,**k)
+        if self==p:return SimpleNamespace(st_uid=0,st_mode=result.st_mode)
+        return result
+    monkeypatch.setattr(Path,"stat",root_stat)
+    class R:
+        returncode=0
+        stdout="/etc/systemd/system/other.conf\n"
+    monkeypatch.setattr(subprocess,"run",lambda *a,**k:R())
+    with pytest.raises(ValueError,match="not the active"):
+        diag._systemd_bsc_env()
+
 def test_code_contains_no_write_or_restart_or_mail_paths():
     text=Path(diag.__file__).read_text()
     for forbidden in ("systemctl restart","CREATE ROLE ",

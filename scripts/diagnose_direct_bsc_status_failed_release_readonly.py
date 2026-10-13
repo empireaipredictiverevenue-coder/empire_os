@@ -24,28 +24,57 @@ _BSC_NAMES = {
     "BSC_RPC_URL","BSC_TREASURY_ADDRESS",
     "BSC_USDT_TOKEN_CONTRACT","BSC_MIN_CONFIRMATIONS",
 }
+BSC_DROPIN = Path(
+    "/etc/systemd/system/empire-self-serve-checkout.service.d/"
+    "30-direct-bsc-readonly.conf"
+)
 
 
 def _systemd_bsc_env() -> dict[str,str]:
-    """Read ONLY the four named settings from existing service env files."""
+    """Read only the existing active BSC systemd drop-in, never DB secrets.
+
+    This checkout uses Environment= directives from drop-in 30, NOT
+    BSC_* entries in /etc/empire_os.env or /etc/empiredb.env.
+    """
+    import stat
+    import subprocess
+    import shlex
+    path=BSC_DROPIN
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("canonical BSC systemd drop-in missing")
+    metadata=path.stat()
+    if (not stat.S_ISREG(metadata.st_mode)
+        or metadata.st_uid!=0 or metadata.st_mode & 0o022):
+        raise ValueError("BSC drop-in ownership or permissions unsafe")
+    check=subprocess.run(
+        ["systemctl","show","empire-self-serve-checkout.service",
+         "-p","DropInPaths","--value"],
+        text=True,capture_output=True,check=False,timeout=5,
+    )
+    if check.returncode!=0 or str(path) not in check.stdout.split():
+        raise ValueError("BSC drop-in is not the active service configuration")
     config={}
-    for path in (Path("/etc/empire_os.env"),Path("/etc/empiredb.env")):
-        if path.is_symlink() or not path.is_file():
-            raise ValueError("missing or untrusted service environment")
-        for raw in path.read_text(encoding="utf-8").splitlines():
-            line=raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line=line.strip()
+        if not line or line.startswith(("#","[")):
+            continue
+        if not line.startswith("Environment="):
+            continue
+        try:
+            assignments=shlex.split(line.split("=",1)[1],posix=True)
+        except ValueError:
+            raise ValueError("invalid systemd environment syntax") from None
+        for entry in assignments:
+            name,sep,value=entry.partition("=")
+            if not sep or name not in _BSC_NAMES:
                 continue
-            name,value=line.split("=",1)
-            name=name.strip()
-            if name not in _BSC_NAMES or name in config:
-                continue
-            val=value.strip()
-            if len(val)>1 and val[0]==val[-1] and val[0] in {"'","\""}:
-                val=val[1:-1]
-            config[name]=val
+            if name in config or not value or any(c in value for c in ("\x00","\n","\r")):
+                raise ValueError("duplicate or invalid BSC configuration")
+            config[name]=value
     if not config.get("BSC_RPC_URL") or not config.get("BSC_TREASURY_ADDRESS"):
-        raise ValueError("checkout service BSC configuration unavailable")
+        raise ValueError("canonical BSC settings missing from active drop-in")
+    if config.get("BSC_MIN_CONFIRMATIONS")!="12":
+        raise ValueError("BSC confirmation minimum changed")
     return config
 
 

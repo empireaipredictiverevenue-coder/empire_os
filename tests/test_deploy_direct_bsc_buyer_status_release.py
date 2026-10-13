@@ -80,6 +80,7 @@ def test_release_does_not_rotate_existing_key_and_preserves_order_flags(monkeypa
     monkeypatch.setattr(r,"read_key",lambda:bytes(range(32)))
     monkeypatch.setattr(r,"install_key",lambda:pytest.fail("rotation"))
     monkeypatch.setattr(r,"_write_dropin",lambda:None)
+    monkeypatch.setattr(r,"_wait_until_services_ready",lambda:None)
     monkeypatch.setattr(r,"_status_probe",lambda:None)
     actions=[]
     monkeypatch.setattr(r,"_run",lambda *args:actions.append(args))
@@ -102,6 +103,44 @@ def test_operator_on_failure_never_prints_secrets(capsys,monkeypatch):
     assert "abc" not in output
     assert "HELD_RELEASE_OR_ROLLBACK_NEEDS_READBACK" in output
 
+
+
+
+def test_release_waits_for_real_http_readiness_without_restarting(monkeypatch):
+    called=[]
+    def health():
+        called.append("health")
+        if len(called)<3:
+            raise ConnectionRefusedError("startup not yet listening")
+        return {"status":"online"}
+    class Response:
+        status=200
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+    monkeypatch.setattr(r,"_health",health)
+    monkeypatch.setattr(r.urllib.request,"urlopen",
+                        lambda request,timeout:Response())
+    r._wait_until_services_ready(seconds=2.0)
+    assert len(called)==3
+
+
+def test_release_readiness_fails_closed_at_bounded_deadline(monkeypatch):
+    monkeypatch.setattr(r,"_health",
+        lambda:(_ for _ in ()).throw(ConnectionRefusedError("not ready")))
+    with pytest.raises(ValueError,match="HTTP-ready"):
+        r._wait_until_services_ready(seconds=0.0)
+
+
+def test_public_gateway_must_return_http_200_before_release_checks(monkeypatch):
+    monkeypatch.setattr(r,"_health",lambda:{"status":"online"})
+    class Response:
+        status=503
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+    monkeypatch.setattr(r.urllib.request,"urlopen",
+                        lambda request,timeout:Response())
+    with pytest.raises(ValueError,match="HTTP-ready"):
+        r._wait_until_services_ready(seconds=0.0)
 
 def test_targeted_git_paths_cover_checkout_gateway_and_status_and_operator():
     assert {"empire_os/public_gateway.py","empire_os/self_serve_checkout_api.py",

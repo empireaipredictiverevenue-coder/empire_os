@@ -141,6 +141,28 @@ def _chain_verified()->dict:
     }
 
 
+def _wait_until_services_ready(*, seconds: float=12.0) -> None:
+    """Bounded, read-only startup wait; systemctl restart is not HTTP readiness."""
+    import time
+    deadline=time.monotonic()+seconds
+    while True:
+        try:
+            snapshot=_health()
+            if snapshot.get("status")=="online":
+                req=urllib.request.Request(
+                    "http://127.0.0.1/buy",
+                    headers={"Host":"empire-ai.co.uk"},
+                )
+                with urllib.request.urlopen(req,timeout=2.0) as resp:
+                    if resp.status==200:
+                        return
+        except (OSError,ValueError,TimeoutError):
+            pass
+        if time.monotonic() >= deadline:
+            raise ValueError("checkout or gateway did not become HTTP-ready")
+        time.sleep(0.25)
+
+
 def _status_probe()->None:
     # Correctly formatted but never-issued fixed bearer. No DB writes,
     # no order UUID, no buyer PII, no bearer disclosed to logs.
@@ -231,6 +253,7 @@ def release()->dict:
         _run("systemctl","daemon-reload")
         _run("systemctl","restart","empire-self-serve-checkout.service")
         _run("systemctl","restart","empire-public-gateway.service")
+        _wait_until_services_ready()
         if _snapshot()!=original:
             raise ValueError("checkout financial admission changed")
         checkout_financial_execution_held()
