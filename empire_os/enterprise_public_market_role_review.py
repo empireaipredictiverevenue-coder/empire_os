@@ -5,6 +5,7 @@ These analyst hypotheses never overwrite scout product mappings or grant send.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 # Official company website evidence reviewed 2026-10-13. This list is not a
@@ -29,6 +30,12 @@ PUBLIC_MARKET_ROLE_RESEARCH: dict[str, dict[str, Any]] = {
         ],
         "reason": "Home-services multi-brand expansion creates a testable forecasting and integration use case",
         "suggested_product_codes_for_review_only": ["predictive_revenue_diagnostic"],
+        "testable_discovery_questions": [
+            "Can cross-brand lead-to-booked-job conversion be measured consistently?",
+            "Where do appointment capacity and local demand fail to match by market?",
+            "Can marketing investment and retention be compared across acquired brands?",
+        ],
+        "economic_impact_not_yet_measured": True,
         "related_seed_account_keys_for_dedup_review_only": ["blackstone_operating_team"],
         "public_contact_routes_for_review_only": [
             {
@@ -44,6 +51,8 @@ PUBLIC_MARKET_ROLE_RESEARCH: dict[str, dict[str, Any]] = {
         "observed_buyer_roles_for_review_only": [
             {"name": "Laura Koester", "title": "Chief Marketing Officer",
              "source_url": "https://championsgroupholdings.com/our-leadership/",
+             "public_professional_profile": "https://www.linkedin.com/in/laurakoester2",
+             "profile_is_recipient_consent": False,
              "person_email_binding_verified": False},
             {"name": "Frank DiMarco", "title": "Chief Executive Officer",
              "source_url": "https://championsgroupholdings.com/our-leadership/",
@@ -100,7 +109,7 @@ def market_role_review(domain: str) -> dict[str, Any]:
             "outreach_authorized": False,
         }
     return {
-        **evidence,
+        **deepcopy(evidence),
         "reviewed_on": "2026-10-13",
         "evidence_class": "PUBLIC_FIRST_PARTY_SITE_OBSERVATION",
         "verified_buying_intent": False,

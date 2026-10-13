@@ -35,6 +35,11 @@ def test_public_champions_partnership_inbox_is_not_an_authorised_ai_buyer_route(
     assert route["recipient_suppression_cleared"] is False
     assert route["outreach_authorized"] is False
     assert all(p["person_email_binding_verified"] is False for p in role["observed_buyer_roles_for_review_only"])
+    laura = next(p for p in role["observed_buyer_roles_for_review_only"] if p["name"] == "Laura Koester")
+    assert laura["public_professional_profile"] == "https://www.linkedin.com/in/laurakoester2"
+    assert laura["profile_is_recipient_consent"] is False
+    assert len(role["testable_discovery_questions"]) == 3
+    assert role["economic_impact_not_yet_measured"] is True
 
 
 def test_unknown_related_account_never_claims_authority():
