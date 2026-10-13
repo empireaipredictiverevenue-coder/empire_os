@@ -43,3 +43,68 @@ The full source JSON is bounded, schema-checked and SHA-256 pinned across the an
 5. Next independent revenue milestone: verify one person-bound, willing buyer and a product-specific scoped pilot; founder approves actual commercial send/terms/payment under the established gated loop.
 
 **Status:** RESEARCH_AUTOMATION_CODE_COMPLETE / TESTED / NOT_PRODUCTION_ACTIVE.
+
+## Production acceptance — 13 October 2026 (supersedes earlier pre-release status)
+
+**Release status: ACTIVE FOR FIRST-PARTY BUYER RESEARCH / OBSERVE ONLY.**
+This section documents a later completed activation; the preceding preparation
+notes are retained as pre-release evidence, not the current deployment state.
+
+- Existing production branch `agent/data-cloud-wave4`: commit `302f8b1f`
+  installed bounded evidence-parked buyer queue and the existing scout's
+  fourth research/review stage. Commit `24fc1553` made zero-valued telemetry
+  explicit. Commit `df9f70f5` aligned the existing revenue supervisor.
+- Existing acquisition-scout and deferred-enrichment timers remained **active**.
+  Existing revenue-completion-supervisor timer also remained **active**.
+  No new agents, queues, timers, services, migrations or service restarts.
+- An operator-authorised, bounded production OBSERVE cycle completed at
+  `2026-10-13T11:42:04Z`:
+  direct-site probe PASS, first-party due diligence PASS, founder-qualification
+  actions PASS, and buyer recovery desk PASS.
+  Its durable evidence is
+  `runtime/buyer_network_intelligence/research_cycle_latest.json`.
+- The private `0600` first-party report
+  `runtime/buyer_network_intelligence/buyer_recovery_action_desk_latest.json`
+  contains 131 high-priority candidates (25 detailed review cases), 2,051
+  evidence-exhausted records to park, and **zero currently due**. The
+  shortlist includes product-scoped enterprise hypotheses but no recipient
+  has been admitted to outbound authority solely from this list.
+- The existing 2-minute revenue supervisor was independently read back at
+  `2026-10-13T11:46:52Z` with `due_now=0`,
+  `evidence_parked_count=2051`, `high_priority_parked_count=125`,
+  `genuine_review_ready_count=0`, and
+  `next_action=await_automatic_first_party_evidence_refresh`.
+  The historical backlog still reports CRITICAL: parking an item does not
+  fabricate completion, verified buyers or revenue.
+- Final targeted production regression: **120 tests passed**. A pre-existing
+  modified test file and the wider 63 tracked changes in the main checkout
+  were preserved; staging covered only audited release paths.
+
+### Remaining hard gates — not part of this OBSERVE activation
+
+1. **Owned professional mailbox:** independently checked live Founder API
+   returned `provider=owned_imap`, `configured=false`,
+   `status=CONFIGURATION_REQUIRED`. The protected owned IMAP credential file
+   was absent. Do not invent a host or password, silently use private Gmail,
+   change MX, turn on SMTP, or claim owned-mailbox reply ingestion.
+2. **No duplicate sends:** the 19 October 13 Gmail messages verified in the
+   connected personal mailbox must be reconciled with canonical EmpireDB
+   evidence before any automated outreach. Hard bounces/blocked recipients
+   remain explicit do-not-retry review holds. Do not treat one-way sends as
+   interested replies.
+3. **No automatic commercial execution:** exact recipient, person-bound
+   identity, jurisdiction, consent/suppression, offer/fulfilment readiness,
+   sender reputation, human/standing founder approvals, binding terms, USDT
+   settlement and genuine realised revenue evidence are separate gates.
+   No automatic email, telephony, consumer calls, live Ringba traffic,
+   purchasing, signatures, or payments were authorised by this release.
+4. **No fabricated advancement:** `genuine_review_ready_count=0`; the
+   automatic desk prepares evidence and prioritises research only.
+   A positive buyer reply must be authenticated and admitted through the
+   established commercial/identity pipeline before the next sales step.
+
+**Operational conclusion:** Repetitive buyer evidence prioritisation,
+bounded retries, scheduled first-party qualification and private founder
+review-packet refresh are now integrated into the existing EmpireOS runtime.
+Full hands-free outbound and closing remain separately blocked by the
+unprovisioned owned mailbox and commercial/identity gates.
