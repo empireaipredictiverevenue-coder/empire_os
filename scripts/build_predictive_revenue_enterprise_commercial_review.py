@@ -9,11 +9,14 @@ from pathlib import Path
 import tempfile
 
 from empire_os.predictive_revenue_enterprise_commercial_review import build_review
+from empire_os.enterprise_domain_history_attestation import apply_operator_domain_readback
+from scripts.inspect_enterprise_review_domain_history_readonly import domains_from_review
 
 POOL = Path("runtime/predictive_revenue/enterprise_pool_latest.json")
 LOCATIONS = Path("runtime/predictive_revenue/enterprise_location_enrichment_latest.json")
 PROMOTION = Path("runtime/buyer_acquisition/promotion_plan_latest.json")
 OUT = Path("runtime/predictive_revenue/enterprise_commercial_review_latest.json")
+OPERATOR_READBACK = Path("runtime/predictive_revenue/enterprise_domain_history_operator_readback_latest.json")
 
 
 def run(root: Path) -> dict:
@@ -24,6 +27,14 @@ def run(root: Path) -> dict:
         json.loads(path.read_text(encoding="utf-8")) for path in source_paths
     ]
     review = build_review(pool, locations, promotion)
+    operator_path = root / OPERATOR_READBACK
+    if operator_path.is_symlink():
+        raise ValueError("UNSAFE_OPERATOR_DOMAIN_READBACK")
+    if operator_path.exists():
+        operator_readback = json.loads(operator_path.read_text(encoding="utf-8"))
+        review = apply_operator_domain_readback(
+            review, operator_readback, expected_domains=domains_from_review(review)
+        )
     target = root / OUT
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.is_symlink():
