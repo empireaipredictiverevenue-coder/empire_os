@@ -193,6 +193,7 @@ def test_predictive_revenue_interest_endpoint(monkeypatch):
             "desired_outcome": "Improve forecast accuracy.",
             "systems": ["CRM"],
             "idempotency_key": "predictive-api-001",
+            "contact_consent": True,
         },
     )
 

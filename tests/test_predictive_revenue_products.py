@@ -41,6 +41,8 @@ def test_predictive_revenue_interest_records_buyer_stated_evidence():
         calls.append((method, path, payload))
         assert path.endswith("/ingest_prospect_atomic")
         assert payload["p_evidence"]["buyer_stated"] is True
+        assert payload["p_evidence"]["contact_consent_evidence"]["consent_to_contact"] is True
+        assert payload["p_evidence"]["automatic_followup_authorized"] is False
         assert payload["p_evidence"]["actual_revenue"] is False
         assert payload["p_evidence"]["payment_action"] is False
         return {
@@ -59,6 +61,7 @@ def test_predictive_revenue_interest_records_buyer_stated_evidence():
         desired_outcome="Improve forecast accuracy and expansion decisions.",
         systems=["CRM", "Finance / Revenue Data"],
         idempotency_key="predictive-test-001",
+        contact_consent=True,
         request=request,
     )
 

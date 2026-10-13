@@ -41,7 +41,7 @@ def test_existing_legitimate_browser_request_still_reaches_only_internal_intake(
     calls=setup(monkeypatch)
     response=CLIENT.post(PATH,headers={
         "Origin":ORIGIN,"Sec-Fetch-Site":"same-origin",
-    },json={"product_code":"predictive_revenue_diagnostic"})
+    },json={"product_code":"predictive_revenue_diagnostic", "contact_consent": True})
     assert response.status_code==200
     assert response.json()["decision"]=="deployment_interest_recorded"
     assert response.headers["cache-control"]=="no-store"

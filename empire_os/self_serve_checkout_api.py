@@ -112,6 +112,8 @@ class PredictiveRevenueInterestRequest(BaseModel):
     annual_revenue_band: str = Field(default="unknown", max_length=40)
     desired_outcome: str = Field(min_length=1, max_length=1200)
     systems: list[str] = Field(default_factory=list, max_length=20)
+    contact_consent: bool
+    website: str = Field(default="", max_length=300)
     idempotency_key: str = Field(min_length=8, max_length=128)
 
 
@@ -271,6 +273,8 @@ def predictive_revenue_products():
 
 @app.post("/v1/predictive-revenue/interests")
 def predictive_revenue_interest(req: PredictiveRevenueInterestRequest):
+    if req.contact_consent is not True or req.website:
+        raise HTTPException(status_code=422, detail="specific_contact_consent_required")
     try:
         return record_predictive_revenue_interest(
             product_code=req.product_code,
@@ -282,6 +286,8 @@ def predictive_revenue_interest(req: PredictiveRevenueInterestRequest):
             annual_revenue_band=req.annual_revenue_band,
             desired_outcome=req.desired_outcome,
             systems=req.systems,
+            contact_consent=req.contact_consent,
+            website=req.website,
             idempotency_key=req.idempotency_key,
         )
     except (PredictiveRevenueInterestError, ValueError) as exc:

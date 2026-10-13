@@ -75,6 +75,8 @@ export default function PredictiveRevenuePage() {
   const [revenueBand, setRevenueBand] = useState("unknown");
   const [desiredOutcome, setDesiredOutcome] = useState("");
   const [systems, setSystems] = useState<string[]>([]);
+  const [contactConsent, setContactConsent] = useState(false);
+  const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<IntakeResult | null>(null);
 
@@ -114,7 +116,7 @@ export default function PredictiveRevenuePage() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!product || submitting) return;
+    if (!product || !contactConsent || submitting) return;
 
     setSubmitting(true);
     setResult(null);
@@ -138,6 +140,8 @@ export default function PredictiveRevenuePage() {
             annual_revenue_band: revenueBand,
             desired_outcome: desiredOutcome,
             systems,
+            contact_consent: contactConsent,
+            website,
             idempotency_key: idempotencyKey,
           }),
         },
@@ -414,8 +418,21 @@ export default function PredictiveRevenuePage() {
                 </div>
               </div>
 
+              <div className="hidden" aria-hidden="true">
+                <label>Website
+                  <input tabIndex={-1} autoComplete="off" value={website}
+                    onChange={(event) => setWebsite(event.target.value)} />
+                </label>
+              </div>
+              <label className="mt-5 flex items-start gap-3 text-xs leading-6 text-white/60">
+                <input type="checkbox" required checked={contactConsent}
+                  onChange={(event) => setContactConsent(event.target.checked)}
+                  className="mt-1 size-4 accent-cyan-300" />
+                <span>I consent to Empire AI emailing me about this specific deployment
+                  enquiry. I am not signing up for unrelated marketing.</span>
+              </label>
               <button
-                disabled={!product || submitting}
+                disabled={!product || !contactConsent || submitting}
                 className="mt-7 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#eaf2ff] px-5 text-xs font-bold tracking-[0.11em] text-[#07132c] transition enabled:hover:-translate-y-0.5 enabled:hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {submitting ? (

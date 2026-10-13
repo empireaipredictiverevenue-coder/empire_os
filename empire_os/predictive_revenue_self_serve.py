@@ -7,6 +7,7 @@ recognize revenue.
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import hashlib
 import re
 from typing import Any, Callable, Mapping
@@ -79,8 +80,18 @@ def record_predictive_revenue_interest(
     desired_outcome: str,
     systems: list[str] | tuple[str, ...],
     idempotency_key: str,
+    contact_consent: bool,
+    website: str = "",
     request: Request = request_json,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
+    if contact_consent is not True:
+        raise PredictiveRevenueInterestError("specific_contact_consent_required")
+    if website:
+        raise PredictiveRevenueInterestError("invalid_submission")
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None or moment.utcoffset() is None:
+        raise PredictiveRevenueInterestError("contact_consent_clock_untrusted")
     product = predictive_revenue_product(product_code)
     business = _text(business_name, "business_name", 200)
     contact_email = _email(email)
@@ -117,6 +128,14 @@ def record_predictive_revenue_interest(
         "geography": market,
         "desired_outcome": outcome,
         "systems": normalized_systems,
+        "contact_consent_evidence": {
+            "kind": "buyer_initiated_specific_response_consent",
+            "observed_at": moment.astimezone(timezone.utc).isoformat(),
+            "consent_to_contact": True,
+            "newsletter_or_ongoing_marketing_consent": False,
+            "source_url": "https://empire-ai.co.uk/predictive-revenue",
+        },
+        "automatic_followup_authorized": False,
         "binding_commercial_terms": False,
         "deployment_scope_verified": False,
         "payment_action": False,
