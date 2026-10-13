@@ -36,6 +36,8 @@ REVIEW_FILES=(
     "empire_os/direct_bsc_buyer_status_private_issuer.py",
     "empire_os/self_serve_checkout_api.py",
     "empire_os/public_gateway.py",
+    "apps/empire-public-site/src/app/buy/page.tsx",
+    "docs/commercial/DIRECT_BSC_BUY_UI_STATIC_EXPORT_MANIFEST_20261013.json",
     "scripts/deploy_direct_bsc_buyer_status_release.py",
 )
 DROPIN=(
@@ -178,10 +180,39 @@ def _write_dropin()->None:
             os.unlink(temp)
 
 
+def _published_checkout_verified()->None:
+    """Insist on the already-released, content-hashed buyer checkout UI."""
+    from hashlib import sha256
+    manifest=ROOT/"docs/commercial/DIRECT_BSC_BUY_UI_STATIC_EXPORT_MANIFEST_20261013.json"
+    page=ROOT/"apps/empire-public-site/out/buy.html"
+    if manifest.is_symlink() or page.is_symlink() or not manifest.is_file() or not page.is_file():
+        raise ValueError("published checkout evidence absent")
+    values=json.loads(manifest.read_text())
+    if sha256(page.read_bytes()).hexdigest()!=values.get("buy_sha256"):
+        raise ValueError("published checkout page not verified")
+    assets=values.get("assets")
+    if type(assets) is not list or len(assets)>150:
+        raise ValueError("published checkout asset manifest invalid")
+    for entry in assets:
+        name=entry.get("path") if type(entry) is dict else None
+        if (type(name) is not str or not name.startswith("_next/static/")
+            or any(part in {"",".",".."} for part in Path(name).parts)
+            or any(ch not in
+              "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-./[]"
+              for ch in name)):
+            raise ValueError("published checkout asset path invalid")
+        asset=page.parent/name
+        if asset.is_symlink() or not asset.is_file():
+            raise ValueError("published checkout asset absent")
+        if sha256(asset.read_bytes()).hexdigest()!=entry.get("sha256"):
+            raise ValueError("published checkout immutable asset changed")
+
+
 def release()->dict:
     if os.geteuid()!=0:
         raise ValueError("root release operator required")
     _reviewed()
+    _published_checkout_verified()
     _verify_unit_targets()
     _verify_login_file()
     checkout_financial_execution_held()
@@ -221,7 +252,7 @@ def release()->dict:
         "status":"DIRECT_BSC_PRIVATE_BUYER_STATUS_RELEASE_VERIFIED",
         "key":key_action,
         "logins":"EXISTING_TWO_REUSED",
-        "frontend_deployed":False,
+        "frontend_deployed":True,
         "status_token_issued":False,
         "public_status_route_unknown_token_denied":True,
         "order_gate_unchanged":True,

@@ -70,6 +70,7 @@ def test_status_probe_rejects_missing_or_non_denial_route(monkeypatch):
 def test_release_does_not_rotate_existing_key_and_preserves_order_flags(monkeypatch):
     monkeypatch.setattr(r.os,"geteuid",lambda:0)
     monkeypatch.setattr(r,"_reviewed",lambda:None)
+    monkeypatch.setattr(r,"_published_checkout_verified",lambda:None)
     monkeypatch.setattr(r,"_verify_unit_targets",lambda:None)
     monkeypatch.setattr(r,"_verify_login_file",lambda:None)
     monkeypatch.setattr(r,"checkout_financial_execution_held",lambda:None)
@@ -86,6 +87,7 @@ def test_release_does_not_rotate_existing_key_and_preserves_order_flags(monkeypa
     assert result["key"]=="EXISTING_KEY_VERIFIED"
     assert result["payment_execution"] is False
     assert result["order_gate_unchanged"] is True
+    assert result["frontend_deployed"] is True
     assert actions==[
         ("systemctl","daemon-reload"),
         ("systemctl","restart","empire-self-serve-checkout.service"),
@@ -105,3 +107,22 @@ def test_targeted_git_paths_cover_checkout_gateway_and_status_and_operator():
     assert {"empire_os/public_gateway.py","empire_os/self_serve_checkout_api.py",
             "scripts/deploy_direct_bsc_buyer_status_release.py",
             "empire_os/direct_bsc_buyer_receipt_bridge.py"}.issubset(set(r.REVIEW_FILES))
+
+
+def test_release_requires_the_verified_published_checkout_page(monkeypatch,tmp_path):
+    from hashlib import sha256
+    pages=tmp_path/"apps/empire-public-site/out"
+    manifests=tmp_path/"docs/commercial"
+    pages.mkdir(parents=True)
+    manifests.mkdir(parents=True)
+    page=pages/"buy.html"
+    page.write_bytes(b"buyer-page-reviewed")
+    expected=sha256(page.read_bytes()).hexdigest()
+    (manifests/"DIRECT_BSC_BUY_UI_STATIC_EXPORT_MANIFEST_20261013.json").write_text(
+        json.dumps({"buy_sha256":expected,"assets":[]})
+    )
+    monkeypatch.setattr(r,"ROOT",tmp_path)
+    r._published_checkout_verified()
+    page.write_bytes(b"buyer-page-unreviewed")
+    with pytest.raises(ValueError,match="not verified"):
+        r._published_checkout_verified()

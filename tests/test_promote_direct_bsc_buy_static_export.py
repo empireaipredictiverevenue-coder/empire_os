@@ -17,17 +17,20 @@ def test_default_off_and_exact_flag(capsys,monkeypatch):
     assert "STAGED_NOT_APPLIED" in capsys.readouterr().out
 
 
-def test_manifest_references_only_versioned_next_assets_and_buy_html(monkeypatch):
-    monkeypatch.setattr(release,"_exact_git",lambda path:None)
-    info,source,target=release._validated()
-    assert source.name=="out"
-    assert target.name=="out"
-    assert 1<=len(info["assets"])<=150
-    assert all(a["path"].startswith("_next/static/") for a in info["assets"])
-    assert all(a["size"]>=0 for a in info["assets"])
-    assert release.sha(source/"buy.html")==info["buy_sha256"]
-    assert release.sha(target/"buy.html")==info["prior_live_buy_sha256"]
-    assert info["buy_sha256"]!=info["prior_live_buy_sha256"]
+def test_postpublished_manifest_matches_only_buy_page_and_hashed_assets():
+    manifest=release.MANIFEST
+    data=json.loads(manifest.read_text())
+    source=Path(data["preview_root"])
+    live=Path(data["live_root"])
+    assert source.name=="out" and live.name=="out"
+    assert 1<=len(data["assets"])<=150
+    assert all(asset["path"].startswith("_next/static/") for asset in data["assets"])
+    assert all(asset["size"]>=0 for asset in data["assets"])
+    assert release.sha(source/"buy.html")==data["buy_sha256"]
+    assert release.sha(live/"buy.html")==data["buy_sha256"]
+    assert release.sha(live/"buy.html")!=data["prior_live_buy_sha256"]
+    for asset in data["assets"]:
+        assert release.sha(live/asset["path"])==asset["sha256"]
 
 
 def test_atomic_one_file_publisher_refuses_overwrite(tmp_path):
