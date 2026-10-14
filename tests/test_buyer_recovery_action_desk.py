@@ -170,3 +170,63 @@ def test_product_scoped_enterprise_evidence_ranks_above_generic_legal_research()
     assert [p["prospect_id"] for p in packet["packets"]] == ["enterprise", "legal"]
     assert packet["packets"][0]["product_hypothesis_count"] == 1
     assert packet["packets"][0]["buyer_demand_verified"] is False
+
+
+def test_verified_wrong_company_directory_binding_is_quarantined_not_pitched():
+    bad = _row(
+        "Sean Regan Law | Personal Injury & Car Accident Lawyer",
+        website="https://lawful.com",
+        reason="no_contact_evidence",
+        target_people=[
+            {"name": "Paul Mazzola", "title": "Co-founder",
+             "evidence_url": "https://lawful.com/about"},
+            {"name": "Mac Lara", "title": "CTO",
+             "evidence_url": "https://lawful.com/about"},
+        ],
+    )
+    healthy = _row(
+        "Lawful", website="https://lawful.com",
+        target_people=[
+            {"name": "Paul Mazzola", "title": "Co-founder",
+             "evidence_url": "https://lawful.com/about"},
+        ],
+    )
+    result = make_packet(
+        {"wrong": bad, "independent_directory": healthy},
+        source_sha256="a" * 64, now=NOW,
+    )
+    assert result["counts"]["verified_identity_conflicts_held"] == 1
+    quarantined = next(x for x in result["packets"] if x["prospect_id"] == "wrong")
+    assert quarantined["stage"] == "IDENTITY_CONFLICT_HOLD"
+    assert quarantined["parked_until_new_evidence"] is True
+    assert quarantined["identity_conflict_verified"] is True
+    assert quarantined["person_evidence_count"] == 0
+    assert quarantined["person_evidence_to_reverify"] == []
+    assert quarantined["verified_company_route_types"] == []
+    assert quarantined["buyer_demand_verified"] is False
+    assert quarantined["outbound_authorized"] is False
+    assert "seanreganlaw.com" in str(quarantined["identity_conflict_evidence"])
+    assert result["packets"][-1]["prospect_id"] == "wrong"
+    valid = next(x for x in result["packets"] if x["prospect_id"] == "independent_directory")
+    assert valid["identity_conflict_verified"] is False
+    assert valid["person_evidence_count"] == 1
+
+
+def test_bad_link_is_exact_pair_only_no_auto_company_reassignment():
+    normal_same_firm = _row(
+        "Sean Regan Law | Personal Injury & Car Accident Lawyer",
+        website="https://seanreganlaw.com/",
+        target_people=[],
+    )
+    unrelated_label = _row(
+        "Unrelated Named Business", website="https://lawful.com",
+        target_people=[],
+    )
+    data = make_packet(
+        {"right": normal_same_firm, "unrelated": unrelated_label},
+        source_sha256="b" * 64, now=NOW,
+    )
+    assert data["counts"]["verified_identity_conflicts_held"] == 0
+    assert all(not row["identity_conflict_verified"] for row in data["packets"])
+    assert data["db_write"] is False
+    assert data["outbound_sent"] is False

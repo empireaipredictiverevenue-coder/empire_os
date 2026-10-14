@@ -36,6 +36,32 @@ MAX_SOURCE_RECORDS = 20_000
 MAX_REVIEW_ITEMS = 25
 MIN_PRIORITY = 80
 
+# Verified first-party identity conflict, scoped to the EXACT bad source
+# company-label / website pair. Do not reassign directory executives or
+# replace a canonical prospect website from a search result.
+KNOWN_COMPANY_WEBSITE_CONFLICTS = {
+    (
+        "sean regan law | personal injury & car accident lawyer",
+        "lawful.com",
+    ): {
+        "case": "SEAN_REGAN_VS_LAWFUL_20261014",
+        "claimed_firm_source": "https://seanreganlaw.com/",
+        "distinct_directory_source": "https://lawful.com/about",
+    },
+}
+
+
+def _known_identity_conflict(business_name: Any, website: Any) -> dict[str, str] | None:
+    try:
+        parsed = urlsplit(str(website or "").strip())
+    except ValueError:
+        return None
+    if parsed.scheme not in ("http", "https") or parsed.username or parsed.password:
+        return None
+    domain = (parsed.hostname or "").casefold().removeprefix("www.")
+    label = " ".join(str(business_name or "").casefold().strip().split())
+    return KNOWN_COMPANY_WEBSITE_CONFLICTS.get((label, domain))
+
 NEXT_EVIDENCE = {
     "site_unavailable": "Obtain a current first-party company website",
     "site_timeout": "Verify the same company website is reachable",
@@ -101,6 +127,8 @@ def _same_host_evidence(value: Any, website: Any) -> str | None:
 def _rank_key(row: Mapping[str, Any]) -> tuple[Any, ...]:
     # Person-bound commercial discovery ahead of blind, repeated crawl.
     return (
+        # A documented wrong-company linkage is not a prospecting work item.
+        row["stage"] == "IDENTITY_CONFLICT_HOLD",
         # Existing, product-scoped enterprise evidence ahead of broad
         # unfunded/regulated-sector research; never proof of buyer demand.
         row["product_hypothesis_count"] == 0,
@@ -138,7 +166,12 @@ def make_packet(
         summary["unresolved"] += 1
         lane = _recovery_lane(item)
         summary["lane_" + lane] += 1
-        parked = _parked_without_new_evidence(item)
+        identity_conflict = _known_identity_conflict(
+            item.get("business_name"), item.get("website")
+        )
+        parked = _parked_without_new_evidence(item) or identity_conflict is not None
+        if identity_conflict is not None:
+            summary["verified_identity_conflicts_held"] += 1
         summary["parked" if parked else "eligible_after_backoff"] += 1
         priority = _priority(item.get("priority_score"))
         reason = str(item.get("reason") or "")
@@ -188,8 +221,14 @@ def make_packet(
             if isinstance(r, dict) and r.get("verified") is True
             and str(r.get("channel") or "") in {"email", "webform", "voice"}
         }
+        if identity_conflict is not None:
+            # Contacts, titles and routes are from a distinct organization,
+            # never something to "verify" as the named target firm.
+            people = []
+            routes = set()
         stage = (
-            "NAMED_PERSON_EVIDENCE_RECOVERY"
+            "IDENTITY_CONFLICT_HOLD" if identity_conflict is not None
+            else "NAMED_PERSON_EVIDENCE_RECOVERY"
             if lane == "hot_contact_recovery" and people
             else "PERSON_CONTACT_RESEARCH" if lane == "hot_contact_recovery"
             else "SOURCE_CHANGE_REQUIRED"
@@ -206,10 +245,18 @@ def make_packet(
             "parked_until_new_evidence": parked,
             "next_retry_at": retry_at.isoformat() if retry_at and not parked else None,
             "reason": reason[:90],
-            "missing_evidence": prerequisite,
-            "next_evidence_action": NEXT_EVIDENCE.get(
-                reason, "Verify company and person-bound first-party evidence"
+            "missing_evidence": (
+                "Resolve exact company/website mismatch before any person evidence"
+                if identity_conflict is not None else prerequisite
             ),
+            "next_evidence_action": (
+                "Reconcile original canonical company identity; never reuse directory contacts"
+                if identity_conflict is not None else NEXT_EVIDENCE.get(
+                    reason, "Verify company and person-bound first-party evidence"
+                )
+            ),
+            "identity_conflict_verified": identity_conflict is not None,
+            "identity_conflict_evidence": identity_conflict,
             "person_evidence_count": len(people),
             "person_evidence_to_reverify": people[:4],
             "verified_company_route_types": sorted(routes),
@@ -236,7 +283,7 @@ def make_packet(
     # counters explicit when all candidates are on backoff or evidence hold.
     for key in (
         "total", "unresolved", "due_now", "parked",
-        "eligible_after_backoff", "high_priority",
+        "eligible_after_backoff", "verified_identity_conflicts_held", "high_priority",
         "high_priority_parked", "high_priority_eligible",
         "status_pending", "status_deferred", "status_running",
         "status_resolved",
