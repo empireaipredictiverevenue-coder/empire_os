@@ -86,10 +86,10 @@ def load_gmail_credentials(
         ) from exc
 
     try:
-        credentials = Credentials.from_authorized_user_file(
-            str(path),
-            GMAIL_SCOPES,
-        )
+        # Preserve the authorised token's actual scope set on refresh. Forcing
+        # gmail.send here would silently strip a separately consented
+        # gmail.readonly scope and break the founder's Workspace inbox.
+        credentials = Credentials.from_authorized_user_file(str(path))
 
         if credentials.expired and credentials.refresh_token:
             credentials.refresh(Request())

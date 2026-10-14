@@ -76,7 +76,7 @@ def normalise_sent_email(row: Mapping[str, Any], *, provider: str = 'resend') ->
         # Owned-IMAP message headers are *provider evidence*, not proof of
         # canonical tenant/person/intent binding. Keep them outside the
         # legacy passive tap until a separate deterministic join verifies it.
-        "message_id": (_text(row.get("message_id")) or None) if provider != 'owned_imap' else None,
+        "message_id": (_text(row.get("message_id")) or None) if provider not in ('owned_imap', 'google_workspace') else None,
         "thread_id": thread_id,
         "intent_id": intent_id,
         "direction": "outbound",
@@ -100,7 +100,9 @@ def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend'
     thread_id = intent_id or (f"received:{provider_id}" if provider_id else None)
     body = _text(row.get("text") or row.get("body_text"))
     subject = _text(row.get("subject"))
-    classification = classify_reply_text(body, subject) if body else {
+    # Google metadata snippets are incomplete previews. Never turn their
+    # partial text into a positive buyer reply or an automated decision.
+    classification = classify_reply_text(body, subject) if body and row.get('body_preview_only') is not True else {
         "classification": "unknown",
         "confidence": None,
         "auto_apply": False,
@@ -112,7 +114,7 @@ def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend'
         # Owned-IMAP message headers are *provider evidence*, not proof of
         # canonical tenant/person/intent binding. Keep them outside the
         # legacy passive tap until a separate deterministic join verifies it.
-        "message_id": (_text(row.get("message_id")) or None) if provider != 'owned_imap' else None,
+        "message_id": (_text(row.get("message_id")) or None) if provider not in ('owned_imap', 'google_workspace') else None,
         "thread_id": thread_id,
         "intent_id": intent_id,
         "direction": "inbound",

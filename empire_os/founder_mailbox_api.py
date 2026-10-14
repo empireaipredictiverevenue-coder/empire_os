@@ -13,6 +13,7 @@ import requests
 from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
+from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -196,11 +197,15 @@ def create_founder_mailbox_router(
     identity_env_path: Path = DEFAULT_OUTBOUND_ENV,
 ) -> APIRouter:
     if provider is None:
-        # Sovereign default. Never fall back silently to a SaaS mail provider.
+        # Preserve owned IMAP by default. Explicit first-party Google Workspace
+        # OAuth reads reuse the *existing* account, never Resend or AWS.
         mode = os.getenv('EMPIRE_FOUNDER_MAILBOX_PROVIDER', 'owned_imap').strip().lower()
-        if mode not in ('owned_imap', 'imap'):
+        if mode in ('owned_imap', 'imap'):
+            source: MailboxProvider = OwnedIMAPMailboxProvider()
+        elif mode == 'google_workspace':
+            source = GoogleWorkspaceMailboxProvider()
+        else:
             raise RuntimeError('FOUNDER_MAILBOX_PROVIDER_NOT_AUTHORIZED')
-        source: MailboxProvider = OwnedIMAPMailboxProvider()
     else:
         source = provider
     router = APIRouter(prefix="/v1/founder-mailbox", tags=["founder-mailbox"])
@@ -233,7 +238,7 @@ def create_founder_mailbox_router(
 
     @router.get('/readiness')
     def readiness():
-        if isinstance(source, OwnedIMAPMailboxProvider):
+        if isinstance(source, (OwnedIMAPMailboxProvider, GoogleWorkspaceMailboxProvider)):
             details = source.readiness()
             return {
                 'status': 'READY_FOR_READ_PROBE' if details['configured'] else 'NOT_CONFIGURED',

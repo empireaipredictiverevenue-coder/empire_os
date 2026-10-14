@@ -75,6 +75,7 @@ def _local_json(path: str, *, opener: Callable[..., Any] | None = None) -> dict:
 
 
 def service_readiness_report(*, probe: bool = False,
+                             expected_provider: str = 'owned_imap',
                              opener: Callable[..., Any] | None = None,
                              startup_attempts: int = 1,
                              startup_sleep: Callable[[float], Any] = time.sleep) -> dict:
@@ -83,9 +84,11 @@ def service_readiness_report(*, probe: bool = False,
     --service-probe uses the existing read-only summary, bounded to one item
     per folder; it never prints person/message/secret fields.
     """
+    if expected_provider not in ('owned_imap', 'google_workspace'):
+        raise ValueError('unsupported_mailbox_readiness_provider')
     result = {
         'schema_version': 'empire.owned_imap_service_readiness.v1',
-        'provider': 'owned_imap', 'mode': 'OBSERVE',
+        'provider': expected_provider, 'mode': 'OBSERVE',
         'service_checked': True, 'configured': False,
         'read_only': True, 'live_probe_performed': False,
         'suppression_evidence_complete': False,
@@ -117,7 +120,7 @@ def service_readiness_report(*, probe: bool = False,
         except (ValueError, UnicodeError, TypeError, KeyError):
             result['status'] = 'SERVICE_RESPONSE_INVALID'
             return result
-    if (status.get('provider') != 'owned_imap'
+    if (status.get('provider') != expected_provider
         or status.get('execution_authority') != 'none'
         or status.get('canonical_identity_verified') is not False
         or status.get('suppression_evidence_complete') is not False):
@@ -140,7 +143,7 @@ def service_readiness_report(*, probe: bool = False,
     except (error.URLError, TimeoutError, OSError, ValueError, UnicodeError, TypeError, KeyError):
         result['status'] = 'READ_PROBE_BLOCKED'
         return result
-    if (summary.get('provider') != 'owned_imap'
+    if (summary.get('provider') != expected_provider
         or summary.get('execution_authority') != 'none'
         or summary.get('canonical_buyer_conversation_verified') is not False
         or summary.get('suppression_evidence_complete') is not False):
