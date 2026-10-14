@@ -116,7 +116,7 @@ def run_fixture(stage: Path, private_key: Path) -> dict:
         bad_auth=_auth_headers(bad_body)
         if "spf=pass" in bad_auth or "dkim=pass" in bad_auth or "dmarc=pass" in bad_auth:
             raise ValueError("forged unaligned sender incorrectly authenticated")
-        negative_outcome="UNAUTHENTICATED_ACCEPTED_FOR_QUARANTINE"
+        negative_outcome="UNAUTHENTICATED_ACCEPTED_WITHOUT_QUARANTINE"
     elif 400 <= status < 600:
         negative_outcome="UNAUTHENTICATED_REFUSED_BY_MTA"
     else:
@@ -130,6 +130,8 @@ def run_fixture(stage: Path, private_key: Path) -> dict:
         "positive_dkim":True,
         "positive_dmarc":True,
         "negative_no_authenticated_pass":True,
+        "negative_quarantine_verified":False,
+        "production_authentication_enforcement_verified":False,
         "negative_mta_result":negative_outcome,
         "real_sender_proven":False,
         "independent_ingress_receipt_signed":False,
