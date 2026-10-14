@@ -14,6 +14,8 @@ def research_with_empire_search(
     inspect_fn: Callable[[str], Mapping[str, Any]] | None = None,
     follow_up_fn: Callable[[str, list[dict[str, Any]], list[str]], Sequence[str]] | None = None,
     synthesize_fn: Callable[[str, list[dict[str, Any]]], Mapping[str, Any]] | None = None,
+    operator_primary_urls: Sequence[str] = (),
+    skip_discovery: bool = False,
 ) -> dict[str, Any]:
     """Use existing Empire search and official-source inspector, not new services.
 
@@ -35,6 +37,8 @@ def research_with_empire_search(
         limits=limits,
         follow_up_fn=follow_up_fn,
         synthesize_fn=synthesize_fn,
+        operator_primary_urls=operator_primary_urls,
+        skip_discovery=skip_discovery,
     )
     result["provider_binding"] = "empire.search_fabric.reliable_search"
     result["inspector_binding"] = "empire.system_improvement_research.official_source"

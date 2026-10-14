@@ -140,6 +140,8 @@ def research_with_profile(
     inspect_fn: Callable[[str], Mapping[str, Any]],
     follow_up_fn: Callable[[str, list[dict[str, Any]], list[str]], Sequence[str]] | None = None,
     synthesize_fn: Callable[[str, list[dict[str, Any]]], Mapping[str, Any]] | None = None,
+    operator_primary_urls: Sequence[str] = (),
+    skip_discovery: bool = False,
 ) -> dict[str, Any]:
     """Execute only explicitly supplied public search/inspection callbacks.
 
@@ -156,13 +158,16 @@ def research_with_profile(
         initial_queries=plan["queries"],
         follow_up_fn=follow_up_fn,
         synthesize_fn=synthesize_fn,
+        operator_primary_urls=operator_primary_urls,
+        skip_discovery=skip_discovery,
     )
     received = evidence["source_count"]
     inspected = evidence["original_pages_inspected"]
     drafts = len(evidence["draft_claims"])
     states = {
         "plan": "completed",
-        "discover": "observed" if evidence["budget"]["searches_executed"] else "blocked",
+        "discover": "observed" if evidence["budget"]["searches_executed"]
+        or evidence["source_count"] else "blocked",
         "inspect": "observed" if inspected else "blocked",
         "crosscheck": "pending_evidence_review" if received else "blocked",
         "synthesize": "draft_ready" if drafts else ("pending_model" if inspected else "blocked"),

@@ -98,6 +98,8 @@ def run_research(
     initial_queries: Sequence[str] | None = None,
     follow_up_fn: Callable[[str, list[dict[str, Any]], list[str]], Sequence[str]] | None = None,
     synthesize_fn: Callable[[str, list[dict[str, Any]]], Mapping[str, Any]] | None = None,
+    operator_primary_urls: Sequence[str] = (),
+    skip_discovery: bool = False,
 ) -> dict[str, Any]:
     """Return traceable research observations; never authorize commercial actions.
 
@@ -113,6 +115,22 @@ def run_research(
         raise ValueError("research question is required")
     bounded = limits.bounded()
     proposed = initial_queries if initial_queries is not None else _seed_queries(q)
+    if not isinstance(operator_primary_urls, (tuple, list)):
+        raise ValueError("bounded operator primary URLs required")
+    if len(operator_primary_urls) > min(3, bounded.max_pages):
+        raise ValueError("operator primary source budget exceeded")
+    normalized_primary: list[str] = []
+    for raw in operator_primary_urls:
+        if not isinstance(raw, str):
+            raise ValueError("invalid operator source URL")
+        canonical = _public_url(raw)
+        if canonical != raw or not raw.startswith("https://") or canonical in normalized_primary:
+            raise ValueError("unsafe or duplicate operator source URL")
+        normalized_primary.append(canonical)
+    if skip_discovery and not normalized_primary:
+        raise ValueError("primary sources required when discovery is disabled")
+    if type(skip_discovery) is not bool:
+        raise ValueError("explicit discovery mode required")
     queue: list[tuple[str, int]] = []
     enqueued: set[str] = set()
 
@@ -125,8 +143,9 @@ def run_research(
         enqueued.add(item.lower())
         queue.append((item, round_index))
 
-    for item in list(proposed)[:bounded.max_queries]:
-        enqueue(item, 0)
+    if not skip_discovery:
+        for item in list(proposed)[:bounded.max_queries]:
+            enqueue(item, 0)
 
     searches: list[dict[str, Any]] = []
     sources: list[dict[str, Any]] = []
@@ -208,6 +227,46 @@ def run_research(
             except Exception as exc:
                 record["followup_error_type"] = type(exc).__name__
 
+    # Explicit operator-owned primary pages survive public search outages.
+    # No fabricated discovery event, and no automatic URL guessing.
+    # Share the same inspector, global page cap, source provenance and
+    # rejection semantics as search-discovered source observations.
+    for canonical in normalized_primary:
+        if page_count >= bounded.max_pages or canonical in visited:
+            continue
+        visited.add(canonical)
+        page_count += 1
+        entry: dict[str, Any] = {
+            "source_id": f"S{len(sources) + 1}",
+            "url": canonical,
+            "title": "", "snippet": "", "discovery_query": "",
+            "source_lane": "official_primary",
+            "discovery_engine": "operator_supplied_primary",
+            "observation_type": "operator_supplied_primary_source",
+            "claim_accuracy_verified": False,
+            "original_page_inspected": False,
+            "inspection_status": "UNINSPECTED",
+        }
+        try:
+            inspected = inspect_fn(canonical)
+            if isinstance(inspected, Mapping):
+                status = _text(inspected.get("status"), 90)
+                entry["inspection_status"] = status or "UNINSPECTED"
+                if status == "ORIGINAL_HTML_HEADINGS_INSPECTED":
+                    entry["original_page_inspected"] = True
+                    entry["content_sha256"] = _text(inspected.get("content_sha256"), 64)
+                    entry["document_headings"] = [
+                        _text(h, 180)
+                        for h in (inspected.get("document_headings") or [])[:4]
+                    ]
+                    entry["visible_excerpt"] = _text(inspected.get("visible_excerpt"), 1200)
+            else:
+                entry["inspection_status"] = "INVALID_INSPECTOR_RESULT"
+        except Exception as exc:
+            entry["inspection_status"] = "INSPECTOR_ERROR"
+            entry["error_type"] = type(exc).__name__
+        sources.append(entry)
+
     eligible = {s["source_id"] for s in sources if s["original_page_inspected"]}
     claims: list[dict[str, Any]] = []
     rejected_claims = 0
@@ -257,6 +316,8 @@ def run_research(
             "max_queries": bounded.max_queries,
             "max_pages": bounded.max_pages,
             "max_rounds": bounded.max_rounds,
+            "discovery_disabled": skip_discovery,
+            "operator_primary_count": len(normalized_primary),
         },
         "execution_authority": "none",
         "database_write": False,
