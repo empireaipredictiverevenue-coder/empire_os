@@ -15,10 +15,17 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - name: Read fixture code only
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
+      - name: Fetch only allowlisted staging files from exact commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REPOSITORY" = "empireaipredictiverevenue-coder/empire_os"
+          git init -q
+          git remote add origin https://github.com/empireaipredictiverevenue-coder/empire_os.git
+          git -c protocol.version=2 fetch -q --no-tags --depth=1 origin "$GITHUB_SHA"
+          git checkout FETCH_HEAD --             empire_os/owned_postfix_staging_profile.py             scripts/probe_postfix_staging_smtp_rcpt.py             scripts/ci_postfix_rcpt_acceptance.sh
+          test -f scripts/ci_postfix_rcpt_acceptance.sh
+          echo "ONLY_BOUNDED_TEST_FILES_FETCHED=TRUE"
       - name: Run actual Postfix locally on disposable runner
         shell: bash
         run: bash scripts/ci_postfix_rcpt_acceptance.sh
