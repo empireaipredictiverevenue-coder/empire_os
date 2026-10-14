@@ -187,10 +187,14 @@ def _json_probe(url: str) -> dict:
         raise ReleaseHeld("FOUNDER_READ_ENDPOINT_UNAVAILABLE") from None
 
 
-def activate() -> dict:
+def activate(*, verified_dsn: str | None = None) -> dict:
+    if verified_dsn is not None and os.geteuid() != 0:
+        raise ReleaseHeld("ROOT_ACCESS_REQUIRED")
     if PRIVATE_DSN_FILE.exists() or SYSTEMD_DROPIN.exists():
         raise ReleaseHeld("EXISTING_REPLY_RELEASE_FILES_REQUIRE_REVIEW")
-    secret = _protected_dsn()
+    secret = verified_dsn if verified_dsn is not None else _protected_dsn()
+    if not isinstance(secret, str) or not secret.strip():
+        raise ReleaseHeld("DEDICATED_CLOSER_OBSERVER_LOGIN_UNAVAILABLE")
     _preflight_role(secret)
     installed_private = installed_dropin = False
     try:
