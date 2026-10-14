@@ -103,6 +103,15 @@ PRICE_PATTERN = re.compile(
     flags=re.IGNORECASE,
 )
 
+# A product pitch is still a pitch without a dollar amount. Keep the
+# rapport-first copy guard independent of whether a price is quoted.
+PRODUCT_PITCH_PATTERN = re.compile(
+    r"(?:\bwe offer\b|\bwe sell\b|\bour (?:service|product|audit)\b|"
+    r"\b(?:technical search audit|search opportunity map|competitor search gap)\b|"
+    r"\bcheckout\b|(?:https?://)?(?:www\.)?empire-ai\.co\.uk/buy\b)",
+    flags=re.IGNORECASE,
+)
+
 COMMERCIAL_REPLY_CLASSES = {
     "positive", "question", "objection",
     "interest", "interested", "commercial",
@@ -468,6 +477,66 @@ def plan_outbound_account(
             touch_number=touch_number, used_evidence_refs=used_refs,
             astra_recommendation=astra_recommendation,
         )
+    # Optional stricter founder policy for a genuine first-sale relationship.
+    # A send, a label alone, or an unbound mail event NEVER advances rapport.
+    # Existing lanes keep their established policy unless explicitly opted in.
+    if account.get("verified_reply_required_for_followup") is True:
+        authenticated = tuple(
+            row for row in r
+            if row.get("provider_authenticated") is True
+            and row.get("same_thread_verified") is True
+            and row.get("counterpart_identity_verified") is True
+            and bool(_text(row.get("reply_id")))
+        )
+        if r and not authenticated:
+            return _result(
+                account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
+                action="WAIT",
+                reason="unverified_reply_must_not_advance_first_sale",
+                touch_number=touch_number, used_evidence_refs=used_refs,
+                missing_evidence=("authenticated_same_thread_person_bound_reply",),
+                astra_recommendation=astra_recommendation,
+            )
+        if authenticated:
+            verified_signal = _reply_signal(authenticated)
+            if verified_signal == "commercial":
+                buyer_requested = any(
+                    row.get("explicit_product_request_verified") is True
+                    and bool(_text(account.get("product_code")))
+                    and _text(row.get("requested_product_code"))
+                       == _text(account.get("product_code"))
+                    for row in authenticated
+                    if _text(row.get("classification")).lower()
+                       in COMMERCIAL_REPLY_CLASSES
+                )
+                return _result(
+                    account=account,
+                    stage="COMMERCIAL_READY" if buyer_requested else "CONVERSATION",
+                    action="HANDOFF_TO_CLOSER",
+                    reason=(
+                        "verified_explicit_product_request_for_human_review"
+                        if buyer_requested
+                        else "verified_two_way_engagement_needs_human_discovery"
+                    ),
+                    touch_number=touch_number, used_evidence_refs=used_refs,
+                    astra_recommendation=astra_recommendation,
+                )
+            return _result(
+                account=account, stage="ENGAGED", action="WAIT",
+                reason="verified_reply_requires_manual_response_not_sequence",
+                touch_number=touch_number, used_evidence_refs=used_refs,
+                astra_recommendation=astra_recommendation,
+            )
+        if sent or account.get("commercial_ready") is True:
+            return _result(
+                account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
+                action="WAIT",
+                reason="no_verified_two_way_rapport_no_followup_or_offer",
+                touch_number=touch_number, used_evidence_refs=used_refs,
+                missing_evidence=("authenticated_two_way_engagement",),
+                astra_recommendation=astra_recommendation,
+            )
+
     if signal == "ooo":
         stage = derive_relationship_state(account, history=h, replies=(), suppressions=s)
         return _result(
@@ -706,6 +775,8 @@ def review_outbound_draft(
     price_allowed = bool(plan.get("price_allowed"))
     if not price_allowed and PRICE_PATTERN.search(clean_body):
         blockers.append("PREMATURE_PRICE")
+    if not price_allowed and PRODUCT_PITCH_PATTERN.search(clean_body):
+        blockers.append("PREMATURE_OFFER")
 
     if not clean_body or len(clean_body.split()) < 8:
         blockers.append("EMPTY_PERSONALIZATION")

@@ -2,6 +2,8 @@
 
 **State:** FOUNDER/OUTREACH-OWNER REVIEW ONLY — UNSENT. Not a CRM lead import, automated campaign, authorised recipient or forecast. Never use this research packet to bypass the other agent's one-to-one outbound control.
 
+> **14 October rapport-first correction:** The previous offer-led first-touch drafts have been superseded. These introductions are for rapport, not conversion. Source-of-truth code: `empire_os/outbound_department.py`; existing-policy adapter: `scripts/review_search_first_sale_rapport.py`. A sent message, a marketing-email open, an unverified positive label or silence NEVER establish rapport or permit a product pitch. Once the buyer genuinely engages, respond to their actual topic. Only a verified, explicit product request may advance to human commercial review; there is still no autonomous send authority.
+
 ## Production products
 
 - Technical Search Audit (`technical_search_audit`): USD 299 one-time, public `https://empire-ai.co.uk/buy`.
@@ -22,26 +24,20 @@
 
 **Trigger:** New website launched 4 October. Reason for written audit: confirm post-launch crawl/indexation, metadata/canonicals, roofing/solar service pages, quote-path instrumentation. No finding, broken tracking, migration loss or customer budget has been proved.
 
-**Draft — UNSENT**
+**Current governed stage: RAPPORT-FIRST / DRAFT REVIEW ONLY — source-backed greeting, NO commercial offer.**
 
-To: brian@gogreencoast.com — person-bound public listing; exact recipient gate PENDING
-Subject: One post-launch search check for Green Coast
+To: brian@gogreencoast.com — public name/address research; canonical identity, suppression, consent, and sender gates NOT cleared.
+Subject: Green Coast's website launch
 
 Hi Brian,
 
-I saw Green Coast launched its redesigned website earlier this month.
+I saw Green Coast Roofing & Solar announced its redesigned website this month. Bringing roofing and solar into one clear experience for customers looks like a substantial project. Thought it was worth recognising the work behind the launch.
 
-After a launch like that, I'd want to check whether roofing, metal-roofing and solar pages are discoverable as intended, and whether enquiries can be traced back to the right pages. That's a check worth doing, not an assumption there's a problem.
-
-We offer a fixed-price $299 Technical Search Audit with the findings and priorities in writing.
-
-Would it be useful if I sent over the one-page scope, focused on Naples and Fort Myers?
-
-Email is fine — no call needed.
-
+Best,
 Phil
 Founder, Empire AI
-https://empire-ai.co.uk/buy
+
+**Policy proof:** existing `plan_outbound_account` returns `DRAFT_RAPPORT_TOUCH`; `review_outbound_draft` passes this text; `send_authorized=false`. There is no audit, price, booking invitation, checkout link or follow-up sequence in this introduction.
 
 ## 2. RoofElite — content quality hypothesis, NOT a proven current defect
 
@@ -57,24 +53,20 @@ https://empire-ai.co.uk/buy
 
 **Trigger:** Website has expanded commercial-roofing content and an April operation expansion. Earlier crawler versions of the blog showed unrelated posts; new front page appears updated. First verify old URLs independently before claiming any defect. Buyer pain and rankings unknown.
 
-**Draft — UNSENT / no person-bound inbox yet**
+**Current governed stage: RESEARCH / NO RECIPIENT / RAPPORT COPY ONLY.**
 
-To: UNSPECIFIED. `info@roof-elite.com` is general inbox and requires explicit approved routing exception.
-Subject: A quick check on RoofElite's older blog pages
+To: UNVERIFIED — do not infer Trey's personal email from the general `info@` inbox.
+Subject: RoofElite's Tampa expansion
 
 Hi Trey,
 
-I came across RoofElite while looking at Tampa roofing businesses.
+I saw RoofElite's update about expanding Tampa operations and bringing more work in-house. Supporting a growing team across commercial and residential roofing is quite a shift. Thought the expansion was worth acknowledging.
 
-Your recent blog posts are focused on commercial roofing, but an older snapshot surfaced a few unrelated June article titles. You may have cleared those already; I wouldn't assume it's still a problem.
-
-What I'd check is whether any old URLs remain live or discoverable, alongside the main service pages. We offer a fixed-price $299 Technical Search Audit for exactly that kind of review.
-
-Would a short written scope be useful?
-
+Best,
 Phil
 Founder, Empire AI
-https://empire-ai.co.uk/buy
+
+**Policy proof:** `RESEARCH` because current person-bound recipient evidence is missing and the April expansion is not fresh enough by itself. No offer, diagnosis or follow-up authorised.
 
 ## 3. Aastro Roofing — verified category expansion
 
@@ -88,24 +80,31 @@ https://empire-ai.co.uk/buy
 
 **Trigger:** Added building/remodeling/painting/doors-windows/concrete restoration to roofing. Hypothesis: separate location/service intent map across Broward and Palm Beach; no visibility deficiency established.
 
-**Draft — UNSENT / no person-bound inbox yet**
+**Current governed stage: RESEARCH / NO RECIPIENT / RAPPORT COPY ONLY.**
 
-To: UNSPECIFIED. Person-bound Jason Blair email not verified.
-Subject: Aastro's new services — search by job type and area
+To: UNVERIFIED — Jason's verified, current personal business email is not established.
+Subject: Aastro's wider service mix
 
 Hi Jason,
 
-I saw Aastro's announcement about expanding into remodeling, doors and windows, and concrete work.
+I saw Aastro Roofing's announcement about adding general contracting alongside roofing. New types of projects bring different decisions for homeowners and property teams. It was interesting to see you broadening the work you take on.
 
-Those jobs bring a different set of local searches from roof repairs. I'm curious how you're deciding which new service and city pages to prioritise across Broward and Palm Beach.
-
-We offer a $249 Search Opportunity Map: an evidence-backed written review of service-area opportunities and a practical priority list, rather than an ongoing SEO retainer.
-
-Would you like me to send the exact scope?
-
+Best,
 Phil
 Founder, Empire AI
-https://empire-ai.co.uk/buy
+
+**Policy proof:** `RESEARCH` until a correct person-bound route and canonical history are established. No Search Opportunity Map offer, price or meeting ask at first touch.
+
+## Coded rapport-first control — outreach agent integration
+
+- **Existing engine:** `empire_os.outbound_department.plan_outbound_account` and `review_outbound_draft`. There is NO new scheduler, database, CRM, or send provider.
+- **Strict per-account switch:** `verified_reply_required_for_followup=True`. An unanswered first touch returns `WAIT`, not a second timed sequence. Unverified positive classifications return `WAIT`, not a commercial stage.
+- **Genuine reply evidence for strict mode:** caller must establish `reply_id`, `provider_authenticated=True`, `same_thread_verified=True`, `counterpart_identity_verified=True` from the canonical original email thread; never fill these booleans from LLM sentiment or public website information.
+- **Rapport escalation:** authenticated commercial reply → `CONVERSATION` human discovery and no price. Only an independently verified explicit request for the exact account `product_code` (`explicit_product_request_verified=True`, matching `requested_product_code`) → `COMMERCIAL_READY` human closer review. Even then, `execution_authority=none`; approval and send are independent.
+- **First-touch copy guard:** `review_outbound_draft` rejects prices, product names, `we offer`, checkout links, calls/meeting CTAs, generic opener, fake familiarity and repeated/unsourced insight before authorised commercial interest.
+- **Reproducible read-only preview:** `/srv/empire_os/.venv/bin/python -m scripts.review_search_first_sale_rapport`. Green Coast produces `DRAFT_RAPPORT_TOUCH` with eligible *copy* but `send_authorized=false`; RoofElite and Aastro produce `RESEARCH` until missing contact/freshness evidence is resolved.
+- **Send-side integration ownership:** the **other outbound/mail agent** must invoke these existing planning and copy gates immediately before sending each exact prospect intent, then independently re-check canonical suppression, prior contact, mailbox identity, sender authorisation and founder approval. This code **has not been wired into or activated as a global send-adapter interceptor**, and an offline copy pass must never be labelled mail-send clearance.
+- **No autopilot follow-ups:** if there is no authenticated incoming response, hold. If the buyer says no, later, unsubscribes, is OOO, or is not the right person, pause/suppress/research as appropriate; no looping.
 
 ## Dedupe, gates, operational owner
 
