@@ -6,6 +6,11 @@ export type FounderJevStatus = {
   native_model_primitives: string[];
   native_compatibility_tested: boolean;
   commercial_model_calibrated: boolean;
+  shared_vane_openmanus_research_core_integrated?: boolean;
+  jev_evidence_gap_plan_available?: boolean;
+  jev_public_research_execution_activated?: boolean;
+  jev_research_source_validation_completed_live?: boolean;
+  jev_research_spend_gbp?: number;
   economic_reader_configured: boolean;
   crm_reader_configured?: boolean;
   crm_prospect_review_available?: boolean;

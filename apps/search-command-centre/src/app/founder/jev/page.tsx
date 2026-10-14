@@ -46,6 +46,9 @@ export default async function FounderJevPage() {
   const replyMigration = state?.reply_candidate_migration_051_applied ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
+  const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
+  const researchActive = state?.jev_public_research_execution_activated ?? null;
+  const researchValidated = state?.jev_research_source_validation_completed_live ?? null;
   const productionLive = state?.production_activated ?? null;
   const buyerRows = state?.buyers_identified ?? null;
   const canonicalRows = state?.real_canonical_rows_verified ?? null;
@@ -149,6 +152,12 @@ export default async function FounderJevPage() {
               detail="Prepared-only EmpireDB 051 adds tenant-restricted reply metadata without message bodies or contact details. Provider authenticity, contact identity and positive buying intent remain unverified." />
             <TruthLine title="Founder access enforcement" value={founderAccess}
               detail="No detailed entity research route is registered unless an independent server-side authorizer is supplied." />
+            <TruthLine title="Shared Vane/OpenManus research core" value={researchCore}
+              detail="Bounded plans, source-cited discovery and review receipts are implemented. Original OpenManus unrestricted tools are not installed." />
+            <TruthLine title="JEV public research operational activation" value={researchActive}
+              detail="Offline engineering is separate from production. Requires approved public-only search/inspection policies and independently tested live evidence quality." />
+            <TruthLine title="Original-source live research quality" value={researchValidated}
+              detail="Source inspection and search result citations do not independently prove factual accuracy, buyer intent or permission to contact." />
             <TruthLine title="Commercial model calibration" value={calibrated}
               detail="Requires real independently labelled cases, reliability analysis and comparison with the deterministic baseline." />
             <TruthLine title="Verified buyer conversations"
