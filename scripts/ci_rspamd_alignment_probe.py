@@ -111,16 +111,14 @@ def run_fixture(stage: Path, private_key: Path) -> dict:
     seen=_maildir_new(stage)
     bad=_message(f"forgery@{BAD}","bad-unsigned")
     status=_send(bad,f"forgery@{BAD}")
-    if status==250:
-        bad_body=_wait_new(stage,seen)
-        bad_auth=_auth_headers(bad_body)
-        if "spf=pass" in bad_auth or "dkim=pass" in bad_auth or "dmarc=pass" in bad_auth:
-            raise ValueError("forged unaligned sender incorrectly authenticated")
-        negative_outcome="UNAUTHENTICATED_ACCEPTED_WITHOUT_QUARANTINE"
-    elif 400 <= status < 600:
-        negative_outcome="UNAUTHENTICATED_REFUSED_BY_MTA"
-    else:
-        raise ValueError("unsupported forged-sender result")
+    if status == 250:
+        # A valid DMARC p=reject record must not silently be accepted.
+        raise ValueError("forged DMARC p=reject message was accepted")
+    if not 500 <= status < 600:
+        raise ValueError("forged DMARC p=reject message was not rejected")
+    negative_outcome = "UNAUTHENTICATED_REJECTED_AT_SMTP"
+    if _maildir_new(stage) != seen:
+        raise ValueError("rejected sender was nevertheless delivered")
     return {
         "schema_version":"empire.mail.offline_rspamd_alignment.v1",
         "mode":"NETWORK_DISABLED_FIXTURE",
@@ -131,6 +129,7 @@ def run_fixture(stage: Path, private_key: Path) -> dict:
         "positive_dmarc":True,
         "negative_no_authenticated_pass":True,
         "negative_quarantine_verified":False,
+        "negative_smtp_rejected":True,
         "production_authentication_enforcement_verified":False,
         "negative_mta_result":negative_outcome,
         "real_sender_proven":False,

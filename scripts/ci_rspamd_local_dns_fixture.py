@@ -35,7 +35,7 @@ class FixtureResolver(BaseResolver):
             (GOOD, "TXT"): "v=spf1 ip4:127.0.0.1 -all",
             (BAD, "TXT"): "v=spf1 -all",
             ("_dmarc." + GOOD, "TXT"): "v=DMARC1; p=reject; adkim=s; aspf=s",
-            ("_dmarc." + BAD, "TXT"): "v=DMARC1; p=none; adkim=s; aspf=s",
+            ("_dmarc." + BAD, "TXT"): "v=DMARC1; p=reject; adkim=s; aspf=s",
             (SELECTOR, "TXT"): f"v=DKIM1; k=rsa; p={self.public_key}",
         }
         txt = records.get((name, rtype))

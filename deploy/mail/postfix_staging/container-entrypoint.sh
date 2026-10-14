@@ -249,6 +249,14 @@ for module in spf dkim dmarc; do
     printf 'check_local = true;\ncheck_authed = true;\n' \
       > "/etc/rspamd/local.d/$module.conf"
 done
+# Stage-only Rspamd action mapping honors the sender's DMARC p=reject.
+cat >> /etc/rspamd/local.d/dmarc.conf <<'EOF'
+actions {
+  reject = "reject";
+  quarantine = "add header";
+  softfail = "no action";
+}
+EOF
 cat > /etc/rspamd/local.d/milter_headers.conf <<'EOF'
 use = ["authentication-results"];
 skip_local = false;
