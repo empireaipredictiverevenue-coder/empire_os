@@ -632,10 +632,23 @@ def build_economic_memory_snapshot(
 ) -> dict[str, Any]:
     evaluation = dict(executive_evaluation or {})
     cortex = dict(cortex_learning or {})
-    from empire_os.outcome_feedback import validate_verified_feedback
-    from empire_os.predictive_calibration import review_commercial_prediction
     feedback_rows = list(verified_feedback)
     reviews = list(calibration_reviews)
+    # V18: deny known partner-originated evidence at the REAL Economic
+    # Memory candidate boundary before generating any outcome/episode
+    # material. This does not replace separately scoped, independently
+    # authenticated source permissions for other unknown origins.
+    from empire_os.company_partner_sink_enforcement_v18 import (
+        assert_partner_rights_at_sink,
+    )
+    assert_partner_rights_at_sink(
+        {"department_work": department_work, "cortex_learning": cortex,
+         "verified_feedback": feedback_rows,
+         "calibration_reviews": reviews},
+        purpose="ECONOMIC_MEMORY_PARTNER_DATA",
+    )
+    from empire_os.outcome_feedback import validate_verified_feedback
+    from empire_os.predictive_calibration import review_commercial_prediction
     for feedback in feedback_rows:
         validate_verified_feedback(feedback, tenant_id=tenant_id, as_of=as_of)
     validated_packets = [row["cortex_packet"] for row in feedback_rows]

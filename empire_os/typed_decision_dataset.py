@@ -129,6 +129,16 @@ def freeze_dataset(
         (case.canonical_dict() for case in cases),
         key=lambda item: item["case_id"],
     )
+    # V18: enforce purpose-specific partner rights at this REAL dataset
+    # materialisation boundary, not only in an observer or a dashboard.
+    # An authenticated source licence must be verified upstream; a URL,
+    # self-declared rights boolean or public terms never grants ML use.
+    from empire_os.company_partner_sink_enforcement_v18 import (
+        assert_partner_rights_at_sink,
+    )
+    assert_partner_rights_at_sink(
+        canonical_cases,purpose="MODEL_TRAINING_OR_BENCHMARK",
+    )
     payload = json.dumps(
         canonical_cases,
         sort_keys=True,
