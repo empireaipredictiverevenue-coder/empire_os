@@ -10,7 +10,12 @@ fi
 
 ROOT="$(mktemp -d -p /tmp empire-postfix-stage-XXXXXXXX)"
 STOP_POSTFIX=0
+RSPAMD_PID=
 cleanup() {
+    if [ -n "$RSPAMD_PID" ]; then
+        kill -TERM "$RSPAMD_PID" >/dev/null 2>&1 || true
+        wait "$RSPAMD_PID" 2>/dev/null || true
+    fi
     if [ "$STOP_POSTFIX" -eq 1 ]; then
         /usr/sbin/postfix stop >/dev/null 2>&1 || true
     fi
@@ -194,4 +199,33 @@ STOP_POSTFIX=1
 python3 -m scripts.probe_postfix_milter_outage \
     --approved-offline-milter-outage
 echo "REAL_POSTFIX_MILTER_DOWN_FAIL_CLOSED=TRUE"
+
+# Only after the 451 outage proof, start the package-installed
+# first-party Rspamd proxy worker. No DNS or network exists outside
+# 127.0.0.1 due to the caller's --network none container flag.
+getent passwd _rspamd >/dev/null
+getent group _rspamd >/dev/null
+/usr/bin/rspamadm configtest >/dev/null
+/usr/bin/rspamd -f -u _rspamd -g _rspamd \
+    >"$ROOT/rspamd-test.log" 2>&1 &
+RSPAMD_PID=$!
+python3 - <<'PY'
+import socket,time
+for _ in range(65):
+    sock=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+    sock.settimeout(.4)
+    try:
+        if sock.connect_ex(("127.0.0.1",11332))==0:
+            print("REAL_RSPAMD_PROXY_LISTENER_PRESENT=TRUE")
+            break
+    finally:
+        sock.close()
+    time.sleep(.2)
+else:
+    raise SystemExit("HOLD_RSPAMD_LOCAL_MILTER_LISTENER_UNAVAILABLE")
+PY
+python3 -m scripts.probe_postfix_milter_online \
+    --approved-offline-local-milter
+echo "REAL_POSTFIX_TO_RSPAMD_SYNTHETIC_DATA=ACCEPTED"
+echo "SENDER_DKIM_SPF_DMARC_AUTHENTICATION_PROVEN=FALSE"
 echo "POSTFIX_MX_CHANGED=FALSE"
