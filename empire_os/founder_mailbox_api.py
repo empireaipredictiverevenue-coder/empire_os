@@ -14,6 +14,7 @@ from empire_os.closer_reply_draft import build_closer_reply
 from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
 from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
+from empire_os.empiredb_founder_reply_mailbox import EmpireDBFounderReplyMailbox
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -204,6 +205,10 @@ def create_founder_mailbox_router(
             source: MailboxProvider = OwnedIMAPMailboxProvider()
         elif mode == 'google_workspace':
             source = GoogleWorkspaceMailboxProvider()
+        elif mode == 'empiredb_canonical_replies':
+            # Explicit private source for previously ingested EmpireDB replies.
+            # It does not represent a general professional email inbox.
+            source = EmpireDBFounderReplyMailbox()
         else:
             raise RuntimeError('FOUNDER_MAILBOX_PROVIDER_NOT_AUTHORIZED')
     else:
@@ -238,7 +243,7 @@ def create_founder_mailbox_router(
 
     @router.get('/readiness')
     def readiness():
-        if isinstance(source, (OwnedIMAPMailboxProvider, GoogleWorkspaceMailboxProvider)):
+        if isinstance(source, (OwnedIMAPMailboxProvider, GoogleWorkspaceMailboxProvider, EmpireDBFounderReplyMailbox)):
             details = source.readiness()
             return {
                 'status': 'READY_FOR_READ_PROBE' if details['configured'] else 'NOT_CONFIGURED',
@@ -369,7 +374,7 @@ def create_founder_mailbox_router(
                     "body_text": str(detail.get("text") or event.get("body_text") or "").strip() or None,
                     "message_id": (
                         str(detail.get("message_id") or event.get("message_id") or "").strip() or None
-                    ) if mailbox.get('provider') != 'owned_imap' else None,
+                    ) if mailbox.get('provider') not in ('owned_imap', 'google_workspace', 'empiredb_canonical_replies') else None,
                 }})
             except Exception:
                 hydrated.append(event)

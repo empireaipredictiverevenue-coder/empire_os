@@ -132,6 +132,8 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
     relay_ready = relay.get("ok") is True and relay.get("provider") == "gmail_api"
     imap_ready = imap.get("provider") == "owned_imap" and imap.get("configured") is True
     workspace_read_ready = imap.get("provider") == "google_workspace" and imap.get("configured") is True
+    canonical_reply_view_ready = (imap.get("provider") == "empiredb_canonical_replies"
+                                  and imap.get("configured") is True)
     inbound_resend = inbound.get("provider") == "resend"
     history = history if isinstance(history, dict) else {}
     historic_sender = (history.get("founder_sender_reached_controlled_inbox") is True
@@ -165,6 +167,8 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         blockers.append("FOUNDER_CONTROLLED_SEND_REPLY_TEST_EVIDENCE_NOT_PRESENT")
     else:
         observations.append("PRIOR_DAY_FOUNDER_SEND_AND_REPLY_FORWARDS_VERIFIED")
+    if canonical_reply_view_ready:
+        observations.append("CANONICAL_REPLIES_VISIBLE_BUT_NOT_COMPLETE_EMAIL_INBOX")
     if not imap_ready and not workspace_read_ready:
         observations.append("FOUNDER_DASHBOARD_CANNOT_DIRECTLY_READ_PRO_MAILBOX")
     return {
@@ -179,6 +183,7 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         "gmail_account_identity_verified": token.get("founder_google_account_identity_verified") is True,
         "founder_imap_configured": imap_ready,
         "founder_workspace_reader_configured": workspace_read_ready,
+        "canonical_reply_view_configured": canonical_reply_view_ready,
         "root_domain_mx_google": google_root,
         "reply_subdomain_mx_amazon_ses": ses_subdomain,
         "reply_subdomain_spf_present": spf_sub,

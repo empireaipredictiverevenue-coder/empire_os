@@ -13,6 +13,8 @@ from urllib import error, request
 from urllib.parse import urlsplit
 
 from empire_os.outbound_provider import OutboundProviderError, send_with_resend
+from empire_os.gmail_api_transport import send_with_gmail_api
+from email.utils import parseaddr
 from empire_os.commercial_outbound_holds import (require_no_commercial_hold, CommercialOutboundHoldError)
 
 
@@ -35,6 +37,34 @@ class ResendEmailTransport:
             api_key=self.api_key,
             resend_module=self.resend_module,
         )
+
+
+@dataclass(frozen=True)
+class GovernedGmailEmailTransport:
+    """Reuses the existing Gmail API only for canonical DB-authorised claims.
+
+    Ordinary payload sending intentionally raises: callers must enter
+    through the Governor's claim_outbound_send transaction.
+    """
+    token_file: str
+    provider: str = "gmail"
+
+    def send(self, payload: dict[str, Any]) -> str:
+        raise OutboundProviderError("GMAIL_REQUIRES_GOVERNED_DATABASE_CLAIM")
+
+    def send_claim(self, claim: dict[str, Any], *, sender: str, reply_to: str) -> str:
+        if (parseaddr(str(sender or ""))[1].casefold() != "phil@mail.empire-ai.co.uk"
+                or str(reply_to or "").casefold() != "reply@mail.empire-ai.co.uk"
+                or self.token_file != "/srv/empire_os/runtime/secrets/google-workspace-internal-token.json"):
+            raise OutboundProviderError("GMAIL_FOUNDER_SENDER_CONTRACT_UNVERIFIED")
+        # Underlying Gmail API transport rechecks the DB claim, commercial
+        # hold, postal footer, governed reply alias, and provider response.
+        result = send_with_gmail_api(
+            claim, sender=sender, reply_to=reply_to, token_file=self.token_file
+        )
+        if result.get("provider") != "gmail" or not result.get("provider_message_id"):
+            raise OutboundProviderError("GMAIL_DELIVERY_RESULT_UNVERIFIED")
+        return str(result["provider_message_id"])
 
 
 @dataclass(frozen=True)

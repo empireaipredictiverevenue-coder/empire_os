@@ -6,6 +6,7 @@ from typing import Any, Callable
 from empire_os.outbound_email_transport import (
     OutboundEmailTransport,
     ResendEmailTransport,
+    GovernedGmailEmailTransport,
 )
 from empire_os.outbound_provider import OutboundProviderError, build_resend_send
 
@@ -80,7 +81,11 @@ def execute_governor_decision(
         })
         payload = build_resend_send(claim, sender=sender, reply_to=reply_to)
         try:
-            provider_message_id = transport.send(payload)
+            provider_message_id = (
+                transport.send_claim(claim, sender=sender, reply_to=reply_to)
+                if isinstance(transport, GovernedGmailEmailTransport)
+                else transport.send(payload)
+            )
         except OutboundProviderError as exc:
             try:
                 sender_rpc("record_outbound_delivery", {

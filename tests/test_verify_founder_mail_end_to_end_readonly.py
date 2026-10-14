@@ -121,3 +121,15 @@ def test_relay_fallback_uses_durable_production_oauth_token(monkeypatch):
     from empire_os.empire_mail_relay_app import _token_file
     monkeypatch.delenv('EMPIRE_GMAIL_TOKEN_FILE', raising=False)
     assert _token_file().endswith('/google-workspace-internal-token.json')
+
+
+def test_canonical_reply_view_not_misreported_as_complete_inbox():
+    args = fixture()
+    args['imap'] = {'provider': 'empiredb_canonical_replies', 'configured': True}
+    result = assess(**args)
+    assert result['canonical_reply_view_configured'] is True
+    assert result['founder_workspace_reader_configured'] is False
+    assert result['direct_professional_inbox_verified'] is False
+    assert 'CANONICAL_REPLIES_VISIBLE_BUT_NOT_COMPLETE_EMAIL_INBOX' in result['architecture_observations']
+    assert 'FOUNDER_READ_INBOX_NOT_CONFIGURED' in result['readiness_blockers']
+    assert result['ready_for_prospect_outbound'] is False
