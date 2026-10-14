@@ -48,6 +48,8 @@ export default async function FounderJevPage() {
   const mailboxCrmVerified = state?.mailbox_crm_alignment_verified ?? null;
   const ingressSignatureValidator = state?.signed_first_party_ingress_verifier_implemented ?? null;
   const liveIngressAudit = state?.signed_first_party_ingress_producer_independently_audited ?? null;
+  const mailTopologyProbe = state?.mail_ingress_source_truth_probe_implemented ?? null;
+  const verifiedIngressProduction = state?.first_party_reply_ingress_production_verified ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
   const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
@@ -163,6 +165,10 @@ export default async function FounderJevPage() {
               detail="First-party Ed25519 signature verification is implemented. The signer is external to JEV and not deployed or provisioned by this release." />
             <TruthLine title="Independently audited live SMTP ingress source" value={liveIngressAudit}
               detail="A valid signature proves key possession and assertion integrity—not that actual transport logs, original sender identity or buyer permission were independently audited." />
+            <TruthLine title="Mail route production-truth probe" value={mailTopologyProbe}
+              detail="Manual one-shot read-only diagnostic compares the existing relay, public MX records, inbound webhook and Founder mailbox readiness. No live network probes run in this page." />
+            <TruthLine title="Verified first-party reply ingress" value={verifiedIngressProduction}
+              detail="Requires reconciliation of actual mail MX routing, independently audited original-message receipt, the canonical tenant/contact join and suppression proof. No bypass by source labels or model classification." />
             <TruthLine title="Founder access enforcement" value={founderAccess}
               detail="No detailed entity research route is registered unless an independent server-side authorizer is supplied." />
             <TruthLine title="Shared Vane/OpenManus research core" value={researchCore}
