@@ -6,7 +6,7 @@ founder-authorization check. No newly public endpoint or new auth system.
 """
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
@@ -18,6 +18,9 @@ from empire_os.jev_gtm_crm_review import read_jev_crm_review
 from empire_os.jev_gtm_reply_candidate_reader import review_jev_reply_candidates
 from empire_os.jev_gtm_mailbox_header_review import (
     review_owned_mailbox_headers, compare_owned_mailbox_to_crm_candidates,
+)
+from empire_os.jev_gtm_signed_transport_review import (
+    inspect_signed_ingress_receipts,
 )
 from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
 from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
@@ -67,6 +70,63 @@ def _safe_reply_review_contract(packet: Any) -> bool:
     )
 
 
+SIGNED_TRANSPORT_RESULT_FIELDS = frozenset({
+    "schema_version", "mode", "signed_receipts_examined",
+    "signed_assertions_matched_to_imap_headers", "unmatched_signed_assertions",
+    "rows", "cryptographic_signature_checked",
+    "trusted_ingress_producer_live_deployment_audited",
+    "original_smtp_provider_authentication_independently_proven",
+    "canonical_tenant_contact_binding_verified", "buyer_reply_count_verified",
+    "recognized_revenue", "suppression_clearance_verified",
+    "outbound_authorized", "mailbox_mutations", "database_mutations",
+    "execution_authority",
+})
+SIGNED_TRANSPORT_ROW_FIELDS = frozenset({
+    "record_ref", "ingress_event_ref", "signed_transport_assertion_valid",
+    "mailbox_rfc_chain_structurally_matched",
+    "independent_ingress_logs_read_by_jev",
+    "producer_assertion_factually_audited",
+    "canonical_tenant_contact_verified", "suppression_clearance_verified",
+    "positive_buyer_intent_verified", "outbound_authorized",
+})
+
+
+def _safe_signed_transport_contract(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != SIGNED_TRANSPORT_RESULT_FIELDS:
+        return False
+    if (value.get("schema_version") != "empire.jev.signed_ingress_review.v1"
+            or value.get("mode") != "OBSERVE"
+            or value.get("execution_authority") != "none"
+            or value.get("cryptographic_signature_checked") is not True
+            or value.get("trusted_ingress_producer_live_deployment_audited") is not False
+            or value.get("original_smtp_provider_authentication_independently_proven") is not False
+            or value.get("canonical_tenant_contact_binding_verified") is not False
+            or value.get("buyer_reply_count_verified") is not None
+            or value.get("recognized_revenue") is not None
+            or value.get("suppression_clearance_verified") is not False
+            or value.get("outbound_authorized") is not False
+            or value.get("mailbox_mutations") is not False
+            or value.get("database_mutations") is not False):
+        return False
+    rows = value.get("rows")
+    if not isinstance(rows, list) or len(rows) > 25 or (
+        value.get("signed_assertions_matched_to_imap_headers") != len(rows)
+    ):
+        return False
+    return all(
+        isinstance(row, dict) and set(row) == SIGNED_TRANSPORT_ROW_FIELDS
+        and row.get("signed_transport_assertion_valid") is True
+        and row.get("mailbox_rfc_chain_structurally_matched") is True
+        and row.get("independent_ingress_logs_read_by_jev") is False
+        and row.get("producer_assertion_factually_audited") is False
+        and row.get("canonical_tenant_contact_verified") is False
+        and row.get("suppression_clearance_verified") is False
+        and row.get("positive_buyer_intent_verified") is False
+        and row.get("outbound_authorized") is False
+        for row in rows
+    )
+
+
 IMAP_RESULT_FIELDS = frozenset({
     "schema_version", "mode", "provider", "received_header_rows",
     "sent_header_rows", "structurally_reviewable_count", "rows",
@@ -76,7 +136,7 @@ IMAP_RESULT_FIELDS = frozenset({
     "database_mutations", "mailbox_mutations", "execution_authority",
 })
 IMAP_ROW_FIELDS = frozenset({
-    "record_ref", "intent_alias_ref", "rfc_parent_ref",
+    "record_ref", "intent_alias_ref", "inbound_rfc_ref", "rfc_parent_ref",
     "sent_rfc_parent_unique", "structural_match_not_authentication",
     "status", "blockers", "original_provider_authenticated",
     "canonical_contact_verified", "tenant_binding_verified",
@@ -208,8 +268,24 @@ def create_founder_jev_router(
     resolve_authenticated_crm: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
     mailbox_provider: OwnedIMAPMailboxProvider | None = None,
     mailbox_hmac_key: bytes | None = None,
+    signed_receipt_source: Callable[[Request, str], Sequence[Mapping[str, Any]]] | None = None,
+    pinned_ingress_public_keys: Mapping[str, Any] | None = None,
 ) -> APIRouter:
+    signed_ingress_requested = (
+        signed_receipt_source is not None or pinned_ingress_public_keys is not None
+    )
     mailbox_configured = mailbox_provider is not None or mailbox_hmac_key is not None
+    if signed_ingress_requested and (
+        not callable(signed_receipt_source)
+        or not isinstance(pinned_ingress_public_keys, Mapping)
+        or not pinned_ingress_public_keys
+        or authorizer is None
+        or resolve_authenticated_crm is None
+        or not isinstance(mailbox_provider, OwnedIMAPMailboxProvider)
+        or not isinstance(mailbox_hmac_key, bytes)
+        or len(mailbox_hmac_key) < 32
+    ):
+        raise ValueError("signed ingress requires authenticated CRM, founder and pinned first-party evidence")
     if mailbox_configured and (
         not isinstance(mailbox_provider, OwnedIMAPMailboxProvider)
         or not isinstance(mailbox_hmac_key, bytes)
@@ -248,6 +324,10 @@ def create_founder_jev_router(
             "owned_imap_header_review_configured": mailbox_configured,
             "owned_imap_header_review_only": True,
             "mailbox_crm_alignment_verified": False,
+            "signed_first_party_ingress_verifier_implemented": True,
+            "signed_first_party_ingress_producer_configured": signed_ingress_requested,
+            "signed_first_party_ingress_producer_independently_audited": False,
+            "independently_verified_buyer_replies": None,
             "independent_founder_authorizer_configured": authorizer is not None,
             "real_canonical_rows_verified": None,
             "buyers_identified": None,
@@ -435,5 +515,61 @@ def create_founder_jev_router(
             if not _safe_jev_alignment_contract(alignment):
                 raise HTTPException(503, detail="mailbox_crm_alignment_contract_invalid")
             return alignment
+
+    if signed_ingress_requested:
+        @router.get("/crm-prospects/{prospect_id}/signed-transport/review")
+        def signed_ingress_review(
+            request: Request, prospect_id: str,
+            limit: int = Query(default=25, ge=1, le=25),
+        ):
+            try:
+                approved = authorizer(request) is True
+            except Exception:
+                approved = False
+            if not approved:
+                raise HTTPException(403, detail="founder_ingress_proof_forbidden")
+            try:
+                scope = resolve_authenticated_crm(request)
+            except Exception:
+                raise HTTPException(503, detail="authenticated_ingress_scope_unavailable") from None
+            if scope is None:
+                raise HTTPException(401, detail="authenticated_ingress_scope_required")
+            if (not isinstance(scope, AuthenticatedRevenueCrmRead)
+                    or not isinstance(scope.repository, PostgresRevenueCrmRepository)
+                    or scope.tenant_id != scope.repository.tenant_id):
+                raise HTTPException(503, detail="authenticated_ingress_scope_unavailable")
+            try:
+                canonical_id = str(UUID(prospect_id))
+                if canonical_id != prospect_id:
+                    raise ValueError("noncanonical prospect UUID")
+            except (ValueError, AttributeError, TypeError):
+                raise HTTPException(400, detail="canonical_prospect_id_required") from None
+            try:
+                prospect = scope.repository.prospect(canonical_id)
+                if (not isinstance(prospect, Mapping)
+                        or str(prospect.get("tenant_id") or "") != scope.tenant_id
+                        or str(prospect.get("prospect_id") or "") != canonical_id):
+                    raise ValueError("unbound or unavailable canonical prospect")
+                # Source receipt collection is owned by an independently
+                # trusted first-party transport service, not by inbound
+                # request headers, user-provided email or local JSON paths.
+                envelopes = signed_receipt_source(request, canonical_id)
+                header_review = review_owned_mailbox_headers(
+                    mailbox_provider, key=mailbox_hmac_key, limit=limit,
+                )
+                if not _safe_jev_mailbox_contract(header_review):
+                    raise ValueError("unsafe IMAP header review")
+                result = inspect_signed_ingress_receipts(
+                    header_review, envelopes,
+                    expected_tenant_id=scope.tenant_id,
+                    pinned_ingress_keys=pinned_ingress_public_keys,
+                    operator_hmac_key=mailbox_hmac_key,
+                    as_of=datetime.now(timezone.utc),
+                )
+            except Exception:
+                raise HTTPException(503, detail="signed_ingress_review_unavailable") from None
+            if not _safe_signed_transport_contract(result):
+                raise HTTPException(503, detail="signed_ingress_review_contract_invalid")
+            return result
 
     return router

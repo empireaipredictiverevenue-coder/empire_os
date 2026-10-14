@@ -46,6 +46,8 @@ export default async function FounderJevPage() {
   const replyMigration = state?.reply_candidate_migration_051_applied ?? null;
   const mailboxHeaderReader = state?.owned_imap_header_review_configured ?? null;
   const mailboxCrmVerified = state?.mailbox_crm_alignment_verified ?? null;
+  const ingressSignatureValidator = state?.signed_first_party_ingress_verifier_implemented ?? null;
+  const liveIngressAudit = state?.signed_first_party_ingress_producer_independently_audited ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
   const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
@@ -157,6 +159,10 @@ export default async function FounderJevPage() {
               detail="Read-only IMAP header reconciliation uses HMAC references. Explicit founder authority and a separate private HMAC key are required; the review cannot send mail." />
             <TruthLine title="Authenticated CRM-to-mailbox buyer linkage" value={mailboxCrmVerified}
               detail="Matching an RFC parent or reply alias is structural evidence only. Original-provider authentication, tenant/contact binding, buyer intent and suppression still require separate proof." />
+            <TruthLine title="Pinned-key signed ingress verifier" value={ingressSignatureValidator}
+              detail="First-party Ed25519 signature verification is implemented. The signer is external to JEV and not deployed or provisioned by this release." />
+            <TruthLine title="Independently audited live SMTP ingress source" value={liveIngressAudit}
+              detail="A valid signature proves key possession and assertion integrity—not that actual transport logs, original sender identity or buyer permission were independently audited." />
             <TruthLine title="Founder access enforcement" value={founderAccess}
               detail="No detailed entity research route is registered unless an independent server-side authorizer is supplied." />
             <TruthLine title="Shared Vane/OpenManus research core" value={researchCore}

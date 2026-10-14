@@ -22,6 +22,10 @@ export type FounderJevStatus = {
   owned_imap_header_review_configured?: boolean;
   owned_imap_header_review_only?: boolean;
   mailbox_crm_alignment_verified?: boolean;
+  signed_first_party_ingress_verifier_implemented?: boolean;
+  signed_first_party_ingress_producer_configured?: boolean;
+  signed_first_party_ingress_producer_independently_audited?: boolean;
+  independently_verified_buyer_replies?: number | null;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;
