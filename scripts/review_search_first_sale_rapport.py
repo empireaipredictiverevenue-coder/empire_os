@@ -80,6 +80,7 @@ def review_candidate(
     candidate: Mapping[str,Any], *,
     history=(), replies=(), suppressions=(), evidence=None,
     model_decision=None, canonical_suppression_cleared=False,
+    catalog_product=None,
 )->dict[str,Any]:
     """Only current, independent external governance can authorise a send."""
     account={
@@ -114,6 +115,7 @@ def review_candidate(
         replies=replies, suppressions=suppressions,
         intent_decision=model_decision,
         canonical_suppression_cleared=canonical_suppression_cleared,
+        catalog_product=catalog_product,
     )
     copy=None
     if plan["action_type"]=="DRAFT_RAPPORT_TOUCH":
@@ -131,6 +133,7 @@ def review_candidate(
         "rapport_policy":"rapport_first_human_specific_v1",
         "strict_verified_reply_required":True,
         "intent_cta_review":plan.get("intent_cta_review"),
+        "intent_cta_reply_review":plan.get("intent_cta_reply_review"),
         "subject":candidate["subject"],
         "first_touch_body":candidate["body"],
         "copy_review":copy,

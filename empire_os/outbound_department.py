@@ -432,6 +432,7 @@ def plan_outbound_account(
     astra_recommendation: str | None = None,
     intent_decision: Any = None,
     canonical_suppression_cleared: bool = False,
+    catalog_product: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return the next permitted outbound proposal. Never executes it.
 
@@ -542,6 +543,18 @@ def plan_outbound_account(
                         and not _suppressed(s)
                     ),
                 )
+                if plan["intent_cta_review"]["review_eligible"]:
+                    from empire_os.rapport_intent_cta import (
+                        compose_contextual_cta_reply_for_review,
+                    )
+                    plan["intent_cta_reply_review"] = (
+                        compose_contextual_cta_reply_for_review(
+                            account=account, reply=authenticated[-1],
+                            model_result=intent_decision,
+                            suppression_cleared=canonical_suppression_cleared is True,
+                            catalog_row=catalog_product,
+                        )
+                    )
                 return plan
             # A real "other" reply may describe a need that a first-pass
             # sentiment classifier misses. Surface a verified AI CTA proposal
@@ -562,6 +575,18 @@ def plan_outbound_account(
                         and not _suppressed(s)
                     ),
                 )
+                if plan["intent_cta_review"]["review_eligible"]:
+                    from empire_os.rapport_intent_cta import (
+                        compose_contextual_cta_reply_for_review,
+                    )
+                    plan["intent_cta_reply_review"] = (
+                        compose_contextual_cta_reply_for_review(
+                            account=account, reply=authenticated[-1],
+                            model_result=intent_decision,
+                            suppression_cleared=canonical_suppression_cleared is True,
+                            catalog_row=catalog_product,
+                        )
+                    )
             return plan
         if sent or account.get("commercial_ready") is True:
             return _result(

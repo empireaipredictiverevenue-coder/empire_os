@@ -191,6 +191,13 @@ def evaluate_intent_with_existing_provider(
         return _empty("HOLD_SOURCE","canonical_thread_identity_not_verified")
     if suppression_cleared is not True:
         return _empty("HOLD_SUPPRESSION","canonical_suppression_not_cleared")
+    # Do not spend model inference on suppression, defer, bounce or
+    # explicit disinterest. The canonical inbox class still governs.
+    if _s(reply.get("classification")).lower() in (
+        "negative","later","unsubscribe","opt_out","suppressed",
+        "ooo","out_of_office","wrong_person","referral","bounce"
+    ) or NEGATIVE.search(_buyer_text(reply.get("body_text"))):
+        return _empty("SUPPRESS_OR_WAIT","noncommercial_reply_no_inference")
     try:
         request=intent_decision_request(account,reply)
         result=provider.evaluate(request)
@@ -200,6 +207,156 @@ def evaluate_intent_with_existing_provider(
         account=account,reply=reply,model_result=result,
         suppression_cleared=suppression_cleared,
     )
+
+
+
+
+def _catalog_price_for_review(row: object, sku: str) -> int | None:
+    """Check an already fetched canonical product row, never invent price.
+
+    As with payment evidence, a caller asserting provenance does NOT prove it;
+    the trusted commercial reader/outbound owner must prove row origin before
+    approving the actual reply.
+    """
+    if not isinstance(row,Mapping):
+        return None
+    price=row.get("price_basis")
+    if not isinstance(price,Mapping):
+        return None
+    cents=price.get("amount_cents")
+    if not (
+        row.get("product_code")==sku
+        and row.get("active") is True
+        and row.get("catalog_state")=="VERIFIED"
+        and row.get("version_state")=="VERIFIED"
+        and row.get("binding_terms_ready") is True
+        and row.get("billing_model")=="one_time"
+        and price.get("state")=="VERIFIED"
+        and price.get("currency")=="USD"
+        and type(cents) is int
+        and 0<cents<=29900
+    ):
+        return None
+    return cents
+
+
+def _safe_salutation(account: Mapping[str,Any]) -> str:
+    name=_s(account.get("decision_maker")).split()
+    first=name[0] if name else ""
+    return f"Hi {first}," if re.fullmatch(r"[A-Za-z][A-Za-z'-]{0,29}",first) else "Hi,"
+
+
+def compose_contextual_cta_reply_for_review(
+    *, account: Mapping[str,Any], reply: Mapping[str,Any],
+    model_result: TypedDecisionResult | None,
+    suppression_cleared: bool=False,
+    catalog_row: Mapping[str,Any] | None=None,
+) -> dict[str,Any]:
+    """Make a single, nonexecuting reply that ANSWERS before it asks.
+
+    No generic closer pilot templates; use the existing Search Intelligence
+    contract for product scope, and verified catalog price ONLY on an exact
+    named-product request. No unverifiable metrics or preview-as-send authority.
+    All inputs are owned by existing authenticated readers/operators.
+    """
+    preview=review_intent_cta(
+        account=account,reply=reply,model_result=model_result,
+        suppression_cleared=suppression_cleared,
+    )
+    out={
+        "schema_version":"empire.rapport.contextual_cta_reply.v1",
+        "decision":"HOLD_REVIEW",
+        "reason":preview["reason"],
+        "cta_tier":preview["cta_tier"],
+        "inbound_message_ref":preview.get("inbound_message_ref"),
+        "inbound_content_digest":preview.get("inbound_content_digest"),
+        "body_text":None,
+        "reply_in_original_verified_thread_required":True,
+        "catalog_origin_verified_by_this_module":False,
+        "recipient_and_suppression_recheck_required":True,
+        "human_approval_required":True,
+        "execution_authority":"none",
+        "send_authorized":False,
+        "outbound_sent":False,
+        "order_created":False,
+        "money_moved":False,
+    }
+    if preview["decision"]!="CTA_DRAFT_FOR_HUMAN_REVIEW":
+        out["reason"]=preview["decision"]
+        return out
+
+    # Only emit a vetted product-specific reply if that offer is actually
+    # defined in the existing search product contracts. Solar is explicitly
+    # withheld until its separate prospect-deliverable binding is complete.
+    from empire_os.search_intelligence.products import get_search_product
+    sku=_s(account.get("product_code"))
+    product=get_search_product(sku)
+    if product is None or sku not in PRODUCTS:
+        out["reason"]="product_scope_not_verified"
+        return out
+
+    greeting=_safe_salutation(account)
+    name=product.name
+    if sku=="technical_search_audit":
+        scope=("indexation and crawl visibility, key-page metadata, "
+               "and enquiry measurement")
+        question=("Which service or location would you want to "
+                  "check first?")
+    elif sku=="competitor_search_gap":
+        scope=("observed competitor search results, query gaps, "
+               "and a prioritised content backlog")
+        question=("Which service and location matter most to you?")
+    else:
+        scope=("search terms with observed opportunity, "
+               "the pages they relate to, and a prioritised backlog")
+        question=("Which service area should the map cover first?")
+
+    if preview["cta_tier"]=="DISCOVERY_QUESTION":
+        body=(
+            f"{greeting}\n\nThanks for explaining. "
+            f"Before suggesting anything, I'd like to understand the priority "
+            f"so I don't make assumptions.\n\n{question}\n\n"
+            "Phil\nFounder, Empire AI"
+        )
+    elif preview["cta_tier"]=="WRITTEN_SCOPE":
+        body=(
+            f"{greeting}\n\nYes. For a {name}, I'd examine {scope}. "
+            "You'd get the observed findings and a practical priority list "
+            "in writing. Anything we can't verify would be clearly marked "
+            "rather than estimated.\n\n"
+            f"{question}\n\nPhil\nFounder, Empire AI"
+        )
+    elif preview["cta_tier"]=="PURCHASE_REVIEW":
+        cents=_catalog_price_for_review(catalog_row,sku)
+        if cents is None:
+            out["reason"]="verified_catalog_product_or_price_not_supplied"
+            return out
+        amount=f"${cents//100:,}" if cents%100==0 else f"${cents/100:,.2f}"
+        body=(
+            f"{greeting}\n\nThe {name} is {amount} as a one-time report. "
+            f"It covers {scope}, with the findings and priorities provided "
+            "in writing.\n\n"
+            "You can review the current product terms and secure checkout "
+            "at https://empire-ai.co.uk/buy before deciding.\n\n"
+            "Phil\nFounder, Empire AI"
+        )
+        out["quoted_catalog_amount_cents"]=cents
+        out["quoted_catalog_currency"]="USD"
+        out["catalog_price_and_terms_approval_required"]=True
+    else:
+        out["reason"]="unsupported_cta_tier"
+        return out
+
+    # Bounded, single next step. No lead-volume, rank, ROI or timing claims.
+    if len(body)>900 or body.count("?")>1:
+        out["reason"]="copy_length_or_cta_policy_hold"
+        return out
+    out["decision"]="DRAFT_FOR_HUMAN_REVIEW"
+    out["reason"]="contextual_buyer_question_answered"
+    out["body_text"]=body
+    out["source_product_code"]=sku
+    out["source_product_contract"]=product.key
+    return out
 
 
 def _empty(decision: str, reason: str) -> dict[str,Any]:

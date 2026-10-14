@@ -372,3 +372,231 @@ def test_resident_inference_exception_redacted_and_no_retry():
     assert out["decision"]=="HOLD_MODEL"
     assert provider.calls==1
     assert "SECRET" not in str(out)
+
+def verified_catalog(sku="technical_search_audit", cents=29900):
+    return {
+        "product_code":sku,
+        "active":True,
+        "catalog_state":"VERIFIED",
+        "version_state":"VERIFIED",
+        "binding_terms_ready":True,
+        "billing_model":"one_time",
+        "price_basis":{
+            "state":"VERIFIED","currency":"USD",
+            "amount_cents":cents,
+        },
+    }
+
+
+@pytest.mark.parametrize("sku,expected",[
+    ("technical_search_audit","indexation and crawl visibility"),
+    ("competitor_search_gap","observed competitor search results"),
+    ("search_opportunity_map","the pages they relate to"),
+])
+def test_product_context_answers_written_scope_without_unverified_claims(sku,expected):
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    account={**A,"product_code":sku}
+    r=reply("Could you send us the written scope?", "question")
+    # Create a typed decision with the independently supplied exact account.
+    request=intent_decision_request(account,r)
+    m=TypedDecisionResult(
+        provider_key="empire_local_ai",model_key="resident_shadow",
+        task_key=request.task_key,decision_schema_ref=request.decision_schema_ref,
+        state_ref=request.state_ref,label="solution_evaluation",
+        confidence=.97,latency_ms=12,source_ref=request.state_ref,
+        shadow_only=True,execution_authority="none",
+    )
+    out=compose_contextual_cta_reply_for_review(
+        account=account,reply=r,model_result=m,suppression_cleared=True)
+    assert out["decision"]=="DRAFT_FOR_HUMAN_REVIEW"
+    assert out["cta_tier"]=="WRITTEN_SCOPE"
+    assert expected in out["body_text"]
+    assert "Yes." in out["body_text"]
+    assert "$" not in out["body_text"]
+    assert "https:" not in out["body_text"]
+    assert out["body_text"].count("?")==1
+    assert out["send_authorized"] is False
+    assert out["catalog_origin_verified_by_this_module"] is False
+
+
+def test_discovery_question_one_simple_next_step_no_pitch():
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    r=reply("We need help understanding our local customer searches.")
+    out=compose_contextual_cta_reply_for_review(
+        account=A,reply=r,model_result=model("problem_discovery",r),
+        suppression_cleared=True)
+    assert out["decision"]=="DRAFT_FOR_HUMAN_REVIEW"
+    assert out["body_text"].startswith("Hi Brian,")
+    assert out["body_text"].count("?")==1
+    assert "Which service or location" in out["body_text"]
+    assert "Technical Search Audit" not in out["body_text"]
+    assert "$299" not in out["body_text"]
+
+
+def test_answer_price_only_for_verified_named_product_request_and_catalog():
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    r=reply("How much does your Technical Search Audit cost?","pricing_question")
+    r.update(explicit_product_request_verified=True,
+             requested_product_code="technical_search_audit")
+    m=model("explicit_product_purchase_request",r)
+    missing=compose_contextual_cta_reply_for_review(
+        account=A,reply=r,model_result=m,suppression_cleared=True)
+    assert missing["decision"]=="HOLD_REVIEW"
+    assert missing["reason"]=="verified_catalog_product_or_price_not_supplied"
+    assert missing["body_text"] is None
+    out=compose_contextual_cta_reply_for_review(
+        account=A,reply=r,model_result=m,suppression_cleared=True,
+        catalog_row=verified_catalog())
+    assert out["decision"]=="DRAFT_FOR_HUMAN_REVIEW"
+    assert out["cta_tier"]=="PURCHASE_REVIEW"
+    assert "$299" in out["body_text"]
+    assert out["quoted_catalog_amount_cents"]==29900
+    assert out["quoted_catalog_currency"]=="USD"
+    assert "https://empire-ai.co.uk/buy" in out["body_text"]
+    assert out["catalog_price_and_terms_approval_required"] is True
+    assert out["send_authorized"] is False
+    assert out["order_created"] is False
+    assert out["money_moved"] is False
+
+
+@pytest.mark.parametrize("override",[
+    {"active":False},
+    {"catalog_state":"DRAFT"},
+    {"version_state":"RETIRED"},
+    {"binding_terms_ready":False},
+    {"billing_model":"subscription"},
+    {"product_code":"search_opportunity_map"},
+    {"price_basis":{"state":"UNVERIFIED","currency":"USD","amount_cents":29900}},
+    {"price_basis":{"state":"VERIFIED","currency":"GBP","amount_cents":29900}},
+    {"price_basis":{"state":"VERIFIED","currency":"USD","amount_cents":True}},
+    {"price_basis":{"state":"VERIFIED","currency":"USD","amount_cents":0}},
+    {"price_basis":{"state":"VERIFIED","currency":"USD","amount_cents":999999}},
+])
+def test_bad_catalog_rows_cannot_generate_price_or_checkout_draft(override):
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    r=reply("How much is your Technical Search Audit?","pricing_question")
+    r.update(explicit_product_request_verified=True,
+             requested_product_code="technical_search_audit")
+    row={**verified_catalog(),**override}
+    out=compose_contextual_cta_reply_for_review(
+        account=A,reply=r,model_result=model("explicit_product_purchase_request",r),
+        suppression_cleared=True,catalog_row=row)
+    assert out["decision"]=="HOLD_REVIEW"
+    assert out["body_text"] is None
+    assert out["send_authorized"] is False
+
+
+def test_solar_separate_report_contract_not_invented():
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    account={**A,"product_code":"solar_opportunity_map_us"}
+    r=reply("Please send us the written scope?")
+    request=intent_decision_request(account,r)
+    m=TypedDecisionResult(
+        provider_key="empire_local_ai",model_key="resident_shadow",
+        task_key=request.task_key,decision_schema_ref=request.decision_schema_ref,
+        state_ref=request.state_ref,label="solution_evaluation",confidence=.95,
+        latency_ms=2,source_ref=request.state_ref,
+        shadow_only=True,execution_authority="none",
+    )
+    out=compose_contextual_cta_reply_for_review(
+        account=account,reply=r,model_result=m,
+        suppression_cleared=True)
+    assert out["reason"]=="product_scope_not_verified"
+    assert out["body_text"] is None
+
+
+def test_negative_inbound_cannot_invoke_resident_model():
+    from empire_os.rapport_intent_cta import evaluate_intent_with_existing_provider
+    class MustNotRun:
+        def evaluate(self,req):raise AssertionError("no model call")
+    for body,classification in [
+        ("Unsubscribe me.","positive"),
+        ("Not interested, thanks.","positive"),
+        ("Thanks. Not right now.","positive"),
+        ("Tell me more","later"),
+    ]:
+        r=reply(body,classification)
+        out=evaluate_intent_with_existing_provider(
+            account=A,reply=r,provider=MustNotRun(),suppression_cleared=True)
+        assert out["decision"]=="SUPPRESS_OR_WAIT"
+
+
+def test_contextual_reply_cannot_be_unlocked_by_spoofed_positive_ai_or_suppression():
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    r=reply("We need help understanding local searches.")
+    m=model("problem_discovery",r)
+    altered=deepcopy(r)
+    altered["sender_address"]="spoofed@other.example"
+    for reply_record,cleared in [(altered,True),(r,False)]:
+        out=compose_contextual_cta_reply_for_review(
+            account=A,reply=reply_record,model_result=m,
+            suppression_cleared=cleared)
+        assert out["body_text"] is None
+        assert out["send_authorized"] is False
+
+def test_planner_surfaces_exact_buyer_reply_preview_with_current_catalog():
+    r=reply("How much is your Technical Search Audit?", "pricing_question")
+    r.update(explicit_product_request_verified=True,
+             requested_product_code="technical_search_audit")
+    result=plan_outbound_account(
+        A,replies=[r],intent_decision=model("explicit_product_purchase_request",r),
+        catalog_product=verified_catalog(),
+        canonical_suppression_cleared=True,
+    )
+    assert result["action_type"]=="HANDOFF_TO_CLOSER"
+    assert result["intent_cta_review"]["cta_tier"]=="PURCHASE_REVIEW"
+    draft=result["intent_cta_reply_review"]
+    assert draft["decision"]=="DRAFT_FOR_HUMAN_REVIEW"
+    assert "$299" in draft["body_text"]
+    assert draft["send_authorized"] is False
+    assert result["execution_authority"]=="none"
+
+
+def test_planner_never_emits_purchase_reply_without_verified_catalog():
+    r=reply("How much does the Technical Search Audit cost?","pricing_question")
+    r.update(explicit_product_request_verified=True,
+             requested_product_code="technical_search_audit")
+    p=plan_outbound_account(
+        A,replies=[r],intent_decision=model("explicit_product_purchase_request",r),
+        canonical_suppression_cleared=True)
+    assert p["intent_cta_reply_review"]["body_text"] is None
+    assert p["intent_cta_reply_review"]["reason"]=="verified_catalog_product_or_price_not_supplied"
+
+
+def test_prospect_adapter_shows_scoped_reply_and_preserves_send_hold():
+    r=reply("Could you send the written scope?", "question")
+    out=review_candidate({
+        **PROSPECTS[0],
+        "tenant_id":A["tenant_id"],"prospect_id":A["prospect_id"],
+        "original_outbound_intent_id":A["original_outbound_intent_id"],
+    },replies=[r],model_decision=model("solution_evaluation",r),
+       canonical_suppression_cleared=True)
+    assert out["intent_cta_review"]["cta_tier"]=="WRITTEN_SCOPE"
+    assert out["intent_cta_reply_review"]["decision"]=="DRAFT_FOR_HUMAN_REVIEW"
+    assert "indexation" in out["intent_cta_reply_review"]["body_text"]
+    assert out["send_authorized"] is False
+    assert out["canonical_suppression_cleared"] is False  # research-only packet
+
+
+def test_unverified_research_prospect_has_no_ai_reply_draft():
+    r=reply("Could you send the written scope?", "question")
+    out=review_candidate(
+        PROSPECTS[0],replies=[r],model_decision=model("solution_evaluation",r),
+        canonical_suppression_cleared=True,
+    )
+    assert out["intent_cta_reply_review"] is None
+    assert out["send_authorized"] is False
+
+
+def test_unauthenticated_response_cannot_extract_model_or_product_price():
+    from empire_os.rapport_intent_cta import compose_contextual_cta_reply_for_review
+    r=reply("How much is your Technical Search Audit?","pricing_question")
+    r.update(explicit_product_request_verified=True,
+             requested_product_code="technical_search_audit")
+    candidate=model("explicit_product_purchase_request",r)
+    r["counterpart_identity_verified"]=False
+    result=compose_contextual_cta_reply_for_review(
+        account=A,reply=r,model_result=candidate,
+        suppression_cleared=True,catalog_row=verified_catalog())
+    assert result["body_text"] is None
+    assert "quoted_catalog_amount_cents" not in result

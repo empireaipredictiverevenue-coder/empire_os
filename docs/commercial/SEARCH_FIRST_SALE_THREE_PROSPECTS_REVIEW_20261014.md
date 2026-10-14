@@ -126,6 +126,20 @@ Founder, Empire AI
 
 **Regression evidence:** isolated unit/provider fixtures check all CTA tiers, precise reply body hash, person and tenant mismatches, prior unsubscribe, spoofed or changed model results, suppression holds, absent/unavailable resident inference and no-send invariants. These tests do not prove a production buyer, live AI execution, permission to contact or realised revenue.
 
+## Context-aware natural CTA reply after verified buyer intent
+
+**Existing module upgraded:** `empire_os.rapport_intent_cta.compose_contextual_cta_reply_for_review`, wired into `outbound_department.plan_outbound_account` as `intent_cta_reply_review`; `scripts.review_search_first_sale_rapport.review_candidate` surfaces the same. These are offline **drafts**, not a new sales runtime, provider or send adaptor.
+
+- **Problem discovery**: one useful question about the priority service/location. No sale or product mention.
+- **Solution evaluation**: answer the buyer's request **now**, in plain English, using the existing Search Intelligence product's scope. Describe a written, sourced deliverable and what cannot yet be verified. One narrow question; no price or link.
+- **Explicit named-product purchase**: only where independent exact product request evidence, typed-AI corroboration, original authenticated reply, independent suppression clearance, and a supplied **currently verified** catalog row all match. Propose the verified **USD one-time** catalog price, existing product scope and official checkout page, **for human review only**; no newly created order or automatic email.
+- **No verified catalog**: `HOLD_REVIEW`, `body_text=null`, no invented quote. Caller-reported catalog status is **not** an attestation of source: `catalog_origin_verified_by_this_module=false`; original DB readback, product terms, sender and recipient proof must be checked by the existing outbound/commercial owner before release.
+- **Solar Opportunity Map**: its separate prospect-based builder is not yet bound to the standard Search Intelligence report contract. Hold `product_scope_not_verified` for the reply composer rather than invent deliverable wording.
+- **Explicit negative, opt-out, later or unrelated replies**: rejected *before* calling resident AI. Quoted older email history and an altered-model message digest cannot become new buyer intent.
+- **No sender connection**: no SMTP/IMAP credential, timer, DB changes, website change, customer contact, commitment or financial action. Drafts stay `send_authorized=false`.
+
+**Test evidence:** the targeted checkout/catalog, Search Intelligence, existing closer/outbound, new intent classifier and contextual reply suite checks cover 219 regressions (one non-blocking library deprecation warning). They do not prove a live buyer reply or live model inference.
+
 ## Dedupe, gates, operational owner
 
 - 14 October snapshots checked: `runtime/revenue_distribution/latest.json` (snapshot last generated 10 Oct) and `runtime/buyer_acquisition/scout_latest.json` (14 Oct). None of the three exact domains appeared. **This is not a canonical EmpireDB prior-contact/suppression proof.**
