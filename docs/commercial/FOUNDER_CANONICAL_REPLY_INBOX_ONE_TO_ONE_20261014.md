@@ -24,6 +24,8 @@ Explicit opt-in configuration is `EMPIRE_FOUNDER_MAILBOX_PROVIDER=empiredb_canon
 
 No new sender process, alternate campaign dispatcher or automatic approval was added. The scheduled `outbound_governor_worker._provider_ready()` remains false; no live automatic sending was activated.
 
+`python -m scripts.operate_founder_one_to_one_gmail --intent-id <approved-uuid> --recipient <exact-address>` is the bounded read-only operator review. A real send is **not** the default: it requires both an exact matching `--confirm-approved-intent-id` alongside `--send` and a separate `EMPIRE_FOUNDER_MANUAL_GMAIL_RELEASE=APPROVED_ONE_TO_ONE_ONLY` release setting. It also rechecks canonical approval, the exact recipient, recipient suppression status, person-bound evidence, reviewed messaging, provider readiness, and governor authority before it claims the DB intent and calls Gmail. No scheduled task uses this script. An unknown provider outcome is held for reconciliation, not retried automatically.
+
 ## Gates to operating from the Founder Console
 
 - Obtain a **dedicated read-only EmpireDB connection** able to set the existing `empire_closer_observer` role. A privileged, approved service configuration is required to select the canonical provider; no service was restarted by this change. A reading of the canonical inbox does **not** require additional Google OAuth consent.
