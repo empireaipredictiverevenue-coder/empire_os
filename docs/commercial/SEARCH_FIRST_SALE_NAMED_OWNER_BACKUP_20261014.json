@@ -1,0 +1,60 @@
+{
+  "schema_version": "empire.search.first_sale.named_owner_backup.v1",
+  "status": "FOUNDER_OUTREACH_OWNER_REVIEW_ONLY",
+  "prepared_at": "2026-10-14",
+  "context": "Supplement to SEARCH_FIRST_SALE_THREE_PROSPECTS_REVIEW_20261014.md; does not alter its existing shortlist",
+  "candidate": {
+    "key": "empire_state_fire",
+    "company_name": "Empire State Fire Sprinkler Corp.",
+    "person": "Helen DiLorenzo",
+    "email": "helen@empirefire.net",
+    "contact_route": "person_bound",
+    "source_ref": "public:empire-state-fire-sprinkler-service-hiring-2026-07-17",
+    "source_url": "https://www.career.com/job/empire-state-fire-sprinkler-corp/fire-sprinkler-technician-for-service/j202607170150378754814",
+    "observation": "Empire State Fire Sprinkler Corp. advertised a full-time fire sprinkler service technician role dated 17 July 2026, covering FDNY testing, maintenance and property-manager work in NYC. A listing described the opportunity as available before 14 November 2026; actual open-vacancy status and marketing need are not independently established.",
+    "fresh": true,
+    "subject": "Empire State's service technician hire",
+    "body": "Hi Helen,\n\nI noticed Empire State Fire Sprinkler Corp.'s service-technician vacancy focuses on FDNY testing, maintenance and working directly with building managers. That looks like a pretty specific skill set to hire for. Hope you find the right person.\n\nBest,\nPhil\nFounder, Empire AI",
+    "recipient_identity_currently_verified": false
+  },
+  "identity_sources": {
+    "company_official_about": "https://www.empirefire.net/blank-1",
+    "industry_member_named_email": "https://member.nfsa.org/Directories/Buyers-Guide",
+    "president_role_secondary": "https://www.bbb.org/us/ny/brooklyn/profile/fire-sprinklers/empire-state-fire-sprinkler-corp-0121-87169866",
+    "company_official_services": "https://www.empirefire.net/"
+  },
+  "optional_market_context_for_later_paid_review": [
+    {
+      "company": "Allstate Sprinkler",
+      "page": "https://allstatesprinkler.com/locations/brooklyn",
+      "observation": "Brooklyn service page lists NFPA 25 inspection, repair and FDNY violations; no ranking result implied."
+    },
+    {
+      "company": "Capitol Fire Sprinkler",
+      "page": "https://www.capitolfire.com/services/violations",
+      "observation": "Separate FDNY and ECB violations service content; no visibility performance claim."
+    }
+  ],
+  "product_if_requested_after_real_reply": {
+    "product_code": "competitor_search_gap",
+    "list_price_usd": 199,
+    "order_revenue_verified": false,
+    "ranking_gap_claim_verified": false,
+    "search_metrics_verified": false
+  },
+  "governance": {
+    "recipient_identity_and_deliverability_cleared": false,
+    "canonical_exact_and_domain_suppression_cleared": false,
+    "prior_professional_mailbox_contact_checked": false,
+    "live_professional_mailbox_send_authorized": false,
+    "founder_exact_one_to_one_send_approved": false,
+    "buyer_interest_proved": false,
+    "send_authorized": false,
+    "outbound_sent": false,
+    "automatic_followup_authorized": false,
+    "campaign_created": false,
+    "database_writes": false,
+    "traffic_activated": false,
+    "payment_action": false
+  }
+}
