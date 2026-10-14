@@ -71,3 +71,15 @@ def test_no_credentials_or_recipient_values_emitted():
     assert "client_secret" not in text
     assert "oauth2.googleapis.com" not in text
     assert "flavag83" not in text
+
+
+def test_verified_workspace_reader_avoids_false_missing_imap_blocker():
+    args = fixture()
+    args["imap"] = {"provider": "google_workspace", "configured": True}
+    args["token"]["founder_google_account_identity_verified"] = True
+    proof = assess(**args)
+    assert proof["founder_workspace_reader_configured"] is True
+    assert proof["founder_imap_configured"] is False
+    assert "FOUNDER_READ_INBOX_NOT_CONFIGURED" not in proof["readiness_blockers"]
+    assert "REPLY_SUBDOMAIN_STILL_ROUTES_TO_AMAZON_SES" in proof["readiness_blockers"]
+    assert proof["ready_for_prospect_outbound"] is False

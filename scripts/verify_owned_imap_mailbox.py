@@ -87,7 +87,11 @@ def service_readiness_report(*, probe: bool = False,
     if expected_provider not in ('owned_imap', 'google_workspace'):
         raise ValueError('unsupported_mailbox_readiness_provider')
     result = {
-        'schema_version': 'empire.owned_imap_service_readiness.v1',
+        'schema_version': (
+            'empire.google_workspace_service_readiness.v1'
+            if expected_provider == 'google_workspace'
+            else 'empire.owned_imap_service_readiness.v1'
+        ),
         'provider': expected_provider, 'mode': 'OBSERVE',
         'service_checked': True, 'configured': False,
         'read_only': True, 'live_probe_performed': False,

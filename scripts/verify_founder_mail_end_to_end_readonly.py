@@ -99,11 +99,23 @@ def _oauth_probe() -> dict[str, bool]:
         return {"token_active_at_google": False, "gmail_send_scope_verified": False,
                 "founder_google_account_identity_verified": False}
     value = response.json()
+    granted_scopes = set(str(value.get("scope", "")).split())
+    owner_verified = False
+    from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider, READ_SCOPE
+    if READ_SCOPE in granted_scopes:
+        # Google's authenticated getProfile is the account-identity proof;
+        # a send-only token or configured From header is not sufficient.
+        try:
+            provider = GoogleWorkspaceMailboxProvider()
+            if provider.configured:
+                provider._service()  # profile only; no email or message read
+                owner_verified = True
+        except Exception:
+            owner_verified = False
     return {
         "token_active_at_google": True,
-        "gmail_send_scope_verified": GMAIL_SEND_SCOPE in str(value.get("scope", "")).split(),
-        # A gmail.send-only access token does not attest the mailbox owner.
-        "founder_google_account_identity_verified": False,
+        "gmail_send_scope_verified": GMAIL_SEND_SCOPE in granted_scopes,
+        "founder_google_account_identity_verified": owner_verified,
     }
 
 
@@ -116,6 +128,7 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
     spf_sub = any("v=spf1" in x.casefold() for x in sub_txt)
     relay_ready = relay.get("ok") is True and relay.get("provider") == "gmail_api"
     imap_ready = imap.get("provider") == "owned_imap" and imap.get("configured") is True
+    workspace_read_ready = imap.get("provider") == "google_workspace" and imap.get("configured") is True
     inbound_resend = inbound.get("provider") == "resend"
     blockers = []
     if not relay_ready or not identity.get("founder_sender_config_matches") or not identity.get("reply_to_config_matches"):
@@ -124,8 +137,8 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         blockers.append("GOOGLE_GMAIL_SEND_OAUTH_UNVERIFIED")
     if not token.get("founder_google_account_identity_verified"):
         blockers.append("GOOGLE_MAILBOX_OWNER_IDENTITY_UNVERIFIED")
-    if not imap_ready:
-        blockers.append("FOUNDER_OWNED_INBOX_NOT_CONFIGURED")
+    if not imap_ready and not workspace_read_ready:
+        blockers.append("FOUNDER_READ_INBOX_NOT_CONFIGURED")
     if ses_subdomain:
         blockers.append("REPLY_SUBDOMAIN_STILL_ROUTES_TO_AMAZON_SES")
     if inbound_resend and ses_subdomain:
@@ -144,6 +157,7 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         "gmail_send_permission_verified": token.get("gmail_send_scope_verified") is True,
         "gmail_account_identity_verified": token.get("founder_google_account_identity_verified") is True,
         "founder_imap_configured": imap_ready,
+        "founder_workspace_reader_configured": workspace_read_ready,
         "root_domain_mx_google": google_root,
         "reply_subdomain_mx_amazon_ses": ses_subdomain,
         "reply_subdomain_spf_present": spf_sub,
