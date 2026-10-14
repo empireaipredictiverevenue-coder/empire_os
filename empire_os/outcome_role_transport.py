@@ -36,6 +36,12 @@ ROLE_FUNCTIONS = {
             "select public.list_revenue_recognition_work(%s)",
             ("p_limit",),
         ),
+        # Existing 029 read-only, order-bound SECURITY DEFINER cost proof.
+        # Granted ONLY to the existing dedicated revenue-recognizer role.
+        "get_verified_actual_cost_evidence": (
+            "select public.get_verified_actual_cost_evidence(%s)",
+            ("p_fulfilment_order_id",),
+        ),
         "recognize_bsc_revenue": (
             "select public.recognize_bsc_revenue(%s,%s)",
             ("p_fulfilment_order_id", "p_actor"),
