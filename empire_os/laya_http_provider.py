@@ -36,6 +36,77 @@ class LayaHttpTypedDecisionProvider:
     provider_key: str = "laya_http"
     telemetry_sink: TelemetrySink | None = None
 
+    def evaluate_batch(
+        self, request: "DecisionBatchRequestV2"
+    ) -> "DecisionBatchResultV2":
+        """One shared-state Laya call for several Choice decisions.
+
+        Score/Noul are explicitly unsupported by this deployed local adapter,
+        not substituted with fabricated outputs.
+        """
+        from empire_os.typed_decision_batch import (
+            DecisionBatchRequestV2,
+            DecisionBatchResultV2,
+        )
+        request.validate()
+        if any(q.kind != "choice" for q in request.questions):
+            raise LayaTypedDecisionError("local Laya batch supports choice only")
+        payload = {
+            "state": dict(request.state),
+            "questions": {
+                q.key: {
+                    "type": "choice",
+                    "instructions": q.instructions,
+                    "criteria": dict(q.criteria),
+                } for q in request.questions
+            },
+        }
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        http_request = urllib.request.Request(
+            self.base_url.rstrip("/") + "/v1/systemone",
+            data=json.dumps(payload).encode("utf-8"),
+            headers=headers,
+            method="POST",
+        )
+        started = perf_counter()
+        try:
+            with urllib.request.urlopen(
+                http_request, timeout=self.timeout_s
+            ) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+        except (
+            urllib.error.HTTPError, urllib.error.URLError,
+            TimeoutError, json.JSONDecodeError,
+        ) as exc:
+            raise LayaTypedDecisionError("local Laya batch request failed") from exc
+        if not isinstance(raw, Mapping) or not isinstance(raw.get("answers"), Mapping):
+            raise LayaTypedDecisionError("local Laya batch response invalid")
+        answers = {}
+        for q in request.questions:
+            ans = raw["answers"].get(q.key)
+            if not isinstance(ans, Mapping):
+                raise LayaTypedDecisionError("local Laya batch answer missing")
+            label = str(ans.get("choice") or "").strip()
+            if label not in q.criteria:
+                raise LayaTypedDecisionError("local Laya batch disallowed choice")
+            mapped = {"choice": label, "confidence": _confidence(ans, label)}
+            if isinstance(ans.get("probabilities"), Mapping):
+                mapped["probabilities"] = dict(ans["probabilities"])
+            answers[q.key] = mapped
+        result = DecisionBatchResultV2(
+            schema_ref=request.schema_ref,
+            state_ref=request.state_ref,
+            provider_key=self.provider_key,
+            model_key=self.model_key,
+            answers=answers,
+            latency_ms=round((perf_counter() - started) * 1000, 3),
+            source_ref=f"laya:http:shadow:{request.state_ref}",
+        )
+        result.validate(request)
+        return result
+
     def evaluate(
         self,
         request: TypedDecisionRequest,
