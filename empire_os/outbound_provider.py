@@ -222,6 +222,34 @@ def extract_resend_provider_event(event: dict[str, Any]) -> dict[str, Any] | Non
     }
 
 
+def inbound_fetch_error_code(error: Exception) -> str:
+    """Sanitized reason only: never persist provider error text or credentials."""
+    status = (getattr(error, 'status_code', None)
+              or getattr(error, 'status', None)
+              or getattr(error, 'http_status', None)
+              or getattr(error, 'code', None))
+    try:
+        status = int(status)
+    except (ValueError, TypeError, OverflowError):
+        status = None
+    if status in (401, 403):
+        return 'RECEIVING_CREDENTIAL_UNAUTHORIZED' if status == 401 else 'RECEIVING_ACCESS_FORBIDDEN'
+    if status == 404:
+        return 'RECEIVED_MESSAGE_NOT_FOUND'
+    if status == 429:
+        return 'RECEIVING_RATE_LIMITED'
+    if isinstance(status, int) and 500 <= status <= 599:
+        return 'RECEIVING_PROVIDER_UNAVAILABLE'
+    if isinstance(error, (TimeoutError, ConnectionError)):
+        return 'RECEIVING_NETWORK_FAILURE'
+    if type(error).__name__ in ('InvalidApiKeyError', 'MissingApiKeyError'):
+        return 'RECEIVING_CREDENTIAL_UNAUTHORIZED'
+    if type(error).__name__ == 'RateLimitError':
+        return 'RECEIVING_RATE_LIMITED'
+    # Avoid exposing arbitrary exception type/message from untrusted providers.
+    return 'RECEIVING_FETCH_FAILED_UNKNOWN'
+
+
 def extract_resend_reply(event: dict[str, Any], *, fetch_email: Callable[[str], Any],
                          reply_to: str | None = None) -> dict[str, Any] | None:
     if event.get("type") != "email.received":
@@ -251,7 +279,8 @@ def extract_resend_reply(event: dict[str, Any], *, fetch_email: Callable[[str], 
 
     try:
         fetched = fetch_email(email_id)
-    except Exception:
+    except Exception as exc:
+        safe_fetch_code = inbound_fetch_error_code(exc)
         # A send-only Resend key cannot fetch received-email bodies. The
         # signed webhook still proves that a reply arrived and provides the
         # governed reply alias, sender, subject and provider email id. Record
@@ -268,6 +297,7 @@ def extract_resend_reply(event: dict[str, Any], *, fetch_email: Callable[[str], 
             "in_reply_to": "",
             "references": "",
             "body_unavailable": True,
+            "body_fetch_error_code": safe_fetch_code,
             "untrusted_content": True,
             "executable": False,
         }
