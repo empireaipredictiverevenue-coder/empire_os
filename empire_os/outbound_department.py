@@ -543,7 +543,7 @@ def plan_outbound_account(
                         and not _suppressed(s)
                     ),
                 )
-                if plan["intent_cta_review"]["review_eligible"]:
+                if plan["intent_cta_review"]["review_eligible"] or buyer_requested:
                     from empire_os.rapport_intent_cta import (
                         compose_contextual_cta_reply_for_review,
                     )
@@ -553,6 +553,7 @@ def plan_outbound_account(
                             model_result=intent_decision,
                             suppression_cleared=canonical_suppression_cleared is True,
                             catalog_row=catalog_product,
+                            allow_verified_human_purchase_fallback=buyer_requested,
                         )
                     )
                 return plan

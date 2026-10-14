@@ -211,6 +211,48 @@ def evaluate_intent_with_existing_provider(
 
 
 
+def review_verified_purchase_without_ai(
+    *, account: Mapping[str,Any], reply: Mapping[str,Any],
+    suppression_cleared: bool=False,
+) -> dict[str,Any]:
+    """Separate HUMAN-only route when resident inference is not ready.
+
+    This must never be misrepresented as an AI-detected buying signal.
+    Requires independently verified original thread/contact/tenant and an
+    explicit named-product pricing request. No execution authority.
+    """
+    if not isinstance(account,Mapping) or not isinstance(reply,Mapping):
+        return _empty("HOLD_SOURCE","invalid_input")
+    if not _preflight(account,reply):
+        return _empty("HOLD_SOURCE","canonical_thread_identity_not_verified")
+    if suppression_cleared is not True:
+        return _empty("HOLD_SUPPRESSION","canonical_suppression_not_cleared")
+    body=_buyer_text(reply.get("body_text"))
+    sku=_s(account.get("product_code"))
+    if (
+        not body
+        or NEGATIVE.search(body)
+        or _s(reply.get("classification")).lower()!="pricing_question"
+        or reply.get("explicit_product_request_verified") is not True
+        or _s(reply.get("requested_product_code"))!=sku
+        or sku not in PRODUCTS
+        or not _corroborates("explicit_product_purchase_request",body,sku)
+    ):
+        return _empty("HOLD_EXPLICIT_INTENT","no_verified_exact_product_purchase_request")
+    result=_empty("HUMAN_ONLY_PURCHASE_REVIEW","canonical_explicit_request_without_ai")
+    result.update({
+        "cta_tier":"PURCHASE_REVIEW",
+        "review_eligible":True,
+        "review_basis":"INDEPENDENT_CANONICAL_HUMAN_VERIFIED_REQUEST_NO_AI",
+        "related_product_code":sku,
+        "inbound_message_ref":_s(reply["reply_id"]),
+        "inbound_content_digest":sha256(body.encode("utf-8")).hexdigest(),
+        "human_closer_review_required":True,
+        "catalog_and_terms_review_required":True,
+    })
+    return result
+
+
 def _catalog_price_for_review(row: object, sku: str) -> int | None:
     """Check an already fetched canonical product row, never invent price.
 
@@ -251,6 +293,7 @@ def compose_contextual_cta_reply_for_review(
     model_result: TypedDecisionResult | None,
     suppression_cleared: bool=False,
     catalog_row: Mapping[str,Any] | None=None,
+    allow_verified_human_purchase_fallback: bool=False,
 ) -> dict[str,Any]:
     """Make a single, nonexecuting reply that ANSWERS before it asks.
 
@@ -263,6 +306,17 @@ def compose_contextual_cta_reply_for_review(
         account=account,reply=reply,model_result=model_result,
         suppression_cleared=suppression_cleared,
     )
+    if (
+        allow_verified_human_purchase_fallback is True
+        and preview["decision"]=="HOLD_MODEL"
+    ):
+        # Human-verified commercial intent can reach a human closer even
+        # when the resident model is unavailable/underconfident. It is
+        # explicitly NOT an AI-verified decision and never authorises send.
+        preview=review_verified_purchase_without_ai(
+            account=account,reply=reply,
+            suppression_cleared=suppression_cleared,
+        )
     out={
         "schema_version":"empire.rapport.contextual_cta_reply.v1",
         "decision":"HOLD_REVIEW",
@@ -281,9 +335,13 @@ def compose_contextual_cta_reply_for_review(
         "order_created":False,
         "money_moved":False,
     }
-    if preview["decision"]!="CTA_DRAFT_FOR_HUMAN_REVIEW":
+    if preview["decision"] not in (
+        "CTA_DRAFT_FOR_HUMAN_REVIEW","HUMAN_ONLY_PURCHASE_REVIEW"
+    ):
         out["reason"]=preview["decision"]
         return out
+    out["review_basis"]=preview.get("review_basis","TYPED_AI_SHADOW_CORROBORATED")
+    out["ai_purchase_intent_approved"]=False
 
     # Only emit a vetted product-specific reply if that offer is actually
     # defined in the existing search product contracts. Solar is explicitly
@@ -359,6 +417,23 @@ def compose_contextual_cta_reply_for_review(
     return out
 
 
+def _typed_source_matches(
+    result: TypedDecisionResult, request: TypedDecisionRequest,
+) -> bool:
+    """Accept the EXACT existing resident-provider evidence namespace.
+
+    A source prefix is NOT a general suffix match: an arbitrary outside
+    provider or a stale different reply hash cannot impersonate this task.
+    """
+    expected={
+        "laya":"laya:shadow:",
+        "laya_http":"laya:http:shadow:",
+    }.get(result.provider_key, "")
+    if expected:
+        return result.source_ref == expected + request.state_ref
+    return result.source_ref == request.state_ref
+
+
 def _empty(decision: str, reason: str) -> dict[str,Any]:
     return {
         "schema_version":SCHEMA,
@@ -407,7 +482,7 @@ def review_intent_cta(
         model_result.validate(request)
     except (ValueError,TypeError,AttributeError):
         return _empty("HOLD_MODEL","invalid_or_unbound_typed_decision")
-    if (model_result.source_ref!=request.state_ref
+    if (not _typed_source_matches(model_result, request)
             or model_result.shadow_only is not True
             or not _s(model_result.provider_key)
             or not _s(model_result.model_key)

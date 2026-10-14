@@ -140,6 +140,14 @@ Founder, Empire AI
 
 **Test evidence:** the targeted checkout/catalog, Search Intelligence, existing closer/outbound, new intent classifier and contextual reply suite checks cover 219 regressions (one non-blocking library deprecation warning). They do not prove a live buyer reply or live model inference.
 
+## Resident-model CTA integration and human-only purchase fallback
+
+The existing Laya decision adapters prepend `laya:shadow:` or `laya:http:shadow:` to the typed state reference. The CTA checker now recognises **only** the exact corresponding provider-prefixed references, rejecting different message hashes, source namespaces and tenants. This repairs a real previously blocked integration, not a new AI runtime.
+
+A **four-case fictional local smoke test** on 14 October found Laya labels matched 3/4, but confidence was only 0.137–0.386 (all below the 0.85 positive-CTA gate). The existing Qwen 1.5B coder sidecar timed out on 3/4 synthetic classifications and mislabelled the remaining one. These small diagnostics do **not** justify positive-intent production activation. Keep resident models shadow-only for these CTA decisions.
+
+To avoid losing a verified buyer while AI is uncertain, `review_verified_purchase_without_ai` and the existing `outbound_department.plan_outbound_account` can prepare a **human-only** exact-product price reply for review. That route requires independently verified original reply/thread/tenant/recipient, explicit named-product pricing request, suppression clearance, and verified current catalog terms. It states `INDEPENDENT_CANONICAL_HUMAN_VERIFIED_REQUEST_NO_AI`, never invents model confidence, and never sends, creates an order or moves funds. The mailbox agent retains final source verification and send ownership. **236 targeted regressions passed**, with one non-blocking library deprecation warning.
+
 ## Dedupe, gates, operational owner
 
 - 14 October snapshots checked: `runtime/revenue_distribution/latest.json` (snapshot last generated 10 Oct) and `runtime/buyer_acquisition/scout_latest.json` (14 Oct). None of the three exact domains appeared. **This is not a canonical EmpireDB prior-contact/suppression proof.**
