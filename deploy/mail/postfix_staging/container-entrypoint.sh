@@ -104,30 +104,40 @@ python3 -m scripts.probe_postfix_staging_smtp_rcpt \
 python3 -m scripts.probe_postfix_synthetic_delivery \
     --approved-isolated-synthetic-delivery --staging-root "$ROOT"
 
+# Store evidence from the independently authored, no-follow Maildir reader.
+# This validates original stored RFC bytes, exact one item, immutable inode,
+# restricted owner/mode and stage-only synthetic Message-ID; not wire auth.
+CUSTODY_BEFORE="$(python3 -m scripts.probe_postfix_maildir_custody \
+    --approved-isolated-custody-check --staging-root "$ROOT")"
+BEFORE="$(printf '%s' "$CUSTODY_BEFORE" | python3 -c '
+import json,sys
+s=json.load(sys.stdin)
+assert s["status"]=="ORIGINAL_STORED_RFC_CUSTODY_VERIFIED"
+assert s["sender_identity_verified"] is False
+print(s["stored_rfc_bytes_sha256"])
+')"
+
 # Controlled same-container Postfix restart must not delete/mutate the
-# single synthetic Maildir message. This is NOT power-loss durability.
-MAILDIR="$ROOT/maildir/jev-00000000-0000-0000-0000-000000000079/new"
-mapfile -t FOUND < <(find "$MAILDIR" -maxdepth 1 -type f)
-if [ "${#FOUND[@]}" -ne 1 ]; then
-    echo "HOLD_SYNTHETIC_MAILDIR_ITEM_COUNT"
-    exit 2
-fi
-BEFORE="$(sha256sum "${FOUND[0]}" | cut -d ' ' -f 1)"
-/usr/sbin/postfix stop >/dev/null
+# single synthetic Maildir item. This is NOT power-loss durability.
+# Validate stable digest and exact mailbox shape with a fresh no-follow
+# read after the restart.
+ /usr/sbin/postfix stop >/dev/null
 STOP_POSTFIX=0
 /usr/sbin/postfix start >/dev/null
 STOP_POSTFIX=1
-mapfile -t AFTER_FILES < <(find "$MAILDIR" -maxdepth 1 -type f)
-if [ "${#AFTER_FILES[@]}" -ne 1 ]; then
-    echo "HOLD_MAILDIR_NOT_PRESERVED_AFTER_RESTART"
-    exit 2
-fi
-AFTER="$(sha256sum "${AFTER_FILES[0]}" | cut -d ' ' -f 1)"
-if [ "$BEFORE" != "$AFTER" ]; then
-    echo "HOLD_MAILDIR_MESSAGE_MUTATED_AFTER_RESTART"
-    exit 2
-fi
+CUSTODY_AFTER="$(python3 -m scripts.probe_postfix_maildir_custody \
+    --approved-isolated-custody-check --staging-root "$ROOT" \
+    --previous-sha256 "$BEFORE")"
+printf '%s' "$CUSTODY_AFTER" | python3 -c '
+import json,sys
+s=json.load(sys.stdin)
+assert s["status"]=="ORIGINAL_STORED_RFC_CUSTODY_VERIFIED"
+assert s["previous_digest_unchanged"] is True
+assert s["sender_identity_verified"] is False
+assert s["original_smtp_wire_digest_verified"] is False
+'
 echo "SYNTHETIC_MAILDIR_SURVIVED_SERVICE_RESTART=TRUE"
+echo "STORED_RFC_CUSTODY_BEFORE_AND_AFTER_RESTART=VERIFIED"
 
 echo "POSTFIX_ISOLATED_ACCEPTANCE=RCPT_PROBE_EXIT_ZERO"
 echo "POSTFIX_ISOLATED_ACCEPTANCE_SYNTHETIC_DATA_ONLY=TRUE"

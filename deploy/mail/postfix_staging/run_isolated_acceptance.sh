@@ -39,6 +39,10 @@ install -m 0600 "$ROOT/scripts/probe_postfix_staging_smtp_rcpt.py" \
     "$STAGE/probe_postfix_staging_smtp_rcpt.py"
 install -m 0600 "$ROOT/scripts/probe_postfix_synthetic_delivery.py" \
     "$STAGE/probe_postfix_synthetic_delivery.py"
+install -m 0600 "$ROOT/empire_os/owned_postfix_maildir_custody.py" \
+    "$STAGE/owned_postfix_maildir_custody.py"
+install -m 0600 "$ROOT/scripts/probe_postfix_maildir_custody.py" \
+    "$STAGE/probe_postfix_maildir_custody.py"
 install -m 0600 "$HERE/container-entrypoint.sh" \
     "$STAGE/container-entrypoint.sh"
 install -m 0600 "$HERE/Dockerfile" "$STAGE/Dockerfile"
