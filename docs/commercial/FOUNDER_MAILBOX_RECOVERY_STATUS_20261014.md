@@ -3,7 +3,8 @@
 ## Confirmed on running EmpireOS
 
 - Existing Gmail HTTPS relay configured with founder sender and reply-to, and remains in OBSERVE with sending disabled.
-- Existing Google OAuth access token successfully refreshed; Google verified the `gmail.send` scope. No email was sent.
+- Correction verified 14 October: the live relay uses `google-workspace-internal-token.json` from the durable project `empireos-workspace-mail-511518`, created and authorised on 13 October. Its refresh token exists, matches the internal OAuth client and refreshes successfully. The separate `google-workspace-token.json` from `superb-garden-511210-a1` is legacy and **is not the live relay token**. Do not reauthorise or replace the working setup simply because access tokens expire.
+- Google verified the live project's `gmail.send` scope. No email was sent. Google's OAuth consent-screen publishing state was not independently read from Cloud Console.
 - Actual Workspace mailbox identity is not verified by the send-only scope; Gmail profile lookup returned insufficient permission.
 - Founder inbox reader is not configured in the running API; separate IMAP credentials are absent.
 - Root domain MX routes to Google; the founder mail subdomain MX points to an older inbound service, inconsistent with the active Resend-labelled webhook.

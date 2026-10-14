@@ -17,14 +17,14 @@ def main() -> int:
         "--client",
         default=(
             "/srv/empire_os/runtime/secrets/"
-            "google-workspace-oauth-client.json"
+            "google-workspace-internal-oauth-client.json"
         ),
     )
     parser.add_argument(
         "--token",
         default=(
             "/srv/empire_os/runtime/secrets/"
-            "google-workspace-token.json"
+            "google-workspace-internal-token.json"
         ),
     )
     parser.add_argument(

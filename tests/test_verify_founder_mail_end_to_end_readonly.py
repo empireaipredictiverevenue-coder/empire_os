@@ -83,3 +83,10 @@ def test_verified_workspace_reader_avoids_false_missing_imap_blocker():
     assert "FOUNDER_READ_INBOX_NOT_CONFIGURED" not in proof["readiness_blockers"]
     assert "REPLY_SUBDOMAIN_STILL_ROUTES_TO_AMAZON_SES" in proof["readiness_blockers"]
     assert proof["ready_for_prospect_outbound"] is False
+
+
+def test_live_relay_uses_existing_durable_workspace_oauth_not_legacy_testing_token():
+    from scripts.verify_founder_mail_end_to_end_readonly import TOKEN_PATH as proof_path
+    from empire_os.google_workspace_mailbox import TOKEN_PATH as inbox_path
+    assert proof_path.name == 'google-workspace-internal-token.json'
+    assert inbox_path == proof_path

@@ -17,7 +17,7 @@ from urllib.error import URLError
 
 EXPECTED_FROM = "phil@mail.empire-ai.co.uk"
 EXPECTED_REPLY = "reply@mail.empire-ai.co.uk"
-TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/google-workspace-token.json")
+TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/google-workspace-internal-token.json")
 
 
 class NoRedirect(HTTPRedirectHandler):

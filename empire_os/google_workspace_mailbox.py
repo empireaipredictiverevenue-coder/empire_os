@@ -19,7 +19,7 @@ from empire_os.owned_imap_mailbox import MailboxReadUnavailable
 READ_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
 SCOPES = [GMAIL_SEND_SCOPE, READ_SCOPE]
 EXPECTED_ACCOUNT = "phil@mail.empire-ai.co.uk"
-TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/google-workspace-token.json")
+TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/google-workspace-internal-token.json")
 ID_PATTERN = re.compile(r"^workspace:(inbox|sent):([a-zA-Z0-9]{8,48})$")
 MAX_LIST = 20
 
