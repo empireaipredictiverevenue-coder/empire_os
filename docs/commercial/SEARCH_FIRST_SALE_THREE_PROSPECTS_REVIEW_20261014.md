@@ -106,6 +106,26 @@ Founder, Empire AI
 - **Send-side integration ownership:** the **other outbound/mail agent** must invoke these existing planning and copy gates immediately before sending each exact prospect intent, then independently re-check canonical suppression, prior contact, mailbox identity, sender authorisation and founder approval. This code **has not been wired into or activated as a global send-adapter interceptor**, and an offline copy pass must never be labelled mail-send clearance.
 - **No autopilot follow-ups:** if there is no authenticated incoming response, hold. If the buyer says no, later, unsubscribes, is OOO, or is not the right person, pause/suppress/research as appropriate; no looping.
 
+## AI buying-intent detection → context-appropriate CTA (14 October upgrade)
+
+**Existing architecture, no duplicate agent:** `empire_os/rapport_intent_cta.py` supplies a typed-intent adaptor to the **existing** `outbound_department.plan_outbound_account` and uses `empire_os.typed_decision_provider` (ASTRA/JEV/resident model if and when separately supplied and tested). The existing prospect review adapter `scripts/review_search_first_sale_rapport.py` exposes `intent_cta_review` only when original prospect and reply evidence has been supplied. It does not instantiate a model or read a live mailbox by itself.
+
+| Evidence from the prospect's authenticated reply | AI candidate | Safe CTA trigger |
+| --- | --- | --- |
+| Generic thanks, silence, quote from a forwarded thread, unsubscribed, objection with no request | No intent / conflicting | WAIT/SUPPRESS; **no CTA** |
+| They describe a genuine business problem | `problem_discovery` | `DISCOVERY_QUESTION`: one relevant question, no pitch |
+| They explicitly ask how we would help / request a written outline | `solution_evaluation` | `WRITTEN_SCOPE`: offer a concise scoped explanation, no price or checkout |
+| They ask about purchasing/pricing a **named** catalogue product, independently verified and bound to that order prospect | `explicit_product_purchase_request` | `PURCHASE_REVIEW`: propose the approved scope, price and secure checkout details for human review; **never auto-send** |
+
+**Release contract:**
+- The model's advisory result must be a valid `TypedDecisionResult`, confidence **at least 0.85**, `shadow_only=true`, `execution_authority=none`, and strictly bound to `canonical:reply:{id}:sha256:{current message}`. It cannot create its own canonical evidence.
+- Canonical **tenant, prospect, original sent intent, exact person email, authenticated provider, same-thread inbound and nonsynthetic text** must all match, and suppression must be independently cleared before any inference. Public posts, opens/clicks and sender-reported events are not enough.
+- The deterministic checker corroborates the actual **new** message (not quoted history) and rejects old model scores, contradictory negative replies, mismatched products, missing exact purchase proof, and attempts to turn generic curiosity into procurement.
+- A `CTA_DRAFT_FOR_HUMAN_REVIEW` is only an **internal recommendation**, not a mail instruction. Existing closer, consent/suppression, current professional-mailbox sender, founder approval, catalog, terms, delivery and payment gates retain their authority. No auto follow-up, phone call, meeting booking, live paid spend or checkout activation.
+- AI inference is **adapter-ready, not independently enabled in production**; a trusted operator must pass the existing authorised **resident** typed provider. The other outbound/mail agent owns final integration into authenticated reply consumption and governed send review, not this prospecting worktree.
+
+**Regression evidence:** isolated unit/provider fixtures check all CTA tiers, precise reply body hash, person and tenant mismatches, prior unsubscribe, spoofed or changed model results, suppression holds, absent/unavailable resident inference and no-send invariants. These tests do not prove a production buyer, live AI execution, permission to contact or realised revenue.
+
 ## Dedupe, gates, operational owner
 
 - 14 October snapshots checked: `runtime/revenue_distribution/latest.json` (snapshot last generated 10 Oct) and `runtime/buyer_acquisition/scout_latest.json` (14 Oct). None of the three exact domains appeared. **This is not a canonical EmpireDB prior-contact/suppression proof.**

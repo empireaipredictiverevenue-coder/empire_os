@@ -79,6 +79,7 @@ PROSPECTS=(
 def review_candidate(
     candidate: Mapping[str,Any], *,
     history=(), replies=(), suppressions=(), evidence=None,
+    model_decision=None, canonical_suppression_cleared=False,
 )->dict[str,Any]:
     """Only current, independent external governance can authorise a send."""
     account={
@@ -95,6 +96,11 @@ def review_candidate(
             else "search_opportunity_map"
         ),
         "verified_reply_required_for_followup":True,
+        # Only a canonical reader can supply these later: no IDs invented
+        # for research-only prospects.
+        "tenant_id":candidate.get("tenant_id"),
+        "prospect_id":candidate.get("prospect_id"),
+        "original_outbound_intent_id":candidate.get("original_outbound_intent_id"),
     }
     observations=list(evidence) if evidence is not None else [{
         "evidence_ref":candidate["source_ref"],
@@ -106,6 +112,8 @@ def review_candidate(
     plan=plan_outbound_account(
         account, history=history, evidence=observations,
         replies=replies, suppressions=suppressions,
+        intent_decision=model_decision,
+        canonical_suppression_cleared=canonical_suppression_cleared,
     )
     copy=None
     if plan["action_type"]=="DRAFT_RAPPORT_TOUCH":
@@ -122,6 +130,7 @@ def review_candidate(
         "next_action":plan["action_type"],
         "rapport_policy":"rapport_first_human_specific_v1",
         "strict_verified_reply_required":True,
+        "intent_cta_review":plan.get("intent_cta_review"),
         "subject":candidate["subject"],
         "first_touch_body":candidate["body"],
         "copy_review":copy,

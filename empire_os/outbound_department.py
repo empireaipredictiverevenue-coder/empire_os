@@ -430,8 +430,14 @@ def plan_outbound_account(
     suppressions: Iterable[Mapping[str, Any]] = (),
     now: Any = None,
     astra_recommendation: str | None = None,
+    intent_decision: Any = None,
+    canonical_suppression_cleared: bool = False,
 ) -> dict[str, Any]:
-    """Return the next permitted outbound proposal. Never executes it."""
+    """Return the next permitted outbound proposal. Never executes it.
+
+    Optional typed intent review may propose one human-reviewed CTA for an
+    authenticated inbound reply. It cannot approve sending or financial steps.
+    """
     del now  # reserved for a future canonical freshness adapter; no wall-clock inference
 
     h = _rows(history)
@@ -470,7 +476,10 @@ def plan_outbound_account(
         )
 
     signal = _reply_signal(r)
-    if _suppressed(s) or signal == "unsubscribe":
+    if (_suppressed(s) or signal == "unsubscribe"
+            or (account.get("verified_reply_required_for_followup") is True
+                and any(_text(row.get("classification")).lower()
+                        in UNSUBSCRIBE_CLASSES for row in r))):
         return _result(
             account=account, stage="SUPPRESSED", action="SUPPRESS",
             reason="suppression_or_unsubscribe_outweighs_nurture",
@@ -488,7 +497,7 @@ def plan_outbound_account(
             and row.get("counterpart_identity_verified") is True
             and bool(_text(row.get("reply_id")))
         )
-        if r and not authenticated:
+        if r and (not authenticated or r[-1] is not authenticated[-1]):
             return _result(
                 account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
                 action="WAIT",
@@ -509,7 +518,11 @@ def plan_outbound_account(
                     if _text(row.get("classification")).lower()
                        in COMMERCIAL_REPLY_CLASSES
                 )
-                return _result(
+                # The model classifies buyer interest; deterministic quote
+                # corroboration plus full reply/tenant/thread binding decide
+                # whether a CTA DRAFT can reach a human reviewer. No send.
+                from empire_os.rapport_intent_cta import review_intent_cta
+                plan = _result(
                     account=account,
                     stage="COMMERCIAL_READY" if buyer_requested else "CONVERSATION",
                     action="HANDOFF_TO_CLOSER",
@@ -521,12 +534,35 @@ def plan_outbound_account(
                     touch_number=touch_number, used_evidence_refs=used_refs,
                     astra_recommendation=astra_recommendation,
                 )
-            return _result(
+                plan["intent_cta_review"] = review_intent_cta(
+                    account=account, reply=authenticated[-1],
+                    model_result=intent_decision,
+                    suppression_cleared=(
+                        canonical_suppression_cleared is True
+                        and not _suppressed(s)
+                    ),
+                )
+                return plan
+            # A real "other" reply may describe a need that a first-pass
+            # sentiment classifier misses. Surface a verified AI CTA proposal
+            # to a HUMAN while leaving the original outbound WAIT intact.
+            plan = _result(
                 account=account, stage="ENGAGED", action="WAIT",
                 reason="verified_reply_requires_manual_response_not_sequence",
                 touch_number=touch_number, used_evidence_refs=used_refs,
                 astra_recommendation=astra_recommendation,
             )
+            if verified_signal == "unclassified_real_reply":
+                from empire_os.rapport_intent_cta import review_intent_cta
+                plan["intent_cta_review"] = review_intent_cta(
+                    account=account, reply=authenticated[-1],
+                    model_result=intent_decision,
+                    suppression_cleared=(
+                        canonical_suppression_cleared is True
+                        and not _suppressed(s)
+                    ),
+                )
+            return plan
         if sent or account.get("commercial_ready") is True:
             return _result(
                 account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
