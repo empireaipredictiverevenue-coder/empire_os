@@ -55,3 +55,15 @@ All database cursors/tenant rows in tests are synthetic fixtures, not claims abo
 5. Founder UI presentation in the existing console, review workflow, production merge, deployment and release gauntlet; preserve concurrent website and Founder Console changes. No production merge is authorised in this commit.
 
 Completion claim: **engineering integration with safe default behavior and mock-bound acceptance tests**, NOT production connection, live buyer access, or realized revenue.
+
+
+## Wave 4B — Dedicated Founder Console JEV view
+
+Bounded follow-on, same isolated branch and unchanged production checkout.
+
+- Added `apps/search-command-centre/src/lib/founder-jev-read.ts`, a server-only, no-cache reader for the already-added `/v1/founder-jev/status` API contract. It validates schema and OBSERVE execution authority; unavailable/malformed responses fail closed.
+- Added `apps/search-command-centre/src/app/founder/jev/page.tsx`: a separate read-only route at `/founder/jev` with model primitive status, canonical economic record availability, verified buyer availability, reader/auth gates, calibration and production routing states.
+- The new page does **not** invent a buyer count, sales amount, prediction calibration or production activation. Missing API results are displayed as unavailable, not as zeros.
+- It does **not** modify the existing `/founder` route or the shared `founder-api.ts` file, which may be under active development by another agent.
+- TypeScript verification: `apps/search-command-centre/node_modules/.bin/tsc --noEmit --incremental false -p tsconfig.json` exited 0, reusing the already installed production dependency tree through an ignored symlink inside the isolated worktree. No downloads or package writes.
+- The route is branch-only and is **not deployed**. Its URL becomes available only after a governed integration/merge and website deployment; no link on the main Founder Console is claimed.
