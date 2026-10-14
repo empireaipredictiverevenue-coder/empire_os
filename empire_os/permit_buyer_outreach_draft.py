@@ -5,6 +5,8 @@ request payment, allocate inventory, or recognize revenue.
 """
 from __future__ import annotations
 
+from empire_os.business_contact_identity import POSTAL_ADDRESS
+
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -105,7 +107,7 @@ def build_permit_buyer_outreach_draft(
         "If easier, just send the coverage area and capacity and I’ll map the "
         "current verified feed against it.\n\n"
         f"Best,\n{founder_name}\nFounder, Empire AI\nempire-ai.co.uk\n\n"
-        "31 St Thomas St, Bolton, BL1 2QR, UK\n"
+        f"{POSTAL_ADDRESS}\n"
         "If you’d rather not hear from me, reply “opt out”."
     )
 

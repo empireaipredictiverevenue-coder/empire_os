@@ -26,7 +26,7 @@ def test_timer_execute_cannot_send_even_with_provider_and_auto_flags(monkeypatch
                     "status":"approved","actual_revenue":False,
                     "channel":"email","recipient":"test-buyer@example.com",
                     "subject":"Test","expires_at":"2027-01-01T00:00:00Z",
-                    "body_text":"Hello. Reply opt out. 31 St Thomas St, Bolton, BL1 2QR, UK"}
+                    "body_text":"Hello. Reply opt out. 68 Wentbridge Road, Bolton, BL1 2QR, UK"}
         if method=="get_outbound_governor_context":
             return {"suppressed":False,"review_ready":True,"outreach_ready":True,
                     "bound_to_decision_maker":True,"contact_source":"official_site",

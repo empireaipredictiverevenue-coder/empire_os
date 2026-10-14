@@ -35,7 +35,7 @@ def test_guarded_execute_governor_degrades_to_observe_even_with_auto_flags(monke
             return {'intent_id':'00000000-0000-0000-0000-000000000001',
                     'status':'approved','actual_revenue':False,
                     'channel':'email','recipient':'buyer@example.org',
-                    'subject':'Question','body_text':'Hello unsubscribe 31 St Thomas St Bolton BL1 2QR UK',
+                    'subject':'Question','body_text':'Hello unsubscribe 68 Wentbridge Road Bolton BL1 2QR UK',
                     'expires_at':'2027-01-01T00:00:00+00:00'}
         if method=='get_outbound_governor_context':
             return {'suppressed':False,'review_ready':True,'outreach_ready':True,

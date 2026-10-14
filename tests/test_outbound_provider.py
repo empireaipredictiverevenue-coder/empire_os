@@ -16,7 +16,7 @@ def authorized_claim(**overrides):
         "channel": "email",
         "recipient": "Buyer@Example.com",
         "subject": "Empire test",
-        "body_text": "Plain text body. Reply opt out. 31 St Thomas St, Bolton, BL1 2QR, UK",
+        "body_text": "Plain text body. Reply opt out. 68 Wentbridge Road, Bolton, BL1 2QR, UK",
         "body_html": "<p>Plain text body</p>",
         "actual_revenue": False,
     }
@@ -187,7 +187,7 @@ def test_send_payload_accepts_multiline_equivalent_postal_footer():
             body_text=(
                 "Hello. Reply opt out.\n\n"
                 "Empire-AI Intelligent Systems\n"
-                "31 St Thomas St\nBolton\nBL1 2QR\nUK"
+                "68 Wentbridge Road\nBolton\nBL1 2QR\nUK"
             )
         ),
         sender="Phil <phil@mail.empire-ai.co.uk>",
@@ -199,7 +199,7 @@ def test_send_payload_accepts_multiline_equivalent_postal_footer():
 def test_send_payload_requires_visible_opt_out_and_postal_footer():
     with pytest.raises(OutboundProviderError, match="opt-out"):
         build_resend_send(
-            authorized_claim(body_text="Hello. 31 St Thomas St, Bolton, BL1 2QR, UK"),
+            authorized_claim(body_text="Hello. 68 Wentbridge Road, Bolton, BL1 2QR, UK"),
             sender="Phil <phil@mail.empire-ai.co.uk>", reply_to="reply@mail.empire-ai.co.uk",
         )
     with pytest.raises(OutboundProviderError, match="postal footer"):

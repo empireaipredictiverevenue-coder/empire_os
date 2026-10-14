@@ -55,7 +55,7 @@ def test_governor_even_approved_intent_holds_responded_domain(monkeypatch,tmp_pa
         "channel":"email","recipient":"contact@roofpitch.net",
         "status":"approved","actual_revenue":False,"subject":"Hi",
         "expires_at":(datetime.now(timezone.utc)+timedelta(days=1)).isoformat(),
-        "body_text":"Partnership. Opt out. 31 St Thomas St, Bolton, BL1 2QR, UK",
+        "body_text":"Partnership. Opt out. 68 Wentbridge Road, Bolton, BL1 2QR, UK",
     }
     context={"suppressed":False,"review_ready":True,"outreach_ready":True,
         "bound_to_decision_maker":True,"contact_source":"official_site",
@@ -77,7 +77,7 @@ def test_database_send_claim_fails_before_provider_payload(monkeypatch,tmp_path)
         "decision":"authorized_send","actual_revenue":False,
         "intent_id":"11111111-1111-4111-8111-111111111111",
         "channel":"email","recipient":"contact@roofpitch.net","subject":"Hi",
-        "body_text":"Partnership. Opt out. 31 St Thomas St, Bolton, BL1 2QR, UK",
+        "body_text":"Partnership. Opt out. 68 Wentbridge Road, Bolton, BL1 2QR, UK",
     }
     with pytest.raises(OutboundProviderError,match="commercial_fit_outbound_held"):
         build_resend_send(claim,sender="Founder <founder@empire-ai.co.uk>",
@@ -125,6 +125,6 @@ def test_gmail_transport_final_check_catches_hold_after_payload_build(monkeypatc
             "intent_id":"11111111-1111-4111-8111-111111111111",
             "channel":"email","recipient":"contact@roofpitch.net",
             "subject":"Hi","body_text":
-                "Partnership. Opt out. 31 St Thomas St, Bolton, BL1 2QR, UK",
+                "Partnership. Opt out. 68 Wentbridge Road, Bolton, BL1 2QR, UK",
         },sender="Founder <founder@empire-ai.co.uk>",
           reply_to="reply@mail.empire-ai.co.uk",service=NoSend())

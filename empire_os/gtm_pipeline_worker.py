@@ -16,7 +16,7 @@ from empire_os.buyer_discovery import looks_like_person_name
 from empire_os.locale_intelligence import contact_window_status, resolve_locale
 from empire_os.outreach_message_optimizer import review_message
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 
 
 @dataclass(frozen=True)

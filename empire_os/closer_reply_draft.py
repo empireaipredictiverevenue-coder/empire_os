@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 
 
 def _text(value: Any) -> str:

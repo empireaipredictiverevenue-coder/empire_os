@@ -8,7 +8,7 @@ from typing import Any, Mapping
 from empire_os.buyer_review_holds import is_do_not_pursue_domain
 from empire_os.commercial_outbound_holds import (commercial_outbound_hold, CommercialOutboundHoldError)
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 ALLOWED_CHANNELS = {"email"}
 ALLOWED_EVIDENCE_SOURCES = {
     "official_site", "official_site_current", "public_record", "press_release"

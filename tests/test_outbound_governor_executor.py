@@ -23,7 +23,7 @@ class Rpc:
                 "subject": "Quick question",
                 "body_text": (
                     "Hello. Reply opt out. "
-                    "31 St Thomas St, Bolton, BL1 2QR, UK"
+                    "68 Wentbridge Road, Bolton, BL1 2QR, UK"
                 ),
                 "body_html": None,
                 "actual_revenue": False,

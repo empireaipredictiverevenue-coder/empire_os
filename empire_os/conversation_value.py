@@ -12,7 +12,7 @@ from typing import Any, Mapping
 
 from empire_os.outreach_message_optimizer import optimise_first_touch
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 _PLACEHOLDERS = {
     "", "unknown", "your team", "your market", "local market",
     "n/a", "none", "null",

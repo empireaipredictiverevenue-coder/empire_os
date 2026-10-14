@@ -187,7 +187,7 @@ def test_bridge_reviews_then_proposes_governed_outbound():
     assert proposal["p_review_id"] == REVIEW_ID
     assert proposal["p_subject"] == "Jane — quick idea for Acme Roofing"
     assert "Worth sending over?" in proposal["p_body_text"]
-    assert "31 St Thomas St, Bolton, BL1 2QR, UK" in (
+    assert "68 Wentbridge Road, Bolton, BL1 2QR, UK" in (
         proposal["p_body_text"]
     )
     assert "opt out" in proposal["p_body_text"].lower()

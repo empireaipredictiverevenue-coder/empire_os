@@ -11,6 +11,7 @@ import re
 from email.utils import parseaddr
 from uuid import UUID
 from typing import Any, Callable
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 from empire_os.commercial_outbound_holds import (require_no_commercial_hold, CommercialOutboundHoldError)
 
 
@@ -49,7 +50,7 @@ def build_resend_send(
         "empire-ai.co.uk",
         "mail.empire-ai.co.uk",
     ),
-    required_postal_footer: str = "31 St Thomas St, Bolton, BL1 2QR, UK",
+    required_postal_footer: str = POSTAL_ADDRESS,
 ) -> dict[str, Any]:
     if not isinstance(claim, dict) or claim.get("decision") != "authorized_send":
         raise OutboundProviderError("database-authorized send claim required")

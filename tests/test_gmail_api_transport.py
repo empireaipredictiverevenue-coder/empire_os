@@ -10,7 +10,7 @@ from empire_os.gmail_api_transport import (
 from empire_os.outbound_provider import OutboundProviderError
 
 
-POSTAL = "31 St Thomas St, Bolton, BL1 2QR, UK"
+POSTAL = "68 Wentbridge Road, Bolton, BL1 2QR, UK"
 
 
 def claim():

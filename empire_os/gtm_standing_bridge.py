@@ -24,7 +24,7 @@ from empire_os.gtm_standing_bridge_repository import (
 
 Request = Callable[..., Any]
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 PROPOSED_BY = "gtm-standing-authority"
 COPY_VARIANT = "short_evidence_brief_v2"
 
