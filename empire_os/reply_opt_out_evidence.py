@@ -32,6 +32,7 @@ _QUOTE_BOUNDARY = re.compile(
     re.IGNORECASE,
 )
 _UNAVAILABLE_BODY = {"", "[provider body unavailable]", "[message unavailable]"}
+_SINGLE_WORD_OPTOUT = re.compile(r"^stop[.!]?$", re.IGNORECASE)
 
 
 def explicit_opt_out_from_preview(subject: Any, body_preview: Any) -> dict[str, Any]:
@@ -75,7 +76,8 @@ def explicit_opt_out_from_preview(subject: Any, body_preview: Any) -> dict[str, 
         found = False
     else:
         found = bool(
-            _DIRECT_BODY_START.search(candidate)
+            _SINGLE_WORD_OPTOUT.fullmatch(candidate)
+            or _DIRECT_BODY_START.search(candidate)
             or _CLEAR_DIRECT_REQUEST.search(candidate)
         )
     return {

@@ -18,6 +18,11 @@ from empire_os.empire_mailbox import normalise_received_email, build_mailbox
     ("Subject: marketing", "This proposal includes an unsubscribe mechanism.", False),
     ("Re: subscribe?", "What does opt out mean?", False),
     ("Re: Hello", "Please do not contact me again.", True),
+    ("Re: James — quick idea for Tarrytown Roofing", "Stop", True),
+    ("Re: Hello", "STOP!", True),
+    ("Re: Hello", "Stop by the office tomorrow", False),
+    ("Re: Hello", "Stop? I had a question", False),
+    ("Re: Hello", "> Stop", False),
 ])
 def test_unambiguous_optout_only(subject, body, expected):
     result = explicit_opt_out_from_preview(subject, body)
@@ -73,3 +78,47 @@ def test_positive_preview_never_triggers_sales_approval():
     event = _incoming("Re: business", "I'm interested. Send the price.")
     assert event["classification"] == "unknown"
     assert event["suppressed"] is False
+
+
+def test_canonical_unsubscribe_classification_is_protective_when_body_missing():
+    row = {
+        "id": "canonical-reply:832ad81a-af22-4d81-aabc-6927e0875787",
+        "intent_id": "c77e459a-c3a9-4b0a-962a-e52c0f728bd9",
+        "from": "wolfgang@tarrytownroofing.com",
+        "to": ["wolfgang@tarrytownroofing.com"],
+        "subject": "Re: James — quick idea for Tarrytown Roofing",
+        "text": "[provider body unavailable]",
+        "body_preview_only": True,
+        "recorded_classification_unverified": "unsubscribe",
+        "received_at": "2026-09-23T00:48:08+00:00",
+    }
+    event = normalise_received_email(row, provider="empiredb_canonical_replies")
+    assert event["classification"] == "unsubscribe"
+    assert event["suppressed"] is True
+    assert event["canonical_suppression_write_verified"] is False
+    assert event["explicit_opt_out_observed"] is False
+    # The same untrusted provider record cannot fabricate canonical state.
+    event_external = normalise_received_email(row, provider="owned_imap")
+    assert event_external["suppressed"] is False
+
+
+def test_standalone_recovered_stop_is_visible_as_suppressed_thread():
+    row = {
+        "id": "canonical-reply:832ad81a-af22-4d81-aabc-6927e0875787",
+        "intent_id": "c77e459a-c3a9-4b0a-962a-e52c0f728bd9",
+        "from": "wolfgang@tarrytownroofing.com",
+        "to": ["wolfgang@tarrytownroofing.com"],
+        "subject": "Re: James — quick idea for Tarrytown Roofing",
+        "text": "Stop",
+        "body_preview_only": True,
+        "recorded_classification_unverified": "unsubscribe",
+        "received_at": "2026-09-23T00:48:08+00:00",
+    }
+    model = build_mailbox([], [row], provider="empiredb_canonical_replies", suppression_evidence_complete=False)
+    assert model["summary"]["suppressed"] == 1
+    assert model["summary"]["positive"] == 0
+    assert model["threads"][0]["classification"] == "unsubscribe"
+    assert model["threads"][0]["suppressed"] is True
+    assert model["threads"][0]["next_action"] == "suppress_and_close"
+    assert model["threads"][0]["events"][0]["body_text"] == "Stop"
+    assert model["threads"][0]["events"][0]["canonical_suppression_write_verified"] is False

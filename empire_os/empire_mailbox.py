@@ -126,7 +126,14 @@ def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend'
     # suppression or positive commercial intent. Existing ingest governance
     # must separately write/verify canonical outbound_suppressions.
     opt_out = explicit_opt_out_from_preview(subject, body)
-    if opt_out["explicit_opt_out_observed"]:
+    # Canonical classification is separate evidence from message body. An
+    # already-recorded unsubscribe is enough for a protective no-contact
+    # display, but does not prove a suppression-table write on its own.
+    canonical_unsubscribe = (
+        provider == "empiredb_canonical_replies"
+        and _text(row.get("recorded_classification_unverified")).lower() == "unsubscribe"
+    )
+    if opt_out["explicit_opt_out_observed"] or canonical_unsubscribe:
         classification = {
             "classification": "unsubscribe",
             "confidence": None,
