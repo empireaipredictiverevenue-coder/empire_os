@@ -1,4 +1,4 @@
-"""Batch transport regression: local Laya may handle Choice only."""
+"""Batch transport regression for native Laya primitives."""
 import json
 import pytest
 
@@ -64,12 +64,11 @@ def test_batched_choice_uses_one_shared_state_call(monkeypatch):
     assert result.execution_authority == "none"
 
 
-@pytest.mark.parametrize("kind", ["score", "noul"])
-def test_nonchoice_primitives_explicitly_held(kind, monkeypatch):
+def test_score_without_explicit_levels_held_before_network(monkeypatch):
     calls = []
     monkeypatch.setattr(adapter.urllib.request, "urlopen", lambda *_args, **_kw: calls.append(True))
-    with pytest.raises(LayaTypedDecisionError, match="choice only"):
-        LayaHttpTypedDecisionProvider().evaluate_batch(batch(kind))
+    with pytest.raises(LayaTypedDecisionError, match="requires explicit levels"):
+        LayaHttpTypedDecisionProvider().evaluate_batch(batch("score"))
     assert calls == []
 
 

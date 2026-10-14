@@ -39,25 +39,30 @@ class LayaHttpTypedDecisionProvider:
     def evaluate_batch(
         self, request: "DecisionBatchRequestV2"
     ) -> "DecisionBatchResultV2":
-        """One shared-state Laya call for several Choice decisions.
-
-        Score/Noul are explicitly unsupported by this deployed local adapter,
-        not substituted with fabricated outputs.
-        """
+        """One shared-state shadow call for native Choice, Score and Noul."""
         from empire_os.typed_decision_batch import (
             DecisionBatchRequestV2,
             DecisionBatchResultV2,
         )
         request.validate()
-        if any(q.kind != "choice" for q in request.questions):
-            raise LayaTypedDecisionError("local Laya batch supports choice only")
+        for q in request.questions:
+            if q.kind == "score" and (
+                not q.score_levels or q.score_min != 0
+                or q.score_max != len(q.score_levels) - 1
+            ):
+                raise LayaTypedDecisionError(
+                    "local Laya score requires explicit levels on 0..n-1 scale"
+                )
         payload = {
             "state": dict(request.state),
             "questions": {
                 q.key: {
-                    "type": "choice",
+                    "type": q.kind,
                     "instructions": q.instructions,
-                    "criteria": dict(q.criteria),
+                    "criteria": (
+                        list(q.score_levels) if q.kind == "score"
+                        else dict(q.criteria)
+                    ),
                 } for q in request.questions
             },
         }
@@ -88,10 +93,19 @@ class LayaHttpTypedDecisionProvider:
             ans = raw["answers"].get(q.key)
             if not isinstance(ans, Mapping):
                 raise LayaTypedDecisionError("local Laya batch answer missing")
-            label = str(ans.get("choice") or "").strip()
-            if label not in q.criteria:
-                raise LayaTypedDecisionError("local Laya batch disallowed choice")
-            mapped = {"choice": label, "confidence": _confidence(ans, label)}
+            if ans.get("type") is not None and ans["type"] != q.kind:
+                raise LayaTypedDecisionError("local Laya answer type mismatch")
+            if q.kind == "choice":
+                label = str(ans.get("choice") or "").strip()
+                if label not in q.criteria:
+                    raise LayaTypedDecisionError("local Laya batch disallowed choice")
+                mapped = {"choice": label, "confidence": _confidence(ans, label)}
+            elif q.kind == "score":
+                mapped = {"score": ans.get("score")}
+                if ans.get("confidence") is not None:
+                    mapped["confidence"] = ans["confidence"]
+            else:
+                mapped = {"probability_true": ans.get("noul")}
             if isinstance(ans.get("probabilities"), Mapping):
                 mapped["probabilities"] = dict(ans["probabilities"])
             answers[q.key] = mapped

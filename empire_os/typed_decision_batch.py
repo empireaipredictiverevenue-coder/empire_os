@@ -22,6 +22,7 @@ class DecisionQuestionV2:
     criteria: Mapping[str, str] = field(default_factory=dict)
     score_min: float = 0.0
     score_max: float = 100.0
+    score_levels: tuple[str, ...] = ()
 
     def validate(self) -> None:
         if not self.key.strip() or not self.instructions.strip():
@@ -32,8 +33,16 @@ class DecisionQuestionV2:
             raise ValueError("choice requires 2 to 20 criteria")
         if self.kind == "noul" and set(self.criteria) != {"true", "false"}:
             raise ValueError("noul requires true and false criteria")
-        if self.kind == "score" and self.criteria:
-            raise ValueError("score must not supply choice criteria")
+        if self.kind == "score":
+            if self.criteria:
+                raise ValueError("score must not supply choice criteria")
+            if self.score_levels and (
+                not 2 <= len(self.score_levels) <= 20
+                or any(not isinstance(v, str) or not v.strip() for v in self.score_levels)
+            ):
+                raise ValueError("score levels require 2 to 20 nonempty labels")
+        elif self.score_levels:
+            raise ValueError("score levels are score-only")
         if any(not isinstance(k, str) or not k.strip() or not isinstance(v, str) or not v.strip() for k, v in self.criteria.items()):
             raise ValueError("nonempty criteria required")
         if not isfinite(self.score_min) or not isfinite(self.score_max) or self.score_max <= self.score_min:
@@ -102,5 +111,18 @@ class DecisionBatchResultV2:
                 value = answer.get("score")
                 if isinstance(value, bool) or not isinstance(value, (int, float)) or not isfinite(value) or not q.score_min <= value <= q.score_max:
                     raise ValueError("score outside range")
+                if "confidence" in answer:
+                    _prob(answer["confidence"])
+                distribution = answer.get("probabilities")
+                if distribution is not None:
+                    if (not q.score_levels or not isinstance(distribution, Mapping)
+                            or set(distribution) != {str(i) for i in range(len(q.score_levels))}):
+                        raise ValueError("score probabilities must match defined levels")
+                    probs = {k: _prob(v) for k, v in distribution.items()}
+                    if abs(sum(probs.values()) - 1) > 0.02:
+                        raise ValueError("score probabilities not normalized")
+                    expected = sum(i * probs[str(i)] for i in range(len(q.score_levels)))
+                    if abs(float(value) - expected) > 0.025:
+                        raise ValueError("score contradicts reported probability distribution")
             else:
                 _prob(answer.get("probability_true"))
