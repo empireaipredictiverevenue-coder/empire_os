@@ -14,6 +14,7 @@ Purpose: Revenue-first, multi-question decision intelligence without duplicating
 - `empire_os.predictive_revenue_jev.compile_predictive_revenue_jev` and Quant Brain own economic recommendations. GTM V2 **consumes** their already-compiled, verified-scope packet; it never invents a revenue probability or recalculates a commercial model.
 - `empire_os.laya_http_provider.LayaHttpTypedDecisionProvider` owns the first-party Laya shadow transport.
 - `empire_os.typed_decision_store`, `typed_decision_eval`, `typed_decision_readiness` remain canonical evaluation and append-only persistence owners. No new database or store was created.
+- `empire_os.revenue_crm_channel_evidence.review_channel_evidence` remains the channel evidence authority. The new adapter consumes its typed result; it does not override its consent/suppression decisions.
 - Existing suppression/consent and outbound governor remain authoritative. GTM V2 is not an alternative suppression processor.
 - This release does not create a scheduler, worker, new agent runtime, mailbox, API subscription, database role or paid service.
 
@@ -45,8 +46,16 @@ Purpose: Revenue-first, multi-question decision intelligence without duplicating
 - Requires same-entity, same-tenant person identity and time-bounded relationship provenance for warm-introduction review.
 - Requires independently linked reply thread, matching entity/tenant and timestamp before classifying it as a relevant customer response.
 - Preserves suppression priority, abstention/review on contradictions, evidence gaps and unverified reply linkage.
+- Suppression readback is treated as verified only with canonical provenance, exact state and reference. The current CRM suppression-hit-only reader cannot prove CLEAR; its UNKNOWN state is never promoted to clearance. The fictional input fixture illustrates a future trusted clearance reader and must not be applied to existing UNKNOWN outputs.
 - Creates reproducible hashed decision fingerprint sensitive to signals, reply text, relationship and source revisions.
 - Never returns a fabricated purchase probability, revenue fact, value-of-information estimate, contact approval or outbound action.
+
+### Existing CRM suppression-evidence integration
+`empire_os/jev_gtm_channel_evidence.py`
+- Invokes the existing `review_channel_evidence` policy owner using typed `TrustedChannelEvidence`.
+- The existing email-channel reader returns UNKNOWN, not clearance. UNKNOWN is never mapped to CLEAR.
+- A verified suppression hit, opt-out or CRM hold blocks review; a trusted full clearance proof still does not authorise outbound.
+- Does not create a new suppression reader, database function, send path or consent policy.
 
 ### Tenant-scoped review queue / offline CLI
 `build_jev_gtm_review_queue` and `scripts/review_jev_gtm_candidates_v2.py`
@@ -86,7 +95,12 @@ Purpose: Revenue-first, multi-question decision intelligence without duplicating
           "evidence_refs": ["source:demo:page"]
         }
       ],
-      "outreach": {"suppression_checked": true, "suppression_readback_ref": "proof:demo"}
+      "outreach": {
+        "suppression_checked": true,
+        "suppression_state": "CLEAR",
+        "canonical_readback_verified": true,
+        "suppression_readback_ref": "proof:demo"
+      }
     }
   ]
 }
@@ -121,7 +135,7 @@ Run after changes:
 ```sh
 PYTHONDONTWRITEBYTECODE=1 /srv/empire_os/.venv/bin/python -m pytest -q -p no:cacheprovider \
   tests/test_jev_gtm_v2.py tests/test_jev_gtm_review_queue_v2.py \
-  tests/test_laya_http_batch_v2.py tests/test_laya_http_provider.py \
+  tests/test_jev_gtm_channel_evidence.py tests/test_laya_http_batch_v2.py tests/test_laya_http_provider.py \
   tests/test_typed_decision_provider.py tests/test_buyer_reply_operations_agent.py \
   tests/test_predictive_revenue_jev.py
 ```

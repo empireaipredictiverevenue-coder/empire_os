@@ -163,8 +163,18 @@ def build_jev_gtm_decision(
     )
     fit = assess_icp_candidate(account)
     access = dict(outreach or {})
-    contact_suppressed = any(access.get(flag) is True for flag in ("suppressed", "do_not_contact", "opted_out"))
-    suppression_checked = access.get("suppression_checked") is True
+    contact_suppressed = (
+        any(access.get(flag) is True for flag in ("suppressed", "do_not_contact", "opted_out"))
+        or access.get("suppression_state") == "SUPPRESSED"
+    )
+    # A suppression-hit-only reader can report UNKNOWN, never CLEAR.
+    # Merely seeing a boolean 'checked' does not provide clearance.
+    suppression_checked = (
+        access.get("suppression_checked") is True
+        and access.get("suppression_state") in {"SUPPRESSED", "CLEAR"}
+        and bool(_text(access.get("suppression_readback_ref")))
+        and access.get("canonical_readback_verified") is True
+    )
     identity_verified = account.get("entity_verified") is True and account.get("tenant_binding_verified") is True
 
     rel = dict(relationship or {})
@@ -287,6 +297,8 @@ def build_jev_gtm_decision(
         "shadow_observations": provider_review,
         "suppression_checked": suppression_checked,
         "suppression_readback_ref": access.get("suppression_readback_ref"),
+        "suppression_state": access.get("suppression_state"),
+        "suppression_canonical_verified": access.get("canonical_readback_verified") is True,
         "suppressed": contact_suppressed, "identity_verified": identity_verified,
         "economic": economic, "action": action,
     }

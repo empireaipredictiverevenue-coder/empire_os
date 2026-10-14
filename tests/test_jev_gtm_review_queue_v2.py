@@ -23,7 +23,7 @@ def case(key, *, reply=None, economic=None, tenant="tenant:1", optout=False):
             "evidence_refs": ["evidence:" + key], "truth_class": "OBSERVED",
             "entity_id": "ent:" + key, "tenant_id": tenant,
         }],
-        "outreach": {"suppression_checked": True, "suppressed": optout},
+        "outreach": {"suppression_checked": True, "suppression_state": "CLEAR", "canonical_readback_verified": True, "suppression_readback_ref": "proof:demo", "suppressed": optout},
         "reply": ({
             "source_ref": "email:" + key, "received_at": NOW.isoformat(),
             "entity_id": "ent:" + key, "tenant_id": tenant,

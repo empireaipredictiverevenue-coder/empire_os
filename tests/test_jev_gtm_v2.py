@@ -49,7 +49,7 @@ def run(**changes):
         "account": account(),
         "signals": [signal()],
         "as_of": NOW,
-        "outreach": {"suppression_checked": True},
+        "outreach": {"suppression_checked": True, "suppression_state": "CLEAR", "canonical_readback_verified": True, "suppression_readback_ref": "proof:demo"},
     }
     params.update(changes)
     return build_jev_gtm_decision(**params)
