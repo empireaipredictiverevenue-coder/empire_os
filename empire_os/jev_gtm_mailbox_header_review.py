@@ -128,6 +128,7 @@ def review_owned_mailbox_headers(
         rows.append({
             "record_ref": _reference(uid if uid else f"invalid:{index}", key),
             "intent_alias_ref": _reference(alias, key) if alias else None,
+            "inbound_rfc_ref": _reference(mid, key) if mid else None,
             "rfc_parent_ref": _reference(parent, key) if parent else None,
             "sent_rfc_parent_unique": bool(matching),
             "structural_match_not_authentication": bool(matching),
