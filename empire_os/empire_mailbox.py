@@ -12,6 +12,7 @@ import re
 from typing import Any, Iterable, Mapping
 
 from empire_os.reply_classifier import classify_reply_text
+from empire_os.reply_opt_out_evidence import explicit_opt_out_from_preview
 
 _CANONICAL_UUID_RE = re.compile(r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$", re.IGNORECASE)
 
@@ -120,6 +121,17 @@ def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend'
         "confidence": None,
         "auto_apply": False,
     }
+    # Exception to preview-unknown: only an unequivocal stop-contact request
+    # may establish a *protective hold*. It cannot assert persisted DB
+    # suppression or positive commercial intent. Existing ingest governance
+    # must separately write/verify canonical outbound_suppressions.
+    opt_out = explicit_opt_out_from_preview(subject, body)
+    if opt_out["explicit_opt_out_observed"]:
+        classification = {
+            "classification": "unsubscribe",
+            "confidence": None,
+            "auto_apply": False,
+        }
     label = classification.get("classification")
     return {
         "provider": provider,
@@ -141,6 +153,9 @@ def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend'
         "classification": label,
         "classification_confidence": classification.get("confidence"),
         "suppressed": label == "unsubscribe",
+        "explicit_opt_out_observed": opt_out["explicit_opt_out_observed"],
+        "opt_out_evidence_kind": opt_out["evidence_kind"],
+        "canonical_suppression_write_verified": False,
         "untrusted_content": True,
     }
 
