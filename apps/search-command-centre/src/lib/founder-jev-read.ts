@@ -7,6 +7,8 @@ export type FounderJevStatus = {
   native_compatibility_tested: boolean;
   commercial_model_calibrated: boolean;
   economic_reader_configured: boolean;
+  crm_reader_configured?: boolean;
+  crm_prospect_review_available?: boolean;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;

@@ -42,6 +42,7 @@ export default async function FounderJevPage() {
 
   const modelReady = state?.native_compatibility_tested ?? null;
   const economicReader = state?.economic_reader_configured ?? null;
+  const crmReader = state?.crm_reader_configured ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
   const productionLive = state?.production_activated ?? null;
@@ -141,6 +142,8 @@ export default async function FounderJevPage() {
               detail="Choice, Score and Noul have been tested against the local Laya sidecar using synthetic data." />
             <TruthLine title="Dedicated EmpireDB reader" value={economicReader}
               detail="Requires a restricted reader login, database-bound tenant and read-only transaction." />
+            <TruthLine title="Canonical CRM prospect review" value={crmReader}
+              detail="Reuses the existing tenant-scoped CRM repository. Prospects are research records; missing conversation and closer joins cannot be presented as buyer replies." />
             <TruthLine title="Founder access enforcement" value={founderAccess}
               detail="No detailed entity research route is registered unless an independent server-side authorizer is supplied." />
             <TruthLine title="Commercial model calibration" value={calibrated}
