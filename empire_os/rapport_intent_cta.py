@@ -48,6 +48,23 @@ BUY_ACTION=re.compile(
     r"\b(?:buy|purchase|order|checkout|payment link|"
     r"pricing|price|cost|how much|invoice)\b", re.I,
 )
+# Counterfactuals and explicit buyer refusals must not turn mentions of
+# "buy" and a product name into purchase intent. Conservative ambiguity
+# escalates to humans; it never becomes a checkout CTA.
+PURCHASE_COUNTERINTENT=re.compile(
+    r"\b(?:i|we)\s+(?:do not|don't|didn't|did not|cannot|can't|"
+    r"will not|won't|never|am not|are not)\s+"
+    r"(?:\w+[ -]+){0,6}?"
+    r"(?:buy|purchase|order|pay|request|ask|want|need)\b"
+    r"|\b(?:we|i)\s+(?:am|are|will|would|do)\s+not\s+"
+    r"(?:buying|purchasing|ordering|paying|requesting|asking|looking to buy)\b"
+    r"|\b(?:not asking|not requesting|no plans to buy|no intention to buy|"
+    r"not looking to buy|don't send|do not send|not a buying request)\b"
+    r"|\b(?:hypothetically|as an example|for example|if someone asks|"
+    r"if a customer asks|you wrote|your email said|you asked whether|"
+    r"this is a quote|i am quoting|i'm quoting)\b",
+    re.I,
+)
 SCOPE_ACTION=re.compile(
     r"\b(?:send|share|outline|explain|show|walk (?:us|me) through|"
     r"what would you check|how (?:does|would) (?:it|that|your)|"
@@ -170,7 +187,8 @@ def _corroborates(label: str, body: str, product_code: str) -> bool:
     if label=="explicit_product_purchase_request":
         pattern=EXPLICIT_PRODUCT_PATTERNS.get(product_code)
         return bool(pattern and re.search(pattern,body,re.I)
-                    and BUY_ACTION.search(body))
+                    and BUY_ACTION.search(body)
+                    and not PURCHASE_COUNTERINTENT.search(body))
     return False
 
 

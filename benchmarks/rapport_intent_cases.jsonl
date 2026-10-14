@@ -1,0 +1,42 @@
+{"case_id":"p01","expected_label":"explicit_product_purchase_request","body_text":"How much does your Technical Search Audit cost?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p02","expected_label":"explicit_product_purchase_request","body_text":"Please send the price for the Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p03","expected_label":"explicit_product_purchase_request","body_text":"We want to buy your Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p04","expected_label":"explicit_product_purchase_request","body_text":"Can we purchase the Technical Search Audit?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p05","expected_label":"explicit_product_purchase_request","body_text":"Please issue an invoice for the Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p06","expected_label":"explicit_product_purchase_request","body_text":"Could you share checkout details for the Technical Search Audit?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p07","expected_label":"explicit_product_purchase_request","body_text":"What's the cost of a Technical Search Audit?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"p08","expected_label":"explicit_product_purchase_request","body_text":"We would like to order the Technical Search Audit this week.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s01","expected_label":"solution_evaluation","body_text":"Could you send the written scope of what you would check?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s02","expected_label":"solution_evaluation","body_text":"Please explain the audit approach in writing.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s03","expected_label":"solution_evaluation","body_text":"How would your team review our search visibility?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s04","expected_label":"solution_evaluation","body_text":"Can you outline what the report contains?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s05","expected_label":"solution_evaluation","body_text":"Would you share the steps involved in the review?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s06","expected_label":"solution_evaluation","body_text":"What would you check before writing recommendations?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s07","expected_label":"solution_evaluation","body_text":"Could you show the kind of issues you would assess?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"s08","expected_label":"solution_evaluation","body_text":"Please send the scope of a search review.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d01","expected_label":"problem_discovery","body_text":"We need to understand which service areas people search for.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d02","expected_label":"problem_discovery","body_text":"I am struggling to measure enquiries from our roofing pages.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d03","expected_label":"problem_discovery","body_text":"We want to understand search demand in our neighbouring cities.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d04","expected_label":"problem_discovery","body_text":"We are looking for a way to check crawl problems.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d05","expected_label":"problem_discovery","body_text":"I would like to improve the visibility of our service pages.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d06","expected_label":"problem_discovery","body_text":"We have been trying to prioritise which cities need pages.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d07","expected_label":"problem_discovery","body_text":"We are figuring out why visitors leave our enquiry forms.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"d08","expected_label":"problem_discovery","body_text":"I need to understand which queries bring enquiries.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n01","expected_label":"no_purchase_intent","body_text":"Thanks for the note.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n02","expected_label":"no_purchase_intent","body_text":"Not interested in this right now.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n03","expected_label":"no_purchase_intent","body_text":"Please unsubscribe.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n04","expected_label":"no_purchase_intent","body_text":"No thanks, we have our own team.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n05","expected_label":"no_purchase_intent","body_text":"I do not want to buy the Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n06","expected_label":"no_purchase_intent","body_text":"We don't want to purchase your Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n07","expected_label":"no_purchase_intent","body_text":"I'm not asking for a Technical Search Audit price.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n08","expected_label":"no_purchase_intent","body_text":"If a customer asks how much the Technical Search Audit costs, what should I say?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n09","expected_label":"no_purchase_intent","body_text":"For example, how much does the Technical Search Audit cost? This is hypothetical.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n10","expected_label":"no_purchase_intent","body_text":"You wrote: How much does your Technical Search Audit cost?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n11","expected_label":"no_purchase_intent","body_text":"Please don't send payment details for the Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n12","expected_label":"no_purchase_intent","body_text":"We have no plans to buy the Technical Search Audit.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n13","expected_label":"no_purchase_intent","body_text":"Maybe next quarter; do not follow up yet.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n14","expected_label":"no_purchase_intent","body_text":"Thanks. On Monday wrote:\nHow much does your Technical Search Audit cost?","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n15","expected_label":"no_purchase_intent","body_text":"Thanks, but I am quoting your original price question, not asking for it.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n16","expected_label":"no_purchase_intent","body_text":"The words 'Technical Search Audit' appear on your site.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n17","expected_label":"no_purchase_intent","body_text":"A customer asked us for the Technical Search Audit price; we are not purchasing.","product_code":"technical_search_audit","synthetic":true}
+{"case_id":"n18","expected_label":"no_purchase_intent","body_text":"Our internal memo says buy Technical Search Audit, but we are not asking for a quote.","product_code":"technical_search_audit","synthetic":true}
