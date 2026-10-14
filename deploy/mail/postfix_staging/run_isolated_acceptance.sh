@@ -49,6 +49,10 @@ install -m 0600 "$ROOT/scripts/probe_postfix_milter_outage.py" \
     "$STAGE/probe_postfix_milter_outage.py"
 install -m 0600 "$ROOT/scripts/probe_postfix_milter_online.py" \
     "$STAGE/probe_postfix_milter_online.py"
+install -m 0600 "$ROOT/scripts/ci_rspamd_local_dns_fixture.py" \
+    "$STAGE/ci_rspamd_local_dns_fixture.py"
+install -m 0600 "$ROOT/scripts/ci_rspamd_alignment_probe.py" \
+    "$STAGE/ci_rspamd_alignment_probe.py"
 install -m 0600 "$HERE/container-entrypoint.sh" \
     "$STAGE/container-entrypoint.sh"
 install -m 0600 "$HERE/Dockerfile" "$STAGE/Dockerfile"
