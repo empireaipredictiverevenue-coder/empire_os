@@ -65,6 +65,8 @@ def test_founder_api_research_truth_and_safe_default():
     assert truth["jev_evidence_gap_plan_available"] is True
     assert truth["jev_public_research_execution_activated"] is False
     assert truth["jev_research_source_validation_completed_live"] is False
+    assert truth["jev_official_primary_continuity_implemented"] is True
+    assert truth["jev_official_primary_continuity_production_enabled"] is False
     assert truth["jev_research_spend_gbp"] == 0
     assert truth["buyers_identified"] is None
     assert truth["verified_revenue"] is None
@@ -74,3 +76,43 @@ def test_founder_api_research_truth_and_safe_default():
         path.startswith("/v1/founder-jev/execute")
         for path in app.openapi()["paths"]
     )
+
+
+def test_operator_official_source_smoke_explicit_only_and_no_search(monkeypatch,capsys):
+    import scripts.probe_jev_evidence_research_v2 as operator
+
+    selected = []
+    def one_source(decision, *, public_niche, public_market, official_source_urls, country):
+        selected.append((public_niche, public_market, official_source_urls, country))
+        return {
+            "pages_considered": 1, "inspected_source_count": 1,
+            "sources": [{
+                "inspection_status": "ORIGINAL_HTML_HEADINGS_INSPECTED",
+                "content_sha256": "a"*64,
+            }],
+        }
+
+    monkeypatch.setattr(operator, "run_jev_official_source_review", one_source)
+    assert operator.main([
+        "--official-source-smoke",
+        "--official-source-url", "https://www.ons.gov.uk/construction",
+        "--public-niche", "roofing", "--public-market", "Manchester",
+    ]) == 0
+    outcome = json.loads(capsys.readouterr().out)
+    assert selected == [(
+        "roofing", "Manchester",
+        ("https://www.ons.gov.uk/construction",), "GB",
+    )]
+    assert outcome["status"] == "PUBLIC_OFFICIAL_SOURCE_SMOKE"
+    assert outcome["search_provider_calls"] == 0
+    assert outcome["inspected_count"] == 1
+    assert outcome["content_fingerprint_present"] is True
+    assert outcome["actual_revenue"] is False
+    assert outcome["buyer_intent_verified"] is False
+    assert outcome["execution_authority"] == "none"
+
+
+def test_operator_rejects_official_source_smoke_without_public_scope():
+    with pytest.raises(SystemExit):
+        main(["--official-source-smoke",
+              "--official-source-url", "https://www.ons.gov.uk/construction"])

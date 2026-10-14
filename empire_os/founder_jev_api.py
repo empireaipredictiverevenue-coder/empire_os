@@ -138,6 +138,8 @@ def create_founder_jev_router(
             "jev_evidence_gap_plan_available": True,
             "jev_public_research_execution_activated": False,
             "jev_research_source_validation_completed_live": False,
+            "jev_official_primary_continuity_implemented": True,
+            "jev_official_primary_continuity_production_enabled": False,
             "jev_research_spend_gbp": 0,
             "economic_reader_configured": reader is not None,
             "crm_reader_configured": resolve_authenticated_crm is not None,

@@ -10,6 +10,8 @@ export type FounderJevStatus = {
   jev_evidence_gap_plan_available?: boolean;
   jev_public_research_execution_activated?: boolean;
   jev_research_source_validation_completed_live?: boolean;
+  jev_official_primary_continuity_implemented?: boolean;
+  jev_official_primary_continuity_production_enabled?: boolean;
   jev_research_spend_gbp?: number;
   economic_reader_configured: boolean;
   crm_reader_configured?: boolean;

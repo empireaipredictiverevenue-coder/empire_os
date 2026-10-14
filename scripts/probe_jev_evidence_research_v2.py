@@ -17,6 +17,7 @@ from empire_os.jev_gtm_research_bridge import (
     attach_jev_research_review,
     plan_jev_evidence_gap,
     run_jev_evidence_gap,
+    run_jev_official_source_review,
 )
 from empire_os.jev_gtm_v2 import build_jev_gtm_decision
 
@@ -88,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
     sources = parser.add_mutually_exclusive_group(required=True)
     sources.add_argument("--fixture-smoke", action="store_true")
     sources.add_argument("--decision-json", type=Path)
+    sources.add_argument("--official-source-smoke", action="store_true")
+    parser.add_argument("--official-source-url")
     parser.add_argument("--public-niche")
     parser.add_argument("--public-market")
     parser.add_argument("--depth", choices=("speed", "balanced", "quality"), default="speed")
@@ -95,6 +98,33 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.fixture_smoke:
         output = execute_fixture_smoke()
+    elif args.official_source_smoke:
+        if not args.official_source_url or not args.public_niche or not args.public_market:
+            parser.error("official source URL, public niche and market required for bounded public probe")
+        receipt = run_jev_official_source_review(
+            _synthetic_decision(),
+            public_niche=args.public_niche,
+            public_market=args.public_market,
+            official_source_urls=(args.official_source_url,),
+            country=args.country,
+        )
+        output = {
+            "schema_version": "empire.jev.research_operator_probe.v1",
+            "status": "PUBLIC_OFFICIAL_SOURCE_SMOKE",
+            "input_authentication": "SYNTHETIC_NOT_CANONICAL",
+            "network_access": True,
+            "search_provider_calls": 0,
+            "public_primary_page_attempts": receipt["pages_considered"],
+            "inspection_status": receipt["sources"][0]["inspection_status"],
+            "inspected_count": receipt["inspected_source_count"],
+            "content_fingerprint_present": bool(
+                receipt["sources"][0].get("content_sha256")
+            ),
+            "buyer_intent_verified": False,
+            "contact_permission_granted": False,
+            "outbound_sent": False, "database_write": False,
+            "actual_revenue": False, "execution_authority": "none",
+        }
     else:
         if not args.public_niche or not args.public_market:
             parser.error("public-niche and public-market required for offline decision review")

@@ -172,6 +172,8 @@ def run_jev_evidence_gap(
     depth: str = "speed",
     follow_up_fn: Callable[[str, list[dict[str, Any]], list[str]], Sequence[str]] | None = None,
     synthesize_fn: Callable[[str, list[dict[str, Any]]], Mapping[str, Any]] | None = None,
+    official_source_urls: Sequence[str] = (),
+    source_only: bool = False,
 ) -> dict[str, Any]:
     """Explicit operator run; no default network/tool access or privileged ops.
 
@@ -200,6 +202,26 @@ def run_jev_evidence_gap(
         }
     if not callable(search_fn) or not callable(inspect_fn):
         raise ValueError("governed search and inspector callbacks required")
+    # Explicit primary URLs must originate from an approved operator packet.
+    # Never guess a document URL, treat a search-result page as a fact, or
+    # silently widen this to arbitrary third-party websites.
+    from empire_os.research.deep_research_intake import _public_url
+    if not isinstance(official_source_urls, (tuple, list)) or len(official_source_urls) > 3:
+        raise ValueError("bounded official primary source list required")
+    if type(source_only) is not bool or (source_only and not official_source_urls):
+        raise ValueError("source-only inspection needs explicit primary URLs")
+    vetted: list[str] = []
+    for url in official_source_urls:
+        if not isinstance(url, str) or _public_url(url) != url or not url.startswith("https://"):
+            raise ValueError("invalid official primary source URL")
+        parsed = urlsplit(url)
+        host = (parsed.hostname or "").lower()
+        if not (host == "gov.uk" or host.endswith(".gov.uk")
+                or host == "ons.gov.uk" or host.endswith(".ons.gov.uk")):
+            raise ValueError("official first-party domain required")
+        if url in vetted:
+            raise ValueError("duplicate official primary URL")
+        vetted.append(url)
     profile = ResearchProfile(
         mode=depth, lanes=ALLOWED_LANES,
         country=country, sector=_public(public_niche),
@@ -208,6 +230,8 @@ def run_jev_evidence_gap(
         plan["question"], profile=profile,
         search_fn=search_fn, inspect_fn=inspect_fn,
         follow_up_fn=follow_up_fn, synthesize_fn=synthesize_fn,
+        operator_primary_urls=tuple(vetted),
+        skip_discovery=source_only,
     )
     if (result.get("execution_authority") != "none"
             or result.get("outbound_authorized") is not False
@@ -242,6 +266,13 @@ def run_jev_evidence_gap(
         canonical = _public_url(url)
         if canonical != url:
             raise ValueError("unsafe source url")
+        origin = raw.get("observation_type")
+        if origin not in {"public_search_result", "operator_supplied_primary_source"}:
+            raise ValueError("unknown original research source origin")
+        if source_only and origin != "operator_supplied_primary_source":
+            raise ValueError("unexpected discovery result during source-only review")
+        if origin == "operator_supplied_primary_source" and url not in vetted:
+            raise ValueError("operator source missing from approved set")
         inspected = raw.get("original_page_inspected") is True
         proof = raw.get("content_sha256")
         if inspected and (
@@ -255,6 +286,7 @@ def run_jev_evidence_gap(
         sources.append({
             "source_id": sid, "url": url,
             "host": urlsplit(url).hostname,
+            "observation_type": origin,
             "content_sha256": proof if inspected else None,
             "original_page_inspected": inspected,
             "inspection_status": str(raw.get("inspection_status") or "UNAVAILABLE")[:90],
@@ -310,6 +342,8 @@ def run_jev_evidence_gap(
         "public_evidence_blockers": plan["public_evidence_blockers"],
         "searches_executed": budget["searches_executed"],
         "pages_considered": budget["pages_considered"],
+        "source_discovery_disabled": source_only,
+        "operator_primary_sources_attempted": len(vetted),
         "sources_are_public_observations_only": True,
         "original_provider_authentication_verified": False,
         "buyer_intent_verified": False,
@@ -320,6 +354,46 @@ def run_jev_evidence_gap(
         "execution_authority": "none",
     }
     return receipt
+
+
+def inspect_jev_official_source(url: str) -> dict[str, Any]:
+    """Use the existing pinned-IP, TLS-validated first-party research inspector.
+
+    A single explicit source read, no redirects or crawling. Caller still
+    owns legal/robots review and source factual confirmation. Never use
+    generic shell/browser tools as an inspection fallback.
+    """
+    from empire_os.research.deep_research_intake import _public_url
+    if not isinstance(url, str) or _public_url(url) != url or not url.startswith("https://"):
+        return {"status": "UNSAFE_URL_REJECTED"}
+    host = (urlsplit(url).hostname or "").lower()
+    if not (host == "gov.uk" or host.endswith(".gov.uk")
+            or host == "ons.gov.uk" or host.endswith(".ons.gov.uk")):
+        return {"status": "NON_OFFICIAL_SOURCE_REJECTED"}
+    from empire_os.research.public_page_inspector import inspect_public_html
+    return inspect_public_html(url, timeout=5.0)
+
+
+def run_jev_official_source_review(
+    decision: Mapping[str, Any], *, public_niche: str,
+    public_market: str, official_source_urls: Sequence[str],
+    inspector: Callable[[str], Mapping[str, Any]] | None = None,
+    country: str = "GB",
+) -> dict[str, Any]:
+    """Primary-only operator review with zero search-provider calls.
+
+    Optional inspector only for offline test injection; this adapter is never
+    installed as an unattended production route.
+    """
+    return run_jev_evidence_gap(
+        decision, public_niche=public_niche, public_market=public_market,
+        search_fn=lambda query, num: {"organic": [], "error": "DISCOVERY_DISABLED"},
+        inspect_fn=inspector or inspect_jev_official_source,
+        official_source_urls=official_source_urls,
+        source_only=True,
+        country=country,
+        depth="speed",
+    )
 
 
 def attach_jev_research_review(

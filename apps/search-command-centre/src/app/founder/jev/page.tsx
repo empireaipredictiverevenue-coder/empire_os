@@ -49,6 +49,7 @@ export default async function FounderJevPage() {
   const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
   const researchActive = state?.jev_public_research_execution_activated ?? null;
   const researchValidated = state?.jev_research_source_validation_completed_live ?? null;
+  const sourceContinuity = state?.jev_official_primary_continuity_implemented ?? null;
   const productionLive = state?.production_activated ?? null;
   const buyerRows = state?.buyers_identified ?? null;
   const canonicalRows = state?.real_canonical_rows_verified ?? null;
@@ -156,8 +157,10 @@ export default async function FounderJevPage() {
               detail="Bounded plans, source-cited discovery and review receipts are implemented. Original OpenManus unrestricted tools are not installed." />
             <TruthLine title="JEV public research operational activation" value={researchActive}
               detail="Offline engineering is separate from production. Requires approved public-only search/inspection policies and independently tested live evidence quality." />
+            <TruthLine title="Original-source continuity" value={sourceContinuity}
+              detail="Allows explicitly selected GOV.UK and ONS primary pages to be inspected when public search is unavailable; no provider bypass, lead claims or commercial permission." />
             <TruthLine title="Original-source live research quality" value={researchValidated}
-              detail="Source inspection and search result citations do not independently prove factual accuracy, buyer intent or permission to contact." />
+              detail="Individual source inspection has been tested. Representative source quality, factual accuracy and buyer-intent validation are not independently complete." />
             <TruthLine title="Commercial model calibration" value={calibrated}
               detail="Requires real independently labelled cases, reliability analysis and comparison with the deterministic baseline." />
             <TruthLine title="Verified buyer conversations"
