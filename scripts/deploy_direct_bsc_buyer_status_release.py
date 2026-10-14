@@ -26,6 +26,14 @@ DROP_DIR=Path("/etc/systemd/system/empire-self-serve-checkout.service.d")
 TARGET=DROP_DIR/"50-direct-bsc-buyer-status-release.conf"
 LOGIN_FILE=Path("/etc/empire_direct_bsc_buyer_status.env")
 APPROVAL="--approved-direct-bsc-buyer-status-release-only"
+
+class SafeReleaseHold(RuntimeError):
+    """A fixed stage identifier only; no secrets, URLs or HTTP bodies."""
+
+    def __init__(self,stage: str):
+        self.stage=stage
+        super().__init__("direct_bsc_status_release_held")
+
 REVIEW_FILES=(
     "empire_os/direct_bsc_status_key_custody.py",
     "empire_os/direct_bsc_buyer_receipt_bridge.py",
@@ -168,8 +176,10 @@ def _status_probe()->None:
     # no order UUID, no buyer PII, no bearer disclosed to logs.
     unknown="ecs1_"+"A"*43
     payload=json.dumps({"token":unknown}).encode("utf-8")
-    for url in ("http://127.0.0.1:8098/v1/checkout/payment-status",
-                "http://127.0.0.1/v1/checkout/payment-status"):
+    for target,url in (
+        ("PRIVATE","http://127.0.0.1:8098/v1/checkout/payment-status"),
+        ("PUBLIC","http://127.0.0.1/v1/checkout/payment-status"),
+    ):
         request=urllib.request.Request(
             url, data=payload,
             headers={"Origin":"https://empire-ai.co.uk",
@@ -184,8 +194,12 @@ def _status_probe()->None:
         except urllib.error.HTTPError as error:
             code=error.code
             body=json.loads(error.read())
+        if code==404 and body=={"detail":"Not Found"}:
+            raise SafeReleaseHold(target+"_STATUS_ROUTE_NOT_MOUNTED")
+        if code==503 and body=={"error":"buyer_status_unavailable"}:
+            raise SafeReleaseHold(target+"_STATUS_ROUTE_HELD_BY_RUNTIME")
         if code!=404 or body!={"error":"payment_status_unavailable"}:
-            raise ValueError("status route not serving isolated unknown-token denial")
+            raise SafeReleaseHold(target+"_STATUS_RESPONSE_MISMATCH")
 
 
 def _write_dropin()->None:
@@ -247,30 +261,44 @@ def release()->dict:
         install_key()
         key_action="NEW_KEY_CREATED_0600"
     changed=False
+    phase="write_dropin"
     try:
         _write_dropin()
         changed=True
+        phase="daemon_reload"
         _run("systemctl","daemon-reload")
+        phase="restart_checkout"
         _run("systemctl","restart","empire-self-serve-checkout.service")
+        phase="restart_gateway"
         _run("systemctl","restart","empire-public-gateway.service")
+        phase="http_readiness"
         _wait_until_services_ready()
+        phase="financial_snapshot"
         if _snapshot()!=original:
             raise ValueError("checkout financial admission changed")
+        phase="financial_guards"
         checkout_financial_execution_held()
+        phase="fresh_chain"
         _chain_verified()
+        phase="private_and_public_status_probe"
         _status_probe()
-    except Exception:
+    except Exception as exc:
+        rollback_ok=False
         if changed:
-            # Restore the former systemd configuration, leaving the
-            # key file for forensic reconciliation (never rotate).
+            # Preserve the original key and financial release configuration.
             TARGET.unlink(missing_ok=True)
             try:
                 _run("systemctl","daemon-reload")
                 _run("systemctl","restart","empire-self-serve-checkout.service")
                 _run("systemctl","restart","empire-public-gateway.service")
+                rollback_ok=True
             except Exception:
-                pass
-        raise
+                rollback_ok=False
+        held=exc.stage if isinstance(exc,SafeReleaseHold) else phase
+        # Report only fixed enums; never emit exception messages.
+        raise SafeReleaseHold(
+            held+("_ROLLBACK_OK" if rollback_ok else "_READBACK_REQUIRED")
+        ) from None
     return {
         "status":"DIRECT_BSC_PRIVATE_BUYER_STATUS_RELEASE_VERIFIED",
         "key":key_action,
@@ -293,12 +321,21 @@ def main(argv: list[str]|None=None)->int:
         return 0 if not argv else 3
     try:
         result=release()
+    except SafeReleaseHold as hold:
+        print(json.dumps({
+            "status":"HELD_RELEASE_OR_ROLLBACK_NEEDS_READBACK",
+            "release_failure_stage":hold.stage,
+            "no_secrets_printed":True,
+            "do_not_retry_without_inspection":True,
+        },sort_keys=True))
+        return 4
     except Exception:
         print(json.dumps({
             "status":"HELD_RELEASE_OR_ROLLBACK_NEEDS_READBACK",
+            "release_failure_stage":"PRECHECK_OR_UNKNOWN",
             "no_secrets_printed":True,
             "do_not_retry_without_inspection":True,
-        }))
+        },sort_keys=True))
         return 4
     print(json.dumps(result,sort_keys=True))
     return 0

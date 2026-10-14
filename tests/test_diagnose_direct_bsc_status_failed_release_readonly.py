@@ -135,6 +135,9 @@ def test_inactive_or_changed_systemd_dropin_fail_closed(tmp_path,monkeypatch):
     p.write_text('[Service]\nEnvironment="BSC_RPC_URL=https://rpc.example"\n'
                  'Environment="BSC_TREASURY_ADDRESS=0x1339b487046B0ad924a10c20b1791608EA8595a8"\n'
                  'Environment="BSC_MIN_CONFIRMATIONS=12"\n')
+    # Independent of the operator umask: the inactive-dropin test must
+    # reach the active DropInPaths guard rather than file-mode guard.
+    p.chmod(0o644)
     monkeypatch.setattr(diag,"BSC_DROPIN",p)
     original=Path.stat
     def root_stat(self,*a,**k):

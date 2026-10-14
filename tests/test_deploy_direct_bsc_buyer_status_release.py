@@ -63,8 +63,9 @@ def test_status_probe_rejects_missing_or_non_denial_route(monkeypatch):
         raise HTTPError(request.full_url,404,"",{},
             __import__("io").BytesIO(b'{"detail":"Not Found"}'))
     monkeypatch.setattr(r.urllib.request,"urlopen",wrong)
-    with pytest.raises(ValueError,match="status route"):
+    with pytest.raises(r.SafeReleaseHold) as caught:
         r._status_probe()
+    assert caught.value.stage=="PRIVATE_STATUS_ROUTE_NOT_MOUNTED"
 
 
 def test_release_does_not_rotate_existing_key_and_preserves_order_flags(monkeypatch):
@@ -165,3 +166,42 @@ def test_release_requires_the_verified_published_checkout_page(monkeypatch,tmp_p
     page.write_bytes(b"buyer-page-unreviewed")
     with pytest.raises(ValueError,match="not verified"):
         r._published_checkout_verified()
+
+
+def test_private_503_status_returns_redacted_runtime_held(monkeypatch):
+    from urllib.error import HTTPError
+    from io import BytesIO
+    def held(request,timeout):
+        raise HTTPError(request.full_url,503,"",{},
+            BytesIO(b'{"error":"buyer_status_unavailable"}'))
+    monkeypatch.setattr(r.urllib.request,"urlopen",held)
+    with pytest.raises(r.SafeReleaseHold) as caught:
+        r._status_probe()
+    assert caught.value.stage=="PRIVATE_STATUS_ROUTE_HELD_BY_RUNTIME"
+
+
+def test_public_generic_404_reports_public_not_mounted_after_private_success(monkeypatch):
+    from urllib.error import HTTPError
+    from io import BytesIO
+    touched=[]
+    def response(request,timeout):
+        local=":8098" in request.full_url
+        touched.append("PRIVATE" if local else "PUBLIC")
+        body=(b'{"error":"payment_status_unavailable"}' if local
+              else b'{"detail":"Not Found"}')
+        raise HTTPError(request.full_url,404,"",{},BytesIO(body))
+    monkeypatch.setattr(r.urllib.request,"urlopen",response)
+    with pytest.raises(r.SafeReleaseHold) as caught:
+        r._status_probe()
+    assert caught.value.stage=="PUBLIC_STATUS_ROUTE_NOT_MOUNTED"
+    assert touched==["PRIVATE","PUBLIC"]
+
+
+def test_stage_redaction_does_not_disclose_exception_messages(capsys,monkeypatch):
+    monkeypatch.setattr(r,"release",lambda:(
+        _ for _ in ()).throw(r.SafeReleaseHold("PRIVATE_STATUS_ROUTE_NOT_MOUNTED_ROLLBACK_OK")))
+    assert r.main(["--apply",r.APPROVAL])==4
+    result=__import__("json").loads(capsys.readouterr().out)
+    assert result["release_failure_stage"]=="PRIVATE_STATUS_ROUTE_NOT_MOUNTED_ROLLBACK_OK"
+    assert result["no_secrets_printed"] is True
+    assert "postgresql://" not in str(result)

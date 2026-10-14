@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import json
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -32,6 +33,15 @@ ACTIVATION="EMPIRE_DIRECT_BSC_BUYER_STATUS_RELEASE"
 CREDENTIAL_KEY="empire_direct_bsc_buyer_status_hmac.key"
 CREDENTIAL_DSN="empire_direct_bsc_buyer_status.env"
 
+_LOG=logging.getLogger("empire.checkout.buyer_status")
+
+class PrivateStatusConfigurationHeld(ValueError):
+    """Carries only a fixed pre-declared stage, never credential contents."""
+    def __init__(self,stage: str):
+        self.stage=stage
+        super().__init__("private_status_configuration_unavailable")
+
+
 
 def _enabled()->bool:
     return os.getenv(ACTIVATION,"OFF")=="ON"
@@ -48,47 +58,60 @@ def _credential_dir()->Path:
 
 
 def _config()->tuple[str,str,bytes,str]:
-    folder=_credential_dir()
-    key_path=folder/CREDENTIAL_KEY
-    dsn_path=folder/CREDENTIAL_DSN
-    for file in (key_path,dsn_path):
-        if file.is_symlink() or not file.is_file():
-            raise ValueError("systemd credential missing")
-        if file.stat().st_mode & 0o077:
-            raise ValueError("systemd credential permissions unsafe")
-    with key_path.open("rb") as file:
-        key=file.read(33)
-    if len(key)!=32:
-        raise ValueError("bad HMAC key")
-    lines=dsn_path.read_text(encoding="utf-8").splitlines()
-    out={}
-    for line in lines:
-        k,sep,raw=line.partition("=")
-        if not sep or k not in {READ_KEY,ISSUE_KEY} or k in out:
-            raise ValueError("invalid credential entry")
-        val=json.loads(raw)
-        if type(val) is not str:
-            raise ValueError("invalid DSN")
-        out[k]=val
-    if set(out)!={READ_KEY,ISSUE_KEY}:
-        raise ValueError("missing DSN")
-    _bound_reader_identity(out[READ_KEY])
-    issuer=conninfo_to_dict(out[ISSUE_KEY])
-    if (issuer.get("user")!=ISSUE_LOGIN
-        or issuer.get("dbname")!="empiredb"
-        or issuer.get("host") not in (
-            "127.0.0.1","localhost","::1","/var/run/postgresql")
-        or issuer.get("hostaddr") not in (None,"","127.0.0.1","::1")
-        or str(issuer.get("port") or "5432")!="5432"
-        or not issuer.get("password")
-        or issuer.get("options") or issuer.get("service")):
-        raise ValueError("untrusted issuer")
-    if conninfo_to_dict(out[READ_KEY])["password"] == issuer["password"]:
-        raise ValueError("shared password denied")
-    cfg=BscUsdtConfig.from_env()
-    if cfg.min_confirmations<12:
-        raise ValueError("minimum chain confirmations below policy")
-    return out[READ_KEY],out[ISSUE_KEY],key,cfg.treasury_address
+    stage="credential_directory"
+    try:
+        folder=_credential_dir()
+        stage="credential_files"
+        key_path=folder/CREDENTIAL_KEY
+        dsn_path=folder/CREDENTIAL_DSN
+        for file in (key_path,dsn_path):
+            if file.is_symlink() or not file.is_file():
+                raise ValueError("systemd credential missing")
+            if file.stat().st_mode & 0o077:
+                raise ValueError("systemd credential permissions unsafe")
+        stage="signing_key"
+        with key_path.open("rb") as file:
+            key=file.read(33)
+        if len(key)!=32:
+            raise ValueError("bad HMAC key")
+        stage="credential_format"
+        lines=dsn_path.read_text(encoding="utf-8").splitlines()
+        out={}
+        for line in lines:
+            k,sep,raw=line.partition("=")
+            if not sep or k not in {READ_KEY,ISSUE_KEY} or k in out:
+                raise ValueError("invalid credential entry")
+            val=json.loads(raw)
+            if type(val) is not str:
+                raise ValueError("invalid DSN")
+            out[k]=val
+        if set(out)!={READ_KEY,ISSUE_KEY}:
+            raise ValueError("missing DSN")
+        stage="reader_identity"
+        _bound_reader_identity(out[READ_KEY])
+        stage="issuer_identity"
+        issuer=conninfo_to_dict(out[ISSUE_KEY])
+        if (issuer.get("user")!=ISSUE_LOGIN
+            or issuer.get("dbname")!="empiredb"
+            or issuer.get("host") not in (
+                "127.0.0.1","localhost","::1","/var/run/postgresql")
+            or issuer.get("hostaddr") not in (None,"","127.0.0.1","::1")
+            or str(issuer.get("port") or "5432")!="5432"
+            or not issuer.get("password")
+            or issuer.get("options") or issuer.get("service")):
+            raise ValueError("untrusted issuer")
+        stage="independent_passwords"
+        if conninfo_to_dict(out[READ_KEY])["password"] == issuer["password"]:
+            raise ValueError("shared password denied")
+        stage="bsc_configuration"
+        cfg=BscUsdtConfig.from_env()
+        if cfg.min_confirmations<12:
+            raise ValueError("minimum chain confirmations below policy")
+        return out[READ_KEY],out[ISSUE_KEY],key,cfg.treasury_address
+    except Exception:
+        # Exception cause and message may include private DSNs. Never print
+        # them or attach an exception chain to service startup output.
+        raise PrivateStatusConfigurationHeld(stage) from None
 
 
 def _chain_verified()->bool:
@@ -148,9 +171,11 @@ def mount_status_if_released(app: FastAPI)->bool:
     if not _enabled():
         return False
     # If credentials unavailable, do NOT mount public HTTP endpoint.
+    phase="credentials"
     try:
         reader_dsn,issuer_dsn,key,treasury=_config()
         assert issuer_dsn
+        phase="status_assembly"
         status=create_staged_private_status_app(
             reader_dsn=reader_dsn,
             hmac_key=key,
@@ -159,7 +184,13 @@ def mount_status_if_released(app: FastAPI)->bool:
             founder_release=_enabled,
             verified_chain=_chain_verified,
         )
+        phase="status_mount"
         app.include_router(status.router)
+        _LOG.info("DIRECT_BSC_STATUS_MOUNT=READY")
         return True
+    except PrivateStatusConfigurationHeld as held:
+        _LOG.warning("DIRECT_BSC_STATUS_MOUNT=HELD stage=%s", held.stage)
+        return False
     except Exception:
+        _LOG.warning("DIRECT_BSC_STATUS_MOUNT=HELD stage=%s", phase)
         return False

@@ -124,3 +124,42 @@ def test_gateway_mediates_bearer_without_query_strings():
     assert status.status_code==403
     assert status.headers["cache-control"].startswith("no-store")
     assert "token" not in status.text
+
+
+def test_startup_mount_config_hold_is_redacted_and_phase_specific(monkeypatch,caplog):
+    monkeypatch.setenv(release.ACTIVATION,"ON")
+    monkeypatch.setattr(release,"_credential_dir",
+        lambda:(_ for _ in ()).throw(ValueError(
+            "CREDENTIALS_DIRECTORY_private_must_not_log")))
+    import logging
+    with caplog.at_level(logging.WARNING):
+        assert release.mount_status_if_released(FastAPI()) is False
+    messages=" ".join(record.message for record in caplog.records)
+    assert "DIRECT_BSC_STATUS_MOUNT=HELD stage=credential_directory" in messages
+    assert "private_must_not_log" not in messages
+
+
+def test_startup_mount_assembly_hold_does_not_leak_credentials(monkeypatch,caplog):
+    monkeypatch.setenv(release.ACTIVATION,"ON")
+    monkeypatch.setattr(release,"_config",lambda:(
+        "secret_reader","secret_issuer",bytes(range(32)),TREASURY))
+    monkeypatch.setattr(release,"create_staged_private_status_app",
+        lambda **kwargs:(_ for _ in ()).throw(
+            RuntimeError("credential_contents_must_not_log")))
+    import logging
+    with caplog.at_level(logging.WARNING):
+        assert release.mount_status_if_released(FastAPI()) is False
+    messages=" ".join(rec.message for rec in caplog.records)
+    assert "DIRECT_BSC_STATUS_MOUNT=HELD stage=status_assembly" in messages
+    assert "secret_reader" not in messages
+    assert "credential_contents_must_not_log" not in messages
+
+
+def test_configuration_categorizes_untrusted_missing_directory_without_leaks(monkeypatch):
+    monkeypatch.setattr(release,"_credential_dir",
+        lambda:(_ for _ in ()).throw(
+            ValueError("private_credentials_unavailable")))
+    with pytest.raises(release.PrivateStatusConfigurationHeld) as caught:
+        release._config()
+    assert caught.value.stage=="credential_directory"
+    assert "private_credentials_unavailable" not in str(caught.value)
