@@ -3,7 +3,7 @@ Status: PROPOSED; NOT EFFECTIVE OR PUBLISHED
 Prepared 12 October 2026. Final legal/founder approval and exact HTML export hash required before effective publication.
 
 ## Who is responsible and how to contact us
-Empire-AI is operated by its founder, Phil Livesley, trading as Empire-AI as an individual sole trader based in Bolton, England. Business correspondence: 31 Saint Thomas St, Bolton BL1 3PW, United Kingdom. Privacy requests and other questions: founder@empire-ai.co.uk. The existing forwarding route to the founder's Gmail account has been delivery-tested. Verify the exact legal name against the founder's legal identity before effective release.
+Empire-AI is operated by its founder, Phil Livesley, trading as Empire-AI as an individual sole trader based in Bolton, England. Business correspondence: 68 Wentbridge Road, Bolton BL1 2QR, United Kingdom. Privacy requests and other questions: founder@empire-ai.co.uk. The existing forwarding route to the founder's Gmail account has been delivery-tested. Verify the exact legal name against the founder's legal identity before effective release.
 
 ## What personal information we collect
 When you visit, website security and delivery systems may process request URLs, IP address, connection times, user-agent/browser characteristics and diagnostic events. The site runs behind Cloudflare and our own EmpireOS public gateway. A no-store response does not prevent infrastructure logs. Some security/diagnostic event records may be held by Cloudflare or local journald/syslog systems.
