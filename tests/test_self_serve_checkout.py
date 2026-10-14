@@ -94,6 +94,12 @@ def test_prepare_checkout_order_is_real_catalog_and_idempotent():
     assert order["state"] == "accepted"
     assert order["price_cents"] == 19900
     assert order["expected_margin_cents"] == 14900
+    # Accepted order does not mean paid, delivered, or authorised to
+    # auto-fulfil. Actual report evidence and verified payment are separate.
+    assert order["delivery_payload"]["automatic_fulfilment_requested"] is False
+    assert order["delivery_payload"]["delivery_mode"] == "email_and_secure_link"
+    assert order.get("delivered_at") is None
+    assert order.get("paid_at") is None
     assert order["commercial_payload"]["actual_revenue"] is False
 
 

@@ -378,7 +378,10 @@ def prepare_checkout_order(
             "delivery_mode": "email_and_secure_link",
             "email": buyer_email,
             "target_domain": domain,
-            "automatic_fulfilment_requested": True,
+            # Payment approval, independently verified settlement and actual
+            # report evidence are separate from order admission. No live
+            # first-party fulfilment consumer exists for this request flag.
+            "automatic_fulfilment_requested": False,
         },
         "commercial_payload": {
             "source": "self_serve_checkout_v1",
