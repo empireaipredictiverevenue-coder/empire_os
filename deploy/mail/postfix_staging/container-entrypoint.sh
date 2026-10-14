@@ -11,7 +11,12 @@ fi
 ROOT="$(mktemp -d -p /tmp empire-postfix-stage-XXXXXXXX)"
 STOP_POSTFIX=0
 RSPAMD_PID=
+DNS_PID=
 cleanup() {
+    if [ -n "$DNS_PID" ]; then
+        kill -TERM "$DNS_PID" >/dev/null 2>&1 || true
+        wait "$DNS_PID" 2>/dev/null || true
+    fi
     if [ -n "$RSPAMD_PID" ]; then
         kill -TERM "$RSPAMD_PID" >/dev/null 2>&1 || true
         wait "$RSPAMD_PID" 2>/dev/null || true
@@ -205,6 +210,44 @@ echo "REAL_POSTFIX_MILTER_DOWN_FAIL_CLOSED=TRUE"
 # 127.0.0.1 due to the caller's --network none container flag.
 getent passwd _rspamd >/dev/null
 getent group _rspamd >/dev/null
+# Generate an EPHEMERAL test signing key (never a production DKIM key).
+# All fixture domains are reserved *.test and runtime network is disabled.
+openssl genrsa -out "$ROOT/rspamd-fixture.key" 2048 >/dev/null 2>&1
+chmod 0600 "$ROOT/rspamd-fixture.key"
+openssl rsa -in "$ROOT/rspamd-fixture.key" -RSAPublicKey_out \
+    -outform DER -out "$ROOT/rspamd-fixture.pub.der" >/dev/null 2>&1
+python3 -m scripts.ci_rspamd_local_dns_fixture \
+    --serve-ci-fixture --public-der "$ROOT/rspamd-fixture.pub.der" \
+    >"$ROOT/local-dns-fixture.log" 2>&1 &
+DNS_PID=$!
+python3 - <<'PY'
+import time
+from dnslib import DNSRecord, QTYPE
+for attempt in range(60):
+    try:
+        reply=DNSRecord.parse(DNSRecord.question(
+            "verified.receiver.test.",qtype="TXT"
+        ).send("127.0.0.1",5353,timeout=.5))
+        if reply.rr and reply.rr[0].rtype == QTYPE.TXT:
+            print("OFFLINE_DKIM_SPF_DMARC_DNS_FIXTURE_READY=TRUE")
+            break
+    except Exception:
+        time.sleep(.2)
+else:
+    raise SystemExit("HOLD_LOCAL_AUTH_DNS_FIXTURE")
+PY
+install -d -m 0755 /etc/rspamd/local.d
+cat > /etc/rspamd/local.d/options.inc <<'EOF'
+dns {
+  nameserver = ["127.0.0.1:5353"];
+}
+local_addrs = ["192.0.2.0/24"];
+EOF
+cat > /etc/rspamd/local.d/milter_headers.conf <<'EOF'
+use = ["authentication-results"];
+skip_local = false;
+skip_authenticated = false;
+EOF
 /usr/bin/rspamadm configtest >/dev/null
 /usr/bin/rspamd -f -u _rspamd -g _rspamd \
     >"$ROOT/rspamd-test.log" 2>&1 &
@@ -227,5 +270,9 @@ PY
 python3 -m scripts.probe_postfix_milter_online \
     --approved-offline-local-milter
 echo "REAL_POSTFIX_TO_RSPAMD_SYNTHETIC_DATA=ACCEPTED"
-echo "SENDER_DKIM_SPF_DMARC_AUTHENTICATION_PROVEN=FALSE"
+python3 -m scripts.ci_rspamd_alignment_probe \
+    --approved-isolated-auth-fixture --stage "$ROOT" \
+    --private-key "$ROOT/rspamd-fixture.key"
+echo "SYNTHETIC_POSITIVE_AND_NEGATIVE_DOMAIN_ALIGNMENT_VERIFIED=TRUE"
+echo "SENDER_DKIM_SPF_DMARC_AUTHENTICATION_PROVEN=FIXTURE_ONLY"
 echo "POSTFIX_MX_CHANGED=FALSE"
