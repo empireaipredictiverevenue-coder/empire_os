@@ -140,10 +140,51 @@ def _canonical_seed_records(
     return rows
 
 
+def refresh_known_partner_gmail_before_public_search(
+    repo_root: str,
+    *,
+    runner=None,
+) -> dict:
+    """Refresh previously authorised buyer threads before slow web discovery.
+
+    Reuse the EXISTING Gmail evidence cycle, its private lock and read-only
+    token. No new timer, mailbox permission or outbound authorization. A
+    provider error is recorded but does not block first-party buyer research.
+    """
+    root = Path(repo_root).resolve()
+    runner = runner or subprocess.run
+    env = os.environ.copy()
+    env.update({
+        "PYTHONPATH": str(root),
+        "EMPIRE_MODE": "OBSERVE",
+        "EMPIRE_EXECUTION_AUTHORITY": "OBSERVE",
+        "OUTBOUND_ENABLED": "0",
+        "EMPIRE_OUTBOUND_ENABLED": "0",
+        "LIVE_OUTBOUND": "0",
+    })
+    try:
+        result = runner(
+            [sys.executable, "-m", "scripts.run_buyer_gmail_evidence_cycle"],
+            cwd=root, env=env, capture_output=True, text=True,
+            timeout=60, check=False,
+        )
+        status = "PASS" if result.returncode == 0 else "BLOCKED"
+        code = result.returncode
+    except subprocess.TimeoutExpired:
+        status = "TIMEOUT"
+        code = 124
+    return {
+        "status": status, "exit_code": code,
+        "mode": "OBSERVE", "outbound_sent": False,
+        "execution_authority": "NONE",
+    }
+
+
 def research_network_after_scout(
     repo_root: str,
     *,
     runner=None,
+    mailbox_preflight: dict | None = None,
 ) -> dict:
     """Piggyback on the EXISTING 30-min buyer scout, without new timers.
 
@@ -182,18 +223,36 @@ def research_network_after_scout(
             research_code = proc.returncode
         except subprocess.TimeoutExpired:
             research_code = 124
-        try:
-            linked = runner(
-                [
-                    sys.executable,
-                    "-m", "scripts.run_buyer_gmail_evidence_cycle",
-                ],
-                cwd=root, env=env, capture_output=True,
-                text=True, timeout=120, check=False,
-            )
-            registry_code = linked.returncode
-        except subprocess.TimeoutExpired:
-            registry_code = 124
+        if mailbox_preflight is None:
+            # Legacy direct-call path stays compatible with existing tests.
+            try:
+                linked = runner(
+                    [
+                        sys.executable,
+                        "-m", "scripts.run_buyer_gmail_evidence_cycle",
+                    ],
+                    cwd=root, env=env, capture_output=True,
+                    text=True, timeout=120, check=False,
+                )
+                registry_code = linked.returncode
+            except subprocess.TimeoutExpired:
+                registry_code = 124
+        else:
+            # The already-completed pre-search read must never execute twice.
+            if (
+                not isinstance(mailbox_preflight, dict)
+                or mailbox_preflight.get("mode") != "OBSERVE"
+                or mailbox_preflight.get("outbound_sent") is not False
+                or mailbox_preflight.get("execution_authority") != "NONE"
+                or mailbox_preflight.get("status") not in ("PASS","BLOCKED","TIMEOUT")
+            ):
+                registry_code = 2
+            else:
+                registry_code = (
+                    0 if mailbox_preflight["status"]=="PASS"
+                    else 124 if mailbox_preflight["status"]=="TIMEOUT"
+                    else 2
+                )
         successes = int(research_code == 0) + int(registry_code == 0)
         return {
             "status": ("PASS" if successes == 2 else
@@ -226,6 +285,14 @@ def main() -> int:
     parser.add_argument("--intent-seed-limit", type=int, default=12)
     parser.add_argument("--skip-buyer-network-research", action="store_true")
     args = parser.parse_args()
+
+    # This read is independent of slow public search and stays OBSERVE-only.
+    # Public engines can hit the scout service's ten-minute timeout; doing
+    # Gmail first keeps reviewed partner replies current in that case.
+    mailbox_preflight = (
+        None if args.skip_buyer_network_research
+        else refresh_known_partner_gmail_before_public_search(args.repo_root)
+    )
 
     public_research = refresh_public_research_seeds(
         args.repo_root,
@@ -273,11 +340,17 @@ def main() -> int:
     research_status = (
         {"status": "SKIPPED", "mode": "OBSERVE"}
         if args.skip_buyer_network_research
-        else research_network_after_scout(args.repo_root)
+        else research_network_after_scout(
+            args.repo_root, mailbox_preflight=mailbox_preflight
+        )
     )
     print(json.dumps({
         "ok": True,
         "buyer_network_research": research_status,
+        "mailbox_presearch": mailbox_preflight or {
+            "status": "SKIPPED", "outbound_sent": False,
+            "execution_authority": "NONE",
+        },
         "query_count": payload["query_count"],
         "domain_count": payload["domain_count"],
         "search_domain_count": payload["search_domain_count"],

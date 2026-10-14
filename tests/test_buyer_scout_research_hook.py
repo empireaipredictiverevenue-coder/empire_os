@@ -90,6 +90,7 @@ def test_existing_systemd_timer_is_reused_without_new_unit():
     src = (root / "scripts/run_buyer_acquisition_scout.py").read_text()
     assert "run_buyer_acquisition_scout.py" in unit
     assert "OnUnitInactiveSec=30min" in timer
-    assert "research_network_after_scout(args.repo_root)" in src
+    assert "research_network_after_scout(" in src
+    assert "mailbox_preflight=mailbox_preflight" in src
     assert "--skip-buyer-network-research" in src
     assert "OUTBOUND_ENABLED" in src
