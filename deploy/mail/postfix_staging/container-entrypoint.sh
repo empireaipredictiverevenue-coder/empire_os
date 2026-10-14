@@ -214,7 +214,7 @@ getent group _rspamd >/dev/null
 # All fixture domains are reserved *.test and runtime network is disabled.
 openssl genrsa -out "$ROOT/rspamd-fixture.key" 2048 >/dev/null 2>&1
 chmod 0600 "$ROOT/rspamd-fixture.key"
-openssl rsa -in "$ROOT/rspamd-fixture.key" -RSAPublicKey_out \
+openssl pkey -in "$ROOT/rspamd-fixture.key" -pubout \
     -outform DER -out "$ROOT/rspamd-fixture.pub.der" >/dev/null 2>&1
 python3 -m scripts.ci_rspamd_local_dns_fixture \
     --serve-ci-fixture --public-der "$ROOT/rspamd-fixture.pub.der" \
