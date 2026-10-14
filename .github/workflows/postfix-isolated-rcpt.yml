@@ -1,0 +1,24 @@
+name: Sovereign mail - isolated Postfix RCPT proof
+
+on:
+  push:
+    branches:
+      - feature/postfix-isolated-rcpt-ci-20261014
+
+permissions:
+  contents: read
+
+jobs:
+  disposable-postfix-rcpt:
+    if: github.repository == 'empireaipredictiverevenue-coder/empire_os'
+    name: Postfix real SMTP RCPT-only (no DATA)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Read fixture code only
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run actual Postfix locally on disposable runner
+        shell: bash
+        run: bash scripts/ci_postfix_rcpt_acceptance.sh
