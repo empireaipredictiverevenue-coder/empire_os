@@ -227,7 +227,7 @@ for attempt in range(60):
     try:
         reply=DNSRecord.parse(DNSRecord.question(
             "verified.receiver.test.",qtype="TXT"
-        ).send("127.0.0.1",5353,timeout=.5))
+        ).send("127.0.0.1",53,timeout=.5))
         if reply.rr and reply.rr[0].rtype == QTYPE.TXT:
             print("OFFLINE_DKIM_SPF_DMARC_DNS_FIXTURE_READY=TRUE")
             break
@@ -239,16 +239,24 @@ PY
 install -d -m 0755 /etc/rspamd/local.d
 cat > /etc/rspamd/local.d/options.inc <<'EOF'
 dns {
-  nameserver = ["127.0.0.1:5353"];
+  nameserver = ["127.0.0.1"];
 }
 local_addrs = ["192.0.2.0/24"];
 EOF
+# Container-scoped resolver, not the EmpireOS host or any public DNS.
+printf 'nameserver 127.0.0.1\noptions timeout:1 attempts:1\n' > /etc/resolv.conf
+for module in spf dkim dmarc; do
+    printf 'check_local = true;\ncheck_authed = true;\n' \
+      > "/etc/rspamd/local.d/$module.conf"
+done
 cat > /etc/rspamd/local.d/milter_headers.conf <<'EOF'
 use = ["authentication-results"];
 skip_local = false;
 skip_authenticated = false;
 EOF
 /usr/bin/rspamadm configtest >/dev/null
+/usr/bin/rspamadm configdump options | grep -Fq '127.0.0.1'
+echo 'REAL_RSPAMD_RESOLVER_POINTS_TO_OFFLINE_FIXTURE=TRUE'
 /usr/bin/rspamd -f -u _rspamd -g _rspamd \
     >"$ROOT/rspamd-test.log" 2>&1 &
 RSPAMD_PID=$!

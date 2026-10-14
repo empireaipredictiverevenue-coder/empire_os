@@ -1,6 +1,6 @@
 """Disposable DNS-authoritative fixture for Rspamd's real auth modules.
 
-NETWORK-NONE container ONLY: binds 127.0.0.1:5353, answers only
+NETWORK-NONE container ONLY: binds 127.0.0.1:53, answers only
 reserved fixture domains; never forwards queries or changes production DNS.
 No real DKIM keys: generated ephemeral container-only for test.
 """
@@ -62,7 +62,7 @@ def main(argv=None) -> int:
     if a.public_der.is_symlink() or not a.public_der.is_file():
         raise ValueError("owner generated RSA public fixture file required")
     public = a.public_der.read_bytes()
-    server = DNSServer(FixtureResolver(public), port=5353, address="127.0.0.1", tcp=False)
+    server = DNSServer(FixtureResolver(public), port=53, address="127.0.0.1", tcp=False)
     server.start_thread()
     print("OFFLINE_AUTHORITATIVE_DNS_FIXTURE_ACTIVE",flush=True)
     import time

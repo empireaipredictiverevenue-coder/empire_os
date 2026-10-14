@@ -98,6 +98,7 @@ def run_fixture(stage: Path, private_key: Path) -> dict:
         raise ValueError(f"positive verifier fixture not accepted: {status}")
     good_body=_wait_new(stage,seen)
     auth=_auth_headers(good_body)
+    print("POSITIVE_AUTH_RESULT_FIXTURE="+auth[:700],flush=True)
     print("POSITIVE_AUTH_HEADER_METHODS="+",".join(
         f"{name}:{'pass' if name+'=pass' in auth else 'not-pass'}"
         for name in ("spf","dkim","dmarc")
