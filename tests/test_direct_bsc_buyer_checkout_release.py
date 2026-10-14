@@ -32,7 +32,8 @@ def credentials(tmp_path,monkeypatch):
     key.write_bytes(bytes(range(32)))
     dsns.write_text("".join(k+"="+json.dumps(v)+"\n"
                             for k,v in dsn_entries().items()))
-    key.chmod(0o600);dsns.chmod(0o600)
+    # Simulate read-only systemd-delivered copies, not 0600 root sources.
+    key.chmod(0o444);dsns.chmod(0o444)
     monkeypatch.setattr(release,"_credential_dir",lambda:tmp_path)
     monkeypatch.setattr(BscUsdtConfig,"from_env",classmethod(
        lambda cls: cls(rpc_url="http://127.0.0.1:8080",

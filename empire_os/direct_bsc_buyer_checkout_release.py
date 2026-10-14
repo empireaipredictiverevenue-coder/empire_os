@@ -32,6 +32,9 @@ from scripts.provision_direct_bsc_buyer_status_logins import (
 ACTIVATION="EMPIRE_DIRECT_BSC_BUYER_STATUS_RELEASE"
 CREDENTIAL_KEY="empire_direct_bsc_buyer_status_hmac.key"
 CREDENTIAL_DSN="empire_direct_bsc_buyer_status.env"
+CHECKOUT_CREDENTIAL_DIR=Path(
+    "/run/credentials/empire-self-serve-checkout.service"
+)
 
 _LOG=logging.getLogger("empire.checkout.buyer_status")
 
@@ -48,12 +51,17 @@ def _enabled()->bool:
 
 
 def _credential_dir()->Path:
+    """Only the real checkout unit's private systemd credential directory."""
     dirname=os.environ.get("CREDENTIALS_DIRECTORY","")
-    if not dirname.startswith("/run/credentials/"):
-        raise ValueError("systemd credential directory required")
-    path=Path(dirname)
+    if dirname!=str(CHECKOUT_CREDENTIAL_DIR):
+        raise ValueError("exact checkout systemd credential context required")
+    path=CHECKOUT_CREDENTIAL_DIR
     if path.is_symlink() or not path.is_dir():
         raise ValueError("untrusted credential directory")
+    # systemd protects 0444 credential copies through the private per-unit
+    # directory, which must not be traversable by unrelated users.
+    if path.stat().st_mode & 0o007:
+        raise ValueError("untrusted credential directory traversal rights")
     return path
 
 
@@ -67,8 +75,11 @@ def _config()->tuple[str,str,bytes,str]:
         for file in (key_path,dsn_path):
             if file.is_symlink() or not file.is_file():
                 raise ValueError("systemd credential missing")
-            if file.stat().st_mode & 0o077:
-                raise ValueError("systemd credential permissions unsafe")
+            # systemd's read-only copy is commonly 0444, unlike the
+            # root-only 0600 source. The exact per-unit directory
+            # above prevents unrelated users from traversing here.
+            if file.stat().st_mode & 0o222:
+                raise ValueError("systemd credential must be read-only")
         stage="signing_key"
         with key_path.open("rb") as file:
             key=file.read(33)
