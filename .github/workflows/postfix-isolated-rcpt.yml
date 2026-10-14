@@ -23,7 +23,7 @@ jobs:
           git init -q
           git remote add origin https://github.com/empireaipredictiverevenue-coder/empire_os.git
           git -c protocol.version=2 fetch -q --no-tags --depth=1 origin "$GITHUB_SHA"
-          git checkout FETCH_HEAD --             empire_os/owned_postfix_staging_profile.py             scripts/probe_postfix_staging_smtp_rcpt.py             scripts/ci_postfix_rcpt_acceptance.sh             deploy/mail/postfix_staging/Dockerfile             deploy/mail/postfix_staging/container-entrypoint.sh             deploy/mail/postfix_staging/run_isolated_acceptance.sh
+          git checkout FETCH_HEAD --             empire_os/owned_postfix_staging_profile.py             scripts/probe_postfix_staging_smtp_rcpt.py             scripts/ci_postfix_rcpt_acceptance.sh             scripts/probe_postfix_synthetic_delivery.py             deploy/mail/postfix_staging/Dockerfile             deploy/mail/postfix_staging/container-entrypoint.sh             deploy/mail/postfix_staging/run_isolated_acceptance.sh
           test -f deploy/mail/postfix_staging/Dockerfile
           echo "ONLY_BOUNDED_TEST_FILES_FETCHED=TRUE"
       - name: Postfix 3.8 real host SMTP admission

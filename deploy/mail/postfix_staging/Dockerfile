@@ -7,5 +7,6 @@ RUN printf 'postfix postfix/main_mailer_type select Local only\npostfix postfix/
 WORKDIR /opt/empire
 COPY owned_postfix_staging_profile.py /opt/empire/empire_os/owned_postfix_staging_profile.py
 COPY probe_postfix_staging_smtp_rcpt.py /opt/empire/scripts/probe_postfix_staging_smtp_rcpt.py
+COPY probe_postfix_synthetic_delivery.py /opt/empire/scripts/probe_postfix_synthetic_delivery.py
 COPY container-entrypoint.sh /opt/empire/container-entrypoint.sh
 ENTRYPOINT ["/bin/bash", "/opt/empire/container-entrypoint.sh"]

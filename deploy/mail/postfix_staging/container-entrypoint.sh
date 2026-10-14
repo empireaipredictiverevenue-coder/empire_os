@@ -46,6 +46,12 @@ maildir.mkdir(mode=0o700)
 maildir.chmod(0o700)
 PY
 
+# Virtual mailbox worker uses 15000:15000; strict but traversable stage parent.
+chown 15000:15000 "$ROOT/maildir"
+chmod 0700 "$ROOT/maildir"
+install -o root -g root -m 0600 /dev/null "$ROOT/.empire-ci-mail-delivery-test"
+printf "CI_CONTAINER_NETWORK_NONE\n" > "$ROOT/.empire-ci-mail-delivery-test"
+
 # The real package-install stage creates the dedicated postfix/postdrop OS
 # identities. Refuse to silently use ubuntu/nobody as a substitute.
 getent passwd postfix >/dev/null
@@ -68,7 +74,7 @@ install -o root -g root -m 0644 "$ROOT/master.cf" /etc/postfix/master.cf
 /usr/sbin/postmap "hash:$ROOT/recipients"
 test -r "$ROOT/recipients.db"
 chown root:postfix "$ROOT" "$ROOT/recipients.db"
-chmod 0750 "$ROOT"
+chmod 0751 "$ROOT"
 chmod 0640 "$ROOT/recipients.db"
 
 # Validate the actual compiled map, not just source files. No open relay,
@@ -93,6 +99,11 @@ STOP_POSTFIX=1
 python3 -m scripts.probe_postfix_staging_smtp_rcpt \
     --approved-isolated-loopback-rcpt-test
 
+# Synthetic SMTP DATA is sent only to the private Maildir inside this
+# disposable, no-network container. No real buyer or public route involved.
+python3 -m scripts.probe_postfix_synthetic_delivery \
+    --approved-isolated-synthetic-delivery --staging-root "$ROOT"
+
 echo "POSTFIX_ISOLATED_ACCEPTANCE=RCPT_PROBE_EXIT_ZERO"
-echo "POSTFIX_ISOLATED_ACCEPTANCE_NO_DATA=TRUE"
+echo "POSTFIX_ISOLATED_ACCEPTANCE_SYNTHETIC_DATA_ONLY=TRUE"
 echo "POSTFIX_MX_CHANGED=FALSE"
