@@ -35,7 +35,7 @@ def simulated_release(monkeypatch, tmp_path):
     def response(url):
         if url == release.READINESS_URL:
             return {'provider':'empiredb_canonical_replies', 'configured':True,
-                    'execution_authority':'none'}
+                    'execution_authority':'none', 'read_only': True}
         return {'provider':'empiredb_canonical_replies', 'read_only':True,
                 'execution_authority':'none', 'suppression_evidence_complete':False}
     monkeypatch.setattr(release, '_json_probe', response)
@@ -96,3 +96,102 @@ def test_role_preflight_rejects_write_privileges(monkeypatch):
     monkeypatch.setattr(psycopg, 'connect', lambda *a,**kw: Con())
     with pytest.raises(release.ReleaseHeld, match='READER_LOGIN_NOT_STRICTLY_READ_ONLY'):
         release._preflight_role('fixture-dsn')
+
+def test_uvicorn_startup_delay_does_not_trigger_false_rollback(monkeypatch, tmp_path):
+    secret, dropin, _, commands = simulated_release(monkeypatch, tmp_path)
+    checks = []
+    def delayed_probe(url):
+        checks.append(url)
+        if url == release.READINESS_URL and checks.count(release.READINESS_URL) < 4:
+            raise release.ReleaseHeld("FOUNDER_READ_ENDPOINT_UNAVAILABLE")
+        if url == release.READINESS_URL:
+            return {
+                "provider": "empiredb_canonical_replies", "configured": True,
+                "execution_authority": "none", "read_only": True,
+            }
+        return {
+            "provider": "empiredb_canonical_replies", "read_only": True,
+            "execution_authority": "none", "suppression_evidence_complete": False,
+        }
+    monkeypatch.setattr(release, "_json_probe", delayed_probe)
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+    result = release.activate()
+    assert result["status"] == "CANONICAL_REPLY_VIEW_ACTIVE"
+    assert checks.count(release.READINESS_URL) == 4
+    assert checks[-1] == release.SUMMARY_URL
+    assert commands == ["daemon-reload", "restart"]
+    assert secret.is_file() and dropin.is_file()
+
+
+def test_summary_transient_unavailable_is_retried_not_treated_as_broken(monkeypatch, tmp_path):
+    secret, dropin, _, commands = simulated_release(monkeypatch, tmp_path)
+    counts = {"summary": 0}
+    def delayed_summary(url):
+        if url == release.SUMMARY_URL:
+            counts["summary"] += 1
+            if counts["summary"] < 3:
+                raise release.ReleaseHeld("FOUNDER_READ_ENDPOINT_NON_200")
+            return {
+                "provider": "empiredb_canonical_replies", "read_only": True,
+                "execution_authority": "none", "suppression_evidence_complete": False,
+            }
+        return {
+            "provider": "empiredb_canonical_replies", "configured": True,
+            "execution_authority": "none", "read_only": True,
+        }
+    monkeypatch.setattr(release, "_json_probe", delayed_summary)
+    monkeypatch.setattr(release.time, "sleep", lambda seconds: None)
+    report = release.activate()
+    assert report["status"] == "CANONICAL_REPLY_VIEW_ACTIVE"
+    assert counts["summary"] == 3
+    assert commands == ["daemon-reload", "restart"]
+
+
+def test_real_contract_mismatch_never_becomes_success_after_wait(monkeypatch, tmp_path):
+    secret, dropin, _, commands = simulated_release(monkeypatch, tmp_path)
+    monkeypatch.setattr(release, "_json_probe", lambda url: {
+        "provider": "empiredb_canonical_replies", "configured": False,
+        "execution_authority": "none", "read_only": True,
+    })
+    with pytest.raises(
+        release.ReleaseHeld,
+        match="CANONICAL_REPLY_RELEASE_ROLLED_BACK:LIVE_CANONICAL_READINESS_CONTRACT_UNVERIFIED",
+    ):
+        release.activate()
+    assert not secret.exists() and not dropin.exists()
+    assert commands == ["daemon-reload", "restart", "daemon-reload", "restart"]
+
+
+def test_startup_timeout_still_rolls_back_and_identifies_stage(monkeypatch, tmp_path):
+    secret, dropin, _, commands = simulated_release(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        release, "_json_probe",
+        lambda url: (_ for _ in ()).throw(release.ReleaseHeld("FOUNDER_READ_ENDPOINT_UNAVAILABLE"))
+    )
+    times = iter([0.0, 15.0])
+    monkeypatch.setattr(release.time, "monotonic", lambda: next(times))
+    with pytest.raises(
+        release.ReleaseHeld,
+        match="CANONICAL_REPLY_RELEASE_ROLLED_BACK:FOUNDER_SERVICE_STARTUP_TIMEOUT_READINESS",
+    ):
+        release.activate()
+    assert not secret.exists() and not dropin.exists()
+    assert commands == ["daemon-reload", "restart", "daemon-reload", "restart"]
+
+
+def test_summary_contract_failure_cannot_become_success(monkeypatch, tmp_path):
+    secret, dropin, _, commands = simulated_release(monkeypatch, tmp_path)
+    monkeypatch.setattr(release, "_json_probe", lambda url: ({
+        "provider": "empiredb_canonical_replies", "configured": True,
+        "read_only": True, "execution_authority": "none",
+    } if url == release.READINESS_URL else {
+        "provider": "empiredb_canonical_replies",
+        "read_only": True, "execution_authority": "write",
+        "suppression_evidence_complete": True,
+    }))
+    with pytest.raises(
+        release.ReleaseHeld,
+        match="CANONICAL_REPLY_RELEASE_ROLLED_BACK:LIVE_CANONICAL_SUMMARY_CONTRACT_UNVERIFIED",
+    ):
+        release.activate()
+    assert not secret.exists() and not dropin.exists()

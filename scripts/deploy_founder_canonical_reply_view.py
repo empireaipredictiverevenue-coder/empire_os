@@ -13,6 +13,7 @@ import os
 import stat
 import subprocess
 import tempfile
+import time
 from pathlib import Path
 from urllib.request import HTTPRedirectHandler, build_opener
 
@@ -187,6 +188,45 @@ def _json_probe(url: str) -> dict:
         raise ReleaseHeld("FOUNDER_READ_ENDPOINT_UNAVAILABLE") from None
 
 
+def _await_service_readback(*, timeout_seconds: float = 15.0,
+                            poll_seconds: float = 0.3) -> tuple[dict, dict]:
+    """Wait only for one restarted Uvicorn service to become healthy.
+
+    `systemctl restart` returns before Uvicorn has bound its HTTP port.
+    Treat that short startup gap as transient, but never treat a bad schema or
+    missing authority as healthy. This is not an agent or recurring timer.
+    """
+    deadline = time.monotonic() + timeout_seconds
+    last_stage = "READINESS"
+    while True:
+        try:
+            ready = _json_probe(READINESS_URL)
+        except ReleaseHeld:
+            ready = None
+        if ready is not None:
+            if (ready.get("provider") != "empiredb_canonical_replies"
+                    or ready.get("configured") is not True
+                    or ready.get("execution_authority") != "none"
+                    or ready.get("read_only") is not True):
+                raise ReleaseHeld("LIVE_CANONICAL_READINESS_CONTRACT_UNVERIFIED")
+            last_stage = "SUMMARY"
+            try:
+                summary = _json_probe(SUMMARY_URL)
+            except ReleaseHeld:
+                summary = None
+            if summary is not None:
+                if (summary.get("read_only") is not True
+                        or summary.get("provider") != "empiredb_canonical_replies"
+                        or summary.get("execution_authority") != "none"
+                        or summary.get("suppression_evidence_complete") is not False):
+                    raise ReleaseHeld("LIVE_CANONICAL_SUMMARY_CONTRACT_UNVERIFIED")
+                return ready, summary
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise ReleaseHeld("FOUNDER_SERVICE_STARTUP_TIMEOUT_" + last_stage)
+        time.sleep(min(poll_seconds, remaining))
+
+
 def activate(*, verified_dsn: str | None = None) -> dict:
     if verified_dsn is not None and os.geteuid() != 0:
         raise ReleaseHeld("ROOT_ACCESS_REQUIRED")
@@ -204,16 +244,7 @@ def activate(*, verified_dsn: str | None = None) -> dict:
         installed_dropin = True
         _systemctl("daemon-reload")
         _systemctl("restart")
-        ready = _json_probe(READINESS_URL)
-        summary = _json_probe(SUMMARY_URL)
-        if (ready.get("provider") != "empiredb_canonical_replies"
-                or ready.get("configured") is not True
-                or ready.get("execution_authority") != "none"
-                or summary.get("read_only") is not True
-                or summary.get("provider") != "empiredb_canonical_replies"
-                or summary.get("execution_authority") != "none"
-                or summary.get("suppression_evidence_complete") is not False):
-            raise ReleaseHeld("LIVE_CANONICAL_REPLY_CONTRACT_UNVERIFIED")
+        _await_service_readback()
         return {
             "status": "CANONICAL_REPLY_VIEW_ACTIVE",
             "provider": "empiredb_canonical_replies",
@@ -223,7 +254,16 @@ def activate(*, verified_dsn: str | None = None) -> dict:
             "service_restarted": True,
             "new_workers_created": False,
         }
-    except Exception:
+    except Exception as exc:
+        # Preserve only known, nonsecret diagnostic codes across rollback.
+        # The former generic ROLLED_BACK status concealed the root cause.
+        safe_codes = {
+            "LIVE_CANONICAL_READINESS_CONTRACT_UNVERIFIED",
+            "LIVE_CANONICAL_SUMMARY_CONTRACT_UNVERIFIED",
+            "FOUNDER_SERVICE_STARTUP_TIMEOUT_READINESS",
+            "FOUNDER_SERVICE_STARTUP_TIMEOUT_SUMMARY",
+        }
+        reason_code = str(exc) if isinstance(exc, ReleaseHeld) and str(exc) in safe_codes else "SERVICE_OR_RELEASE_CHECK_FAILED"
         # Never abandon a broken dashboard; restore the original systemd unit.
         if installed_dropin:
             SYSTEMD_DROPIN.unlink(missing_ok=True)
@@ -234,7 +274,7 @@ def activate(*, verified_dsn: str | None = None) -> dict:
             _systemctl("restart")
         except Exception:
             raise ReleaseHeld("ROLLBACK_NEEDS_PRIVILEGED_REPAIR") from None
-        raise ReleaseHeld("CANONICAL_REPLY_RELEASE_ROLLED_BACK") from None
+        raise ReleaseHeld("CANONICAL_REPLY_RELEASE_ROLLED_BACK:" + reason_code) from None
 
 
 def main(argv=None) -> int:
