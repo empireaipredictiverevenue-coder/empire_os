@@ -17,6 +17,7 @@ from empire_os.outbound_governor import OutboundGovernorPolicy, evaluate_outboun
 from empire_os.outbound_governor_executor import execute_governor_decision, OutboundGovernorExecutionError
 from empire_os.outbound_role_transport import PostgresOutboundRpc
 from empire_os.outbound_email_transport import GovernedGmailEmailTransport
+from empire_os.founder_one_to_one_suppression import read_one_to_one_preflight
 
 UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}$")
 SENDER = "Phil - Founder - Empire AI <phil@mail.empire-ai.co.uk>"
@@ -36,6 +37,10 @@ def policy_review(review: dict[str, Any], context: dict[str, Any],
         raise ValueError("CANONICAL_APPROVED_ONE_TO_ONE_INTENT_REQUIRED")
     if context.get("suppressed") is not False:
         raise ValueError("EXACT_RECIPIENT_SUPPRESSION_UNVERIFIED")
+    if context.get("exact_and_domain_suppression_cleared") is not True:
+        raise ValueError("EXACT_AND_DOMAIN_SUPPRESSION_UNVERIFIED")
+    if context.get("no_existing_canonical_contact_history") is not True:
+        raise ValueError("EXISTING_CANONICAL_CONTACT_REQUIRES_SEPARATE_REVIEW")
     required = ("review_ready", "outreach_ready", "bound_to_decision_maker")
     if any(context.get(flag) is not True for flag in required):
         raise ValueError("VERIFIED_PERSON_BOUND_OUTREACH_REQUIRED")
@@ -94,7 +99,15 @@ def main(argv: list[str] | None = None) -> int:
             from empire_os.gmail_api_transport import load_gmail_credentials
             credentials = load_gmail_credentials(TOKEN_FILE)
             provider_ok = bool(credentials.valid)
-        context = {**context, "provider_ready": provider_ok}
+        suppression = read_one_to_one_preflight(
+            dsn, recipient=args.recipient, intent_id=args.intent_id
+        )
+        context = {
+            **context,
+            "provider_ready": provider_ok,
+            "exact_and_domain_suppression_cleared": suppression["exact_and_domain_suppression_cleared"],
+            "no_existing_canonical_contact_history": suppression["no_existing_canonical_contact_history"],
+        }
         decision = policy_review(review, context, recipient=args.recipient,
                                  execution_requested=args.send)
         result["mode"] = "REVIEW_ONLY" if not args.send else "HELD"

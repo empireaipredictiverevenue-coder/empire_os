@@ -26,6 +26,8 @@ def context():
         'bound_to_decision_maker': True,
         'contact_source': 'official_site', 'contact_confidence': 0.95,
         'company_score': 90, 'provider_ready': False,
+        'exact_and_domain_suppression_cleared': True,
+        'no_existing_canonical_contact_history': True,
     }
 
 
