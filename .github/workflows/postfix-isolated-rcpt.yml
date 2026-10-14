@@ -11,7 +11,7 @@ permissions:
 jobs:
   disposable-postfix-rcpt:
     if: github.repository == 'empireaipredictiverevenue-coder/empire_os'
-    name: Postfix real SMTP RCPT-only (no DATA)
+    name: Real Postfix RCPT-only (3.8 host + 3.10 container)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -23,9 +23,12 @@ jobs:
           git init -q
           git remote add origin https://github.com/empireaipredictiverevenue-coder/empire_os.git
           git -c protocol.version=2 fetch -q --no-tags --depth=1 origin "$GITHUB_SHA"
-          git checkout FETCH_HEAD --             empire_os/owned_postfix_staging_profile.py             scripts/probe_postfix_staging_smtp_rcpt.py             scripts/ci_postfix_rcpt_acceptance.sh
-          test -f scripts/ci_postfix_rcpt_acceptance.sh
+          git checkout FETCH_HEAD --             empire_os/owned_postfix_staging_profile.py             scripts/probe_postfix_staging_smtp_rcpt.py             scripts/ci_postfix_rcpt_acceptance.sh             deploy/mail/postfix_staging/Dockerfile             deploy/mail/postfix_staging/container-entrypoint.sh             deploy/mail/postfix_staging/run_isolated_acceptance.sh
+          test -f deploy/mail/postfix_staging/Dockerfile
           echo "ONLY_BOUNDED_TEST_FILES_FETCHED=TRUE"
-      - name: Run actual Postfix locally on disposable runner
+      - name: Postfix 3.8 real host SMTP admission
         shell: bash
         run: bash scripts/ci_postfix_rcpt_acceptance.sh
+      - name: Postfix 3.10 real isolated container SMTP admission
+        shell: bash
+        run: bash deploy/mail/postfix_staging/run_isolated_acceptance.sh --approved-isolated-container-only
