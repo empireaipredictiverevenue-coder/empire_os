@@ -73,9 +73,23 @@ install -o root -g root -m 0644 "$ROOT/master.cf" /etc/postfix/master.cf
 # generated static policy. Container lifetime owns these temporary paths.
 /usr/sbin/postmap "hash:$ROOT/recipients"
 test -r "$ROOT/recipients.db"
-chown root:postfix "$ROOT" "$ROOT/recipients.db"
+chown root:postfix "$ROOT" "$ROOT/recipients.db" "$ROOT/header_checks"
 chmod 0751 "$ROOT"
-chmod 0640 "$ROOT/recipients.db"
+chmod 0640 "$ROOT/recipients.db" "$ROOT/header_checks"
+
+# Postfix regexp: map is used directly by cleanup; postmap -q confirms
+# matching rule dispatch without compiling a regex database.
+for FORGED_HEADER in \
+    "Authentication-Results: mx-stage.mail.empire-ai.co.uk; dmarc=pass" \
+    "ARC-Authentication-Results: i=1; mx-stage.mail.empire-ai.co.uk; dkim=pass" \
+    "Received-SPF: pass (untrusted)"; do
+    HEADER_ACTION="$(/usr/sbin/postmap -q "$FORGED_HEADER" "regexp:$ROOT/header_checks")"
+    if [ "$HEADER_ACTION" != "IGNORE" ]; then
+        echo "HOLD_FORGED_AUTHENTICATION_HEADER_SANITIZATION_MISSING"
+        exit 2
+    fi
+done
+echo "FORGED_AUTHENTICATION_HEADERS_IGNORED_BY_REAL_POSTFIX=TRUE"
 
 # Validate the actual compiled map, not just source files. No open relay,
 # bare reply@, unlisted alias or unrelated domain can match the allowlist.

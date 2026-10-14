@@ -17,6 +17,14 @@ from uuid import UUID
 DOMAIN = "mail.empire-ai.co.uk"
 HOST = "mx-stage.mail.empire-ai.co.uk"
 MAX_BYTES = 512 * 1024
+# Fixture hygiene ONLY. The sender can freely supply Authentication-Results
+# and Received-SPF headers. Stripping them does not establish trusted DKIM,
+# SPF, ARC or DMARC verification; the future mail-owned Milter must do that.
+HEADER_CHECKS = (
+    "/^Authentication-Results:[[:space:]]*/ IGNORE\n"
+    "/^ARC-Authentication-Results:[[:space:]]*/ IGNORE\n"
+    "/^Received-SPF:[[:space:]]*/ IGNORE\n"
+)
 SAFE = re.compile(r"^/tmp/empire-postfix-stage-[a-zA-Z0-9_-]{4,48}$")
 REQUIRED = {
     "compatibility_level": "3.6",
@@ -103,6 +111,7 @@ def generate_candidate_postfix_profile(
     base = _root(root)
     fields = {
         **REQUIRED,
+        "header_checks": f"regexp:{base}/header_checks",
         "virtual_mailbox_maps": f"hash:{base}/recipients",
         "virtual_mailbox_base": f"{base}/maildir",
         "virtual_uid_maps": f"static:{identity.uid}",
@@ -113,6 +122,7 @@ def generate_candidate_postfix_profile(
         "main.cf": "".join(f"{k} = {v}\n" for k, v in fields.items()),
         "master.cf": MASTER,
         "recipients": map_row,
+        "header_checks": HEADER_CHECKS,
     }
     validate_candidate_postfix_profile(material, identity=identity, root=root)
     return material
@@ -124,7 +134,7 @@ def validate_candidate_postfix_profile(
     intent = identity.validate()
     base = _root(root)
     if not isinstance(material, Mapping) or set(material) != {
-        "main.cf", "master.cf", "recipients"
+        "main.cf", "master.cf", "recipients", "header_checks"
     } or any(not isinstance(v, str) or len(v) > 8000 for v in material.values()):
         raise ValueError("bounded candidate profile required")
     settings: dict[str, str] = {}
@@ -137,6 +147,7 @@ def validate_candidate_postfix_profile(
         settings[k] = v
     expected = {
         **REQUIRED,
+        "header_checks": f"regexp:{base}/header_checks",
         "virtual_mailbox_maps": f"hash:{base}/recipients",
         "virtual_mailbox_base": f"{base}/maildir",
         "virtual_uid_maps": f"static:{identity.uid}",
@@ -144,6 +155,8 @@ def validate_candidate_postfix_profile(
     }
     if settings != expected:
         raise ValueError("staging configuration differs from deny-by-default policy")
+    if material["header_checks"] != HEADER_CHECKS:
+        raise ValueError("staging authentication header policy changed")
     if material["master.cf"] != MASTER:
         raise ValueError("staging listener or delivery graph was modified")
     recipient = f"reply+{intent}@{DOMAIN} jev-{intent}/\n"
@@ -164,6 +177,8 @@ def validate_candidate_postfix_profile(
         "smtp_submission_enabled": False,
         "runtime_postfix_parser_verified": False,
         "postmap_compiled": False,
+        "untrusted_authentication_headers_policy_present": True,
+        "trusted_authentication_filter_installed": False,
         "virtual_maildir_provisioned": False,
         "actual_mail_received": False,
         "receiver_deployed": False,

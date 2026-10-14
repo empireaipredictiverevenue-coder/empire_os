@@ -132,6 +132,10 @@ def _inspect_fixture_maildir_custody(
     parsed = BytesHeaderParser(policy=default).parsebytes(raw[:cut+4])
     if parsed.defects:
         raise ValueError("stored RFC header parser defects")
+    if any(parsed.get_all(header, []) for header in (
+        "Authentication-Results", "ARC-Authentication-Results", "Received-SPF"
+    )):
+        raise ValueError("unverified sender-authentication header survived staging")
     if len(parsed.get_all("Message-ID", [])) != 1:
         raise ValueError("ambiguous Message-ID in stored RFC")
     if str(parsed["Message-ID"]) != expected_rfc_message_id:
@@ -155,6 +159,8 @@ def _inspect_fixture_maildir_custody(
         "original_smtp_wire_digest_verified": False,
         "mta_queue_log_binding_verified": False,
         "dkim_spf_dmarc_authenticated": False,
+        "untrusted_authentication_headers_absent": True,
+        "trusted_mta_auth_verifier_deployed": False,
         "sender_identity_verified": False,
         "canonical_contact_verified": False,
         "customer_mail_received": False,

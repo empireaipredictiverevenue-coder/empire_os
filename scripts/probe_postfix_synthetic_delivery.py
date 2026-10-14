@@ -55,6 +55,11 @@ def verify_one_synthetic_delivery(root: Path) -> dict[str, object]:
     fixture["From"]="synthetic-fixture@offline.invalid"
     fixture["To"]=RCPT
     fixture["Subject"]="Synthetic Postfix delivery integration test ONLY"
+    # These are attacker-controllable claims, NOT evidence. The separate
+    # receiving-MTA filter must remove them BEFORE delivery or JEV review.
+    fixture["Authentication-Results"]="mx-stage.mail.empire-ai.co.uk; dmarc=pass header.from=forged.invalid"
+    fixture["ARC-Authentication-Results"]="i=1; mx-stage.mail.empire-ai.co.uk; dkim=pass header.d=forged.invalid"
+    fixture["Received-SPF"]="pass (forged sender-controlled SPF claim)"
     fixture.set_content(MARKER)
     serialized=fixture.as_bytes(policy=SMTP_POLICY)
     assert len(serialized) < 1024
@@ -91,6 +96,11 @@ def verify_one_synthetic_delivery(root: Path) -> dict[str, object]:
     body=result[0].read_bytes()
     if MESSAGE_ID.encode() not in body or MARKER.encode() not in body or RCPT.encode() not in body:
         raise ValueError("synthetic original RFC contents not preserved")
+    header_block=body.split(b"\r\n\r\n",1)[0].lower()
+    if any(header in header_block for header in (
+        b"authentication-results:", b"arc-authentication-results:", b"received-spf:",
+    )):
+        raise ValueError("sender-forged authentication headers reached Maildir")
     if len(body) >= 4096 or not (mailbox/"tmp").is_dir():
         raise ValueError("unexpected Maildir structure or fixture size")
     if any((mailbox/"tmp").iterdir()):
@@ -106,6 +116,8 @@ def verify_one_synthetic_delivery(root: Path) -> dict[str, object]:
         "delivered_maildir_bytes_sha256":sha256(body).hexdigest(),
         "deliver_to_real_contact":False,
         "sender_authentication_verified":False,
+        "sender_supplied_auth_claims_stripped":True,
+        "trusted_mta_auth_result_installed":False,
         "original_smtp_source_attested":False,
         "replay_idempotency_verified":False,
         "production_ready":False,
