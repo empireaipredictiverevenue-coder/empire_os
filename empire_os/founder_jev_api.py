@@ -16,6 +16,10 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from empire_os.jev_gtm_economic_transport import JevEconomicResearchReadUnavailable
 from empire_os.jev_gtm_crm_review import read_jev_crm_review
 from empire_os.jev_gtm_reply_candidate_reader import review_jev_reply_candidates
+from empire_os.jev_gtm_mailbox_header_review import (
+    review_owned_mailbox_headers, compare_owned_mailbox_to_crm_candidates,
+)
+from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
 from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
@@ -60,6 +64,89 @@ def _safe_reply_review_contract(packet: Any) -> bool:
         and item.get("outbound_authorized") is False
         and item.get("provenance_status") == "REVIEW_ONLY_UNAUTHENTICATED"
         for item in items
+    )
+
+
+IMAP_RESULT_FIELDS = frozenset({
+    "schema_version", "mode", "provider", "received_header_rows",
+    "sent_header_rows", "structurally_reviewable_count", "rows",
+    "inbox_sample_complete", "provider_receipts_authenticated",
+    "canonical_identity_authenticated", "commercial_buyer_reply_count",
+    "contact_suppression_clearance", "outbound_authorized",
+    "database_mutations", "mailbox_mutations", "execution_authority",
+})
+IMAP_ROW_FIELDS = frozenset({
+    "record_ref", "intent_alias_ref", "rfc_parent_ref",
+    "sent_rfc_parent_unique", "structural_match_not_authentication",
+    "status", "blockers", "original_provider_authenticated",
+    "canonical_contact_verified", "tenant_binding_verified",
+    "positive_buyer_intent_verified", "outbound_authorized",
+})
+ALIGN_RESULT_FIELDS = frozenset({
+    "schema_version", "mode", "candidate_count", "rows",
+    "tenant_binding_proven_across_sources", "original_provider_authenticated",
+    "buyer_conversation_count_verified", "recognized_revenue",
+    "contact_permission_granted", "outbound_authorized", "execution_authority",
+})
+ALIGN_ROW_FIELDS = frozenset({
+    "candidate_ref", "mailbox_alias_matching_rows", "linkage_status",
+    "original_provider_authenticated", "canonical_tenant_contact_verified",
+    "positive_buyer_reply_verified",
+})
+
+
+def _safe_jev_mailbox_contract(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != IMAP_RESULT_FIELDS:
+        return False
+    if (value.get("schema_version") != "empire.jev.owned_mailbox_header_review.v1"
+            or value.get("mode") != "OBSERVE"
+            or value.get("provider") != "owned_imap"
+            or value.get("execution_authority") != "none"
+            or value.get("inbox_sample_complete") is not False
+            or value.get("provider_receipts_authenticated") is not False
+            or value.get("canonical_identity_authenticated") is not False
+            or value.get("commercial_buyer_reply_count") is not None
+            or value.get("contact_suppression_clearance") is not False
+            or value.get("outbound_authorized") is not False
+            or value.get("database_mutations") is not False
+            or value.get("mailbox_mutations") is not False):
+        return False
+    rows = value.get("rows")
+    if not isinstance(rows, list) or len(rows) > 25:
+        return False
+    return all(
+        isinstance(row, dict) and set(row) == IMAP_ROW_FIELDS
+        and row.get("original_provider_authenticated") is False
+        and row.get("canonical_contact_verified") is False
+        and row.get("tenant_binding_verified") is False
+        and row.get("positive_buyer_intent_verified") is False
+        and row.get("outbound_authorized") is False
+        for row in rows
+    )
+
+
+def _safe_jev_alignment_contract(value: Any) -> bool:
+    if not isinstance(value, dict) or set(value) != ALIGN_RESULT_FIELDS:
+        return False
+    if (value.get("schema_version") != "empire.jev.mailbox_crm_candidate_alignment.v1"
+            or value.get("mode") != "OBSERVE"
+            or value.get("execution_authority") != "none"
+            or value.get("tenant_binding_proven_across_sources") is not False
+            or value.get("original_provider_authenticated") is not False
+            or value.get("buyer_conversation_count_verified") is not None
+            or value.get("recognized_revenue") is not None
+            or value.get("contact_permission_granted") is not False
+            or value.get("outbound_authorized") is not False):
+        return False
+    rows = value.get("rows")
+    if not isinstance(rows, list) or len(rows) > 25 or value.get("candidate_count") != len(rows):
+        return False
+    return all(
+        isinstance(row, dict) and set(row) == ALIGN_ROW_FIELDS
+        and row.get("original_provider_authenticated") is False
+        and row.get("canonical_tenant_contact_verified") is False
+        and row.get("positive_buyer_reply_verified") is False
+        for row in rows
     )
 
 
@@ -119,9 +206,20 @@ def create_founder_jev_router(
     reader: Any | None = None,
     authorizer: Callable[[Request], bool] | None = None,
     resolve_authenticated_crm: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
+    mailbox_provider: OwnedIMAPMailboxProvider | None = None,
+    mailbox_hmac_key: bytes | None = None,
 ) -> APIRouter:
-    if (authorizer is None and (reader is not None or resolve_authenticated_crm is not None)
-            or authorizer is not None and reader is None and resolve_authenticated_crm is None):
+    mailbox_configured = mailbox_provider is not None or mailbox_hmac_key is not None
+    if mailbox_configured and (
+        not isinstance(mailbox_provider, OwnedIMAPMailboxProvider)
+        or not isinstance(mailbox_hmac_key, bytes)
+        or len(mailbox_hmac_key) < 32
+    ):
+        raise ValueError("owned IMAP provider and independent HMAC key required")
+    if (authorizer is None and (
+        reader is not None or resolve_authenticated_crm is not None or mailbox_configured
+    ) or authorizer is not None and reader is None
+            and resolve_authenticated_crm is None and not mailbox_configured):
         raise ValueError("JEV research reader and founder authorization must be paired")
     router = APIRouter(prefix="/v1/founder-jev", tags=["founder-jev"])
 
@@ -147,6 +245,9 @@ def create_founder_jev_router(
             "reply_candidate_reader_prepared": True,
             "reply_candidate_migration_051_applied": None,
             "verified_original_reply_count": None,
+            "owned_imap_header_review_configured": mailbox_configured,
+            "owned_imap_header_review_only": True,
+            "mailbox_crm_alignment_verified": False,
             "independent_founder_authorizer_configured": authorizer is not None,
             "real_canonical_rows_verified": None,
             "buyers_identified": None,
@@ -270,5 +371,69 @@ def create_founder_jev_router(
             if not _safe_reply_review_contract(reply_packet):
                 raise HTTPException(503, detail="canonical_reply_review_contract_invalid")
             return reply_packet
+
+    if mailbox_configured and authorizer is not None:
+        @router.get("/mailbox/headers/review")
+        def mailbox_header_review(
+            request: Request, limit: int = Query(default=25, ge=1, le=25)
+        ):
+            try:
+                approved = authorizer(request) is True
+            except Exception:
+                approved = False
+            if not approved:
+                raise HTTPException(403, detail="founder_mailbox_evidence_forbidden")
+            try:
+                packet = review_owned_mailbox_headers(
+                    mailbox_provider, key=mailbox_hmac_key, limit=limit,
+                )
+            except Exception:
+                raise HTTPException(503, detail="owned_mailbox_header_review_unavailable") from None
+            if not _safe_jev_mailbox_contract(packet):
+                raise HTTPException(503, detail="owned_mailbox_header_contract_invalid")
+            return packet
+
+    if mailbox_configured and authorizer is not None and resolve_authenticated_crm is not None:
+        @router.get("/crm-prospects/{prospect_id}/mailbox-alignment")
+        def mailbox_crm_alignment(
+            request: Request, prospect_id: str,
+            limit: int = Query(default=25, ge=1, le=25),
+        ):
+            try:
+                approved = authorizer(request) is True
+            except Exception:
+                approved = False
+            if not approved:
+                raise HTTPException(403, detail="founder_mailbox_alignment_forbidden")
+            try:
+                scope = resolve_authenticated_crm(request)
+            except Exception:
+                raise HTTPException(503, detail="authenticated_crm_scope_unavailable") from None
+            if scope is None:
+                raise HTTPException(401, detail="authenticated_crm_scope_required")
+            if (not isinstance(scope, AuthenticatedRevenueCrmRead)
+                    or not isinstance(scope.repository, PostgresRevenueCrmRepository)
+                    or scope.tenant_id != scope.repository.tenant_id):
+                raise HTTPException(503, detail="authenticated_crm_scope_unavailable")
+            try:
+                candidate = review_jev_reply_candidates(
+                    scope.repository, prospect_id=prospect_id,
+                    limit=limit, as_of=datetime.now(timezone.utc),
+                )
+                if not _safe_reply_review_contract(candidate):
+                    raise ValueError("unsafe canonical candidate")
+                headers = review_owned_mailbox_headers(
+                    mailbox_provider, key=mailbox_hmac_key, limit=limit,
+                )
+                if not _safe_jev_mailbox_contract(headers):
+                    raise ValueError("unsafe IMAP header review")
+                alignment = compare_owned_mailbox_to_crm_candidates(
+                    headers, candidate, key=mailbox_hmac_key,
+                )
+            except Exception:
+                raise HTTPException(503, detail="mailbox_crm_alignment_unavailable") from None
+            if not _safe_jev_alignment_contract(alignment):
+                raise HTTPException(503, detail="mailbox_crm_alignment_contract_invalid")
+            return alignment
 
     return router

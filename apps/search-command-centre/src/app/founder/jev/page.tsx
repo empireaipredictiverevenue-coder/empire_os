@@ -44,6 +44,8 @@ export default async function FounderJevPage() {
   const economicReader = state?.economic_reader_configured ?? null;
   const crmReader = state?.crm_reader_configured ?? null;
   const replyMigration = state?.reply_candidate_migration_051_applied ?? null;
+  const mailboxHeaderReader = state?.owned_imap_header_review_configured ?? null;
+  const mailboxCrmVerified = state?.mailbox_crm_alignment_verified ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
   const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
@@ -151,6 +153,10 @@ export default async function FounderJevPage() {
               detail="Reuses the existing tenant-scoped CRM repository. Prospects are research records; missing conversation and closer joins cannot be presented as buyer replies." />
             <TruthLine title="Original reply candidate scope" value={replyMigration}
               detail="Prepared-only EmpireDB 051 adds tenant-restricted reply metadata without message bodies or contact details. Provider authenticity, contact identity and positive buying intent remain unverified." />
+            <TruthLine title="First-party mailbox header review" value={mailboxHeaderReader}
+              detail="Read-only IMAP header reconciliation uses HMAC references. Explicit founder authority and a separate private HMAC key are required; the review cannot send mail." />
+            <TruthLine title="Authenticated CRM-to-mailbox buyer linkage" value={mailboxCrmVerified}
+              detail="Matching an RFC parent or reply alias is structural evidence only. Original-provider authentication, tenant/contact binding, buyer intent and suppression still require separate proof." />
             <TruthLine title="Founder access enforcement" value={founderAccess}
               detail="No detailed entity research route is registered unless an independent server-side authorizer is supplied." />
             <TruthLine title="Shared Vane/OpenManus research core" value={researchCore}

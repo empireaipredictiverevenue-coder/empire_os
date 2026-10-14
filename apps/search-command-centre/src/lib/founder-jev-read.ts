@@ -19,6 +19,9 @@ export type FounderJevStatus = {
   reply_candidate_reader_prepared?: boolean;
   reply_candidate_migration_051_applied?: boolean | null;
   verified_original_reply_count?: number | null;
+  owned_imap_header_review_configured?: boolean;
+  owned_imap_header_review_only?: boolean;
+  mailbox_crm_alignment_verified?: boolean;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;
