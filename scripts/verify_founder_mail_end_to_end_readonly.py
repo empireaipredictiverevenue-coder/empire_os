@@ -15,6 +15,8 @@ from pathlib import Path
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.error import URLError
 
+from empire_os.founder_mail_delivery_evidence import load_historical_mail_evidence
+
 EXPECTED_FROM = "phil@mail.empire-ai.co.uk"
 EXPECTED_REPLY = "reply@mail.empire-ai.co.uk"
 TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/google-workspace-internal-token.json")
@@ -120,7 +122,8 @@ def _oauth_probe() -> dict[str, bool]:
 
 
 def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
-           inbound: dict, root_mx: list[str], sub_mx: list[str], sub_txt: list[str]) -> dict:
+           inbound: dict, root_mx: list[str], sub_mx: list[str], sub_txt: list[str],
+           history: dict | None = None) -> dict:
     """Pure proof assessment: fail closed when identity or reply path unknown."""
     google_root = any("smtp.google.com" in x.casefold() for x in root_mx)
     ses_subdomain = any("inbound-smtp" in x.casefold() and "amazonaws.com" in x.casefold()
@@ -130,7 +133,13 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
     imap_ready = imap.get("provider") == "owned_imap" and imap.get("configured") is True
     workspace_read_ready = imap.get("provider") == "google_workspace" and imap.get("configured") is True
     inbound_resend = inbound.get("provider") == "resend"
+    history = history if isinstance(history, dict) else {}
+    historic_sender = (history.get("founder_sender_reached_controlled_inbox") is True
+                       and history.get("sender_spf_dkim_dmarc_passed") is True)
+    historic_reply = (history.get("reply_base_forwarded") is True
+                      and history.get("reply_alias_forwarded") is True)
     blockers = []
+    observations = []
     if not relay_ready or not identity.get("founder_sender_config_matches") or not identity.get("reply_to_config_matches"):
         blockers.append("LIVE_FOUNDER_SENDER_OR_REPLY_IDENTITY_UNVERIFIED")
     if not token.get("token_active_at_google") or not token.get("gmail_send_scope_verified"):
@@ -140,12 +149,24 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
     if not imap_ready and not workspace_read_ready:
         blockers.append("FOUNDER_READ_INBOX_NOT_CONFIGURED")
     if ses_subdomain:
-        blockers.append("REPLY_SUBDOMAIN_STILL_ROUTES_TO_AMAZON_SES")
-    if inbound_resend and ses_subdomain:
-        blockers.append("PUBLIC_REPLY_MX_AND_INBOUND_WEBHOOK_PROVIDER_MISMATCH")
+        # The public MX uses SES infrastructure. Actual owner-controlled
+        # messages reached Resend's signed inbound webhook yesterday: this
+        # record is not, by itself, proof that the route is broken.
+        observations.append("INBOUND_MX_USES_AMAZON_SES_INFRASTRUCTURE")
+    if inbound_resend:
+        observations.append("ACTIVE_REPLY_PROVIDER_IS_RESEND_NOT_FIRST_PARTY")
+        blockers.append("SOVEREIGN_REPLIES_NOT_YET_MIGRATED_FROM_PROVIDER")
     if not spf_sub:
-        blockers.append("FOUNDER_SENDER_SUBDOMAIN_SPF_ABSENT")
-    blockers.append("INDEPENDENT_END_TO_END_SEND_AND_REPLY_NOT_VERIFIED")
+        # SPF is evaluated on the *envelope* sender; the delivered test's
+        # envelope domain was empire-ai.co.uk and root DKIM aligned with the
+        # mail.* From. Do not falsely claim authentication failed.
+        observations.append("SUBDOMAIN_SPF_ABSENT_CHECK_ACTUAL_ENVELOPE_AUTH")
+    if not (historic_sender and historic_reply):
+        blockers.append("FOUNDER_CONTROLLED_SEND_REPLY_TEST_EVIDENCE_NOT_PRESENT")
+    else:
+        observations.append("PRIOR_DAY_FOUNDER_SEND_AND_REPLY_FORWARDS_VERIFIED")
+    if not imap_ready and not workspace_read_ready:
+        observations.append("FOUNDER_DASHBOARD_CANNOT_DIRECTLY_READ_PRO_MAILBOX")
     return {
         "schema_version": "empire.founder-mail-end-to-end-readiness.v1",
         "mode": "OBSERVE", "source": "LIVE_EMPIREOS_PROBES",
@@ -162,6 +183,12 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         "reply_subdomain_mx_amazon_ses": ses_subdomain,
         "reply_subdomain_spf_present": spf_sub,
         "resend_inbound_webhook_service_active": inbound.get("ok") is True and inbound_resend,
+        "historical_sender_authenticated_delivery": historic_sender,
+        "historical_base_and_threaded_reply_visibility": historic_reply,
+        "historical_test_date": history.get("test_date") if historic_sender and historic_reply else None,
+        "direct_professional_inbox_verified": False,
+        "canonical_buyer_reply_verified_by_test": False,
+        "architecture_observations": observations,
         "readiness_blockers": blockers,
         "ready_for_internal_mail_test": False,
         "ready_for_prospect_outbound": False,
@@ -170,6 +197,13 @@ def assess(*, relay: dict, identity: dict, token: dict, imap: dict,
         "services_restarted": False,
         "credential_values_disclosed": False,
     }
+
+
+def _optional_historical_evidence() -> dict:
+    try:
+        return load_historical_mail_evidence()
+    except (ValueError, OSError, TypeError, json.JSONDecodeError):
+        return {}
 
 
 def main() -> int:
@@ -194,6 +228,7 @@ def main() -> int:
             # No exception text: provider errors can contain private paths/data.
             failures.append(label)
     proof = assess(
+        history=_optional_historical_evidence(),
         relay=outputs.get("relay", {}), identity=outputs.get("identity", {}),
         token=outputs.get("token", {}), imap=outputs.get("imap", {}),
         inbound=outputs.get("inbound", {}), root_mx=outputs.get("root_mx", []),

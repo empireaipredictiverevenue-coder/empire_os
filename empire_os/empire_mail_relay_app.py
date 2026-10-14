@@ -67,7 +67,7 @@ def _token_file() -> str:
         os.getenv(
             "EMPIRE_GMAIL_TOKEN_FILE",
             "/srv/empire_os/runtime/secrets/"
-            "google-workspace-token.json",
+            "google-workspace-internal-token.json",
         )
     ).strip()
 

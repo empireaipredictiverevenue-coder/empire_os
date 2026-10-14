@@ -7,8 +7,8 @@
 - Google verified the live project's `gmail.send` scope. No email was sent. Google's OAuth consent-screen publishing state was not independently read from Cloud Console.
 - Actual Workspace mailbox identity is not verified by the send-only scope; Gmail profile lookup returned insufficient permission.
 - Founder inbox reader is not configured in the running API; separate IMAP credentials are absent.
-- Root domain MX routes to Google; the founder mail subdomain MX points to an older inbound service, inconsistent with the active Resend-labelled webhook.
-- SPF and DKIM for the founder mail subdomain have not passed verification.
+- Root MX routes to Google; the mail subdomain MX advertises Amazon SES infrastructure while signed incoming mail is handled by the active Resend webhook. Founder-controlled test messages DID reach that webhook on 13 October; this DNS/provider combination is not proven broken. Sovereign inbound migration remains separate.
+- Actual received-test headers show SPF, DKIM and DMARC passed on 13 October; this supersedes the earlier DNS-only warning.
 
 ## Engineering repaired and tested
 
@@ -23,6 +23,6 @@
 1. Account-holder grants read-only permission to the real founder Workspace account. This requires an external Google sign-in; the running send-only token cannot grant it automatically.
 2. Deploy only the explicit Workspace reader setting through the existing privileged Founder API service, then verify one bounded inbox and sent-folder read. Remote Commander currently rejects privileged service changes.
 3. Validate Workspace acceptance of the mail subdomain and both sender/reply addresses before changing MX or retiring the old inbound provider. Preserve existing incoming mail during migration.
-4. Verify SPF, DKIM, DMARC and a controlled founder-approved send-and-reply test; keep prospect outreach governed.
+4. Preserve the successful 13 October send/reply test evidence; do not repeat it merely to check the already-proven path. A separate proof is only needed after a future change to the inbound provider or direct Workspace inbox. Keep prospect outreach governed.
 
-**Status: send OAuth repaired; first-party read path implemented but not activated; sender owner, inbox and end-to-end replies remain unverified. No real outbound message, service restart or DNS change.**
+**Status 14 October: actual 13 October founder-controlled tests verified professional sending and forwarded base/threaded replies. Direct Workspace inbox access and fully sovereign inbound migration remain incomplete. No new message sent, service restart or DNS change by this recovery.**
