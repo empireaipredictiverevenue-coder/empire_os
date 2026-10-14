@@ -125,3 +125,48 @@ def test_founder_router_canonical_mode_is_explicit_and_does_not_send(monkeypatch
     assert "NOT_GENERAL_INBOX" in data["scope"]
     response = client.get("/v1/founder-mailbox/summary?limit=1")
     assert response.status_code == 503
+
+
+def test_canonical_reply_and_sent_intent_share_one_thread_without_forged_email_headers():
+    from empire_os.empire_mailbox import build_mailbox
+    source = EmpireDBFounderReplyMailbox(dsn='fixture-reader')
+    sent = source._sent(OUT_ROW)
+    incoming = source._received(IN_ROW)
+    mailbox = build_mailbox([sent], [incoming], provider='empiredb_canonical_replies', suppression_evidence_complete=False)
+    assert mailbox['thread_count'] == 1
+    assert mailbox['threads'][0]['intent_id'] == IID
+    assert mailbox['threads'][0]['thread_id'] == IID
+    assert mailbox['threads'][0]['event_count'] == 2
+    assert mailbox['summary']['replies'] == 1
+    assert mailbox['summary']['verified_canonical_buyer_replies'] == 0
+    assert mailbox['canonical_buyer_conversation_verified'] is False
+    assert mailbox['suppression_evidence_complete'] is False
+    assert mailbox['threads'][0]['classification'] == 'unknown'
+    assert mailbox['read_only'] is True
+
+
+def test_unverified_provider_fields_cannot_self_claim_canonical_thread():
+    from empire_os.empire_mailbox import normalise_received_email, normalise_sent_email
+    assert normalise_received_email({'id':'provider-a', 'intent_id':IID, 'from':'buyer@example.org'}, provider='owned_imap')['intent_id'] is None
+    assert normalise_sent_email({'id':'canonical-intent:not-a-uuid', 'canonical_intent_state_only':True}, provider='empiredb_canonical_replies')['intent_id'] is None
+    assert normalise_received_email({'id':'canonical-reply:x', 'intent_id':'not-a-uuid'}, provider='empiredb_canonical_replies')['intent_id'] is None
+
+
+def test_systemd_reader_credential_is_private_and_only_for_canonical_view(tmp_path, monkeypatch):
+    from empire_os.empiredb_founder_reply_mailbox import SYSTEMD_CREDENTIAL
+    secret = tmp_path / SYSTEMD_CREDENTIAL
+    secret.write_text('postgresql://read-only@localhost/empiredb\n')
+    secret.chmod(0o600)
+    monkeypatch.setenv('CREDENTIALS_DIRECTORY', str(tmp_path))
+    monkeypatch.delenv('EMPIRE_FOUNDER_REPLY_READER_DSN', raising=False)
+    provider = EmpireDBFounderReplyMailbox()
+    assert provider.configured is True
+    assert provider.readiness()['execution_authority'] == 'none'
+    secret.chmod(0o644)
+    assert EmpireDBFounderReplyMailbox().configured is False
+    secret.chmod(0o600)
+    secret.write_text('postgresql://reader@example/db\nsecond-line')
+    assert EmpireDBFounderReplyMailbox().configured is False
+    secret.unlink()
+    secret.symlink_to(tmp_path / 'other')
+    assert EmpireDBFounderReplyMailbox().configured is False

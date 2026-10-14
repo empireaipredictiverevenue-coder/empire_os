@@ -13,6 +13,8 @@ from typing import Any, Iterable, Mapping
 
 from empire_os.reply_classifier import classify_reply_text
 
+_CANONICAL_UUID_RE = re.compile(r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$", re.IGNORECASE)
+
 _REPLY_ALIAS_RE = re.compile(
     r"\breply\+([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})@",
     re.IGNORECASE,
@@ -64,7 +66,16 @@ def _delivery_state(row: Mapping[str, Any], *, direction: str) -> str:
 
 def normalise_sent_email(row: Mapping[str, Any], *, provider: str = 'resend') -> dict[str, Any]:
     provider_id = _text(row.get("id"))
-    intent_id = _intent_from_values(
+    # Canonical EmpireDB sent intents carry a verified foreign-key identity.
+    # Provider-only mail still requires the separate reply-alias evidence.
+    canonical_intent = (_text(row.get("id")).removeprefix("canonical-intent:")
+                        if provider == "empiredb_canonical_replies"
+                        and _text(row.get("id")).startswith("canonical-intent:")
+                        and row.get("canonical_intent_state_only") is True
+                        else None)
+    if canonical_intent and not _CANONICAL_UUID_RE.fullmatch(canonical_intent):
+        canonical_intent = None
+    intent_id = canonical_intent or _intent_from_values(
         row.get("reply_to"),
         row.get("replyTo"),
         row.get("to"),
@@ -96,7 +107,9 @@ def normalise_sent_email(row: Mapping[str, Any], *, provider: str = 'resend') ->
 def normalise_received_email(row: Mapping[str, Any], *, provider: str = 'resend') -> dict[str, Any]:
     provider_id = _text(row.get("id") or row.get("email_id"))
     recipients = row.get("to")
-    intent_id = _intent_from_values(recipients)
+    intent_id = row.get('intent_id') if provider == 'empiredb_canonical_replies' else _intent_from_values(recipients)
+    if provider == 'empiredb_canonical_replies' and not _CANONICAL_UUID_RE.fullmatch(_text(intent_id)):
+        intent_id = None
     thread_id = intent_id or (f"received:{provider_id}" if provider_id else None)
     body = _text(row.get("text") or row.get("body_text"))
     subject = _text(row.get("subject"))

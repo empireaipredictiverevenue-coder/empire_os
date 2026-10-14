@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import os
 import re
+import stat
+from pathlib import Path
 from datetime import datetime
 from typing import Any, Callable
 
@@ -17,6 +19,24 @@ from empire_os.owned_imap_mailbox import MailboxReadUnavailable
 MAX_ROWS = 50
 _UUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 READ_ROLE = "empire_closer_observer"
+SYSTEMD_CREDENTIAL = "founder_reply_reader_dsn"
+
+def _credential_from_systemd() -> str:
+    directory = os.getenv("CREDENTIALS_DIRECTORY", "").strip()
+    if not directory:
+        return ""
+    base = Path(directory)
+    path = base / SYSTEMD_CREDENTIAL
+    try:
+        if not base.is_dir() or path.is_symlink() or not path.is_file():
+            return ""
+        info = path.stat()
+        if not 0 < info.st_size <= 4096 or (stat.S_IMODE(info.st_mode) & 0o027):
+            return ""
+        secret = path.read_text(encoding="utf-8").strip()
+        return secret if secret and "\n" not in secret and "\r" not in secret else ""
+    except (OSError, UnicodeError):
+        return ""
 # SQL identifiers are fixed, not derived from user input. Recipient addresses
 # and full bodies are never printed in health/readiness output.
 RECEIVED_SQL = """
@@ -65,7 +85,7 @@ class EmpireDBFounderReplyMailbox:
     suppression_evidence_complete = False
 
     def __init__(self, *, dsn: str | None = None, connect_factory: Callable[..., Any] | None = None):
-        self.dsn = (dsn if dsn is not None else os.environ.get("EMPIRE_FOUNDER_REPLY_READER_DSN", "")).strip()
+        self.dsn = (dsn if dsn is not None else (_credential_from_systemd() or os.environ.get("EMPIRE_FOUNDER_REPLY_READER_DSN", ""))).strip()
         self._connect = connect_factory
 
     @property
