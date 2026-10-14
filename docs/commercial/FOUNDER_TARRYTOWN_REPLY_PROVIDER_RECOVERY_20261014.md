@@ -10,6 +10,12 @@ The connected Resend receiving account returned the original email ID 44a5aec3-b
 
 Source evidence is verified using the user's connected receiving-account read-only API, independently of the canonical EmpireDB webhook metadata. The local server stored a placeholder and has not yet been updated. The original 23 September exception was swallowed by earlier code, so the exact historical API error cannot be reconstructed.
 
+## 14 October recovery failure diagnosed from PostgreSQL logs
+
+The first approved one-record repair returned `CANONICAL_LOCAL_POSTGRES_PROBE_FAILED`. A bounded read of the local PostgreSQL error log establishes the **actual** database failure: `pinned provider reply evidence mismatch` raised from the transaction's guarded `DO` block, with the transaction rolled back. It was not a PostgreSQL connection outage. The original preflight allowed canonical `classification='unsubscribe'` and/or `intent_status='suppressed'` but the atomic update insisted on `classification='unclassified'` and status in `sent/delivered/replied` only. If another workflow suppressed the record, this would cause a false rejection; the exact live classification/intent state was not disclosed by the failed run.
+
+The revised recovery mirrors all preflight conditions inside the transaction. It accepts a preclassified canonical unsubscribe **only if the email suppression record already exists**, permits an intent already in `suppressed` state, and skips duplicate classifier/event writes when both are already suppressed. It remains pinned to the same sender/recipient/subject/provider/date/body placeholder and performs an exact post-commit check requiring `body='Stop'`, `classification='unsubscribe'`, `intent_status='suppressed'` and confirmed suppression. Null-safe comparisons guard identity checks. Future PostgreSQL errors are reported by sanitized SQLSTATE (`READ_ONLY_EVIDENCE` versus `ATOMIC_RECOVERY` versus `POSTCOMMIT_READBACK`), never raw SQL or credentials. Custom `P1001`, `P1002` and `P1003` distinguish exact identity, missing-body marker and opt-out state mismatches.
+
 ## First-party engineering changes
 
 - `empire_os/outbound_provider.py` now classifies historical-style failed `Receiving.get()` exceptions into a small allowlist of safe status codes (401, 403, 404, 429, 5xx, network or unknown) without logging exception text, secrets or message bodies.

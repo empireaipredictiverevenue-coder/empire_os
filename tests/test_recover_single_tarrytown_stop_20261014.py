@@ -66,7 +66,7 @@ def test_sql_targets_one_known_message_only_and_governed_classifier():
     assert recovery.REPLY_ID in sql
     assert recovery.INTENT_ID in sql
     assert recovery.PROVIDER_ID in sql
-    assert "r.body_text<>'[provider body unavailable]'" in sql
+    assert "r.body_text IS DISTINCT FROM '[provider body unavailable]'" in sql
     assert "r.normalized_recipient" in sql
     assert "r.normalized_from_contact" in sql
     assert "unquoted_visible_reply_only" in sql
@@ -169,3 +169,83 @@ def test_limited_live_provider_credentials_do_not_discard_connected_account_evid
     assert result["live_inbound_receiving_probe"] == "RECEIVING_CREDENTIAL_UNAUTHORIZED"
     assert result["source"] == "SIGNED_CANONICAL_REPLY_PLUS_CONNECTED_PROVIDER_GET"
     assert result["email_sent"] is False
+
+
+def test_review_and_atomic_guard_accept_same_existing_suppressed_states():
+    # Regression for 14 Oct live PostgreSQL failure: read-only evidence
+    # accepted suppressed/preclassified rows while the DO block rejected them.
+    sql = recovery._apply_sql()
+    assert "r.classification NOT IN ('unclassified','unsubscribe')" in sql
+    assert "r.status NOT IN ('sent','delivered','replied','suppressed')" in sql
+    assert "existing_suppression<>1" in sql
+    assert "SELECT count(*) INTO existing_suppression" in sql
+    assert "IF r.classification='unclassified' OR r.status<>'suppressed' THEN" in sql
+    assert "IS DISTINCT FROM" in sql
+    assert "ERRCODE='P1001'" in sql
+    assert "ERRCODE='P1002'" in sql
+    assert "ERRCODE='P1003'" in sql
+    accepted = recovery.check_proof(record(
+        classification="unsubscribe",
+        intent_status="suppressed",
+        suppression_count=1,
+    ))
+    assert accepted["ready_for_exact_recovery"] is True
+    assert accepted["classification"] == "unsubscribe"
+    assert accepted["intent_status"] == "suppressed"
+
+
+def test_preclassified_without_actual_suppression_is_held():
+    with pytest.raises(
+        recovery.RecoveryHeld,
+        match="PRECLASSIFIED_OPT_OUT_WITHOUT_CANONICAL_SUPPRESSION",
+    ):
+        recovery.check_proof(record(
+            classification="unsubscribe", intent_status="suppressed",
+            suppression_count=0,
+        ))
+
+
+@pytest.mark.parametrize("sqlstate", ["P1001", "P1002", "P1003", "42703", "42501"])
+def test_real_psql_error_state_reported_without_postgres_stderr(monkeypatch, sqlstate):
+    monkeypatch.setattr(recovery.os, "geteuid", lambda: 0)
+    class SimulatedPsql:
+        returncode = 3
+        stderr = f"ERROR:  {sqlstate}\nSTATEMENT: PRIVATE_CREDENTIAL_AND_EMAIL"
+        stdout = ""
+    monkeypatch.setattr(recovery.subprocess, "run", lambda *a, **kw: SimulatedPsql())
+    with pytest.raises(
+        recovery.RecoveryHeld,
+        match="CANONICAL_POSTGRES_SQLSTATE_" + sqlstate,
+    ) as captured:
+        recovery._psql("SELECT 1;", read_output=True)
+    assert "PRIVATE_CREDENTIAL_AND_EMAIL" not in str(captured.value)
+
+
+def test_atomic_failure_has_distinct_reason_and_cannot_falsely_report_recovery(monkeypatch):
+    monkeypatch.setattr(recovery.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(recovery, "_read", lambda: record())
+    def fail(_query, *, read_output):
+        assert read_output is False
+        raise recovery.RecoveryHeld("CANONICAL_POSTGRES_SQLSTATE_P1003")
+    monkeypatch.setattr(recovery, "_psql", fail)
+    with pytest.raises(
+        recovery.RecoveryHeld,
+        match="ATOMIC_RECOVERY_CANONICAL_POSTGRES_SQLSTATE_P1003",
+    ):
+        recovery.restore(apply=True)
+
+
+def test_postcommit_intent_still_replied_cannot_claim_completed(monkeypatch):
+    monkeypatch.setattr(recovery.os, "geteuid", lambda: 0)
+    calls = iter([
+        record(),
+        record(
+            body_state="STOP", classification="unsubscribe",
+            body_unavailable="false", suppression_count=1,
+            intent_status="replied",
+        ),
+    ])
+    monkeypatch.setattr(recovery, "_read", lambda: next(calls))
+    monkeypatch.setattr(recovery, "_psql", lambda *_a, **_kw: "")
+    with pytest.raises(recovery.RecoveryHeld, match="CANONICAL_POSTCOMMIT_RECOVERY_UNVERIFIED"):
+        recovery.restore(apply=True)

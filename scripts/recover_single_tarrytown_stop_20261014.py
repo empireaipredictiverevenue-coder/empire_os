@@ -48,11 +48,19 @@ def _psql(script: str, *, read_output: bool) -> str:
     try:
         proc = subprocess.run(
             ["runuser", "-u", "postgres", "--", "psql", "-X", "-q", "-A", "-t",
-             "-v", "ON_ERROR_STOP=1", "-d", "empiredb"],
+             "-v", "ON_ERROR_STOP=1",
+             "-v", "VERBOSITY=sqlstate", "-d", "empiredb"],
             input=script, text=True, capture_output=True, timeout=20, check=False,
         )
         if proc.returncode != 0:
-            raise RecoveryHeld("CANONICAL_LOCAL_POSTGRES_PROBE_FAILED")
+            # The previous release discarded all database diagnostics, hiding
+            # read permission errors, SQL/schema mismatches and transaction
+            # failures behind one generic code. With psql VERBOSITY=sqlstate,
+            # only the five-character SQLSTATE is surfaced, never raw stderr,
+            # contact data, SQL text, API keys or database credentials.
+            match = re.search(r"(?m)(?:ERROR|FATAL):\s*([0-9A-Z]{5})\b", proc.stderr or "")
+            sqlstate = match.group(1) if match else "UNKNOWN"
+            raise RecoveryHeld("CANONICAL_POSTGRES_SQLSTATE_" + sqlstate)
         return proc.stdout[:12000] if read_output else ""
     except RecoveryHeld:
         raise
@@ -90,7 +98,10 @@ ROLLBACK;
 
 
 def _read() -> dict[str, Any]:
-    raw = _psql(_review_sql(), read_output=True).strip()
+    try:
+        raw = _psql(_review_sql(), read_output=True).strip()
+    except RecoveryHeld as exc:
+        raise RecoveryHeld("READ_ONLY_EVIDENCE_" + str(exc)) from None
     try:
         d = json.loads(raw)
     except (ValueError, TypeError):
@@ -123,6 +134,8 @@ def check_proof(d: dict[str, Any]) -> dict[str, Any]:
         raise RecoveryHeld("CANONICAL_REPLY_OR_SUPPRESSION_STATE_UNEXPECTED")
     if d["body_state"] == "PLACEHOLDER" and d.get("body_unavailable") not in ("true", "True"):
         raise RecoveryHeld("SOURCE_MISSING_BODY_FLAG_UNVERIFIED")
+    if d["classification"] == "unsubscribe" and d["suppression_count"] != 1:
+        raise RecoveryHeld("PRECLASSIFIED_OPT_OUT_WITHOUT_CANONICAL_SUPPRESSION")
     if (d["body_state"] == "STOP"
             and (d["classification"] != "unsubscribe"
                  or d["suppression_count"] != 1)):
@@ -134,6 +147,7 @@ def check_proof(d: dict[str, Any]) -> dict[str, Any]:
         "body_state": d["body_state"],
         "canonical_suppression_verified": d["suppression_count"] == 1,
         "classification": d["classification"],
+        "intent_status": d["intent_status"],
         "ready_for_exact_recovery": d["body_state"] == "PLACEHOLDER",
     }
 
@@ -163,18 +177,34 @@ BEGIN
     WHERE reply.id='{REPLY_ID}'::uuid
     FOR UPDATE OF reply,intent;
   IF NOT FOUND THEN RAISE EXCEPTION 'pinned reply not present'; END IF;
-  IF r.intent_id<>'{INTENT_ID}'::uuid
-     OR r.provider_message_id<>'{PROVIDER_ID}'
-     OR lower(btrim(r.normalized_from_contact))<>'{CONTACT}'
-     OR lower(btrim(r.normalized_recipient))<>'{CONTACT}'
-     OR r.subject<>'{SUBJECT}'
-     OR (r.received_at at time zone 'UTC')::date<>'{ORIGINAL_DATE}'::date
-     OR r.body_text<>'[provider body unavailable]'
-     OR r.classification<>'unclassified'
-     OR coalesce(r.metadata->>'body_unavailable','')<>'true'
+  SELECT count(*) INTO existing_suppression
+    FROM public.outbound_suppressions s
+   WHERE lower(btrim(s.normalized_contact))='{CONTACT}'
+     AND s.contact_type='email';
+  -- Mirror the read-only record proof exactly, with null-safe comparisons.
+  -- Bounded SQLSTATE codes distinguish identity, body and canonical state
+  -- without disclosing sender data or arbitrary provider exception text.
+  IF r.intent_id IS DISTINCT FROM '{INTENT_ID}'::uuid
+     OR r.provider_message_id IS DISTINCT FROM '{PROVIDER_ID}'
+     OR lower(btrim(r.normalized_from_contact)) IS DISTINCT FROM '{CONTACT}'
+     OR lower(btrim(r.normalized_recipient)) IS DISTINCT FROM '{CONTACT}'
+     OR r.subject IS DISTINCT FROM '{SUBJECT}'
+     OR (r.received_at at time zone 'UTC')::date IS DISTINCT FROM '{ORIGINAL_DATE}'::date
      OR coalesce(r.metadata->>'provider','')<>'resend'
-     OR r.status NOT IN ('sent','delivered','replied')
-  THEN RAISE EXCEPTION 'pinned provider reply evidence mismatch'; END IF;
+  THEN RAISE EXCEPTION 'verified canonical provider identity mismatch'
+       USING ERRCODE='P1001'; END IF;
+  IF r.body_text IS DISTINCT FROM '[provider body unavailable]'
+     OR coalesce(r.metadata->>'body_unavailable','')<>'true'
+  THEN RAISE EXCEPTION 'verified missing body state mismatch'
+       USING ERRCODE='P1002'; END IF;
+  IF r.classification IS NULL
+     OR r.classification NOT IN ('unclassified','unsubscribe')
+     OR r.status IS NULL
+     OR r.status NOT IN ('sent','delivered','replied','suppressed')
+     OR existing_suppression>1
+     OR (r.classification='unsubscribe' AND existing_suppression<>1)
+  THEN RAISE EXCEPTION 'verified opt-out state mismatch'
+       USING ERRCODE='P1003'; END IF;
   UPDATE public.outbound_replies
      SET body_text='{VISIBLE_REPLY}',
          metadata=metadata || jsonb_build_object(
@@ -186,8 +216,13 @@ BEGIN
             'executable',false
          )
    WHERE id='{REPLY_ID}'::uuid;
-  PERFORM public.classify_outbound_reply(
-      '{REPLY_ID}'::uuid,'unsubscribe',0.99,'{ACTOR}');
+  -- A pre-existing canonical unsubscribe plus suppression must not emit
+  -- duplicate classification/event records. An unclassified reply or an
+  -- intent not yet in suppressed state uses the normal canonical function.
+  IF r.classification='unclassified' OR r.status<>'suppressed' THEN
+    PERFORM public.classify_outbound_reply(
+        '{REPLY_ID}'::uuid,'unsubscribe',0.99,'{ACTOR}');
+  END IF;
 END $recovery$;
 COMMIT;
 """
@@ -252,6 +287,8 @@ def restore(*, apply: bool) -> dict[str, Any]:
         "provider_identity_verified": True,
         "canonical_suppression_verified": before["canonical_suppression_verified"],
         "body_state_before": before["body_state"],
+        "canonical_classification_before": before["classification"],
+        "canonical_intent_status_before": before["intent_status"],
         "database_writes": False,
         "email_sent": False,
         "dns_changed": False,
@@ -261,11 +298,20 @@ def restore(*, apply: bool) -> dict[str, Any]:
     if not apply:
         return result
     if before["ready_for_exact_recovery"]:
-        _psql(_apply_sql(), read_output=False)
+        try:
+            _psql(_apply_sql(), read_output=False)
+        except RecoveryHeld as exc:
+            raise RecoveryHeld("ATOMIC_RECOVERY_" + str(exc)) from None
         result["database_writes"] = True
-    after = check_proof(_read())
+    try:
+        after = check_proof(_read())
+    except RecoveryHeld as exc:
+        # A successful commit followed by failed readback is not permission
+        # to retry the write; operator must reconcile canonical state first.
+        raise RecoveryHeld("POSTCOMMIT_READBACK_" + str(exc)) from None
     if (after["body_state"] != "STOP"
             or after["classification"] != "unsubscribe"
+            or after["intent_status"] != "suppressed"
             or after["canonical_suppression_verified"] is not True):
         raise RecoveryHeld("CANONICAL_POSTCOMMIT_RECOVERY_UNVERIFIED")
     result["status"] = "WOLFGANG_STOP_RECOVERED_AND_SUPPRESSED"
