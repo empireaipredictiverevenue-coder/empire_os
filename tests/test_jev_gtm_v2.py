@@ -411,3 +411,15 @@ def test_shadow_result_change_invalidates_fingerprint():
     b = run(shadow_batch=(req, result("no")))
     assert a["decision_fingerprint"] != b["decision_fingerprint"]
     assert a["action"] == b["action"]
+
+
+def test_unknown_canonical_clearance_never_returns_outreach_review():
+    row = run(outreach={
+        "suppression_checked": True,
+        "suppression_state": "UNKNOWN",
+        "suppression_readback_ref": "claimed:only",
+        "canonical_readback_verified": True,
+    })
+    assert row["suppression_checked"] is False
+    assert row["action"] == "EVIDENCE_REVIEW"
+    assert "suppression_readback_missing" in row["blockers"]

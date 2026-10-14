@@ -109,3 +109,32 @@ def test_cli_refuses_symlink(tmp_path, capsys):
     link.symlink_to(path)
     assert main(["--input", str(link), "--tenant-id", "tenant:1", "--as-of", NOW.isoformat()]) == 2
     assert "HELD" in capsys.readouterr().out
+
+
+def test_untrusted_json_export_never_claims_approved_opportunities(tmp_path, capsys):
+    p = tmp_path / "cases.json"
+    p.write_text(json.dumps({"cases": [case("outreach")]}))
+    assert main([
+        "--input", str(p), "--tenant-id", "tenant:1",
+        "--as-of", NOW.isoformat(), "--include-items",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["input_origin_authenticated"] is False
+    assert data["promotion_eligible"] is False
+    assert data["items"][0]["action"] == "EVIDENCE_REVIEW"
+    assert data["items"][0]["unverified_preview_action"] == "OUTREACH_REVIEW"
+    assert "local_export_origin_not_authenticated" in data["items"][0]["blockers"]
+    assert data["action_counts"]["OUTREACH_REVIEW"] == 0
+    assert data["items"][0]["outbound_approved"] is False
+
+
+def test_untrusted_export_does_not_unlock_positive_reply(tmp_path, capsys):
+    p = tmp_path / "cases.json"
+    p.write_text(json.dumps({"cases": [case("reply", reply="Send pricing")]}))
+    assert main([
+        "--input", str(p), "--tenant-id", "tenant:1",
+        "--as-of", NOW.isoformat(), "--include-items",
+    ]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert data["items"][0]["action"] == "EVIDENCE_REVIEW"
+    assert data["items"][0]["contact_permission_granted"] is False

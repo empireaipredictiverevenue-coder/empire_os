@@ -36,6 +36,24 @@ def main(argv: list[str] | None = None) -> int:
             as_of=as_of,
             max_candidates=args.limit,
         )
+        # JSON on disk cannot attest canonical tenant bindings, contact
+        # clearance, or reply provenance, regardless of embedded booleans.
+        # Do not let an arbitrary export pretend to be a verified sales queue.
+        for item in queue["items"]:
+            if item["action"] not in {"HOLD", "EVIDENCE_REVIEW", "RESEARCH_REQUIRED"}:
+                item["unverified_preview_action"] = item["action"]
+                item["action"] = "EVIDENCE_REVIEW"
+                item["reason"] = "local_export_origin_not_authenticated"
+            if "local_export_origin_not_authenticated" not in item["blockers"]:
+                item["blockers"].append("local_export_origin_not_authenticated")
+            item["contact_permission_granted"] = False
+            item["outbound_approved"] = False
+        queue["action_counts"] = {
+            action: sum(item["action"] == action for item in queue["items"])
+            for action in queue["action_counts"]
+        }
+        queue["input_origin_authenticated"] = False
+        queue["promotion_eligible"] = False
         if not args.include_items:
             queue.pop("items")
         print(json.dumps(queue, sort_keys=True, separators=(",", ":"), default=str))

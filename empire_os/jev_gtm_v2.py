@@ -12,6 +12,7 @@ from typing import Any, Mapping, Sequence
 
 from empire_os.buyer_reply_operations_agent import analyze_buyer_reply
 from empire_os.icp_buyer_trigger_intelligence import assess_icp_candidate
+from empire_os.jev_gtm_buying_window import assess_buying_window
 from empire_os.typed_decision_batch import DecisionBatchRequestV2, DecisionBatchResultV2
 
 SCHEMA_VERSION = "empire.jev.gtm_decision.v2"
@@ -238,6 +239,8 @@ def build_jev_gtm_decision(
         action, reason = "IDENTITY_REVIEW", "canonical_identity_unverified"
     elif snap["has_contradiction"] or reply_class in {"unverified", "stale"}:
         action, reason = "EVIDENCE_REVIEW", "source_evidence_ambiguous"
+    elif not suppression_checked:
+        action, reason = "EVIDENCE_REVIEW", "canonical_contact_evidence_unverified"
     elif snap["fresh"] and fit["model_fit_score"] >= 55 and is_warm:
         action, reason = "INTRODUCTION_REVIEW", "verified_warm_relationship_and_signal"
     elif snap["fresh"] and fit["model_fit_score"] >= 55:
@@ -316,6 +319,7 @@ def build_jev_gtm_decision(
         "blockers": sorted(set(blockers)),
         "evidence_refs": evidence,
         "signal_review": snap,
+        "buying_window": assess_buying_window(snap),
         "icp": {
             "profile_key": fit["best_profile_key"],
             "fit_score": fit["model_fit_score"],
