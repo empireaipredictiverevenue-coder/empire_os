@@ -32,6 +32,9 @@ export type FounderJevStatus = {
   sovereign_ingress_receipt_pipeline_tested?: boolean;
   sovereign_ingress_mta_deployed?: boolean;
   sovereign_ingress_signer_production_audited?: boolean;
+  postfix_offline_staging_profile_prepared?: boolean;
+  postfix_staging_smtp_acceptance_tested?: boolean;
+  postfix_production_receiver_deployed?: boolean;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;

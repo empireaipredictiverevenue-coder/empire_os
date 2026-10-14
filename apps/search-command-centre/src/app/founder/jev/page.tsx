@@ -52,6 +52,8 @@ export default async function FounderJevPage() {
   const verifiedIngressProduction = state?.first_party_reply_ingress_production_verified ?? null;
   const sovereignPipeline = state?.sovereign_ingress_receipt_pipeline_tested ?? null;
   const sovereignMta = state?.sovereign_ingress_mta_deployed ?? null;
+  const postfixStaging = state?.postfix_offline_staging_profile_prepared ?? null;
+  const postfixAcceptance = state?.postfix_staging_smtp_acceptance_tested ?? null;
   const founderAccess = state?.independent_founder_authorizer_configured ?? null;
   const calibrated = state?.commercial_model_calibrated ?? null;
   const researchCore = state?.shared_vane_openmanus_research_core_integrated ?? null;
@@ -171,6 +173,10 @@ export default async function FounderJevPage() {
               detail="Manual one-shot read-only diagnostic compares the existing relay, public MX records, inbound webhook and Founder mailbox readiness. No live network probes run in this page." />
             <TruthLine title="First-party original-message receipt pipeline" value={sovereignPipeline}
               detail="Bounded RFC parsing, owner-supplied MTA evidence, canonical tenant mapping, Ed25519 signing, durable replay and Wave 10 verifier passed offline synthetic tests. No external email was received." />
+            <TruthLine title="Postfix offline staging profile" value={postfixStaging}
+              detail="Loopback-only 127.0.0.1:2525 Postfix candidate with exactly one provisioned reply+UUID recipient. No catch-all, bare reply@ routing, SMTP submission or production deployment." />
+            <TruthLine title="Postfix SMTP staging acceptance" value={postfixAcceptance}
+              detail="Main and master configuration parsed with extracted Ubuntu Postfix 3.10 binaries; full SMTP acceptance, postmap identity, sender authentication and live runtime have NOT passed." />
             <TruthLine title="Sovereign SMTP receiver installed and audited" value={sovereignMta}
               detail="No local receiving MTA was found on the EmpireOS host. We must independently provision and audit delivery, SPF/DKIM/DMARC and non-relaying reception before any MX change." />
             <TruthLine title="Verified first-party reply ingress" value={verifiedIngressProduction}
