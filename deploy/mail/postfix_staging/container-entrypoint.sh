@@ -104,6 +104,31 @@ python3 -m scripts.probe_postfix_staging_smtp_rcpt \
 python3 -m scripts.probe_postfix_synthetic_delivery \
     --approved-isolated-synthetic-delivery --staging-root "$ROOT"
 
+# Controlled same-container Postfix restart must not delete/mutate the
+# single synthetic Maildir message. This is NOT power-loss durability.
+MAILDIR="$ROOT/maildir/jev-00000000-0000-0000-0000-000000000079/new"
+mapfile -t FOUND < <(find "$MAILDIR" -maxdepth 1 -type f)
+if [ "${#FOUND[@]}" -ne 1 ]; then
+    echo "HOLD_SYNTHETIC_MAILDIR_ITEM_COUNT"
+    exit 2
+fi
+BEFORE="$(sha256sum "${FOUND[0]}" | cut -d ' ' -f 1)"
+/usr/sbin/postfix stop >/dev/null
+STOP_POSTFIX=0
+/usr/sbin/postfix start >/dev/null
+STOP_POSTFIX=1
+mapfile -t AFTER_FILES < <(find "$MAILDIR" -maxdepth 1 -type f)
+if [ "${#AFTER_FILES[@]}" -ne 1 ]; then
+    echo "HOLD_MAILDIR_NOT_PRESERVED_AFTER_RESTART"
+    exit 2
+fi
+AFTER="$(sha256sum "${AFTER_FILES[0]}" | cut -d ' ' -f 1)"
+if [ "$BEFORE" != "$AFTER" ]; then
+    echo "HOLD_MAILDIR_MESSAGE_MUTATED_AFTER_RESTART"
+    exit 2
+fi
+echo "SYNTHETIC_MAILDIR_SURVIVED_SERVICE_RESTART=TRUE"
+
 echo "POSTFIX_ISOLATED_ACCEPTANCE=RCPT_PROBE_EXIT_ZERO"
 echo "POSTFIX_ISOLATED_ACCEPTANCE_SYNTHETIC_DATA_ONLY=TRUE"
 echo "POSTFIX_MX_CHANGED=FALSE"
