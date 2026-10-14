@@ -155,4 +155,43 @@ echo "STORED_RFC_CUSTODY_BEFORE_AND_AFTER_RESTART=VERIFIED"
 
 echo "POSTFIX_ISOLATED_ACCEPTANCE=RCPT_PROBE_EXIT_ZERO"
 echo "POSTFIX_ISOLATED_ACCEPTANCE_SYNTHETIC_DATA_ONLY=TRUE"
+# A real inbound receiving verifier must be REQUIRED, not best-effort.
+# Shut down the original test receiver first; no production ports exist.
+/usr/sbin/postfix stop >/dev/null
+STOP_POSTFIX=0
+
+python3 - "$ROOT" <<'PY'
+from pathlib import Path
+import sys
+from uuid import UUID
+from empire_os.owned_postfix_rspamd_auth_stage import (
+    StageIdentity, generate_postfix_rspamd_auth_stage,
+)
+root=Path(sys.argv[1])
+candidate=generate_postfix_rspamd_auth_stage(
+    StageIdentity(str(UUID(int=121)),15000,15000),root=root,
+)
+(root/"main.cf").write_text(candidate["main.cf"],encoding="utf8")
+PY
+install -o root -g root -m 0644 "$ROOT/main.cf" /etc/postfix/main.cf
+/usr/sbin/postconf -n >/dev/null
+/usr/sbin/postfix check
+
+# The authentication verifier is deliberately NOT started. A down Milter
+# MUST cause temporary failure, not acceptance or silent fallback.
+python3 - <<'PY'
+import socket
+s=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+s.settimeout(.5)
+try:
+    assert s.connect_ex(("127.0.0.1",11332)) != 0
+finally:
+    s.close()
+print("REAL_MILTER_IS_DELIBERATELY_UNAVAILABLE=TRUE")
+PY
+/usr/sbin/postfix start >/dev/null
+STOP_POSTFIX=1
+python3 -m scripts.probe_postfix_milter_outage \
+    --approved-offline-milter-outage
+echo "REAL_POSTFIX_MILTER_DOWN_FAIL_CLOSED=TRUE"
 echo "POSTFIX_MX_CHANGED=FALSE"
