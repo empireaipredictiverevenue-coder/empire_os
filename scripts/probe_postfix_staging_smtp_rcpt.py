@@ -31,8 +31,22 @@ CASES = (
 )
 
 
+class BannerCapturingSMTP(smtplib.SMTP):
+    """Preserve the actual SMTP greeting returned by the stdlib connect().
+
+    smtplib.SMTP does not expose a documented .welcome attribute. The fake
+    test transport had one, hiding a production-only failure. Capture the
+    genuine server's original banner without sending any SMTP command.
+    """
+
+    def connect(self, host="localhost", port=0, source_address=None):
+        code, banner = super().connect(host, port, source_address=source_address)
+        self.welcome = banner
+        return code, banner
+
+
 def probe_rcpt(
-    *, factory: Callable[..., Any] = smtplib.SMTP,
+    *, factory: Callable[..., Any] = BannerCapturingSMTP,
 ) -> dict[str, object]:
     observations: list[dict[str, object]] = []
     try:
