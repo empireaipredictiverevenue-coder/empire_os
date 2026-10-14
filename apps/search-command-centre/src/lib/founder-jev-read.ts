@@ -9,6 +9,9 @@ export type FounderJevStatus = {
   economic_reader_configured: boolean;
   crm_reader_configured?: boolean;
   crm_prospect_review_available?: boolean;
+  reply_candidate_reader_prepared?: boolean;
+  reply_candidate_migration_051_applied?: boolean | null;
+  verified_original_reply_count?: number | null;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;

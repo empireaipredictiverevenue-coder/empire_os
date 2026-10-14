@@ -15,8 +15,52 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from empire_os.jev_gtm_economic_transport import JevEconomicResearchReadUnavailable
 from empire_os.jev_gtm_crm_review import read_jev_crm_review
+from empire_os.jev_gtm_reply_candidate_reader import review_jev_reply_candidates
 from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
+
+
+REPLY_RESULT_FIELDS = frozenset({
+    "schema_version", "mode", "prospect_id", "candidate_count",
+    "candidate_counts_by_unverified_class", "review_fingerprint", "items",
+    "full_tenant_inbox_verified", "original_provider_authenticated_count",
+    "genuine_buying_conversations_verified", "contact_binding_verified_count",
+    "provider_receipts_independently_verified", "new_database_authority",
+    "send_authorized", "recognized_revenue", "execution_authority",
+})
+REPLY_ITEM_FIELDS = frozenset({
+    "reply_ref", "intent_ref", "classification_unverified", "received_at",
+    "conversation_match_count", "provider_reference_present",
+    "provenance_status", "blocker", "positive_buyer_reply_verified",
+    "outbound_authorized",
+})
+
+
+def _safe_reply_review_contract(packet: Any) -> bool:
+    if not isinstance(packet, dict) or set(packet) != REPLY_RESULT_FIELDS:
+        return False
+    if (packet.get("schema_version") != "empire.jev.reply_candidate_review.v1"
+            or packet.get("mode") != "OBSERVE"
+            or packet.get("execution_authority") != "none"
+            or packet.get("full_tenant_inbox_verified") is not False
+            or packet.get("original_provider_authenticated_count") is not None
+            or packet.get("genuine_buying_conversations_verified") is not None
+            or packet.get("contact_binding_verified_count") is not None
+            or packet.get("provider_receipts_independently_verified") is not False
+            or packet.get("new_database_authority") is not False
+            or packet.get("send_authorized") is not False
+            or packet.get("recognized_revenue") is not None):
+        return False
+    items = packet.get("items")
+    if not isinstance(items, list) or len(items) > 100 or packet.get("candidate_count") != len(items):
+        return False
+    return all(
+        isinstance(item, dict) and set(item) == REPLY_ITEM_FIELDS
+        and item.get("positive_buyer_reply_verified") is False
+        and item.get("outbound_authorized") is False
+        and item.get("provenance_status") == "REVIEW_ONLY_UNAUTHENTICATED"
+        for item in items
+    )
 
 
 CRM_RESULT_FIELDS = frozenset({
@@ -93,6 +137,9 @@ def create_founder_jev_router(
             "economic_reader_configured": reader is not None,
             "crm_reader_configured": resolve_authenticated_crm is not None,
             "crm_prospect_review_available": resolve_authenticated_crm is not None and authorizer is not None,
+            "reply_candidate_reader_prepared": True,
+            "reply_candidate_migration_051_applied": None,
+            "verified_original_reply_count": None,
             "independent_founder_authorizer_configured": authorizer is not None,
             "real_canonical_rows_verified": None,
             "buyers_identified": None,
@@ -181,5 +228,40 @@ def create_founder_jev_router(
             if not _safe_crm_review_contract(packet):
                 raise HTTPException(503, detail="canonical_crm_review_contract_invalid")
             return packet
+
+    if resolve_authenticated_crm is not None and authorizer is not None:
+        @router.get("/crm-prospects/{prospect_id}/reply-candidates")
+        def crm_reply_candidates(
+            prospect_id: str, request: Request,
+            limit: int = Query(default=25, ge=1, le=100),
+        ):
+            try:
+                approved = authorizer(request) is True
+            except Exception:
+                approved = False
+            if not approved:
+                raise HTTPException(403, detail="founder_reply_review_forbidden")
+            try:
+                scope = resolve_authenticated_crm(request)
+            except Exception:
+                raise HTTPException(503, detail="authenticated_reply_review_unavailable") from None
+            if scope is None:
+                raise HTTPException(401, detail="authenticated_crm_scope_required")
+            if (not isinstance(scope, AuthenticatedRevenueCrmRead)
+                    or not isinstance(scope.repository, PostgresRevenueCrmRepository)
+                    or scope.tenant_id != scope.repository.tenant_id):
+                raise HTTPException(503, detail="authenticated_reply_review_unavailable")
+            try:
+                reply_packet = review_jev_reply_candidates(
+                    scope.repository, prospect_id=prospect_id,
+                    limit=limit, as_of=datetime.now(timezone.utc),
+                )
+            except ValueError:
+                raise HTTPException(400, detail="canonical_reply_review_input_invalid") from None
+            except Exception:
+                raise HTTPException(503, detail="authenticated_reply_review_unavailable") from None
+            if not _safe_reply_review_contract(reply_packet):
+                raise HTTPException(503, detail="canonical_reply_review_contract_invalid")
+            return reply_packet
 
     return router
