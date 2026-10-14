@@ -29,6 +29,9 @@ export type FounderJevStatus = {
   mail_ingress_source_truth_probe_implemented?: boolean;
   mail_ingress_source_truth_checked_by_api?: boolean;
   first_party_reply_ingress_production_verified?: boolean;
+  sovereign_ingress_receipt_pipeline_tested?: boolean;
+  sovereign_ingress_mta_deployed?: boolean;
+  sovereign_ingress_signer_production_audited?: boolean;
   independent_founder_authorizer_configured: boolean;
   real_canonical_rows_verified: number | null;
   buyers_identified: number | null;
