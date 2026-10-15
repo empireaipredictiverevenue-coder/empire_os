@@ -21,6 +21,7 @@ from typing import Any, Mapping, Sequence
 
 from empire_os.agi_memory import build_memory_query
 from empire_os.astra_canonical_company_binding import resolve_company_bindings
+from empire_os.executive_commercial_observer import observe_executive_commercial_roles
 from empire_os.astra_validated_workstream_ranking import rank_validated_workstreams
 from empire_os.control_fabric import default_registry
 from empire_os.departments import (
@@ -994,6 +995,11 @@ def refresh_astra_executive(repo_root: Path) -> dict[str, Any]:
         scout_identity=_read(
             repo_root / "runtime/buyer_acquisition/scout_latest.json"
         ),
+    )
+    # Non-authoritative management *observation* inside the existing Astra
+    # refresh, not a new loop, service, dispatch action or commercial gate.
+    payload["executive_commercial_roles"] = observe_executive_commercial_roles(
+        repo_root,
     )
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)

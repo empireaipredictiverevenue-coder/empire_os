@@ -6,6 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter
+from empire_os.executive_founder_status import (
+    DEFAULT_EXECUTIVE,
+    read_executive_founder_status,
+)
 
 DEFAULT_SNAPSHOT = Path("/srv/empire_os/runtime/ops_control/latest.json")
 
@@ -39,11 +43,20 @@ def read_ops_snapshot(path: Path = DEFAULT_SNAPSHOT) -> dict[str, Any]:
     return {"available": True, **value}
 
 
-def create_founder_ops_router(snapshot_path: Path = DEFAULT_SNAPSHOT) -> APIRouter:
+def create_founder_ops_router(
+    snapshot_path: Path = DEFAULT_SNAPSHOT,
+    executive_snapshot_path: Path = DEFAULT_EXECUTIVE,
+) -> APIRouter:
     router = APIRouter(prefix="/v1/founder-ops", tags=["founder-ops"])
 
     @router.get("/status")
     def status():
         return read_ops_snapshot(snapshot_path)
+
+    @router.get("/executive-roles/status")
+    def executive_roles_status():
+        # Read from the existing Astra plan snapshot, never run an agent or
+        # perform a live mailbox/production action from a Founder Console GET.
+        return read_executive_founder_status(executive_snapshot_path)
 
     return router

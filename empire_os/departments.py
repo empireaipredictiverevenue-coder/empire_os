@@ -42,7 +42,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "control_fabric",
                 "intelligence_router",
             ),
-            agent_roles=("supervisor", "executive_operations"),
+            agent_roles=("supervisor", "executive_operations", "chief_of_staff", "coo"),
             kpis=(
                 "realized_gross_profit",
                 "goal_completion_rate",
@@ -129,7 +129,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "commercial_terms",
                 "revenue_pulse",
             ),
-            agent_roles=("sales", "closer"),
+            agent_roles=("sales", "closer", "business_development"),
             kpis=(
                 "qualified_conversations",
                 "commercial_terms",

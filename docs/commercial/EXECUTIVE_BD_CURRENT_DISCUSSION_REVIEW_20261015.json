@@ -1,0 +1,102 @@
+{
+  "as_of": "2026-10-15T15:14:34Z",
+  "operations": {
+    "department_cycle_status": "SUCCEEDED",
+    "astra_dispatcher_status": "SUCCEEDED",
+    "founder_attention_items": 281,
+    "founder_notifications_sent": false,
+    "founder_notification_evidence": "VERIFIED",
+    "opportunities_source_proof_state": "FRESH",
+    "mailbox_observer_state": "PROVIDER_ONLY",
+    "partner_snapshot_state": "HISTORICAL_ONLY",
+    "evidence_refs": [
+      "systemd:empire-department-cycle.service:2026-10-15T15:14:34Z",
+      "runtime/astra/department_cycle_latest.json:2026-10-15T15:14:34Z",
+      "gmail_connected_primary:selective_partner_review:2026-10-15"
+    ]
+  },
+  "partners": [
+    {
+      "name": "AceLeads",
+      "domain": "aceleads.co.uk",
+      "market": "UK",
+      "state": "APPLICATION_ACKNOWLEDGED",
+      "last_touch_date": "2026-10-13",
+      "contact_history_verified": true,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "docs/commercial/ACELEADS_APPLICATION_EVIDENCE_20261013.json",
+        "gmail_message:1a134b27eca68158"
+      ]
+    },
+    {
+      "name": "LeadsDoWork",
+      "domain": "leads.work",
+      "market": "UK",
+      "state": "PARTNER_ACCEPTED",
+      "last_touch_at": "2026-10-14T11:55:35Z",
+      "contact_history_verified": true,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "gmail_thread:1a13578880d79264",
+        "gmail_sent:1a13a4494f03917a"
+      ]
+    },
+    {
+      "name": "RVNU",
+      "domain": "rvnu.com",
+      "market": "USA",
+      "state": "CONTACTED",
+      "last_touch_at": "2026-10-10T21:22:31Z",
+      "contact_history_verified": true,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "docs/commercial/PARTNER_SCALE_20261010.md",
+        "gmail_sent:1a127b22e30557bc"
+      ]
+    },
+    {
+      "name": "Modernize",
+      "domain": "modernize.com",
+      "market": "USA",
+      "state": "RESEARCH_ONLY",
+      "contact_history_verified": false,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "public:https://modernize.com/affiliates",
+        "docs/commercial/UK_US_FRESH_PARTNER_DISCOVERY_20261015.json"
+      ]
+    },
+    {
+      "name": "Newpower Advanced",
+      "domain": "newpoweruk.co.uk",
+      "market": "UK",
+      "state": "RESEARCH_ONLY",
+      "contact_history_verified": false,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "public:https://www.newpoweruk.co.uk/collaborate",
+        "docs/commercial/UK_US_FRESH_PARTNER_DISCOVERY_20261015.json"
+      ]
+    },
+    {
+      "name": "SolarBriton",
+      "domain": "solarbriton.co.uk",
+      "market": "UK",
+      "state": "PILOT_DISCUSSION",
+      "last_touch_at": "2026-10-15T10:34:23Z",
+      "contact_history_verified": true,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "gmail_thread:1a1268b899c78a29",
+        "gmail_message:1a13f20a8e86cf52"
+      ]
+    }
+  ]
+}
