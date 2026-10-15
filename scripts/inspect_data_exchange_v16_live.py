@@ -21,6 +21,7 @@ from empire_os.data_exchange_observation_custody import verify_custody_window
 from empire_os.data_exchange_temporal_quality import build_temporal_quality
 from empire_os.data_exchange_scientific_custody_review import build_scientific_custody_review
 from empire_os.data_exchange_canonical_rights_docket import build_canonical_rights_docket
+from empire_os.data_exchange_release_evidence_register import build_release_evidence_register
 from scripts.inspect_data_exchange_v15_release import protected_dsn
 from scripts.operate_data_exchange_v16_followup import due_check
 from scripts.operate_data_exchange_observation_custody import capture
@@ -128,6 +129,7 @@ def inspect_live(*, now: datetime, dsn: str, recheck_official: bool = False,
             or rights["customer_delivery_enabled"] is not False
             or rights["production_writes"] is not False):
             raise InspectionHold("RIGHTS_DOCKET_CUSTODY_MISMATCH")
+        rights["release_evidence_register"]=build_release_evidence_register(rights)
         report["canonical_field_rights_docket"]=rights
     return report
 
