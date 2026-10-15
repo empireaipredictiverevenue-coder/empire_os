@@ -19,6 +19,7 @@ from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
 from empire_os.runtime_self_heal import run_runtime_self_heal
 from empire_os.sovereign_infrastructure_observer import collect_sovereign_infrastructure_health
+from empire_os.conversation_control_operational_truth import inspect_conversation_evidence
 from empire_os.supabase_egress_guard import (
     MANAGED_TIMERS,
     supabase_egress_contained,
@@ -430,6 +431,9 @@ def main() -> int:
     # Add passive sovereign capacity/recovery evidence to the SAME Ops Control
     # snapshot and incident fabric; never add units to the healer allowlist.
     sovereign_infrastructure = collect_sovereign_infrastructure_health()
+    # Existing Founder Ops snapshot: only counts and control states,
+    # never reply bodies, sender identities, outbound or DB connections.
+    conversation_evidence_review = inspect_conversation_evidence(Path("/srv/empire_os"))
     passive_incidents = build_incident_report({
         "findings": sovereign_infrastructure["service_findings"],
     })
@@ -444,6 +448,7 @@ def main() -> int:
             default=None,
         )
     health_domains = {
+        "conversation_evidence": conversation_evidence_review["status"],
         "sovereign_infrastructure": sovereign_infrastructure["status"],
         "user_owned_workers": user_worker_health["status"],
         "leadgen_commercial_truth": leadgen_truth["status"],
@@ -507,6 +512,7 @@ def main() -> int:
         "leadgen_truth": leadgen_truth,
         "user_worker_health": user_worker_health,
         "sovereign_infrastructure": sovereign_infrastructure,
+        "conversation_evidence_review": conversation_evidence_review,
         "leadgen_truth_transition": transition,
         "leadgen_preflight_checks_clear": leadgen_truth["preflight_checks_clear"],
         "blocking_finding_count": len(blocking_findings),
