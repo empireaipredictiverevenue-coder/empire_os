@@ -330,6 +330,50 @@ def collect_research_queries(
     return dedup
 
 
+def select_market_review_domains(
+    domains_by_market: Mapping[str, str], *,
+    slots: int,
+    as_of: datetime,
+) -> list[str]:
+    """Fairly rotate EXISTING review/probe slots across country markets.
+
+    This is a review allocation, never automatic outreach or proof of demand.
+    No extra sites, search queries or cycle timers are authorised by this.
+    """
+    if as_of.tzinfo is None or as_of.utcoffset() is None:
+        raise ValueError("timezone-aware selection required")
+    budget = min(max(0, int(slots)), 4, len(domains_by_market))
+    if not budget:
+        return []
+    pools = {
+        market: sorted(
+            domain for domain, target in domains_by_market.items()
+            if target == market
+        )
+        for market in ("USA", "UK", "AU", "CA", "UNSPECIFIED")
+    }
+    tick = int(as_of.timestamp() // 1800)
+    markets = [market for market in ("USA", "UK", "AU", "CA", "UNSPECIFIED")
+               if pools[market]]
+    offset = tick % len(markets)
+    rotated = markets[offset:] + markets[:offset]
+    selected: list[str] = []
+    for market in rotated:
+        candidates = pools[market]
+        host = candidates[(tick // len(markets)) % len(candidates)]
+        if host not in selected:
+            selected.append(host)
+        if len(selected) >= budget:
+            return selected
+    # Fill spare slots from the same reviewed, non-contacting domain set.
+    for domain in sorted(domains_by_market):
+        if domain not in selected:
+            selected.append(domain)
+        if len(selected) >= budget:
+            break
+    return selected
+
+
 def run_buyer_scout(
     plan: Mapping[str, Any],
     *,
@@ -533,6 +577,10 @@ def run_buyer_scout(
                         provenance.setdefault(host, []).append({
                             "source": "public_research_seed",
                             "source_refs": source_refs,
+                            "target_markets": [
+                                m for m in (row.get("target_markets") or [])
+                                if m in {"USA", "UK", "AU", "CA"}
+                            ][:4],
                             "registry_business_name": row.get("registry_business_name"),
                             "query": query,
                             "buyer_pool": pool,
@@ -572,18 +620,31 @@ def run_buyer_scout(
     # could be recorded as seeds yet disappear behind the domain cap.
     # Reserve at most 10% of candidate/probe capacity for those *review-only*
     # seeds. Do not displace bounded opportunity/intent/recovery evidence.
-    reviewed_publisher_domains = sorted({
-        host
-        for row in research_seed_records or []
-        if isinstance(row, Mapping)
-        for host in [_host(str(row.get("website") or row.get("domain") or ""))]
-        if host in provenance and any(
-            str(ref) == "public:publisher_review:" + host
-            for ref in row.get("source_refs") or []
+    reviewed_publisher_rows: dict[str, str] = {}
+    for row in research_seed_records or []:
+        if not isinstance(row, Mapping):
+            continue
+        host = _host(str(row.get("website") or row.get("domain") or ""))
+        if not host or host not in provenance:
+            continue
+        refs = [str(ref) for ref in row.get("source_refs") or []]
+        legacy = "public:publisher_review:" + host in refs
+        market_refs = [
+            market for market in ("USA", "UK", "AU", "CA")
+            if f"public:multimarket_review:{market}:{host}" in refs
+        ]
+        if not legacy and not market_refs:
+            continue
+        reviewed_publisher_rows[host] = (
+            market_refs[0] if market_refs else "UNSPECIFIED"
         )
-    })
+    reviewed_publisher_domains = sorted(reviewed_publisher_rows)
     reserved_budget = min(4, domain_budget // 8, len(reviewed_publisher_domains))
-    preferred = reviewed_publisher_domains[:reserved_budget]
+    preferred = select_market_review_domains(
+        reviewed_publisher_rows,
+        slots=reserved_budget,
+        as_of=datetime.now(timezone.utc),
+    )
     reserved_keys = (
         opportunity_seed_domains | low_yield_canonical_domains
         | intent_seed_domains

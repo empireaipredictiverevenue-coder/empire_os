@@ -64,7 +64,7 @@ PATHS = (
 
 ALLOWED_TLDS = {
     "com", "co", "uk", "io", "ai", "net", "org",
-    "us", "ca", "biz", "info", "pro", "media",
+    "us", "ca", "au", "biz", "info", "pro", "media",
     "marketing", "agency", "digital", "group",
     "company", "services", "solutions",
 }

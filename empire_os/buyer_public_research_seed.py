@@ -64,6 +64,35 @@ _BASELINE_SEEDS = (
 )
 
 
+# Verified first-party public programme pages observed 15 October 2026.
+# PUBLIC DISCOVERY CANDIDATES ONLY: not Empire AI buyer contracts, payouts,
+# traffic permission, partner approval or category/postcode acceptance.
+# Market labels describe *programme jurisdiction*, not founder location.
+_MULTIMARKET_REVIEW_SEEDS = (
+    ("https://modernize.com/affiliates", "USA", ("solar", "roofing", "hvac")),
+    ("https://www.angi.com/landing/affiliatepartners", "USA", ("home_services",)),
+    ("https://homeservicesleadgroup.com/affiliates", "USA", ("solar", "roofing", "hvac")),
+    ("https://leads2trade.co.uk/about/affiliates/", "UK", ("solar", "home_services")),
+    ("https://yoursolarquotes.com.au/solar-affiliate-program/", "AU", ("solar",)),
+    ("https://www.australiansolarquotes.com.au/about-us/referral-partners/", "AU", ("solar",)),
+    ("https://www.liveleads.ca/", "CA", ("home_services", "insurance", "legal")),
+    ("https://centfix.ca/affiliates", "CA", ("home_services",)),
+    ("https://xolar.ca/referral-program/", "CA", ("solar",)),
+)
+MARKETS = frozenset({"UK", "USA", "AU", "CA"})
+_MARKET_PUBLISHER_QUERIES = (
+    # Existing four tested US home-service queries preserved unchanged below.
+    ('"solar" "pay per lead" "publisher" "United States"', "USA"),
+    ('"HVAC" "publisher" "lead buyer" "United States"', "USA"),
+    ('"solar panels" "affiliate" "lead" "United Kingdom"', "UK"),
+    ('"home improvements" "affiliate programme" "publisher" "UK"', "UK"),
+    ('"solar" "affiliate program" "Australia"', "AU"),
+    ('"roofing" "pay per lead" "Australia"', "AU"),
+    ('"solar" "lead partner" "Canada"', "CA"),
+    ('"home services" "affiliate" "publisher" "Canada"', "CA"),
+)
+
+
 def _host(value: Any) -> str:
     text = str(value or "").strip().lower()
     if not text:
@@ -127,13 +156,20 @@ _PUBLISHER_DISCOVERY_QUERIES = (
     '"home services" "publisher" "organic" "apply"',
     '"roofing" "publisher" "qualification" "tracking"',
     '"home services" "calls" "publisher application" "SEO"',
+    *(query for query, market in _MARKET_PUBLISHER_QUERIES),
 )
 
 
 def _publisher_queries(*, observed_at: datetime, max_queries: int) -> list[dict[str, Any]]:
     count = min(max(0, int(max_queries)), 2)
     slot = int(observed_at.timestamp() // 1800)
-    start = (slot % 2) * 2
+    # Exactly two searches per existing scout run. Cycle across country
+    # pairs; widening markets does NOT increase provider calls or timers.
+    start = (slot % (len(_PUBLISHER_DISCOVERY_QUERIES) // 2)) * 2
+    def market_at(index: int) -> str:
+        if index < 4:
+            return "USA"
+        return _MARKET_PUBLISHER_QUERIES[index - 4][1]
     return [{
         "query": _PUBLISHER_DISCOVERY_QUERIES[start + i],
         "buyer_pool": "direct_demand_buyers",
@@ -141,6 +177,7 @@ def _publisher_queries(*, observed_at: datetime, max_queries: int) -> list[dict[
         "product_code": None,
         "priority_score": 90,
         "source": "tested_publisher_first_search",
+        "target_market": market_at(start + i),
     } for i in range(count)]
 
 
@@ -202,6 +239,8 @@ def build_public_research_seeds(
         corridor_key: str | None = None,
         product_code: str | None = None,
         buyer_pool: str = "direct_demand_buyers",
+        target_market: str | None = None,
+        target_verticals: tuple[str, ...] = (),
     ) -> None:
         host = _host(website)
         if not host or host in _BAD_HOSTS:
@@ -214,6 +253,8 @@ def build_public_research_seeds(
             "target_buyer_pools": [],
             "target_corridor_keys": [],
             "target_product_codes": [],
+            "target_markets": [],
+            "target_verticals": [],
             "truth_class": "OBSERVED_PUBLIC_RESEARCH",
             "identity_verified": False,
             "commercial_terms_verified": False,
@@ -235,9 +276,24 @@ def build_public_research_seeds(
             row["target_corridor_keys"].append(corridor_key)
         if product_code and product_code not in row["target_product_codes"]:
             row["target_product_codes"].append(product_code)
+        if target_market in MARKETS and target_market not in row["target_markets"]:
+            row["target_markets"].append(target_market)
+        for vertical in target_verticals:
+            if (isinstance(vertical, str) and vertical in {
+                "solar", "roofing", "hvac", "home_services", "legal", "insurance"
+            } and vertical not in row["target_verticals"]):
+                row["target_verticals"].append(vertical)
 
     for website, source_ref in _BASELINE_SEEDS:
         add_seed(website, source_ref=source_ref)
+    for website, market, verticals in _MULTIMARKET_REVIEW_SEEDS:
+        host = _host(website)
+        add_seed(
+            website,
+            source_ref=f"public:multimarket_review:{market}:{host}",
+            target_market=market,
+            target_verticals=verticals,
+        )
 
     safe_max = max(1, min(int(max_queries), 60))
     publisher = _publisher_queries(observed_at=now, max_queries=safe_max)
@@ -293,6 +349,7 @@ def build_public_research_seeds(
                 source_query=query,
                 corridor_key=query_row.get("corridor_key"),
                 product_code=query_row.get("product_code"),
+                target_market=query_row.get("target_market"),
                 buyer_pool=str(
                     query_row.get("buyer_pool")
                     or "direct_demand_buyers"
@@ -320,6 +377,9 @@ def build_public_research_seeds(
             "local_volume": sum(row.get("source") == "rotating_volume_wave" for row in queries),
         },
         "publisher_first_queries_are_discovery_hints_only": True,
+        "multimarket_first_party_seed_count": len(_MULTIMARKET_REVIEW_SEEDS),
+        "searches_per_existing_cycle_unchanged": True,
+        "markets_targeted": list(sorted(MARKETS)),
         "fresh_search_domain_count": len(observed_from_queries),
         "fresh_search_result_status": query_result_status,
         "search_provider_health_independently_verified": False,
@@ -444,8 +504,17 @@ def load_known_registry_domains(root: Path) -> set[str] | None:
 def publisher_review_page_path(domain: str) -> str | None:
     """Bounded same-host official entry point for first-party site verification."""
     host = _host(domain)
-    for page_url, source in _BASELINE_SEEDS:
-        if source != "public:publisher_review:" + host:
+    pages = [
+        *( (url, source) for url, source in _BASELINE_SEEDS),
+        *( (url, f"public:multimarket_review:{market}:{_host(url)}")
+            for url, market, _verticals in _MULTIMARKET_REVIEW_SEEDS),
+    ]
+    for page_url, source in pages:
+        if not (
+            source == "public:publisher_review:" + host
+            or any(source == f"public:multimarket_review:{market}:{host}"
+                   for market in MARKETS)
+        ):
             continue
         parsed = urlparse(page_url)
         path = parsed.path.rstrip("/")

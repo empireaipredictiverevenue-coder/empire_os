@@ -15,7 +15,7 @@ INVALID_DOMAINS = frozenset({
     "localhost", "test.com",
 })
 ALLOWED_TLDS = frozenset({
-    "com", "co", "uk", "io", "ai", "net", "org", "us", "ca",
+    "com", "co", "uk", "io", "ai", "net", "org", "us", "ca", "au",
     "biz", "info", "pro", "media", "marketing", "agency",
     "digital", "group", "company", "services", "solutions",
 })
