@@ -1,4 +1,5 @@
 "use client";
+import CommercialBuyerExplanation from "@/components/CommercialBuyerExplanation";
 import { ArrowLeft, ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -156,6 +157,7 @@ export default function CommercialPage() {
           </form>
         </section>
       </div>
+      <CommercialBuyerExplanation />
     </div>
   </main>;
 }

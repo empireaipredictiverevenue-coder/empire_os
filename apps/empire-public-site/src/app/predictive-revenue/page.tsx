@@ -1,4 +1,5 @@
 "use client";
+import PredictiveRevenueBuyerExplanation from "@/components/PredictiveRevenueBuyerExplanation";
 
 import {
   ArrowLeft,
@@ -476,6 +477,7 @@ export default function PredictiveRevenuePage() {
             </form>
           </section>
         </div>
+        <PredictiveRevenueBuyerExplanation />
       </div>
 
       <style jsx>{`
