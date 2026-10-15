@@ -18,6 +18,7 @@ from empire_os.engineering_health_bridge import build_engineering_health_report
 from empire_os.ops_healer import execute_plan
 from empire_os.ops_sentinel import observe
 from empire_os.runtime_self_heal import run_runtime_self_heal
+from empire_os.sovereign_infrastructure_observer import collect_sovereign_infrastructure_health
 from empire_os.supabase_egress_guard import (
     MANAGED_TIMERS,
     supabase_egress_contained,
@@ -426,7 +427,24 @@ def main() -> int:
     ]
     leadgen_truth = observe_leadgen_truth()
     user_worker_health = observe_user_workers()
+    # Add passive sovereign capacity/recovery evidence to the SAME Ops Control
+    # snapshot and incident fabric; never add units to the healer allowlist.
+    sovereign_infrastructure = collect_sovereign_infrastructure_health()
+    passive_incidents = build_incident_report({
+        "findings": sovereign_infrastructure["service_findings"],
+    })
+    if passive_incidents["incident_count"]:
+        incident_manager["diagnoses"].extend(passive_incidents["diagnoses"])
+        incident_manager["incident_count"] = len(incident_manager["diagnoses"])
+        incident_manager["requires_escalation"] = (
+            incident_manager["requires_escalation"] or passive_incidents["requires_escalation"]
+        )
+        incident_manager["highest_priority"] = max(
+            (item["commercial_priority"] for item in incident_manager["diagnoses"]),
+            default=None,
+        )
     health_domains = {
+        "sovereign_infrastructure": sovereign_infrastructure["status"],
         "user_owned_workers": user_worker_health["status"],
         "leadgen_commercial_truth": leadgen_truth["status"],
         "infrastructure": (
@@ -488,6 +506,7 @@ def main() -> int:
         "health_domains": health_domains,
         "leadgen_truth": leadgen_truth,
         "user_worker_health": user_worker_health,
+        "sovereign_infrastructure": sovereign_infrastructure,
         "leadgen_truth_transition": transition,
         "leadgen_preflight_checks_clear": leadgen_truth["preflight_checks_clear"],
         "blocking_finding_count": len(blocking_findings),
