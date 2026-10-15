@@ -115,3 +115,33 @@ def test_rights_docket_flag_fails_root_guard(monkeypatch,capsys):
     output=json.loads(capsys.readouterr().out)
     assert output["reason_code"]=="AUTHORISED_ROOT_READ_ACCESS_REQUIRED"
     assert output["database_writes"] is False
+
+
+def test_future_attribution_preview_is_complete_but_unpublished():
+    import empire_os.data_exchange_canonical_rights_docket as mod
+    preview=docket()["proposed_attribution_preview"]
+    assert preview["preview_status"]=="INTERNAL_TEXT_FOR_HUMAN_REVIEW_ONLY"
+    assert preview["source_url"]==mod.DATASET_PAGE
+    assert preview["licence_url"]==mod.LICENCE_PAGE
+    assert mod.PLANNING_RIGHTS["required_attribution"] in preview["attribution_text"]
+    assert "Open Government Licence v3.0" in preview["attribution_text"]
+    assert "not endorsed" in preview["independent_product_disclaimer"]
+    assert preview["displayed_on_customer_product"] is False
+    assert preview["commercial_distribution_authorized"] is False
+    assert preview["attribution_review_completed"] is False
+    assert docket()["customer_delivery_enabled"] is False
+
+
+def test_catalogue_drift_fails_attribution_preview_closed(monkeypatch):
+    import empire_os.data_exchange_canonical_rights_docket as mod
+    monkeypatch.setitem(mod.PLANNING_RIGHTS,"required_attribution","altered")
+    with pytest.raises(CustodyIntegrityError,match="attribution catalogue drift"):
+        docket()
+
+
+def test_preview_does_not_include_pilot_record_ids_or_contacts():
+    preview=docket()["proposed_attribution_preview"]
+    string=json.dumps(preview,sort_keys=True)
+    for value in ("1739547","1722645","1739516","@example.com","mailto:","sales@"):
+        assert value not in string
+    assert "customer_email" not in string

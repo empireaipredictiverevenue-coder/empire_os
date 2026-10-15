@@ -22,6 +22,49 @@ from empire_os.data_exchange_temporal_quality import PILOT_IDS
 SCHEMA="empire.data_exchange.canonical_field_rights_docket.v18"
 DATASET_PAGE="https://www.planning.data.gov.uk/dataset/brownfield-land"
 LICENCE_PAGE="https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/"
+def build_internal_attribution_preview() -> dict[str, Any]:
+    """Proposed future attribution only; never render or grant distribution."""
+    if (
+        PLANNING_RIGHTS["dataset_uri"] != DATASET_PAGE
+        or PLANNING_RIGHTS["licence_url"] != LICENCE_PAGE
+        or PLANNING_RIGHTS["required_attribution"]
+           != "© Crown copyright and database right 2026"
+    ):
+        raise CustodyIntegrityError("official publisher attribution catalogue drift")
+    return {
+        "preview_status":"INTERNAL_TEXT_FOR_HUMAN_REVIEW_ONLY",
+        "intended_context":"FUTURE_EMPIRE_CONSTRUCTION_SOURCE_CREDIT",
+        "source_label":"Planning Data — Brownfield land (England)",
+        "source_url":DATASET_PAGE,
+        "attribution_text":(
+            "Planning Data — Brownfield land. "
+            "© Crown copyright and database right 2026. "
+            "Contains public sector information licensed under "
+            "the Open Government Licence v3.0."
+        ),
+        "licence_label":"Open Government Licence v3.0",
+        "licence_url":LICENCE_PAGE,
+        "independent_product_disclaimer":(
+            "Empire AI is an independent data analysis service, "
+            "not an official UK Government or Planning Data service "
+            "and is not endorsed by either."
+        ),
+        "required_human_checks":[
+            "Confirm attribution wording matches current publisher statement",
+            "Confirm link visibility in every eventual customer-facing surface",
+            "Check applicable source-specific exceptions and field-level third-party rights",
+            "Check personal data is excluded under applicable UK data protection rules",
+            "Confirm record update age is not presented as current site activity",
+            "Record independent review and founder approval before any publication",
+        ],
+        "displayed_on_customer_product":False,
+        "publisher_endorsement_claimed":False,
+        "attribution_review_completed":False,
+        "commercial_distribution_authorized":False,
+        "data_resale_authorized":False,
+    }
+
+
 API_PROJECTION={
     "source_record_id":"entity",
     "source_url":"official entity permalink (constructed from verified entity ID)",
@@ -106,6 +149,7 @@ def build_canonical_rights_docket(
         "dataset_stated_licence":"Open Government Licence v3.0",
         "dataset_stated_attribution":PLANNING_RIGHTS["required_attribution"],
         "publisher_evidence_status":"OFFICIAL_DATASET_PAGE_STATES_OGL_V3",
+        "proposed_attribution_preview":build_internal_attribution_preview(),
         "independent_source_licence_review_completed":False,
         "source_field_count":len(fields),
         "field_evidence_docket":fields,
