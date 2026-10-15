@@ -17,13 +17,12 @@ from empire_os.data_exchange_construction import (
     build_construction_preview, normalise_official_brownfield_entities,
 )
 from scripts.operate_data_exchange_observation_custody import PILOT_ENTITY_IDS
-from scripts.probe_construction_official_entities import fetch_official_json
+from scripts.probe_construction_official_entities import (
+    fetch_official_json, APPROVED_SOURCE_INPUT_KEYS,
+)
 
 SCHEMA="empire.data_exchange.transient_source_key_inventory.v19"
-ALLOWED_RAW_KEYS=frozenset({
-    "entity", "dataset", "quality", "organisation-entity", "end-date",
-    "planning-permission-status", "hectares", "entry-date",
-})
+ALLOWED_RAW_KEYS=APPROVED_SOURCE_INPUT_KEYS
 SENSITIVE_KEY_TERMS=frozenset({
     "email", "mail", "telephone", "phone", "contact",
     "address", "person", "owner", "name", "notes", "description",

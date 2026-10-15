@@ -17,7 +17,7 @@ from empire_os.data_exchange_construction import (
 )
 from empire_os.data_exchange_observation_custody import plan_custody_append
 from empire_os.data_exchange_custody_transport import EmpireDBConstructionCustody
-from scripts.probe_construction_official_entities import fetch_official_json
+from scripts.probe_construction_official_entities import fetch_projected_official_json
 
 SCHEMA = "empire.data_exchange.custody_capture_operator.v15"
 PILOT_ENTITY_IDS = (1722645, 1739516, 1739547)
@@ -29,7 +29,7 @@ def capture(
     *,
     entity_ids: tuple[int, ...] = PILOT_ENTITY_IDS,
     now: datetime,
-    fetch_json=fetch_official_json,
+    fetch_json=fetch_projected_official_json,
 ) -> dict:
     if (
         not isinstance(entity_ids, tuple)

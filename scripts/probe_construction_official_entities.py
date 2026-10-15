@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import re
 from urllib.error import URLError
 from urllib.parse import urlsplit
 from urllib.request import (
@@ -19,6 +20,11 @@ from empire_os.data_exchange_construction import (
 )
 
 MAX_RESPONSE_BYTES = 200_000
+APPROVED_SOURCE_INPUT_KEYS = frozenset({
+    "entity", "dataset", "quality", "organisation-entity", "end-date",
+    "planning-permission-status", "hectares", "entry-date",
+})
+OFFICIAL_ENTITY_PATH = re.compile(r"/entity/[1-9][0-9]*\.json", re.ASCII)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -32,8 +38,8 @@ def fetch_official_json(url: str) -> dict:
         parsed.scheme != "https"
         or parsed.hostname != "www.planning.data.gov.uk"
         or parsed.port not in (None, 443)
-        or not parsed.path.startswith("/entity/")
-        or not parsed.path.endswith(".json")
+        or OFFICIAL_ENTITY_PATH.fullmatch(parsed.path) is None
+        or parsed.username is not None or parsed.password is not None
         or parsed.query or parsed.fragment
     ):
         raise ValueError("non-official URL rejected")
@@ -51,6 +57,18 @@ def fetch_official_json(url: str) -> dict:
     return payload
 
 
+def fetch_projected_official_json(url: str) -> dict:
+    """Return only reviewed source input keys to the custody normalizer.
+
+    The bounded JSON HTTP parser necessarily decodes a raw response before
+    this filter, but the normal capture pipeline no longer retains or passes
+    its unreviewed values beyond this boundary. This is NOT privacy signoff.
+    """
+    full_response = fetch_official_json(url)
+    return {key: full_response[key] for key in APPROVED_SOURCE_INPUT_KEYS
+            if key in full_response}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--entity", type=int, nargs="+", required=True)
@@ -58,7 +76,7 @@ def main(argv: list[str] | None = None) -> int:
     now = datetime.now(timezone.utc)
     try:
         rows = normalise_official_brownfield_entities(
-            args.entity, fetch_json=fetch_official_json, observed_at=now,
+            args.entity, fetch_json=fetch_projected_official_json, observed_at=now,
         )
         result = build_construction_preview(rows, observed_at=now)
     except (ValueError, URLError, OSError, json.JSONDecodeError) as exc:
