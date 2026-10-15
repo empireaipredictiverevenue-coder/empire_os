@@ -19,6 +19,7 @@ from typing import Any
 from empire_os.data_exchange_custody_transport import EmpireDBConstructionCustody
 from empire_os.data_exchange_observation_custody import verify_custody_window
 from empire_os.data_exchange_temporal_quality import build_temporal_quality
+from empire_os.data_exchange_scientific_custody_review import build_scientific_custody_review
 from scripts.inspect_data_exchange_v15_release import protected_dsn
 from scripts.operate_data_exchange_v16_followup import due_check
 from scripts.operate_data_exchange_observation_custody import capture
@@ -37,6 +38,7 @@ class InspectionHold(RuntimeError):
 
 
 def inspect_live(*, now: datetime, dsn: str, recheck_official: bool = False,
+                 scientific_review: bool = False,
                  fetch_snapshot=capture, store_factory=EmpireDBConstructionCustody) -> dict[str, Any]:
     if not isinstance(now, datetime) or now.tzinfo is None or now.utcoffset() is None:
         raise InspectionHold("UTC_AWARE_TIME_REQUIRED")
@@ -67,7 +69,7 @@ def inspect_live(*, now: datetime, dsn: str, recheck_official: bool = False,
         or quality["production_writes"] is not False
     ):
         raise InspectionHold("CUSTODY_QUALITY_READBACK_INCONSISTENT")
-    return {
+    report = {
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
         "status": "CANONICAL_CUSTODY_READONLY_VERIFIED",
@@ -107,12 +109,25 @@ def inspect_live(*, now: datetime, dsn: str, recheck_official: bool = False,
         "service_started": False,
         "execution_authority": "NONE",
     }
+    if scientific_review:
+        science = build_scientific_custody_review(
+            rows, assessed_at=now, recheck=fresh,
+        )
+        if (science["canonical_head_sha256"] != report["canonical_head_sha256"]
+            or science["v14_observed_field_changes_in_window"]
+               != report["v14_observed_field_change_count"]
+            or science["customer_delivery_enabled"] is not False
+            or science["production_writes"] is not False):
+            raise InspectionHold("SCIENTIFIC_EVIDENCE_AND_CUSTODY_MISMATCH")
+        report["scientific_evidence_review"] = science
+    return report
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--read-only", action="store_true")
     p.add_argument("--recheck-official", action="store_true")
+    p.add_argument("--scientific-review", action="store_true")
     args = p.parse_args(argv)
     report: dict[str, Any]
     try:
@@ -125,6 +140,7 @@ def main(argv: list[str] | None = None) -> int:
         report = inspect_live(
             now=datetime.now(timezone.utc), dsn=protected_dsn(),
             recheck_official=args.recheck_official,
+            scientific_review=args.scientific_review,
         )
     except InspectionHold as exc:
         report = {
