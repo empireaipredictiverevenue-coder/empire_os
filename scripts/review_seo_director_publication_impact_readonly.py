@@ -29,6 +29,7 @@ API = "http://127.0.0.1:8771/v1/search/search-console"
 FOUNDER_API = "http://127.0.0.1:8766/v1/founder-ops/executive-roles/status"
 FIRST = Path("/srv/empire_os/runtime/public_website/seo_four_pages_20261015_release_v1/release_receipt.json")
 SECOND = Path("/srv/empire_os/runtime/public_website/seo_director_b2b_two_pages_20261015_release_v1/release_receipt.json")
+METADATA = Path("/srv/empire_os/runtime/public_website/seo_buyer_metadata_two_pages_20261015_release_v1/release_receipt.json")
 ALLOWED_OUTPUT_DIR = Path("/var/tmp")
 
 
@@ -92,7 +93,8 @@ def _windows(end: date) -> tuple[date,date,date,date]:
 
 def run(*, getter: Callable[..., Any] = requests.get,
         end: date | None = None,
-        first: Path = FIRST, second: Path = SECOND) -> dict[str, Any]:
+        first: Path = FIRST, second: Path = SECOND,
+        metadata: Path = METADATA) -> dict[str, Any]:
     # Search Console normally requires processing time; never demand today's
     # unprocessed rows or interpret absence of today's data as no traffic.
     today=datetime.now(timezone.utc).date()
@@ -134,6 +136,7 @@ def run(*, getter: Callable[..., Any] = requests.get,
     result=review_publication_impact(
         baseline=baseline,observed_query_pages=current,
         earlier_release=_receipt(first),latest_release=_receipt(second),
+        metadata_release=_receipt(metadata) if metadata.is_file() else None,
         live_pages=owned,buyer_capacity_status=status,
         www_status=www.status_code,
     )

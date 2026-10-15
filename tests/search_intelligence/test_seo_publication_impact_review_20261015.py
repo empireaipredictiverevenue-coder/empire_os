@@ -196,3 +196,30 @@ def test_symlink_unsafe_receipt_rejected(tmp_path):
     fake=tmp_path/'fake';fake.symlink_to(original)
     with pytest.raises(ValueError,match='trusted_publication_receipt_required'):
         op._receipt(fake)
+
+
+def test_third_b2b_search_metadata_release_overlays_only_exact_industry_pages():
+    inp=inputs()
+    new_receipt=deepcopy(inp["earlier_release"])
+    new_receipt["pages"]={name:{"after_sha256":"c"*64} for name in
+        ("industries/roofing.html","industries/solar.html")}
+    inp["metadata_release"]=new_receipt
+    inp["live_pages"]["/industries/roofing"]["sha256"]="c"*64
+    inp["live_pages"]["/industries/solar"]["sha256"]="c"*64
+    result=review_publication_impact(**inp)
+    assert result["buyer_intent_search_metadata_release_verified"] is True
+    assert result["seo_pages_verified_public"]==4
+    assert result["paid_cpc_revenue"] is None
+    assert result["production_site_modified"] is False
+    assert result["buyer_outbound_authorized"] is False
+
+
+def test_missing_or_malformed_third_receipt_cannot_hide_changed_live_page_hash():
+    inp=inputs()
+    inp["live_pages"]["/industries/solar"]["sha256"]="c"*64
+    with pytest.raises(ValueError,match="published_page_not_current_verified_release"):
+        review_publication_impact(**inp)
+    inp["metadata_release"]=deepcopy(inp["earlier_release"])
+    inp["metadata_release"]["pages"]={"industries/roofing.html":{"after_sha256":"c"*64}}
+    with pytest.raises(ValueError,match="incorrect_reviewed_release_page_scope"):
+        review_publication_impact(**inp)

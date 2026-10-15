@@ -21,6 +21,7 @@ PAGE_SET = (
 )
 FIRST_RELEASE = {"industries/roofing.html", "industries/solar.html", "commercial.html", "predictive-revenue.html"}
 SECOND_RELEASE = {"commercial.html", "predictive-revenue.html"}
+METADATA_RELEASE = {"industries/roofing.html", "industries/solar.html"}
 EXPECTED_HEADINGS = {
     "/industries/roofing": "From a roofing search to a qualified commercial opportunity.",
     "/industries/solar": "Solar referrals only become revenue when the buyer accepts the outcome.",
@@ -60,6 +61,7 @@ def review_publication_impact(*,
         live_pages: Mapping[str, Mapping[str, Any]],
         buyer_capacity_status: str,
         www_status: int | None,
+        metadata_release: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (not isinstance(baseline, Mapping) or
         baseline.get("schema_version") != "empire.search.owned_gsc_organic_review.v1"
@@ -97,7 +99,12 @@ def review_publication_impact(*,
             raise ValueError("gsc_clicks_are_not_commercial_conversions")
     first = _release(earlier_release,expected=FIRST_RELEASE)
     second = _release(latest_release,expected=SECOND_RELEASE)
-    final = {**first,**second}
+    final = {**first, **second}
+    if metadata_release is not None:
+        # A later search snippet-only release updates roofing/solar HTML hashes.
+        # Only these exact original industry pages may overlay first-release
+        # evidence, and every subsequent live page must match its receipt.
+        final.update(_release(metadata_release, expected=METADATA_RELEASE))
     if not isinstance(live_pages,Mapping) or set(live_pages)!=set(PAGE_SET):
         raise ValueError("all_four_owned_pages_live_proof_required")
     for path in PAGE_SET:
@@ -176,6 +183,7 @@ def review_publication_impact(*,
         "post_release_gsc_days_in_window_max":eligible_days,
         "post_release_gsc_outcome_attributable_to_site_change":False,
         "seo_pages_verified_public":4,
+        "buyer_intent_search_metadata_release_verified":metadata_release is not None,
         "page_evidence":tracked,
         "www_host_redirect_review_needed":www_status==200,
         "buyer_capacity_status":buyer_capacity_status,
