@@ -20,6 +20,12 @@ def sandbox(tmp_path,mutate):
     proof=tmp_path/proof_path
     data=json.loads(bindings.read_text())
     observed=json.loads(proof.read_text())
+    # Fixture, not production: force three original unverified slots so
+    # this test stays deterministic after a successful live promotion.
+    for lane in data["lanes"]:
+        if lane.get("lane")=="campaigns":
+            for name in ("evidence_lineage","canonical_identity","quarantine"):
+                lane["controls"][name]["status"]="UNVERIFIED"
     mutate(data,observed)
     bindings.write_text(json.dumps(data))
     proof.write_text(json.dumps(observed))

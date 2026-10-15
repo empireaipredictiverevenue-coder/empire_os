@@ -4,10 +4,13 @@ from __future__ import annotations
 import copy
 import json
 from collections import defaultdict
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-from empire_os.runtime_promotion_guard import atomic_binding_write, binding_writer_lock
+from empire_os.runtime_promotion_guard import (
+    atomic_binding_write, binding_writer_lock,
+    validate_control_proof, PromotionProofError,
+)
 
 ROOT = Path("/srv/empire_os")
 
@@ -63,6 +66,28 @@ def load(name):
     )
 
 
+def evidence_fresh(name, lane):
+    """Require contemporaneous OBSERVE source before trusting positive claims."""
+    proof=load(name)
+    try:
+        if proof.get("lane") != lane or proof.get("mode") != "OBSERVE":
+            raise ValueError("incorrect source authority")
+        if any(proof.get(k) is True for k in
+               ("outbound", "db_write", "campaign_state_mutated",
+                "action_authority_granted", "payment_execution")):
+            raise ValueError("consequential authority present")
+        stamp=datetime.fromisoformat(
+            str(proof.get("generated_at") or "").replace("Z","+00:00"))
+        if stamp.tzinfo is None:
+            raise ValueError("naive source timestamp")
+        age=datetime.now(timezone.utc)-stamp.astimezone(timezone.utc)
+        if not timedelta(0)<=age<=timedelta(days=7):
+            raise ValueError("stale or future source evidence")
+    except (TypeError, ValueError) as exc:
+        raise SystemExit(f"FAIL: {name} source proof stale or untrusted") from exc
+    return proof
+
+
 def rel(name):
     return str(
         PROOF_PATHS[name]
@@ -93,24 +118,10 @@ with binding_writer_lock(BINDINGS):
         for row in data["lanes"]
     }
 
-    templates = lanes[
-        "conversations_replies"
-    ]["controls"]
-
-    template_verified = {
-        name
-        for name, row
-        in templates.items()
-        if isinstance(row, dict)
-        and row.get("status")
-            == "VERIFIED_RUNTIME"
-    }
-
-    if len(template_verified) != 11:
-        raise SystemExit(
-            "FAIL: conversations_replies is not 11/11; "
-            "cannot use canonical templates"
-        )
+    # Cross-lane evidence cannot be borrowed: Conversations & Replies
+    # may remain legitimately unverified without blocking independent
+    # Campaign / Agent Tasks / Opportunities proof validation.
+    # Never treat an unverified conversation control as a template.
 
 
     proofs = defaultdict(
@@ -122,18 +133,16 @@ with binding_writer_lock(BINDINGS):
     # CAMPAIGNS
     # --------------------------------------------------
 
-    campaign_runtime = load(
-        "campaign_runtime"
-    )
+    campaign_runtime = evidence_fresh("campaign_runtime", "campaigns")
 
-    if (
-        campaign_runtime.get("status")
-        == "VERIFIED_RUNTIME"
-    ):
-        for control in campaign_runtime.get(
-            "runtime_verified_controls",
-            [],
-        ):
+    if campaign_runtime.get("status") == "VERIFIED_RUNTIME":
+        try:
+            certified=validate_control_proof(
+                campaign_runtime, lane="campaigns",
+                allowed=set(lanes["campaigns"]["controls"]))
+        except PromotionProofError as exc:
+            raise SystemExit("FAIL: campaign observer proof invalid") from exc
+        for control in certified:
             proofs[
                 "campaigns"
             ][control].append(
@@ -141,9 +150,7 @@ with binding_writer_lock(BINDINGS):
             )
 
 
-    campaign_outcomes = load(
-        "campaign_outcomes"
-    )
+    campaign_outcomes = evidence_fresh("campaign_outcomes", "campaigns")
 
     if (
         campaign_outcomes.get(
@@ -180,9 +187,7 @@ with binding_writer_lock(BINDINGS):
     # AGENT TASKS
     # --------------------------------------------------
 
-    agent_tasks = load(
-        "agent_tasks"
-    )
+    agent_tasks = evidence_fresh("agent_tasks", "agent_tasks")
 
     if (
         agent_tasks.get("status")
@@ -194,10 +199,13 @@ with binding_writer_lock(BINDINGS):
             )
         ) > 0
     ):
-        for control in agent_tasks.get(
-            "runtime_verified_controls",
-            [],
-        ):
+        try:
+            certified=validate_control_proof(
+                agent_tasks, lane="agent_tasks",
+                allowed=set(lanes["agent_tasks"]["controls"]))
+        except PromotionProofError as exc:
+            raise SystemExit("FAIL: agent task observer proof invalid") from exc
+        for control in certified:
             proofs[
                 "agent_tasks"
             ][control].append(
@@ -209,9 +217,7 @@ with binding_writer_lock(BINDINGS):
     # OPPORTUNITIES
     # --------------------------------------------------
 
-    opp_runtime = load(
-        "opportunities_runtime"
-    )
+    opp_runtime = evidence_fresh("opportunities_runtime", "opportunities")
 
     if (
         opp_runtime.get("status")
@@ -223,10 +229,13 @@ with binding_writer_lock(BINDINGS):
             )
         ) > 0
     ):
-        for control in opp_runtime.get(
-            "runtime_verified_controls",
-            [],
-        ):
+        try:
+            certified=validate_control_proof(
+                opp_runtime, lane="opportunities",
+                allowed=set(lanes["opportunities"]["controls"]))
+        except PromotionProofError as exc:
+            raise SystemExit("FAIL: opportunity observer proof invalid") from exc
+        for control in certified:
             proofs[
                 "opportunities"
             ][control].append(
@@ -234,9 +243,7 @@ with binding_writer_lock(BINDINGS):
             )
 
 
-    opp_final = load(
-        "opportunities_final"
-    )
+    opp_final = evidence_fresh("opportunities_final", "opportunities")
 
     if (
         opp_final.get(
@@ -269,9 +276,7 @@ with binding_writer_lock(BINDINGS):
         )
 
 
-    opp_quarantine = load(
-        "opportunities_quarantine"
-    )
+    opp_quarantine = evidence_fresh("opportunities_quarantine", "opportunities")
 
     if (
         opp_quarantine.get("status")
@@ -340,11 +345,16 @@ with binding_writer_lock(BINDINGS):
 
                 continue
 
-            template = copy.deepcopy(
-                templates[
-                    control
-                ]
-            )
+            # Promote only an EXISTING control in its own canonical lane.
+            # An unrelated verified conversation row is not evidence for it.
+            if (not isinstance(current, dict)
+                or current.get("lane") != lane_name
+                or current.get("control") != control
+                or current.get("status") not in ("UNVERIFIED", "HOLD", "HOLD_REVIEW_REQUIRED")):
+                raise SystemExit(
+                    f"FAIL: invalid same-lane canonical slot: {lane_name}.{control}"
+                )
+            template = copy.deepcopy(current)
 
             template[
                 "lane"
@@ -408,29 +418,8 @@ with binding_writer_lock(BINDINGS):
                     "OBSERVE semantics preserved."
                 )
 
-            if "confidence" in template:
-                confidence = template[
-                    "confidence"
-                ]
-
-                if isinstance(
-                    confidence,
-                    (int, float),
-                ):
-                    template[
-                        "confidence"
-                    ] = max(
-                        float(confidence),
-                        0.90,
-                    )
-
-                elif isinstance(
-                    confidence,
-                    str,
-                ):
-                    template[
-                        "confidence"
-                    ] = "HIGH"
+            # Proven control existence is NOT a calibrated likelihood.
+            # Keep the lane-owner confidence unchanged.
 
             controls[
                 control
