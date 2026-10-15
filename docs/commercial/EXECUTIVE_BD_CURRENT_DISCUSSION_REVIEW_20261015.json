@@ -62,14 +62,16 @@
       "name": "Modernize",
       "domain": "modernize.com",
       "market": "USA",
-      "state": "RESEARCH_ONLY",
-      "contact_history_verified": false,
+      "state": "CONTACTED",
+      "contact_history_verified": true,
       "suppressed": false,
       "paid_revenue_verified": false,
       "evidence_refs": [
         "public:https://modernize.com/affiliates",
-        "docs/commercial/UK_US_FRESH_PARTNER_DISCOVERY_20261015.json"
-      ]
+        "docs/commercial/UK_US_FRESH_PARTNER_DISCOVERY_20261015.json",
+        "gmail_sent:1a1349e18b6e46cf"
+      ],
+      "last_touch_at": "2026-10-13T09:35:38Z"
     },
     {
       "name": "Newpower Advanced",
@@ -96,6 +98,22 @@
       "evidence_refs": [
         "gmail_thread:1a1268b899c78a29",
         "gmail_message:1a13f20a8e86cf52"
+      ]
+    },
+    {
+      "name": "Home Services Lead Group",
+      "domain": "homeservicesleadgroup.com",
+      "market": "USA",
+      "state": "HUMAN_REPLY",
+      "last_touch_at": "2026-10-09T23:25:31Z",
+      "contact_history_verified": true,
+      "suppressed": false,
+      "paid_revenue_verified": false,
+      "evidence_refs": [
+        "gmail_thread:1a0cfb667dca0957",
+        "gmail_message:1a114d6b9b33e40b",
+        "gmail_sent:1a122fc70c9614",
+        "public:https://validatedlg.ai/standard"
       ]
     }
   ]
