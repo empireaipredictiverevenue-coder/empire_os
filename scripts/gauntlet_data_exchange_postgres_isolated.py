@@ -20,6 +20,7 @@ import psycopg
 from empire_os.data_exchange_construction import build_construction_preview
 from empire_os.data_exchange_custody_transport import EmpireDBConstructionCustody
 from empire_os.data_exchange_observation_custody import verify_custody_window
+from scripts.deploy_data_exchange_custody_v15 import transaction_sql
 
 NOW = datetime.now(timezone.utc)
 
@@ -102,12 +103,9 @@ def main() -> int:
             with psycopg.connect(admin_dsn, autocommit=True) as conn:
                 with conn.cursor() as cur:
                     cur.execute("CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT")
-                    cur.execute("CREATE ROLE empire_data_exchange_custodian NOLOGIN NOINHERIT")
-                    cur.execute("CREATE ROLE custody_fixture_login LOGIN NOINHERIT")
-                    cur.execute("GRANT empire_data_exchange_custodian TO custody_fixture_login")
                     cur.execute("CREATE DATABASE data_exchange_custody_fixture")
             fixture_admin = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user={admin_user}"
-            fixture_writer = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user=custody_fixture_login"
+            fixture_writer = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user=empire_data_exchange_custody_login"
             with psycopg.connect(fixture_admin) as conn:
                 with conn.cursor() as cur:
                     cur.execute("GRANT USAGE, CREATE ON SCHEMA public TO empiredb_migrator")
@@ -115,9 +113,10 @@ def main() -> int:
             sql = MIGRATION.read_text(encoding="utf-8")
             with psycopg.connect(fixture_admin) as conn:
                 with conn.cursor() as cur:
-                    cur.execute(sql)
+                    cur.execute(transaction_sql(sql, "A" * 48))
                 conn.commit()
             result["postgres_schema_applied_in_fixture"] = True
+            result["production_role_and_ddl_single_transaction_tested"] = True
             store = EmpireDBConstructionCustody(fixture_writer)
             first_receipt = store.append_once(first(), now=NOW)
             assert first_receipt["mode"] == "CANONICAL_APPEND_COMMITTED"
