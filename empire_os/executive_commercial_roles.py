@@ -165,6 +165,13 @@ def review_executive_commercial_roles(
     snapshot_state = operations.get("partner_snapshot_state", "HISTORICAL_ONLY")
     if snapshot_state not in {"CURRENT_REVIEW", "HISTORICAL_ONLY", "STALE_REVIEW", "MISSING"}:
         raise ValueError("invalid partner snapshot state")
+    buyer_capacity_state = operations.get("buyer_capacity_state", "UNKNOWN")
+    if buyer_capacity_state not in {
+        "UNKNOWN", "SOURCE_MISSING", "SOURCE_UNTRUSTED", "SOURCE_STALE",
+        "NO_VERIFIED_COMMERCIAL_CAPACITY",
+        "AGGREGATE_CAPACITY_NOT_SPECIFIC_BUYBOX",
+    }:
+        raise ValueError("invalid buyer capacity evidence state")
     health_refs = operations.get("evidence_refs")
     if not isinstance(health_refs, list) or not health_refs or any(
         not isinstance(ref, str) or not ref.strip() for ref in health_refs
@@ -215,6 +222,18 @@ def review_executive_commercial_roles(
             "evidence_refs": list(health_refs),
             "required_proof": "ORIGINAL_PROVIDER_MESSAGE_PLUS_PERSON_THREAD_AND_SUPPRESSION_EVIDENCE",
             "unauthorized_mail_read_or_send_allowed": False,
+            "production_activation_allowed": False,
+        })
+    if buyer_capacity_state != "UNKNOWN":
+        ops_actions.append({
+            "owner": "coo",
+            "delegated_to": "business_development",
+            "priority": "P1_DOWNSTREAM_BUYER_CAPACITY",
+            "action": "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
+            "reason": f"buyer_capacity_state={buyer_capacity_state}",
+            "evidence_refs": list(health_refs),
+            "required_proof": "SIGNED_BUYBOX_POSTCODE_SOURCE_AND_SETTLEMENT_TERMS",
+            "buyer_delivery_authorized": False,
             "production_activation_allowed": False,
         })
     if health == "FAILED":
@@ -299,6 +318,18 @@ def review_executive_commercial_roles(
             "evidence_refs": list(health_refs),
             "external_action_authorized": False,
         })
+    if buyer_capacity_state in {
+        "SOURCE_MISSING", "SOURCE_UNTRUSTED", "SOURCE_STALE",
+        "NO_VERIFIED_COMMERCIAL_CAPACITY",
+        "AGGREGATE_CAPACITY_NOT_SPECIFIC_BUYBOX",
+    }:
+        founder_next_actions.append({
+            "owner": "business_development",
+            "action": "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
+            "reason": f"buyer_capacity_state={buyer_capacity_state}",
+            "evidence_refs": list(health_refs),
+            "external_action_authorized": False,
+        })
     if snapshot_state in {"MISSING", "STALE_REVIEW"}:
         founder_next_actions.append({
             "owner": "business_development",
@@ -367,6 +398,7 @@ def review_executive_commercial_roles(
             "opportunities_source_proof_state": proof_state,
             "mailbox_observer_state": mailbox_state,
             "partner_snapshot_state": snapshot_state,
+            "buyer_capacity_state": buyer_capacity_state,
             "founder_notification_evidence": notification_evidence,
             "operational_claim": "PARTIAL_OR_BLOCKED" if (health != "SUCCEEDED" or astra != "SUCCEEDED")
                                  else "REVIEWED_HEALTH_EVIDENCE",
@@ -376,6 +408,7 @@ def review_executive_commercial_roles(
             "partner_cases": cases,
             "source_evidence_status": snapshot_state,
             "live_mailbox_evidence_status": mailbox_state,
+            "downstream_buyer_capacity_state": buyer_capacity_state,
             "no_new_reply_claim_authorized": False,
             "source_tasks": ([{
                 "owner": "business_development",

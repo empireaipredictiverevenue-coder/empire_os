@@ -14,6 +14,7 @@ from typing import Any, Mapping
 
 from empire_os.executive_commercial_roles import review_executive_commercial_roles
 from empire_os.executive_relationship_registry_review import summarize_relationship_registry
+from empire_os.executive_buyer_capacity_review import review_buyer_capacity
 
 SCHEMA_VERSION = "empire.executive.commercial_observer.v1"
 CURRENT_PARTNERS = Path("runtime/executive/partner_review_input_latest.json")
@@ -34,6 +35,7 @@ MAILBOX = Path(
     "runtime/conversations_replies_control/founder_mailbox_inprocess_observer_latest.json"
 )
 COMMERCIAL_REGISTRY = Path("runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json")
+BUYER_CAPACITY = Path("runtime/buyer_capacity_readiness/latest.json")
 OPPORTUNITY_RADAR = Path("runtime/opportunity_radar/latest.json")
 RADAR_UPSTREAM_MAX_AGE = timedelta(hours=24)
 MAX_COMMERCIAL_REGISTRY_BYTES = 1_500_000
@@ -333,6 +335,7 @@ def observe_executive_commercial_roles(
     else:
         mailbox_state = "ERROR"
     partners, partner_state, partner_ref = _partner_packet(root, now=now)
+    buyer_capacity = review_buyer_capacity(_file(root, BUYER_CAPACITY), as_of=now)
     registry_review = summarize_relationship_registry(
         _file(root, COMMERCIAL_REGISTRY, max_bytes=MAX_COMMERCIAL_REGISTRY_BYTES), as_of=now,
     )
@@ -352,6 +355,7 @@ def observe_executive_commercial_roles(
         "opportunities_source_proof_state": proof_state,
         "mailbox_observer_state": mailbox_state,
         "partner_snapshot_state": partner_state,
+        "buyer_capacity_state": buyer_capacity["status"],
         "evidence_refs": [
             "systemd:empire-department-cycle.service:read_only_observation",
             "systemd:empire-astra-dispatcher.service:read_only_observation",
@@ -359,6 +363,7 @@ def observe_executive_commercial_roles(
             str(DEPARTMENT),
             str(MAILBOX),
             str(COMMERCIAL_REGISTRY),
+            str(BUYER_CAPACITY),
             str(OPPORTUNITY_RADAR),
             partner_ref,
         ],
@@ -385,6 +390,10 @@ def observe_executive_commercial_roles(
             "source_files_observed_not_repaired": True,
         },
         "existing_relationship_registry": registry_review,
+        "downstream_buyer_capacity": {
+            **buyer_capacity,
+            "evidence_ref": str(BUYER_CAPACITY),
+        },
         "founder_mailbox_observer": {
             "status": mailbox_state,
             "evidence_ref": str(MAILBOX),

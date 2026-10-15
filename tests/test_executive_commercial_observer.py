@@ -411,3 +411,42 @@ def test_expired_manual_reply_snapshot_triggers_source_review_instead_of_sending
         "REVALIDATE_CURRENT_PARTNER_EVIDENCE"
     )
     assert result["outbound_enabled"] is False
+
+
+def test_buyer_capacity_zero_terms_prioritised_before_publisher_pilot(tmp_path):
+    seed(tmp_path)
+    save(tmp_path, "runtime/buyer_capacity_readiness/latest.json", {
+        "schema_version": "empire.buyer_capacity_readiness.v1",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "allocation_executed": False, "allocation_ready": False,
+        "payment_action": False, "revenue_recognition": False,
+        "observed_at": NOW.isoformat(), "buyers_seen": 1057,
+        "reviewed": 1, "market_defined": 107,
+        "positive_capacity_configured": 121,
+        "delivery_destination_present": 485,
+        "capacity_verified": 0, "terms_verified": 0,
+        "delivery_verified": 0, "commercially_activated": 0,
+        "fully_activated": 0,
+    })
+    output = observe(tmp_path)
+    buyer = output["downstream_buyer_capacity"]
+    assert buyer["status"] == "NO_VERIFIED_COMMERCIAL_CAPACITY"
+    assert buyer["counts"]["buyers_seen"] == 1057
+    assert buyer["publisher_payout_can_be_quoted"] is False
+    assert output["review"]["coo"]["buyer_capacity_state"] == buyer["status"]
+    actions = output["review"]["chief_of_staff"]["top_three_next_actions"]
+    # In this fixture the department cycle is failed, so COO recovery first.
+    assert actions[0]["owner"] == "coo"
+    assert actions[1]["action"] == "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY"
+    assert actions[1]["external_action_authorized"] is False
+    assert output["outbound_enabled"] is False
+    assert output["database_writes"] is False
+
+
+def test_missing_buyer_snapshot_remains_an_explicit_gate(tmp_path):
+    seed(tmp_path)
+    result = observe(tmp_path)
+    assert result["downstream_buyer_capacity"]["status"] == "SOURCE_MISSING"
+    assert result["review"]["chief_of_staff"]["top_three_next_actions"][1]["action"] == (
+        "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY"
+    )

@@ -197,3 +197,70 @@ def test_founder_console_distinguishes_provider_read_from_identity_proof(tmp_pat
     assert status["status"] == "EVIDENCE_HOLD"
     assert status["business_development"]["new_replies_verified"] is False
     assert status["business_development"]["mailbox_current"] is False
+
+
+def test_founder_projection_surfaces_real_buyer_terms_hold_without_sensitive_data(tmp_path):
+    from empire_os.executive_buyer_capacity_review import review_buyer_capacity
+
+    d = plan()
+    sample = {
+        "schema_version": "empire.buyer_capacity_readiness.v1",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "allocation_executed": False, "allocation_ready": False,
+        "payment_action": False, "revenue_recognition": False,
+        "observed_at": NOW.isoformat(), "buyers_seen": 1057,
+        "reviewed": 1, "market_defined": 107,
+        "positive_capacity_configured": 121,
+        "delivery_destination_present": 485,
+        "capacity_verified": 0, "terms_verified": 0,
+        "delivery_verified": 0, "commercially_activated": 0,
+        "fully_activated": 0,
+        "confidential_buyer_email": "SENSITIVE_DO_NOT_EXPOSE",
+    }
+    d["executive_commercial_roles"]["downstream_buyer_capacity"] = (
+        review_buyer_capacity(sample, as_of=NOW)
+    )
+    r = read(tmp_path, d)
+    assert r["available"] is True
+    cap = r["business_development"]["downstream_buyer_capacity"]
+    assert cap["status"] == "NO_VERIFIED_COMMERCIAL_CAPACITY"
+    assert cap["buyers_seen"] == 1057
+    assert cap["terms_verified"] == 0
+    assert cap["capacity_verified"] == 0
+    assert cap["publisher_payout_can_be_quoted"] is False
+    assert cap["specific_buybox_verified"] is False
+    assert cap["lead_delivery_authorized"] is False
+    assert "SENSITIVE_DO_NOT_EXPOSE" not in json.dumps(r)
+
+
+def test_forged_buyer_capacity_authority_holds_entire_founder_projection(tmp_path):
+    d = plan()
+    d["executive_commercial_roles"]["downstream_buyer_capacity"] = {
+        "schema_version": "empire.executive.buyer_capacity_review.v1",
+        "status": "AGGREGATE_CAPACITY_NOT_SPECIFIC_BUYBOX",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "specific_buybox_verified": True,
+        "publisher_payout_can_be_quoted": True,
+        "lead_delivery_authorized": False, "payment_execution": False,
+        "counts": {"buyers_seen": 100, "capacity_verified": 1,
+                   "terms_verified": 1, "delivery_verified": 1,
+                   "commercially_activated": 1},
+    }
+    assert read(tmp_path, d)["status"] == "OVERLAY_UNTRUSTED"
+
+
+def test_founder_api_accepts_bounded_buyer_terms_task_but_never_dispatches(tmp_path):
+    d = plan()
+    d["executive_commercial_roles"]["review"]["chief_of_staff"]["top_three_next_actions"][0] = {
+        "owner": "business_development",
+        "action": "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
+        "external_action_authorized": False,
+    }
+    projection = read(tmp_path, d)
+    assert projection["available"] is True
+    assert projection["chief_of_staff"]["top_three_review_actions"][0]["action"] == (
+        "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY"
+    )
+    assert projection["emails_sent"] is False
+    assert projection["lead_delivery_authorized"] is False
+    assert projection["production_release_authorized"] is False

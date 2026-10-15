@@ -32,6 +32,7 @@ ROLE_ACTIONS = frozenset({
     "VERIFY_PRIOR_CONTACT_AND_PARTNER_FIT",
     "REVIEW_SUBSTANTIVE_REPLY_AND_PROPOSE_FOUNDER_ACTION",
     "QUALIFY_NO_UPFRONT_PERFORMANCE_PILOT",
+    "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
 })
 ROLES = frozenset({"coo", "business_development", "chief_of_staff"})
 REGISTRY_STATES = frozenset({
@@ -74,6 +75,17 @@ def _base(reason: str) -> dict[str, Any]:
             "suppression_review_count": None,
             "new_replies_verified": False,
             "mailbox_current": False,
+            "downstream_buyer_capacity": {
+                "status": "SOURCE_MISSING",
+                "buyers_seen": None,
+                "capacity_verified": None,
+                "terms_verified": None,
+                "delivery_verified": None,
+                "commercially_activated": None,
+                "specific_buybox_verified": False,
+                "publisher_payout_can_be_quoted": False,
+                "lead_delivery_authorized": False,
+            },
         },
         "chief_of_staff": {
             "top_three_review_actions": [],
@@ -126,6 +138,32 @@ def read_executive_founder_status(
     mailbox = attachment.get("founder_mailbox_observer")
     reg = attachment.get("existing_relationship_registry")
     review = attachment.get("review")
+    buyer = attachment.get("downstream_buyer_capacity")
+    if buyer is not None:
+        permitted = {
+            "SOURCE_MISSING", "SOURCE_UNTRUSTED", "SOURCE_STALE",
+            "NO_VERIFIED_COMMERCIAL_CAPACITY",
+            "AGGREGATE_CAPACITY_NOT_SPECIFIC_BUYBOX",
+        }
+        if (not isinstance(buyer, dict)
+                or buyer.get("schema_version") != "empire.executive.buyer_capacity_review.v1"
+                or buyer.get("status") not in permitted
+                or buyer.get("mode") != "OBSERVE"
+                or buyer.get("execution_authority") != "none"
+                or buyer.get("publisher_payout_can_be_quoted") is not False
+                or buyer.get("specific_buybox_verified") is not False
+                or buyer.get("lead_delivery_authorized") is not False
+                or buyer.get("payment_execution") is not False):
+            return _base("OVERLAY_UNTRUSTED")
+        counts = buyer.get("counts")
+        if counts is not None and (
+            not isinstance(counts, dict)
+            or any(type(v) is not int or not 0 <= v <= 10_000_000 for v in counts.values())
+            or any(k not in counts for k in ("buyers_seen", "capacity_verified",
+                                           "terms_verified", "delivery_verified",
+                                           "commercially_activated"))
+        ):
+            return _base("OVERLAY_UNTRUSTED")
     if not all(isinstance(x, dict) for x in (ops, proof, mailbox, reg)):
         return _base("OVERLAY_UNTRUSTED")
     cycle, dispatcher = ops.get("department_cycle"), ops.get("astra_dispatcher")
@@ -191,6 +229,16 @@ def read_executive_founder_status(
         "suppression_review_count": suppressed,
         "new_replies_verified": False,
         "mailbox_current": bool(reg.get("mailbox_current") is True and mailbox_state == "HEALTHY"),
+        "downstream_buyer_capacity": {
+            "status": buyer["status"] if buyer else "SOURCE_MISSING",
+            **{k: (buyer.get("counts") or {}).get(k) if buyer else None for k in (
+                "buyers_seen", "capacity_verified", "terms_verified",
+                "delivery_verified", "commercially_activated",
+            )},
+            "specific_buybox_verified": False,
+            "publisher_payout_can_be_quoted": False,
+            "lead_delivery_authorized": False,
+        },
     }
     summary["chief_of_staff"] = {
         "top_three_review_actions": tasks,
