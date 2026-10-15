@@ -111,6 +111,17 @@ SOURCES: dict[str, SourceContract] = {
         "continuous", "Open Government Licence", raw_resale_allowed=True,
         allowed_uses=("internal_acquisition", "analytics", "derived_products"),
     ),
+    "gb_find_a_tender_ocds": _source(
+        "gb_find_a_tender_ocds", "UK Cabinet Office Find a Tender", "GB",
+        "official_procurement_data", "public_ocds_api",
+        "https://www.find-tender.service.gov.uk/Developer/Documentation",
+        ("procurement", "construction", "property"),
+        ("procurement_notice", "planning_stage", "tender", "award"),
+        "daily", "Open Government Licence v3.0",
+        production_status="research", raw_resale_allowed=False,
+        allowed_uses=("analytics",),
+        notes="OBSERVE-only research. Notice publication is not proof of a site/entity match; field-level commercial rights review required.",
+    ),
     "gb_ofgem_fit": _source(
         "gb_ofgem_fit", "Ofgem", "GB", "official_energy_installation_data", "xlsx_bulk",
         "https://www.ofgem.gov.uk/feed-tariffs-fit/contacts-guidance-and-resources/public-reports-and-data-fit/installation-reports",
