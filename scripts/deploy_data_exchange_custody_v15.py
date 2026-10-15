@@ -240,6 +240,7 @@ def main(argv: list[str] | None = None) -> int:
               "scope":"OFFICIAL_SOURCE_OBSERVATION_CUSTODY_ONLY",
               "outbound_enabled":False,"customer_delivery_enabled":False,
               "payment_execution":False}
+    phase = "BEFORE_RELEASE_CHECKS"
     try:
         if not args.apply or not getattr(args, APPROVAL.lstrip("-").replace("-","_")):
             hold("EXACT_FOUNDER_APPROVED_APPLY_FLAGS_REQUIRED")
@@ -247,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
             hold("AUTHORISED_ROOT_OPERATOR_REQUIRED")
         if Path.cwd().resolve() != ROOT.resolve():
             hold("CANONICAL_REPOSITORY_REQUIRED")
+        phase = "VERIFY_RELEASE_COMMIT_AND_SQL"
         template = checked_schema()
         for name in ("runuser","psql","pg_dump","pg_dumpall","pg_restore","systemctl"):
             if shutil.which(name) is None:
@@ -255,19 +257,23 @@ def main(argv: list[str] | None = None) -> int:
             hold("CANONICAL_DATABASE_CONFIGURATION_MISSING")
         if ENV_FILE.exists() or UNIT_FILE.exists():
             hold("POSSIBLE_PRIOR_ACTIVATION_RECONCILE_NO_RETRY")
+        phase = "ACQUIRE_RELEASE_LOCK"
         with Path("/run/lock/empire-data-exchange-v15.lock").open("a+") as lock:
             try:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 hold("ANOTHER_RELEASE_IN_PROGRESS")
+            phase = "VERIFY_POSTGRES_IDENTITY"
             identity = postgresql(
                 "SELECT current_database()||'|'||current_setting('data_directory')"
                 "||'|'||pg_is_in_recovery()"
             )
             if identity != "empiredb|/var/lib/postgresql/18/main|f":
                 hold("CANONICAL_DATABASE_IDENTITY_UNVERIFIED")
+            phase = "VERIFY_APP_DATABASE_MATCH"
             if not application_same_database():
                 hold("APPLICATION_DATABASE_INSTANCE_MISMATCH")
+            phase = "CHECK_EXISTING_CUSTODY_SCHEMA_AND_ROLES"
             absent = postgresql(
                 "SELECT (to_regclass('public.empire_data_exchange_observations') IS NULL)::int"
                 "||'|'||(SELECT count(*) FROM pg_roles WHERE rolname IN "
@@ -277,13 +283,16 @@ def main(argv: list[str] | None = None) -> int:
                 hold("CUSTODY_SCHEMA_OR_ROLE_ALREADY_EXISTS_RECONCILE")
             password = secrets.token_urlsafe(48)
             sql = transaction_sql(template, password)
+            phase = "BACKUP_CANONICAL_DB"
             backup = backup_canonical()
             try:
+                phase = "APPLY_SCHEMA_TRANSACTION"
                 postgresql(stdin_sql=sql, silent=True)
             except ReleaseHeld:
                 report["status"] = "HOLD_SCHEMA_TRANSACTION_FAILED"
                 report["backup_recorded"] = True
                 raise
+            phase = "VERIFY_POSTCOMMIT_RLS_AND_TRIGGERS"
             contract = postgresql(
                 "SELECT (relrowsecurity AND relforcerowsecurity)::int"
                 "||'|'||(SELECT count(*) FROM pg_trigger t "
@@ -293,6 +302,7 @@ def main(argv: list[str] | None = None) -> int:
             )
             if contract != "1|3":
                 hold("POSTCOMMIT_CUSTODY_RLS_OR_TRIGGER_CHECK_FAILED_NO_RETRY")
+            phase = "INSTALL_ENV_AND_ONESHOT_UNIT"
             conninfo = install_env_and_service(password)
             import psycopg
             with psycopg.connect(conninfo, connect_timeout=5) as connection:
@@ -303,12 +313,14 @@ def main(argv: list[str] | None = None) -> int:
                     if cursor.fetchone() != (0,):
                         hold("UNEXPECTED_PRE_EXISTING_CUSTODY_ROWS")
             # Explicitly one run, with no timer or enable command.
+            phase = "RUN_FIRST_OFFICIAL_SOURCE_CAPTURE"
             started = subprocess.run(
                 ["systemctl","start","empire-data-exchange-custody-capture.service"],
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45,
             )
             if started.returncode != 0:
                 hold("SCHEMA_INSTALLED_BUT_INITIAL_CAPTURE_HELD_NO_RETRY")
+            phase = "VERIFY_CANONICAL_READBACK"
             rows = EmpireDBConstructionCustody(conninfo).read_window()
             if (len(rows) != 1 or rows[0]["sequence"] != 0
                 or rows[0]["schema_version"] != "empire.data_exchange.observation_custody.v15"
@@ -340,8 +352,10 @@ def main(argv: list[str] | None = None) -> int:
                 out.write(json.dumps(report, sort_keys=True) + "\\n")
     except ReleaseHeld as exc:
         report.setdefault("reason_code", str(exc))
-    except Exception:
-        report["reason_code"] = "UNKNOWN_RELEASE_ERROR_INSPECT_ROOT_ONLY_LOG"
+    except Exception as exc:
+        report["reason_code"] = "UNEXPECTED_RELEASE_EXCEPTION_STOP_NO_RETRY"
+        report["failed_phase"] = phase
+        report["exception_type"] = type(exc).__name__
     print(json.dumps(report, sort_keys=True))
     return 0 if report["status"] == "PRODUCTION_OBSERVE_CUSTODY_ACTIVE" else 2
 
