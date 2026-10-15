@@ -431,6 +431,9 @@ export default function PredictiveRevenuePage() {
                 <span>I consent to Empire AI emailing me about this specific deployment
                   enquiry. I am not signing up for unrelated marketing.</span>
               </label>
+              <p className="mt-3 text-xs leading-6 text-white/55">
+                Before submitting, <a href="/privacy" className="font-semibold text-cyan-200 underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">read how Empire AI handles this enquiry</a>.
+              </p>
               <button
                 disabled={!product || !contactConsent || submitting}
                 className="mt-7 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#eaf2ff] px-5 text-xs font-bold tracking-[0.11em] text-[#07132c] transition enabled:hover:-translate-y-0.5 enabled:hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"

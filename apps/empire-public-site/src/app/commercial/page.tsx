@@ -142,6 +142,9 @@ export default function CommercialPage() {
               <input required type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} className="mt-1 size-4 accent-cyan-400" />
               <span>I consent to Empire AI emailing me about this specific enquiry. I am not signing up for unrelated marketing.</span>
             </label>
+            <p className="text-xs leading-6 text-slate-400">
+              How we use enquiry details: <a href="/privacy" className="font-semibold text-cyan-200 underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">Read the Empire AI privacy notice</a>.
+            </p>
             <button disabled={!code || !consent || submitting} type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-4 text-sm font-semibold disabled:opacity-40">
               {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
