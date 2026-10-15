@@ -7,12 +7,12 @@ One capture per explicit one-shot invocation; no pollers or timers.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
 from empire_os.data_exchange_observation_custody import (
     CustodyIntegrityError, MAX_BOARD_HISTORY,
-    plan_custody_append, verify_custody_window,
+    parse_at, plan_custody_append, verify_custody_window,
 )
 from empire_os.data_exchange_signal_board import build_signal_board
 
@@ -85,6 +85,18 @@ class EmpireDBConstructionCustody:
                             "execution_authority": "NONE",
                         }
                     entry = plan["row"]
+                    # V16 temporal guard is enforced INSIDE the existing
+                    # serialised writer, not just in a separate CLI check.
+                    # A manually started legacy V15 oneshot cannot bypass it.
+                    # Exact same-timestamp replays remain a prior no-op.
+                    if preceding is not None and (
+                        parse_at(entry["source_observed_at"])
+                        - parse_at(preceding["source_observed_at"])
+                        < timedelta(hours=24)
+                    ):
+                        raise CustodyIntegrityError(
+                            "CANONICAL_NEXT_OBSERVATION_NOT_DUE_24H"
+                        )
                     cur.execute(
                         f"INSERT INTO {TABLE} "
                         "(sequence,schema_version,source_id,dataset_id,region,"

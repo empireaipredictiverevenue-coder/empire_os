@@ -19,7 +19,7 @@ import psycopg
 
 from empire_os.data_exchange_construction import build_construction_preview
 from empire_os.data_exchange_custody_transport import EmpireDBConstructionCustody
-from empire_os.data_exchange_observation_custody import verify_custody_window
+from empire_os.data_exchange_observation_custody import CustodyIntegrityError, verify_custody_window
 from scripts.deploy_data_exchange_custody_v15 import transaction_sql, DB_IDENTITY_SQL
 
 NOW = datetime.now(timezone.utc)
@@ -160,6 +160,23 @@ def main() -> int:
             assert first_receipt["mode"] == "CANONICAL_APPEND_COMMITTED"
             duplicate = store.append_once(first(), now=NOW)
             assert duplicate["mode"] == "ALREADY_OBSERVED"
+            # Real PostgreSQL fixture: the legacy V15 append transport is
+            # now bound by the same minimum V16 24-hour interval.
+            try:
+                store.append_once(
+                    snapshot(days_ago=1.99, status="non-permissioned"), now=NOW
+                )
+            except CustodyIntegrityError as exc:
+                assert "CANONICAL_NEXT_OBSERVATION_NOT_DUE_24H" in str(exc)
+            else:
+                raise AssertionError("premature canonical append bypassed gate")
+            with psycopg.connect(fixture_admin) as check_connection:
+                with check_connection.cursor() as check_cursor:
+                    check_cursor.execute(
+                        "SELECT count(*) FROM public.empire_data_exchange_observations"
+                    )
+                    assert check_cursor.fetchone() == (1,)
+            result["v16_24h_transport_gate_no_premature_sql_write"] = True
             second_receipt = store.append_once(second(), now=NOW)
             assert second_receipt["mode"] == "CANONICAL_APPEND_COMMITTED"
             assert first_receipt["sequence"] == 0 and second_receipt["sequence"] == 1
