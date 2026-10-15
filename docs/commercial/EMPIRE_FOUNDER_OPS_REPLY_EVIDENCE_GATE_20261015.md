@@ -49,3 +49,16 @@ authoritative message/thread IDs, exact reply-to-intent joins, canonical
 tenant/contact binding, suppression/privacy checks and independently
 verified genuine outcomes. Until those exist, the six conversation
 controls and buyer-intent claims MUST remain on HOLD.
+
+## Quarantine diagnostics added
+
+The same existing read-only snapshot now emits only bounded counts of
+allowlisted adjudicator reasons: MISSING_STABLE_MESSAGE_ID,
+MISSING_STABLE_THREAD_ID and MISSING_CANONICAL_CONTACT_IDENTITY. If
+an unknown reason appears, reason coverage is HELD and no unsafe reason
+text is copied to the Founder Console.
+
+15 October real snapshot (5 quarantined candidates): 1 missing a
+stable message ID, 4 missing a stable thread ID and all 5 missing
+canonical contact identity. These overlap by record and do not prove
+five distinct buyers. Do NOT synthesize IDs or weaken suppression.

@@ -25,6 +25,11 @@ SOURCE_PATHS={
     "identity_discovery":"runtime/control_plane/conversations_replies_binding_truth_latest.json",
     "identity_gap":"runtime/control_plane/conversations_replies_identity_gap_latest.json",
 }
+ADMITTED_QUARANTINE_REASONS=frozenset({
+    "MISSING_STABLE_MESSAGE_ID",
+    "MISSING_STABLE_THREAD_ID",
+    "MISSING_CANONICAL_CONTACT_IDENTITY",
+})
 ACTIONS=(
     "Verify original inbound provider event and authoritative message/thread IDs",
     "Verify exact canonical reply -> intent -> conversation joins, including 0/1/multiple matches",
@@ -102,6 +107,22 @@ def inspect_conversation_evidence(
     admission=collector.get("source_admission")
     admission=admission if isinstance(admission,dict) else {}
     admitted=_nonnegative_count(admission.get("admitted_conversation_candidate_rows"))
+    quarantine=collector.get("quarantine")
+    quarantined=quarantine.get("records") if isinstance(quarantine,dict) else None
+    approved_reason_counts={k:0 for k in sorted(ADMITTED_QUARANTINE_REASONS)}
+    reason_coverage_complete=isinstance(quarantined,list) and len(quarantined)<=1000
+    if reason_coverage_complete:
+        for row in quarantined:
+            if not isinstance(row,dict) or not isinstance(row.get("reasons"),list):
+                reason_coverage_complete=False
+                break
+            for reason in set(row["reasons"]):
+                if reason not in ADMITTED_QUARANTINE_REASONS:
+                    reason_coverage_complete=False
+                    break
+                approved_reason_counts[reason]+=1
+    if not reason_coverage_complete:
+        approved_reason_counts={k:None for k in sorted(ADMITTED_QUARANTINE_REASONS)}
     canonical=_nonnegative_count(summary.get("canonical_message_count"))
     inbound=_nonnegative_count(summary.get("inbound_reply_count"))
     joined=_nonnegative_count(linkage.get("actual_joined_rows_proven"))
@@ -149,6 +170,9 @@ def inspect_conversation_evidence(
         "verified_internal_controls":verified,
         "unverified_controls":missing,
         "original_candidate_count":admitted,
+        "quarantined_candidate_count":len(quarantined) if reason_coverage_complete else None,
+        "safe_quarantine_reason_counts":approved_reason_counts,
+        "quarantine_reason_coverage_complete":reason_coverage_complete,
         "canonical_message_count":canonical,
         "observed_inbound_reply_candidate_count":inbound,
         "authenticated_inbound_reply_count_verified":None,

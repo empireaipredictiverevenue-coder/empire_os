@@ -125,3 +125,46 @@ def test_ops_control_reuses_existing_owner_no_new_service():
     for forbidden in ("systemctl start","systemctl restart","send_email(",
                       "execute_plan(","os.environ["):
         assert forbidden not in observer
+
+
+def test_quarantine_counts_are_allowlisted_aggregate_only(tmp_path):
+    set_up(tmp_path)
+    path=tmp_path/SOURCE_PATHS["collector"]
+    data=json.loads(path.read_text())
+    data["quarantine"]={"records":[
+        {"source_record_id":SECRET,"reasons":[
+            "MISSING_STABLE_THREAD_ID",
+            "MISSING_CANONICAL_CONTACT_IDENTITY",
+        ]},
+        {"source_record_id":SECRET,"reasons":[
+            "MISSING_STABLE_MESSAGE_ID",
+            "MISSING_CANONICAL_CONTACT_IDENTITY",
+        ]},
+    ]}
+    path.write_text(json.dumps(data))
+    report=inspect_conversation_evidence(tmp_path,now=NOW)
+    assert report["quarantined_candidate_count"]==2
+    assert report["safe_quarantine_reason_counts"]=={
+        "MISSING_CANONICAL_CONTACT_IDENTITY":2,
+        "MISSING_STABLE_MESSAGE_ID":1,
+        "MISSING_STABLE_THREAD_ID":1,
+    }
+    assert report["quarantine_reason_coverage_complete"] is True
+    assert SECRET not in json.dumps(report)
+    assert report["authenticated_reply_identity_verified"] is False
+
+
+def test_unknown_quarantine_reason_never_disclosed_or_marked_complete(tmp_path):
+    set_up(tmp_path)
+    path=tmp_path/SOURCE_PATHS["collector"]
+    data=json.loads(path.read_text())
+    data["quarantine"]={"records":[{
+        "source_record_id":SECRET,
+        "reasons":["PRIVATE_PERSON_NAME_DO_NOT_EMIT"],
+    }]}
+    path.write_text(json.dumps(data))
+    report=inspect_conversation_evidence(tmp_path,now=NOW)
+    assert report["quarantine_reason_coverage_complete"] is False
+    assert report["quarantined_candidate_count"] is None
+    assert all(x is None for x in report["safe_quarantine_reason_counts"].values())
+    assert "PRIVATE_PERSON_NAME" not in json.dumps(report)
