@@ -148,3 +148,50 @@ def test_replica_database_fails_closed_even_with_matching_name(monkeypatch, tmp_
     assert result["custody_table_exists"] is False
     assert result["dedicated_role_count"] == 0
     assert result["database_writes"] is False
+
+
+def test_dedicated_auth_error_classification_never_exposes_credentials():
+    from scripts.inspect_data_exchange_v15_release import _connection_failure_class
+    samples={
+        "FATAL: permission denied for database empiredb password=SECRET":
+            "LOGIN_DATABASE_CONNECT_DENIED",
+        "FATAL: no pg_hba.conf entry for host 127.0.0.1, user=example password=SECRET":
+            "LOGIN_HBA_NO_MATCH",
+        "FATAL: password authentication failed for user password=SECRET":
+            "LOGIN_PASSWORD_AUTH_FAILED",
+        "connection refused password=SECRET": "LOCAL_POSTGRES_CONNECTION_REFUSED",
+        "unknown provider details password=SECRET": "LOGIN_CONNECTION_REJECTED_OTHER",
+    }
+    for raw, expected in samples.items():
+        result=_connection_failure_class(RuntimeError(raw))
+        assert result==expected
+        assert "SECRET" not in result
+
+
+def test_dedicated_connect_privilege_probed_readonly(monkeypatch,tmp_path):
+    monkeypatch.setattr(review.os,"geteuid",lambda:0)
+    monkeypatch.setattr(review.deploy,"checked_schema",lambda:"SQL")
+    monkeypatch.setattr(review.deploy,"application_same_database",lambda:True)
+    def fake_postgresql(query):
+        if "pg_roles" in query:
+            return "1|2"
+        if "has_database_privilege" in query:
+            return "false|true|true"
+        if "data_directory" in query:
+            return review.deploy.EXPECTED_DB_IDENTITY
+        if "SELECT count(*)" in query:
+            return "0"
+        raise AssertionError("unexpected SQL")
+    monkeypatch.setattr(review.deploy,"postgresql",fake_postgresql)
+    monkeypatch.setattr(review.deploy,"ENV_FILE",tmp_path/"env")
+    monkeypatch.setattr(review.deploy,"UNIT_FILE",tmp_path/"unit")
+    monkeypatch.setattr(review.deploy,"BACKUP_ROOT",tmp_path/"backups")
+    monkeypatch.setattr(review.subprocess,"run",
+        lambda *args,**kwargs:(_ for _ in ()).throw(FileNotFoundError()))
+    result=review.inspect()
+    assert result["production_state"]=="PARTIAL_OR_COMPLETE_INSTALL_NEEDS_READBACK"
+    assert result["custody_login_database_connect"] is False
+    assert result["custody_role_schema_usage"] is True
+    assert result["custody_role_table_select_insert"] is True
+    assert result["canonical_observation_row_count"]==0
+    assert result["database_writes"] is False

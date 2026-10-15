@@ -104,6 +104,7 @@ def main() -> int:
                 with conn.cursor() as cur:
                     cur.execute("CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT")
                     cur.execute("CREATE DATABASE data_exchange_custody_fixture")
+                    cur.execute("REVOKE CONNECT ON DATABASE data_exchange_custody_fixture FROM PUBLIC")
             fixture_admin = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user={admin_user}"
             # Regression of the exact production HOLD: concatenated booleans
             # emit "false" while a standalone psql boolean may show "f".
@@ -131,6 +132,29 @@ def main() -> int:
                 conn.commit()
             result["postgres_schema_applied_in_fixture"] = True
             result["production_role_and_ddl_single_transaction_tested"] = True
+            # A locked-down EmpireDB-style database revokes PUBLIC CONNECT.
+            # Prove the dedicated role cannot connect until specifically
+            # granted this capability; do not grant CONNECT to PUBLIC.
+            try:
+                with psycopg.connect(fixture_writer, connect_timeout=4):
+                    raise AssertionError("ungranted dedicated login connected")
+            except psycopg.OperationalError as exc:
+                assert "permission denied for database" in str(exc).lower()
+            result["missing_database_connect_reproduced"] = True
+            with psycopg.connect(fixture_admin) as grant_connection:
+                with grant_connection.cursor() as grant_cursor:
+                    grant_cursor.execute(
+                        "GRANT CONNECT ON DATABASE data_exchange_custody_fixture "
+                        "TO empire_data_exchange_custody_login"
+                    )
+                    grant_cursor.execute(
+                        "SELECT has_database_privilege("
+                        "'empire_data_exchange_custody_login',"
+                        "'data_exchange_custody_fixture','CONNECT')"
+                    )
+                    assert grant_cursor.fetchone() == (True,)
+                grant_connection.commit()
+            result["dedicated_login_connect_grant_restores_access"] = True
             store = EmpireDBConstructionCustody(fixture_writer)
             first_receipt = store.append_once(first(), now=NOW)
             assert first_receipt["mode"] == "CANONICAL_APPEND_COMMITTED"
