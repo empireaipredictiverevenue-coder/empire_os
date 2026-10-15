@@ -75,3 +75,48 @@ def test_no_application_secrets_or_mutating_sql():
                       "UPDATE public", "SET ROLE", "systemctl start",
                       "pg_dump", "pg_restore", "subprocess.run(['sudo'"):
         assert forbidden not in code
+
+
+def test_postgresql_uses_verified_absolute_runuser_even_with_restricted_path(monkeypatch):
+    """Exact regression: /usr/sbin/runuser absent from child PATH /usr/bin:/bin."""
+    from scripts import deploy_data_exchange_custody_v15 as deploy
+    from types import SimpleNamespace
+    calls=[]
+    def fake_run(command, **kwargs):
+        calls.append((command,kwargs))
+        return SimpleNamespace(returncode=0,stdout="empiredb",stderr="")
+    monkeypatch.setattr(deploy.subprocess,"run",fake_run)
+    assert deploy.postgresql("SELECT current_database()")=="empiredb"
+    command,kwargs=calls[0]
+    assert command[:5]==["/usr/sbin/runuser","-u","postgres","--","/usr/bin/psql"]
+    assert kwargs["env"]["PATH"]=="/usr/bin:/bin"
+    assert kwargs["input"] is None
+    assert kwargs["capture_output"] is True
+
+
+def test_backup_uses_absolute_admin_binary_paths():
+    from scripts import deploy_data_exchange_custody_v15 as deploy
+    from pathlib import Path
+    source=Path(deploy.__file__).read_text(encoding="utf-8")
+    assert 'RUNUSER = "/usr/sbin/runuser"' in source
+    assert '[RUNUSER, "-u", "postgres", "--", "/usr/bin/pg_dump"' in source
+    assert '[RUNUSER, "-u", "postgres", "--", "/usr/bin/pg_dumpall"' in source
+    assert '["runuser", "-u", "postgres"' not in source
+
+
+def test_diagnostic_handles_missing_executable_as_type_not_fake_schema(monkeypatch,tmp_path):
+    monkeypatch.setattr(review.os,"geteuid",lambda:0)
+    monkeypatch.setattr(review.deploy,"checked_schema",lambda:"SQL")
+    monkeypatch.setattr(review.deploy,"ENV_FILE",tmp_path/"env")
+    monkeypatch.setattr(review.deploy,"UNIT_FILE",tmp_path/"unit")
+    monkeypatch.setattr(review.deploy,"BACKUP_ROOT",tmp_path/"backup")
+    monkeypatch.setattr(review.deploy,"postgresql",
+        lambda query: (_ for _ in ()).throw(FileNotFoundError()))
+    monkeypatch.setattr(review.deploy,"application_same_database",lambda:False)
+    monkeypatch.setattr(review.subprocess,"run",
+        lambda *args,**kw: (_ for _ in ()).throw(FileNotFoundError()))
+    result=review.inspect()
+    assert result["canonical_db_probe_error_type"]=="FileNotFoundError"
+    assert result["schema_role_probe_error_type"]=="FileNotFoundError"
+    assert result["production_state"]=="UNDETERMINED"
+    assert "safe_to_reconcile" not in result

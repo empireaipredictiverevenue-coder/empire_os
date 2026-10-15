@@ -36,6 +36,7 @@ ENV_FILE = Path("/etc/empire/data-exchange-custody.env")
 UNIT_FILE = Path("/etc/systemd/system/empire-data-exchange-custody-capture.service")
 BACKUP_ROOT = Path("/var/backups/empiredb/data-exchange-custody-v15")
 PGHOST = "/var/run/postgresql"
+RUNUSER = "/usr/sbin/runuser"  # verified Ubuntu 26.04 path; never depend on a reduced PATH
 RESULT_SCHEMA = "empire.data_exchange.production_custody_activation.v15"
 
 
@@ -100,7 +101,7 @@ def transaction_sql(template: str, password: str) -> str:
 
 def postgresql(query: str | None = None, *, stdin_sql: str | None = None,
                silent: bool = False) -> str:
-    cmd = ["runuser", "-u", "postgres", "--", "psql",
+    cmd = [RUNUSER, "-u", "postgres", "--", "/usr/bin/psql",
            "-X", "-w", "-q", "-A", "-t", "-v", "ON_ERROR_STOP=1", "-d", "empiredb"]
     if query is not None:
         cmd.extend(["-c", query])
@@ -156,9 +157,9 @@ def backup_canonical() -> Path:
     backup.mkdir(mode=0o700)
     for filename, args in (
         ("empiredb-before-v15.dump",
-         ["runuser", "-u", "postgres", "--", "pg_dump", "-w", "-Fc", "-d", "empiredb"]),
+         [RUNUSER, "-u", "postgres", "--", "/usr/bin/pg_dump", "-w", "-Fc", "-d", "empiredb"]),
         ("postgres-globals-before-v15.sql",
-         ["runuser", "-u", "postgres", "--", "pg_dumpall", "-w", "--globals-only"]),
+         [RUNUSER, "-u", "postgres", "--", "/usr/bin/pg_dumpall", "-w", "--globals-only"]),
     ):
         target = backup / filename
         with target.open("xb") as fd:
@@ -250,9 +251,11 @@ def main(argv: list[str] | None = None) -> int:
             hold("CANONICAL_REPOSITORY_REQUIRED")
         phase = "VERIFY_RELEASE_COMMIT_AND_SQL"
         template = checked_schema()
-        for name in ("runuser","psql","pg_dump","pg_dumpall","pg_restore","systemctl"):
+        for name in ("psql","pg_dump","pg_dumpall","pg_restore","systemctl"):
             if shutil.which(name) is None:
                 hold("REQUIRED_FIRST_PARTY_DATABASE_TOOL_MISSING")
+        if not Path(RUNUSER).is_file() or not os.access(RUNUSER, os.X_OK):
+            hold("VERIFIED_RUNUSER_EXECUTABLE_MISSING")
         if not Path("/etc/empiredb.env").is_file():
             hold("CANONICAL_DATABASE_CONFIGURATION_MISSING")
         if ENV_FILE.exists() or UNIT_FILE.exists():
