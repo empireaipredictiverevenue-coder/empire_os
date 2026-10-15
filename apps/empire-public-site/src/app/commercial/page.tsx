@@ -1,5 +1,6 @@
 "use client";
 import CommercialBuyerExplanation from "@/components/CommercialBuyerExplanation";
+import TamBuyingIntentEvidenceGuide from "@/components/TamBuyingIntentEvidenceGuide";
 import { ArrowLeft, ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -105,7 +106,7 @@ export default function CommercialPage() {
             <a href="/predictive-revenue" className="inline-flex items-center gap-2 rounded-full border border-blue-300/30 px-5 py-3 text-xs text-blue-200">Enterprise platform <ArrowRight className="size-4" /></a>
           </div>
         </section>
-        <section className="h-fit rounded-3xl border border-white/10 bg-[#07142b] p-6 md:p-8">
+        <section id="commercial-enquiry" className="h-fit scroll-mt-8 rounded-3xl border border-white/10 bg-[#07142b] p-6 md:p-8">
           <h2 className="text-2xl font-semibold">Request a commercial proposal</h2>
           <p className="mt-2 text-sm leading-6 text-slate-400">Buyer-initiated enquiries go to our first-party commercial workflow for founder review. No automated follow-up, checkout or payment.</p>
           <form onSubmit={submit} className="mt-7 space-y-4">
@@ -158,6 +159,7 @@ export default function CommercialPage() {
         </section>
       </div>
       <CommercialBuyerExplanation />
+      <TamBuyingIntentEvidenceGuide />
     </div>
   </main>;
 }
