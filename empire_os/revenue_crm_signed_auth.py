@@ -249,7 +249,20 @@ class EmpireDbCrmMembershipReader:
                     if (
                         membership.user_id != user_id
                         or membership.tenant_id != expected
-                        or not membership.can("read")
+                        or not (
+                            membership.can("read")
+                            # Allow the SAME existing protected membership
+                            # reader to return a GTM-only reviewer role.
+                            # SignedCrmTenantVerifier separately still
+                            # requires can("read"), so a reviewer cannot
+                            # log into CRM or inherit customer read grants.
+                            or (
+                                membership.role == "gtm_research_reviewer"
+                                and membership.can(
+                                    "gtm:independent-research-review"
+                                )
+                            )
+                        )
                     ):
                         return None
                     # Malformed/ambiguous SQL function results fail closed.

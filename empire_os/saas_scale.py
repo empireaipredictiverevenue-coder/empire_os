@@ -11,6 +11,9 @@ ROLE_PERMISSIONS = {
     "operator": frozenset({"read", "operate"}),
     "analyst": frozenset({"read"}),
     "viewer": frozenset({"read"}),
+    # Dedicated research-only principal; not a CRM reader and not a
+    # founder/financial/outbound approver. DB migration is PREPARED ONLY.
+    "gtm_research_reviewer": frozenset({"gtm:independent-research-review"}),
 }
 
 
