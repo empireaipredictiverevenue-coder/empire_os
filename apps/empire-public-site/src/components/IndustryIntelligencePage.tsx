@@ -10,6 +10,8 @@ import {
   Waypoints,
 } from "lucide-react";
 import type { IndustryPage } from "@/lib/industry-pages";
+import { getBuyerEditorial } from "@/lib/industry-buying-editorial";
+import IndustryBuyerEditorialSection from "@/components/IndustryBuyerEditorialSection";
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -34,6 +36,7 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
   };
 
   const forecastIcons = [Radar, BarChart3, BrainCircuit, Waypoints];
+  const buyerEditorial = getBuyerEditorial(page.slug);
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#020403] text-[#F4FFF9] selection:bg-[#7CFF00] selection:text-black">
@@ -199,6 +202,10 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
           </div>
         </div>
       </section>
+
+      {buyerEditorial && (page.slug === "roofing" || page.slug === "solar") && (
+        <IndustryBuyerEditorialSection industry={page.slug} editorial={buyerEditorial} />
+      )}
 
       <section className="relative z-10 border-y border-white/[0.07] bg-white/[0.012] py-24">
         <div className="mx-auto w-[min(1180px,calc(100%-32px))] text-center">
