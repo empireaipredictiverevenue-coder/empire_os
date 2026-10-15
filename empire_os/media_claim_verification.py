@@ -789,6 +789,7 @@ def refresh_media_claim_verification(
     source_request_timeout_seconds: float = 6.0,
     source_time_budget_seconds: float = 8.0,
     force: bool = False,
+    defer_model_inference: bool = False,
     resolver: ResolverFn = socket.getaddrinfo,
 ) -> dict[str, Any]:
     source = _read_json(repo_root / INPUT)
@@ -829,7 +830,10 @@ def refresh_media_claim_verification(
             pending.append(pack)
 
     limit = max(1, min(int(max_packs), 5))
-    selected = pending[:limit]
+    # The existing Media OS systemd preflight uses defer_model_inference.
+    # No model router, free-tier API, retry/backoff or source GET is executed
+    # until an explicit approved run requests actual claim verification.
+    selected = [] if defer_model_inference else pending[:limit]
 
     llm = gateway or (LLMGateway() if selected else None)
     results = []
@@ -952,7 +956,14 @@ def refresh_media_claim_verification(
             for row in current_verified
         ),
         "results": results,
-        "skipped_unchanged": not selected and not force,
+        "skipped_unchanged": not selected and not force and not defer_model_inference,
+        "model_inference_deferred": bool(defer_model_inference and pending),
+        "external_model_invocation_permitted": not defer_model_inference,
+        "model_inference_attempted": None if not defer_model_inference else False,
+        "model_inference_defer_reason": (
+            "PROVIDER_AUTHORITY_NOT_GRANTED_IN_SYSTEMD_OBSERVE_PREFLIGHT"
+            if defer_model_inference and pending else None
+        ),
         "external_reads_performed": any(
             int(row.get("observed_source_count") or 0) > 0
             for row in results

@@ -228,10 +228,9 @@ with binding_writer_lock(BINDINGS):
             "FAIL: no existing canonical campaign bindings"
         )
 
-    if not conversation_records:
-        raise SystemExit(
-            "FAIL: no accepted conversation templates"
-        )
+    # Conversation-lane proof is NOT a campaign template or a prerequisite.
+    # Campaign promotion is allowed only for an EXISTING same-lane slot
+    # named by the independently validated Campaign observer.
 
 
     # Find the actual container holding the existing
@@ -290,15 +289,22 @@ with binding_writer_lock(BINDINGS):
 
     existing_campaign = {
         rec["row"]["control"]: rec
-        for rec in verified_campaign_records
+        for rec in campaign_records
     }
+    if len(existing_campaign) != len(campaign_records):
+        raise SystemExit("FAIL: ambiguous duplicate canonical campaign slots")
+    if any(rec["parent"] is not parent for rec in existing_campaign.values()):
+        raise SystemExit("FAIL: canonical campaign slots span containers")
 
-    for control in TARGETS:
-        if control not in conversation_templates:
+    for control in sorted(TARGETS):
+        if control not in existing_campaign:
             raise SystemExit(
-                "FAIL: missing accepted template: "
+                "FAIL: existing canonical campaign slot absent: "
                 + control
             )
+        candidate = existing_campaign[control]["row"]
+        if candidate.get("lane") != "campaigns" or candidate.get("control") != control:
+            raise SystemExit("FAIL: canonical campaign slot identity mismatch")
 
 
     def insert_dict_row(
@@ -438,11 +444,10 @@ with binding_writer_lock(BINDINGS):
         ):
             continue
 
-        template = copy.deepcopy(
-            conversation_templates[
-                control
-            ]["row"]
-        )
+        # Use the campaign control itself, never a borrowed conversation
+        # control: it has its own unverified schema and validated observer
+        # proof. No new control or false cross-lane provenance is invented.
+        template = copy.deepcopy(existing_campaign[control]["row"])
 
         template["lane"] = (
             "campaigns"
@@ -503,37 +508,13 @@ with binding_writer_lock(BINDINGS):
 
         if "reason" in template:
             template["reason"] = (
-                "093B real deployed Campaign runtime "
-                "artifact proved this control; "
-                "093D-R1 promotes that existing proof "
-                "into the canonical binding schema. "
-                "OBSERVE only; no send or mutation."
+                "Campaign observer proof validated; existing same-lane "
+                "canonical campaign slot promoted OBSERVE only. "
+                "No customer, outbound or payment authority."
             )
 
-        if "confidence" in template:
-
-            old = template[
-                "confidence"
-            ]
-
-            if isinstance(
-                old,
-                (int, float),
-            ):
-                template[
-                    "confidence"
-                ] = max(
-                    float(old),
-                    0.90,
-                )
-
-            elif isinstance(
-                old,
-                str,
-            ):
-                template[
-                    "confidence"
-                ] = "HIGH"
+        # Preserve any existing confidence: observer proof is not
+        # a calibrated probability and must not raise it to 0.90/HIGH.
 
         if isinstance(
             parent,

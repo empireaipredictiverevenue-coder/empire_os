@@ -5,6 +5,7 @@ Uses a temporary root; never writes to live runtime or grants send authority.
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 import sys
@@ -72,6 +73,13 @@ def test_campaign_classification_promotion_is_evidence_bound(
     }
     binding_path.write_text(json.dumps(before), encoding="utf-8")
     observer = {
+        "lane": "campaigns",
+        "mode": "OBSERVE",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "outbound": False,
+        "db_write": False,
+        "campaign_state_mutated": False,
+        "action_authority_granted": False,
         "status": "VERIFIED_RUNTIME",
         "runtime_verified_controls": [
             c for c in TARGETS if not (missing_proof and c == "entity_classification")
