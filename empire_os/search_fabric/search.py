@@ -342,12 +342,40 @@ def _decode_http_response(response) -> str:
     return document.text
 
 
+_EXPLICIT_COUNTRY_ALIASES = {
+    # Match whole country names (or unambiguous abbreviations), not partial
+    # words. Bare "us" is intentionally excluded: it is also a pronoun.
+    "united states": "US",
+    "usa": "US",
+    "united kingdom": "GB",
+    "great britain": "GB",
+    "britain": "GB",
+    "uk": "GB",
+    "australia": "AU",
+    "canada": "CA",
+}
+
+
 def _search_market_locale(query: str) -> tuple[str | None, str | None]:
-    """Resolve search locale from one unambiguous canonical registered market."""
+    """Resolve exact country or metro intent from the existing geo registry.
+
+    If the query names conflicting countries/cities, do not let the server's
+    geolocation silently choose a market. A multilingual country's language
+    remains unspecified unless an unambiguous canonical metro is present.
+    """
     query_text = " ".join(
         re.findall(r"[a-z0-9]+", str(query or "").casefold())
     )
-
+    explicit = {
+        country for alias, country in _EXPLICIT_COUNTRY_ALIASES.items()
+        if re.search(
+            rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])",
+            query_text,
+        )
+    }
+    if len(explicit) > 1:
+        return None, None
+    country_intent = next(iter(explicit)) if explicit else None
     matches = []
 
     for market in acquisition_markets():
@@ -373,10 +401,20 @@ def _search_market_locale(query: str) -> tuple[str | None, str | None]:
         ):
             matches.append(market)
 
-    # Multiple registry entries for the same real locale are acceptable only
-    # when they agree on country and language.
+    # Explicit country terms work even without a metro, e.g. Australia.
+    # Preserve the registry's multilingual uncertainty for Canada.
     if not matches:
-        return None, None
+        if not country_intent:
+            return None, None
+        languages = {
+            market.language_code
+            for market in acquisition_markets(countries=(country_intent,))
+            if market.language_code
+        }
+        return (
+            country_intent,
+            next(iter(languages)) if len(languages) == 1 else None,
+        )
 
     # Prefer the most specific matching city/metro.
     # Example: "New York" must outrank the nested market name "York".
@@ -392,11 +430,14 @@ def _search_market_locale(query: str) -> tuple[str | None, str | None]:
         for market in best
     }
 
-    # Equal-specificity disagreement remains ambiguous and fails closed.
+    # The named country must agree with every selected metro; conflicting
+    # countries or equal-specificity locales fail closed.
     if len(locales) != 1:
         return None, None
-
-    return next(iter(locales))
+    resolved_country, resolved_language = next(iter(locales))
+    if country_intent is not None and resolved_country != country_intent:
+        return None, None
+    return resolved_country, resolved_language
 
 
 def _fetch(engine: dict, query: str, num: int) -> Optional[str]:
@@ -443,6 +484,10 @@ def _fetch_locked(engine: dict, query: str, num: int) -> Optional[str]:
                     params["cc"] = country_code
                 if language_code:
                     params["setlang"] = language_code
+                    # Bing's country and market selectors are not equivalent.
+                    # Pass only registry-grounded language/region combinations;
+                    # never infer a locale from the server IP.
+                    params["mkt"] = language_code
                 r = requests.get(
                     engine["base"],
                     params=params,

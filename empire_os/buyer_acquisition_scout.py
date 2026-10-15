@@ -14,6 +14,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 import json
+import re
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlparse
@@ -189,13 +190,35 @@ def _site_identity(
 def _nyc_territory_evidence(
     evidence: Mapping[str, Any],
 ) -> tuple[bool, list[str]]:
+    """Require a bounded NYC location claim, never substrings of overseas terms.
+
+    "Queens" in "Queensland" or "York" in "Yorkshire" is not New York
+    permit-market evidence. Borough-only mentions elsewhere in the world are
+    not sufficient unless paired with an explicit NY state location.
+    """
     corpus = _site_corpus(evidence)
-    hits = [
-        term
-        for term in _NYC_TERRITORY_TERMS
-        if term in corpus
+    strong = ("new york city", "new york", "nyc")
+    boroughs = ("manhattan", "brooklyn", "queens", "bronx", "staten island")
+
+    def present(term: str) -> bool:
+        return re.search(
+            rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])", corpus
+        ) is not None
+
+    hits = [term for term in strong if present(term)]
+    if hits:
+        hits.extend(term for term in boroughs if present(term))
+        return True, hits
+
+    borough_with_ny = [
+        term for term in boroughs
+        if re.search(
+            rf"(?<![a-z0-9]){re.escape(term)}(?![a-z0-9])"
+            rf"[^a-z0-9]{{0,18}}ny(?![a-z0-9])",
+            corpus,
+        )
     ]
-    return bool(hits), hits
+    return bool(borough_with_ny), borough_with_ny
 
 
 def _host(value: str) -> str:
