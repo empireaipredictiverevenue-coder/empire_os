@@ -33,9 +33,23 @@ WITH sales AS MATERIALIZED (
     SELECT s.source, s.prospect_id,
            s.evidence->>'source' = s.source AS source_matches,
            s.evidence->>'buyer_stated' = 'true' AS buyer_stated,
-           CASE WHEN s.source = 'first_party_commercial_sales_enquiry'
-                THEN (s.evidence #>> '{contact_consent_evidence,consent_to_contact}') = 'true'
-                ELSE TRUE END AS consent_evidence,
+           -- Both first-party commercial and Predictive Revenue routes
+           -- require explicit response consent. A legacy ELSE TRUE treated
+           -- predictive source rows as consented even if proof was absent.
+           (
+             s.evidence #>> '{contact_consent_evidence,kind}'
+                = 'buyer_initiated_specific_response_consent'
+             AND s.evidence #>> '{contact_consent_evidence,consent_to_contact}'
+                = 'true'
+             AND s.evidence #>> '{contact_consent_evidence,newsletter_or_ongoing_marketing_consent}'
+                = 'false'
+             AND s.evidence #>> '{contact_consent_evidence,source_url}'
+                = CASE
+                    WHEN s.source = 'first_party_commercial_sales_enquiry'
+                      THEN 'https://empire-ai.co.uk/commercial'
+                    ELSE 'https://empire-ai.co.uk/predictive-revenue'
+                  END
+           ) AS consent_evidence,
            EXISTS (
                SELECT 1 FROM public.prospect_entity_links link
                WHERE link.prospect_id=s.prospect_id

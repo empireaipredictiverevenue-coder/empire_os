@@ -31,6 +31,13 @@ def test_exact_source_query_is_read_only_and_has_tenant_scope():
     assert "public.tenant_business_entity_bindings" in q
     assert "binding.binding_kind IN ('owned','managed','customer','prospect')" in q
     assert "evidence #>> '{contact_consent_evidence,consent_to_contact}'" in q
+    assert "evidence #>> '{contact_consent_evidence,kind}'" in q
+    assert "evidence #>> '{contact_consent_evidence,newsletter_or_ongoing_marketing_consent}'" in q
+    assert "evidence #>> '{contact_consent_evidence,source_url}'" in q
+    assert "'buyer_initiated_specific_response_consent'" in q
+    assert "'https://empire-ai.co.uk/commercial'" in q
+    assert "'https://empire-ai.co.uk/predictive-revenue'" in q
+    assert "ELSE TRUE END AS consent_evidence" not in q
     assert "SELECT jsonb_build_object" in q
     for token in ("INSERT INTO","UPDATE public","DELETE FROM","GRANT ","ALTER TABLE",
                   "TRUNCATE ","CREATE TABLE","SET ROLE"):
