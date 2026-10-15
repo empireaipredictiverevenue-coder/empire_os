@@ -168,3 +168,42 @@ def test_unknown_quarantine_reason_never_disclosed_or_marked_complete(tmp_path):
     assert report["quarantined_candidate_count"] is None
     assert all(x is None for x in report["safe_quarantine_reason_counts"].values())
     assert "PRIVATE_PERSON_NAME" not in json.dumps(report)
+
+
+def test_unavailable_owned_mailbox_is_an_explicit_safe_hold(tmp_path):
+    set_up(tmp_path)
+    save(tmp_path,"mailbox_observer",{
+        "schema_version":"empire-founder-mailbox-inprocess-observer-v1",
+        "generated_at":"2026-10-15T11:59:00+00:00",
+        "mode":"OBSERVE","status":"OBSERVER_ERROR",
+        "error_type":"HTTPException",
+        "error":"503: mailbox_provider_unavailable:MailboxReadUnavailable "
+                + SECRET,
+        "outbound":False,"db_write":False,"mailbox_write":False,
+    })
+    report=inspect_conversation_evidence(tmp_path,now=NOW)
+    assert report["founder_mailbox_observer_status"]=="OBSERVER_ERROR"
+    assert report["founder_mailbox_observer_metadata_stale"] is False
+    assert report["founder_mailbox_observer_proves_authenticated_reply"] is False
+    assert "FOUNDER_MAILBOX_READ_UNAVAILABLE" in report["source_blockers"]
+    assert report["buyer_intent_verified"] is False
+    assert report["automatic_promotion_authorized"] is False
+    assert SECRET not in json.dumps(report)
+    assert "mailbox_provider_unavailable" not in json.dumps(report)
+
+
+def test_missing_and_stale_mailbox_observation_do_not_fabricate_replies(tmp_path):
+    set_up(tmp_path)
+    missing=inspect_conversation_evidence(tmp_path,now=NOW)
+    assert missing["founder_mailbox_observer_status"]=="NOT_VERIFIED"
+    assert "FOUNDER_MAILBOX_OBSERVER_NOT_CURRENTLY_VERIFIED" in missing["source_blockers"]
+    save(tmp_path,"mailbox_observer",{
+        "generated_at":"2026-10-06T09:00:00+00:00",
+        "status":"NO_COMPLETE_INBOUND_MESSAGE",
+        "observed":0,
+    })
+    stale=inspect_conversation_evidence(tmp_path,now=NOW)
+    assert stale["founder_mailbox_observer_status"]=="NO_COMPLETE_INBOUND_MESSAGE"
+    assert stale["founder_mailbox_observer_metadata_stale"] is True
+    assert "FOUNDER_MAILBOX_OBSERVER_NOT_CURRENTLY_VERIFIED" in stale["source_blockers"]
+    assert stale["authenticated_inbound_reply_count_verified"] is None

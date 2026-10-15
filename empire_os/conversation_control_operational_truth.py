@@ -24,6 +24,7 @@ SOURCE_PATHS={
     "linkage":"runtime/conversations_replies_control/reply_linkage_plan_latest.json",
     "identity_discovery":"runtime/control_plane/conversations_replies_binding_truth_latest.json",
     "identity_gap":"runtime/control_plane/conversations_replies_identity_gap_latest.json",
+    "mailbox_observer":"runtime/conversations_replies_control/founder_mailbox_inprocess_observer_latest.json",
 }
 ADMITTED_QUARANTINE_REASONS=frozenset({
     "MISSING_STABLE_MESSAGE_ID",
@@ -156,6 +157,18 @@ def inspect_conversation_evidence(
         blockers.append("CANONICAL_CONTROL_SCHEMA_UNVERIFIED")
     if not source_ready:
         blockers.append("LIVE_COLLECTOR_OR_LINKAGE_NOT_READY")
+    mailbox=docs["mailbox_observer"] or {}
+    raw_mailbox_status=mailbox.get("status")
+    mailbox_status=(
+        raw_mailbox_status if isinstance(raw_mailbox_status,str) and raw_mailbox_status in {
+            "OBSERVER_ERROR", "NO_COMPLETE_INBOUND_MESSAGE", "VERIFIED_RUNTIME"
+        } else "NOT_VERIFIED"
+    )
+    mailbox_metadata_stale=_old(mailbox,now=assessed)
+    if mailbox_status=="OBSERVER_ERROR":
+        blockers.append("FOUNDER_MAILBOX_READ_UNAVAILABLE")
+    elif mailbox_status=="NOT_VERIFIED" or mailbox_metadata_stale:
+        blockers.append("FOUNDER_MAILBOX_OBSERVER_NOT_CURRENTLY_VERIFIED")
     stale=sorted(k for k in ("identity_discovery","identity_gap")
                  if _old(docs[k],now=assessed))
     if stale:
@@ -181,6 +194,9 @@ def inspect_conversation_evidence(
         "tenant_binding_independently_verified":False,
         "linkage_verification_ready":linkage_ready,
         "collector_source_read_verified":source_ready,
+        "founder_mailbox_observer_status":mailbox_status,
+        "founder_mailbox_observer_metadata_stale":mailbox_metadata_stale,
+        "founder_mailbox_observer_proves_authenticated_reply":False,
         "stale_identity_metadata_sources":stale,
         "source_blockers":blockers,
         "next_evidence_actions":list(ACTIONS),
