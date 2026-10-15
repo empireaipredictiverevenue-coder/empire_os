@@ -19,7 +19,7 @@ def test_safe_empty_predeploy_state(monkeypatch,tmp_path):
     monkeypatch.setattr(review.deploy,"checked_schema",lambda:"BEGIN;\nCOMMIT;")
     monkeypatch.setattr(review.deploy,"application_same_database",lambda:True)
     monkeypatch.setattr(review.deploy,"postgresql",lambda query:
-        "empiredb|/var/lib/postgresql/18/main|f"
+        "empiredb|/var/lib/postgresql/18/main|PRIMARY"
         if "data_directory" in query else "0|0")
     monkeypatch.setattr(review.deploy,"ENV_FILE",tmp_path/"missing.env")
     monkeypatch.setattr(review.deploy,"UNIT_FILE",tmp_path/"missing.service")
@@ -44,7 +44,7 @@ def test_partial_schema_is_never_cleared_for_retry(monkeypatch,tmp_path):
     monkeypatch.setattr(review.deploy,"checked_schema",lambda:"SQL")
     monkeypatch.setattr(review.deploy,"application_same_database",lambda:False)
     monkeypatch.setattr(review.deploy,"postgresql",lambda query:
-        "empiredb|/var/lib/postgresql/18/main|f"
+        "empiredb|/var/lib/postgresql/18/main|PRIMARY"
         if "data_directory" in query else
         "1|2" if "pg_roles" in query else "0")
     monkeypatch.setattr(review.deploy,"ENV_FILE",tmp_path/"env")
@@ -120,3 +120,31 @@ def test_diagnostic_handles_missing_executable_as_type_not_fake_schema(monkeypat
     assert result["schema_role_probe_error_type"]=="FileNotFoundError"
     assert result["production_state"]=="UNDETERMINED"
     assert "safe_to_reconcile" not in result
+
+
+def test_identity_check_produces_stable_primary_or_replica_token():
+    from scripts import deploy_data_exchange_custody_v15 as deploy
+    assert "CASE WHEN pg_is_in_recovery()" in deploy.DB_IDENTITY_SQL
+    assert "'REPLICA' ELSE 'PRIMARY'" in deploy.DB_IDENTITY_SQL
+    assert deploy.EXPECTED_DB_IDENTITY.endswith("|PRIMARY")
+    assert "|f" not in deploy.EXPECTED_DB_IDENTITY
+
+
+def test_replica_database_fails_closed_even_with_matching_name(monkeypatch, tmp_path):
+    monkeypatch.setattr(review.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(review.deploy,"checked_schema",lambda:"SQL")
+    monkeypatch.setattr(review.deploy,"application_same_database",lambda:True)
+    monkeypatch.setattr(review.deploy,"postgresql",lambda query:
+        "empiredb|/var/lib/postgresql/18/main|REPLICA" if
+        "pg_is_in_recovery()" in query else "0|0")
+    monkeypatch.setattr(review.deploy,"ENV_FILE",tmp_path/"env")
+    monkeypatch.setattr(review.deploy,"UNIT_FILE",tmp_path/"unit")
+    monkeypatch.setattr(review.deploy,"BACKUP_ROOT",tmp_path/"backups")
+    monkeypatch.setattr(review.subprocess,"run",
+        lambda *args,**kw: (_ for _ in ()).throw(FileNotFoundError()))
+    result=review.inspect()
+    assert result["canonical_db_identity_verified"] is False
+    assert result["app_dsn_same_pg_instance"] is True
+    assert result["custody_table_exists"] is False
+    assert result["dedicated_role_count"] == 0
+    assert result["database_writes"] is False

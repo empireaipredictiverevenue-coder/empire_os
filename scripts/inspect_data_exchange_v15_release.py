@@ -58,11 +58,9 @@ def inspect() -> dict:
             )
         except OSError as e:
             report["backup_inspection_error_type"]=type(e).__name__
-    ident, err=classify(lambda: deploy.postgresql(
-        "SELECT current_database()||'|'||current_setting('data_directory')"
-        "||'|'||pg_is_in_recovery()"))
+    ident, err=classify(lambda: deploy.postgresql(deploy.DB_IDENTITY_SQL))
     report["canonical_db_identity_verified"] = (
-        ident == "empiredb|/var/lib/postgresql/18/main|f")
+        ident == deploy.EXPECTED_DB_IDENTITY)
     if err:
         report["canonical_db_probe_error_type"]=err
     app,err=classify(deploy.application_same_database)

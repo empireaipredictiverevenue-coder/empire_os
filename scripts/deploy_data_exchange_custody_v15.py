@@ -36,6 +36,13 @@ ENV_FILE = Path("/etc/empire/data-exchange-custody.env")
 UNIT_FILE = Path("/etc/systemd/system/empire-data-exchange-custody-capture.service")
 BACKUP_ROOT = Path("/var/backups/empiredb/data-exchange-custody-v15")
 PGHOST = "/var/run/postgresql"
+# Concatenating a PostgreSQL boolean with text emits "false", not "f".
+# Produce an explicit primary/replica token instead of relying on formatting.
+DB_IDENTITY_SQL = (
+    "SELECT current_database()||'|'||current_setting('data_directory')"
+    "||'|'||(CASE WHEN pg_is_in_recovery() THEN 'REPLICA' ELSE 'PRIMARY' END)"
+)
+EXPECTED_DB_IDENTITY = "empiredb|/var/lib/postgresql/18/main|PRIMARY"
 RUNUSER = "/usr/sbin/runuser"  # verified Ubuntu 26.04 path; never depend on a reduced PATH
 RESULT_SCHEMA = "empire.data_exchange.production_custody_activation.v15"
 
@@ -267,11 +274,8 @@ def main(argv: list[str] | None = None) -> int:
             except BlockingIOError:
                 hold("ANOTHER_RELEASE_IN_PROGRESS")
             phase = "VERIFY_POSTGRES_IDENTITY"
-            identity = postgresql(
-                "SELECT current_database()||'|'||current_setting('data_directory')"
-                "||'|'||pg_is_in_recovery()"
-            )
-            if identity != "empiredb|/var/lib/postgresql/18/main|f":
+            identity = postgresql(DB_IDENTITY_SQL)
+            if identity != EXPECTED_DB_IDENTITY:
                 hold("CANONICAL_DATABASE_IDENTITY_UNVERIFIED")
             phase = "VERIFY_APP_DATABASE_MATCH"
             if not application_same_database():

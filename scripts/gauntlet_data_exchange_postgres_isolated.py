@@ -20,7 +20,7 @@ import psycopg
 from empire_os.data_exchange_construction import build_construction_preview
 from empire_os.data_exchange_custody_transport import EmpireDBConstructionCustody
 from empire_os.data_exchange_observation_custody import verify_custody_window
-from scripts.deploy_data_exchange_custody_v15 import transaction_sql
+from scripts.deploy_data_exchange_custody_v15 import transaction_sql, DB_IDENTITY_SQL
 
 NOW = datetime.now(timezone.utc)
 
@@ -105,6 +105,20 @@ def main() -> int:
                     cur.execute("CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT")
                     cur.execute("CREATE DATABASE data_exchange_custody_fixture")
             fixture_admin = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user={admin_user}"
+            # Regression of the exact production HOLD: concatenated booleans
+            # emit "false" while a standalone psql boolean may show "f".
+            with psycopg.connect(fixture_admin) as identity_conn:
+                with identity_conn.cursor() as identity_cur:
+                    identity_cur.execute(
+                        "SELECT 'x|' || pg_is_in_recovery(),"
+                        " (CASE WHEN pg_is_in_recovery() THEN 'REPLICA' ELSE 'PRIMARY' END)"
+                    )
+                    assert identity_cur.fetchone() == ("x|false", "PRIMARY")
+                    identity_cur.execute(DB_IDENTITY_SQL)
+                    actual_identity = identity_cur.fetchone()[0]
+                    assert actual_identity.endswith("|PRIMARY")
+                    assert "data_exchange_custody_fixture|" in actual_identity
+            result["primary_identity_boolean_cast_regression_passed"] = True
             fixture_writer = f"host={sockets} port={port} dbname=data_exchange_custody_fixture user=empire_data_exchange_custody_login"
             with psycopg.connect(fixture_admin) as conn:
                 with conn.cursor() as cur:
