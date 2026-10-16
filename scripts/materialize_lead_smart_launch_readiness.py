@@ -66,8 +66,15 @@ def approved_candidate_matches(report: dict, root: Path = Path(".")) -> bool:
 
 # Built, source-matched and exposed at the actual edge after Seth's approval
 # on 12 October; changing the HTML bytes cancels this particular release.
+# Reconciled 16 Oct after buyer message gmail:1a145b32d742f3b1
+# specifically acknowledged the added on-page call recording notice. Both
+# original approved TSX sources remain byte-for-byte at frozen buyer hash.
+# The present HTTPS /roofing and generated out/roofing.html are identical
+# sha256:db3521c904f20ab774aebec08d71d70d21fe8695adc9ec8c1626a8502be20aba.
+# This exact-byte publication check does NOT satisfy independent routing,
+# recording retention/consent, tracking, legal or supervised-stop gates.
 APPROVED_ROOFING_HTML_SHA256 = (
-    "3b79c7856d2a9135900d797631693c75277947a78af47d10e1b9d6d4dff47997"
+    "db3521c904f20ab774aebec08d71d70d21fe8695adc9ec8c1626a8502be20aba"
 )
 
 
