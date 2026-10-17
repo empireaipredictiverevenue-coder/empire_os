@@ -33,6 +33,58 @@ from empire_os.business_optimization_policy_intelligence import (
 
 
 OUTPUT = Path("runtime/astra/department_cycle_latest.json")
+CANONICAL_HOOK_REVIEW_ROOT = Path("/srv/empire_os")
+
+
+def review_revenue_first_hooks_in_cycle(root: Path) -> dict[str, Any]:
+    """Passive evidence observation within the EXISTING department heartbeat.
+
+    No extra timer, queue, content publishing or model invocation is added.
+    Test/scratch worktrees never query production sources. A read failure
+    cannot stop an unrelated department cycle.
+    """
+    if root != CANONICAL_HOOK_REVIEW_ROOT:
+        return {
+            "status": "NOT_CANONICAL_RUNTIME",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "candidate_count": 0,
+            "hooks_dispatched": 0,
+        }
+    try:
+        from scripts.review_revenue_first_hook_evidence import run
+        review = run(root=root, include_public_website=False)
+        return {
+            "status": "REVIEW_ONLY_NO_DISPATCH",
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "candidate_count": review["candidate_count"],
+            "candidates": [
+                {
+                    "hook_key": row["hook_key"],
+                    "priority": row["priority"],
+                    "review_status": row["review_status"],
+                }
+                for row in review["existing_hook_candidates"]
+            ],
+            "seo_evidence_state": review["source_status"]["search_intelligence"]["interpretation"],
+            "buyer_reply_evidence_state": review["source_status"]["buyer_replies"]["interpretation"],
+            "conversion_evidence_state": review["source_status"]["conversion"]["interpretation"],
+            "revenue_evidence_state": review["source_status"]["revenue_pulse"]["interpretation"],
+            "hooks_dispatched": review["jobs_dispatched"],
+            "models_invoked": review["models_invoked"],
+            "outbound_sent": review["buyer_replies_sent"],
+            "payments_executed": review["payments_executed"],
+        }
+    except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+        return {
+            "status": "HELD_SOURCE_UNAVAILABLE",
+            "reason_code": type(exc).__name__,
+            "mode": "OBSERVE",
+            "execution_authority": "none",
+            "candidate_count": 0,
+            "hooks_dispatched": 0,
+        }
 
 
 def run_department_cycle(
@@ -355,6 +407,9 @@ def run_department_cycle(
             ),
         },
         "marketing_growth": observe_marketing_agency(root),
+        # Existing department-cycle timer owns this passive revenue-first
+        # observation. No extra daemon, provider call or dispatch is created.
+        "revenue_first_hook_review": review_revenue_first_hooks_in_cycle(root),
         "external_execution_performed": False,
         "commercial_authority": "none",
         "payment_authority": "none",
