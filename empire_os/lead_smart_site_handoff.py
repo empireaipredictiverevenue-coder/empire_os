@@ -62,6 +62,11 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
         or control.get("stop_method") != "atomic_site_handoff_gate"
         or not isinstance(control.get("monitoring_owner"), str)
         or len(control["monitoring_owner"].strip()) < 3
+        # A disabled-template placeholder is not a person assigned to monitor
+        # the release. Simply flipping enabled must never make it valid.
+        or control["monitoring_owner"].strip().upper().startswith((
+            "PENDING", "UNASSIGNED", "TBD", "PLACEHOLDER", "TO_BE_ASSIGNED",
+        ))
         or not isinstance(control.get("founder_authority_ref"), str)
         or not control["founder_authority_ref"].strip()
     ):

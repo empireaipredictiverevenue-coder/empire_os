@@ -1,0 +1,12 @@
+{
+  "campaign_id": "CA8278ed3f26e9495b881fe3833174d007",
+  "enabled": false,
+  "ends_at": "2026-10-19T17:00:00+00:00",
+  "founder_authority_ref": "docs/evidence/lead_smart_founder_launch_intent_20261011.json",
+  "max_site_handoffs": 5,
+  "monitoring_owner": "PENDING_NAMED_FOUNDER_MONITORING_OWNER",
+  "schema_version": "empire.lead_smart.site_handoff_control.v1",
+  "starts_at": "2026-10-19T15:00:00+00:00",
+  "stop_method": "atomic_site_handoff_gate",
+  "tracking_number": "+18883579305"
+}
