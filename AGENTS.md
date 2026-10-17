@@ -7,6 +7,16 @@ This section overrides any conflicting historical wording below.
 - `EMPIRE_DATA_BACKEND=empiredb`.
 - Supabase is legacy/recovery evidence only and must not become canonical again.
 - Unknown stays unknown. Never fabricate production data or evidence.
+- Founder revenue-first operating order (2026-10-17): read the current
+  `docs/MASTER_REMAINING_CHECKLIST.md` checkpoint and the Founder Priority
+  Override in `docs/FOUNDER_DIRECTIVE_OS.md` before choosing new work.
+  **Finish, integrate, test and commit owned pending changes before expanding**;
+  remove optional internal bureaucracy, not actual legal/security safeguards.
+  For the dirty main branch, reconcile each owner-specific feature and commit
+  only validated paths. Do not `git add .`, stage generated `.next` archives,
+  merge unrelated agent work, or erase unstaged edits. If the Codex sandbox
+  cannot write `.git`, hand the verified explicit-path commit to the existing
+  Git-capable operator instead of claiming the commit succeeded.
 - Founder DO NOT PURSUE (2026-10-10): callvox.pro and partners@callvox.pro.
   The founder rejected this network after SMTP 550 5.1.1 and credibility concerns.
   Do not research, qualify, select, recommend, queue for outreach, email, call,
