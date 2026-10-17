@@ -73,12 +73,43 @@ def test_recording_enabled_requires_full_legal_and_admin_controls(tmp_path):
         "responsible_recording_party_verified": True,
         "recording_access_retention_deletion_verified": True,
         "applicable_call_law_review_complete": True,
-        "independent_legal_review_ref": "review:independent-20261013",
+        "documented_compliance_review_ref": "review:founder-20261013",
     })
     save(tmp_path, data)
     assert review(tmp_path) == (True, True)
     data["applicable_call_law_review_complete"] = "true"
     save(tmp_path, data)
+    assert review(tmp_path) == (True, False)
+
+
+def test_no_paid_lawyer_required_but_real_compliance_review_still_required(tmp_path):
+    data = valid()
+    data.update({
+        "recording_mode": "ENABLED",
+        "recording_disable_confirmed_by_buyer_admin": False,
+        "caller_notice_and_consent_verified": True,
+        "responsible_recording_party_verified": True,
+        "recording_access_retention_deletion_verified": True,
+        "applicable_call_law_review_complete": True,
+        "documented_compliance_review_ref": "internal:documented-founder-review-20261017",
+    })
+    save(tmp_path, data)
+    assert review(tmp_path) == (True, True)
+    for missing in (
+        "caller_notice_and_consent_verified",
+        "responsible_recording_party_verified",
+        "recording_access_retention_deletion_verified",
+        "applicable_call_law_review_complete",
+        "documented_compliance_review_ref",
+    ):
+        unsafe = dict(data)
+        unsafe.pop(missing)
+        save(tmp_path, unsafe)
+        assert review(tmp_path) == (True, False)
+    unsafe = dict(data)
+    unsafe.pop("documented_compliance_review_ref")
+    unsafe["independent_legal_review_ref"] = "review:old-only-does-not-count"
+    save(tmp_path, unsafe)
     assert review(tmp_path) == (True, False)
 
 

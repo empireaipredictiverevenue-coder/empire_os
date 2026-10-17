@@ -89,8 +89,12 @@ def verified_buyer_admin_proof(
             and data.get("responsible_recording_party_verified") is True
             and data.get("recording_access_retention_deletion_verified") is True
             and data.get("applicable_call_law_review_complete") is True
-            and isinstance(data.get("independent_legal_review_ref"), str)
-            and len(data["independent_legal_review_ref"].strip()) > 8
+            # A professional lawyer is not intrinsically required by the
+            # software. The founder/responsible operator may document a
+            # source-grounded review of the actual call flow and applicable
+            # recording rules. This reference is NOT itself legal consent.
+            and isinstance(data.get("documented_compliance_review_ref"), str)
+            and len(data["documented_compliance_review_ref"].strip()) > 8
         )
         return (ani, disabled or governed)
     except (OSError, ValueError, TypeError, KeyError, OverflowError):
