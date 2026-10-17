@@ -28,3 +28,16 @@ def test_premium_page_uses_webpage_service_schema_not_fake_local_business():
     assert '"@type":"WebPage"' in page
     assert '"@type":"Service"' in page
     assert '"@type":"LocalBusiness"' not in page
+
+
+def test_only_reviewed_dfw_roofing_page_gets_contextual_buyer_link():
+    from pathlib import Path
+    page=generate_page("roofing", "DFW")
+    label="How roofing opportunities are qualified"
+    assert page.count(label)==1
+    assert 'href="/industries/roofing"' in page
+    assert Path("scripts/_aeo_pages/roofing/DFW/index.html").read_text() == page
+    for niche, metro in (("roofing","NYC"),("hvac","DFW")):
+        alternative=generate_page(niche,metro)
+        assert label not in alternative
+        assert 'href="/industries/roofing"' not in alternative

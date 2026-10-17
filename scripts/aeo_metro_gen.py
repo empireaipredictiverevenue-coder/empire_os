@@ -382,7 +382,7 @@ footer .row{{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
     </div>
     <div class="cta-copy">
       Empire AI connects market intelligence, Search, CRM and Revenue Pulse so teams can see what is changing, why it matters and what deserves attention next.
-      <div class="actions"><a class="btn btn-primary" href="https://empire-ai.co.uk">Explore the platform</a></div>
+      <div class="actions"><a class="btn btn-primary" href="https://empire-ai.co.uk">Explore the platform</a>{contextual_buyer_link}</div>
     </div>
   </div>
 </section>
@@ -449,6 +449,13 @@ def generate_page(niche: str, metro: str) -> str:
         ),
         "signal_cards": "".join(signal_cards),
         "focus_items": focus_items,
+        # Only this reviewed DFW buyer page receives an editorial link; no
+        # scaled metro/doorway links and no change to other AEO pages.
+        "contextual_buyer_link": (
+            '<a class="btn btn-secondary" href="/industries/roofing">'
+            'How roofing opportunities are qualified</a>'
+            if (niche, metro) == ("roofing", "DFW") else ""
+        ),
         "year": str(datetime.now(timezone.utc).year),
     }
     page = PAGE_TEMPLATE.replace("{{", "{").replace("}}", "}")
