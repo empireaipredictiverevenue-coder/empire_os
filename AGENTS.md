@@ -7,6 +7,13 @@ This section overrides any conflicting historical wording below.
 - `EMPIRE_DATA_BACKEND=empiredb`.
 - Supabase is legacy/recovery evidence only and must not become canonical again.
 - Unknown stays unknown. Never fabricate production data or evidence.
+- Founder DO NOT PURSUE (2026-10-10): callvox.pro and partners@callvox.pro.
+  The founder rejected this network after SMTP 550 5.1.1 and credibility concerns.
+  Do not research, qualify, select, recommend, queue for outreach, email, call,
+  submit forms, or automatically reconsider this entity. Historical records
+  remain for audit only. The policy is in
+  config/buyer_network_manual_review_holds.json; only a new explicit founder
+  instruction may reverse the restriction.
 - Default autonomous authority remains OBSERVE.
 - Existing approved bounded revenue schedules may continue operating.
 - New authority expansion remains founder-gated.
