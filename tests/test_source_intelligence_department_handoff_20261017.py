@@ -117,6 +117,8 @@ def test_departments_receive_bounded_durable_work_not_repeated_7726_tasks(tmp_pa
     assert third["handoffs_enqueued"] == 0
     assert third["handoffs_unchanged"] == 5
     assert queue.counts()["ready"] == 5
+    stable = json.loads((root / SNAPSHOT).read_text())
+    assert len([r for r in stable["routes"] if r.get("department_work_id")]) == 5
     states = json.loads((root / STATE).read_text())
     assert len(states["lanes"]) == 5
     assert (root / SNAPSHOT).stat().st_mode & 0o777 == 0o600
@@ -321,3 +323,18 @@ def test_without_recent_new_record_model_skips_inference(tmp_path):
     assert not model.calls
     assert review["model_shadow"]["model_output_review_status"]=="NOT_ELIGIBLE"
     assert review["semantic_model_review_performed"] is False
+
+
+
+def test_aging_recent_cohort_without_new_source_identity_does_not_requeue(tmp_path):
+    root = _fixture_root(tmp_path)
+    dispatch_source_intelligence_handoffs(
+        root, now=NOW, max_jobs=5, allow_noncanonical_test=True)
+    # When the 24h display window expires, source identities have not
+    # changed. A stale status change MAY prompt source refresh, but the
+    # short-window count declining alone must never manufacture new work.
+    after=dispatch_source_intelligence_handoffs(
+        root, now=NOW+timedelta(hours=23, minutes=30),
+        max_jobs=5, allow_noncanonical_test=True)
+    assert after["handoffs_enqueued"] == 0
+    assert after["handoffs_unchanged"] == 5

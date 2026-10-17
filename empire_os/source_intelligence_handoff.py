@@ -73,7 +73,7 @@ def _write(path: Path, data: Mapping[str, Any]) -> None:
     tmp.replace(path)
 
 
-def _permit_activity(root: Path, now: datetime) -> dict[str, int]:
+def _permit_activity(root: Path, now: datetime) -> dict[str, Any]:
     """Read current acquisition evidence, never materialize customer details.
 
     First observed and last seen are distinct. A refreshed old record is NOT
@@ -87,12 +87,19 @@ def _permit_activity(root: Path, now: datetime) -> dict[str, int]:
         "official_nyc_portal_source_count": 0,
     }
     observed_job_types: Counter[str] = Counter()
+    newest_identities: list[tuple[str, str]] = []
     for raw in records.values():
         if not isinstance(raw, dict):
             continue
         source = str(raw.get("source") or "").strip().lower()
         if source not in PERMIT_SOURCES and "permit" not in source:
             continue
+        ident = raw.get("signal_id")
+        created = raw.get("created_at")
+        if (isinstance(ident, str) and
+                len(ident) <= 128 and isinstance(created, str)
+                and _time(created) is not None):
+            newest_identities.append((created, ident))
         seen = _time(raw.get("last_seen_at") or raw.get("created_at"))
         first = _time(raw.get("created_at"))
         if seen and timedelta(0) <= now - seen <= timedelta(hours=24):
@@ -117,6 +124,12 @@ def _permit_activity(root: Path, now: datetime) -> dict[str, int]:
             observed_job_types.items(), key=lambda item: (-item[1], item[0])
         )[:5]
     )
+    # A stable rolling *newest ever seen* identity digest picks up new source
+    # records without treating a 24-hour expiry as a new arrival.
+    result["latest_record_identity_digest"] = sha256(
+        json.dumps(sorted(newest_identities, reverse=True)[:8],
+                   separators=(",", ":")).encode()
+    ).hexdigest() if newest_identities else None
     return result
 
 
@@ -152,8 +165,14 @@ def _lane(name: str, *, status: str, counts: Mapping[str, Any],
     }
     # Age is a display field, not a source change. Otherwise the timer would
     # create a new task every time source_age_hours rounds to another decimal.
+    freshness_display_only = {
+        "source_age_hours", "observed_or_refreshed_last_24h",
+        "first_recorded_last_24h", "new_filing_type_mix",
+        "new_underlying_permit_signals_last_24h",
+    }
     fingerprint_input["counts"] = {
-        k: v for k, v in safe_counts.items() if k != "source_age_hours"
+        k: v for k, v in safe_counts.items()
+        if k not in freshness_display_only
     }
     clean["evidence_fingerprint"] = sha256(
         json.dumps(fingerprint_input, sort_keys=True, separators=(",", ":")).encode()
@@ -216,6 +235,7 @@ def build_source_intelligence_handoffs(
             "first_recorded_last_24h": activity[
                 "first_recorded_last_24h"],
             "new_filing_type_mix": activity["new_filing_type_mix"],
+            "latest_record_identity_digest": activity["latest_record_identity_digest"],
             "markets": ",".join(sorted(markets)[:5]),
             "source_age_hours": (round(permit_age / 3600, 1)
                                  if permit_age is not None and permit_age >= 0 else None),
@@ -236,6 +256,7 @@ def build_source_intelligence_handoffs(
             "new_underlying_permit_signals_last_24h": activity[
                 "first_recorded_last_24h"],
             "new_filing_type_mix": activity["new_filing_type_mix"],
+            "latest_record_identity_digest": activity["latest_record_identity_digest"],
             "physical_observation_count": property_count,
             "volumetric_observation_count": property_.get("volumetric_observation_count"),
             "verified_property_opportunity_count": None,
@@ -361,6 +382,8 @@ def dispatch_source_intelligence_handoffs(
             old = dict(state.get(lane) or {})
             if row["evidence_fingerprint"] == old.get("fingerprint"):
                 row["delivery_status"] = "UNCHANGED"
+                if isinstance(old.get("work_id"), str):
+                    row["department_work_id"] = old["work_id"]
                 unchanged += 1
                 continue
             if enqueued >= max_jobs or old.get("last_hour") == hour:
