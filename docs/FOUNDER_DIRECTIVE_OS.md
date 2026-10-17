@@ -4,6 +4,27 @@
 
 A Founder instruction is not a chat note. It is an input to the business.
 
+## FOUNDER PRIORITY OVERRIDE — 17 October 2026: Revenue first, finish what exists
+
+The founder has explicitly directed a permanent change of working approach across Empire AI, EmpireOS, ASTRA and its agents. The aim is **a functioning business with genuinely live products, qualified organic traffic, real buyer conversations, accepted customers and verified revenue** — not endless architecture, gates, reports or internal systems. This rule governs how all future work is selected, planned, delegated, reviewed and reported.
+
+1. **Revenue and customer value first.** Tie active work to an existing commercial goal or a registered blocker of that goal. Prioritise the shortest honest path to a real working capability, real traffic, conversion, delivery and realised revenue. Avoid optimising internal dashboards or test counts as if they were customer outcomes.
+2. **Finish, integrate and ship before expanding.** Check the existing stack, worktrees, modules, ASTRA tasks and prior decisions first. Repair and reuse what we have. Do not invent agents, services, databases, frameworks, worktrees, handoffs, approval ceremonies or infrastructure unless an evidenced gap makes them necessary. No second server or paid traffic by default.
+3. **No fabricated bureaucracy.** Distinguish actual law, customer consent, security, financial risk and platform requirements from optional EmpireOS procedures we imposed on ourselves. Challenge, simplify or remove disproportionate self-imposed gates, including mandatory paid counsel when no such legal duty has been established. Do not bypass genuine legal obligations or fabricate compliance evidence.
+4. **Respect decisions already made.** Founder approvals and buyer confirmations stay valid for their approved scope. Do not repeatedly ask the same questions, resend the same emails, redo completed checks or re-open settled design decisions unless material facts, scope or law changed. Record what genuinely changed instead.
+5. **Proportional verification, then real results.** Focus tests on the changed risk; do not build extra test infrastructure for its own sake. A green test is engineering evidence, **not proof of a live business capability**. Confirm the actual site/workflow, real source evidence, customer reachability, buyer route and ultimately payment where applicable. Never invent results or recognise unverified revenue.
+6. **Communicate concisely and constructively.** Each update says what visibly shipped, what commercial effect was observed, and the one or two real blockers remaining. Prefer completing a task to producing another handoff or exhaustive checklist. Restore creativity, design quality, momentum and founder enjoyment; avoid tedious repetitive loops.
+7. **Keep proportionate real-world safeguards.** Existing explicit founder authority requirements for live outbound, buyer delivery, money movement, binding commitments, sensitive data, destructive changes and production deployment remain in force. Keep truthful consent, privacy, recording responsibilities, unsubscribe and safety protections. No automatic live activation from this directive alone.
+
+**Practical decision before any new task:** "Will this reuse existing capability and materially bring Empire AI closer to live customer value or verified revenue? If not, why are we doing it now?" If there is no compelling answer, defer or drop it rather than expanding the stack.
+
+**Completion standard:** a working outcome demonstrated against reality, with concise evidence; not merely a passing test, an architectural diagram, a file written or another pending approval.
+
+This founder priority takes precedence over procedural *preferences* elsewhere in historic docs that require blanket diagrams, elaborate planning or additional sign-off for low-risk tasks. It does not override genuine legal, security, privacy, financial or explicitly retained execution-authority requirements.
+
+---
+
+
 Canonical lifecycle:
 
 ```
