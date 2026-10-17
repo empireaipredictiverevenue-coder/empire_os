@@ -1,8 +1,24 @@
 # EmpireOS Master Remaining Checklist
 
-_Last saved: 2026-09-22_
+_Last reviewed: 2026-10-17 (revenue-first, scoped production reconciliation; older item statuses remain historical unless rechecked)._
 
 This is the canonical execution checklist for the remaining EmpireOS build.
+
+## 17 October 2026 — Revenue-first founder checkpoint (work from here)
+
+**Operating instruction:** `docs/FOUNDER_DIRECTIVE_OS.md`, commit `2058fcac`. Finish and reuse working systems before starting more infrastructure; remove unjustified internal bureaucracy; respect previous approvals, real privacy/security/financial responsibilities, and truthful production evidence. Work by commercial outcome, not checklist volume. The 595 historically checked and 285 historically open tasks are a backlog, **not** a direction to launch 285 new projects.
+
+**Active execution order, using existing teams and existing release controls:**
+
+- [x] Empire AI revenue-first operating priority saved to Founder Directive OS (17 Oct); no new agent or server.
+- [x] Lead Smart US roofing buyer/founder go-live approvals and the exact published landing `/roofing` verified; buyer says its Direct route and original ANI are configured. This is not independent buyer-leg proof or payability.
+- [ ] First genuine accepted and payable customer event. Lead Smart supervised 19 Oct 10:00–12:00 Chicago pilot remains **disabled**; stop and five-site-handoff tests passed. Resolve only factual recorded-call consent/handling, receiving route/ANI evidence, human monitor, and close-to-launch source freshness; no duplicate buyer approval, test calls or mandatory paid lawyer.
+- [ ] Organic visitor acquisition: `/roofing` currently HTTP 200 **noindex**; two homeowner guides return HTTP 404 pending reviewed publication. Complete ASTRA's existing flagship/SEO release and deploy approved, specific pages. Do not promise immediate Google traffic or overwrite concurrent website changes.
+- [ ] Convert current warm buyer/consultancy/affiliate conversations into one actual scoped product/buyer agreement and verifiable payment/fulfilment. Prioritise follow-ups with buying intent; no general mass outreach or paid traffic until separately approved.
+- [ ] **Main agent Git closeout:** 17 Oct audit found **192 changed/untracked working-tree paths**, including two files both staged and further edited (`MM`), plus generated `.next_pre_*` builds. Codex's current managed sandbox shows `.git` read-only; Git-capable operator must review and commit changes in narrowly owned, tested groups (website, CRM, commercial, SEO, docs) rather than using `git add .` or claiming all changes are ready. Preserve another agent's work and root-owned paths; no automatic live deployment/restart.
+- [ ] Each completion needs a demonstrated real-world outcome and a concise evidence link: live URL/accepted buyer event/real payment when applicable. Tests and files alone do not equal revenue.
+
+**Audit note:** This checkpoint supersedes the *priority order* of older architecture-heavy tasks, but does not silently mark historic tasks completed or waive real-world legal/authority restrictions. No new infrastructure is approved by this checklist.
 
 **DONE rule:** code + tests + live runtime + canonical data + Founder surface where applicable. A file existing by itself is not completion.
 
@@ -372,7 +388,7 @@ reserved for genuine consequential gates.
 
 ## Automate recurring intelligence
 
-- [ ] Scheduled competitor sweeps
+- [ ] Scheduled competitor sweeps — execution cadence not independently verified in 17 Oct timer review; do not count a configured intention as a live schedule
 - [ ] Evidence refresh
 - [ ] Freshness/expiry
 - [ ] Changed-page detection
@@ -639,6 +655,11 @@ Completion backlog:
 - [ ] Finish Enterprise / White Label / Partner product and reseller surfaces
 - [ ] Component-mine Hermes-era Harvester / Snipers / Whale Finder / Whale Harvester into current Source Mesh, identity and enterprise-fit layers
 - [ ] Recover strongest legacy usage-metering / pay-per-call / PPL / appointment/value-meter concepts without JSONL or legacy settlement becoming commercial truth
+  - [x] Three partner-isolated, offline PPL + PPC review previews generated and verified (2026-10-10); public programme ≠ buyer approval; no live forms or numbers
+  - [ ] Obtain one actual buyer-approved PPL form/API buy-box or PPC call buy-box (Connexis Monday priority; LeadBank, Validated and Polyares pending). Confirm source, geography, payout and settlement from the original partner
+  - [ ] Implement and independently verify consent-bound homeowner/form enquiry identity and receipts in sovereign EmpireDB; BUSINESS `prospects` and legacy SQLite `si_ppl_leads` / `lane_leads` must not be relabelled as sellable consumer PPL leads; migration 025 is HELD and research-only
+  - [ ] Bind per-buyer approved intake schema, duplicate/exclusivity rules, lawful consent proof, tracked call route where applicable, accepted/rejected lead postbacks and same-consumer PPL/PPC attribution before any real delivery
+  - [ ] Obtain explicit founder go-live approval; verify accepted payable events, actual settlement and fulfilment before claiming PPL/PPC realised revenue
 - [ ] Recover business-loop watchdog / circuit-breaker / kill-switch / real-time Founder-event patterns into current operating fabric
 - [ ] Reconcile old GTM/marketing packs, Founding Partner patterns, enterprise campaigns, roofing/restoration/storm campaigns, account-based/whale GTM and inbound speed-to-lead against fresh contacts/evidence
 - [ ] Review remaining half-built/gated phases 6–18 components and classify each as CONNECTED / NEEDS WIRING / INCUBATE / REBUILD_LATER / RETIRED / FOUNDER_GATE
