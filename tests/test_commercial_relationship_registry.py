@@ -1053,3 +1053,93 @@ def test_inquirly_replied_and_sent_proposal_is_fourth_distinct_zero_authority_pi
     assert packet["publisher_format_review"]["PAY_PER_LEAD"]["lead_delivery_enabled"] is False
     assert state["live_traffic_authorized"] is False
     assert state["outbound_authorized"] is False
+
+
+# 17 October reviewed Gmail replies: stop asking questions that have already
+# been answered; retain explicit buyer/permission/financial gates.
+def _reviewed_live_reply_sources():
+    src, queue, qual = sources()
+    now = datetime(2026, 10, 17, 18, 15, tzinfo=timezone.utc)
+    src["captured_at"] = now.isoformat()
+    lead = src["threads"][0]
+    lead["gmail_thread_id"] = "1a0d9ce883c87d4a"
+    lead["last_inbound_message_id"] = "1a145b32d742f3b1"
+    lead["last_inbound_at"] = "2026-10-16T17:12:09+00:00"
+    lead["last_outbound_at"] = "2026-10-16T17:05:46+00:00"
+    lead["last_outbound_message_id"] = "1a145ad4636ac390"
+    src["threads"].append({
+        **row(
+            "inquirly.com", "inquirly.com", "1a0d9ef44c7f77d0",
+            inbound="2026-10-16T15:06:05+00:00",
+            outbound="2026-10-16T10:43:45+00:00",
+            company="inquirly.com",
+        ),
+        "last_inbound_message_id": "1a14540463907582",
+        "last_outbound_message_id": "1a1444f864718408",
+    })
+    return src, queue, qual, now
+
+
+def test_latest_real_buyer_replies_replace_obsolete_contact_actions():
+    src, queue, qual, now = _reviewed_live_reply_sources()
+    d = reconcile(src, queue, qual, now=now)
+    rows = {x["entity_key"]: x for x in d["relationships"]}
+    lead = rows["lead-smart"]
+    assert lead["stage"] == "INBOUND_REVIEW_REQUIRED"
+    assert lead["next_founder_action"] == (
+        "PREPARE_EXISTING_SUPERVISED_ROOFING_PILOT_NO_DUPLICATE_TEST"
+    )
+    assert lead["reviewed_buyer_reply_disposition"]["status"] == (
+        "BUYER_REPORTS_RECORDING_TEST_COMPLETE"
+    )
+    assert lead["reviewed_buyer_reply_disposition"]["payable_event_verified"] is False
+    assert lead["founder_review_required"] is True
+    inquirly = rows["inquirly.com"]
+    assert inquirly["next_founder_action"] == (
+        "DEFER_INQUIRLY_UNTIL_VERIFIED_TRAFFIC_NO_REPEAT_REQUEST"
+    )
+    assert inquirly["founder_review_required"] is False
+    assert inquirly["reviewed_buyer_reply_disposition"]["live_traffic_authorized"] is False
+    pilots = {x["entity_key"]: x for x in d["partner_pilot_readiness_queue"]}
+    assert pilots["inquirly.com"]["current_next_partner_task"] == inquirly["next_founder_action"]
+    assert pilots["inquirly.com"]["activation_stage"] == "DEFERRED_PENDING_ESTABLISHED_TRAFFIC"
+    assert all(v is False for v in pilots["inquirly.com"]["activation_gates"].values())
+    assert d["outbound_authorized"] is False
+    assert d["outbound_sent"] is False
+
+
+def test_reviewed_buyer_reply_override_fails_closed_if_source_changes():
+    src, queue, qual, now = _reviewed_live_reply_sources()
+    src["threads"][0]["last_inbound_message_id"] = "1a145b32d742f3b0"
+    src["threads"][-1]["gmail_thread_id"] = "1a0d9ef44c7f77d1"
+    rows = {x["entity_key"]: x for x in reconcile(src, queue, qual, now=now)["relationships"]}
+    assert rows["lead-smart"]["reviewed_buyer_reply_disposition"] is None
+    assert rows["inquirly.com"]["reviewed_buyer_reply_disposition"] is None
+    assert rows["lead-smart"]["outbound_authorized"] is False
+    assert rows["inquirly.com"]["outbound_authorized"] is False
+
+
+def test_stale_or_newer_outbound_never_reuses_reviewed_reply_decision():
+    src, queue, qual, now = _reviewed_live_reply_sources()
+    stale = reconcile(src, queue, qual, now=now + timedelta(days=5))
+    rows = {x["entity_key"]: x for x in stale["relationships"]}
+    assert rows["lead-smart"]["reviewed_buyer_reply_disposition"] is None
+    assert rows["inquirly.com"]["reviewed_buyer_reply_disposition"] is None
+
+    src["threads"][0]["last_outbound_at"] = "2026-10-16T17:30:00+00:00"
+    src["threads"][0]["last_outbound_message_id"] = "aaaaaaaaaaaaaaaa"
+    rows = {x["entity_key"]: x for x in reconcile(src, queue, qual, now=now)["relationships"]}
+    assert rows["lead-smart"]["reviewed_buyer_reply_disposition"] is None
+
+
+def test_founder_no_contact_hold_beats_even_exact_reviewed_reply():
+    src, queue, qual, now = _reviewed_live_reply_sources()
+    d = reconcile(
+        src, queue, qual, now=now,
+        do_not_pursue_domains=frozenset({"leadsmartinc.com", "inquirly.com"}),
+    )
+    rows = {x["entity_key"]: x for x in d["relationships"]}
+    for key in ("lead-smart", "inquirly.com"):
+        assert rows[key]["next_founder_action"] == "DO_NOT_PURSUE_NO_CONTACT"
+        assert rows[key]["founder_review_required"] is False
+        assert rows[key]["outbound_authorized"] is False

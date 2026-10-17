@@ -599,7 +599,12 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
                 if key == "connexis"
                 else "CONFIRM_VALIDATED_AFFILIATE_TERMS_AND_BUYBOX"
                 if key == "validated"
-                else "AWAIT_INQUIRLY_NJ_BUYBOX_LANDING_REVIEW_NO_REPEAT"
+                else (
+                    "DEFER_INQUIRLY_UNTIL_VERIFIED_TRAFFIC_NO_REPEAT_REQUEST"
+                    if (relationship.get("reviewed_buyer_reply_disposition") or {}).get("status")
+                    == "PARTNER_REPORTS_NO_PILOT_WITHOUT_ESTABLISHED_TRAFFIC"
+                    else "AWAIT_INQUIRLY_NJ_BUYBOX_LANDING_REVIEW_NO_REPEAT"
+                )
                 if key == "inquirly.com"
                 else "WAIT_CURRENT_BUYBOX_AND_SOURCE_APPROVAL"
             ),
@@ -620,6 +625,9 @@ def partner_pilot_readiness(relationships: list[dict[str, Any]]) -> list[dict[st
             "activation_stage": (
                 "ONBOARDING_DOCUMENTS_AND_TECH_HANDOFF_PROMISED"
                 if leadbank_docs_promised and snapshot_fresh
+                else "DEFERRED_PENDING_ESTABLISHED_TRAFFIC"
+                if (relationship.get("reviewed_buyer_reply_disposition") or {}).get("status")
+                == "PARTNER_REPORTS_NO_PILOT_WITHOUT_ESTABLISHED_TRAFFIC"
                 else "WAITING_BUYER_BUYBOX"
                 if thread_present and reply_present and snapshot_fresh and safe_stage
                 else "REVIEW_RELATIONSHIP_EVIDENCE"
@@ -658,6 +666,49 @@ def _apply_reviewed_request_to_action(
         return ("REVIEW_ANSWERED_FIELDS_ONLY_NO_REPEAT_QUESTIONNAIRE",
                 "COMPLETE_BUYER_REQUEST_ALREADY_SENT", True)
     return current_action, current_reason, current_review_required
+
+
+# Human-reviewed provider replies: conditional review hints, never authority.
+# The exact original-message/thread relationship prevents stale advice from
+# triggering another unnecessary buyer follow-up.
+REVIEWED_BUYER_RESPONSES = {
+    ("lead-smart", "1a0d9ce883c87d4a", "1a145b32d742f3b1"):
+        ("BUYER_REPORTS_RECORDING_TEST_COMPLETE",
+         "PREPARE_EXISTING_SUPERVISED_ROOFING_PILOT_NO_DUPLICATE_TEST"),
+    ("inquirly.com", "1a0d9ef44c7f77d0", "1a14540463907582"):
+        ("PARTNER_REPORTS_NO_PILOT_WITHOUT_ESTABLISHED_TRAFFIC",
+         "DEFER_INQUIRLY_UNTIL_VERIFIED_TRAFFIC_NO_REPEAT_REQUEST"),
+}
+
+
+def reviewed_buyer_reply_disposition(
+    key: str, *, thread_ids: set[str],
+    last_inbound_message_id: str | None,
+    last_inbound_at: datetime | None,
+    last_outbound_at: datetime | None,
+    source_fresh: bool, stage: str,
+) -> dict[str, Any] | None:
+    """Observed buyer-reply position, not consent, route or payable acceptance."""
+    if (not source_fresh or stage != "INBOUND_REVIEW_REQUIRED"
+            or len(thread_ids) != 1 or last_inbound_at is None
+            or (last_outbound_at is not None
+                and last_inbound_at <= last_outbound_at)):
+        return None
+    match = REVIEWED_BUYER_RESPONSES.get(
+        (key, next(iter(thread_ids)), last_inbound_message_id)
+    )
+    if match is None:
+        return None
+    return {
+        "status": match[0], "next_action": match[1],
+        "source": "REVIEWED_PROVIDER_GMAIL_MESSAGE_CLAIM_ONLY",
+        "canonical_buyer_identity_verified": False,
+        "buyer_route_and_leg_independently_verified": False,
+        "payable_event_verified": False,
+        "outbound_authorized": False,
+        "live_traffic_authorized": False,
+        "execution_authority": "NONE",
+    }
 
 
 FOUNDER_FOLLOWUP_REVIEW_SECONDS = 7 * 24 * 3600
@@ -979,6 +1030,19 @@ def reconcile(
             key, reviewed_request, current_action=founder_action,
             current_reason=action_reason, current_review_required=needs_review,
         )
+        # The original Gmail message is already present in our existing
+        # read-only metadata index. Never promote the email claim to actual
+        # buyer acceptance or supersede a hold / contact suppression.
+        disposition = reviewed_buyer_reply_disposition(
+            key, thread_ids=record["gmail_thread_ids"],
+            last_inbound_message_id=record["last_inbound_message_id"],
+            last_inbound_at=inc, last_outbound_at=out,
+            source_fresh=record_mail_fresh, stage=stage,
+        )
+        if disposition is not None and not founder_excluded:
+            founder_action = disposition["next_action"]
+            action_reason = disposition["status"]
+            needs_review = key == "lead-smart"
         if founder_excluded:
             founder_action = "DO_NOT_PURSUE_NO_CONTACT"
             needs_review = False
@@ -1017,6 +1081,7 @@ def reconcile(
             ),
             "recognized_buyer_events_are_verified": False,
             "buyer_onboarding_duplicate_guard": reviewed_request,
+            "reviewed_buyer_reply_disposition": disposition,
             "commercial_buyer_approved": False,
             "suppression_evidence_complete": False,
             "outbound_authorized": False,
@@ -1071,6 +1136,7 @@ def reconcile(
             "entity_key": item['entity_key'], "company": item['company'],
             "stage": item['stage'], "next_founder_action": item['next_founder_action'],
             "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
+            "reviewed_buyer_reply_disposition": item["reviewed_buyer_reply_disposition"],
             "automatically_recognized_buyer_events": item["automatically_recognized_buyer_events"],
             "gmail_url": item['gmail_url'],
             "last_inbound_at": item['last_inbound_at'],
@@ -1090,6 +1156,7 @@ def reconcile(
             "entity_key": item["entity_key"], "company": item["company"],
             "stage": item["stage"], "next_founder_action": item["next_founder_action"],
             "buyer_onboarding_duplicate_guard": item["buyer_onboarding_duplicate_guard"],
+            "reviewed_buyer_reply_disposition": item["reviewed_buyer_reply_disposition"],
             "automatically_recognized_buyer_events": item["automatically_recognized_buyer_events"],
             "reason": item["founder_action_reason"],
             "last_inbound_at": item["last_inbound_at"],
