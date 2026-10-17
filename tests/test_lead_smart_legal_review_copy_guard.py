@@ -82,10 +82,41 @@ def test_real_review_documents_remain_proposed_and_have_no_release_authority(tmp
         "terms",site_root=site,receipt_path=path) is None
 
 
-def test_live_gateway_unapproved_routes_remain_404_and_noindex():
+def test_unreleased_general_legal_routes_remain_404_and_noindex(monkeypatch):
+    # A real Empire AI public/legal publication may exist independently of
+    # the Lead Smart first-party US homeowner release. Test the *absent*
+    # general release explicitly instead of assuming the live URLs are 404.
+    # Compatible with older first-party gateway revisions where general
+    # pages shared a route resolver, and newer standalone legal-page releases.
+    hook = ("checked_empire_ai_legal_path"
+            if hasattr(gateway, "checked_empire_ai_legal_path")
+            else "_approved_static_content_path")
+    monkeypatch.setattr(gateway, hook, lambda _: None)
     client=TestClient(gateway.app)
-    for route in ("/privacy","/terms"):
+    for route in ("/privacy", "/terms"):
         response=client.get(route)
         assert response.status_code==404
         assert response.headers.get("x-robots-tag")=="noindex, nofollow"
         assert "tel:" not in response.text
+
+
+def test_released_general_legal_pages_do_not_release_roofing_lane(
+        tmp_path, monkeypatch):
+    # General legal pages may correctly be public (for example, Growth
+    # Insights), but they are NOT the exact-source legal approval receipt
+    # required to admit Lead Smart recorded homeowner traffic.
+    site, receipt_path, _ = prepare(tmp_path)
+    receipt_path.unlink()
+    scoped_homeowner_gate = gateway._approved_static_content_path
+    hook = ("checked_empire_ai_legal_path"
+            if hasattr(gateway, "checked_empire_ai_legal_path")
+            else "_approved_static_content_path")
+    monkeypatch.setattr(gateway, hook, lambda route: site / f"{route}.html")
+    client=TestClient(gateway.app)
+    for route in ("privacy", "terms"):
+        response=client.get("/" + route)
+        assert response.status_code==200
+        assert "tel:" not in response.text
+        assert scoped_homeowner_gate(
+            route, site_root=site, receipt_path=receipt_path,
+        ) is None
