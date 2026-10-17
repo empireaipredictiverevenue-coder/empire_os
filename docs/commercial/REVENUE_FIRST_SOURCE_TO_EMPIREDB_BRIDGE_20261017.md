@@ -33,3 +33,24 @@ The tests prove every allowed path, 16 rejected input types, consent-first valid
 After approved deployment: use GET-only website/offer canaries, independently observed real enquiries and aggregate EmpireDB sales state. Never infer real client count or revenue from code/tests alone.
 
 This is one minimal last-mile bridge, not a new CRM, SEO stack, lead router, payment processor or outbound service. No buyer capacity, payable call or recognized income is conferred by this field.
+
+
+## Production activation — verified 17 October 2026
+
+The optional field is no longer just staged. Canonical commit 5c2ffe57 was regression-tested, and only the existing empire-self-serve-checkout.service was restarted. Source checksums were pinned before restart; the new service, public gateway, and GET-only sales canary returned healthy.
+
+- 60 targeted source/model/public GET-only tests passed before restart.
+- 43 checkout/first-party tests passed afterward.
+- Existing founder-led commercial offers count stays 10, checkout_authorized=false and actual_revenue=false. No synthetic buyer POST was sent.
+- Pre-existing controlled financial state was unchanged: pending-order and payment-proposal flags already ON; payment_execution=false and revenue_recognition=false, direct BSC with BSC_CONFIGURED_CHAIN_UNVERIFIED. See docs/commercial/DIRECT_BSC_BUYER_CHECKOUT_END_TO_END_RELEASE_20261013.md. No new financial authorization, order, transaction or payment was performed.
+- The checkout, gateway and existing department cycle stayed active; no CRM migration, new agent, outbound send or website publication occurred.
+- Canonical read-only EmpireDB sales aggregate still showed zero real first-party sales-acquisition records, not proof that a live buyer enquiry was tested.
+- The current website does not yet submit claimed_entry_page. No live source-to-CRM attribution result can be reported until ASTRA integrates that field and a genuine opted-in buyer submits an enquiry.
+
+### ASTRA existing flagship website owner task
+
+The existing commercial form is apps/empire-public-site/src/app/commercial/page.tsx. Preserve its original buyer-input, contact-consent checkbox, honeypot, idempotency and submit endpoint; add optional claimed_entry_page only for explicit first-party navigation from a reviewed page.
+
+Proposed closed mapping of page origin codes: predictive -> /predictive-revenue; roofing -> /industries/roofing; solar -> /industries/solar; roi -> /insights/revenue-opportunity-assessment. A URL such as /commercial?src=roofing can be mapped through this *closed* literal map. Direct navigation without a matching value must leave claimed_entry_page absent. The backend accepts only the exact path allowlist in REVIEWED_ENTRY_PATHS. Never carry raw referrers, visitor identifiers, query strings, email addresses, marketing cookie IDs or UTM keywords. A well-formed path is STILL UNVERIFIED_BROWSER_SUBMITTED, never a proved search visit.
+
+Use ASTRA's existing scoped website workflow. Test client payload using browser mocks, confirm direct/no-source visits remain backwards compatible, retain zero automatic email/checkout, then have a human review the actual website diff. The public source field is not a verified lead, sale, or marketing opt-in.
