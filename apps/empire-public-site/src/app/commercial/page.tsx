@@ -2,7 +2,12 @@
 import CommercialBuyerExplanation from "@/components/CommercialBuyerExplanation";
 import TamBuyingIntentEvidenceGuide from "@/components/TamBuyingIntentEvidenceGuide";
 import { ArrowLeft, ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import {
+  reuseCommercialInterestAttempt,
+  type CommercialInterestAttempt,
+  type CommercialInterestDetails,
+} from "@/lib/commercial-interest-attempt";
 
 type Offer = { product_code: string; name: string; offer_family: string; currency: string; approved_price_cents: number; price_interval: string; implementation_fee_cents?: number };
 type Catalog = { status: string; offers: Offer[] };
@@ -28,6 +33,7 @@ export default function CommercialPage() {
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Receipt | null>(null);
+  const enquiryAttemptRef = useRef<CommercialInterestAttempt | null>(null);
   useEffect(() => {
     let mounted = true;
     fetch("/v1/checkout/commercial/offers", { cache: "no-store" })
@@ -44,22 +50,40 @@ export default function CommercialPage() {
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!code || !consent || submitting) return;
+    if (!code || !consent || submitting ||
+        result?.decision === "commercial_enquiry_recorded") return;
     setSubmitting(true);
     setResult(null);
     try {
+      const details: CommercialInterestDetails = {
+        product_code: code, business_name: business, email, domain,
+        industry, geography: region, desired_outcome: outcome,
+        contact_consent: consent, website,
+      };
+      const attempt = reuseCommercialInterestAttempt(
+        enquiryAttemptRef.current,
+        details,
+        () => {
+          const key = globalThis.crypto?.randomUUID?.();
+          if (!key) throw new Error("secure_commercial_key_unavailable");
+          return key;
+        },
+      );
+      enquiryAttemptRef.current = attempt;
       const response = await fetch("/v1/checkout/commercial/interests", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_code: code, business_name: business, email, domain,
-          industry, geography: region, desired_outcome: outcome,
-          contact_consent: consent, idempotency_key: crypto.randomUUID(), website,
-        }),
+        body: JSON.stringify({...details, idempotency_key: attempt.idempotencyKey}),
       });
       const body = await response.json() as Receipt;
       setResult(response.ok && body.decision === "commercial_enquiry_recorded" ? body :
         { detail: body.detail || body.error || "Enquiry could not be recorded." });
-    } catch { setResult({ detail: "Enquiry service unavailable. No order was placed." }); }
+    } catch (error) {
+      setResult({detail:
+        error instanceof Error && error.message === "secure_commercial_key_unavailable"
+          ? "Secure request identity unavailable. Please reload before retrying."
+          : "We could not confirm receipt. You can retry this same enquiry safely. No order was placed.",
+      });
+    }
     finally { setSubmitting(false); }
   }
 
@@ -147,13 +171,14 @@ export default function CommercialPage() {
             <p className="text-xs leading-6 text-slate-400">
               How we use enquiry details: <a href="/privacy" className="font-semibold text-cyan-200 underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">Read the Empire AI privacy notice</a>.
             </p>
-            <button disabled={!code || !consent || submitting} type="submit"
+            <button disabled={!code || !consent || submitting ||
+              result?.decision === "commercial_enquiry_recorded"} type="submit"
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-4 text-sm font-semibold disabled:opacity-40">
               {submitting ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
               {submitting ? "Recording…" : "Request founder proposal"}
             </button>
             {result?.decision === "commercial_enquiry_recorded" ?
-              <p role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/20 p-4 text-sm text-emerald-200"><CheckCircle2 className="size-4" /> Enquiry recorded, reference {result.reference}. No order or payment created.</p>
+              <p role="status" className="flex items-center gap-2 rounded-xl border border-emerald-300/20 p-4 text-sm text-emerald-200"><CheckCircle2 className="size-4" /> Enquiry recorded, reference {result.reference}. No order or payment created. To start a separate enquiry, reload this page.</p>
               : result?.detail ? <p role="alert" className="rounded-xl border border-amber-300/30 p-4 text-sm text-amber-200">{result.detail}</p> : null}
           </form>
         </section>
