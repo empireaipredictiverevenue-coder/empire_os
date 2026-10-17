@@ -23,6 +23,11 @@ FIRST_RELEASE = {"industries/roofing.html", "industries/solar.html", "commercial
 SECOND_RELEASE = {"commercial.html", "predictive-revenue.html"}
 METADATA_RELEASE = {"industries/roofing.html", "industries/solar.html"}
 TAM_ANSWER_RELEASE = {"commercial.html"}
+INDUSTRY_LINK_RELEASE = {
+    "industries/solar.html", "industries/hvac.html",
+    "industries/legal-mass-tort.html", "industries/roofing.html",
+    "industries/property.html", "industries/private-equity.html",
+}
 EXPECTED_HEADINGS = {
     "/industries/roofing": "From a roofing search to a qualified commercial opportunity.",
     "/industries/solar": "Solar referrals only become revenue when the buyer accepts the outcome.",
@@ -64,6 +69,7 @@ def review_publication_impact(*,
         www_status: int | None,
         metadata_release: Mapping[str, Any] | None = None,
         tam_answer_release: Mapping[str, Any] | None = None,
+        industry_link_release: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (not isinstance(baseline, Mapping) or
         baseline.get("schema_version") != "empire.search.owned_gsc_organic_review.v1"
@@ -112,6 +118,20 @@ def review_publication_impact(*,
         # unverified legacy route; the current Commercial page supplies
         # new, original guidance without inventing conversion evidence.
         final.update(_release(tam_answer_release, expected=TAM_ANSWER_RELEASE))
+    if industry_link_release is not None:
+        # Only a six-page, independently loopback-verified atomic release
+        # can advance the roofing/solar hash baseline. The other four pages
+        # are protected by the exact six-target receipt and owner audit.
+        if (industry_link_release.get("approved_page_count") != 6
+            or industry_link_release.get("gateway_restart_required") is not False
+            or industry_link_release.get("consumer_roofing_indexation_enabled") is not False):
+            raise ValueError("untrusted_six_industry_link_release_scope")
+        changed = _release(industry_link_release, expected=INDUSTRY_LINK_RELEASE)
+        for rel in METADATA_RELEASE:
+            prior = industry_link_release["pages"][rel].get("before_sha256")
+            if prior != final[rel]:
+                raise ValueError("industry_link_release_previous_hash_chain_broken")
+            final[rel] = changed[rel]
     if not isinstance(live_pages,Mapping) or set(live_pages)!=set(PAGE_SET):
         raise ValueError("all_four_owned_pages_live_proof_required")
     for path in PAGE_SET:
@@ -192,6 +212,7 @@ def review_publication_impact(*,
         "seo_pages_verified_public":4,
         "buyer_intent_search_metadata_release_verified":metadata_release is not None,
         "original_tam_buyer_explainer_release_verified":tam_answer_release is not None,
+        "six_industry_editorial_link_release_verified":industry_link_release is not None,
         "page_evidence":tracked,
         "www_host_redirect_review_needed":www_status==200,
         "buyer_capacity_status":buyer_capacity_status,

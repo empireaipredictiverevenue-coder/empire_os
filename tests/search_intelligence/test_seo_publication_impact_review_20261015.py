@@ -223,3 +223,32 @@ def test_missing_or_malformed_third_receipt_cannot_hide_changed_live_page_hash()
     inp["metadata_release"]["pages"]={"industries/roofing.html":{"after_sha256":"c"*64}}
     with pytest.raises(ValueError,match="incorrect_reviewed_release_page_scope"):
         review_publication_impact(**inp)
+
+
+def test_six_industry_release_hash_chain_and_readonly_outcome():
+    from empire_os.search_intelligence.seo_publication_impact_review import INDUSTRY_LINK_RELEASE
+    inp=inputs()
+    metadata=deepcopy(inp["earlier_release"])
+    metadata["pages"]={k:{"after_sha256":"c"*64} for k in
+        ("industries/roofing.html","industries/solar.html")}
+    inp["metadata_release"]=metadata
+    release=deepcopy(inp["earlier_release"])
+    release["pages"]={k:{"before_sha256":"c"*64,"after_sha256":"d"*64}
+                      for k in INDUSTRY_LINK_RELEASE}
+    release.update({"approved_page_count":6, "gateway_restart_required":False,
+                    "consumer_roofing_indexation_enabled":False})
+    inp["industry_link_release"]=release
+    for page in ("/industries/roofing","/industries/solar"):
+        inp["live_pages"][page]["sha256"]="d"*64
+    result=review_publication_impact(**inp)
+    assert result["six_industry_editorial_link_release_verified"] is True
+    assert result["seo_pages_verified_public"] == 4
+    assert result["paid_cpc_revenue"] is None
+    assert result["production_site_modified"] is False
+    release["pages"]["industries/roofing.html"]["before_sha256"]="0"*64
+    with pytest.raises(ValueError, match="industry_link_release_previous_hash_chain_broken"):
+        review_publication_impact(**inp)
+    release["pages"]["industries/roofing.html"]["before_sha256"]="c"*64
+    release["gateway_restart_required"]=True
+    with pytest.raises(ValueError, match="untrusted_six_industry_link_release_scope"):
+        review_publication_impact(**inp)

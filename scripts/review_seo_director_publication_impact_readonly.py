@@ -31,6 +31,7 @@ FIRST = Path("/srv/empire_os/runtime/public_website/seo_four_pages_20261015_rele
 SECOND = Path("/srv/empire_os/runtime/public_website/seo_director_b2b_two_pages_20261015_release_v1/release_receipt.json")
 METADATA = Path("/srv/empire_os/runtime/public_website/seo_buyer_metadata_two_pages_20261015_release_v1/release_receipt.json")
 TAM_ANSWER = Path("/srv/empire_os/runtime/public_website/seo_tam_answer_one_page_20261015_release_v1/release_receipt.json")
+SIX_LINK_RELEASE = Path("/srv/empire_os/runtime/public_website/seo_editorial_six_industry_pages_20261016_v1/release_receipt.json")
 ALLOWED_OUTPUT_DIR = Path("/var/tmp")
 
 
@@ -96,7 +97,8 @@ def run(*, getter: Callable[..., Any] = requests.get,
         end: date | None = None,
         first: Path = FIRST, second: Path = SECOND,
         metadata: Path = METADATA,
-        tam_answer: Path = TAM_ANSWER) -> dict[str, Any]:
+        tam_answer: Path = TAM_ANSWER,
+        six_link_release: Path = SIX_LINK_RELEASE) -> dict[str, Any]:
     # Search Console normally requires processing time; never demand today's
     # unprocessed rows or interpret absence of today's data as no traffic.
     today=datetime.now(timezone.utc).date()
@@ -140,6 +142,7 @@ def run(*, getter: Callable[..., Any] = requests.get,
         earlier_release=_receipt(first),latest_release=_receipt(second),
         metadata_release=_receipt(metadata) if metadata.is_file() else None,
         tam_answer_release=_receipt(tam_answer) if tam_answer.is_file() else None,
+        industry_link_release=_receipt(six_link_release) if six_link_release.is_file() else None,
         live_pages=owned,buyer_capacity_status=status,
         www_status=www.status_code,
     )

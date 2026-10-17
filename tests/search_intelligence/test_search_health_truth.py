@@ -84,3 +84,13 @@ def test_injected_adapter_is_single_source_of_truth_even_if_env_differs(monkeypa
     for route in ("/v1/search/health", "/v1/search/summary"):
         data = client.get(route).json()
         assert data["search_console"] == {**exact, "status": exact["reason"]}
+
+
+def test_integration_status_does_not_claim_verified_rankings():
+    serp = search_health()["serp_source"]
+    assert serp["status"] == "INTEGRATION_PRESENT_OBSERVATION_UNVERIFIED"
+    assert serp["integration"] == "search_fabric"
+    assert serp["verified_organic_observations"] is None
+    assert serp["rank_positions_attested"] is False
+    assert serp["query_demand_observed"] is None
+    assert serp["writes_enabled"] is False

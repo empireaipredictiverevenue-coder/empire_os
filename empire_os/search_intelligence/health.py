@@ -30,7 +30,15 @@ def search_health(
             "status": console.reason,
         },
         "serp_source": {
-            "status": "available_via_search_fabric",
+            # The Search Fabric integration exists; this status endpoint does
+            # NOT execute a search, read an organic result or verify a rank.
+            # Do not mistake integration readiness for witnessed demand.
+            "status": "INTEGRATION_PRESENT_OBSERVATION_UNVERIFIED",
+            "integration": "search_fabric",
+            "verified_organic_observations": None,
+            "last_verified_organic_observation_at": None,
+            "rank_positions_attested": False,
+            "query_demand_observed": None,
             "writes_enabled": False,
         },
         "repository": {
