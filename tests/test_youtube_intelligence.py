@@ -322,3 +322,109 @@ def test_commercial_cli_runs_offline_with_existing_youtube_intelligence(tmp_path
     assert output["candidates"][0]["vertical"] == "solar"
     assert output["candidates"][0]["revenue_proven"] is False
     assert output["automatic_publication_authorized"] is False
+
+
+def test_age_cohort_benchmark_uses_other_videos_in_same_channel_and_duration():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.youtube_intelligence import (
+        benchmark_youtube_channel_videos, review_youtube_commercial_opportunities,
+    )
+
+    now = datetime.now(timezone.utc)
+    published = (now - timedelta(days=12)).isoformat()
+    def api_row(video_id, views, channel="UCc", duration="PT6M", title="UK Roofing Homeowner Guidance"):
+        return {
+            "id": video_id, "source_adapter": "youtube_data_api", "read_only": True,
+            "evidence_refs": ["youtube:data_api:video:" + video_id],
+            "snippet": {"channelId": channel, "title": title, "publishedAt": published},
+            "statistics": {"viewCount": str(views)},
+            "contentDetails": {"duration": duration},
+        }
+    rows = [api_row("high", 1000), api_row("peer-a", 100),
+            api_row("peer-b", 110), api_row("peer-c", 90),
+            api_row("unrelated-channel", 100000, channel="UCdifferent"),
+            api_row("short-format", 200000, duration="PT30S")]
+    packet = benchmark_youtube_channel_videos(rows, now=now)
+    assert packet["eligible_count"] == 6
+    assert packet["compared_count"] == 4
+    assert packet["outlier_candidate_count"] == 1
+    assert packet["outlier_candidates"][0]["video_id"] == "high"
+    assert packet["outlier_candidates"][0]["outlier_ratio"] == 10.0
+    assert packet["outlier_candidates"][0]["cohort_comparison"]["peer_count_excluding_target"] == 3
+    assert packet["outlier_candidates"][0]["cohort_comparison"]["full_age_normalisation_proven"] is False
+    assert packet["omitted_reason_counts"]["INSUFFICIENT_MATCHED_PEERS"] == 2
+    assert packet["vidiq_comparison_proven"] is False
+    commercial = review_youtube_commercial_opportunities(
+        packet["observations"], now=now,
+    )
+    assert commercial["candidate_count"] == 1
+    assert commercial["candidates"][0]["vertical"] == "roofing"
+    assert commercial["candidates"][0]["revenue_proven"] is False
+
+
+def test_age_cohort_excludes_unverified_sources_and_old_or_incomplete_videos():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.youtube_intelligence import benchmark_youtube_channel_videos
+    import pytest
+
+    now = datetime.now(timezone.utc)
+    def api_row(video_id, days, *, source="youtube_data_api", duration="PT6M", views="100"):
+        return {
+            "id": video_id, "source_adapter": source, "read_only": True,
+            "evidence_refs": ["youtube:data_api:video:" + video_id],
+            "snippet": {"channelId": "c", "title": "Dental Marketing",
+                        "publishedAt": (now - timedelta(days=days)).isoformat()},
+            "statistics": ({"viewCount": views} if views is not None else {}),
+            "contentDetails": {"duration": duration},
+        }
+    with pytest.raises(ValueError, match="official read-only"):
+        benchmark_youtube_channel_videos([api_row("bad", 10, source="scraped")], now=now)
+    with pytest.raises(ValueError, match="official video evidence"):
+        row = api_row("badref", 10)
+        row["evidence_refs"] = []
+        benchmark_youtube_channel_videos([row], now=now)
+    packet = benchmark_youtube_channel_videos(
+        [api_row("outdated", 600), api_row("recent", 10),
+         api_row("noduration", 10, duration=""), api_row("noviews", 10, views=None)],
+        now=now,
+    )
+    assert packet["eligible_count"] == 1
+    assert packet["compared_count"] == 0
+    assert packet["omitted_reason_counts"]["OUTSIDE_AGE_BANDS"] == 1
+    assert packet["omitted_reason_counts"]["NO_PUBLIC_VIEWS_OR_DURATION"] == 2
+
+
+def test_age_cohort_cli_accepts_offline_official_packet(tmp_path, capsys):
+    from datetime import datetime, timedelta, timezone
+    import json
+    from scripts.review_youtube_video_readonly import main
+
+    now = datetime.now(timezone.utc)
+    packet = {"observations": [
+        {
+            "id": f"test-{i}", "source_adapter": "youtube_data_api",
+            "read_only": True, "evidence_refs": [f"youtube:data_api:video:test-{i}"],
+            "snippet": {"channelId": "ch1", "title": "UK Solar Installation Guide",
+                        "publishedAt": (now - timedelta(days=5)).isoformat()},
+            "statistics": {"viewCount": str(900 if i == 0 else 100)},
+            "contentDetails": {"duration": "PT6M"},
+        }
+        for i in range(4)
+    ]}
+    path = tmp_path / "official.json"
+    path.write_text(json.dumps(packet))
+    assert main(["--benchmark-file", str(path)]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["outlier_candidate_count"] == 1
+    assert output["commercial_opportunity_review"]["candidate_count"] == 1
+    assert output["commercial_opportunity_review"]["candidates"][0]["vertical"] == "solar"
+    assert output["public_publish_authorized"] is False
+
+
+def test_channel_benchmark_without_key_does_not_issue_network_requests(capsys):
+    import json
+    from scripts.review_youtube_video_readonly import main
+    assert main(["--benchmark-channel", "UCany"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "UNAVAILABLE_API_KEY"
+    assert result["data_api_calls_performed"] is False

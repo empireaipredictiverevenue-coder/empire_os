@@ -13,6 +13,7 @@ from empire_os.runtime_env import load_runtime_env
 from empire_os.youtube_intelligence import (
     youtube_inspiration_review,
     review_youtube_commercial_opportunities,
+    benchmark_youtube_channel_videos,
 )
 from empire_os.youtube_read_adapter import (
     YouTubeDataReadAdapter,
@@ -26,12 +27,44 @@ def main(argv: list[str] | None = None) -> int:
     group.add_argument("--url", help="Public YouTube video link or ID")
     group.add_argument("--query", help="Search YouTube by topic using official Data API")
     group.add_argument("--opportunities-file", help="Review an existing Media OS normalized-observations JSON packet offline")
+    group.add_argument("--benchmark-file", help="Age-band comparison from an existing official YouTube API observations JSON file")
+    group.add_argument("--benchmark-channel", help="Read one channel from the existing official YouTube Data API adapter and compare")
     parser.add_argument("--description-file", help="Optional supplied video description with published chapter labels")
     parser.add_argument("--allow-one-search-call", action="store_true", help="Explicitly spend one YouTube search quota call")
     parser.add_argument("--max-results", type=int, default=10)
+    parser.add_argument("--max-videos", type=int, default=60, help="Bounded per-channel read for a competitor benchmark (max 100)")
     args = parser.parse_args(argv)
 
-    if args.opportunities_file:
+    if args.benchmark_file:
+        file = Path(args.benchmark_file).resolve()
+        if not file.is_file() or file.stat().st_size > 4_000_000:
+            raise ValueError("official API observations file must be local and <=4MB")
+        packet = json.loads(file.read_text(encoding="utf-8"))
+        if not isinstance(packet, dict) or not isinstance(packet.get("observations"), list):
+            raise ValueError("official YouTube observations packet required")
+        result = benchmark_youtube_channel_videos(packet["observations"])
+        result["commercial_opportunity_review"] = review_youtube_commercial_opportunities(
+            result["observations"], limit=args.max_results,
+        )
+    elif args.benchmark_channel:
+        if not 1 <= args.max_videos <= 100:
+            raise ValueError("bounded channel benchmark max-videos must be 1..100")
+        env = load_runtime_env("/etc/empire_os.env")
+        key = (env.get("EMPIRE_YOUTUBE_API_KEY") or env.get("YOUTUBE_API_KEY") or "").strip()
+        if not key:
+            result = {"schema_version": "empire.media.youtube_cohort_comparison.v1",
+                      "status": "UNAVAILABLE_API_KEY",
+                      "data_api_calls_performed": False, "read_only": True,
+                      "next_action": "Set the existing EmpireOS YouTube Data API key."}
+        else:
+            rows = YouTubeDataReadAdapter(api_key=key).channel_videos(
+                args.benchmark_channel, max_videos=args.max_videos,
+            )
+            result = benchmark_youtube_channel_videos(rows)
+            result["commercial_opportunity_review"] = review_youtube_commercial_opportunities(
+                result["observations"], limit=args.max_results,
+            )
+    elif args.opportunities_file:
         file = Path(args.opportunities_file).resolve()
         if not file.is_file() or file.stat().st_size > 3_000_000:
             raise ValueError("opportunity packet must be local and <=3MB")

@@ -642,3 +642,160 @@ def review_youtube_commercial_opportunities(
         "automatic_publication_authorized": False,
         "execution_authority": "none",
     }
+
+
+# Age-band and duration-proxy comparison reuses the EXISTING observations.
+# Do not confuse duration <= 180s with YouTube's platform-native Shorts flag.
+VIDEO_AGE_BANDS_DAYS = ((1, 7), (7, 30), (30, 90), (90, 365))
+
+
+def benchmark_youtube_channel_videos(
+    public_video_rows: Iterable[Mapping[str, Any]],
+    *,
+    now: datetime | None = None,
+    minimum_peer_videos: int = 3,
+    max_rows: int = 500,
+) -> dict[str, Any]:
+    """Build same-channel cohort baselines from official videos.list rows.
+
+    Each target is compared against >=3 *other* videos in its channel,
+    age band, and duration class. Age bands are coarse descriptive cohorts,
+    not real views-per-hour velocity or age-matched causal predictions.
+    """
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        raise ValueError("timezone-aware now required")
+    moment = moment.astimezone(timezone.utc)
+    if not 3 <= int(minimum_peer_videos) <= 30:
+        raise ValueError("peer minimum must be within 3..30")
+    if not 1 <= int(max_rows) <= 2000:
+        raise ValueError("invalid comparison input limit")
+
+    eligible: list[dict[str, Any]] = []
+    omitted: dict[str, int] = {}
+    video_ids: set[str] = set()
+    input_count = 0
+
+    def omit(reason: str) -> None:
+        omitted[reason] = omitted.get(reason, 0) + 1
+
+    for source in public_video_rows:
+        input_count += 1
+        if input_count > max_rows:
+            raise ValueError("YouTube comparison row limit exceeded")
+        if not isinstance(source, Mapping):
+            raise ValueError("API data row must be a mapping")
+        if source.get("source_adapter") != "youtube_data_api" or source.get("read_only") is not True:
+            raise ValueError("official read-only YouTube Data API source required")
+        ref = str(source.get("id") or "").strip()
+        refs = source.get("evidence_refs")
+        if not ref or not isinstance(refs, list) or ("youtube:data_api:video:" + ref) not in refs:
+            raise ValueError("official video evidence reference required")
+        if ref in video_ids:
+            omit("DUPLICATE_ID")
+            continue
+        video_ids.add(ref)
+
+        normal = normalize_youtube_video_observation(
+            source, evidence_refs=refs, owned_channel=False,
+        )
+        if not normal.get("channel_id"):
+            omit("NO_CHANNEL")
+            continue
+        views = normal.get("views")
+        seconds = normal.get("duration_seconds")
+        if views is None or seconds is None or seconds <= 0:
+            omit("NO_PUBLIC_VIEWS_OR_DURATION")
+            continue
+        published = normal.get("published_at")
+        try:
+            pdate = datetime.fromisoformat(published.replace("Z", "+00:00"))
+        except (AttributeError, ValueError):
+            omit("UNKNOWN_PUBLICATION_TIME")
+            continue
+        if pdate.tzinfo is None:
+            omit("UNKNOWN_PUBLICATION_TIME")
+            continue
+        age_days = (moment - pdate.astimezone(timezone.utc)).total_seconds() / 86400
+        band = next((
+            f"{lo}-{hi}d" for lo, hi in VIDEO_AGE_BANDS_DAYS
+            if lo <= age_days < hi
+        ), None)
+        if band is None:
+            omit("OUTSIDE_AGE_BANDS")
+            continue
+        duration_class = "UNDER_3MIN_DURATION" if seconds <= 180 else "OVER_3MIN_DURATION"
+        eligible.append({
+            "observation": normal,
+            "age_band": band,
+            "duration_proxy": duration_class,
+        })
+
+    cohorts: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
+    for entry in eligible:
+        normal = entry["observation"]
+        key = (normal["channel_id"], entry["age_band"], entry["duration_proxy"])
+        cohorts.setdefault(key, []).append(entry)
+
+    ranked = []
+    candidates = []
+    for entry in eligible:
+        raw = entry["observation"]
+        key = (raw["channel_id"], entry["age_band"], entry["duration_proxy"])
+        peers = [
+            r["observation"]["views"] for r in cohorts[key]
+            if r["observation"]["video_id"] != raw["video_id"]
+        ]
+        if len(peers) < minimum_peer_videos:
+            omit("INSUFFICIENT_MATCHED_PEERS")
+            continue
+        baseline = build_channel_baseline(
+            peers, metric="views", minimum_samples=minimum_peer_videos,
+        )
+        ratio = outlier_ratio(raw["views"], baseline.value)
+        if ratio is None:
+            omit("NO_COMPARABLE_MEDIAN")
+            continue
+        item = {
+            **raw,
+            "channel_baseline": baseline.as_dict(),
+            "outlier_ratio": ratio,
+            "outlier_state": (
+                "OUTLIER_CANDIDATE" if ratio >= DEFAULT_OUTLIER_RATIO
+                else "WITHIN_BASELINE"
+            ),
+            "cohort_comparison": {
+                "age_band": entry["age_band"],
+                "duration_proxy": entry["duration_proxy"],
+                "peer_count_excluding_target": len(peers),
+                "baseline_method": "LEAVE_ONE_OUT_MEDIAN_RAW_VIEWS",
+                "full_age_normalisation_proven": False,
+                "platform_native_shorts_flag_proven": False,
+                "velocity_views_per_hour_proven": False,
+                "competitor_private_analytics_available": False,
+            },
+        }
+        ranked.append(item)
+        if ratio >= DEFAULT_OUTLIER_RATIO:
+            candidates.append(item)
+    ranked.sort(key=lambda row: (-float(row["outlier_ratio"]), row["video_id"]))
+    candidates.sort(key=lambda row: (-float(row["outlier_ratio"]), row["video_id"]))
+
+    return {
+        "schema_version": "empire.media.youtube_cohort_comparison.v1",
+        "mode": "OBSERVE",
+        "source": "OFFICIAL_YOUTUBE_DATA_API_READER",
+        "comparison_method": "SAME_CHANNEL_AGE_BAND_DURATION_PROXY_LEAVE_ONE_OUT",
+        "input_count": input_count,
+        "eligible_count": len(eligible),
+        "compared_count": len(ranked),
+        "outlier_candidate_count": len(candidates),
+        "omitted_reason_counts": dict(sorted(omitted.items())),
+        "observations": ranked,
+        "outlier_candidates": candidates,
+        "reported_view_metrics_held_to_source": True,
+        "relative_performance_predicts_revenue": False,
+        "vidiq_comparison_proven": False,
+        "public_publish_authorized": False,
+        "execution_authority": "none",
+    }
