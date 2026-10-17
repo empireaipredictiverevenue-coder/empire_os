@@ -95,7 +95,7 @@ def test_governor_accepts_injected_transport_without_resend_configuration():
                 "subject": "Empire AI",
                 "body_text": (
                     "A governed message. To unsubscribe, reply opt out.\n\n"
-                    "31 St Thomas St, Bolton, BL1 2QR, UK"
+                    "68 Wentbridge Road, Bolton, BL1 2QR, UK"
                 ),
             }
         if name == "record_outbound_delivery":
@@ -148,7 +148,7 @@ def test_governor_marks_unknown_provider_outcome_for_reconciliation():
                 "subject": "Empire AI",
                 "body_text": (
                     "Governed message. To unsubscribe, reply opt out.\n\n"
-                    "31 St Thomas St, Bolton, BL1 2QR, UK"
+                    "68 Wentbridge Road, Bolton, BL1 2QR, UK"
                 ),
             }
 
@@ -180,3 +180,10 @@ def test_governor_marks_unknown_provider_outcome_for_reconciliation():
     assert calls[-1][1]["p_provider_message_id"] == ""
     assert calls[-1][1]["p_payload"]["provider"] == "postal"
     assert calls[-1][1]["p_payload"]["provider_outcome"] == "unknown"
+
+
+def test_gmail_transport_rejects_ungoverned_payload():
+    from empire_os.outbound_email_transport import GovernedGmailEmailTransport
+    transport = GovernedGmailEmailTransport(token_file='fixture-path')
+    with pytest.raises(OutboundProviderError, match='GMAIL_REQUIRES_GOVERNED_DATABASE_CLAIM'):
+        transport.send({})
