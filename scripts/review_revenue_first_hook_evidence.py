@@ -27,6 +27,7 @@ SOURCES = {
     "revenue_pulse": Path("runtime/revenue_pulse/latest.json"),
 }
 SEARCH_URL = "http://127.0.0.1:8771/v1/search/summary"
+FOUNDER_MAILBOX_SUMMARY_URL = "http://127.0.0.1:8766/v1/founder-mailbox/summary?limit=10"
 SEARCH_DAILY_URL = "http://127.0.0.1:8771/v1/search/search-console/daily"
 PUBLIC_BASE = "https://empire-ai.co.uk"
 PUBLIC_PATHS = (
@@ -86,6 +87,26 @@ def _search_console_daily(now: datetime) -> dict[str, Any]:
         return {**daily, "observed_at": now.isoformat()}
 
 
+def _founder_mailbox_summary(now: datetime) -> dict[str, Any]:
+    # The Founder API exposes recorded EmpireDB replies, NOT general Gmail.
+    # Read a bounded summary only: no email identities, bodies or thread rows.
+    request = Request(
+        FOUNDER_MAILBOX_SUMMARY_URL,
+        method="GET",
+        headers={"Accept": "application/json", "User-Agent": "EmpireOS-HookEvidenceRead/1.0"},
+    )
+    with urlopen(request, timeout=5) as response:
+        if response.status != 200:
+            raise ValueError("founder_mailbox_read_api_unavailable")
+        raw = response.read(65537)
+        if len(raw) > 65536:
+            raise ValueError("founder_mailbox_read_api_response_too_large")
+        data = json.loads(raw)
+        if not isinstance(data, dict):
+            raise ValueError("founder_mailbox_summary_invalid")
+        return {**data, "observed_at": now.isoformat()}
+
+
 def _website_route_status() -> dict[str, Any]:
     observations: dict[str, int | str] = {}
     for path in PUBLIC_PATHS:
@@ -121,10 +142,15 @@ def run(*, root: Path, include_public_website: bool, now: datetime | None = None
         daily = _search_console_daily(clock)
     except (ValueError, OSError, UnicodeError, json.JSONDecodeError, TimeoutError):
         daily = None
+    try:
+        mailbox = _founder_mailbox_summary(clock)
+    except (ValueError, OSError, UnicodeError, json.JSONDecodeError, TimeoutError):
+        mailbox = None
     website = _website_route_status() if include_public_website else None
     return review_revenue_first_sources(
         search_summary=search,
         search_console_daily=daily,
+        founder_mailbox_summary=mailbox,
         conversion_snapshot=loaded["conversion_snapshot"],
         reply_collector=loaded["reply_collector"],
         revenue_pulse=loaded["revenue_pulse"],

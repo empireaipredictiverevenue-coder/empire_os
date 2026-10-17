@@ -48,6 +48,23 @@ def sources(clock: datetime = NOW) -> dict:
             ],
             "raw_query": "private-unapproved-query",
         },
+        "founder_mailbox_summary": {
+            "provider": "empiredb_canonical_replies",
+            "mode": "OBSERVE",
+            "read_only": True,
+            "execution_authority": "none",
+            "canonical_buyer_conversation_verified": False,
+            "suppression_evidence_complete": False,
+            "observed_at": stamp,
+            "summary": {
+                "all": 14,
+                "replies": 0,
+                "verified_canonical_buyer_replies": 0,
+                "suppressed": 4,
+                "provider_only_reply_evidence": True,
+            },
+            "identity": {"sender_email": "NEVER_EXPOSE_INTERNAL_SENDER_ADDRESS"},
+        },
         "conversion_snapshot": {
             "observed_at": stamp,
             "mode": "OBSERVE",
@@ -107,6 +124,13 @@ def test_realistic_zero_revenue_snapshots_generate_four_inert_reviews():
     assert result["source_status"]["conversion"]["observed_delivered_to_reply_entries"] == 52
     assert result["source_status"]["conversion"]["observed_delivered_to_reply_transitions"] == 0
     assert result["source_status"]["buyer_replies"]["authenticated_buyer_reply_proven"] is False
+    mailbox = result["source_status"]["founder_mailbox"]
+    assert mailbox["contract_valid"] is True
+    assert mailbox["recorded_thread_or_mailbox_rows"] == 14
+    assert mailbox["suppressed_record_rows"] == 4
+    assert mailbox["verified_canonical_buyer_reply_rows"] == 0
+    assert mailbox["general_gmail_inbox_was_queried"] is False
+    assert mailbox["actual_gmail_reply_absence_inferred"] is False
     assert result["source_status"]["search_intelligence"]["stored_opportunity_count"] == 0
     assert result["source_status"]["search_intelligence"]["gsc_adapter_available"] is True
     assert result["source_status"]["search_intelligence"]["gsc_daily_aggregate_valid"] is True
@@ -124,7 +148,7 @@ def test_realistic_zero_revenue_snapshots_generate_four_inert_reviews():
     assert all(c["external_execution"] is False for c in result["existing_hook_candidates"])
     assert all(c["evidence_verified"] is False for c in result["existing_hook_candidates"])
     raw = json.dumps(result)
-    for secret in ("SECRET_SHOULD_NOT_ESCAPE", "private@example.test", "+441234567890", "BANK_REFERENCE_SHOULD_NOT_ESCAPE", "private-unapproved-query"):
+    for secret in ("SECRET_SHOULD_NOT_ESCAPE", "private@example.test", "+441234567890", "BANK_REFERENCE_SHOULD_NOT_ESCAPE", "private-unapproved-query", "NEVER_EXPOSE_INTERNAL_SENDER_ADDRESS"):
         assert secret not in raw
 
 
@@ -219,6 +243,7 @@ def test_script_does_not_call_live_services_when_mocked(tmp_path, monkeypatch):
         p.write_text(json.dumps(sources()[name]))
     monkeypatch.setattr(runner, "_search_summary", lambda _clock: sources()["search_summary"])
     monkeypatch.setattr(runner, "_search_console_daily", lambda _clock: sources()["search_console_daily"])
+    monkeypatch.setattr(runner, "_founder_mailbox_summary", lambda _clock: sources()["founder_mailbox_summary"])
     monkeypatch.setattr(runner, "_website_route_status", lambda: sources()["website_checks"])
     result = runner.run(root=root, include_public_website=True, now=NOW)
     assert result["candidate_count"] == 4
@@ -230,6 +255,7 @@ def test_script_does_not_call_live_services_when_mocked(tmp_path, monkeypatch):
 def test_cli_restricts_sources_to_existing_known_files_and_handles_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(runner, "_search_summary", lambda _clock: sources()["search_summary"])
     monkeypatch.setattr(runner, "_search_console_daily", lambda _clock: sources()["search_console_daily"])
+    monkeypatch.setattr(runner, "_founder_mailbox_summary", lambda _clock: sources()["founder_mailbox_summary"])
     result = runner.run(root=tmp_path, include_public_website=False, now=NOW)
     assert result["candidate_count"] == 1
     assert result["existing_hook_candidates"][0]["hook_key"] == "seo_source_integrity_review"
@@ -271,3 +297,37 @@ def test_stale_gsc_daily_response_cannot_claim_impressions():
     result=review(search_console_daily=bad)
     assert result["source_status"]["search_intelligence"]["gsc_daily_aggregate_source_state"]=="STALE"
     assert result["source_status"]["search_intelligence"]["gsc_observed_impressions"] is None
+
+def test_founder_mailbox_is_not_general_gmail_and_cannot_assert_buyer_identity():
+    result=review()
+    box=result["source_status"]["founder_mailbox"]
+    assert box["provider"]=="empiredb_canonical_replies"
+    assert box["interpretation"]=="EMPIREDB_PROVIDER_ONLY_NOT_GMAIL_INBOX"
+    assert box["provider_reply_rows"]==0
+    assert box["verified_canonical_buyer_reply_rows"]==0
+    assert box["suppression_proof_complete"] is False
+    assert box["general_gmail_inbox_was_queried"] is False
+    assert result["buyer_replies_sent"]==0
+
+
+def test_false_mailbox_authentication_or_forged_reply_totals_fail_closed():
+    source=sources()["founder_mailbox_summary"]
+    source["canonical_buyer_conversation_verified"]=True
+    result=review(founder_mailbox_summary=source)
+    assert result["source_status"]["founder_mailbox"]["contract_valid"] is False
+    assert result["source_status"]["founder_mailbox"]["verified_canonical_buyer_reply_rows"] is None
+    source=sources()["founder_mailbox_summary"]
+    source["summary"]["verified_canonical_buyer_replies"]=5
+    result=review(founder_mailbox_summary=source)
+    assert result["source_status"]["founder_mailbox"]["contract_valid"] is False
+    assert result["source_status"]["founder_mailbox"]["verified_canonical_buyer_reply_rows"] is None
+
+
+def test_stale_mailbox_aggregate_does_not_stand_in_for_live_gmail():
+    source=sources()["founder_mailbox_summary"]
+    source["observed_at"]=(NOW-timedelta(days=3)).isoformat()
+    result=review(founder_mailbox_summary=source)
+    x=result["source_status"]["founder_mailbox"]
+    assert x["source_state"]=="STALE"
+    assert x["recorded_thread_or_mailbox_rows"] is None
+    assert x["actual_gmail_reply_absence_inferred"] is False

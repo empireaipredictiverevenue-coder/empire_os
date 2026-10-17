@@ -100,3 +100,8 @@ EmpireDB is canonical. Older Search Intelligence material mentioning Supabase is
 - No production services restarted, mail delivered, page published, funds transferred or model credits used.
 
 The next operational step is to replay a bounded set of *real observed* SEO, site-conversion, buyer-reply and opt-in evidence through this review surface, and only then connect an existing draft-only department task after separate source/permission verification.
+
+
+## Production promotion checkpoint — 17 October
+
+The scoped 34-hook catalogue and revenue-first review were promoted to the canonical existing EmpireOS department cycle in commit 86b41e46. The timer ran successfully, displaying four passive review candidates with zero dispatch, model invocation, outbound or payments. A further read-only comparison of Founder Mailbox records and actual Gmail source scope prevents a canonical-reply zero from being confused with absence of real email conversations. See the Buyer Reply and SEO Evidence Reconciliation document for source and commercial details.

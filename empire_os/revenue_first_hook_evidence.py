@@ -86,6 +86,7 @@ def review_revenue_first_sources(
     website_checks: Mapping[str, Any] | None,
     now: datetime,
     search_console_daily: Mapping[str, Any] | None = None,
+    founder_mailbox_summary: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Prepare four observable review packets; never dispatch them.
 
@@ -279,6 +280,52 @@ def review_revenue_first_sources(
             "Reconcile canonical buyer reply identity; drafts only, no automatic send",
             reply_age,
         )
+
+    # This API is NOT Gmail and must not be misreported as Gmail inbox
+    # coverage. It exposes canonical EmpireDB recorded-reply aggregates only,
+    # which can disagree with actual email messages until identity reconciliation.
+    mailbox = founder_mailbox_summary or {}
+    mailbox_age = _age_state(mailbox, now)
+    summary = mailbox.get("summary")
+    summary = summary if isinstance(summary, Mapping) else {}
+    recorded_rows = _whole_number(summary.get("all"))
+    provider_reply_rows = _whole_number(summary.get("replies"))
+    canonical_buyer_rows = _whole_number(summary.get("verified_canonical_buyer_replies"))
+    suppression_rows = _whole_number(summary.get("suppressed"))
+    mailbox_valid = (
+        mailbox_age == "FRESH"
+        and mailbox.get("provider") == "empiredb_canonical_replies"
+        and mailbox.get("mode") == "OBSERVE"
+        and mailbox.get("read_only") is True
+        and mailbox.get("execution_authority") == "none"
+        and mailbox.get("canonical_buyer_conversation_verified") is False
+        and mailbox.get("suppression_evidence_complete") is False
+        and summary.get("provider_only_reply_evidence") is True
+        and None not in (
+            recorded_rows, provider_reply_rows,
+            canonical_buyer_rows, suppression_rows,
+        )
+        and provider_reply_rows <= recorded_rows
+        and canonical_buyer_rows <= provider_reply_rows
+        and suppression_rows <= recorded_rows
+    )
+    status["founder_mailbox"] = {
+        "source_state": mailbox_age,
+        "contract_valid": bool(mailbox_valid),
+        "provider": "empiredb_canonical_replies" if mailbox_valid else None,
+        "recorded_thread_or_mailbox_rows": recorded_rows if mailbox_valid else None,
+        "provider_reply_rows": provider_reply_rows if mailbox_valid else None,
+        "verified_canonical_buyer_reply_rows": canonical_buyer_rows if mailbox_valid else None,
+        "suppressed_record_rows": suppression_rows if mailbox_valid else None,
+        "suppression_proof_complete": False,
+        "general_gmail_inbox_was_queried": False,
+        "actual_gmail_reply_absence_inferred": False,
+        "source_conversation_identity_verification": False,
+        "interpretation": (
+            "EMPIREDB_PROVIDER_ONLY_NOT_GMAIL_INBOX" if mailbox_valid
+            else "FOUNDER_MAILBOX_SOURCE_UNAVAILABLE"
+        ),
+    }
 
     revenue = revenue_pulse or {}
     revenue_age = _age_state(revenue, now)
