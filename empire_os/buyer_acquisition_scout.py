@@ -315,14 +315,28 @@ def collect_research_queries(
             if stream:
                 rows.append(stream.pop(0))
 
-    # Reserve existing streams and pools before filling remaining priority slots.
-    # Partner queries share the existing reseller pool, not direct-buyer status.
+    # Reserve distinct current commercial streams and the already configured
+    # insurance/law ICP lanes BEFORE repeated generic product searches consume
+    # the bounded query slots. This changes only research allocation:
+    # no extra requests, contact promotion, outreach or financial authority.
+    # Carrier/TPA procurement must still be distinguished from insurance
+    # agency distribution and managed-repair contractor applications.
+    strategic_icp_lanes = frozenset({
+        "legal_mass_tort_plaintiff_firm",
+        "legal_plaintiff_growth_firm",
+        "insurance_distribution_growth",
+    })
     reserved = []
     coverage = set()
-    for dimension in ("stream", "pool", "partner"):
+    for dimension in ("stream", "strategic_icp", "pool", "partner"):
         for row in rows:
             if dimension == "stream":
                 key = (dimension, row["target_kind"], row.get("billing_model"))
+            elif dimension == "strategic_icp":
+                if (row["target_kind"] != "icp"
+                        or row.get("icp_profile_key") not in strategic_icp_lanes):
+                    continue
+                key = (dimension, row["icp_profile_key"])
             elif dimension == "pool":
                 key = (dimension, row["buyer_pool"])
             else:

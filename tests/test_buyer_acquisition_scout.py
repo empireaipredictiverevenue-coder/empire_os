@@ -662,3 +662,73 @@ def test_founder_do_not_pursue_holds_search_canonical_and_research_seeds(monkeyp
     assert output["candidate_count"] == 0
     assert output["outbound_sent"] is False
     assert output["database_write_performed"] is False
+
+
+
+def test_small_query_budget_reserves_existing_legal_and_insurance_icp_lanes():
+    # Real scout defaults to 12 queries. Large generic product query streams
+    # previously displaced all legal and mass-tort firm discovery.
+    plan = {
+        "priority_targets": [{
+            "priority_score": 999,
+            "corridor_key": "corridor:roofing:us",
+            "research_queries": {
+                "direct_demand_buyers": ["roofing buyer demand usa"],
+                "end_service_buyers": ["roofing contractor usa"],
+                "local_and_smb_buyers": ["roofing service business usa"],
+            },
+        }],
+        "product_priority_targets": [{
+            "priority_score": 300 - i,
+            "product_code": "research_product_%d" % i,
+            "research_queries": {
+                "enterprise_and_data_buyers": ['"predictive revenue" "data team"' + str(i)],
+                "agency_and_reseller_buyers": ["B2B growth agency no." + str(i)],
+            },
+        } for i in range(12)],
+        "icp_priority_targets": [
+            {
+                "priority_score": 106,
+                "icp_profile_key": "legal_mass_tort_plaintiff_firm",
+                "research_queries": {
+                    "direct_demand_buyers": ["mass tort law firm vendor analytics"]
+                },
+            },
+            {
+                "priority_score": 104,
+                "icp_profile_key": "legal_plaintiff_growth_firm",
+                "research_queries": {
+                    "direct_demand_buyers": ["plaintiff law firm marketing analytics"]
+                },
+            },
+            {
+                "priority_score": 104,
+                "icp_profile_key": "insurance_distribution_growth",
+                "research_queries": {
+                    "enterprise_and_data_buyers": [
+                        "insurance distribution analytics agency"
+                    ]
+                },
+            },
+        ],
+    }
+    queries = collect_research_queries(plan, max_queries=12)
+    assert len(queries) == 12
+    targets = {
+        q["icp_profile_key"] for q in queries
+        if q["target_kind"] == "icp"
+    }
+    assert targets >= {
+        "legal_mass_tort_plaintiff_firm",
+        "legal_plaintiff_growth_firm",
+        "insurance_distribution_growth",
+    }
+    assert any(q["target_kind"] == "corridor" for q in queries)
+    assert any(q["target_kind"] == "product" for q in queries)
+    assert any(q["buyer_pool"] == "agency_and_reseller_buyers" for q in queries)
+    assert len({(
+        q["query"], q["buyer_pool"],
+        q.get("corridor_key"), q.get("product_code"),
+        q.get("icp_profile_key")
+    ) for q in queries}) == 12
+    assert len(collect_research_queries(plan, max_queries=4)) == 4
