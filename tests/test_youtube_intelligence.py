@@ -146,3 +146,42 @@ def test_trend_fusion_requires_multiple_observed_sources_for_acceleration():
     assert result["revenue_inferred"] is False
     assert result["media_publish_authorized"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_published_chapter_parser_marks_ideas_as_unverified():
+    from empire_os.youtube_intelligence import (
+        extract_creator_chapters, youtube_inspiration_review,
+    )
+    description = (
+        "00:00 Intro\n"
+        "04:15 Give AI Clearer Instructions\n"
+        "39:53 Add Animation Around Your Talking Video\n"
+        "56:28 Put Your Face and Voice in Videos\n"
+        "1:00:29 Build a Workflow From a YouTube Video\n"
+    )
+    rows = extract_creator_chapters(description)
+    assert len(rows) == 5
+    assert rows[2]["at_seconds"] == 2393
+    assert rows[3]["at_seconds"] == 3388
+    assert rows[-1]["at_seconds"] == 3629
+    assert rows[3]["observed_video_content"] is False
+    result = youtube_inspiration_review(
+        video_id="j6JlWhDw-2w", creator="Paul Ponna Official",
+        title="Make LONG AI Videos FREE & UNLIMITED",
+        published_description=description,
+    )
+    assert "avatar_presenter" in result["workflow_topics"]
+    assert "source_analysis" in result["workflow_topics"]
+    assert result["transcript_obtained"] is False
+    assert result["ideas_are_unverified_candidates"] is True
+    assert result["production_auto_publish"] is False
+
+
+def test_chapters_skip_bad_timestamps():
+    from empire_os.youtube_intelligence import extract_creator_chapters
+    rows = extract_creator_chapters(
+        "00:00 Intro\n00:00 Duplicate\n00:87 Broken\n"
+        "07:09 Teach With Your Own Examples\n04:15 Earlier Chapter\n"
+    )
+    assert len(rows) == 2
+    assert rows[-1]["at"] == "07:09"

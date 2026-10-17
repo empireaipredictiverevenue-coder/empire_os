@@ -255,3 +255,56 @@ def test_public_channel_inventory_uses_uploads_playlist_without_search():
     assert [row["id"] for row in rows] == ["v1", "v2"]
     assert len(calls) == 3
     assert all("/search" not in url for url in calls)
+
+
+def test_public_oembed_validates_youtube_video_and_does_not_claim_transcript():
+    from empire_os.youtube_read_adapter import (
+        normalize_youtube_video_id, read_public_youtube_oembed,
+    )
+    calls = []
+    def transport(url, headers, timeout):
+        calls.append(url)
+        return {
+            "provider_name": "YouTube",
+            "title": "Make LONG AI Videos FREE & UNLIMITED (No Watermark)",
+            "author_name": "Paul Ponna Official",
+            "thumbnail_url": "https://i.ytimg.com/vi/j6JlWhDw-2w/hqdefault.jpg",
+        }
+    data = read_public_youtube_oembed(
+        "https://www.youtube.com/live/j6JlWhDw-2w?is=RfgbVPtoYs-KPVFk",
+        transport=transport,
+    )
+    assert data["video_id"] == "j6JlWhDw-2w"
+    assert data["read_only"] is True
+    assert data["views"] is None
+    assert data["video_watched"] is False
+    assert "youtube.com/oembed" in calls[0]
+    for bad in ("https://youtube.com.evil.test/watch?v=j6JlWhDw-2w",
+                "file:///etc/passwd", "https://evil.example/live/j6JlWhDw-2w",
+                "https://www.youtube.com/watch?v=evil"):
+        with pytest.raises(ValueError):
+            normalize_youtube_video_id(bad)
+
+
+def test_youtube_topic_search_requires_explicit_single_quota_call():
+    def transport(url, headers, timeout):
+        calls.append(url)
+        return {"items": [{
+            "id": {"kind": "youtube#video", "videoId": "j6JlWhDw-2w"},
+            "snippet": {"title": "Official result", "channelId": "UCexample",
+                        "publishedAt": "2026-10-16T18:42:45Z"},
+        }, {"id": {"videoId": "not-11"}, "snippet": {}}]}
+    calls = []
+    adapter = YouTubeDataReadAdapter(api_key="not-a-real-key", transport=transport)
+    with pytest.raises(ValueError, match="explicit allowance"):
+        adapter.search_videos("AI video workflow")
+    assert calls == []
+    with pytest.raises(ValueError, match="max 50"):
+        adapter.search_videos("AI video workflow", max_results=55, search_call_allowance=1)
+    assert calls == []
+    result = adapter.search_videos("AI video workflow", search_call_allowance=1)
+    assert len(calls) == 1
+    assert result[0]["video_id"] == "j6JlWhDw-2w"
+    assert len(result) == 1
+    assert result[0]["read_only"] is True
+    assert "search?" in calls[0] and "key=not-a-real-key" in calls[0]

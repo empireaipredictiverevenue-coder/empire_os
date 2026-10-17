@@ -9,8 +9,9 @@ from __future__ import annotations
 from datetime import date
 import json
 from typing import Any, Callable, Iterable, Mapping
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
+import re
 
 
 JsonTransport = Callable[[str, Mapping[str, str], float], Mapping[str, Any]]
@@ -223,6 +224,124 @@ class YouTubeDataReadAdapter:
                 output.append(item)
         return output
 
+    def search_videos(
+        self,
+        query: str,
+        *,
+        max_results: int = 10,
+        search_call_allowance: int = 0,
+    ) -> list[dict[str, Any]]:
+        """One official search.list request, no hidden pagination.
+
+        YouTube currently enforces a distinct default 100-searches/day bucket.
+        Caller must explicitly supply a per-request quota allowance. The
+        existing videos() method can subsequently enrich selected results.
+        """
+        topic = str(query or "").strip()
+        if not 2 <= len(topic) <= 160:
+            raise ValueError("bounded YouTube search query required")
+        count = int(max_results)
+        if not 1 <= count <= 50:
+            raise ValueError("one YouTube search page only, max 50")
+        if int(search_call_allowance) < 1:
+            raise ValueError("one search.list call requires explicit allowance")
+        params = urlencode({
+            "part": "snippet",
+            "q": topic,
+            "type": "video",
+            "maxResults": count,
+            "safeSearch": "moderate",
+            "key": self._api_key,
+        })
+        payload = self._transport(
+            f"{DATA_API}/search?{params}",
+            {"Accept": "application/json"},
+            self._timeout,
+        )
+        output = []
+        for result in (payload.get("items") or []):
+            if not isinstance(result, Mapping):
+                continue
+            id_obj = result.get("id") or {}
+            video_id = str(id_obj.get("videoId") or "").strip() if isinstance(id_obj, Mapping) else ""
+            if not re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id):
+                continue
+            output.append({
+                "video_id": video_id,
+                "title": str((result.get("snippet") or {}).get("title") or ""),
+                "channel_id": str((result.get("snippet") or {}).get("channelId") or ""),
+                "published_at": str((result.get("snippet") or {}).get("publishedAt") or ""),
+                "watch_url": "https://www.youtube.com/watch?v=" + video_id,
+                "evidence_refs": ["youtube:data_api:search:" + video_id],
+                "metadata_not_content_review": True,
+                "read_only": True,
+            })
+        return output
+
+
+def normalize_youtube_video_id(value: str) -> str:
+    """Accept only video IDs and standard YouTube links; reject arbitrary hosts."""
+    source = str(value or "").strip()
+    if re.fullmatch(r"[A-Za-z0-9_-]{11}", source):
+        return source
+    u = urlparse(source)
+    host = (u.hostname or "").lower()
+    if u.scheme not in {"https", "http"} or host not in {
+        "youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be",
+        "www.youtube-nocookie.com",
+    }:
+        raise ValueError("unsupported YouTube video link")
+    parts = [s for s in u.path.split("/") if s]
+    candidate = ""
+    if host == "youtu.be" and len(parts) == 1:
+        candidate = parts[0]
+    elif u.path in {"/watch", "/live"}:
+        candidate = (parse_qs(u.query).get("v") or [""])[0]
+    elif len(parts) == 2 and parts[0] in {"live", "shorts", "embed"}:
+        candidate = parts[1]
+    if not re.fullmatch(r"[A-Za-z0-9_-]{11}", candidate):
+        raise ValueError("valid YouTube video id required")
+    return candidate
+
+
+def read_public_youtube_oembed(
+    url_or_id: str,
+    *,
+    transport: JsonTransport = _default_transport,
+    timeout_seconds: float = 8.0,
+) -> dict[str, Any]:
+    """Public embed metadata: no paid app credits, no API key, no transcript.
+
+    This deliberately does NOT scrape YouTube pages, request captions or
+    invent views, transcript, retention, sentiment, or observed visual scenes.
+    """
+    video_id = normalize_youtube_video_id(url_or_id)
+    watch = "https://www.youtube.com/watch?v=" + video_id
+    url = "https://www.youtube.com/oembed?" + urlencode({
+        "url": watch, "format": "json",
+    })
+    payload = transport(url, {"Accept": "application/json"}, timeout_seconds)
+    if payload.get("provider_name") != "YouTube":
+        raise ValueError("not an authoritative YouTube oEmbed result")
+    return {
+        "schema_version": "empire.media.youtube_public_link.v1",
+        "video_id": video_id,
+        "watch_url": watch,
+        "title": str(payload.get("title") or ""),
+        "author_name": str(payload.get("author_name") or ""),
+        "author_url": str(payload.get("author_url") or ""),
+        "thumbnail_url": str(payload.get("thumbnail_url") or ""),
+        "evidence_refs": ["youtube:oembed:" + video_id],
+        "observation": "PUBLIC_OEMBED_METADATA",
+        "transcript_available": None,
+        "video_watched": False,
+        "visual_content_verified": False,
+        "views": None,
+        "read_only": True,
+        "execution_authority": "none",
+    }
+
+
 
 class YouTubeAnalyticsReadAdapter:
     def __init__(
@@ -389,7 +508,10 @@ def youtube_read_adapter_contract() -> dict[str, Any]:
             "channels.list",
             "playlistItems.list",
             "videos.list",
+            "search.list",
         ],
+        "public_no_key_actions": ["youtube_oembed_metadata"],
+        "search_call_allowance_required": True,
         "analytics_actions": [
             "owned_channel_top_video_report",
             "owned_channel_traffic_source_report",

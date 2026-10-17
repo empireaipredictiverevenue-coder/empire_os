@@ -381,3 +381,85 @@ def build_outlier_candidates(
         "public_action_performed": False,
         "execution_authority": "none",
     }
+
+
+# Public video descriptions supply creator-labelled chapters, not a transcript.
+_CHAPTER_LINE = re.compile(
+    r"^\s*(?P<clock>(?:\d{1,2}:)?\d{1,2}:\d{2})[ \t\\-–—]+(?P<label>[^\r\n]{3,180})\s*$"
+)
+_YOUTUBE_WORKFLOW_LABELS = {
+    "prompt_quality": ("prompt", "instruction", "teach", "mistake", "example"),
+    "workflow_library": ("workflow", "github", "automating", "reus", "combine"),
+    "avatar_presenter": ("face", "voice", "talking", "avatar"),
+    "edit_animation": ("animation", "film", "video style", "vertical", "export"),
+    "source_analysis": ("youtube video", "reference video"),
+}
+
+
+def extract_creator_chapters(description: str) -> list[dict[str, Any]]:
+    """Parse official-description chapter labels without inventing scenes."""
+    if len(str(description or "")) > 100_000:
+        raise ValueError("YouTube description exceeds review bound")
+    chapters: list[dict[str, Any]] = []
+    last = -1
+    for line in str(description or "").splitlines():
+        match = _CHAPTER_LINE.match(line)
+        if not match:
+            continue
+        units = [int(x) for x in match["clock"].split(":")]
+        if any(x >= 60 for x in units[1:]):
+            continue
+        seconds = sum(part * 60 ** power for power, part in enumerate(reversed(units)))
+        if seconds <= last or seconds > 12 * 3600:
+            continue
+        label = match["label"].strip()
+        if not label:
+            continue
+        tag = []
+        low = label.lower()
+        for category, keywords in _YOUTUBE_WORKFLOW_LABELS.items():
+            if any(key in low for key in keywords):
+                tag.append(category)
+        chapters.append({
+            "at_seconds": seconds,
+            "at": match["clock"],
+            "creator_label": label,
+            "workflow_topics": tag,
+            "evidence_type": "CREATOR_PUBLISHED_DESCRIPTION_ONLY",
+            "observed_video_content": False,
+        })
+        last = seconds
+    return chapters
+
+
+def youtube_inspiration_review(
+    *,
+    video_id: str,
+    title: str,
+    creator: str,
+    published_description: str = "",
+) -> dict[str, Any]:
+    """Review-labelled ideas, not a claim of having watched or transcribed."""
+    from empire_os.youtube_read_adapter import normalize_youtube_video_id
+    validated_id = normalize_youtube_video_id(video_id)
+    chapters = extract_creator_chapters(published_description)
+    topics = sorted({topic for row in chapters for topic in row["workflow_topics"]})
+    return {
+        "schema_version": "empire.media.youtube_inspiration_review.v1",
+        "mode": "OBSERVE",
+        "video_id": validated_id,
+        "watch_url": "https://www.youtube.com/watch?v=" + validated_id,
+        "title": str(title).strip(),
+        "creator": str(creator).strip(),
+        "chapters": chapters,
+        "workflow_topics": topics,
+        "chapter_count": len(chapters),
+        "transcript_obtained": False,
+        "visual_scenes_observed": False,
+        "voice_or_face_downloaded": False,
+        "claims_verified_from_chapters": False,
+        "ideas_are_unverified_candidates": True,
+        "production_auto_publish": False,
+        "execution_authority": "none",
+        "evidence_refs": ["youtube:video_description:" + validated_id] if published_description else [],
+    }
