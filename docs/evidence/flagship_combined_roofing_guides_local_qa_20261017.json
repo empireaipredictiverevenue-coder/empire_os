@@ -1,0 +1,50 @@
+{
+  "schema_version": "empire.flagship.combined_roofing_guides.local_qa.v1",
+  "date": "2026-10-17",
+  "scope": "ASTRA committed orbital-A preview plus Empire AI two homeowner guides in a temporary isolated static export",
+  "source_commits": {
+    "astra_orbital_homepage": "81600461",
+    "homeowner_guides": "a7da3591"
+  },
+  "source_sha256": {
+    "apps/empire-public-site/src/components/RoofingHomeownerGuide.tsx": "99a38cc0ebd3b8ad1228aec9c8e79fffe27940169ec74ef8223bc02bc309a8af",
+    "apps/empire-public-site/src/app/roofing/replacement-vs-repair/page.tsx": "4ecbd43eeda640931ec85c57c41882404041383cfb10ee17ec12c80409250e1f",
+    "apps/empire-public-site/src/app/roofing/installation-checklist/page.tsx": "3f7382856cd91d6758fa52fd47d7ab39deda5f693bdc1c51f4b40030e4fc7a31"
+  },
+  "build": {
+    "framework": "Next.js 16.3.5",
+    "mode": "webpack static export",
+    "typescript": "PASS",
+    "pages_generated": 22,
+    "expected_pages": 22,
+    "status": "PASS"
+  },
+  "browser": {
+    "chromium_viewports": [
+      "1440x900",
+      "390x844",
+      "320x720"
+    ],
+    "checks_passed": 6,
+    "checks_total": 6,
+    "no_browser_exceptions": true,
+    "no_horizontal_overflow": true,
+    "two_guide_html_files": true,
+    "no_call_links_or_forms": true,
+    "noindex_in_preview": true
+  },
+  "public_readback": {
+    "roofing": 200,
+    "roofing_replacement_vs_repair": 404,
+    "roofing_installation_checklist": 404,
+    "commercial": 200
+  },
+  "production_changed": false,
+  "site_released": false,
+  "astra_owner_branch_merged": false,
+  "pending": [
+    "ASTRA integration with latest owner edits",
+    "founder visual/logo reference review",
+    "coordinated public site release and indexation choice"
+  ]
+}
