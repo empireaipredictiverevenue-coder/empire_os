@@ -230,3 +230,91 @@ def test_journey_paths_require_server_authenticated_read_even_if_client_spoofs_t
         })
         assert response.status_code == 401
         assert response.json()["detail"] == "authenticated_crm_scope_required"
+
+
+def test_automatic_vertical_and_lifecycle_segment_distribution_has_no_mail_authority():
+    rows = [
+        prospect(prospect_id="p1", niche="Roofing", conversation_id="c1",
+                 conversation_state="engaged"),
+        prospect(prospect_id="p2", niche="Solar", closer_case_id="case-2",
+                 closer_state="proposal_ready"),
+        prospect(prospect_id="p3", niche="SEO"),
+        prospect(prospect_id="p4", niche="Private Capital",
+                 closer_case_id="case-4", closer_state="awaiting_payment"),
+        prospect(prospect_id="p5", niche="Dental", prospect_status="opted_out"),
+        prospect(prospect_id="p6", niche="unknown free text"),
+    ]
+    result = preview_segment_distribution(rows, tenant_id=TENANT, requested_limit=10)
+    assert result["automatic_crm_segmentation"] is True
+    assert result["marketing_subscription_verified"] is False
+    assert result["newsletter_send_authorized"] is False
+    assert result["subscribers_verified"] is False
+    assert result["send_authorized"] is False
+    assert result["execution_authority"] == "none"
+    assert {x["name"]: x["count"] for x in result["industry_segments"]} == {
+        "home_services": 2, "search_growth": 1, "private_capital": 1,
+        "dental": 1, "unknown": 1,
+    }
+    assert {x["topic"]: x["count"] for x in
+            result["editorial_interest_hypotheses_not_subscribers"]} == {
+        "industry_opportunity_signals": 2,
+        "search_ai_visibility": 1,
+        "predictive_revenue_brief": 1,
+    }
+    assert sum(x["count"] for x in result["industry_lifecycle_segments"]) == 6
+    assert "p1" not in str(result) and "c1" not in str(result)
+    assert not any(key in str(result).lower() for key in
+                   ("buyer@example", "private_email", "opt_in_verified"))
+
+
+def test_no_industry_inference_from_company_name_or_email_and_contact_holds_not_topics():
+    entries = [
+        prospect(prospect_id="p1", business_name="Solar Roofer LLC",
+                 niche=None, email="abc@example.test"),
+        prospect(prospect_id="p2", niche="solarity consulting"),
+        prospect(prospect_id="p3", niche="roofing", prospect_status="bounced"),
+        prospect(prospect_id="p4", niche="roofing", prospect_status="unsubscribed"),
+        prospect(prospect_id="p5", niche="hvac", prospect_status="do_not_contact"),
+    ]
+    result=preview_segment_distribution(entries, tenant_id=TENANT, requested_limit=10)
+    assert result["industry_segments"] == [
+        {"name":"home_services","count":3},{"name":"unknown","count":2},
+    ]
+    assert result["editorial_interest_hypotheses_not_subscribers"] == []
+    row=preview_crm_journey(entries[2], now=NOW)
+    assert row["observed_industry_segment"] == "home_services"
+    assert row["editorial_interest_hypothesis_not_subscription"] is None
+    assert row["newsletter_send_authorized"] is False
+    assert row["marketing_subscription_verified"] is False
+
+
+def test_server_scoped_crm_api_exposes_segment_aggregates_but_no_contact_records():
+    rows=[
+        prospect(prospect_id="p1", niche="roofing", conversation_id="conv-1",
+                 conversation_state="engaged", email="must-not-expose@example.test"),
+        prospect(prospect_id="p2", niche="solar"),
+    ]
+    c=client(MemoryRepo(rows))
+    response=c.get("/v1/revenue-crm/journeys/segments/preview?limit=10",
+                   headers={"X-Tenant-ID":OTHER,"X-Consent":"true",
+                            "X-Marketing-Authorization":"true"})
+    assert response.status_code == 200
+    data=response.json()
+    assert data["industry_segments"] == [{"name":"home_services","count":2}]
+    assert data["editorial_interest_hypotheses_not_subscribers"] == [
+        {"topic":"industry_opportunity_signals","count":2},
+    ]
+    assert data["newsletter_send_authorized"] is False
+    assert data["complete_tenant_audience_verified"] is False
+    assert data["execution_authority"] == "none"
+    assert "must-not-expose@example.test" not in response.text
+    assert "X-Consent" not in response.text
+
+
+def test_cross_tenant_and_duplicated_rows_cannot_be_counted_as_segments():
+    correct=prospect(prospect_id="p1",niche="roofing")
+    invalid=prospect(tenant_id=OTHER,prospect_id="p2",niche="seo")
+    with pytest.raises(ValueError):
+        preview_segment_distribution([correct,invalid],tenant_id=TENANT)
+    with pytest.raises(ValueError):
+        preview_segment_distribution([correct,correct],tenant_id=TENANT)

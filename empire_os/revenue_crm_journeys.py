@@ -20,6 +20,35 @@ CHANNELS = ("email", "sms", "web_push")
 MAX_ROWS = 500
 STATUS_EXCLUDE = {"suppressed", "unsubscribed", "opted_out", "do_not_contact", "bounced"}
 
+# Bounded, evidence-only vertical labels. Never mine company names, free text,
+# deal scores, web clicks or cold prospect lists for marketing subscriptions.
+VERTICAL_TO_EDITORIAL_INTEREST = {
+    "roofing": ("home_services", "industry_opportunity_signals"),
+    "restoration": ("home_services", "industry_opportunity_signals"),
+    "hvac": ("home_services", "industry_opportunity_signals"),
+    "solar": ("home_services", "industry_opportunity_signals"),
+    "dental": ("dental", "industry_opportunity_signals"),
+    "search": ("search_growth", "search_ai_visibility"),
+    "seo": ("search_growth", "search_ai_visibility"),
+    "aeo": ("search_growth", "search_ai_visibility"),
+    "agency": ("search_growth", "search_ai_visibility"),
+    "legal": ("legal", "industry_opportunity_signals"),
+    "private_capital": ("private_capital", "predictive_revenue_brief"),
+    "enterprise": ("enterprise", "predictive_revenue_brief"),
+    "consultancy": ("enterprise", "predictive_revenue_brief"),
+    "property": ("property", "industry_opportunity_signals"),
+    "saas": ("enterprise", "predictive_revenue_brief"),
+}
+
+
+def _observed_vertical(row: Mapping[str, Any]) -> tuple[str, str | None]:
+    """Niche-derived classification for CRM review, not consent or buyer intent."""
+    raw = row.get("niche")
+    if not isinstance(raw, str) or not 1 <= len(raw) <= 100:
+        return "unknown", None
+    key = raw.strip().casefold().replace("-", "_").replace(" ", "_")
+    return VERTICAL_TO_EDITORIAL_INTEREST.get(key, ("unknown", None))
+
 
 def journey_blueprint() -> dict[str, Any]:
     """JSON graph suitable for a visual canvas; not a live workflow definition."""
@@ -125,6 +154,9 @@ def preview_crm_journey(
     if not prospect or not tenant:
         raise ValueError("canonical tenant-scoped CRM identity required")
     segment, reason, supporting_id_key = _stage(row)
+    vertical, editorial_interest = _observed_vertical(row)
+    if segment == "contact_hold":
+        editorial_interest = None
     refs = []
     if supporting_id_key:
         ref = _identifier(row, supporting_id_key)
@@ -160,6 +192,11 @@ def preview_crm_journey(
         "schema_version": SCHEMA, "mode": "OBSERVE", "status": "REVIEW_ONLY",
         "tenant_id": tenant, "prospect_id": prospect,
         "segment": segment, "segment_reason": reason,
+        "observed_industry_segment": vertical,
+        "editorial_interest_hypothesis_not_subscription": editorial_interest,
+        "automatic_crm_segmentation": True,
+        "marketing_subscription_verified": False,
+        "newsletter_send_authorized": False,
         "engaged_conversation_stale_candidate": stale_review,
         "evidence_refs": refs,
         "existing_crm_next_action": candidate if isinstance(candidate, str) else None,
@@ -189,6 +226,9 @@ def preview_segment_distribution(
     if not isinstance(tenant_id, str) or not tenant_id.strip():
         raise ValueError("authenticated CRM tenant required")
     counts: dict[str, int] = {}
+    industries: dict[str, int] = {}
+    lifecycle_industry: dict[tuple[str, str], int] = {}
+    interest_candidates: dict[str, int] = {}
     unique: set[str] = set()
     for row in rows:
         if not isinstance(row, Mapping):
@@ -199,12 +239,32 @@ def preview_segment_distribution(
             raise ValueError("duplicate, unbound or cross-tenant CRM prospect")
         unique.add(pid)
         label = _stage(row)[0]
+        vertical, interest = _observed_vertical(row)
         counts[label] = counts.get(label, 0) + 1
+        industries[vertical] = industries.get(vertical, 0) + 1
+        key = (vertical, label)
+        lifecycle_industry[key] = lifecycle_industry.get(key, 0) + 1
+        if interest is not None and label != "contact_hold":
+            interest_candidates[interest] = interest_candidates.get(interest, 0) + 1
     return {
         "schema_version": "empire.revenue_crm_segment_distribution.v1",
         "mode": "OBSERVE", "read_only": True,
         "tenant_id": tenant_id, "observed_prospect_count": len(rows),
         "segments": [{"name": key, "count": counts[key]} for key in sorted(counts)],
+        "industry_segments": [
+            {"name": key, "count": industries[key]} for key in sorted(industries)
+        ],
+        "industry_lifecycle_segments": [
+            {"industry": key[0], "lifecycle": key[1], "count": lifecycle_industry[key]}
+            for key in sorted(lifecycle_industry)
+        ],
+        "editorial_interest_hypotheses_not_subscribers": [
+            {"topic": key, "count": interest_candidates[key]}
+            for key in sorted(interest_candidates)
+        ],
+        "automatic_crm_segmentation": True,
+        "marketing_subscription_verified": False,
+        "newsletter_send_authorized": False,
         "page_may_be_partial": len(rows) == requested_limit,
         "complete_tenant_audience_verified": False,
         "subscribers_verified": False, "revenue_cents": None,
