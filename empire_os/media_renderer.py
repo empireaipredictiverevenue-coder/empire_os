@@ -29,6 +29,14 @@ RENDER_PROVIDERS = {
         "open_source_first": True,
         "licence_profile_required": False,
     },
+    "openmontage": {
+        "type": "optional_agentic_editor_capability",
+        "open_source_first": True,
+        "licence_profile_required": True,
+        "license": "AGPL-3.0",
+        "local_only_default": True,
+        "automatic_execution": False,
+    },
     "react_renderer": {
         "type": "optional_adapter",
         "open_source_first": False,
@@ -211,4 +219,108 @@ def cost_governor(
         "actual_cost_usd": None,
         "actual_revenue": False,
         "execution_authority": "none",
+    }
+# The original video-editing agent and ASTRA share this existing Media OS renderer.
+# OpenMontage adds editorial capabilities, never a second agent/queue or authority.
+OPENMONTAGE_EDITORIAL_PIPELINES = frozenset({
+    "documentary-montage", "clip-factory", "talking-head",
+    "screen-demo", "hybrid",
+})
+
+
+def review_openmontage_edit(
+    timeline: Mapping[str, Any],
+    *,
+    pipeline: str,
+    source_root: str | None = None,
+    licence_review_approved: bool = False,
+    source_rights_approved: bool = False,
+    local_no_paid_providers: bool = False,
+    estimated_cost_usd: float | None = None,
+) -> dict[str, Any]:
+    """Review OpenMontage against canonical Media OS timeline; never run it.
+
+    OpenMontage's current render_demo.py is only a fixture/demo CLI, NOT the
+    former --pipeline/--brief runner. A live editor runner requires a separately
+    reviewed capability binding and release authority.
+    """
+    from hashlib import sha256
+    from pathlib import Path
+
+    if timeline.get("schema_version") != "empire.media.timeline.v1":
+        raise ValueError("canonical Media OS timeline required")
+    if timeline.get("mode") != "OBSERVE":
+        raise ValueError("OBSERVE timeline required")
+    if timeline.get("execution_authority") != "none":
+        raise ValueError("unexpected timeline authority")
+    if timeline.get("public_publish_authorized") is not False:
+        raise ValueError("public publishing not approved")
+    shots = timeline.get("shots")
+    if not isinstance(shots, list) or not shots:
+        raise ValueError("non-empty timeline shots required")
+    if timeline.get("shot_count") != len(shots):
+        raise ValueError("timeline shot count mismatch")
+    if pipeline not in OPENMONTAGE_EDITORIAL_PIPELINES:
+        raise ValueError("OpenMontage pipeline not approved for Media OS")
+
+    expected_seconds = 0.0
+    for scene in shots:
+        if not isinstance(scene, dict) or not scene.get("scene_id"):
+            raise ValueError("invalid media scene")
+        start, end = float(scene.get("start_seconds", -1)), float(scene.get("end_seconds", -1))
+        if abs(start - expected_seconds) > 0.03 or end <= start:
+            raise ValueError("non-contiguous media scenes")
+        if scene.get("asset_type") in {"chart", "animated_data", "comparison", "map", "product_demo"}:
+            if not (scene.get("data_refs") or scene.get("provenance_refs")):
+                raise ValueError("source evidence missing")
+        expected_seconds = end
+    if abs(expected_seconds - float(timeline.get("duration_seconds", -1))) > 0.03:
+        raise ValueError("duration mismatch")
+
+    blockers: list[str] = []
+    manifest_hash: str | None = None
+    if source_root:
+        path = Path(source_root).resolve() / "pipeline_defs" / f"{pipeline}.yaml"
+        if path.is_file() and path.stat().st_size <= 256_000:
+            manifest = path.read_bytes()
+            if f"name: {pipeline}".encode() in manifest[:4096]:
+                manifest_hash = sha256(manifest).hexdigest()
+    if not manifest_hash:
+        blockers.append("upstream_pipeline_source_unverified")
+    if not licence_review_approved:
+        blockers.append("AGPL3_commercial_licence_review_pending")
+    if not source_rights_approved:
+        blockers.append("footage_music_and_brand_rights_review_pending")
+    if not local_no_paid_providers:
+        blockers.append("paid_or_hosted_provider_exclusion_unverified")
+
+    job = MediaRenderJob(
+        job_id=str(timeline["video_id"]) + "-openmontage-review",
+        production_id=str(timeline["video_id"]),
+        timeline_ref="empire.media.timeline.v1:" + str(timeline["video_id"]),
+        output_profile="private-youtube-review",
+        priority="P3" if pipeline == "clip-factory" else "P1",
+        renderer="openmontage",
+        estimated_cost_usd=estimated_cost_usd,
+    )
+    render_plan = build_render_plan(
+        job, renderer_license_ref="openmontage:AGPL-3.0"
+        if licence_review_approved else None
+    )
+    if render_plan["state"] != "INTERNAL_RENDER_CANDIDATE":
+        blockers.append("media_render_gate:" + render_plan["state"])
+    return {
+        "schema_version": "empire.media.openmontage.review.v1",
+        "mode": "OBSERVE",
+        "media_render_plan": render_plan,
+        "selected_pipeline": pipeline,
+        "pipeline_manifest_sha256": manifest_hash,
+        "state": "REVIEW_CANDIDATE" if not blockers else "HOLD",
+        "blockers": sorted(set(blockers)),
+        "reuse_media_os": True,
+        "independent_agent_created": False,
+        "automatic_demo": False,
+        "execution_authority": "none",
+        "render_executed": False,
+        "public_publish_authorized": False,
     }

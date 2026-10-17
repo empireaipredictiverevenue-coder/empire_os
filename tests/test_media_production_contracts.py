@@ -256,3 +256,88 @@ def test_render_queue_and_cost_governor_do_not_spend():
     assert decision["automatic_spend_authorized"] is False
     assert decision["actual_cost_usd"] is None
     assert decision["actual_revenue"] is False
+# OpenMontage is an editorial capability of the existing Media OS, not a worker.
+def test_openmontage_capability_uses_existing_render_plan_and_holds_licenses(tmp_path):
+    from empire_os.media_renderer import review_openmontage_edit
+
+    root = tmp_path / "source"
+    folder = root / "pipeline_defs"
+    folder.mkdir(parents=True)
+    (folder / "clip-factory.yaml").write_text(
+        "name: clip-factory\nversion: '1.0'\n"
+    )
+    timeline = build_media_timeline(
+        video_id="short-empire",
+        script_ref="script:approved",
+        research_ref="research:owned",
+        brand_profile_ref="brand:empire",
+        shots=[
+            MediaShot(
+                scene_id="original-clip",
+                duration_seconds=15,
+                narration="Founder explains a business problem.",
+                visual_intent="real approved footage",
+                asset_type="video",
+                provenance_refs=("owned-original-video",),
+            )
+        ],
+    )
+    hold = review_openmontage_edit(
+        timeline, pipeline="clip-factory", source_root=str(root),
+        estimated_cost_usd=0,
+    )
+    assert hold["mode"] == "OBSERVE"
+    assert hold["state"] == "HOLD"
+    assert "AGPL3_commercial_licence_review_pending" in hold["blockers"]
+    assert hold["media_render_plan"]["job"]["renderer"] == "openmontage"
+    assert hold["independent_agent_created"] is False
+    assert hold["render_executed"] is False
+    assert hold["public_publish_authorized"] is False
+
+    candidate = review_openmontage_edit(
+        timeline, pipeline="clip-factory", source_root=str(root),
+        licence_review_approved=True,
+        source_rights_approved=True,
+        local_no_paid_providers=True,
+        estimated_cost_usd=0,
+    )
+    assert candidate["state"] == "REVIEW_CANDIDATE"
+    assert candidate["pipeline_manifest_sha256"]
+    assert candidate["execution_authority"] == "none"
+    assert candidate["media_render_plan"]["render_executed"] is False
+
+
+def test_openmontage_rejects_unreviewed_pipeline_and_unsafe_timeline():
+    from empire_os.media_renderer import review_openmontage_edit
+
+    timeline = build_media_timeline(
+        video_id="short-1",
+        script_ref="script:1",
+        research_ref="research:1",
+        brand_profile_ref="brand:empire",
+        shots=[
+            MediaShot(
+                scene_id="one", duration_seconds=5, narration="Sample",
+                visual_intent="owned video", asset_type="video",
+            )
+        ],
+    )
+    with pytest.raises(ValueError, match="not approved"):
+        review_openmontage_edit(timeline, pipeline="avatar-spokesperson")
+    timeline["public_publish_authorized"] = True
+    with pytest.raises(ValueError, match="publishing"):
+        review_openmontage_edit(timeline, pipeline="clip-factory")
+    timeline["public_publish_authorized"] = False
+    timeline["shots"][0]["start_seconds"] = 1
+    with pytest.raises(ValueError, match="non-contiguous"):
+        review_openmontage_edit(timeline, pipeline="clip-factory")
+
+
+def test_old_video_agent_does_not_render_or_self_demo():
+    from empire_os.agents.video_editing_agent import VideoEditingAgent, render_brief
+
+    assert VideoEditingAgent.act(None, "self_demo")["execution_authority"] == "none"
+    assert "idle" in VideoEditingAgent.reason(None, {})
+    review = render_brief({"id": "unused"}, "clip-factory")
+    assert review["ok"] is False
+    assert review["render_executed"] is False
