@@ -97,3 +97,35 @@ def test_public_call_preview_uses_fresh_builder_and_fails_on_missing_evidence(
     monkeypatch.setattr(handoff,"compute_live_launch_readiness",
                         lambda: (_ for _ in ()).throw(FileNotFoundError()))
     assert handoff.call_available("10001") is False
+
+
+def test_reviewed_buyer_admin_attestation_never_replaces_independent_live_route(
+        monkeypatch,tmp_path):
+    now=datetime(2026,10,19,15,10,tzinfo=timezone.utc)
+    root=tmp_path / "runtime"
+    for rel,content in (
+        ("ringba/tracking_verification/latest.json", {
+            "state":"VERIFIED","tracking_verified":True,
+            "verified_at":now.isoformat(),"source_observed_at":now.isoformat()}),
+        ("coverage/activation/latest.json",{
+            "zip_targeting_gate_verified":True,
+            "zip_coverage_activation_verified":True,
+            "source_fresh_for_targeting":True,
+            "source_observed_at":now.isoformat(),
+            "verified_freshness":{"source_newest_last_updated":now.isoformat()}}),
+        ("ringba/routing_observation/latest.json",{
+            "routing_runtime_verified":False,"observed_at":now.isoformat()}),
+    ):
+        p=root/rel;p.parent.mkdir(parents=True,exist_ok=True)
+        p.write_text(json.dumps(content))
+    monkeypatch.setattr(release,"verified_buyer_admin_proof",lambda *a,**k:(True,True))
+    monkeypatch.setattr(release,"effective_legal_release_verified",lambda:False)
+    monkeypatch.setattr(release,"verified_site_handoff_control",lambda:False)
+    result=release.compute_live_launch_readiness(
+        evidence_root=root,repo_root=Path(__file__).resolve().parents[1],now=now)
+    assert result['gates']['caller_id_pass_through_verified'] is True
+    assert result['gates']['recording_notice_and_retention_verified'] is True
+    assert result['gates']['routing_runtime_verified'] is False
+    assert result['gates']['legal_release_verified'] is False
+    assert result['call_cta_enabled'] is False
+    assert result['execution_authority'] == 'NONE'

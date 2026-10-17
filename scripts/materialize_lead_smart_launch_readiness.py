@@ -12,6 +12,7 @@ from empire_os.lead_smart_launch_readiness import (
 )
 from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
 from empire_os.lead_smart_site_handoff import verified_site_handoff_control
+from empire_os.lead_smart_buyer_admin_proof import verified_buyer_admin_proof
 
 
 TRACKING = Path(
@@ -139,6 +140,11 @@ def compute_live_launch_readiness(
         source_ref="gmail:1a10c6b2530f2951"
     )
     direct = policy["routing"]["direct_route_requirements"]
+    # Existing secure, reviewed buyer-admin evidence reader. An attestation
+    # cannot replace fresh independently observed Ringba routing/tracking.
+    admin_ani, admin_recording = verified_buyer_admin_proof(
+        evidence_root, now=now,
+    )
     return build_launch_readiness(
         tracking=load(evidence_root / 'ringba/tracking_verification/latest.json'),
         zip_gate=load(evidence_root / 'coverage/activation/latest.json'),
@@ -153,6 +159,7 @@ def compute_live_launch_readiness(
         # of the runtime caller-ANI path has not been independently proved.
         caller_id_pass_through_verified=(
             direct["caller_id_pass_through_verified"] is True
+            or admin_ani is True
         ),
 
         buyer_landing_page_approved=approved_candidate_matches(
@@ -161,10 +168,11 @@ def compute_live_launch_readiness(
 
         legal_release_verified=effective_legal_release_verified(),
 
-        # Seth reports Ringba recording ENABLED. A proposed privacy notice
-        # is not consent/retention/access/deletion evidence; no authoritative
-        # verification receipt exists. Fail closed until independently proved.
-        recording_notice_and_retention_verified=False,
+        # A published recording notice and buyer acknowledgement alone are
+        # insufficient. Only a source-reviewed, securely owned record with
+        # verified responsible-party, consent, retention and legal checks
+        # can release this separate recording gate.
+        recording_notice_and_retention_verified=admin_recording,
 
         # The approved source is already published in production. This proof
         # is independently checked against the frozen exported HTML digest.
