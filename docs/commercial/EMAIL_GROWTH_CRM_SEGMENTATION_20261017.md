@@ -17,6 +17,7 @@
   - Empire AI — Search & AI Visibility Subscribers : 2d0df2b8-e643-48d8-a681-1b8818306a82
 - No third Industry segment: Resend rejected creation because current plan supports three segments total including General. Do NOT pay for an upgrade solely to add a segment or enrol unrelated General contacts.
 - First real newsletter ISSUE 01 created in Resend as a DRAFT ONLY: 0e2a43c7-7ba4-4d0f-83e3-fb3ca74f402f. Subject: Three numbers to check before paying for AI. Segment: Predictive Revenue Subscribers. Verified status draft, no send or scheduled send.
+- Second original newsletter ISSUE 01 created in Resend as a DRAFT ONLY: 6eff331e-c0d7-4197-bab0-bfcb18553ad1. Subject: Five checks before publishing another SEO page. Segment: Search & AI Visibility Subscribers. Verified status draft; no send or scheduled send.
 
 ## Next integration for ASTRA: do not rebuild the site
 
