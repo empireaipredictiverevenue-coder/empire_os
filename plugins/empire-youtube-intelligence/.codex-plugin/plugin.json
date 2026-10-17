@@ -1,0 +1,38 @@
+{
+  "interface": {
+    "displayName": "Empire AI YouTube Intelligence",
+    "shortDescription": "Research videos. Plan smarter.",
+    "longDescription": "Build original video ideas using public information and clearly stated limits. This preview does not include authenticated channel analytics, private competitor metrics, or video publishing.",
+    "developerName": "Empire AI",
+    "category": "Productivity",
+    "websiteURL": "https://empire-ai.co.uk",
+    "privacyPolicyURL": "https://empire-ai.co.uk/privacy",
+    "termsOfServiceURL": "https://empire-ai.co.uk/terms",
+    "brandColor": "#0A266C",
+    "brandColorDark": "#66B7FF",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png",
+    "capabilities": [],
+    "defaultPrompt": null
+  },
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md"
+    }
+  },
+  "name": "empire-youtube-intelligence",
+  "version": "0.2.0",
+  "description": "Evidence-conscious research and original video planning for business creators, from Empire AI.",
+  "author": {
+    "name": "Empire AI",
+    "url": "https://empire-ai.co.uk"
+  },
+  "keywords": [
+    "youtube",
+    "video",
+    "content-strategy",
+    "business-research"
+  ],
+  "homepage": "https://empire-ai.co.uk",
+  "skills": "./skills"
+}

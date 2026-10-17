@@ -16,7 +16,21 @@ def test_package_has_portable_manifest_and_does_not_publish_ops_mcp():
     manifest = json.loads((PKG / "plugin.json").read_text())
     assert manifest["name"] == "empire-youtube-intelligence"
     assert manifest["$schema"].endswith("plugin.schema.json")
-    assert manifest["extensions"]["com.openai"]["interface"]["capabilities"] == ["Read"]
+    assert manifest["version"] == "0.2.0"
+    interface = manifest["extensions"]["com.openai"]["interface"]
+    assert interface["displayName"] == "Empire AI YouTube Intelligence"
+    assert interface.get("capabilities") in (None, [])  # Skills-only package.
+    assert interface["composerIcon"] == "./assets/icon.png"
+    assert interface["logo"] == "./assets/logo.png"
+    for asset in ("assets/icon.png", "assets/logo.png"):
+        data = (PKG / asset).read_bytes()
+        assert data[:8] == bytes((137, 80, 78, 71, 13, 10, 26, 10))
+        from struct import unpack
+        width, height = unpack(">II", data[16:24])
+        assert width == height and width >= 512
+    codex_manifest = json.loads((PKG / ".codex-plugin" / "plugin.json").read_text())
+    assert codex_manifest["name"] == manifest["name"]
+    assert codex_manifest["version"] == manifest["version"]
     assert not (PKG / "mcp.json").exists()  # No invented public endpoint.
     assert (PKG / "skills" / "setup" / "SKILL.md").exists()
     assert (PKG / "skills" / "youtube-research" / "SKILL.md").exists()

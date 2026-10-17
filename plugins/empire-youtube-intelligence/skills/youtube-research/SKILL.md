@@ -1,13 +1,8 @@
 ---
 name: empire-youtube-research
-description: Examine a public YouTube video or plan an original business-focused video with source-checked evidence.
+description: Plan original, business-focused YouTube videos from verifiable references and audience problems.
 ---
-# Empire AI YouTube Research
-
-When asked for YouTube research, use `empire_youtube_public_video_review` if installed and authorized. This tool currently returns the video title, creator, thumbnail URL and evidence links. It does **not** watch the video or retrieve a transcript.
-
-For video planning, identify the user's business audience, the customer problem, the original creative angle, and what evidence would support factual claims. Separate **observed**, **creator-described**, and **not established** findings.
-
-You may recommend narrative, title and thumbnail experiments, but do not label scoring estimates as empirical YouTube search demand or give private competitor retention or revenue figures. Do not copy competitors' scripts, music, likenesses or footage. Keep the user's material confidential. Do not publish videos or send marketing messages.
-
-Present evidence-led ideas as recommendations, not verified business outcomes. This skill has no payment or subscription authority. Follow Empire AI visual identity only when authentic, user-approved brand assets are available.
+# YouTube video research and planning
+Distinguish verified source evidence, creator claims, public metadata, and unverified hypotheses. Analyse title/hook positioning, evidence available, buyer problems, creative direction, and editorial differentiation. Never invent search volumes, buyer intent, views-per-hour, private audience retention, transcripts or sales.
+Provide up to three concise original video opportunities with specific audiences and source-supported justifications. Keep visuals cinematic where requested without unapproved brand logos, website recordings, or synthetic likenesses.
+Never copy third-party footage or scripts. For voice avatar requests, be explicit if avatar generation and consented voice synthesis are not actually available. No upload, customer message, purchase or background publishing without explicit authorization.

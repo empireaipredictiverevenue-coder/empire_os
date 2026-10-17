@@ -1,9 +1,13 @@
-# Empire AI YouTube Intelligence — portable private preview
+# Empire AI YouTube Intelligence — private plugin v0.2.0
 
-This package has a real portable `plugin.json` plus two bundled skills, but **no remote `mcp.json`** yet. An MCP URL would be invalid to publish today: we have no founder-approved public customer endpoint or entitlement/auth rate limits. Never substitute the internal Empire Ops MCP URL for a public URL.
+**Canonical installed ChatGPT private plugin**: `plugins_6ad3b84a3dec819193d8836ed6866a4b`, version `0.2.0`, original installed release `pluginrel_6ad3c32f1b948191ac1ba94a6921dace`. This repository folder now mirrors that release's manifests, two skills and two founder-approved Empire AI globe/logo PNGs. The installed plugin was not changed by this source sync. Both logo and icon are 1024x1024 square PNGs.
 
-The matching **private-only**, code-reviewed MCP facade lives in the same EmpireOS repository at `empire_os/youtube_public_plugin_mcp.py`. It provides one useful read-only tool: `empire_youtube_public_video_review(video_url)`, using `youtube_read_adapter.read_public_youtube_oembed`. The preview may be started only locally on 127.0.0.1 with explicit `--private-loopback-only`; it has no customer auth, throttling, or publishing approval and **must not be exposed externally**.
+This is a **skills-only private plugin**: no customer-facing remote `mcp.json` is attached. Do not claim live YouTube competitor analysis, private channel analytics, automatic video rendering or a public directory listing from this version.
 
-Next steps: test private MCP and skill, design public service rate limits and auth, decide if the first release is skills-only or an MCP+skills plugin; complete business verification and the plugin listing, validate with test users, and submit only after the public connection passes an independent security review.
+The matching private-only code-reviewed MCP facade is in `empire_os/youtube_public_plugin_mcp.py`, built on the existing `empire_os/youtube_read_adapter.py`. It is restricted to localhost and was never activated for external customers. It **must not** be confused with or connected to the privileged `empire-ops-mcp.service`.
 
-Policies: https://developers.openai.com/plugins/build/plugins ; https://developers.openai.com/plugins/deploy/submission ; https://developers.openai.com/plugins/resources/plugin-guidelines .
+The other chat independently develops next-version MCP research tools inside `feature/empire-youtube-intelligence-p0-20261017` (or its successor feature worktree). Do not duplicate that work. Any new release must preserve the original plugin backend ID and this branding; reconcile its feature branch into the existing repo first, run the full tests, then explicitly update this same private plugin.
+
+Publication readiness still requires operational remote customer MCP, tenant/security review, API quota and auth tests, independent benchmarking on live data, validated privacy/support, founder approval and platform review. ChatGPT public publication is **not** authorized by this repository commit.
+
+References: https://developers.openai.com/plugins/build/plugins and https://developers.openai.com/plugins/deploy/submission.

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "empire-youtube-intelligence",
-  "version": "0.1.0",
-  "description": "Research public YouTube videos and plan original, evidence-based business content with Empire AI.",
+  "version": "0.2.0",
+  "description": "Evidence-conscious research and original video planning for business creators, from Empire AI.",
   "author": {
     "name": "Empire AI",
     "url": "https://empire-ai.co.uk"
@@ -10,30 +10,26 @@
   "homepage": "https://empire-ai.co.uk",
   "keywords": [
     "youtube",
-    "research",
     "video",
     "content-strategy",
-    "competitors"
+    "business-research"
   ],
   "extensions": {
     "com.openai": {
       "onboardingSkill": "./skills/setup/SKILL.md",
       "interface": {
         "displayName": "Empire AI YouTube Intelligence",
-        "shortDescription": "Research YouTube videos and plan evidence-led content.",
-        "longDescription": "Check public video information, distinguish observed facts from assumptions, and plan original videos for business audiences. Preview does not provide private competitor analytics or publish videos.",
+        "shortDescription": "Research videos. Plan smarter.",
+        "longDescription": "Build original video ideas using public information and clearly stated limits. This preview does not include authenticated channel analytics, private competitor metrics, or video publishing.",
         "developerName": "Empire AI",
         "category": "Productivity",
-        "capabilities": [
-          "Read"
-        ],
         "websiteURL": "https://empire-ai.co.uk",
         "privacyPolicyURL": "https://empire-ai.co.uk/privacy",
         "termsOfServiceURL": "https://empire-ai.co.uk/terms",
-        "defaultPrompt": [
-          "Review the public metadata for this YouTube video and suggest three original content angles.",
-          "Help me plan an evidence-led YouTube video without inventing metrics."
-        ]
+        "brandColor": "#0A266C",
+        "brandColorDark": "#66B7FF",
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/logo.png"
       }
     }
   }

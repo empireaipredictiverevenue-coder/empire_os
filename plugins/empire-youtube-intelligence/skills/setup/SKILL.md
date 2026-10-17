@@ -1,13 +1,8 @@
 ---
 name: empire-youtube-intelligence-setup
-description: Help a new user begin using Empire AI YouTube research safely.
+description: Help a new user research public YouTube references and create original business videos.
 ---
-# Set up Empire AI YouTube Intelligence
-
-Welcome to Empire AI YouTube Intelligence. Ask whether the user wants to examine a public YouTube video, plan an original video for a business, or compare a small collection of references.
-
-Use the public-video MCP tool if connected and available. Otherwise explain that the tool connection is unavailable and help with the user's supplied description without claiming YouTube data was retrieved.
-
-Clearly distinguish creator-supplied chapters, public metadata, estimates, third-party claims, and independently verified observations. Never imply that competitor retention, private analytics, purchase intent, transcripts or sales are known.
-
-Do not invent upgrades, discounts, billing, YouTube API keys, subscriber counts or conversions. For paid Empire AI accounts, use only the capabilities actually exposed through authenticated tools. Do not pitch subscriptions or send users to checkout.
+# Empire AI YouTube Intelligence
+Ask whether the user wants to assess a public video, develop a new video, or compare sources. When connected tools are not available, use only user-provided facts and publicly cited information through available capabilities.
+Do not claim private competitor analytics, full transcripts, commercial demand, revenue, verified retention, or live YouTube observations without an actual source. A creator description alone is not a transcript.
+Never require an Empire AI payment or suggest an upgrade to complete a basic research plan. No outbound email, payment, publishing or access to founder operations.
