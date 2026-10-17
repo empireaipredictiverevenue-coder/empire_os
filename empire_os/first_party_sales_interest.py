@@ -31,6 +31,28 @@ DOMAIN_RE = re.compile(
     r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$"
 )
 KEY_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_:.-]{7,127}$")
+# Browser-stated first-party entry point only. A URL or UTM query must never
+# become verified SEO attribution, a trusted referrer, or marketing consent.
+# Reuse existing published routes, not a duplicate tracking database.
+REVIEWED_ENTRY_PATHS = frozenset({
+    "/",
+    "/commercial",
+    "/predictive-revenue",
+    "/industries/roofing",
+    "/industries/solar",
+    "/industries/hvac",
+    "/industries/property",
+    "/insights/revenue-opportunity-assessment",
+})
+
+
+def _claimed_entry_path(value: Any) -> str | None:
+    """A bounded *unverified* website path; no URL, query, IDs or PII."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or value not in REVIEWED_ENTRY_PATHS:
+        raise CommercialInterestError("invalid_claimed_entry_page")
+    return value
 
 # Existing founder decision for these *consultancy* offers, not a claim that
 # EmpireDB catalog versions or fulfilment terms are already verified.
@@ -202,6 +224,7 @@ def record_founder_led_interest(
     contact_consent: bool,
     idempotency_key: str,
     website: str = "",
+    claimed_entry_page: str | None = None,
     root: str | Path = "/srv/empire_os",
     request: Request = request_json,
     now: datetime | None = None,
@@ -223,6 +246,7 @@ def record_founder_led_interest(
     sector = _text(industry, "industry", limit=120)
     market = _text(geography, "geography", limit=160)
     outcome = _text(desired_outcome, "desired_outcome", limit=1200)
+    entry_page = _claimed_entry_path(claimed_entry_page)
     key = _text(idempotency_key, "idempotency_key", limit=128)
     if not KEY_RE.fullmatch(key):
         raise CommercialInterestError("invalid_idempotency_key")
@@ -266,6 +290,19 @@ def record_founder_led_interest(
         "actual_revenue": False,
         "execution_authority": "none",
     }
+    # A visitor/browser-submitted path is useful for funnel *review*, but
+    # does not prove a search visit, a payable event, or ongoing consent.
+    # Legacy direct enquiries stay identical: never fabricate a source.
+    if entry_page is not None:
+        evidence["claimed_entry_page_review"] = {
+            "path": entry_page,
+            "source": "UNVERIFIED_BROWSER_SUBMITTED",
+            "organic_search_attributed": False,
+            "search_click_proven": False,
+            "qualified_buyer_proven": False,
+            "marketing_consent_granted": False,
+            "recognized_revenue_proven": False,
+        }
     result = request(
         "POST",
         "/rest/v1/rpc/ingest_prospect_atomic",
