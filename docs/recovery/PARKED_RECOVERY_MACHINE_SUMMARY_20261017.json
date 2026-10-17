@@ -1,0 +1,243 @@
+{
+  "closure_snapshot": {
+    "applied_closure_count": 0,
+    "eligible_exact_closure_count": 0,
+    "generated_at": "2026-10-17T20:56:21.577170+00:00",
+    "pending_row_count_before_apply": 286,
+    "state_counts": {
+      "FOUNDER_GATE": 2,
+      "NEEDS_LIVE_PROOF": 85,
+      "REAL_WORLD_EVIDENCE_REQUIRED": 9,
+      "UNVERIFIED_PENDING": 190
+    }
+  },
+  "generated_at": "2026-10-17T20:59:01.478057+00:00",
+  "git_worktrees": 362,
+  "live_completion": {
+    "canonical_done_count": 598,
+    "canonical_pending_count": 286,
+    "canonical_total_count": 884,
+    "founder_gate_count": 2,
+    "generated_at": "2026-10-17T20:58:58.986299+00:00",
+    "real_world_evidence_required_count": 32,
+    "state_counts": {
+      "BUILDER_PROVIDER_BLOCKED": 2,
+      "FOUNDER_GATE": 2,
+      "FOUNDER_PRICE_POLICY_APPROVED_FORMAL_CLOSURE_PENDING": 1,
+      "PLAN_HANDOFF_ONLY_BUILD_OR_VERIFY_PENDING": 246,
+      "REAL_WORLD_EVIDENCE_REQUIRED": 32,
+      "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE": 3
+    },
+    "verified_done_count": 0
+  },
+  "outbound_authorized": false,
+  "payment_authorized": false,
+  "production_mutation": false,
+  "registry": {
+    "workstream_count": 31,
+    "workstreams": [
+      {
+        "historical_registry_pending_count": 27,
+        "key": "control_plane",
+        "name": "Control Plane / Astra / Execution Plane",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 15,
+        "key": "data_cloud",
+        "name": "Data Cloud / EmpireDB / Data Fabric",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 11,
+        "key": "signal_sensor_mesh",
+        "name": "Signal & Sensor Mesh",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 21,
+        "key": "identity_graph",
+        "name": "Identity / Entity / Contact Graph",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 19,
+        "key": "intelligence_fabric",
+        "name": "Intelligence Fabric",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 16,
+        "key": "predictive_cloud_quant",
+        "name": "Predictive Cloud / Quant / Decision Intelligence",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 17,
+        "key": "opportunity_factory",
+        "name": "Opportunity Radar / Foundry / Factory",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 31,
+        "key": "marketplace_auction",
+        "name": "Marketplace / Opportunity Auction / Bidding",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 26,
+        "key": "revenue_exchange",
+        "name": "Revenue Exchange / Allocation / Capacity",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 18,
+        "key": "commercial_exchange",
+        "name": "Commercial Exchange / Inventory / Pricing",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 10,
+        "key": "product_factory",
+        "name": "Product Factory / Revenue Compiler",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 21,
+        "key": "buyer_acquisition",
+        "name": "Buyer Acquisition / Buyer Intelligence",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 21,
+        "key": "outreach_deliverability",
+        "name": "Outreach / Deliverability",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 34,
+        "key": "conversation_closer",
+        "name": "Conversation OS / AI Closer",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 13,
+        "key": "voice_calls",
+        "name": "Voice / Calls",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 23,
+        "key": "search_intelligence",
+        "name": "Search / SEO / AEO / GEO",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 9,
+        "key": "marketing_media",
+        "name": "Marketing / Campaigns / Media Intelligence",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 27,
+        "key": "vertical_intelligence",
+        "name": "Vertical Intelligence Nodes",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 13,
+        "key": "digital_twin",
+        "name": "Digital Twin / Scenario",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 19,
+        "key": "capital_allocator",
+        "name": "Capital Allocator / Portfolio",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 24,
+        "key": "payments_settlement",
+        "name": "Payments / USDT-BSC / Settlement",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 24,
+        "key": "fulfilment_outcomes",
+        "name": "Fulfilment / Outcomes",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 17,
+        "key": "economic_memory",
+        "name": "Economic Memory / Revenue OS Learning",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 19,
+        "key": "experiment_causal",
+        "name": "Experiment / Causal Engine",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 21,
+        "key": "revenue_crm",
+        "name": "Revenue CRM / Retention / Customer Success",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 31,
+        "key": "saas_network",
+        "name": "SaaS / Multi-tenant / White Label / Affiliate",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 13,
+        "key": "a2a_commerce",
+        "name": "A2A Commerce Network",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 7,
+        "key": "founder_console",
+        "name": "Founder Console / Operational Truth",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 19,
+        "key": "observability_reliability",
+        "name": "Observability / Self-Heal / Reliability",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 14,
+        "key": "model_agent_intelligence",
+        "name": "Model / Agent Intelligence Fabric",
+        "state": "PARTIAL"
+      },
+      {
+        "historical_registry_pending_count": 18,
+        "key": "revenue_truth",
+        "name": "Revenue Truth / First Revenue / Realized GP",
+        "state": "PARTIAL"
+      }
+    ]
+  },
+  "schema": "empire.recovery.master_inventory_summary.v1",
+  "source_refs": {
+    "canonical_checklist": "docs/MASTER_REMAINING_CHECKLIST.md",
+    "live_closure": "runtime/execution_plane/completion_closure_reconciliation_latest.json",
+    "live_reconciliation": "runtime/execution_plane/completion_reconciliation_latest.json",
+    "open_task_csv": "docs/recovery/PARKED_OPEN_CHECKLIST_20261017.csv",
+    "workstream_registry": "runtime/execution_plane/empire_completion_capability_registry.json",
+    "worktree_inventory": "docs/recovery/PARKED_GIT_WORKTREE_INVENTORY_20261017.json"
+  },
+  "source_sha256": {
+    "canonical_checklist": "361e8273e4bd081086126ac4962f77ca4cc87e96c5f9e01f79a744bc1ed3419b",
+    "live_closure": "88ca46d030f3157c77697d5cc369a0109426fa44d38fd42e3c3e35c3b65edaf4",
+    "live_reconciliation": "f9ef47c491d94a784590dc22ad68aba0cbc15b45053a5c0e86dba2958626599a",
+    "registry": "896f25af0e715effff02ea375410b71a1b74fdae77ed73ca3e32b223dc834eb0"
+  },
+  "worktrees_are_not_jobs_to_activate": true
+}

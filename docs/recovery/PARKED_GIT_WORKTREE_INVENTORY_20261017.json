@@ -1,0 +1,2555 @@
+{
+  "base_git_commit": "2f780ca980b5",
+  "counts_by_name_family": {
+    "agents_or_control": 10,
+    "b2b_data_and_scrapers": 6,
+    "commercial_sales": 93,
+    "database_recovery": 33,
+    "finance_payments": 4,
+    "flagship_search": 53,
+    "media_content": 18,
+    "other_unclassified": 145
+  },
+  "generated_at": "2026-10-17T20:59:01.473370+00:00",
+  "name_family_disclaimer": "Loose name-based ownership buckets are not completion/quality classifications. Worktrees may represent old copies, active agents, CI work or historical experiments.",
+  "schema": "empire.recovery.worktree_inventory.v1",
+  "source": "git worktree list --porcelain",
+  "status": "METADATA_INVENTORY_ONLY_NO_CODE_COMPLETION_CLAIM",
+  "total_worktrees": 362,
+  "worktrees": [
+    {
+      "branch": "refs/heads/agent/data-cloud-wave4",
+      "commit": "2f780ca980b5",
+      "name_family": "other_unclassified",
+      "path": "/srv/empire_os",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "e29497fe1ab3",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/.codex/worktrees/410f/empire_os",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "fd93273c86ee",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/.codex/worktrees/6ed7/empire_os",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "d212b6237dcc",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/.codex/worktrees/e318/empire_os",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/astra-phase4",
+      "commit": "4f2c1e775892",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/astra",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/astra-canonical-identity-bridge-021e",
+      "commit": "0e7b9d0aab92",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_agents/astra_canonical_identity_bridge_021e",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/astra-okf-auto-retrieval-021d",
+      "commit": "364fd4edbe05",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/astra_okf_auto_retrieval_021d",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/astra-okf-research-021c",
+      "commit": "aa933a5c3584",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/astra_okf_research_021c",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-claim-provenance-v1",
+      "commit": "93023b70cb22",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-claim-provenance-v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-email-relationship-registry-20261009",
+      "commit": "e1bb897c634e",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-email-relationship-registry-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-evidence-park-20261013",
+      "commit": "17c9b3d6ad24",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-evidence-park-20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-network-domain-hygiene-20261009",
+      "commit": "65ec956bcc13",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-network-domain-hygiene-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-network-fair-evidence-20261009",
+      "commit": "1cb3235491a4",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-network-fair-evidence-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-network-known-source-20261009",
+      "commit": "e7a5c9e41510",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-network-known-source-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-network-single-writer-20261009",
+      "commit": "c6b9f172db9f",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-network-single-writer-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-qualification-scout-refresh-20261009",
+      "commit": "4fff99934773",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-qualification-scout-refresh-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-recovery-release-20261013",
+      "commit": "84d5022527eb",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-recovery-release-20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-registry-independent-refresh-20261009",
+      "commit": "c266acdb1069",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-registry-independent-refresh-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-scout-research-hook-20261009",
+      "commit": "0a0937c0e3bd",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-scout-research-hook-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-source-benchmark-20261010",
+      "commit": "e90bdba3fb07",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer-source-benchmark-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-evidence-quality-020e",
+      "commit": "90c06d985e28",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer_evidence_quality_020e",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-flow-recovery-021g",
+      "commit": "23c1a6f8806d",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer_flow_recovery_021g",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/buyer-weak-search-supply-021h",
+      "commit": "1e7574843169",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/buyer_weak_search_supply_021h",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/checkout-replay-receipt-20261013",
+      "commit": "4cff40c869a1",
+      "name_family": "finance_payments",
+      "path": "/home/ubuntu/empire_agents/checkout_replay_receipt_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/checkout-retry-safety-20261013",
+      "commit": "e211970c6e8a",
+      "name_family": "finance_payments",
+      "path": "/home/ubuntu/empire_agents/checkout_retry_safety_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/closer-outreach",
+      "commit": "9f066fd90499",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/closer-outreach",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/closer-outreach-v2",
+      "commit": "b55893ec8cc7",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/closer-outreach-v2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/closer-runtime-v3",
+      "commit": "c78bc9ee5517",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/closer-runtime-v3",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/commercial-social-intent-bridge-20261009",
+      "commit": "49faf6c1b3cb",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/commercial-social-intent-bridge-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/commercial-evidence-recovery-020f",
+      "commit": "c23d8fb9b5ed",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_agents/commercial_evidence_recovery_020f",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/community-linkedin-circuit-20261009",
+      "commit": "4b2d06ae6b93",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/community-linkedin-circuit-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/completion-competitor-sweeps-proof-20261010",
+      "commit": "1f296d0711fe",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/completion_competitor_sweeps_proof_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/completion-exact-live-proof-023",
+      "commit": "0cdf1a470203",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/completion_exact_live_proof_023",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/completion-verify-recovery-024",
+      "commit": "095c834e64e1",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_agents/completion_verify_recovery_024",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-cloud-analytics-v2",
+      "commit": "b940155fc2af",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/cloud-analytics",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-department-scorecards-v2",
+      "commit": "f79e7e3672e3",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/department-scorecards",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-intelligence-profiles-v2",
+      "commit": "b940155fc2af",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/intelligence-profiles",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-quant-extensions-v2",
+      "commit": "b940155fc2af",
+      "name_family": "finance_payments",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/quant-extensions",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-radar-inputs-v2",
+      "commit": "b940155fc2af",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/radar-inputs",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-subsystem-convergence-v2",
+      "commit": "b940155fc2af",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave2/subsystem-convergence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-permit-product-v1",
+      "commit": "1d95f8f4b586",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/permit-product",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-private-capital-product-v1",
+      "commit": "db9922682fd8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/private-capital-product",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-property-product-v1",
+      "commit": "80e0a2ee31bd",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/property-product",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-search-product-v1",
+      "commit": "b940155fc2af",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/search-product",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-storm-product-v1",
+      "commit": "2ad4a27e284c",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/storm-product",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/checklist-tam-market-v1",
+      "commit": "b940155fc2af",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/completion_wave3/tam-market",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-dedicated-login-authority-20261010",
+      "commit": "32b216dc3820",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_dedicated_login_authority_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-first-party-pilot-http-20261010",
+      "commit": "4039bd2265b9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_first_party_pilot_http_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-one-active-membership-20261010",
+      "commit": "003583f4b265",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_active_member_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-domain-challenge-20261010",
+      "commit": "0674eafe7cf2",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_domain_challenge_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-evidence-review-20261010",
+      "commit": "ecf63c9141f0",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_agents/crm_founder_identity_evidence_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-loopback-activation-20261011",
+      "commit": "a19396ea0aed",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_loopback_activation_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-pending-role-evidence-fix-20261010",
+      "commit": "495960a6bb29",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_membership_fix_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-single-pending-membership-20261010",
+      "commit": "b78fb2c05e91",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_membership_owner_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-pending-readback-20261010",
+      "commit": "f41981ed0c7d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_pending_readback_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-prospect-8s-readonly-20261011",
+      "commit": "380c9866871e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_prospect_timeout_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-founder-single-invitation-20261011",
+      "commit": "f2d68b59d646",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_founder_single_invitation_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-hba-scram-three-role-20261010",
+      "commit": "ba3b76409281",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_hba_scram_three_role_20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-postcommit-passfile-recovery-20261011",
+      "commit": "727989734272",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_agents/crm_postcommit_passfile_recovery_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/crm-session-truth-diagnostic-20261011",
+      "commit": "b5e499c81d92",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/crm_session_truth_diagnostic_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/curated-publisher-slot-20261010",
+      "commit": "88f0de156b33",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/curated-publisher-slot-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/empire-coder",
+      "commit": "33fdc0cb77f2",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/empire-coder",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/empire-coder-api",
+      "commit": "8d46f05e6ae2",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/empire-coder-api",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/empire-coder-benchmark",
+      "commit": "c3a5f8592589",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/empire-coder-benchmark",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/empire-coder-selfbuild",
+      "commit": "2517b78f15f6",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/empire-coder-selfbuild",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/empire-coder-structured",
+      "commit": "cab4f3d1b5bf",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_agents/empire-coder-structured",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/commercial-source-attribution-20261012",
+      "commit": "3490edd531fe",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/empire_commercial_source_attribution_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/pr-consultancy-review-20261011",
+      "commit": "0ee837002d9d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/empire_pr_consultancy_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/organic-revenue-canonical-stable-20261012",
+      "commit": "ff2451bd5296",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/empire_revenue_canonical_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/evidence-enrichment-planner",
+      "commit": "089e88b2287e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/evidence-enrichment-planner",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/first-party-evidence-sitemap",
+      "commit": "2fad16ce3362",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/first-party-evidence-sitemap",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/industry-conversion-20261013",
+      "commit": "afb2be0fe9f9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/industry_conversion_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/infra-qa",
+      "commit": "4a2a518e2db4",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/infra-qa",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/intelligence-materializer",
+      "commit": "75ed66252385",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/intelligence-materializer",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/intent-first-party-evidence-20261009",
+      "commit": "d3a6a4c698da",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/intent-first-party-evidence-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/intent-observation-learning-20261009",
+      "commit": "3a617fcb76f0",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/intent-observation-learning-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/intent-to-company-review-tasks-20261009",
+      "commit": "8f0f98922732",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/intent-to-company-review-tasks-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-knowledge-vault-v2-20261013",
+      "commit": "53792c905eb2",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/knowledge_vault_v1_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/known-buyer-buying-signals-20261010",
+      "commit": "846c54576237",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/known-buyer-buying-signals-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/lead-intelligence",
+      "commit": "adaa7dc5afee",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/lead-intelligence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/lead-parity",
+      "commit": "d1221beb3d02",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/lead-parity",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/lead-smart-routing-20261009",
+      "commit": "d711148e93da",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/lead-smart-routing-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-buyer-confirmation-20261009",
+      "commit": "44cb9b433de3",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-buyer-confirmation-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-call-evidence-permissions-20261009",
+      "commit": "95232f767881",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-call-evidence-permissions-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-effective-zip-gate-20261009",
+      "commit": "8a05ac4a5475",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-effective-zip-gate-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-live-zip-endpoint-20261009",
+      "commit": "9ef8f2ff35c1",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-live-zip-endpoint-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-operating-hours-gate-20261009",
+      "commit": "fd38fe4910e6",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-operating-hours-gate-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-public-cta-gates-20261009",
+      "commit": "484300658518",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-public-cta-gates-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-roofing-zip-preview-20261009",
+      "commit": "5044020ff4f0",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-roofing-zip-preview-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/leadsmart-support-evidence-20261009",
+      "commit": "4e8f7d371af6",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/leadsmart-support-evidence-20261009",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/okf-knowledge-adapter-021",
+      "commit": "6fd37dc63acc",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/okf_knowledge_adapter_021",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/okf-skillforge-readonly-021b",
+      "commit": "dd50c1407450",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/okf_skillforge_readonly_021b",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/outbound-owned-mailbox-content-safety-20261011",
+      "commit": "63a3c5e2a122",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/outbound_owned_mailbox_content_safety_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/outbound-strategy-health-gate-20261011",
+      "commit": "213dbc773712",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/outbound_strategy_sender_health_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/parallel-buyer-pilot-readiness-20261010",
+      "commit": "2dea36844799",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/parallel-buyer-pilot-readiness-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/partner-contract-lane-reconciliation-20261010",
+      "commit": "22d16db4cad6",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/partner-contract-lane-reconciliation-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/partner-evidence-admission-20261010",
+      "commit": "9e926cf15c02",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/partner-evidence-admission-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/partner-isolated-review-packets-20261010",
+      "commit": "65e9bb4df67e",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/partner-isolated-review-packets-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/partner-private-landing-previews-20261010",
+      "commit": "6c67515ece43",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/partner-private-landing-previews-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/platform-saas",
+      "commit": "60ef14fe80dd",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/platform-saas",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/publisher-search-yield-truth-20261010",
+      "commit": "3722d3e3412f",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/publisher-search-yield-truth-20261010",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/qualification-v2-evidence",
+      "commit": "6b0cec9ad30c",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/qualification-v2-evidence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/referral-identity-lanes-20261013",
+      "commit": "bded8f5798f2",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_agents/referral_identity_lanes_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/reply-lifecycle-join-fix-022",
+      "commit": "8cd7c44ab163",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/reply_lifecycle_join_fix_022",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/revenue-payments",
+      "commit": "abc1b68d8d6d",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/revenue-payments",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/revenue-flow-meter-021f",
+      "commit": "8e585ac62b7a",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_agents/revenue_flow_meter_021f",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/search-intelligence",
+      "commit": "1e92240889fd",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/search-intelligence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/search-intelligence-v2",
+      "commit": "bc0399e56894",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/search-intelligence-v2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/search-health-truth-20261013",
+      "commit": "5790481954e9",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/search_health_truth_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/seo-measurement-evidence-guard-20261011",
+      "commit": "e6dab8fd1f66",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_agents/seo_measurement_evidence_guard_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/signal-ingress",
+      "commit": "1bdf966d5812",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/signal-ingress",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/supabase-lockdown-2",
+      "commit": "d10af45d70dc",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/supabase-lockdown-2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/supabase-security-audit",
+      "commit": "1ccfe026c241",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/supabase-security-audit",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/v2-first-party-evidence",
+      "commit": "75f7cbdff02e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_agents/v2-first-party-evidence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/founder-console-v2",
+      "commit": "5675b84a206d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_os_founder_console_v2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/integration/intent-brain-v1",
+      "commit": "c61f63158f0e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_os_intent_brain",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/v10-integration-e3368d17",
+      "commit": "a8d22d231766",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_os_v10_clean_e3368d17",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/agent/v10-prodshadow-a8d22d23",
+      "commit": "5675b84a206d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_os_v10_prodshadow_a8d22d23",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/aceleads-commercial-solar-offline-preview-20261016",
+      "commit": "b1e5e624fae8",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/aceleads_solar_offline_preview_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/skillforge-b2b-sales-20261012",
+      "commit": "279c4e1fbbd7",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/b2b_sales_skillforge_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/b2b-scout-contractor-carrier-mass-tort-fairness-20261017",
+      "commit": "cc6ed4edc6f2",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/b2b_scout_vertical_fairness_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-gmail-priority-20261014",
+      "commit": "bef5ff092d55",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_gmail_priority_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-brand-refinement-20261015",
+      "commit": "43559593f0b9",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_brand_refinement_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-canonical-brand-20261016",
+      "commit": "8111f9cdda07",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_canonical_brand_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-cinematic-mountain-20261015",
+      "commit": "1db2b782893f",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_cinematic_mountain_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-first-party-conversion-20261016",
+      "commit": "fbe5c2445aa4",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_first_party_conversion_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-flagship-merge-20261015",
+      "commit": "936cb3143f91",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_flagship_release_candidate_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-founder-selected-20261015",
+      "commit": "c55b9e843b31",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_founder_selected_integrated_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-high-contrast-benchmark-20261016",
+      "commit": "90b9ef639722",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_high_contrast_competitor_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-private-revenue-truth-20261016",
+      "commit": "631fa2235991",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_private_proof_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-reference-parity-20261016",
+      "commit": "1db2b782893f",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_reference_exact_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/buyer-readiness-reference-faithful-20261016",
+      "commit": "7256eed07062",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/buyer_readiness_reference_faithful_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/cloudflare-http-apex-only-20261016",
+      "commit": "c7f8ed34c16d",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/cloudflare_http_apex_only_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-canonical-integration-20261014",
+      "commit": "9935fa58901c",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_canonical_integration_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-ci-libpq-pgpass-rootcause-20261015",
+      "commit": "249f161dc845",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_ci_libpq_pgpass_fix_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-ci-recovery-v39-20261015",
+      "commit": "c2db04dd716e",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/company_ci_recovery_v39_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-ci-v40-direct-catalogue-readonly-20261015",
+      "commit": "9a073ddbc868",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_ci_v40_direct_catalogue_readonly_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-custody-rotation-v29-20261015",
+      "commit": "eb83e597f1c1",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_custody_rotation_v29_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-import-closure-v23-20261015",
+      "commit": "28b6b4b8e0c4",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_import_closure_v23_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-intelligence-20261014",
+      "commit": "83cfe2f0c908",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_intelligence_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-mandate-custody-v27-20261015",
+      "commit": "396b3b8010aa",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_mandate_custody_v27_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-migration-053-release-prep-v41-20261015",
+      "commit": "5ad14911bf2d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_migration_053_release_prep_v41_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-canary-20261015",
+      "commit": "5a213af9e902",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_canary_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-current-head-reconcile-20261015",
+      "commit": "29258b6037ba",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_current_head_reconcile_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-latest-release-20261015",
+      "commit": "8a36ffdf3eeb",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_latest_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-live-owner-snapshot-v40-20261015",
+      "commit": "7c012188b8bd",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_live_owner_snapshot_v40_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-operator-release-20261015",
+      "commit": "d05387c1aba8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_operator_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-release-triage-20261015",
+      "commit": "525764e2f675",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_release_triage_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v32-audit-bridge-20261015",
+      "commit": "08c04d944513",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v32_audit_bridge_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v33-operator-preflight-20261015",
+      "commit": "2b43a57f5faa",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v33_operator_preflight_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v34-hba-readonly-20261015",
+      "commit": "8122f32ae107",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v34_hba_readonly_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v35-exact-auditor-hba-plan-20261015",
+      "commit": "2c021f0f1b31",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v35_auditor_hba_plan_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v36-auditor-hba-installer-20261015",
+      "commit": "a4442837c7c1",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v36_hba_installer_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v36-live-acceptance-20261015",
+      "commit": "e34ec50d64b9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v36_live_acceptance_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v37-first-party-auditor-credential-20261015",
+      "commit": "95b225b37a5b",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v37_auditor_credential_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v37-auditor-credential-custody-20261015",
+      "commit": "29e90af08f1e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v37_credential_custody_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v38-credential-diagnostics-20261015",
+      "commit": "2c309081a04d",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v38_credential_diagnostics_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-observe-v5-evidence-bridge-20261015",
+      "commit": "b85288516607",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_observe_v5_evidence_bridge_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-pg-rehearsal-v28-20261015",
+      "commit": "66e1ebe4784f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_pg_rehearsal_v28_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-prod-readiness-v30-20261015",
+      "commit": "7d823e8e480f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_prod_readiness_v30_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-production-release-20261015",
+      "commit": "7cddc42f5d1c",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_production_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-relationship-memory-v25-20261015",
+      "commit": "4bb2e2f38a57",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_relationship_memory_v25_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-release-integrated-v22-20261015",
+      "commit": "17f0a83f8f17",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_release_integrated_v22_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-release-overlay-v21-20261014",
+      "commit": "29e74e9e46b6",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_release_overlay_v21_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-prod-rebased-v24-20261015",
+      "commit": "eb43df947c4a",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_release_prod_rebased_v24_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/company-verified-mandates-v26-20261015",
+      "commit": "73cc16b9adcd",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/company_verified_mandates_v26_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/completion-reconciliation-20261014",
+      "commit": "b4d9818b8000",
+      "name_family": "agents_or_control",
+      "path": "/home/ubuntu/empire_worktrees/completion_reconciliation_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/construction-decision-brief-20261015",
+      "commit": "e679e12084c1",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/construction_decision_brief_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-cloud-psql-observer-20261015",
+      "commit": "1f506e6cfa70",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/data_cloud_psql_observer_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "13ec2be61492",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_071_producer_YTQYFYW4",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/conversation-evidence-founder-health-20261015",
+      "commit": "37e558f62a52",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_conversation_evidence_health_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/conversation-quarantine-reason-diagnostics-20261015",
+      "commit": "e8eb71e4487f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_conversation_reasons_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-cross-department-hooks-20261017",
+      "commit": "c47585e4b893",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_cross_department_hooks_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-data-exchange-20261014",
+      "commit": "200d2c0e7a6e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/release/data-exchange-v15-20261015",
+      "commit": "85bc939525e3",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_release_v15_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-canonical-scientific-review-20261015",
+      "commit": "3a2ff38630e1",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_science_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v16-temporal-20261015",
+      "commit": "850635733e9b",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v16_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v16-production-inspector-20261015",
+      "commit": "5e5cdf59ce11",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v16_inspector_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v18-rights-docket-20261015",
+      "commit": "105dad779b8f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v18_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v18-attribution-preview-20261015",
+      "commit": "bba904aeaa1b",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v18_attribution_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v19-release-controls-20261015",
+      "commit": "369d6b01cd95",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v19_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/data-exchange-v20-source-minimisation-20261015",
+      "commit": "655bbb937d52",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_data_exchange_v20_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/finalizer-canonical-proof-boundaries-20261015",
+      "commit": "7c6729fdd929",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_finalizer_truth_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-gtm-intelligence-20261014",
+      "commit": "7f595d6b238f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_gtm_intelligence_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/fix/campaign-promotion-ordering-20261015",
+      "commit": "f8bdc6595e31",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_heartbeat_ordering_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-sovereign-integrated-health-20261015",
+      "commit": "c4eab23ce30f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/empire_integrated_health_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/reply-mailbox-observer-health-20261015",
+      "commit": "333737614898",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/empire_reply_mailbox_health_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-aeo-dfw-buyer-link-20261016",
+      "commit": "b006f4d7985b",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/empire_seo_aeo_dfw_link_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-integrate-service-recovery-20261015",
+      "commit": "2b05d6b3bdc5",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empire_service_recovery_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-youtube-intelligence-p0-20261017",
+      "commit": "d33d949f89ba",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/empire_youtube_intelligence_v03_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empire-youtube-plugin-branded-integration-20261017",
+      "commit": "b323e565d1a0",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/empire_youtube_plugin_branded_integration_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-bucket-policy-audit-v60-20261016",
+      "commit": "cf93168a8f15",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_bucket_policy_audit_v60_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-bucket-prompt-v51-20261015",
+      "commit": "5f884ca35b91",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_bucket_prompt_v51_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-capacity-gate-v56-20261016",
+      "commit": "b995d011351c",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_capacity_gate_v56_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-caps-evidence-v62-20261016",
+      "commit": "c8af833865eb",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_caps_evidence_v62_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-cost-guard-readonly-v59-20261016",
+      "commit": "8d3e5f62da4e",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_cost_guard_readonly_v59_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-empty-inventory-evidence-v65-20261016",
+      "commit": "7fafec7256fd",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_empty_inventory_v65_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-key-readonly-v50-20261015",
+      "commit": "24a4f6155988",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_key_readonly_v50_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-keyid-preflight-v54-20261015",
+      "commit": "2255d9751f51",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_keyid_preflight_v54_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-native-auth-v52-20261015",
+      "commit": "a1baf57b8ce0",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_native_auth_v52_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-no-payment-gate-v63-20261016",
+      "commit": "9f7d74f3d479",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_no_payment_gate_v63_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-policy-evidence-v61-20261016",
+      "commit": "f73043b10afe",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_policy_evidence_v61_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-recovery-gap-v57-20261016",
+      "commit": "d571626f02df",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_recovery_gap_v57_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-restore-preflight-v66-20261016",
+      "commit": "5e976a64e26a",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_restore_preflight_v66_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-s3-list-v55-20261016",
+      "commit": "f36a7c5e99d9",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_s3_list_v55_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-secret-format-v53-20261015",
+      "commit": "e63c17c777e5",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_secret_format_v53_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-b2-version-inventory-v64-20261016",
+      "commit": "0c44c5c88791",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_b2_version_inventory_v64_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-backblaze-b2-candidate-v49-20261015",
+      "commit": "00bff71101d9",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_backblaze_b2_candidate_v49_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-founder-backup-automation-20261015",
+      "commit": "646b46aded5d",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_founder_backup_automation_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-founder-recovery-evidence-v43-20261015",
+      "commit": "692858c87fee",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_founder_recovery_evidence_v43_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-online-backup-rehearsal-v42-20261015",
+      "commit": "2e6102a990a7",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_online_backup_rehearsal_v42_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-pgbackrest-active-repository-audit-v58-20261016",
+      "commit": "f30ec7252121",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_pgbackrest_active_repo_audit_v58_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-pgbackrest-pitr-disposable-v47-20261015",
+      "commit": "ee73a974b3d0",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_pgbackrest_pitr_disposable_v47_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-pitr-offnode-readiness-v48-20261015",
+      "commit": "e0924a2bbc34",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_pitr_offnode_readiness_v48_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-wal-archive-command-audit-v45-20261015",
+      "commit": "6d4694de79e3",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_wal_archive_command_audit_v45_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-wal-archive-disambiguation-v46-20261015",
+      "commit": "31e02615a6a9",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_wal_archive_disambiguation_v46_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/empiredb-wal-pitr-readiness-v44-20261015",
+      "commit": "c8388843e077",
+      "name_family": "database_recovery",
+      "path": "/home/ubuntu/empire_worktrees/empiredb_wal_pitr_readiness_v44_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/enterprise-intake-consent-20261013",
+      "commit": "4930d6716acf",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/enterprise_intake_consent_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/executive-buyer-capacity-gate-20261015",
+      "commit": "9d32c85846cb",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/executive_buyer_capacity_gate_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/executive-commercial-roles-20261015",
+      "commit": "27d17521e608",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/executive_commercial_roles_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/executive-compat-20261015",
+      "commit": "76ff149f7e05",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/executive_compat_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/executive-core-release-20261015",
+      "commit": "29a3be1848df",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/executive_core_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-approved-sectors-source-20261016",
+      "commit": "66ea756f6581",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_approved_sectors_source_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/flagship-astra-orbital-integration-20261017",
+      "commit": "81600461eec0",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_astra_merge_rehearsal_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-buyer-readiness-isolated-integrate-20261016",
+      "commit": "a053bf0d5bed",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/flagship_buyer_readiness_integration_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/flagship-first-revenue-20261016",
+      "commit": "4e6ed3a437ad",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/flagship_first_revenue_review_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-orbital-hero-20261017",
+      "commit": "e7e63b85d1f3",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_orbital_hero_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-sector-integration-review-20261016",
+      "commit": "53c294120d8d",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_sector_integrate_review_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-seo-link-reconcile-20261016",
+      "commit": "1172897a195a",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_seo_link_reconcile_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/flagship-website-completion-20261012",
+      "commit": "11f809f33806",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/flagship_website_completion_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/sovereign-founder-mailbox-readonly-20261015",
+      "commit": "0d0b8a1977dd",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/founder_mailbox_readonly_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/founder-operational-truth-v1",
+      "commit": "99499e5657c8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/founder_operational_truth_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/founder-postal-identity-20261014",
+      "commit": "ec094d03841d",
+      "name_family": "b2b_data_and_scrapers",
+      "path": "/home/ubuntu/empire_worktrees/founder_postal_identity_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/getlead-blitz-local-business-graph-v1",
+      "commit": "089547f0063a",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/getlead_blitz_local_business_v2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/getlead-blitz-owned-source-tool-integration-v1",
+      "commit": "e1707e67054d",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/getlead_blitz_owned_sources_v2",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/getlead-blitz-phase2-convergence-v1",
+      "commit": "7f2ecdb21242",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/getlead_blitz_phase2_convergence",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/getlead-blitz-lead-reader-provisioning-v1",
+      "commit": "9f7dfc3f52c0",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/getlead_blitz_phase3_ingestion",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/getlead-blitz-waterfall-convergence-v2",
+      "commit": "e18d5d88cd49",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/getlead_blitz_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/global-commercial-intelligence-20261015",
+      "commit": "564091650548",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/global_commercial_intelligence_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/growth001-current-flagship-integration-20261016",
+      "commit": "4e6ed3a437ad",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/growth001_current_flagship_integration_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/growth001-flagship-offline-preview-20261016",
+      "commit": "673ddb1cdb95",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/growth001_flagship_offline_preview_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/growth001-publication-qa-20261016",
+      "commit": "4a4c2463498c",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/growth001_publication_qa_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/gsc-url-inspection-readonly-20261016",
+      "commit": "05d88e47de91",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/gsc_url_inspection_readonly_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/jev-gtm-v2-20261014",
+      "commit": "5c1f7d91c02c",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/jev_gtm_v2_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-buyer-admin-proof-20261013",
+      "commit": "9bf57ec73d91",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_admin_proof_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-admin-receipt-wiring-20261017",
+      "commit": "7e06c26482c6",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_admin_receipt_wiring_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-approved-export-reconcile-20261016",
+      "commit": "e51fb3b5ca1e",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_approved_export_reconcile_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-disable-only-operator-20261013",
+      "commit": "6672497b9b0a",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_disable_only_operator_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-founder-compliance-review-20261017",
+      "commit": "873c41bffd42",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_founder_compliance_review_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-legal-offline-export-20261013",
+      "commit": "859c09b98f2d",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_legal_offline_export_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-legal-regression-realign-20261016",
+      "commit": "f5792e03c2d1",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_legal_regression_realign_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-legal-test-distinction-20261017",
+      "commit": "c6a4170067bf",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_legal_test_distinction_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-monday-pilot-preflight-20261017",
+      "commit": "5fecfbfc2cb3",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_monday_pilot_preflight_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/lead-smart-nonlive-release-pack-20261013",
+      "commit": "cd166fc13eec",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_nonlive_release_pack_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/lead-smart-ops-watch-20261017",
+      "commit": "c6a4170067bf",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/lead_smart_ops_watch_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/leadsdowork-uk-pilot-20261014",
+      "commit": "d1bdfdf40e5a",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/leadsdowork_uk_pilot_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/leadsmart-recording-notice-20261014",
+      "commit": "1e4d0bd20aeb",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/leadsmart_recording_notice_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/linkedin-founder-content-20261012",
+      "commit": "c3d78dc573e9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/linkedin_founder_content_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/mailbox-observer-loopback-20261015",
+      "commit": "a9946702fac9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/mailbox_observer_loopback_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/master-closure-ledger-v1",
+      "commit": "ca2b691d4147",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/master_closure_ledger_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-brand-identity-evolution-20261015",
+      "commit": "6aeb623d8762",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_brand_identity_evolution_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-case-study-evidence-20261015",
+      "commit": "23a63ab4a648",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_case_study_evidence_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-cinematic-ad-20261012",
+      "commit": "8b9f70244e01",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_cinematic_ads_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-empire-subscribe-20261015",
+      "commit": "0bbe278e51d1",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_cta_renderer_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-evolution-fullfilm-v13-20261015",
+      "commit": "99dae5c95679",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_evolution_fullfilm_v13_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-first-real-world-pilot-readiness-20261015",
+      "commit": "a0a1b9da9e3d",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_first_real_world_pilot_readiness_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-higgsfield-director-20261013",
+      "commit": "3bdb5908c9d2",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_higgsfield_director_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-hyperframes-avatar-v17-20261015",
+      "commit": "7ab245216acc",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_hyperframes_avatar_v17_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-live-capture-20261015",
+      "commit": "d52debf03bc7",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_live_capture_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-predictive-demo-ui-readability-20261015",
+      "commit": "543dd6817022",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_predictive_ui_readability_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-real-world-human-impact-20261015",
+      "commit": "dfba175b8a3f",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/media_real_world_human_impact_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/media-website-final-shots-20261015",
+      "commit": "93c0fc9edcea",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/media_website_handoff_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/multimarket-buyer-discovery-20261015",
+      "commit": "fdf6aa2efe3a",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/multimarket_buyer_discovery_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/myjobquote-uk-roofing-offline-20261013",
+      "commit": "f21ccc1709f4",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/myjobquote_uk_roofing_offline_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/named-owner-search-backup-20261014",
+      "commit": "0b0a2529f7a9",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/named_owner_search_backup_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/openseo-gsc-keyword-bridge-20261016",
+      "commit": "1eb6a2a12242",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/openseo_gsc_keyword_bridge_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/opportunity-source-custody-20261015",
+      "commit": "138608da7bc2",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/opportunity_source_custody_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-admin-boundaries-20261015",
+      "commit": "05acd656bc8f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_admin_boundaries_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-admin-boundaries-v2-20261015",
+      "commit": "33de115754a9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_admin_boundaries_v2_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-helper-v3-nested-diagnostic-20261015",
+      "commit": "da826d47cdf8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_helper_v3_nested_diag_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-role-054-post-commit-acceptance-20261015",
+      "commit": "15421f2e2eb0",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_role_054_acceptance_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-role-054-acl-full-scope-20261015",
+      "commit": "b8d1963969f3",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_role_054_acl_full_scope_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-role-054-public-acl-impact-20261015",
+      "commit": "cd3bfc440871",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_role_054_acl_impact_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-role-054-preserve-usage-repair-20261015",
+      "commit": "a2e268c1bd52",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_role_054_acl_repair_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-role-054-bounded-diagnostic-20261015",
+      "commit": "2375ec1f5ea8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_role_054_diagnostic_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-root-helper-v3-role054-20261015",
+      "commit": "889e7f840648",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_root_helper_v3_role054_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-root-helper-v4-readiness-20261015",
+      "commit": "e4fc686cb095",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_root_helper_v4_readiness_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-root-helper-v5-disconnect-safety-20261015",
+      "commit": "323d18bf0ef8",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_root_helper_v5_disconnect_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/ops-helper-v5-live-acceptance-20261015",
+      "commit": "b85288516607",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/ops_root_helper_v5_live_acceptance_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/organic-revenue-owner-handoff-20261016",
+      "commit": "c52ab7829940",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/organic_revenue_owner_handoff_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/organic-search-legacy-recovery-v1",
+      "commit": "5df36645aa91",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/organic_search_legacy_recovery_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/owned-gmail-governor-adapter-20261013",
+      "commit": "65c442ea5c94",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/owned_gmail_governor_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/postfix-isolated-rcpt-ci-20261014",
+      "commit": "6fbb163d8c84",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/postfix_isolated_ci_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/postfix-receiver-integration-20261014",
+      "commit": "6a70e2e0fb6f",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/postfix_receiver_integration_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/predictive-conversion-v2-20261013",
+      "commit": "5a9fe0af82f6",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/predictive_conversion_v2_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/predictive-consent-release-20261013",
+      "commit": "06d3a0a5ed53",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/predictive_revenue_consent_release_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/private-quant-skillforge-20261011",
+      "commit": "6b6d60dc2108",
+      "name_family": "finance_payments",
+      "path": "/home/ubuntu/empire_worktrees/private_quant_skillforge_20261011",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/snapshot/production-uncommitted-2026-10-01",
+      "commit": "70cf2013293e",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/production_snapshot_20261001",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/public-canonical-www-review-20261016",
+      "commit": "4fcd38996879",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/public_canonical_www_review_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/public-head-compat-review-20261016",
+      "commit": "34b2bbeac377",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/public_head_compat_review_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/reg-vertical-revenue-20261016",
+      "commit": "e2d773a9a4cb",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/regulated_vertical_revenue_audit_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/research-privacy-link-release-prep-20261015",
+      "commit": "a282c7c1ac00",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/research_privacy_link_release_prep_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/revenue-activation-pack-v1",
+      "commit": "e4a95dbce50e",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/revenue_activation_pack_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/revenue-first-commercial-source-evidence-20261017",
+      "commit": "66b7e28ab618",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/revenue_first_commercial_source_evidence_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/revenue-first-seo-gmail-recovery-20261017",
+      "commit": "e5dd8cb0da06",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/revenue_first_seo_and_gmail_recovery_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/rights-sink-prod-release-20261015",
+      "commit": "281859d7d4c9",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/rights_sink_prod_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/roofing-buyer-reply-closeout-20261016",
+      "commit": "83a3dda35e65",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/roofing_buyer_reply_closeout_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/release/roofing-recording-notice-20261016",
+      "commit": "14c6ff4271d1",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/roofing_recording_notice_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/search-answer-agent-discovery-observer-20261016",
+      "commit": "d268f0e91911",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/search_answer_agent_discovery_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/search-growth-department-research-20261016",
+      "commit": "9c3e0f23b2f3",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/search_growth_department_research_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/search-market-integrity-20261015",
+      "commit": "4629407b3dc5",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/search_market_integrity_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/search-serp-observation-truth-20261016",
+      "commit": "40025670f66c",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/search_serp_observation_truth_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/candidate/sell-now-convergence-v1",
+      "commit": "5fcddf009143",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/sell_now_convergence_v1",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-acquisition-hint-contract-20261016",
+      "commit": "174edb3a7376",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_acquisition_hint_contract_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-aeo-sitemap-canonical-alignment-20261016",
+      "commit": "253bbf6f451c",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_aeo_sitemap_canonical_alignment_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-existing-b2b-copy-integration-20261015",
+      "commit": "0a051373e8b0",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_b2b_copy_integration_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-buyer-intent-metadata-20261015",
+      "commit": "a8d88d4acc90",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/seo_buyer_metadata_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-buyer-pillar-copy-20261015",
+      "commit": "d87915b2dd22",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/seo_buyer_pillar_copy_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-canonical-host-review-20261015",
+      "commit": "f6981a8b504f",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_canonical_host_review_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-canonical-research-scope-20261016",
+      "commit": "f6981a8b504f",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_canonical_research_scope_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-commoncrawl-mass-wat-20261016",
+      "commit": "99f912cfbd63",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_commoncrawl_mass_wat_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-contextual-research-links-20261016",
+      "commit": "16c38a62a38a",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_contextual_research_links_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-director-microdirectories-20261014",
+      "commit": "ea3c38cdbfdd",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_director_microdirectories_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-director-postrelease-measurement-20261015",
+      "commit": "4c632503fa06",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_director_postrelease_measurement_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-earned-editorial-evidence-20261016",
+      "commit": "d38bade70c03",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_earned_editorial_evidence_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-editorial-link-network-20261016",
+      "commit": "ed9590c5c348",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_editorial_link_network_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-flagship-asset-completeness-20261016",
+      "commit": "7a59f2fe415e",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_flagship_asset_completeness_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-first-party-form-privacy-links-20261015",
+      "commit": "3c311d7187cf",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_form_privacy_links_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/release/seo-four-page-live-20261015",
+      "commit": "521454819b32",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_four_page_live_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-homepage-release-preflight-20261016",
+      "commit": "197412a271c5",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_homepage_release_preflight_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-indexability-legal-truth-20261015",
+      "commit": "ce244dcdff8a",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_legal_indexability_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-link-receipt-scorecard-20261016",
+      "commit": "bca83e43c88c",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_link_receipt_scorecard_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-link-verification-20261016",
+      "commit": "0957fcaa10d9",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_link_verification_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-organic-enquiry-source-20261016",
+      "commit": "fb6eafcb815d",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_organic_enquiry_source_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-ppc-original-content-20261015",
+      "commit": "9f620fb15e79",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_ppc_editorial_release_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-ppc-revenue-readiness-20261015",
+      "commit": "c5cf306cdf8c",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/seo_ppc_revenue_bridge_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-research-intake-aggregate-observer-20261015",
+      "commit": "e28dbb60c981",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/seo_research_intake_count_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-tam-buyer-answer-20261015",
+      "commit": "9148cceaaecb",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/seo_tam_buyer_answer_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-tam-editorial-preview-20261015",
+      "commit": "6ca4c829459f",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_tam_editorial_preview_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-tam-integrated-gateway-20261015",
+      "commit": "6a1276095a3f",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_tam_integrated_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-targeted-spider-20261016",
+      "commit": "db54aa17072a",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_targeted_spider_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/seo-wat-acquisition-20261016",
+      "commit": "6d13ffaa06bc",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/seo_wat_acquisition_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/uk-roofing-editorial-first-traffic-20261016",
+      "commit": "6e2493806b42",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/uk_roofing_editorial_first_traffic_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/uk-us-partner-discovery-20261015",
+      "commit": "733ab92e37ec",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/uk_us_partner_discovery_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/us-guides-astra-rehearsal-20261017",
+      "commit": "0d4305b06b7b",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/us_buyer_guides_astra_rehearsal_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/us-dental-vertical-20261013",
+      "commit": "5961af58d33a",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/us_dental_vertical_20261013",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/us-roofing-keyword-copy-review-20261016",
+      "commit": "5dad6521c89b",
+      "name_family": "other_unclassified",
+      "path": "/home/ubuntu/empire_worktrees/us_roofing_keyword_copy_review_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/us-roofing-solar-buyer-guides-20261017",
+      "commit": "014c0b721ae1",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/us_roofing_solar_buyer_guides_20261017",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/vertical-growth-revenue-20261012",
+      "commit": "d58efac5acbd",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/vertical_growth_revenue_20261012",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/warm-buyer-mailbox-reconciliation-20261015",
+      "commit": "f855170ed97b",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/warm_buyer_mailbox_reconciliation_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/review/warm-buyer-terms-readback-20261015",
+      "commit": "ba76c848bb40",
+      "name_family": "commercial_sales",
+      "path": "/home/ubuntu/empire_worktrees/warm_buyer_terms_readback_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/website-live-seo-consent-reconciliation-20261016",
+      "commit": "ca0259c764d2",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/website_live_seo_consent_reconciliation_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/website-vertical-brand-recovery-20261016",
+      "commit": "f4ccad0ea4f5",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/website_vertical_brand_recovery_20261016",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-commercial-release-candidate-20261014",
+      "commit": "29dbddb62318",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/youtube_commercial_release_candidate_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-earth-texture-repair-20261014",
+      "commit": "286aed144c0f",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/youtube_earth_asset_repair_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-flagship-combined-validation-20261014",
+      "commit": "403dd6208ed6",
+      "name_family": "flagship_search",
+      "path": "/home/ubuntu/empire_worktrees/youtube_flagship_combined_validation_20261014",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-funnel-readonly-20261015",
+      "commit": "7aa397f13d22",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/youtube_funnel_readonly_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-growth-console-20261015",
+      "commit": "c794e466fab7",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/youtube_growth_console_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "branch": "refs/heads/feature/youtube-growth-freshness-20261015",
+      "commit": "7805edef84b4",
+      "name_family": "media_content",
+      "path": "/home/ubuntu/empire_worktrees/youtube_growth_freshness_20261015",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "82178685c769",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/srv/empire_os/runtime/hermes_control/worker_code",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "041383ea2b72",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/srv/empire_remote_commander_releases/041383ea2b72",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    },
+    {
+      "commit": "82178685c769",
+      "detached": true,
+      "name_family": "other_unclassified",
+      "path": "/srv/empire_remote_commander_releases/82178685c769",
+      "review_state": "METADATA_ONLY_NOT_INDEPENDENTLY_CODE_REVIEWED"
+    }
+  ]
+}

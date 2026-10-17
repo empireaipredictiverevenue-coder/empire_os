@@ -1,0 +1,287 @@
+check_id,line,section,state,blocker,open_task
+check_2b394aa04a272edd,15,17 October 2026 — Revenue-first founder checkpoint (work from here),UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"First genuine accepted and payable customer event. Lead Smart supervised 19 Oct 10:00–12:00 Chicago pilot remains **disabled**; stop and five-site-handoff tests passed. Resolve only factual recorded-call consent/handling, receiving route/ANI evidence, human monitor, and close-to-launch source freshness; no duplicate buyer approval, test calls or mandatory paid lawyer."
+check_c0adb59d18847598,16,17 October 2026 — Revenue-first founder checkpoint (work from here),UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Organic visitor acquisition: `/roofing` currently HTTP 200 **noindex**. The two homeowner-guide source pages are committed in `a7da3591` (17 Oct; two source tests and TypeScript passed), but the public URLs remain HTTP 404 until reviewed build/publication. Both guides remain `noindex` in source pending editorial/indexation approval. Complete ASTRA's existing flagship/SEO release without overwriting concurrent website changes; do not promise immediate Google traffic."
+check_640d1fa6a35c6462,19,17 October 2026 — Revenue-first founder checkpoint (work from here),UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Convert current warm buyer/consultancy/affiliate conversations into one actual scoped product/buyer agreement and verifiable payment/fulfilment. Prioritise follow-ups with buying intent; no general mass outreach or paid traffic until separately approved.
+check_b38b34b03c258a60,20,17 October 2026 — Revenue-first founder checkpoint (work from here),UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"**Main agent Git closeout:** 17 Oct audit found **192 changed/untracked working-tree paths**, including two files both staged and further edited (`MM`), plus generated `.next_pre_*` builds. Codex's current managed sandbox shows `.git` read-only; Git-capable operator must review and commit changes in narrowly owned, tested groups (website, CRM, commercial, SEO, docs) rather than using `git add .` or claiming all changes are ready. Preserve another agent's work and root-owned paths; no automatic live deployment/restart."
+check_9af62cb5a00ab92b,21,17 October 2026 — Revenue-first founder checkpoint (work from here),UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Each completion needs a demonstrated real-world outcome and a concise evidence link: live URL/accepted buyer event/real payment when applicable. Tests and files alone do not equal revenue.
+check_f71f2a9067952458,62,Intelligence Router / Model Upgrade Layer — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Matched-pair workload calibration replaces model-quality priors
+check_7ccdfe1eed44fe75,63,Intelligence Router / Model Upgrade Layer — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Department-specific model routing profiles
+check_a276bc154cb17c47,64,Intelligence Router / Model Upgrade Layer — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Shadow-evaluation path for newly discovered models
+check_433b99f2f5dbbf73,65,Intelligence Router / Model Upgrade Layer — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Automatic promotion/demotion based on verified quality/cost/latency evidence
+check_9e63011c74538446,101,Quant Brain / Decision Verification — ACTIVE,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Calibrated probability-of-success source from verified outcome cohorts
+check_f3aa4c4d7e82bf0b,102,Quant Brain / Decision Verification — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Calibrated time-to-revenue distributions
+check_2cad9f4d96e00cca,103,Quant Brain / Decision Verification — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Prediction intervals / coverage monitoring
+check_78dec0b9485b5c3a,105,Quant Brain / Decision Verification — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Causal/experiment decision packet integration
+check_18793e9ed5b41143,106,Quant Brain / Decision Verification — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Capital/portfolio packet integration
+check_494fc5e84cc0381b,107,Quant Brain / Decision Verification — ACTIVE,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Economic Memory feedback from Quant prediction → verified outcome
+check_0af2dab4eb7d24b6,139,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Retire/migrate the legacy SQLite `agents/data_analysis_agent.py` concepts into canonical Supabase/Intelligence Fabric reads
+check_641f3b61b0c5eace,140,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Unified descriptive analytics: counts, distributions, cohorts, trends, rolling windows, freshness/missingness"
+check_f52b09e1d3f14de3,141,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Unified diagnostic analytics: funnel/segment/source/market/product decomposition and anomaly explanations
+check_7364a6ebe0e88df3,142,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Unified predictive analytics: demand/revenue/GP/conversion/churn/capacity/search forecasts with uncertainty
+check_811a896280eddd33,143,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Unified prescriptive layer: next-best decision + risk-adjusted expected value + value-of-information
+check_bb2f09076b75a5b0,144,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Unified causal layer: experiments/holdouts/incrementality/forecast-vs-actual
+check_767b14e676ea3c6e,146,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Risk & resilience read model: downside, concentration, capacity and operational risk"
+check_003a1e4280bf3358,147,Predictive Cloud convergence — ACTIVE / IMPORTANT,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Capital/portfolio read model: expected return, capital at risk, opportunity cost and diversification"
+check_feb645898616826a,148,Predictive Cloud convergence — ACTIVE / IMPORTANT,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Economic Memory join across prediction → action → verified outcome
+check_579ee71fb58ecb31,151,Predictive Cloud convergence — ACTIVE / IMPORTANT,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Real production evidence through the full prediction → outcome → calibration loop
+check_c3b724dfe7efe507,193,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Confirm Astra dispatcher invokes one deduped Opportunity Loop without external mutation
+check_a94872b8347d47cc,198,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Feed validated candidates into Astra workstream ranking
+check_09a3ec290653d4f4,199,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Add Storm / Permit / Property / Search AI Recommendation / Private Capital
+check_e52da7b5035c41f7,201,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Add TAM / new-industry / new-country opportunity classes
+check_88a053d08ec1cdc2,202,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Add productization / partner / distribution / pricing mismatch opportunity classes
+check_3c08ec6f2e3d109e,203,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Dedupe opportunity history across cycles and preserve lifecycle
+check_e31ce6d31239c99d,205,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Expose full Radar / research / blockers / opportunity lifecycle in Founder Console
+check_f33b99cca1038916,207,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Feed verified outcomes into opportunity calibration / Economic Memory
+check_531a9aab32f283f0,208,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Daily Results: what AI found, researched, advanced, blocked, proved and learned"
+check_330f40666026f1db,211,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,FOUNDER_GATE,explicit_founder_approval_required,Safe internal work advances continuously without repeated founder approval
+check_a4f582d34fa5766e,212,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Existing standing authority handles approved bounded external workflows
+check_10435296186b8f0a,213,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder involvement is reserved for genuine consequential gates
+check_e0ccad97829e41d4,214,Autonomous Predictive Cloud / Opportunity Loop — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,System keeps pursuing evidence-backed commercial opportunities while founder is away
+check_6ec50231fb59869c,244,Astra Executive / Department Operating System — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Department scorecards from live KPIs
+check_c1518e5d161ef8b5,257,Astra Executive / Department Operating System — ACTIVE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder Console department command surface
+check_6804563956294712,281,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Classify every major subsystem: CONNECTED / NEEDS WIRING / LEGACY / RETIRED
+check_cb6d1c1be3ed87e1,282,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Wire remaining Sensor Mesh domains -> Opportunity Radar
+check_70721f83427ff940,284,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Wire Opportunity Factory -> Astra work queue — CANONICAL Opportunity Loop registered with Astra/Control Fabric; normalized Factory evidence completion + live verification pending
+check_11b55c43631f151f,286,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Wire safe research/build tasks -> Empire Coder — AI planner now queues deduplicated PLAN jobs from Radar + research + Factory blockers; reversible IMPLEMENT promotion still pending
+check_034f2e613694e546,287,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Wire product/GTM preparation -> governed external execution
+check_29b7cbb221147bbb,288,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Wire Conversation OS -> terms/payment/fulfilment progression
+check_5327ee0bebbed81a,289,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Wire verified outcomes -> Economic Memory / calibration — verified Cortex outcome → Economic Memory CODED; opportunity/Quant prediction → action → outcome calibration join still pending
+check_379cb20263c031f9,291,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Build full visual autonomous-loop status in Founder Console
+check_59d9f6922a651b8b,292,Autonomous Business Loop — CURRENT PARALLEL FOUNDATION,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Prove one real opportunity through the complete autonomous loop
+check_8c1cbddbaa18721e,388,Competitor mining at scale,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Share-of-voice / search presence — PARKED: optional SERP overlay; provider reliability does not block downstream intelligence
+check_43a29d742353e754,393,Automate recurring intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Scheduled competitor sweeps — execution cadence not independently verified in 17 Oct timer review; do not count a configured intention as a live schedule
+check_5a4e21c9c46591e5,394,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Evidence refresh
+check_719ed8b8dbc939a2,395,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Freshness/expiry
+check_9462131d8b419085,396,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Changed-page detection
+check_8965412495135423,397,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Research-on-change
+check_2e299fd20f10fd5c,400,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Bounded retry/provider fallback
+check_9f9e6d0f2519dac8,401,Automate recurring intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Search Fabric provider reliability improvement
+check_0877bc13a8290bde,405,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Continue real outbound
+check_656c61b2b1f32221,410,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Genuine positive/commercial reply
+check_2145ba89e50b62d7,412,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Capacity/territory/delivery-route capture
+check_c50870c3f34782f6,413,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Closer case
+check_e54301b9a53d949f,414,Buyer acquisition / commercial loop,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Actual product-bound order
+check_45ebdc51f05741a8,415,Buyer acquisition / commercial loop,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Commercial terms
+check_5a0d3fc7b7d63b78,416,Buyer acquisition / commercial loop,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Founder gate where required
+check_47c4f066d69c65ab,417,Buyer acquisition / commercial loop,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,USDT/BSC payment request
+check_459a05c084691d2f,418,Buyer acquisition / commercial loop,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Verified payment evidence
+check_d92c5b7dd10c9fc5,419,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Fulfilment
+check_b049a8a9a0dd1e57,420,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Outcome capture
+check_089b607572f411e1,421,Buyer acquisition / commercial loop,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Revenue recognition
+check_7fc05c6a6c4c7e65,422,Buyer acquisition / commercial loop,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Realized gross profit
+check_d97e70fc3b9197b6,432,Managed Service first-cash offer,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Bind first real buyer
+check_67e30fdcd3e2801d,433,Managed Service first-cash offer,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First verified paid pilot
+check_8c8a8cc4c04d879f,434,Managed Service first-cash offer,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First fulfilled pilot
+check_6564959364ed23ac,435,Managed Service first-cash offer,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First recognized revenue
+check_dc205c545c142b9f,436,Managed Service first-cash offer,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First measured GP
+check_159ceeba459e9113,469,Revenue Pulse,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Opportunity alerts
+check_0dae1791d8c9539a,470,Revenue Pulse,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Market/niche/territory rollups
+check_06f13b6e0c1da0f1,478,Market Sweeps / Revenue GPS,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Supply gaps
+check_1cbb31a2bdda9f23,481,Market Sweeps / Revenue GPS,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Economics estimate clearly marked prediction
+check_56ca05ef66d6fea3,482,Market Sweeps / Revenue GPS,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Feed research/NBA
+check_4dce89cae2e95040,483,Market Sweeps / Revenue GPS,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Founder market-opportunity view
+check_e3da0be4b6d57e0a,487,Storm Leads Multiplier,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Restore/confirm storm tracker pipeline
+check_9d142ee8eefc4f2e,488,Storm Leads Multiplier,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Storm/event detection
+check_1ecdc8f2b93e0ade,489,Storm Leads Multiplier,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Affected businesses/properties
+check_0c3b07edca969d25,490,Storm Leads Multiplier,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Scoring
+check_2affce3fb085f048,491,Storm Leads Multiplier,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Enrichment
+check_3f930bfa8f7961d5,492,Storm Leads Multiplier,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Buyer/product matching
+check_692d76d4d7f1934b,493,Storm Leads Multiplier,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Founder dashboard
+check_b7c5eb52253845c9,494,Storm Leads Multiplier,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Commercial path
+check_ce9b1e0e6d91526b,495,Storm Leads Multiplier,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,No fake storm opportunities
+check_09c3e0f1fa28e12c,500,Permit Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Convert observed permit signals into proper opportunities
+check_eb79be4c7267e134,501,Permit Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Buyer/product matching
+check_770bf21976592ba9,502,Permit Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Economics
+check_8d130f7df372e5fb,503,Permit Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Recurring feed/API product
+check_2a6cad70dfd4676b,504,Permit Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Monetization proof
+check_a08537edb9815b31,509,Property Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Opportunity extraction
+check_89dbb38c618ee8d2,510,Property Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Prioritization
+check_e8424efbc684f457,511,Property Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Economics
+check_6e7727c33915144e,512,Property Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Commercial offer
+check_9765abc38d11fca3,513,Property Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Paid proof
+check_b44fe69512970528,518,Private Capital / Roll-Up Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Acquire genuine canonical PE/company evidence
+check_753c7e41bbd9f51f,519,Private Capital / Roll-Up Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Segment roll-up markets
+check_3419487793c1973f,520,Private Capital / Roll-Up Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Target/member graph
+check_c91753c7ee12ef21,521,Private Capital / Roll-Up Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Opportunity detection
+check_059e9619991a54b3,522,Private Capital / Roll-Up Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Deal-intent evidence
+check_a1f009d44a438f80,523,Private Capital / Roll-Up Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Enterprise offer
+check_44ca5086358e76ca,524,Private Capital / Roll-Up Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Paid proof
+check_7c2988c132e00757,525,Private Capital / Roll-Up Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Never fabricate PE evidence
+check_670549e70c61a25f,530,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Finish native Rank-Math-style product
+check_28433af70764b484,531,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Technical SEO audits
+check_98da8b57e43b812e,532,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Content opportunities
+check_cc69510b869b4c10,533,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,SERP tracking
+check_446ebc6b8cc7aed2,534,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,AI citation tracking
+check_4a8594c5de13c465,535,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Competitor content gap
+check_770c3872d0be8884,536,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,AEO/GEO
+check_a81c3d6687f211dc,537,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reporting/dashboard
+check_ac12d2562c44f10f,538,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Sellable plans/API/white-label
+check_6842a10a458d4aa4,539,Search / SEO / AEO / GEO product family,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Real customer proof
+check_74986a90b5042e52,561,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Organic SERP baseline from Search Fabric
+check_8fc72771f7b43852,562,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Real AI-answer observation adapters / evidence capture
+check_950c75d8d66c3669,563,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Brand mention/citation/recommendation history
+check_b1431703367e62cc,564,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Competitor share-of-observed-recommendations trend
+check_447e4cca3e172471,565,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Recommendation-gap query portfolio
+check_44b3aa128180d570,566,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Citation/source gap backlog
+check_0aab94217e873098,567,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Search Console + rank-history join where available
+check_aa033de455f11143,568,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Search/AI-touch -> recognized revenue attribution
+check_ba69e24c4a466150,569,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Search Command Centre / Founder Console product surface
+check_5d09ea9411ec2e87,570,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Scheduled monitoring + freshness/expiry
+check_e44a878e6d8d7bf2,571,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Client report/export
+check_78f1b2f3f32a662b,572,Organic + AI Recommendation Intelligence — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Commercial packaging / pricing evidence
+check_a6e9e9e99c8a8b6e,573,Organic + AI Recommendation Intelligence — ACTIVE BUILD,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,First real customer proof
+check_f64196ef1227ede6,577,TAM / Market Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,TAM graph from canonical companies
+check_024795757b9119eb,578,TAM / Market Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,ICP clustering
+check_3d33ea5a76ee4a11,579,TAM / Market Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Decision-maker enrichment
+check_c5a5f822df5d7e78,580,TAM / Market Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Competitor-derived lookalikes
+check_2f751eebcec2efee,581,TAM / Market Intelligence,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Territory segmentation
+check_518466c2b8a215b0,582,TAM / Market Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Niche/metro opportunities
+check_99269dcd3fa2ab10,583,TAM / Market Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,White-label feed/API
+check_45cbd4e89862f610,584,TAM / Market Intelligence,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,TAM numbers backed by evidence
+check_3a7129e920118b5f,591,Commercial/product economics across Empire,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Storm pricing
+check_a3a5ed8f07fa6abd,594,Commercial/product economics across Empire,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Managed-growth pricing
+check_5718a42be2f5094d,596,Commercial/product economics across Empire,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,White-label/channel pricing
+check_3ee8ff77e21a2277,598,Commercial/product economics across Empire,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Actual cost tracking
+check_010401cc9920ae29,599,Commercial/product economics across Empire,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Realized margin tracking
+check_924f0b5056fe9a83,603,Production cleanup / infrastructure,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Inspect stray FETCH_HEAD file before removing it
+check_bf390a217a512125,604,Production cleanup / infrastructure,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Continue leaving /recovery untouched
+check_8a15c221cf03554f,605,Production cleanup / infrastructure,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Continue leaving /toop untouched
+check_5f2febc69bbf4a14,606,Production cleanup / infrastructure,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Keep explicit-path Git staging only
+check_e3fae8d4f469f60e,607,Production cleanup / infrastructure,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Service health/alerts
+check_991e6a8d965b3e51,608,Production cleanup / infrastructure,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Safe deployment path
+check_6112bc5a01b38a96,609,Production cleanup / infrastructure,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Direct Empire MCP/ops connection to reduce copy/paste
+check_d57050165aac758b,610,Production cleanup / infrastructure,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,No destructive authority expansion
+check_c63d2c7a70c8f739,614,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Genuine buyer
+check_cf35b9138132bc52,615,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Genuine positive commercial conversation
+check_3a39f487743f04e8,616,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Accepted terms
+check_1ef2aeda1f01f42b,617,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verified USDT/BSC payment
+check_9b4cc14682dd8447,618,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Fulfilled product/service
+check_0899d029ffeca4c4,619,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Observed outcome
+check_47391b63a3d82795,620,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Recognized revenue
+check_e8410ee0d9c473f8,621,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Realized GP
+check_ccbc6e6960b2d3eb,622,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Feed outcome back into Cortex
+check_c2571a5be1bd9a54,623,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Repeat with second customer
+check_80d1f870e921b12b,624,Phase exit / real-money proof,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Prove repeatability before scaling spend
+check_f94ff28396ad5799,643,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,"Review every registered `ACTIVE_BUILD`, `SALVAGE_CANDIDATE`, `REBUILD_LATER` and `FOUNDER_GATE` asset against the current canonical architecture"
+check_386c43a920923e47,648,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Finish Satellite / Volumetric / spatial-intelligence recovery where evidence quality supports it
+check_bfc9a63ff0469f0f,649,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Finish Warehouse / Industrial / Idle-Asset Radar recovery or explicitly retain as INCUBATE
+check_2577cfd49579ad18,650,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Finish Revenue Pulse restoration on canonical Revenue Truth
+check_9f83212372ced3b9,651,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Finish Search / SEO / AEO / GEO productization and monetized read surfaces
+check_3340d48b35064d43,652,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Rebuild Revenue Leak / Commercial Audit tooling without fabricated loss estimates
+check_f1df3a9a443b7535,653,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Rebuild Hourly Intelligence Retainer against current product catalog, usage/entitlement, BSC/USDT and Revenue Truth; historical $150/hour remains unapproved pricing"
+check_9d75bf70123acae9,654,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,REAL_WORLD_EVIDENCE_REQUIRED,real_world_evidence_required,Rebuild Omega Evaluation / Value Meter against Omega 2 + Quant + verified outcomes + canonical usage billing
+check_75f484329e7fcf83,655,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Recover buyer-waterfall / opportunity marketplace concepts only after verified buyer/capacity/terms/allocation controls are satisfied
+check_2127258ac55db060,656,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Finish Managed Growth / done-for-you product family against real scope, cost, margin and capacity"
+check_91eff7bcd6cbfad4,657,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Finish Enterprise / White Label / Partner product and reseller surfaces
+check_59fc694fe0a0ddb1,658,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Component-mine Hermes-era Harvester / Snipers / Whale Finder / Whale Harvester into current Source Mesh, identity and enterprise-fit layers"
+check_c7abc825a61bc00c,659,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Recover strongest legacy usage-metering / pay-per-call / PPL / appointment/value-meter concepts without JSONL or legacy settlement becoming commercial truth
+check_f516758a82b4870a,665,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Recover business-loop watchdog / circuit-breaker / kill-switch / real-time Founder-event patterns into current operating fabric
+check_36a2e166358c3bcf,666,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Reconcile old GTM/marketing packs, Founding Partner patterns, enterprise campaigns, roofing/restoration/storm campaigns, account-based/whale GTM and inbound speed-to-lead against fresh contacts/evidence"
+check_ab3899389cd18cfa,667,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Review remaining half-built/gated phases 6–18 components and classify each as CONNECTED / NEEDS WIRING / INCUBATE / REBUILD_LATER / RETIRED / FOUNDER_GATE
+check_70c8328438875c59,668,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Surface recovery state, canonical replacement, readiness, blocker, evidence and next safe action in Founder Console"
+check_d399391518bc6ca3,669,Salvage / half-built / gated completion lane — PRESERVE AND FINISH,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Close salvage items only when the canonical replacement is proven; do not mark historical existence as completion
+check_db55eac40fb50e9a,716,AI decision / safety foundation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Expand Promptfoo into agent/model promotion matrix with adversarial suites and matched-pair evaluation
+check_b3b8a36d68a7fd05,717,AI decision / safety foundation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Matched-pair benchmark stronger candidate models against current local models
+check_643f77a85791b2f0,718,AI decision / safety foundation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Department-specific evidence-backed model routing profiles
+check_412fbd14c56d8a57,719,AI decision / safety foundation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Automatic model promotion/demotion from verified quality/cost/latency evidence
+check_83bff7eafa80fbdc,728,Observability / control foundation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live EmpireOS observability smoke verification
+check_7747ee6c4103665a,729,Observability / control foundation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Secure Langfuse credentials/environment wiring if chosen
+check_0461343e99735ec1,730,Observability / control foundation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live remote trace verification without prompt/secret leakage
+check_9fc70d56a26eca9f,731,Observability / control foundation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,"Agent/model latency, error, cost and evaluation Founder surfaces"
+check_09acac69982e27a5,735,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Buyer Reply / Conversation Operations Agent
+check_cad23abf103388cc,736,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Deliverability & Sender Reputation Agent
+check_a1fcf2532b598784,737,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Revenue Truth / Settlement Agent
+check_a5e61a6af115439f,738,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Data Quality & Source Reliability Agent
+check_ce00c53b3f82b978,739,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Growth & Experiment Agent
+check_e896965728a67d61,740,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Customer Success / Expansion Agent
+check_31b70e2fd48c9a4a,741,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Cost / Capacity / Unit-Economics Agent
+check_026c9fc93d0b2e0b,742,Business agents to build,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Daily Results / Founder Operating Brief Agent
+check_03e265d7209a9929,746,Durable operating fabric,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Temporal durable workflow layer for long-running commercial flows
+check_f506a2725c10c782,747,Durable operating fabric,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,NATS / JetStream event fabric
+check_dbec427628d75536,748,Durable operating fabric,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,OpenFGA authorization layer
+check_7ad9eeac0cb0357a,749,Durable operating fabric,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Unleash feature flags / kill switches / staged experiments
+check_1b600dfb5d11f816,750,Durable operating fabric,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Preserve Empire evidence/authority gates above all four external layers
+check_9d3d463d2a541f8f,754,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Wire Needle into eligible low-risk routing workloads
+check_ea0ba54b4c2e6d11,755,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Wire Laya specialist shadow lane into governed reply-analysis path
+check_7c26b829e79cf84a,756,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Wire stronger reasoning model into positive/question/objection reply analysis
+check_4f69ccbf250e9e54,757,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Wire all new agents to OTEL/Langfuse and Promptfoo gates
+check_ca4508cc086b3e71,758,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Wire verified outcomes from new agents into Cortex / Economic Memory
+check_9eb2068c32ea587d,759,Cross-system integrations,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,"Surface agent state, blockers, evidence and next-safe-action in Founder Console"
+check_8aa438a5071c4d80,763,Blueprint phases 6–18 preservation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Phase 6 — A2A Commerce Network remaining slices
+check_bda7cb4cf98189f6,764,Blueprint phases 6–18 preservation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Phase 7 — Conversation OS remaining slices
+check_97856cc75cbc8644,765,Blueprint phases 6–18 preservation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Phase 8 — Revenue CRM
+check_f1d108cdcaa97411,766,Blueprint phases 6–18 preservation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Phase 9 — Advertising Brain
+check_c2fd3893e7493380,767,Blueprint phases 6–18 preservation,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Phase 10 — Predictive Cloud V3 convergence
+check_17d1c09105d0a809,768,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 11 — Experiment + Causal Engine
+check_2a24248989a72f6d,769,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 12 — Demand Genesis
+check_2b72e042210358c9,770,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 13 — Revenue Exchange
+check_b283890fa3fe85c9,771,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 14 — Digital Twin
+check_129a967dc5722473,772,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 15 — Capital Allocator
+check_2258d548c34f3f1d,773,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 16 — SaaS / Network Scale
+check_7cc7ff2afa616935,774,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 17 — Enterprise
+check_aa8406eb42200b46,775,Blueprint phases 6–18 preservation,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Phase 18 — Full Autonomous Revenue OS
+check_b8e390de54e0c33f,779,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Generate machine-readable execution ledger from this checklist
+check_16159f109c5716c8,780,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reconcile live runtime against checklist without treating code existence as completion
+check_f9bf2bb70159d73b,781,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reconcile Blueprint V6 phases against live runtime and canonical data
+check_10692d447317380b,782,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reconcile recovery/salvage registry against canonical replacements
+check_61bbb288c4777d97,783,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Mark every major subsystem CONNECTED / NEEDS_WIRING / LEGACY / RETIRED / INCUBATE / FOUNDER_GATE
+check_52d08a539619c963,784,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder Console master execution/readiness surface
+check_c4cde778e455aade,785,Reconciliation / anti-loss controls,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Require explicit evidence before any item moves to DONE
+check_0a5acf96aa548f4c,809,Architecture-first engineering doctrine — REQUIRED,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Every new material agent/tool/product/integration gets an architecture contract before implementation
+check_fa247e99952e02b7,810,Architecture-first engineering doctrine — REQUIRED,NEEDS_LIVE_PROOF,exact_live_closure_checkpoint_required,Every bounded extension records an architecture delta before implementation
+check_38ebace5c87b9c52,811,Architecture-first engineering doctrine — REQUIRED,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Mutating builder ownership/lease prevents overlapping edits
+check_556feac025a0faa0,812,Architecture-first engineering doctrine — REQUIRED,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verification/promotion evidence is recorded before checklist DONE
+check_652d670b9cc6febb,827,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Hermes central mutation-lease integration — CODED; regression/runtime verification pending
+check_ffd87ef4620a272b,833,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Credentialed Agent Reach channels remain disabled pending separate architecture/risk contract
+check_a7a15f78175cb7e4,836,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Space Agent Founder/department Mission Control workspace
+check_0cfac4fa1d108a2a,842,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,OTEL/Langfuse trace events for queue → route → lease → worker → verify → proposal → live result
+check_17547617cd4ba3b0,844,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live parallel non-overlapping Hermes/Pi proof
+check_35facbb3530d10cf,846,Agent & Tool Execution Plane — ACTIVE BUILD,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First checklist items completed by the software factory and independently verified
+check_c39e353add02c3ac,875,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Run first bounded Hermes build through central mutation lease
+check_49b0fd671d101336,876,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Run first bounded Pi build through sandbox + independent candidate verification — native Pi mutation demoted on current qwen2.5-coder:1.5b after repeated structured-tool-call probe failure
+check_6b8da890e31415ee,877,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Empire Coder disposable-clone structured-patch fallback — CODED; live capability probe + proposal proof pending
+check_653bf2ba611d8f45,879,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Build first Space Agent Founder Mission Control workspace from read-only Empire APIs
+check_c4a3585431b81444,880,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verify post-merge Swarm V6 QA on first execution-plane candidate
+check_26db081e21fa8af9,881,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verify Promptfoo gate on first AI-behavior-changing candidate
+check_e86d5e3e4ccdd272,882,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Record OTel/Langfuse execution-plane traces
+check_d9b88f2345f88919,883,Agent & Tool Execution Plane — Architecture-First Build,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Mark execution plane CONNECTED only after all live evidence exists
+check_7d6704ebe36c86a9,944,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Provision Recall region/API key/workspace verification secret without exposing values
+check_b7474dfb151d589e,945,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Install/activate bounded Recall webhook + SHADOW worker services
+check_b1f8398951ffffe3,946,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reload public gateway and verify signed Recall endpoint live
+check_d89ec2296c8c2a2d,947,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,First controlled real meeting join in SHADOW mode
+check_7acfa3254632a8d5,948,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verify signed lifecycle + transcript evidence in live runtime
+check_1eef7fa7a7ed0c74,949,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verify Founder meeting-state surface against that live meeting
+check_fa41c7b636fea3c9,950,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Enable private grounded-draft worker only after explicit model/cost decision
+check_80d378091bba806b,951,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Verify first live private grounded draft from canonical evidence
+check_dd25bfb9807d1dc2,952,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Provision Presence signing/audio-push secrets and activate Presence service
+check_bc52534e49870bb4,953,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Start Recall Output Media for one controlled COPILOT meeting
+check_c6e67b6f3763fdec,954,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder explicitly approves one exact turn/text fingerprint
+check_50fadd77a4a70556,955,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Execute one approved speech turn and verify browser playback/ticket finalization
+check_3016f35be79e54eb,956,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Confirm meeting-side audio heard; browser completion alone is not delivery proof
+check_1add39b335cfa98a,957,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Run bounded Copilot shadow period with latency/error/cost evidence
+check_bbb58b8a00d19727,958,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Separate founder decision before REPRESENT authority
+check_fa11e8a5290ee6ed,959,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Separate delegated authority contract before NEGOTIATE/CLOSE
+check_b7ee22706432889d,960,Digital Avatar live promotion gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,No Avatar payment/funds/revenue-recognition authority unless separately architected
+check_195530fa0ac7a00c,987,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Trusted authenticated tenant-membership source for fleet HTTP surfaces
+check_f396e2720697bc91,988,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder/tenant read-only fleet surface against trusted membership
+check_e71770c59e25370f,989,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Canonical EmpireDB fleet persistence architecture
+check_1f3e7c33f5182232,990,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Explicit approval before any tenant-context migration or Migration 018 change
+check_7b3398b036f6584d,991,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Tenant-scoped voice/visual asset storage contract
+check_b8a5eff22e17e2ca,992,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Usage/quota/metering integration from verified runtime events
+check_ac5fe08a54c1409b,993,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Multi-avatar scheduling / concurrency contract
+check_5d1df0a722e05d8d,994,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,White-label tenant configuration contract
+check_68fd6251af8b1323,995,Clone Fleet live/persistence gates — NOT DONE,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live cross-tenant isolation proof after canonical persistence exists
+check_d209a3b35ec17006,1009,Clone Fleet read model — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,HTTP exposure remains blocked until trusted tenant authentication exists
+check_20cc317f69a110b4,1025,Clone Fleet concurrency planner — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Persistent reservation/scheduler remains a future separately approved architecture slice
+check_d365a7e4b4e5dca0,1065,Clone Fleet concurrency / routing / assignment — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Reservation persistence/provider scheduling remains unimplemented and gated
+check_43a8456fd5ba7f7c,1123,Clone Fleet verified usage metering — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Persisted canonical tenant usage remains gated on tenant-context architecture
+check_1f2ea64c62eabe90,1183,Fleet Recall launch preparation / activation scoping — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live Recall materialization/execution remains gated by explicit meeting-bound approval and production activation
+check_db5f605cb5a314e9,1203,Fleet Recall materialization / live-execution adapter — engineering verified,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,REAL Recall provider execution remains explicitly approval-gated for a named meeting
+check_7ea5cdabace7cdf3,1224,Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending,FOUNDER_GATE,explicit_founder_approval_required,FOUNDER APPROVAL REQUIRED: exact Digital Avatar pricing/economics ladder
+check_316f3e1b6d2f367e,1225,Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Observe/verify real fulfilment cost + meeting-duration + concurrency capacity
+check_c9c68f83a230a599,1226,Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Governed canonical product/version proposal after pricing approval
+check_cad10b700905cf76,1227,Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Independent catalog verification before binding_terms_ready
+check_f0a9b9f0c2c62ef6,1228,Empire Digital Avatar commercial packaging / pricing proposal — founder decision pending,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Checkout/payment activation remains separately gated
+check_f55d7c9d7de2b5cf,1247,All-products pre-market testing — campaigns remain gated,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,"Campaign activation stays paused until all 26 commercially verified products pass Stage-2 live production smoke, per founder direction"
+check_e207f02780bf4b9f,1255,Stage-2 vertical / solar product smoke refinement,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Founder dashboard service restart required to deploy new Permit/Property/Private-Capital read routes
+check_01ecca46d59b63e2,1256,Stage-2 vertical / solar product smoke refinement,UNVERIFIED_PENDING,verify_and_live_closure_evidence_required,Live loopback verify new vertical routes after restart
