@@ -30,6 +30,9 @@ from empire_os.business_optimization_sources import (
 from empire_os.business_optimization_policy_intelligence import (
     run_business_optimization_policy_intelligence,
 )
+from empire_os.source_intelligence_handoff import (
+    dispatch_source_intelligence_handoffs,
+)
 
 
 OUTPUT = Path("runtime/astra/department_cycle_latest.json")
@@ -95,6 +98,17 @@ def run_department_cycle(
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     completion_dispatch = dispatch_completion_board(root)
+    # One existing heartbeat owns acquisition -> bounded evidence triage ->
+    # durable specialist review. Noncanonical replay never touches production.
+    try:
+        signal_handoffs = dispatch_source_intelligence_handoffs(root)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        signal_handoffs = {
+            "status": "HELD_SOURCE_TRIAGE_UNAVAILABLE",
+            "reason_code": type(exc).__name__,
+            "handoffs_enqueued": 0,
+            "execution_authority": "none",
+        }
     worker = run_department_worker(
         root,
         max_items=max_items,
@@ -137,6 +151,18 @@ def run_department_cycle(
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "service_health": "completed",
         "work_ok": worker.get("ok") is not False,
+        "source_intelligence_handoffs": {
+            "status": signal_handoffs.get("status"),
+            "handoffs_enqueued": signal_handoffs.get("handoffs_enqueued", 0),
+            "handoffs_unchanged": signal_handoffs.get("handoffs_unchanged"),
+            "handoffs_rate_held": signal_handoffs.get("handoffs_rate_held"),
+            "source_lane_count": signal_handoffs.get("source_lane_count"),
+            "current_evidence_lane_count": signal_handoffs.get("current_evidence_lane_count"),
+            "source_snapshot_ref": signal_handoffs.get("source_snapshot_ref"),
+            "router_paid_model_invoked": False,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        },
         "completion_board_dispatch": {
             "status": completion_dispatch.get("status"),
             "source_pending_count": completion_dispatch.get(

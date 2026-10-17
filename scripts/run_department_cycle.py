@@ -42,6 +42,7 @@ def main() -> int:
             "service_health": payload.get("service_health"),
             "work_ok": payload.get("work_ok"),
             "worker": payload.get("worker") or {},
+            "source_intelligence_handoffs": payload.get("source_intelligence_handoffs") or {},
             "evaluation_state": dict(
                 payload.get("evaluation") or {}
             ).get("evaluation_state"),

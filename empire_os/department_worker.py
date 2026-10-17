@@ -384,6 +384,77 @@ def _run_one_department_work_impl(
             "execution_authority": "none",
         }
 
+    if item.target_component == "source_intelligence_review":
+        # Read-only specialist SOURCE review on the existing team work queue.
+        # Delivers a verified snapshot reference; never promotes a company,
+        # forecasts money, invokes a paid model, or sends external outreach.
+        from empire_os.source_intelligence_handoff import (
+            deliver_source_intelligence_review,
+        )
+        raw = (
+            item.intelligence_request.get("source_intelligence_review")
+            if isinstance(item.intelligence_request, dict) else None
+        )
+        contract = raw if isinstance(raw, dict) else {}
+        try:
+            if len(item.department_keys) != 1:
+                raise ValueError("one_specialist_department_required")
+            result = deliver_source_intelligence_review(
+                root,
+                lane=str(contract.get("lane") or ""),
+                fingerprint=str(contract.get("evidence_fingerprint") or ""),
+                department=item.department_keys[0],
+                allow_local_model=(
+                    root == Path("/srv/empire_os")
+                    and contract.get("approved_local_model") is True
+                    and isinstance(item.intelligence_request, dict)
+                    and (
+                        dict(item.intelligence_request.get("budget") or {})
+                        .get("requested_model_tokens", 0)
+                    ) >= 512
+                ),
+            )
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            held = queue.block(
+                item, "source_intelligence_evidence_hold",
+                {"reason_code": str(exc)[:120],
+                 "outbound_sent": False,
+                 "paid_model_invoked": False,
+                 "execution_authority": "none"},
+            )
+            return {
+                "ok": True,
+                "state": "BLOCKED",
+                "work_id": held.id,
+                "blocker": held.error,
+                "execution_authority": "none",
+                "queue_counts": queue.counts(),
+            }
+        done = queue.complete(
+            item, result,
+            evidence_refs=("runtime:departments:source_intelligence_latest",),
+            execution_completed=False,
+        )
+        return {
+            "ok": True,
+            "state": "DONE",
+            "work_id": done.id,
+            "target_component": done.target_component,
+            "department": result["department"],
+            "first_pass_analysis_completed": True,
+            "semantic_model_review_performed": bool(
+                result.get("semantic_model_review_performed")
+            ),
+            "model_output_review_status": (
+                (result.get("model_shadow") or {}).get(
+                    "model_output_review_status"
+                )
+            ),
+            "result_evidence_refs": list(done.result_evidence_refs),
+            "execution_authority": "none",
+            "queue_counts": queue.counts(),
+        }
+
     if item.target_component == "identity_enrichment":
         entity_id = ""
         for ref in item.evidence_refs:
