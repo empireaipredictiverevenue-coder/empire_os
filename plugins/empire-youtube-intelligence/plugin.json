@@ -1,0 +1,40 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "empire-youtube-intelligence",
+  "version": "0.1.0",
+  "description": "Research public YouTube videos and plan original, evidence-based business content with Empire AI.",
+  "author": {
+    "name": "Empire AI",
+    "url": "https://empire-ai.co.uk"
+  },
+  "homepage": "https://empire-ai.co.uk",
+  "keywords": [
+    "youtube",
+    "research",
+    "video",
+    "content-strategy",
+    "competitors"
+  ],
+  "extensions": {
+    "com.openai": {
+      "onboardingSkill": "./skills/setup/SKILL.md",
+      "interface": {
+        "displayName": "Empire AI YouTube Intelligence",
+        "shortDescription": "Research YouTube videos and plan evidence-led content.",
+        "longDescription": "Check public video information, distinguish observed facts from assumptions, and plan original videos for business audiences. Preview does not provide private competitor analytics or publish videos.",
+        "developerName": "Empire AI",
+        "category": "Productivity",
+        "capabilities": [
+          "Read"
+        ],
+        "websiteURL": "https://empire-ai.co.uk",
+        "privacyPolicyURL": "https://empire-ai.co.uk/privacy",
+        "termsOfServiceURL": "https://empire-ai.co.uk/terms",
+        "defaultPrompt": [
+          "Review the public metadata for this YouTube video and suggest three original content angles.",
+          "Help me plan an evidence-led YouTube video without inventing metrics."
+        ]
+      }
+    }
+  }
+}
