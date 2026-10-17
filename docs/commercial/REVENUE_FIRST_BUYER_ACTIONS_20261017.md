@@ -20,6 +20,14 @@ For Lead Smart it replaces the obsolete landing-page/route repeat-approval reque
 
 The server's dedicated Gmail read-only token failed refresh on 17 Oct (RefreshError); its last valid metadata scan is 10:34 UTC. This does not mean the real Gmail account has no replies. The connected Gmail account was separately read-only checked, showing the actual last responses. The Founder Mailbox API currently exposes only provider-recorded EmpireDB replies (14 records and zero canonical verified messages), not the entire Gmail inbox. Do not promote the external messages to verified person-to-buyer CRM joins without authentic mapping and suppression evidence.
 
+## Delivery failure — Unified Energy Group commercial solar
+
+A 15 October professional Workspace Gmail message (1a1419090249560e) sent to hello@ueg.co.uk received a Google Groups delivery failure (1a14190986b23ef3): the hello group may not exist or may reject external senders. This is DELIVERY_REJECTED_RETRY_HELD, NOT a delivered buyer enquiry, programme acceptance or confirmed 550 user-not-found. Do not retry that recipient or invent an alternative mailbox.
+
+Official UEG commercial-solar application: https://ueg.co.uk/partners/apply and v1.0 referral terms dated 25 September 2026: https://ueg.co.uk/partners/application-terms. Published referral reward is 5% of qualifying contract value excluding VAT subject to contract, project completion and receipt of customer payment. The application requires an authorised person to accept binding terms and provide a phone number. No partner application submission, signed terms or payment occurred during this review. It is a distinct commercial-premises programme, not Solar Briton's UK residential payer corridor.
+
+The original delivery failure is retained for exact-recipient suppression review; no EmpireDB row, address or mail account was changed without a separately verified delivery-evidence write.
+
 ## Monday live decision, without extra bureaucracy
 
 Proceed only through the existing Monday human-supervised pilot process: actual relevant recorded-call notice and data-handling decision, buyer-side routing/ANI proof, available human supervisor, same-day fresh Ringba tracking and ZIP information, and limited authorised source. Current pilot control is enabled=false. No automatic start is scheduled, no paid lawyer is an invented mandatory vendor, and no payable call has been verified. A real accepted buyer event, settlement and recognized margin must be shown before declaring revenue.
