@@ -2,6 +2,10 @@
 
 **Evidence snapshot: 17 October 2026, ~21:00 UK.** Founder directive: recover *all* unfinished work, not just contractor, insurance carrier or B2B acquisition. Warehouse Sniper, early GitHub projects, old 891k-lead Harvester lineage, storm/permit/property/private-capital products, CRM/voice/marketing, SaaS/enterprise and agents **must remain accounted for**. This is a **classification and next-build assessment**, not automatic authority to reactivate every system.
 
+## Founder execution correction: build product families NOW in parallel
+
+The founder requires Permit, Property, Private Capital, Storm, Satellite, Warehouse/Industrial, B2B Scrapers and every other parked business family to keep progressing immediately, **not after first revenue**. Earlier P1/P2 priority language below is a historical sequencing proposal and must NOT be used as a blanket product hold. The active scoped priorities, verified Founder read endpoints, existing engineering owners and 19–23 October parallel completion milestones are in docs/recovery/EMPIREOS_PARALLEL_PRODUCT_COMPLETION_DIRECTIVE_20261017.md. Sales and safe product work both proceed; high-impact approvals and production safety gates still apply.
+
 ## Executive baseline: these are different measurements
 
 - **Canonical live task reconciliation:** 884 tasks historically counted: **598 checked, 286 open** (`runtime/execution_plane/completion_reconciliation_latest.json`, refreshed 17 Oct), with **246 plan-handoff/build-or-verify pending**, 32 needing real-world evidence, 2 blocked by builder/provider, 3 observed runtime pending formal closure, 2 founder gates and 1 price-policy closure pending. Do not call 246 unfinished implementations: individual proof states require independent checking.
