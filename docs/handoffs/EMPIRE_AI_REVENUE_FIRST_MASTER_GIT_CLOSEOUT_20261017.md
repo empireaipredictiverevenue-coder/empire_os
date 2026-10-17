@@ -101,3 +101,25 @@ P1 continuing: full EmpireOS functionality. The historical open master checklist
 No website redeployment/restart, live Ringba enable, new call or email, paid campaign, migration, settlement, direct BSC payment, new server, new agent, replacement of other agents' files, global Git commit or completed master checklist sweep. No verified accepted buyer call or recognised revenue. No assertion that 183 pending Git status entries are ready for commit. This handoff completes the current founder-requested AUDIT + SCOPED COMMITS + SAFE NEXT ACTIONS, not the entire EmpireOS business build.
 
 Report to founder by working products, exact source commits, buyer conversations, verified receipts/payments and remaining decisive blockers. Do not replace customer outcomes with green tests or endless handoffs.
+
+## 8. Ready-to-run main-agent handoff prompt
+
+Copy this into the main EmpireOS agent/Codex session. ASTRA should follow the website portion in its EXISTING flagship website workstream. This instruction does not grant unsupervised live execution.
+
+```text
+EMPIRE AI MAIN AGENT / ASTRA — FINISH, VERIFY AND COMMIT EXISTING WORK
+
+Resume /srv/empire_os on agent/data-cloud-wave4. FIRST READ: AGENTS.md, docs/FOUNDER_DIRECTIVE_OS.md, the current checkpoint at the top of docs/MASTER_REMAINING_CHECKLIST.md, THIS handoff, and docs/LEAD_SMART_LAUNCH_CLOSURE_20261012.md.
+
+FOUNDER ORDER: REVENUE FIRST; FINISH BEFORE EXPANDING. Reuse existing ASTRA, SEO, CRM, GTM and Founder Console work. Do not create more services, agents, architecture layers, approvals, infrastructure or reports to replace delivery. EmpireDB PostgreSQL remains canonical, not Supabase. No paid traffic or invented paid-lawyer prerequisite. Preserve actual consent, privacy, security, financial and explicit live-execution authority.
+
+1. MAIN-AGENT GIT CLOSEOUT NOW: Recheck current git status: historical dirty-file counts in this handoff may have changed. Group changes by real feature and owner (website/Founder Console, CRM, commercial/GTM, SEO, other). Verify diffs, tests, dependencies, provenance and active editor. Commit ONLY finished, owned paths in small cohesive commits. Never use git add ., git reset --hard or git clean -fd; never stage generated .next backup directories, secrets or unfinished work by another agent. Main Codex's current sandbox has .git read-only: hand exact reviewed file lists to the EXISTING Git-capable operator. Do not claim a commit unless it is in git log.
+
+2. FINISH ACTUAL WEBSITE AND ORGANIC ACQUISITION: ASTRA, complete the EXISTING flagship website, mobile UX, approved globe logo, electric blue/deep navy/warm gold cinematic hero, and founder-approved visual comparison BEFORE showing new design. Finish vertical-specific SEO content and the two homeowner roofing guides using existing approved source/worktrees. Preserve buyer-approved /roofing. Reconcile actual public indexability, URLs and Search Console; no fabricated ranking, traffic, consent or lead claims. Do not overwrite concurrent gateway edits.
+
+3. CLOSE FIRST COMMERCIAL LOOP: Lead Smart is a DIFFERENT buying company. Keep its exact already-approved US roofing Direct scope. Respect prior founder and Seth approvals, no duplicate test-call/approval emails. Clear only genuine recording/consent/data handling, buyer route/original ANI proof, fresh Ringba/ZIP source facts and live human pilot monitor. Monday 19 October 10am–noon Chicago, maximum FIVE first-party site handoffs, remains disabled until genuinely safe and separately authorised; no automatic activation. Verify actual accepted calls and settlements before claiming revenue. Then focus existing warm buyer/consultancy/affiliate enquiries, qualified organic traffic, customer offers and verified payments. No paid traffic, unapproved outreach or funds movement.
+
+4. KEEP CHECKLIST HONEST: Update the existing master checklist only from real source evidence and verified live capability. Do not confuse a passing unit test with published functionality or a commercial outcome. Long-term, connect ALL existing departments into the full EmpireOS business, but do not turn today's first-revenue execution into endless new architecture.
+
+REPORT ONLY (a) verified scoped commits and tests, (b) independently checked live website/product changes, (c) genuine buyer or payment evidence and (d) the next one or two decisive blockers and owner. If blocked from consequential production execution, leave it unchanged, name the exact missing authority/evidence, and continue completing authorised work. Less bureaucracy, more shipped results. No new handoff in place of execution.
+```
