@@ -185,3 +185,140 @@ def test_chapters_skip_bad_timestamps():
     )
     assert len(rows) == 2
     assert rows[-1]["at"] == "07:09"
+
+
+def test_commercial_opportunities_rank_real_baselines_but_not_fake_revenue():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.youtube_intelligence import review_youtube_commercial_opportunities
+
+    now = datetime.now(timezone.utc)
+    published = (now - timedelta(days=2)).isoformat()
+    baseline = build_channel_baseline([100, 110, 90, 100], metric="views")
+
+    def observation(video, title, views):
+        return normalize_youtube_video_observation({
+            "id": video,
+            "snippet": {"title": title, "channelId": "source-channel", "publishedAt": published},
+            "statistics": {"viewCount": str(views)},
+        }, evidence_refs=("youtube:data_api:" + video,), channel_baseline=baseline)
+
+    rows = [
+        observation("a", "UK Roofing Lead Generation Explained", 450),
+        observation("b", "AI consultancy business automation UK", 270),
+        observation("c", "Local news unrelated video", 99999),
+        observation("d", "US Solar Installation Business Guide", 90),
+    ]
+    result = review_youtube_commercial_opportunities(
+        rows,
+        commercial_capacity={
+            "roofing": {"status": "NO_VERIFIED_CAPACITY"},
+            "ai_consultancy": {"status": "TERMS_PENDING"},
+        },
+        now=now,
+    )
+    assert result["candidate_count"] == 2
+    assert [row["video_id"] for row in result["candidates"]] == ["a", "b"]
+    top = result["candidates"][0]
+    assert top["vertical"] == "roofing"
+    assert top["outlier_ratio_descriptive"] == 4.5
+    assert top["priority"] == "HIGH_SIGNAL_REVIEW"
+    assert top["market_cues_not_territory_proof"] == ["UK"]
+    assert top["suggested_next_step"] == "RESEARCH_EDUCATIONAL_CONTENT_NO_PAYABLE_LEAD_CLAIMS"
+    assert top["revenue_proven"] is False
+    assert top["public_publish_authorized"] is False
+    assert result["commercial_activation_authorized"] is False
+    assert result["performance_benchmark_against_vidiq_proven"] is False
+
+
+def test_commercial_review_requires_fresh_comparable_evidence():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.youtube_intelligence import review_youtube_commercial_opportunities
+
+    now = datetime.now(timezone.utc)
+    row = normalize_youtube_video_observation({
+        "id": "a", "snippet": {
+            "title": "UK Roofing Market Explained",
+            "publishedAt": (now - timedelta(days=3)).isoformat(),
+        },
+        "statistics": {"viewCount": "20000"},
+    }, evidence_refs=("youtube:video:a",))
+    # No valid channel baseline must not become a winning competitor just
+    # because the raw view count is large.
+    packet = review_youtube_commercial_opportunities([row], now=now)
+    assert packet["candidate_count"] == 0
+    assert packet["excluded_reason_counts"]["NO_COMPARABLE_CHANNEL_BASELINE"] == 1
+    row["channel_baseline"] = build_channel_baseline([100, 100, 100]).as_dict()
+    row["outlier_ratio"] = 99999  # Malicious/stale pre-computed claim.
+    row["observed_at"] = (now - timedelta(days=15)).isoformat()
+    packet = review_youtube_commercial_opportunities([row, row], now=now)
+    assert packet["candidate_count"] == 0
+    assert packet["excluded_reason_counts"]["STALE_OR_UNKNOWN_OBSERVATION"] == 1
+    assert packet["excluded_reason_counts"]["duplicate_video_id"] == 1
+
+
+def test_commercial_review_notices_market_uncertainty_and_source_status():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.youtube_intelligence import review_youtube_commercial_opportunities
+
+    now = datetime.now(timezone.utc)
+    row = normalize_youtube_video_observation({
+        "id": "z",
+        "snippet": {"title": "AI consulting market challenges",
+                    "publishedAt": (now-timedelta(days=4)).isoformat()},
+        "statistics": {"viewCount": "500"},
+    }, evidence_refs=("youtube:data_api:z",),
+       channel_baseline=build_channel_baseline([100, 100, 100]))
+    packet = review_youtube_commercial_opportunities(
+        [row], now=now,
+        commercial_capacity={
+            "ai_consultancy": {"status": "VERIFIED_CAPACITY", "evidence_refs": ["upstream:claimed"]},
+        },
+    )
+    assert packet["candidate_count"] == 1
+    selected = packet["candidates"][0]
+    assert selected["priority"] == "RESEARCH_REVIEW"
+    assert selected["market_cues_not_territory_proof"] == []
+    assert selected["buyer_capacity_independently_verified_here"] is False
+    assert selected["suggested_next_step"] == "REVIEW_EVIDENCE_AND_EDITORIAL_ANGLE"
+    assert packet["automatic_publication_authorized"] is False
+
+
+def test_commercial_review_empty_and_rejects_wrong_contract():
+    from empire_os.youtube_intelligence import review_youtube_commercial_opportunities
+    import pytest
+
+    packet = review_youtube_commercial_opportunities([])
+    assert packet["candidate_count"] == 0
+    assert packet["revenue_recognized"] is False
+    with pytest.raises(ValueError, match="normalized video"):
+        review_youtube_commercial_opportunities([{"title": "roofing"}])
+    with pytest.raises(ValueError, match="limit"):
+        review_youtube_commercial_opportunities([], limit=0)
+
+
+def test_commercial_cli_runs_offline_with_existing_youtube_intelligence(tmp_path, capsys):
+    from datetime import datetime, timedelta, timezone
+    import json
+    from scripts.review_youtube_video_readonly import main
+
+    now = datetime.now(timezone.utc)
+    row = normalize_youtube_video_observation({
+        "id": "offline-example",
+        "snippet": {
+            "title": "Solar customer questions in UK",
+            "publishedAt": (now - timedelta(days=1)).isoformat(),
+        },
+        "statistics": {"viewCount": "340"},
+    }, evidence_refs=["fixture:youtube:api"],
+       channel_baseline=build_channel_baseline([100, 110, 90]))
+    payload = tmp_path / "existing_media_packet.json"
+    payload.write_text(json.dumps({"observations": [row],
+                                   "commercial_capacity": {
+                                       "solar": {"status": "NO_VERIFIED_CAPACITY"}
+                                   }}))
+    assert main(["--opportunities-file", str(payload)]) == 0
+    output = json.loads(capsys.readouterr().out)
+    assert output["candidate_count"] == 1
+    assert output["candidates"][0]["vertical"] == "solar"
+    assert output["candidates"][0]["revenue_proven"] is False
+    assert output["automatic_publication_authorized"] is False

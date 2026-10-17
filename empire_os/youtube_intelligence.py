@@ -463,3 +463,182 @@ def youtube_inspiration_review(
         "execution_authority": "none",
         "evidence_refs": ["youtube:video_description:" + validated_id] if published_description else [],
     }
+
+
+# Existing YouTube Intelligence -> Empire commercial prioritisation. NO new queue.
+EMPIRE_VIDEO_VERTICAL_TERMS = {
+    "roofing": ("roofing", "roofer", "roof repair", "roof replacement"),
+    "solar": ("solar", "photovoltaic", "pv installation"),
+    "hvac": ("hvac", "heat pump", "air conditioning", "furnace"),
+    "dental": ("dental", "dentist", "dentistry"),
+    "ai_consultancy": ("ai consultancy", "ai consulting", "ai strategy", "business automation"),
+    "enterprise_ai": ("enterprise ai", "predictive revenue", "revenue intelligence"),
+}
+EMPIRE_VIDEO_MARKET_CUES = {
+    "UK": ("uk", "united kingdom", "britain", "british", "london", "manchester", "bolton"),
+    "USA": ("usa", "united states", "america", "us roofing", "texas", "chicago", "new york"),
+}
+
+
+def review_youtube_commercial_opportunities(
+    observations: Iterable[Mapping[str, Any]],
+    *,
+    commercial_capacity: Mapping[str, Mapping[str, Any]] | None = None,
+    now: datetime | None = None,
+    max_observation_age_hours: int = 48,
+    max_video_age_days: int = 90,
+    minimum_outlier_ratio: float = 2.0,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Rank *research*, not revenue, using only normalized YouTube observations.
+
+    Existing buyer-capacity status is informative, never an execution gate
+    grant. Numbers are descriptive heuristics, not view or sales forecasts.
+    """
+    moment = now or datetime.now(timezone.utc)
+    if moment.tzinfo is None:
+        raise ValueError("timezone-aware now required")
+    moment = moment.astimezone(timezone.utc)
+    if not 1 <= int(limit) <= 100:
+        raise ValueError("opportunity review limit out of bounds")
+    if not 1 <= max_observation_age_hours <= 24 * 14:
+        raise ValueError("invalid observation freshness window")
+    if not 1 <= max_video_age_days <= 365:
+        raise ValueError("invalid publication window")
+    if not 1 <= float(minimum_outlier_ratio) <= 100:
+        raise ValueError("invalid baseline threshold")
+
+    def parsed(raw: Any) -> datetime | None:
+        if not isinstance(raw, str) or not raw.strip():
+            return None
+        try:
+            dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if dt.tzinfo is None:
+            return None
+        return dt.astimezone(timezone.utc)
+
+    def matches(text: str, term: str) -> bool:
+        return bool(re.search(r"(?<![a-z0-9])" + re.escape(term) + r"(?![a-z0-9])", text))
+
+    seen: set[str] = set()
+    candidates: list[dict[str, Any]] = []
+    excluded: dict[str, int] = {}
+    count = 0
+    for row in observations:
+        count += 1
+        if count > 2000:
+            raise ValueError("bounded research observations exceeded")
+        if not isinstance(row, Mapping) or row.get("schema_version") != "empire.media.youtube_video_observation.v1":
+            raise ValueError("normalized video observation required")
+        ref = row.get("video_id")
+        if not isinstance(ref, str) or not ref.strip() or len(ref) > 128:
+            raise ValueError("video id required")
+        if ref in seen:
+            excluded["duplicate_video_id"] = excluded.get("duplicate_video_id", 0) + 1
+            continue
+        seen.add(ref)
+        reasons = []
+        evidence = row.get("evidence_refs")
+        if not isinstance(evidence, (list, tuple)) or not any(isinstance(x, str) and x.strip() for x in evidence):
+            reasons.append("NO_SOURCE_EVIDENCE")
+        title = str(row.get("title") or "").lower()
+        description = str(row.get("description") or "").lower()
+        verticals = [
+            name for name, terms in EMPIRE_VIDEO_VERTICAL_TERMS.items()
+            if any(matches(title, term) for term in terms)
+        ]
+        # Description alone is not enough to declare the main video topic.
+        if not verticals:
+            reasons.append("NO_TITLE_LEVEL_VERTICAL_MATCH")
+        market_text = title + " " + description
+        market_cues = [
+            market for market, terms in EMPIRE_VIDEO_MARKET_CUES.items()
+            if any(matches(market_text, term) for term in terms)
+        ]
+        observed_at = parsed(row.get("observed_at"))
+        published_at = parsed(row.get("published_at"))
+        # A normalization within the same batch can postdate a caller-captured
+        # clock by milliseconds. Permit up to 60 seconds of bounded skew.
+        if observed_at is None or not -60 <= (moment - observed_at).total_seconds() <= 3600 * max_observation_age_hours:
+            reasons.append("STALE_OR_UNKNOWN_OBSERVATION")
+        if published_at is None or not 0 <= (moment - published_at).total_seconds() <= 86400 * max_video_age_days:
+            reasons.append("STALE_OR_UNKNOWN_PUBLICATION")
+        baseline = row.get("channel_baseline")
+        metric = row.get("primary_performance_metric")
+        ratio = None
+        if isinstance(baseline, Mapping) and baseline.get("baseline_state") == "OBSERVED_MEDIAN" and baseline.get("metric") == metric and isinstance(baseline.get("sample_size"), int) and baseline["sample_size"] >= MIN_BASELINE_VIDEOS:
+            ratio = outlier_ratio(row.get("primary_performance_value"), baseline.get("value"))
+        if ratio is None:
+            reasons.append("NO_COMPARABLE_CHANNEL_BASELINE")
+        elif ratio < minimum_outlier_ratio:
+            reasons.append("BELOW_OUTLIER_THRESHOLD")
+
+        if reasons:
+            for reason in reasons:
+                excluded[reason] = excluded.get(reason, 0) + 1
+            continue
+        # No invented market certainty from words in a video title/description.
+        sector = verticals[0]
+        capacity = (commercial_capacity or {}).get(sector, {})
+        if not isinstance(capacity, Mapping):
+            raise ValueError("commercial capacity entries must be mappings")
+        status = str(capacity.get("status") or "NOT_VERIFIED")
+        if status not in {"NOT_VERIFIED", "NO_VERIFIED_CAPACITY", "TERMS_PENDING", "VERIFIED_CAPACITY"}:
+            raise ValueError("unrecognized buyer capacity state")
+        capacity_refs = capacity.get("evidence_refs") or []
+        if status == "VERIFIED_CAPACITY" and not capacity_refs:
+            status = "NOT_VERIFIED"
+        age_days = round((moment - published_at).total_seconds() / 86400, 2)
+        # Priority is an editorial heuristic, not a performance or cash projection.
+        priority = (
+            "HIGH_SIGNAL_REVIEW" if ratio >= 3 and market_cues
+            else "RESEARCH_REVIEW"
+        )
+        candidates.append({
+            "video_id": ref,
+            "title": row.get("title"),
+            "channel_id": row.get("channel_id"),
+            "vertical": sector,
+            "matched_verticals": verticals,
+            "market_cues_not_territory_proof": market_cues,
+            "published_age_days": age_days,
+            "outlier_ratio_descriptive": ratio,
+            "priority": priority,
+            "upstream_reported_buyer_capacity_status": status,
+            "buyer_capacity_evidence_refs": list(capacity_refs),
+            "buyer_capacity_independently_verified_here": False,
+            "suggested_next_step": (
+                "REVIEW_EVIDENCE_AND_EDITORIAL_ANGLE" if status == "VERIFIED_CAPACITY"
+                else "RESEARCH_EDUCATIONAL_CONTENT_NO_PAYABLE_LEAD_CLAIMS"
+            ),
+            "evidence_refs": [str(x) for x in evidence if isinstance(x, str) and x.strip()],
+            "competitor_transcript_verified": bool(row.get("transcript_ref")),
+            "commercial_buyer_intent_verified": False,
+            "revenue_proven": False,
+            "public_publish_authorized": False,
+        })
+    candidates.sort(key=lambda item: (
+        item["priority"] != "HIGH_SIGNAL_REVIEW",
+        -float(item["outlier_ratio_descriptive"]),
+        item["published_age_days"],
+        item["video_id"],
+    ))
+    return {
+        "schema_version": "empire.media.youtube_commercial_opportunities.v1",
+        "mode": "OBSERVE",
+        "observation_count": count,
+        "unique_video_count": len(seen),
+        "candidate_count": len(candidates),
+        "candidates": candidates[:limit],
+        "excluded_reason_counts": dict(sorted(excluded.items())),
+        "comparison_method": "CHANNEL_MEDIAN_OUTLIER_HEURISTIC_NOT_AGE_NORMALIZED",
+        "performance_benchmark_against_vidiq_proven": False,
+        "owned_channel_conversion_attribution_proven": False,
+        "revenue_recognized": False,
+        "commercial_activation_authorized": False,
+        "automatic_video_generation_authorized": False,
+        "automatic_publication_authorized": False,
+        "execution_authority": "none",
+    }

@@ -10,7 +10,10 @@ import json
 from pathlib import Path
 
 from empire_os.runtime_env import load_runtime_env
-from empire_os.youtube_intelligence import youtube_inspiration_review
+from empire_os.youtube_intelligence import (
+    youtube_inspiration_review,
+    review_youtube_commercial_opportunities,
+)
 from empire_os.youtube_read_adapter import (
     YouTubeDataReadAdapter,
     read_public_youtube_oembed,
@@ -22,12 +25,25 @@ def main(argv: list[str] | None = None) -> int:
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--url", help="Public YouTube video link or ID")
     group.add_argument("--query", help="Search YouTube by topic using official Data API")
+    group.add_argument("--opportunities-file", help="Review an existing Media OS normalized-observations JSON packet offline")
     parser.add_argument("--description-file", help="Optional supplied video description with published chapter labels")
     parser.add_argument("--allow-one-search-call", action="store_true", help="Explicitly spend one YouTube search quota call")
     parser.add_argument("--max-results", type=int, default=10)
     args = parser.parse_args(argv)
 
-    if args.url:
+    if args.opportunities_file:
+        file = Path(args.opportunities_file).resolve()
+        if not file.is_file() or file.stat().st_size > 3_000_000:
+            raise ValueError("opportunity packet must be local and <=3MB")
+        packet = json.loads(file.read_text(encoding="utf-8"))
+        if not isinstance(packet, dict) or not isinstance(packet.get("observations"), list):
+            raise ValueError("normalized observations packet required")
+        result = review_youtube_commercial_opportunities(
+            packet["observations"],
+            commercial_capacity=packet.get("commercial_capacity"),
+            limit=args.max_results,
+        )
+    elif args.url:
         public = read_public_youtube_oembed(args.url)
         description = ""
         if args.description_file:
