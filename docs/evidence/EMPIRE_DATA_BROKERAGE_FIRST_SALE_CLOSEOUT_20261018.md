@@ -75,6 +75,27 @@ No fabricated rank, backlinks, click metrics, forecast sales uplift,
 claim of current contract authority, raw source redistribution or
 payment receipt is included.
 
+## Fresh live read-only source and site verification (18 October 2026)
+
+The exact existing \`scripts.audit_data_exchange_raw_source_shape_v19 --read-only\`
+completed successfully (exit 0) against the three fixed official
+Planning Data entity endpoints, with **zero database writes, raw data
+exports or customer delivery**. Aggregate report: 3 responses,
+59 raw JSON key occurrences, 35 occurrences outside the allowed input
+projection, and 6 potentially sensitive key-name occurrences. The
+strict source-field projection passed; real-person data within excluded
+raw values was **not inspected**, so raw payload/privacy and field-rights
+review remain open. This is not new source change evidence or a signed
+licence decision.
+
+The live \`https://empire-ai.co.uk/buy\` HTTP HEAD responded 200;
+that proves public page availability only, **not** checkout activation,
+merchant settlement, a paid customer or a fulfilled original report.
+
+The separate Workspace Gmail inbox showed no new buyer reply to the
+existing SPC thread when inspected during this closeout; therefore no
+second message, inferred acceptance, order or invoice was generated.
+
 ## What remains genuinely external and cannot be closed by software tests
 
 | Real-world completion dependency | Observed truth | Revenue-first action |
