@@ -79,19 +79,27 @@ def _parse_counts(rows: Any) -> dict[str, Any]:
         total, matching, approved, original_id = counts[tid]
         if total == 0:
             status = "NO_CANONICAL_GMAIL_THREAD_INTENT_VISIBLE_TO_READER"
+            next_action = "REVIEW_HISTORICAL_SENT_EVIDENCE_FOR_CANONICAL_ADMISSION"
         elif matching == 0:
             status = "GMAIL_THREAD_PRESENT_ORIGINAL_RECIPIENT_NOT_BOUND"
+            next_action = "REVIEW_EXACT_ORIGINAL_RECIPIENT_MISMATCH"
         elif matching > 1:
             status = "AMBIGUOUS_CANONICAL_SENT_INTENT"
+            next_action = "RESOLVE_CANONICAL_INTENT_AMBIGUITY"
         elif approved != 1:
             status = "CANONICAL_APPROVAL_EVIDENCE_NOT_COMPLETE"
+            next_action = "VERIFY_ACTUAL_FOUNDER_APPROVAL_PROVENANCE"
         elif original_id != 1:
             status = "ORIGINAL_PROVIDER_SENT_MESSAGE_ID_NOT_BOUND"
+            next_action = "RECONCILE_ORIGINAL_PROVIDER_MESSAGE_PROVENANCE"
         else:
             status = "STRUCTURAL_CANDIDATE_ONLY_REQUIRES_TENANT_AND_PROVIDER_REVIEW"
+            next_action = "VERIFY_TENANT_CONTACT_SUPPRESSION_AND_BUYER_REPLY"
         items.append({
             "company": company,
             "status": status,
+            "next_founder_review_action": next_action,
+            "historical_send_reconciliation_automatically_authorized": False,
             "canonical_same_thread_intents_visible": total,
             "canonical_exact_recipient_sent_intents_visible": matching,
             "original_sent_provider_message_id_matches": original_id,

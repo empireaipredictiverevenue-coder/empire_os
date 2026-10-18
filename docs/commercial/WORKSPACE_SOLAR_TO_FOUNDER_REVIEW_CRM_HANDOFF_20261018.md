@@ -193,9 +193,9 @@ The new route reuses the existing Founder read API and requires only that
 service's ordinary read-only reload; no migration, new credential, new
 timer, CRM write, payment or public publication is part of this change.
 
-**Live canonical evidence result:** to be independently filled in after
-service readback; do not confuse Gmail's six verified SENT anchors with
-six EmpireDB approved intents.
+**Independently verified production result (18 October 2026):** the new private read API returned HTTP 200 with six complete aggregate rows. For GB NRG, Perfect Sense Energy, Solar4Good, Sustain Commercial Solar, SOL PV Group and 100% Renewables, the restricted canonical observer saw **zero matching Gmail-thread intents** and zero exact-recipient sent intents. Separately, the authenticated Workspace Gmail API verified all six real original sent messages and zero reply candidates. This is a **historical send-to-canonical-ledger mapping gap**, not a failed Gmail send and not proof that no canonical record exists outside this reader's visibility. No DB or CRM record was inserted.
+
+The canonical review now supplies a deterministic `next_founder_review_action` for each of the six exact thread anchors, with `historical_send_reconciliation_automatically_authorized=false`. Where no canonical intent is visible, the action is `REVIEW_HISTORICAL_SENT_EVIDENCE_FOR_CANONICAL_ADMISSION`. Ambiguous/mismatched or partially proved intents instead receive specific review steps. This does not authorise an automatic retrospective approval, new send, tenant binding, contact creation or suppression change.
 
 ## What remains conditional / NOT verified
 

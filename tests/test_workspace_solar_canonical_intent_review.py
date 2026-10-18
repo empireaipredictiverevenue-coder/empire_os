@@ -28,19 +28,21 @@ def test_zero_visible_is_not_attested_absence_or_crm():
     assert report["outbound_sent"] is False
     assert report["founder_crm_delivery_verified"] is False
     assert "@" not in str(report)
+    assert all(x["next_founder_review_action"] == "REVIEW_HISTORICAL_SENT_EVIDENCE_FOR_CANONICAL_ADMISSION" for x in report["items"])
+    assert all(x["historical_send_reconciliation_automatically_authorized"] is False for x in report["items"])
 
 
-@pytest.mark.parametrize("counts,code",[
-    ((1,0,0,0),"GMAIL_THREAD_PRESENT_ORIGINAL_RECIPIENT_NOT_BOUND"),
-    ((2,2,2,2),"AMBIGUOUS_CANONICAL_SENT_INTENT"),
-    ((1,1,0,1),"CANONICAL_APPROVAL_EVIDENCE_NOT_COMPLETE"),
-    ((1,1,1,0),"ORIGINAL_PROVIDER_SENT_MESSAGE_ID_NOT_BOUND"),
-    ((1,1,1,1),"STRUCTURAL_CANDIDATE_ONLY_REQUIRES_TENANT_AND_PROVIDER_REVIEW"),
+@pytest.mark.parametrize("counts,code,action",[
+    ((1,0,0,0),"GMAIL_THREAD_PRESENT_ORIGINAL_RECIPIENT_NOT_BOUND","REVIEW_EXACT_ORIGINAL_RECIPIENT_MISMATCH"),
+    ((2,2,2,2),"AMBIGUOUS_CANONICAL_SENT_INTENT","RESOLVE_CANONICAL_INTENT_AMBIGUITY"),
+    ((1,1,0,1),"CANONICAL_APPROVAL_EVIDENCE_NOT_COMPLETE","VERIFY_ACTUAL_FOUNDER_APPROVAL_PROVENANCE"),
+    ((1,1,1,0),"ORIGINAL_PROVIDER_SENT_MESSAGE_ID_NOT_BOUND","RECONCILE_ORIGINAL_PROVIDER_MESSAGE_PROVENANCE"),
+    ((1,1,1,1),"STRUCTURAL_CANDIDATE_ONLY_REQUIRES_TENANT_AND_PROVIDER_REVIEW","VERIFY_TENANT_CONTACT_SUPPRESSION_AND_BUYER_REPLY"),
 ])
-def test_six_exact_source_states_never_promote(counts,code):
+def test_six_exact_source_states_never_promote(counts,code,action):
     report=_parse_counts(rows(counts))
-    assert all(r["status"] == code for r in report["items"])
-    assert not any(r["tenant_identity_verified"] or r["crm_handoff_authorized"] for r in report["items"])
+    assert all(r["status"] == code and r["next_founder_review_action"] == action for r in report["items"])
+    assert not any(r["tenant_identity_verified"] or r["crm_handoff_authorized"] or r["historical_send_reconciliation_automatically_authorized"] for r in report["items"])
 
 
 @pytest.mark.parametrize("broken",[
