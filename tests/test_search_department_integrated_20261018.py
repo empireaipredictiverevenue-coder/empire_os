@@ -74,6 +74,29 @@ def evidence():
             "returned_page_rows":28,"missing_legacy_page_count":26,
             "missing_legacy_page_impressions":37,
             "missing_legacy_page_clicks":0,
+            "returned_page_clicks":1,
+            "returned_page_impressions":55,
+            "missing_review_categories":{
+                "BUYER_INTENT_EDITORIAL_REVIEW":1,
+                "EMPIRE_PRODUCT_TOPIC_REVIEW":11,
+                "ROOFING_RESEARCH_REVIEW":4,
+                "OFF_CORE_RETAIN_404_PENDING_EVIDENCE":10,
+            },
+            "missing_review_queue":[
+                {
+                    "path":f"/aeo/example/fixture-{index}/",
+                    "review_category":(
+                        "BUYER_INTENT_EDITORIAL_REVIEW" if index == 0 else
+                        "EMPIRE_PRODUCT_TOPIC_REVIEW" if index < 12 else
+                        "ROOFING_RESEARCH_REVIEW" if index < 16 else
+                        "OFF_CORE_RETAIN_404_PENDING_EVIDENCE"
+                    ),
+                    "origin_http_status":404,
+                    "page_dimension_impressions":37 if index == 0 else 0,
+                    "page_dimension_clicks":0,
+                    "redirect_authorized":False,"restore_authorized":False,
+                } for index in range(26)
+            ],
             "query_page_rows_joined_or_added":False,
             "database_writes":False,"redirect_authorized":False,
             "publication_authorized":False,
@@ -90,6 +113,11 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     assert d["live_campaign_measurement_release_verified"] is False
     assert d["gsc_returned_page_rows"]==28
     assert d["legacy_missing_404_count_in_returned_page_sample"]==26
+    assert d["gsc_returned_page_sample_clicks"]==1
+    assert d["legacy_404_core_topic_editorial_review_count"]==16
+    assert d["legacy_404_off_core_retain_404_count"]==10
+    assert d["legacy_404_restorations_approved"]==0
+    assert d["legacy_404_redirects_approved"]==0
     assert d["gsc_query_and_page_totals_added"] is False
     assert d["gsc_sitewide_traffic_or_indexing_verified"] is False
     assert d["external_ai_answer_citation_verified"] is False
@@ -123,6 +151,8 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     ("semantic","paid_api_requests",1,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
     ("semantic","site_mutated",True,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
     ("semantic","revenue_verified",True,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
+    ("legacy","missing_review_queue",[],"LEGACY_EDITORIAL_REVIEW_LEDGER_UNVERIFIED"),
+    ("legacy","returned_page_clicks",100,"LEGACY_SAMPLE_TOTALS_CONTRADICTED"),
     ("legacy","redirect_authorized",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","database_writes",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","returned_page_rows",27,"INCONSISTENT_PAGE_DIMENSION_SAMPLE"),
@@ -155,6 +185,8 @@ def test_absence_of_historical_404_rows_does_not_prove_search_visitors():
     e=evidence()
     e["legacy"]["missing_legacy_page_count"]=0
     e["legacy"]["missing_legacy_page_impressions"]=0
+    e["legacy"]["missing_review_queue"]=[]
+    e["legacy"]["missing_review_categories"]={}
     d=reconcile_department(**e)
     assert "HISTORIC_GSC_404_EDITORIAL_TRIAGE_PENDING" not in d["open_gates"]
     assert d["gsc_sitewide_traffic_or_indexing_verified"] is False
@@ -190,3 +222,32 @@ def test_cli_requires_explicit_review_only_and_date_pair():
                  ["--review-only","--send"]):
         with pytest.raises(SystemExit):
             cli.main(args)
+
+
+def test_404_category_totals_cannot_be_invented():
+    e=evidence()
+    e["legacy"]["missing_review_categories"]["EMPIRE_PRODUCT_TOPIC_REVIEW"] += 1
+    with pytest.raises(IntegrationEvidenceHeld,match="LEGACY_EDITORIAL_CATEGORY_COUNT_MISMATCH"):
+        reconcile_department(**e)
+
+
+def test_404_duplicate_page_path_fails_closed():
+    e=evidence()
+    e["legacy"]["missing_review_queue"][1]["path"] = (
+        e["legacy"]["missing_review_queue"][0]["path"])
+    with pytest.raises(IntegrationEvidenceHeld,match="LEGACY_EDITORIAL_ENTRY_UNVERIFIED"):
+        reconcile_department(**e)
+
+
+def test_404_ledger_mismatched_impressions_fails_closed():
+    e=evidence()
+    e["legacy"]["missing_review_queue"][0]["page_dimension_impressions"] += 1
+    with pytest.raises(IntegrationEvidenceHeld,match="LEGACY_EDITORIAL_LEDGER_TOTALS_MISMATCH"):
+        reconcile_department(**e)
+
+
+def test_non_core_retained_404_never_authorizes_mass_redirect():
+    e=evidence()
+    e["legacy"]["missing_review_queue"][16]["redirect_authorized"] = True
+    with pytest.raises(IntegrationEvidenceHeld,match="LEGACY_EDITORIAL_ENTRY_UNVERIFIED"):
+        reconcile_department(**e)

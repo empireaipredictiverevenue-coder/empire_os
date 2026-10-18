@@ -130,6 +130,54 @@ def reconcile_department(
     if (gsc_count != legacy_count or missing > legacy_count
             or missing_clicks > missing_imp):
         raise IntegrationEvidenceHeld("INCONSISTENT_PAGE_DIMENSION_SAMPLE")
+    # The existing dedicated 404 reviewer already fetches and categorizes
+    # these exact page-dimension rows. Consume its ledger without inventing
+    # redirect equivalence, sales or SERP rankings from its labels.
+    valid_groups = (
+        "BUYER_INTENT_EDITORIAL_REVIEW",
+        "EMPIRE_PRODUCT_TOPIC_REVIEW",
+        "ROOFING_RESEARCH_REVIEW",
+        "OFF_CORE_RETAIN_404_PENDING_EVIDENCE",
+    )
+    category_counts = legacy.get("missing_review_categories")
+    queue = legacy.get("missing_review_queue")
+    if (not isinstance(category_counts, Mapping)
+            or not isinstance(queue, list) or len(queue) != missing
+            or set(category_counts) - set(valid_groups)
+            or any(not isinstance(entry, Mapping) for entry in queue)):
+        raise IntegrationEvidenceHeld("LEGACY_EDITORIAL_REVIEW_LEDGER_UNVERIFIED")
+    groups = {key: _exact_nonnegative(category_counts.get(key, 0), max_value=250)
+              for key in valid_groups}
+    if sum(groups.values()) != missing:
+        raise IntegrationEvidenceHeld("LEGACY_EDITORIAL_CATEGORY_COUNT_MISMATCH")
+    observed = {key: 0 for key in valid_groups}
+    paths = set()
+    observed_impressions = 0
+    observed_clicks = 0
+    for entry in queue:
+        category, path = entry.get("review_category"), entry.get("path")
+        if (category not in observed or not isinstance(path, str)
+                or not path.startswith("/aeo/") or len(path) > 200
+                or path in paths or entry.get("origin_http_status") != 404
+                or entry.get("redirect_authorized") is not False
+                or entry.get("restore_authorized") is not False):
+            raise IntegrationEvidenceHeld("LEGACY_EDITORIAL_ENTRY_UNVERIFIED")
+        paths.add(path)
+        observed[category] += 1
+        observed_impressions += _exact_nonnegative(
+            entry.get("page_dimension_impressions"))
+        observed_clicks += _exact_nonnegative(entry.get("page_dimension_clicks"))
+    if (observed != groups or observed_impressions != missing_imp
+            or observed_clicks != missing_clicks):
+        raise IntegrationEvidenceHeld("LEGACY_EDITORIAL_LEDGER_TOTALS_MISMATCH")
+    sample_clicks = _exact_nonnegative(legacy.get("returned_page_clicks"))
+    sample_impressions = _exact_nonnegative(legacy.get("returned_page_impressions"))
+    if (sample_clicks > sample_impressions or sample_clicks < missing_clicks
+            or sample_impressions < missing_imp):
+        raise IntegrationEvidenceHeld("LEGACY_SAMPLE_TOTALS_CONTRADICTED")
+    core_topics = (groups["BUYER_INTENT_EDITORIAL_REVIEW"]
+                   + groups["EMPIRE_PRODUCT_TOPIC_REVIEW"]
+                   + groups["ROOFING_RESEARCH_REVIEW"])
     ready = (
         all(p.get("http") == 200 and p.get("available") is True for p in pages.values())
         and seo.get("sitemap_http") == 200
@@ -179,6 +227,13 @@ def reconcile_department(
         "legacy_missing_404_count_in_returned_page_sample": missing,
         "legacy_missing_404_impressions_in_returned_page_sample": missing_imp,
         "legacy_missing_404_clicks_in_returned_page_sample": missing_clicks,
+        "gsc_returned_page_sample_clicks": sample_clicks,
+        "gsc_returned_page_sample_impressions": sample_impressions,
+        "legacy_404_editorial_category_counts": groups,
+        "legacy_404_core_topic_editorial_review_count": core_topics,
+        "legacy_404_off_core_retain_404_count": groups["OFF_CORE_RETAIN_404_PENDING_EVIDENCE"],
+        "legacy_404_restorations_approved": 0,
+        "legacy_404_redirects_approved": 0,
         "owned_seo_aeo_a2a_discovery_http_verified": ready,
         "external_ai_answer_citation_verified": ai_proven,
         "external_geo_mentions_verified": geo_proven,
