@@ -260,6 +260,42 @@ needs original sender, suppression, canonical intent, contact and tenant
 authority to justify CRM promotion. **Do not implement another Gmail
 monitor or replay the six original outreach emails.**
 
+## Final isolated DB proof + private read endpoint (18 October evening)
+
+A reproducible scratch-only PostgreSQL 18 integration exercise is now
+checked into the repository at
+`scripts/verify_workspace_historical_scratch_postgres_20261018.py`.
+It creates its OWN temporary database cluster over a private Unix socket;
+it never connects to production EmpireDB. Migration 052 applied successfully
+there, refused a duplicate install, and the actual importer admitted all
+six original Gmail historical receipts, then replayed with zero duplicates.
+The restricted read-only observer could SELECT all six but could not
+DELETE them; UPDATE/DELETE and fraudulent historical approval changes
+were rejected. The scratch instance was stopped and deleted.
+
+The existing private Founder read API now has another GET endpoint:
+`/v1/founder-mailbox/workspace-solar-historical-evidence-status`.
+It independently compares the original 0600 six-receipt private custody
+with the exact six database rows (when the new table exists), under the
+existing `empire_closer_observer` role and a strictly READ ONLY transaction.
+It reveals safe status/counts only, not contact addresses or bodies.
+Source conflicts return sanitized HTTP 503, never false success.
+
+**Independently verified LIVE production response:**
+`PRIVATE_CUSTODY_ONLY_DATABASE_SCHEMA_HELD`,
+`private_custody_receipts_verified=6`,
+`database_historical_receipt_table_active=false`,
+`database_historical_receipts_verified=0`,
+`canonical_outbound_intents_created=0`,
+`crm_records_created=0`, `outbound_sent=false`,
+`database_writes=false`. All four existing Founder/CRM/Gmail services
+remained active after the read-only Founder API reload.
+
+**Do not claim EmpireDB 052 was installed or the six historical receipts
+were imported in production.** Production DDL and six-receipt INSERT
+remain pending explicit founder authority. No live buyer reply has been
+verified and no historical email was resent.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
