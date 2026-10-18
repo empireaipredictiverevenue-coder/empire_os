@@ -173,6 +173,12 @@ def review_formula_evidence(
     if dist_status == "FRESH" and opportunity_count == 0:
         blockers.append("no_observed_opportunities_for_formula")
 
+    # Same authenticated Economic Memory/Quant benchmark as the existing
+    # shadow learning subsystem. Never trust a serialized performance number
+    # as proof, or expose per-tenant learning in this global founder response.
+    from empire_os.predictive_learning_readiness import read_founder_learning_readiness
+    learning = read_founder_learning_readiness(root, as_of=now)
+
     current = cloud_status == "FRESH" and dist_status == "FRESH"
     status = (
         "REVIEW_READY" if current and ready is True and evaluated is True
@@ -195,6 +201,7 @@ def review_formula_evidence(
         "fresh_opportunity_count": opportunity_count,
         "revenue_formula_bounds_supported": bounds_supported,
         "missing_factor_counts": missing_counts,
+        "verified_outcome_learning": learning,
         "blockers": sorted(set(blockers)),
         "model_is_commercially_calibrated": False,
         "source_reports_are_not_independent_payment_proof": True,

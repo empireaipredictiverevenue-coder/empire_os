@@ -20,6 +20,9 @@ def test_no_outcome_history_reports_insufficient_evidence():
     assert result["verified_review_count"] == 0
     assert result["candidate_brier"] is None
     assert result["candidate_beats_baseline"] is None
+    assert result["calibration_improvement_brier_absolute"] is None
+    assert result["holdout_signed_probability_bias"] is None
+    assert result["calibration_metrics_ready"] is False
     assert not result["evaluation_ready"]
     assert not result["model_weight_mutation"]
 
@@ -94,6 +97,17 @@ def test_time_safe_baseline_never_sees_future_outcomes(monkeypatch):
     assert result["candidate_brier"] is not None
     assert result["historical_baseline_brier"] is not None
     assert result["evaluation_ready"] is True
+    assert result["calibration_metrics_ready"] is True
+    assert result["calibration_improvement_brier_absolute"] == round(
+        result["historical_baseline_brier"] - result["candidate_brier"], 6
+    )
+    assert result["calibration_improvement_brier_relative"] is not None
+    assert result["holdout_mean_predicted_probability"] == 0.8
+    assert result["holdout_verified_event_rate"] is not None
+    assert result["holdout_signed_probability_bias"] == round(
+        result["holdout_mean_predicted_probability"] - result["holdout_verified_event_rate"], 6
+    )
+    assert result["outcomes_used_before_prediction"] is False
     assert result["promoted_learning"] is False
 
 

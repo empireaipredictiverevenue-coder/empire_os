@@ -72,7 +72,31 @@ export type PredictiveBuyerCapacityBrief = {
   work_dispatched: false;
 };
 
+export type PredictiveLearningReadiness = {
+  schema_version: string;
+  status: string;
+  reason: string | null;
+  source_status: string;
+  verified_review_count: number | null;
+  verified_outcome_feedback_count: number | null;
+  temporal_holdout_count: number | null;
+  required_prior_outcomes?: number;
+  required_holdout_outcomes?: number;
+  candidate_brier: number | null;
+  historical_baseline_brier: number | null;
+  candidate_beats_baseline: boolean | null;
+  improvement_brier_absolute: number | null;
+  improvement_brier_relative: number | null;
+  calibration_bias: number | null;
+  next_evidence_action: string;
+  learning_promoted: false;
+  outbound_authorized: false;
+  model_weight_mutation: false;
+  execution_authority: "none";
+};
+
 export type PredictiveFormulaEvidence = {
+  verified_outcome_learning: PredictiveLearningReadiness;
   schema_version: string;
   status: string;
   mode: "OBSERVE";

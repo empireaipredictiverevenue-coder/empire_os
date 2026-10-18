@@ -177,3 +177,87 @@ and scenario costs, refuses declines/invalid inputs, never performs actions,
 and does not promote hypothetical improvements into calibrated revenue or
 Economic Memory. It belongs to the original canonical formula module, not
 a new optimizer or autonomous execution service.
+
+
+## 18 October continuation — connect formula intelligence to verified outcomes
+
+Enhance **existing** Economic Memory → canonical outcome validator → original
+prediction calibration → Quant Brier → historical time-safe baseline. No new
+model-fitting pipeline, database, worker or calibration math is invented.
+
+### Existing shadow benchmark enhanced
+
+`empire_os/lead_shadow_calibration_benchmark.py` now returns:
+- `reviewed_as_of` (evaluation clock, not a claim about producer freshness)
+- `calibration_improvement_brier_absolute` = historical baseline Brier minus
+  original prediction Brier
+- `calibration_improvement_brier_relative` = that delta divided by the
+  historical baseline Brier (NULL when baseline is zero)
+- `holdout_mean_predicted_probability`, `holdout_verified_event_rate`
+- `holdout_signed_probability_bias` = predicted frequency minus observed
+  verified frequency.
+
+These diagnostics remain NULL until the **same** canonical provenance-checked
+and chronologically safe comparison reaches its required cohort size. Tests
+confirm the metrics are descriptive, do not fit/promote weights and cannot
+include outcomes that became available after the original prediction.
+
+### Readiness bridge
+
+New `empire_os/predictive_learning_readiness.py` reuses the existing
+`evaluate_shadow_calibration` function, rather than trusting a serialized
+shadow score. It returns a bounded review packet and identifies the next
+commercial evidence task:
+- no terminal outcomes → `OBTAIN_VERIFIED_TERMINAL_COMMERCIAL_OUTCOMES`
+- outcomes lacking original prediction lineage →
+  `LINK_ORIGINAL_PREDICTION_TO_VERIFIED_OUTCOME`
+- too little chronological holdout → `GROW_TIME_SAFE_VERIFIED_OUTCOME_COHORT`
+- sufficient revalidated holdout →
+  `FOUNDER_REVIEW_CALIBRATION_VS_HISTORICAL_BASELINE`.
+
+Only a caller with an **explicit matching tenant_id** can evaluate a populated
+tenant-specific cohort. The global founder dashboard deliberately holds a
+tenant-scoped Economic Memory source instead of leaking customer-level data
+or inference. Its unscoped review requires the existing Economic Memory file,
+schema, OBSERVE/no authority, current timestamp and a bounded regular file.
+
+The existing `predictive_formula_evidence_review` now exposes a nested
+`verified_outcome_learning` packet. The existing Founder Console presents
+verified reviews, matched outcomes, time-safe sample size, conditional
+performance against the baseline and a next evidence action.
+
+The earlier formula-readiness flag remains distinct from model calibration:
+the arithmetic can be technically ready while verified commercial learning
+is **not**. The console does not display revenue forecasts or counterfeit
+calibration values.
+
+### Observed production checkpoint (read-only)
+
+18 October 2026 observed canonical unscoped Economic Memory:
+- 0 verified calibration reviews
+- 0 matched verified outcomes
+- 0 time-safe evaluation rows
+- next action: verified terminal commercial outcome evidence.
+
+That result is an **evidence gap**, not proof of commercial failure across all
+unqueried tenants. No transactions, outbound, source records, models or live
+production deployment were changed by this branch.
+
+### Verification
+
+```bash
+cd /home/ubuntu/empire_agents/predictive_decision_control_20261018
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -m pytest -q \
+  tests/test_predictive_learning_readiness.py \
+  tests/test_lead_shadow_calibration_benchmark.py \
+  tests/test_verified_outcome_learning_continuity.py \
+  tests/test_predictive_formula_evidence_review.py \
+  tests/test_founder_dashboard.py
+cd apps/search-command-centre
+./node_modules/.bin/tsc --noEmit -p tsconfig.json
+./node_modules/.bin/eslint src/app/founder/page.tsx src/lib/founder-api.ts
+```
+
+After the coordinated feature merge, independently verify the authenticated
+Founder Console and current producer outputs. Do not infer readiness from
+test fixtures or silently change the existing financial/outbound gates.

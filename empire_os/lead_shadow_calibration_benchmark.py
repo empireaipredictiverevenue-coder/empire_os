@@ -120,8 +120,34 @@ def evaluate_shadow_calibration(
     candidate_metric = brier_score([row[0] for row in scored], [row[2] for row in scored])
     baseline_metric = brier_score([row[1] for row in scored], [row[2] for row in scored])
     adequate = not blockers
+    candidate_brier = candidate_metric.get("brier_score")
+    baseline_brier = baseline_metric.get("brier_score")
+    # Descriptive calibration diagnostics over the SAME prequential holdout;
+    # never borrow outcomes that arrived after a prediction was issued.
+    delta = None
+    relative_delta = None
+    bias = None
+    event_rate = None
+    mean_probability = None
+    if adequate and candidate_brier is not None and baseline_brier is not None:
+        delta = round(baseline_brier - candidate_brier, 6)
+        relative_delta = (
+            round(delta / baseline_brier, 6) if baseline_brier > 0 else None
+        )
+        event_rate = round(sum(row[2] for row in scored) / len(scored), 6)
+        mean_probability = round(sum(row[0] for row in scored) / len(scored), 6)
+        bias = round(mean_probability - event_rate, 6)
     return {
         "schema_version": "empire.lead_shadow_calibration_benchmark.v1",
+        "reviewed_as_of": now.isoformat(),
+        "calibration_improvement_brier_absolute": delta,
+        "calibration_improvement_brier_relative": relative_delta,
+        "holdout_mean_predicted_probability": mean_probability,
+        "holdout_verified_event_rate": event_rate,
+        "holdout_signed_probability_bias": bias,
+        "calibration_metrics_ready": adequate,
+        "calibration_metrics_are_descriptive_only": True,
+        "outcomes_used_before_prediction": False,
         "mode": "OBSERVE", "execution_authority": "none",
         "tenant_scoped": bool(tenant_id),
         "verified_review_count": len(validated),

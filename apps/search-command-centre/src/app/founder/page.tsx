@@ -274,6 +274,32 @@ export default async function FounderPage() {
                               .slice(0, 10).map(([factor, count]) => `${factor.replaceAll("_", " ")} (${count})`).join(" · ") || "None reported"}
                           </div>
                         ) : null}
+                        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.025] p-4">
+                          <div className="flex flex-wrap justify-between gap-2">
+                            <h4 className="text-sm font-semibold text-white">
+                              Learning from verified commercial outcomes
+                            </h4>
+                            <span className="text-xs text-amber-200">
+                              {show(formulaEvidence.verified_outcome_learning?.status, "NOT AVAILABLE").replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-300 lg:grid-cols-4">
+                            <span>Verified reviews: {formulaEvidence.verified_outcome_learning?.verified_review_count ?? "Unknown"}</span>
+                            <span>Matched outcomes: {formulaEvidence.verified_outcome_learning?.verified_outcome_feedback_count ?? "Unknown"}</span>
+                            <span>Time-safe holdout: {formulaEvidence.verified_outcome_learning?.temporal_holdout_count ?? "Unknown"}</span>
+                            <span>Model vs baseline: {formulaEvidence.verified_outcome_learning?.candidate_beats_baseline === null ||
+                              formulaEvidence.verified_outcome_learning?.candidate_beats_baseline === undefined
+                              ? "Not established"
+                              : formulaEvidence.verified_outcome_learning.candidate_beats_baseline ? "Improved" : "Not improved"}</span>
+                          </div>
+                          <p className="mt-3 text-xs font-medium text-amber-100">
+                            Next: {show(formulaEvidence.verified_outcome_learning?.next_evidence_action, "Refresh validated outcomes").replaceAll("_", " ")}
+                          </p>
+                          <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                            Reuses Economic Memory and time-safe Quant Brier comparison.
+                            Empty or unverified cohorts are not treated as calibrated performance.
+                          </p>
+                        </div>
                         <p className="mt-3 text-[11px] text-slate-500">
                           Diagnostics only · no forecast generated here · no model promotion, outbound or payments.
                         </p>

@@ -164,3 +164,35 @@ def test_empty_formulas_cannot_become_commercially_ready(tmp_path):
     report = review_formula_evidence(tmp_path, as_of=NOW)
     assert report["status"] == "EVIDENCE_HOLD"
     assert "no_observed_opportunities_for_formula" in report["blockers"]
+
+
+def test_formula_health_includes_revalidated_empty_learning_not_fake_accuracy(tmp_path):
+    _sources(tmp_path)
+    from test_predictive_learning_readiness import empty_memory, _write
+    _write(tmp_path, empty_memory(generated_at=NOW.isoformat()))
+    report = review_formula_evidence(tmp_path, as_of=NOW)
+    learning = report["verified_outcome_learning"]
+    assert learning["status"] == "INSUFFICIENT_VERIFIED_EVIDENCE"
+    assert learning["verified_review_count"] == 0
+    assert learning["candidate_brier"] is None
+    assert learning["candidate_beats_baseline"] is None
+    assert learning["learning_promoted"] is False
+    # Formula availability and commercial calibration are independent.
+    assert report["status"] == "REVIEW_READY"
+    assert report["model_is_commercially_calibrated"] is False
+
+
+def test_formula_health_does_not_expose_scoped_outcome_data(tmp_path):
+    _sources(tmp_path)
+    from test_predictive_learning_readiness import empty_memory, _write
+    _write(tmp_path, empty_memory(
+        generated_at=NOW.isoformat(),
+        tenant_id="private-tenant",
+        verified_learning_feedback=[{"secret": "private-customer-data"}],
+    ))
+    report = review_formula_evidence(tmp_path, as_of=NOW)
+    learning = report["verified_outcome_learning"]
+    assert learning["reason"] == "TENANT_SCOPE_REQUIRED"
+    assert learning["verified_review_count"] is None
+    assert "private-tenant" not in json.dumps(report)
+    assert "private-customer-data" not in json.dumps(report)
