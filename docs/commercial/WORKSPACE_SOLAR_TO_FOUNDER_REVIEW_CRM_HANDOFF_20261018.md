@@ -94,6 +94,30 @@ sent messages are CRM records. An attempted remote invocation of the
 separately privileged aggregate observer was denied by the command
 interface, and no permission or credential workaround was used.
 
+## Founder Mail UI production completion — 18 October
+
+The founder ran the already-tested private Founder Console release command
+and the operator reported `PRIVATE_FOUNDER_MAIL_RELEASE_VERIFIED`.
+Independent loopback tests proved the Gmail review panel LIVE under
+`/founder/mail` on the private Founder Console (port 3001), with all eight
+prior routes still HTTP 200 including YouTube and Intent Review. The
+existing Gmail reader snapshot still had six verified sent anchors and zero
+incoming candidate messages. No canonical CRM identity, contact, lead,
+tenant or revenue event was created from these observations.
+
+The live Founder Console uses the frozen isolated parity candidate release,
+not the shared dirty Next.js working-tree build. Public
+`https://empire-ai.co.uk/founder/mail` still returns HTTP 404.
+Production source/deployment details:
+`docs/commercial/FOUNDER_MAIL_WORKSPACE_SOLAR_UI_RELEASE_20261018.md`.
+
+**Completed gap:** authenticated Gmail metadata → bounded private snapshot →
+read-only founder review API → rendered Founder Mail page.
+
+**Still unverified:** actual inbound response and its exact authorised
+canonical sent-intent / contact / tenant CRM join, followed by a founder
+review before prospect promotion.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

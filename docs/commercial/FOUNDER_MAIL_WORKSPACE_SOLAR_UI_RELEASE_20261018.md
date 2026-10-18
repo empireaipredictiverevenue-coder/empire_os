@@ -1,6 +1,6 @@
 # Empire AI — Workspace solar tracking inside existing Founder Mail UI
 
-**18 October 2026 | Source integrated, isolated production build verified, not yet live frontend-switched**
+**18 October 2026 | Private Founder Mail frontend deployment VERIFIED LIVE**
 
 ## Why this path
 
@@ -97,9 +97,7 @@ Console service**. It restarts ONLY that private console and verifies
 the panel, all eight existing routes, other services and public 404.
 On any failure or interruption it restores the original service.
 
-**Current live UI status remains PENDING operator-run release.**
-To complete from a trusted Ubuntu session, after separate explicit
-Founder release approval, run:
+**Historical release command (completed successfully by founder on 18 October 2026):**
 
 ```bash
 cd /srv/empire_os
@@ -114,6 +112,40 @@ printed on success; only the dedicated
 `/etc/systemd/system/empire-founder-console.service.d/70-private-solar-review-release.conf`
 drop-in is owned by this release.
 
+## 18 October — founder deployment succeeded and independently read back
+
+The founder executed the exact operator-authorised one-time release command
+`sudo bash scripts/deploy_private_founder_mail_solar_review_20261018.sh
+--apply-approved-private-release` on EmpireOS. It reported
+`PRECHECK_PASS` and `PRIVATE_FOUNDER_MAIL_RELEASE_VERIFIED`;
+`routes=8 founder_mail_panel=visible crm_mutations=none emails_sent=none`.
+
+An independent readback confirmed:
+- `empire-founder-console.service` active with exact deployment
+  `WorkingDirectory=/home/ubuntu/empire_worktrees/empire_founder_mail_parity_candidate_20261018`
+  and only new drop-in
+  `/etc/systemd/system/empire-founder-console.service.d/70-private-solar-review-release.conf`.
+- All 8 tested frontend routes returned HTTP 200 after cutover: `/`,
+  `/founder`, `/founder/mail`, `/founder/results`,
+  `/founder/solar`, `/founder/youtube`,
+  `/founder/intent-review`, `/revenue`.
+- Live `/founder/mail` HTML contains `Commercial outreach tracking`,
+  `GB NRG`, `100% Renewables`, and `CRM cases created`.
+- Founder API Gmail snapshot: `FRESH_WORKSPACE_REVIEW_QUEUE`, six
+  verified sent anchors, zero observed inbound header candidates,
+  `crm_conversation_created=false`, `outbound_sent=false`.
+- Founder API, authenticated CRM pilot and existing Gmail monitoring timer
+  all remained active. Public `https://empire-ai.co.uk/founder/mail`
+  remained HTTP 404; only private loopback was switched.
+- **Remaining commercial dependency:** match a genuinely received Gmail
+  reply to an authorised canonical outbound-intent/contact and exact CRM
+  tenant. No opportunity, revenue, customer or reply was fabricated.
+
+The frozen candidate currently contains the other agents' two uncommitted
+feature routes. Retain it as an immutable release artifact until those
+features are committed to their owning source branches. The existing
+canonical shared checkout is intentionally left untouched.
+
 ## Production deployment / owner handoff
 
 The canonical `apps/search-command-centre/src/app/founder/page.tsx` and
@@ -123,12 +155,12 @@ The existing deploy helper `scripts/deploy_founder_console.sh` assumes
 restarts services; it is NOT safe for the current shared dirty canonical
 branch and MUST NOT be run blindly.
 
-The two exact TSX additions have been tested, and their isolated preview
-fully renders. **They are not yet in the live Next.js .next build**. The
-current UI/deployment owner should coordinate a bounded no-rollback build
-and release that retains the unrelated founder changes, then verify
-localhost 3001/founder/mail and do an authenticated user visual review
-BEFORE saying it is production UI live.
+The two exact TSX additions and the other agents' existing Founder routes
+are now running together in the isolated frozen production build, enabled
+by the exact private-console systemd WorkingDirectory override. The
+original shared source files and the existing canonical .next directory
+have NOT been overwritten. Human visual review from the founder login
+may add UX feedback, but the runtime endpoints are independently verified.
 
 ## Outstanding CRM promotion prerequisite
 
@@ -142,5 +174,6 @@ acceptance are verified. No synthetic leads, CRM writes, replies, payment
 activation, publicity or customer records were used for validation.
 
 Current status: **six sent, zero inbound candidates in the scoped snapshot;
-live Founder API 200; frontend source and isolated build PASS; live frontend
-release pending owner coordination.**
+live Founder API 200; Founder Mail panel LIVE on private port 3001; eight
+existing routes preserved; public /founder/mail 404; no CRM contact
+created, email sent or payment executed by this release.**
