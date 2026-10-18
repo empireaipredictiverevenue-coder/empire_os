@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from empire_os import founder_mailbox_api
 from empire_os.workspace_solar_canonical_intent_review import (
     CanonicalIntentReviewUnavailable, _parse_counts,
-    review_six_workspace_canonical_intents, SQL,
+    review_six_workspace_canonical_intents, SQL, RECIPIENT_SQL,
 )
 from empire_os.workspace_solar_reply_tracking import ANCHORS
 
@@ -131,3 +131,75 @@ def test_private_endpoint_returns_sanitised_unavailable_without_db_errors(monkey
     assert resp.status_code==503
     assert resp.json()["detail"]=="workspace_solar_canonical_intent_review_unavailable"
     assert "RAW_PRIVATE_DATABASE_SECRET" not in resp.text
+
+
+def test_exact_recipient_without_thread_is_a_distinct_review_state():
+    report=_parse_counts(
+        rows(),
+        recipient_rows=rows((2,1,1,0)),
+    )
+    assert report["exact_recipient_scan_complete"] is True
+    assert report["source_visibility_complete"] is False
+    assert all(
+        r["canonical_same_thread_intents_visible"] == 0 and
+        r["canonical_same_recipient_intents_visible"] == 2 and
+        r["canonical_same_recipient_sent_intents_visible"] == 1 and
+        r["next_founder_review_action"] == "REVIEW_POTENTIAL_UNLINKED_EXACT_RECIPIENT_RECORDS" and
+        r["crm_handoff_authorized"] is False
+        for r in report["items"]
+    )
+    assert "@" not in str(report)
+
+
+def test_no_exact_recipient_does_not_invent_a_canonical_intent():
+    report=_parse_counts(rows(),recipient_rows=rows())
+    assert all(
+        r["canonical_same_recipient_intents_visible"] == 0
+        and r["next_founder_review_action"]
+        == "REVIEW_HISTORICAL_SENT_EVIDENCE_FOR_CANONICAL_ADMISSION"
+        for r in report["items"]
+    )
+
+
+@pytest.mark.parametrize("bad",[
+    lambda rr: rr[:-1],
+    lambda rr: rr + rr[:1],
+    lambda rr: rr[:-1]+[("not-an-anchor",0,0,0,0)],
+    lambda rr: rr[:-1]+[(rr[0][0],0,0,0,0)],
+    lambda rr: rr[:-1]+[(rr[-1][0],0,1,0,0)],
+    lambda rr: rr[:-1]+[(rr[-1][0],1,1,2,0)],
+    lambda rr: rr[:-1]+[(rr[-1][0],1,1,1,2)],
+    lambda rr: rr[:-1]+[(rr[-1][0],True,0,0,0)],
+])
+def test_bad_recipient_aggregates_fail_closed(bad):
+    with pytest.raises(CanonicalIntentReviewUnavailable):
+        _parse_counts(rows(),recipient_rows=bad(rows()))
+
+
+def test_two_views_must_be_consistent_before_any_status():
+    with pytest.raises(CanonicalIntentReviewUnavailable,match="CONFLICTING_THREAD_AND_RECIPIENT_COUNTS"):
+        _parse_counts(rows((1,1,1,1)), recipient_rows=rows())
+
+
+def test_sql_parameters_remain_private_and_both_reads_are_in_one_transaction():
+    class TwoResultCursor(Cursor):
+        def __init__(self):
+            super().__init__([])
+            self.index=0
+        def fetchall(self):
+            self.index += 1
+            return rows() if self.index == 1 else rows((2,1,1,0))
+    class TwoResultConnection(Connection):
+        def __init__(self):
+            self.cursor_obj=TwoResultCursor()
+    connection=TwoResultConnection()
+    report=review_six_workspace_canonical_intents(
+        dsn="testing-only",connect_factory=lambda *a,**kw: connection,
+    )
+    assert report["exact_recipient_scan_complete"] is True
+    commands=connection.cursor_obj.calls
+    assert commands[3][0] == SQL
+    assert commands[4][0] == RECIPIENT_SQL
+    assert commands[3][1] == commands[4][1]
+    assert commands[5][0] == "ROLLBACK"
+    assert "testing-only" not in str(report)

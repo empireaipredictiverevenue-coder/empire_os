@@ -197,6 +197,32 @@ timer, CRM write, payment or public publication is part of this change.
 
 The canonical review now supplies a deterministic `next_founder_review_action` for each of the six exact thread anchors, with `historical_send_reconciliation_automatically_authorized=false`. Where no canonical intent is visible, the action is `REVIEW_HISTORICAL_SENT_EVIDENCE_FOR_CANONICAL_ADMISSION`. Ambiguous/mismatched or partially proved intents instead receive specific review steps. This does not authorise an automatic retrospective approval, new send, tenant binding, contact creation or suppression change.
 
+## 18 October follow-up — second canonical join, exact original recipient
+
+The initial canonical SQL used an exact Gmail thread metadata key, and
+therefore its zero rows alone could not prove that no original-recipient
+canonical records were visible. The same existing restricted read-only
+reader now executes a SECOND bounded, parameterised aggregate in the
+same read-only transaction, joining outbound intents by the six exact
+original recipient addresses *without* requiring Gmail metadata. It
+returns aggregate counts only: all visible recipient intents, sent
+recipient intents, sent recipient intents with approvals, and those
+carrying the exact original provider message ID.
+
+The two result sets are both required to be complete, six-thread
+consistent, and internally bounded before returning evidence; partial
+or contradictory results fail closed (HTTP 503). Matching a recipient
+alone never authenticates the originally sent Gmail message, grants a
+tenant relationship, resurrects historical approvals or permits a send.
+If exact-recipient records exist without thread metadata, the next
+action is `REVIEW_POTENTIAL_UNLINKED_EXACT_RECIPIENT_RECORDS`, NOT an
+automatic link. Restricted-reader zero remains
+`NO_RECORD_VISIBLE_TO_READER`, not a database-wide absence claim.
+
+The dedicated Founder API/systemd reader and existing credential were
+reused. No OAuth, backend timer, role, schema, CRM or payment mutation.
+Live outcome recorded after independent endpoint readback.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
