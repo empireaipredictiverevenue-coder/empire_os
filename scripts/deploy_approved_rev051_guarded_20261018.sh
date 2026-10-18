@@ -47,31 +47,23 @@ if ! runuser -u postgres -- pgbackrest info --output=json \
   hold "BACKUP_REPOSITORY_NOT_ACCESSIBLE"
 fi
 python3 - "$tmp/backups.json" <<'PYBACKUP' || exit 2
-import datetime, json, sys
+import json,sys
 from pathlib import Path
+sys.path.insert(0,'/srv/empire_os')
+from empire_os.rev051_pgbackrest_readiness import review_pgbackrest_info
 try:
-    x=json.loads(Path(sys.argv[1]).read_text())
-    now=datetime.datetime.now(datetime.timezone.utc).timestamp()
-    proofs=[]
-    for stanza in x:
-        status=stanza.get('status',{})
-        repos=stanza.get('repo',[])
-        if status.get('code') != 0 or not any(
-            r.get('status',{}).get('code')==0 for r in repos
-        ):
-            continue
-        for backup in stanza.get('backup',[]):
-            stamp=backup.get('timestamp',{}).get('stop')
-            if isinstance(stamp,(int,float)) and not isinstance(stamp,bool):
-                age=(now-stamp)/3600
-                if 0 <= age <= 24*7:
-                    proofs.append(age)
-    assert proofs
+    metadata=json.loads(Path(sys.argv[1]).read_text())
+    review=review_pgbackrest_info(metadata)
+    if review['status']!='PG_BACKREST_RECENT_BACKUP_METADATA_VALIDATED':
+        print('REV051_DEPLOYMENT_HOLD=RECENT_VERIFIED_BACKUP_NOT_PROVEN',
+              'reason='+review.get('reason','UNKNOWN'),file=sys.stderr)
+        raise SystemExit(2)
     print('REV051_LOCAL_RECOVERY_PREFLIGHT_PASS',
-          'latest_backup_age_hours='+str(round(min(proofs),1)))
-except (ValueError,TypeError,KeyError,AssertionError,ImportError,OSError):
+          'latest_backup_age_hours='+str(review['newest_backup_age_hours']),
+          'healthy_stanzas='+str(review['healthy_stanza_count']))
+except (ValueError,TypeError,KeyError,OSError):
     print('REV051_DEPLOYMENT_HOLD=RECENT_VERIFIED_BACKUP_NOT_PROVEN',
-          file=sys.stderr)
+          'reason=INVALID_METADATA',file=sys.stderr)
     raise SystemExit(2)
 PYBACKUP
 
