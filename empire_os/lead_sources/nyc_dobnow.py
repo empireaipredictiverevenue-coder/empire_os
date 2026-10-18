@@ -63,7 +63,10 @@ def _rows(url: str, params: dict, *, client=requests) -> tuple[list[dict], str]:
     return result, sha256(body).hexdigest()
 
 
-def current_event_sample(*, now: datetime | None = None, offset: int = 0, client=requests) -> dict:
+def current_event_sample(*, now: datetime | None = None, offset: int = 0,
+                         issued_day: str | None = None,
+                         after_source_row_id: str | None = None,
+                         client=requests) -> dict:
     """Bounded read-only first-issuance/filing join; no DB, mail, or service.
 
     The query deliberately reads no names, phone numbers, addresses, free-text
@@ -73,6 +76,21 @@ def current_event_sample(*, now: datetime | None = None, offset: int = 0, client
         raise ValueError("UNSAFE_PERMIT_PAGE_OFFSET")
     today = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     since = (today - timedelta(days=LOOKBACK_DAYS)).strftime("%Y-%m-%dT00:00:00")
+    if issued_day is not None:
+        if offset != 0 or not isinstance(issued_day,str) or not re.fullmatch(r"\d{4}-\d{2}-\d{2}",issued_day):
+            raise ValueError("UNSAFE_DOBNOW_DATE_PARTITION")
+        date = _day(issued_day+"T00:00:00")
+        # Source event dates are whole UTC days, not observation timestamps.
+        # Include the oldest calendar day even when now is midday.
+        if (date is None or not
+                today.date() - timedelta(days=LOOKBACK_DAYS)
+                <= date.date() <= today.date()):
+            raise ValueError("DATE_PARTITION_OUTSIDE_REVIEW_WINDOW")
+    if after_source_row_id is not None and (
+        issued_day is None or not isinstance(after_source_row_id,str)
+        or not re.fullmatch(r"row-[a-z0-9._~-]{4,60}",after_source_row_id)
+    ):
+        raise ValueError("UNSAFE_OFFICIAL_SOURCE_ROW_CURSOR")
     permit_params = {
         "$select": ("job_filing_number,issued_date,approved_date,filing_reason,"
                     "work_type,permit_status,borough,bin,bbl"),
@@ -81,7 +99,32 @@ def current_event_sample(*, now: datetime | None = None, offset: int = 0, client
         "$limit": MAX_ROWS,
         "$offset": offset,
     }
+    if issued_day is not None:
+        permit_params["$select"] = ":id as source_row_id," + permit_params["$select"]
+        permit_params["$where"] = (
+            f"issued_date = '{issued_day}T00:00:00' AND filing_reason = 'Initial Permit'"
+        )
+        if after_source_row_id is not None:
+            permit_params["$where"] += f" AND :id > '{after_source_row_id}'"
+        permit_params["$order"] = ":id ASC"
+        permit_params.pop("$offset")
     permits, permits_sha = _rows(PERMITS_URL, permit_params, client=client)
+    last_source_row_id = None
+    if issued_day is not None and permits:
+        source_ids=[p.get("source_row_id") for p in permits]
+        if any(not isinstance(x,str) or
+               re.fullmatch(r"row-[a-z0-9._~-]{4,60}", x) is None
+               for x in source_ids) or len(set(source_ids))!=len(source_ids):
+            raise ValueError("INVALID_OFFICIAL_ROW_IDS")
+        if after_source_row_id is not None and source_ids[0] <= after_source_row_id:
+            # Socrata row IDs are opaque, not guaranteed to sort like ordinary
+            # strings; provider predicate/order remain authoritative.
+            # Only reject identical exact cursors, not lexical ordering.
+            if source_ids[0] == after_source_row_id:
+                raise ValueError("CURSOR_NOT_ADVANCING")
+        last_source_row_id=source_ids[-1]
+        if last_source_row_id==after_source_row_id:
+            raise ValueError("CURSOR_NOT_ADVANCING")
     jobs = []
     for p in permits:
         job = p.get("job_filing_number")
@@ -97,6 +140,7 @@ def current_event_sample(*, now: datetime | None = None, offset: int = 0, client
         return {
             "status": "NO_BOUNDED_INITIAL_PERMIT_ROWS", "mode": "OBSERVE",
             "events": [], "query_rows": len(permits), "page_offset": offset,
+            "issued_day": issued_day, "last_source_row_id": last_source_row_id,
             "sample_may_be_incomplete": False,
             "source_response_sha256": {"permits": permits_sha},
             "no_sales_authority": True,
@@ -182,6 +226,7 @@ def current_event_sample(*, now: datetime | None = None, offset: int = 0, client
         "events": events,
         "query_rows": len(permits),
         "page_offset": offset,
+        "issued_day": issued_day, "last_source_row_id": last_source_row_id,
         "distinct_crosschecked_jobs": len(events),
         "duplicate_work_permit_rows_collapsed": sum(
             event["underlying_permit_row_count"] - 1 for event in events

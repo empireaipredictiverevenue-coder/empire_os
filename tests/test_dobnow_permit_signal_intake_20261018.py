@@ -355,25 +355,30 @@ def test_batch_rejects_mixed_source_or_oversized_payload(bounded):
     assert not (bounded/"signal_inbox.json").exists()
 
 
-def test_existing_crawler_uses_one_dobnow_batch_without_db(bounded, monkeypatch):
+def test_existing_crawler_uses_gated_daily_resume_not_raw_iterator(monkeypatch):
     from empire_os.crawler_runner import run_source_safe
-    from empire_os.lead_sources import LeadCandidate, SourceInfo
-    from empire_os.lead_sources.nyc_dobnow import to_signal_candidates
-    one=list(to_signal_candidates(current_event_sample(
-        now=NOW,client=FakeOpenData())))[0]
-    def candidates(metro):
-        for i in range(60):
-            yield LeadCandidate(**{**one.__dict__,
-              "name":f"NYC DOB NOW Permit B{i:08d}-I1",
-              "raw":{**one.raw,"job_filing_number":f"B{i:08d}-I1"}})
+    from empire_os.lead_sources import SourceInfo
+    import empire_os.dobnow_incremental as incremental
+
+    called=[]
+    def source_should_not_be_called(metro):
+        raise AssertionError("old offset crawler must never be used")
+
     src=SourceInfo(name="permits_dobnow",tier="real",requires=[],
-                   description="test",run_fn=candidates)
+                   description="cursor",run_fn=source_should_not_be_called)
     monkeypatch.setattr("empire_os.crawler_runner.log",lambda *a,**kw:None)
-    observed,accepted,errors=run_source_safe(src,"NYC",dry_run=False)
-    assert (observed,accepted,errors)==(60,60,0)
-    assert len(json.loads((bounded/"signal_inbox.json").read_text()))==60
-    observed,accepted,errors=run_source_safe(src,"NYC",dry_run=False)
-    assert (observed,accepted,errors)==(60,60,0)
-    assert len(json.loads((bounded/"signal_inbox.json").read_text()))==60
-    assert all(r["prospect_id"] is None for r in
-               json.loads((bounded/"signal_inbox.json").read_text()).values())
+    monkeypatch.setattr(incremental,"next_unfinished_day",
+                        lambda *,root:"2026-10-16")
+    def fake_observe(day,*,root,commit):
+        called.append((day,commit))
+        return {"status":"DATE_PARTITION_COMPLETE",
+                "source_rows_this_run":40,"verified_events_staged":3,
+                "source_completed_and_committed":commit}
+    monkeypatch.setattr(incremental,"observe_one_day",fake_observe)
+    monkeypatch.delenv("EMPIRE_DOBNOW_PERMIT_SOURCE_ENABLED",raising=False)
+    assert run_source_safe(src,"NYC",dry_run=False)==(0,0,0)
+    assert called==[]
+    monkeypatch.setenv("EMPIRE_DOBNOW_PERMIT_SOURCE_ENABLED","1")
+    assert run_source_safe(src,"NYC",dry_run=True)==(40,0,0)
+    assert run_source_safe(src,"NYC",dry_run=False)==(40,3,0)
+    assert called==[("2026-10-16",False),("2026-10-16",True)]

@@ -135,6 +135,48 @@ def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
         )
         return 0, 0, 0
 
+    if src.name == "permits_dobnow":
+        # The separate NYC DOB NOW filing namespace is always signals-only.
+        # Bounded durable keyset data is committed ONLY after a complete,
+        # count-reconciled official issuance-day partition.  A live flag
+        # controls the *existing* crawler; no new scheduler is installed.
+        if os.getenv("EMPIRE_DOBNOW_PERMIT_SOURCE_ENABLED") != "1":
+            log("SKIP", "dobnow_explicit_enable_flag_off", source=src.name)
+            return 0, 0, 0
+        if (metro not in (None, "NYC") or
+                (niche and niche != "general_contractor") or
+                max_candidates is not None):
+            log("SKIP", "dobnow_bounded_keyset_cannot_meet_requested_filter",
+                source=src.name)
+            return 0, 0, 0
+        try:
+            from empire_os.dobnow_incremental import (
+                next_unfinished_day, observe_one_day,
+            )
+            root=Path("/srv/empire_os")
+            day=next_unfinished_day(root=root)
+            if day is None:
+                log("INFO", "dobnow_date_partitions_fresh", source=src.name)
+                return 0, 0, 0
+            review=observe_one_day(day,root=root,commit=not dry_run)
+            accepted=(int(review.get("verified_events_staged") or 0)
+                      if review.get("source_completed_and_committed") is True
+                      else 0)
+            candidates=int(review.get("source_rows_this_run") or 0)
+            log("INFO", "dobnow_daily_coverage_review",
+                day=day, source=src.name,
+                status=review["status"],
+                source_rows=candidates,
+                data_only_events_committed=accepted,
+                execution_authority="none",
+                inbound_only=True,
+                outbound=False)
+            return candidates, accepted, 0
+        except Exception as exc:
+            log("ERROR", "dobnow_daily_cursor_fail_closed",
+                source=src.name,error_type=type(exc).__name__)
+            return 0, 0, 1
+
     log("INFO", "source_run_start", source=src.name)
     candidates = accepted = errors = 0
     pending_dobnow_signals = []
