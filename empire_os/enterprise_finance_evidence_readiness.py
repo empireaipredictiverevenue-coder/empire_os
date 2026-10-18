@@ -14,6 +14,8 @@ from pathlib import Path
 import json
 from typing import Any
 
+from empire_os.finance_event_reader_source_contract import review_source
+
 SCHEMA="empire.enterprise_finance_source_readiness.v1"
 SOURCE_DEFINITIONS=(
     ("revenue_pulse","runtime/revenue_pulse/latest.json",
@@ -206,6 +208,7 @@ def review_finance_source_readiness(
         "independent_finance_evidence_requirements":requirements,
         "required_proofs_not_admitted_count":len(requirements),
         "canonical_single_event_reader_role_provisioning_independently_checked":False,
+        "single_event_reader_repository_prerequisites":review_source(root),
         "source_report_consistency_is_independent_custody":False,
         "source_file_hash_is_external_signature":False,
         "customer_record_completeness_verified":False,
