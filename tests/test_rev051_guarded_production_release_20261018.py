@@ -37,7 +37,12 @@ def test_privileged_release_only_allows_one_existing_ddl_artifact():
     assert 'if ! pg -f "$SQL"' in source
     assert source.count('pg -f "$SQL"')==1
     assert source.count('pg -f "$CATALOG"')==2
-    assert source.count('pgbackrest info --output=json')==1
+    assert source.count('--config="$BACKUP_CONFIG" --stanza="$BACKUP_STANZA" --output=json info')==1
+    assert 'BACKUP_CONFIG=/etc/pgbackrest/empiredb.conf' in source
+    assert 'BACKUP_STANZA=empiredb' in source
+    assert 'repo1-type=posix' in source
+    assert 'repo1-cipher-type=aes-256-cbc' in source
+    assert 'archive_command_matches_active_repo' in source
     assert "runuser -u postgres -- psql" in source
     assert "BEGIN" in DDL.read_text()
     assert DDL.read_text().rstrip().endswith("COMMIT;")

@@ -50,13 +50,13 @@ def test_healthy_explicit_repo_passes_but_no_backup_stays_hold():
 
 @pytest.mark.parametrize("bad,reason", [
     ([stanza(healthy=False)],"STANZA_UNHEALTHY"),
-    ([{"name":"e","status":{"code":0},"backup":[]}],"NO_FULL_BACKUP_IN_STANZA"),
+    ([{"name":"empiredb","status":{"code":0},"backup":[]}],"NO_FULL_BACKUP_IN_STANZA"),
     ([dict(stanza(),repo=[])],"INVALID_REPOSITORY_STATUS_LIST"),
     ([dict(stanza(),repo=[{"key":1,"status":{"code":2}}])],"NO_HEALTHY_REPOSITORY"),
     ([stanza(stop=STOP-9*24*3600)],"NO_RECENT_COMPLETED_BACKUP"),
     ([stanza(stop=STOP+5*24*3600)],"NO_RECENT_COMPLETED_BACKUP"),
-    ([], "NO_HEALTHY_BACKUP_STANZA"),
-    ({"status": {"code":0}}, "MALFORMED_STANZA_LIST"),
+    ([], "EXPECTED_SINGLE_EMPIREDB_STANZA_NOT_RETURNED"),
+    ({"status": {"code":0}}, "EXPECTED_SINGLE_EMPIREDB_STANZA_NOT_RETURNED"),
 ])
 def test_absent_stale_invalid_repo_and_stanza_status_fail_closed(bad,reason):
     result=review_pgbackrest_info(bad,now_utc=NOW)
@@ -93,7 +93,8 @@ def test_sanitized_root_diagnostic_never_outputs_raw_backup_metadata(monkeypatch
     def fake_run(args,**kwargs):
         called.append(args)
         assert args == ["runuser","-u","postgres","--",
-                        "pgbackrest","info","--output=json"]
+                        "pgbackrest", "--config=/etc/pgbackrest/empiredb.conf",
+                        "--stanza=empiredb", "--output=json", "info"]
         assert kwargs["capture_output"] is True
         return SimpleNamespace(
             returncode=0,
@@ -127,5 +128,17 @@ def test_release_backup_verification_uses_same_strict_shared_parser():
     assert "review_pgbackrest_info(metadata)" in content
     assert "RECENT_VERIFIED_BACKUP_NOT_PROVEN" in content
     assert "latest_backup_age_hours" in content
-    assert "pgbackrest info --output=json" in content
+    assert '--config="$BACKUP_CONFIG" --stanza="$BACKUP_STANZA" --output=json info' in content
+    assert "BACKUP_CONFIG=/etc/pgbackrest/empiredb.conf" in content
+    assert "archive_command_matches_active_repo" in content
     assert 'if ! pg -f "$SQL"' in content
+
+
+def test_wrong_or_multiple_backup_stanzas_never_authorize_empiredb():
+    extra=stanza()
+    extra["name"]="different_tenant"
+    assert review_pgbackrest_info([extra],now_utc=NOW)["reason"] == "UNEXPECTED_STANZA_IDENTITY"
+    assert review_pgbackrest_info([stanza(),extra],now_utc=NOW)["reason"] == "EXPECTED_SINGLE_EMPIREDB_STANZA_NOT_RETURNED"
+    mismatched=stanza(repo_present=True)
+    mismatched["repo"][0]["key"]=2
+    assert review_pgbackrest_info([mismatched],now_utc=NOW)["reason"] == "NO_HEALTHY_REPOSITORY"

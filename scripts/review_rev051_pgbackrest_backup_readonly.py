@@ -20,7 +20,8 @@ def diagnostic(*, run=subprocess.run) -> dict:
     try:
         result = run(
             ["runuser", "-u", "postgres", "--",
-             "pgbackrest", "info", "--output=json"],
+             "pgbackrest", "--config=/etc/pgbackrest/empiredb.conf",
+             "--stanza=empiredb", "--output=json", "info"],
             capture_output=True, check=False, timeout=20,
         )
         if result.returncode != 0:

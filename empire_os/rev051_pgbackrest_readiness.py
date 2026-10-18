@@ -45,15 +45,17 @@ def review_pgbackrest_info(
         "database_mutation": False,
         "execution_authority": "none",
     }
-    if type(info) is not list or len(info) > 32:
-        summary["reason"] = "MALFORMED_STANZA_LIST"
+    # The caller explicitly requests the live 'empiredb' stanza. Never
+    # accept an unrelated healthy backup to permit EmpireDB DDL.
+    if type(info) is not list or len(info) != 1:
+        summary["reason"] = "EXPECTED_SINGLE_EMPIREDB_STANZA_NOT_RETURNED"
         return summary
     summary["stanza_count"] = len(info)
     verified_ages: list[float] = []
     reason = "NO_HEALTHY_BACKUP_STANZA"
     for stanza in info:
-        if not isinstance(stanza, dict):
-            reason = "MALFORMED_STANZA_RECORD"
+        if not isinstance(stanza, dict) or stanza.get("name") != "empiredb":
+            reason = "UNEXPECTED_STANZA_IDENTITY"
             continue
         status = stanza.get("status")
         if not isinstance(status, dict) or type(status.get("code")) is not int:
@@ -70,6 +72,7 @@ def review_pgbackrest_info(
                 continue
             if not any(
                 isinstance(repo, dict)
+                and repo.get("key") == 1
                 and isinstance(repo.get("status"), dict)
                 and type(repo["status"].get("code")) is int
                 and repo["status"]["code"] == 0

@@ -9,6 +9,11 @@ ROOT=/srv/empire_os
 SQL="$ROOT/migrations/empiredb/051_predictive_revenue_event_reader_held.sql"
 CATALOG="$ROOT/scripts/probe_predictive_revenue_event_reader_catalog_readonly.sql"
 EXPECTED_SHA=b8509150662512c1e9fae9c8dfb1e288bb68ce0fbf95c3cb98a43125bfeb6bc7
+# Match the existing production archive_command; the default pgBackRest
+# configuration does not contain the active encrypted EmpireDB repository.
+BACKUP_CONFIG=/etc/pgbackrest/empiredb.conf
+BACKUP_STANZA=empiredb
+BACKUP_REPO=/var/backups/empiredb/pgbackrest
 
 hold() {
   printf 'REV051_DEPLOYMENT_HOLD=%s\n' "$1" >&2
@@ -27,6 +32,20 @@ echo "$EXPECTED_SHA  $SQL" | sha256sum -c --status ||
   hold "MIGRATION_SOURCE_HASH_MISMATCH"
 command -v runuser >/dev/null || hold "LOCAL_POSTGRES_IDENTITY_NOT_AVAILABLE"
 command -v pgbackrest >/dev/null || hold "PGBACKREST_MISSING"
+# Never read the default repository or an arbitrary replacement config.
+[[ -f "$BACKUP_CONFIG" && ! -L "$BACKUP_CONFIG" ]] ||
+  hold "EXISTING_ACTIVE_BACKUP_CONFIG_NOT_FOUND"
+[[ "$(stat -c '%U:%G:%a' "$BACKUP_CONFIG")" == "postgres:postgres:600" ]] ||
+  hold "BACKUP_CONFIG_OWNER_OR_MODE_UNEXPECTED"
+# Only check non-secret, pinned config keys; never print the cipher passphrase.
+grep -Fxq 'pg1-path=/var/lib/postgresql/18/main' "$BACKUP_CONFIG" ||
+  hold "BACKUP_CONFIG_WRONG_POSTGRES_CLUSTER"
+grep -Fxq 'repo1-type=posix' "$BACKUP_CONFIG" ||
+  hold "BACKUP_CONFIG_WRONG_REPO_TYPE"
+grep -Fxq "repo1-path=$BACKUP_REPO" "$BACKUP_CONFIG" ||
+  hold "BACKUP_CONFIG_WRONG_REPO_PATH"
+grep -Fxq 'repo1-cipher-type=aes-256-cbc' "$BACKUP_CONFIG" ||
+  hold "BACKUP_CONFIG_ENCRYPTION_UNPROVEN"
 
 # Deny accidental PGPASSWORD, PGHOST, etc overrides; use only the local peer
 # administrator and existing production PostgreSQL socket.
@@ -42,7 +61,8 @@ pg() {
 
 # Read-only recovery metadata: do not initiate a new backup, WAL switch, or
 # restore. A current physical pgBackRest backup is required to proceed.
-if ! runuser -u postgres -- pgbackrest info --output=json \
+if ! runuser -u postgres -- pgbackrest \
+    --config="$BACKUP_CONFIG" --stanza="$BACKUP_STANZA" --output=json info \
     > "$tmp/backups.json" 2> "$tmp/backup.stderr"; then
   hold "BACKUP_REPOSITORY_NOT_ACCESSIBLE"
 fi
@@ -75,6 +95,8 @@ if ! pg -c "SELECT pg_catalog.jsonb_build_object(
   'primary',NOT pg_catalog.pg_is_in_recovery(),
   'archive_on',current_setting('archive_mode')='on',
   'archive_command_present',length(trim(current_setting('archive_command')))>0,
+  'archive_command_matches_active_repo',current_setting('archive_command')=
+    '/usr/bin/pgbackrest --config=/etc/pgbackrest/empiredb.conf --stanza=empiredb archive-push %p',
   'successful_archives',(SELECT archived_count>0 FROM pg_catalog.pg_stat_archiver)
 )::text" > "$tmp/primary.json"; then
   hold "PRIMARY_ARCHIVE_PREFLIGHT_READ_FAILED"
