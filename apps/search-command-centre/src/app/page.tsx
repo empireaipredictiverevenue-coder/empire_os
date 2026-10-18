@@ -230,6 +230,12 @@ export default async function Home() {
               </p>
               <div className="mt-5 flex flex-wrap gap-5">
                 <Link
+                  href="/department"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200"
+                >
+                  Unified SEO evidence →
+                </Link>
+                <Link
                   href="/technical"
                   className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-300 hover:text-emerald-200"
                 >

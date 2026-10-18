@@ -30,6 +30,41 @@ export type SearchConsoleStatus = {
   site_url?: string | null;
 };
 
+export type SeoDepartmentReview = {
+  schema_version: "empire.search_growth.department_integration.v1";
+  status: "DEPARTMENT_CONNECTED_EVIDENCE_GAPS_OPEN";
+  mode: "OBSERVE";
+  gsc_final_page_window: [string, string];
+  gsc_returned_page_rows: number;
+  gsc_returned_page_sample_clicks: number;
+  gsc_returned_page_sample_impressions: number;
+  legacy_missing_404_count_in_returned_page_sample: number;
+  legacy_missing_404_impressions_in_returned_page_sample: number;
+  legacy_missing_404_clicks_in_returned_page_sample: number;
+  legacy_404_editorial_category_counts: Record<string, number>;
+  legacy_404_core_topic_editorial_review_count: number;
+  legacy_404_off_core_retain_404_count: number;
+  semantic_live_priority_pages_checked: number;
+  semantic_editorial_review_candidates: number;
+  semantic_owned_pages_commercial_route_verified: boolean;
+  search_fabric_cache_files_observed: number;
+  search_fabric_cache_fresh_candidates_24h: number;
+  search_fabric_cache_stale_candidates: number;
+  search_fabric_cache_invalid_envelopes: number;
+  search_rankings_verified: false;
+  independent_google_rank_positions_verified: false;
+  external_ai_answer_citation_verified: boolean;
+  external_geo_mentions_verified: boolean;
+  buyer_enquiries_verified: false;
+  realised_revenue_verified: false;
+  growth_specialist_desks: number;
+  research_campaigns: number;
+  open_gates: string[];
+  customer_identifiers_disclosed: false;
+  publisher_mutation_authorized: false;
+  execution_authority: "NONE";
+};
+
 export type CollectionEnvelope = {
   available: boolean;
   source: string;
@@ -145,4 +180,9 @@ export async function getRevenueAttributionData() {
     request<CollectionEnvelope>("/v1/search/revenue?limit=200"),
   ]);
   return { health, revenue };
+}
+
+/** Read-only search-department totals; no client credentials or side effects. */
+export function getSeoDepartmentReview() {
+  return request<SeoDepartmentReview>("/v1/search/department/review");
 }

@@ -293,6 +293,22 @@ def create_search_router(
             "api_contract_version": "search-v1",
         }
 
+    @router.get("/department/review")
+    def department_review():
+        """Cached first-party SEO aggregates; NEVER a ranking or buyer receipt."""
+        from .department_snapshot import (
+            DepartmentSnapshotUnavailable, read_department_snapshot,
+        )
+        try:
+            return read_department_snapshot()
+        except DepartmentSnapshotUnavailable:
+            # Do not disclose source URLs, credentials or private driver errors.
+            raise HTTPException(
+                status_code=503,
+                detail="department_evidence_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
     @router.get("/search-console/status")
     def search_console_status():
         return search_console.status().as_dict()
