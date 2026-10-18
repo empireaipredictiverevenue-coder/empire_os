@@ -296,6 +296,33 @@ were imported in production.** Production DDL and six-receipt INSERT
 remain pending explicit founder authority. No live buyer reply has been
 verified and no historical email was resent.
 
+## Founder historical evidence UI release prepared (18 October late)
+
+The next frozen private Founder Mail frontend candidate has been built and
+previewed:
+`/home/ubuntu/empire_worktrees/empire_founder_mail_historical_evidence_candidate_20261018`.
+Its one changed source is
+`apps/search-command-centre/src/app/founder/mail/workspace-solar-review.tsx`,
+which now displays the difference between original Gmail receipt custody
+and historical receipts actually admitted to EmpireDB. The real private
+read API says **6 in custody, 0 admitted, schema 052 unapplied**.
+
+Next.js 16 production build, ESLint, TypeScript, read-only historical
+status backend, and isolated rendered page all passed. All eight private
+Founder routes including YouTube and Intent Review matched the active
+release at HTTP 200. The operator-only deployment script
+`scripts/deploy_private_founder_mail_historical_status_20261018.sh`
+passed its preflight. Its single new
+`90-private-historical-evidence-release.conf` drop-in is **NOT yet
+installed**; the live UI still uses the previous
+`empire_founder_mail_reply_triage_candidate_20261018` frozen build.
+The UI script can be run by the founder separately from DB approval and
+automatically returns to prior 70+80 drop-ins on failed cutover.
+
+**Never conflate this UI switch with applying migration 052 or importing
+the six receipts to production EmpireDB.** Both latter database changes
+remain explicitly held.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
