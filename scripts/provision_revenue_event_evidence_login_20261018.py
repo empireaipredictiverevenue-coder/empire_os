@@ -269,6 +269,16 @@ def private_credential(password: str) -> None:
         os.fsync(handle.fileno())
 
 
+def role_name_text(value: object) -> str | None:
+    """psycopg may return PostgreSQL name/text as bytes; fail closed otherwise."""
+    if isinstance(value, bytes):
+        try:
+            return value.decode("ascii", errors="strict")
+        except UnicodeDecodeError:
+            return None
+    return value if isinstance(value, str) else None
+
+
 def live_login_proof(password: str) -> bool:
     import psycopg
     with psycopg.connect(
@@ -287,7 +297,10 @@ def live_login_proof(password: str) -> bool:
                 "pg_catalog.has_table_privilege(session_user,"
                 "'public.buyers','SELECT')"
             ).fetchone()
-            if row != (LOGIN,LOGIN,False,False,False):
+            if (row is None or len(row)!=5
+                or role_name_text(row[0])!=LOGIN
+                or role_name_text(row[1])!=LOGIN
+                or row[2:]!=(False,False,False)):
                 return False
             cur.execute("SET LOCAL ROLE "+ROLE)
             # Do NOT grant direct EXECUTE on the trusted session tenant

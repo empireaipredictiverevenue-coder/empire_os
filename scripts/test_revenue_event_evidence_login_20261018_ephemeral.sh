@@ -233,5 +233,44 @@ then
   echo 'REV052_EPHEMERAL_LEDGER_TABLE_READ_WAS_ACCEPTED' >&2
   exit 12
 fi
+# Exercise exact psycopg protocol used by the production verifier, not only
+# libpq psql. The test connector targets this isolated Unix socket ONLY.
+PYTHONPATH="$repo" /srv/empire_os/.venv/bin/python - "$scratch/socket" <<'PYAUDIT'
+import psycopg,sys
+from scripts.review_rev052_committed_login_readonly_20261018 import bounded_auth_probe
+fixture_password="isolated-test-credential-not-a-real-secret-12345"
+def connect_fixture(**kwargs):
+    kwargs["host"]=sys.argv[1]
+    kwargs["port"]=59631
+    return psycopg.connect(**kwargs)
+with connect_fixture(dbname="empiredb",user="empire_predictive_revenue_evidence_login",password=fixture_password,connect_timeout=5) as dbg:
+    with dbg.cursor() as c:
+        sample=c.execute("SELECT session_user::text,current_user::text,pg_catalog.has_table_privilege(session_user,'public.commercial_events','SELECT')").fetchone()
+        print("FIXTURE_IDENTITY_SHAPE",repr(sample),[type(v).__name__ for v in sample],flush=True)
+result=bounded_auth_probe(fixture_password,connector=connect_fixture)
+assert result["failure_stage"]=="NONE",result
+assert result["auth_connection_verified"] is True
+assert result["session_login_identity_verified"] is True
+assert result["login_has_no_direct_source_table_select"] is True
+assert result["capability_set_role_verified"] is True
+assert result["capability_function_execute_verified"] is True
+assert result["sentinel_zero_result_verified"] is True
+assert result["real_event_selected"] is False
+print("REV052_ISOLATED_PSYCOPG_AUTH_FUNCTION_PROOF=PASS")
+# Exercise the original already-deployed REV052 verifier as well: monkeypatch
+# ONLY this temporary Python process to point at the disposable test socket.
+from scripts.provision_revenue_event_evidence_login_20261018 import live_login_proof
+original_connect=psycopg.connect
+def original_verifier_fixture(**kwargs):
+    kwargs["host"]=sys.argv[1]
+    kwargs["port"]=59631
+    return original_connect(**kwargs)
+psycopg.connect=original_verifier_fixture
+try:
+    assert live_login_proof(fixture_password) is True
+finally:
+    psycopg.connect=original_connect
+print("REV052_ISOLATED_ORIGINAL_LOGIN_PROOF=PASS")
+PYAUDIT
 unset PGPASSWORD
 echo 'REV052_ISOLATED_POSTGRES_PASS dedicated_scram=YES wrong_password=DENIED founder_tenant=BOUND own_event=1 cross_tenant=0 ledger_select=DENIED production=UNTOUCHED'

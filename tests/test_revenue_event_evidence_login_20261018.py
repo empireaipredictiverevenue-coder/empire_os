@@ -184,3 +184,11 @@ def test_readonly_preflight_reports_stage_not_exception_or_credentials(monkeypat
     assert "REV052_FAILURE_STAGE=CATALOG_READONLY" in output
     assert "REV052_STATUS=HOLD_OR_UNVERIFIED_NO_BLIND_RETRY" in output
     assert "private secret path" not in output
+
+
+def test_role_names_strictly_decode_postgres_bytes_without_broadening_access():
+    assert rev.role_name_text(b"empire_predictive_revenue_evidence_login")==rev.LOGIN
+    assert rev.role_name_text(rev.LOGIN)==rev.LOGIN
+    assert rev.role_name_text(b"\xff") is None
+    assert rev.role_name_text(None) is None
+    assert rev.role_name_text(12345) is None
