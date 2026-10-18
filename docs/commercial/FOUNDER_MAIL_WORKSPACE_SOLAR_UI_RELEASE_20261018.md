@@ -57,6 +57,63 @@
 5. Live owner `empire-founder-console.service` remained active and untouched,
    as did `empire-revenue-crm-pilot.service` and all email/outbound services.
 
+## 18 October — complete-route parity candidate and operator-gated deployment
+
+The previous clean HEAD-only release omitted the existing live Founder
+YouTube and Intent Review routes. To preserve those routes, a separate
+**isolated, frozen, complete frontend snapshot** was created at:
+
+`/home/ubuntu/empire_worktrees/empire_founder_mail_parity_candidate_20261018`
+
+This snapshot was copied WITHOUT modifying the original shared source files.
+It intentionally contains the two other agents' uncommitted frontend
+features that are **already present in the currently running console**.
+The candidate ran a full Next.js 16.3.5 Webpack production build:
+compiled, TypeScript, static pages and route output all PASS. Its
+127.0.0.1:3099 isolated preview returned HTTP 200 for ALL EIGHT existing
+routes (`/`, `/founder`, `/founder/mail`,
+`/founder/results`, `/founder/solar`, `/founder/youtube`,
+`/founder/intent-review`, `/revenue`). The running 3001 console returned
+HTTP 200 for the same eight. The candidate additionally rendered the
+real six-business Workspace Gmail review panel (GB NRG and
+100% Renewables both checked) and explicit no-CRM-case and no-auto-send
+indicators. Source parity was verified with byte-level rsync checks.
+The public apex `/founder/mail` returned 404 before any release.
+
+A remote attempt to install a systemd drop-in for the private console
+was **denied by the remote-command interface**. That attempt did NOT
+mutate the live service. We did not bypass this restriction.
+
+`scripts/deploy_private_founder_mail_solar_review_20261018.sh` is a
+new one-off, narrowly scoped **operator-controlled** release script.
+Its `--preflight` passed on the live server, and three release-script
+tests passed. It pins four critical source hashes and frozen-build
+presence; refuses altered canonical frontend source, an existing
+competing systemd override, an unhealthy Founder API/CRM/timer, missing
+existing UI routes or public exposure. Only the explicitly approved
+`--apply-approved-private-release` branch makes a root-owned systemd
+drop-in overriding **WorkingDirectory of the existing loopback Founder
+Console service**. It restarts ONLY that private console and verifies
+the panel, all eight existing routes, other services and public 404.
+On any failure or interruption it restores the original service.
+
+**Current live UI status remains PENDING operator-run release.**
+To complete from a trusted Ubuntu session, after separate explicit
+Founder release approval, run:
+
+```bash
+cd /srv/empire_os
+./scripts/deploy_private_founder_mail_solar_review_20261018.sh --preflight
+sudo bash ./scripts/deploy_private_founder_mail_solar_review_20261018.sh --apply-approved-private-release
+```
+
+Do NOT use `scripts/deploy_founder_console.sh`, overwrite the shared
+`.next` directory, publish a public Founder URL or merge unrelated
+frontend changes to achieve this release. Its rollback command is
+printed on success; only the dedicated
+`/etc/systemd/system/empire-founder-console.service.d/70-private-solar-review-release.conf`
+drop-in is owned by this release.
+
 ## Production deployment / owner handoff
 
 The canonical `apps/search-command-centre/src/app/founder/page.tsx` and
