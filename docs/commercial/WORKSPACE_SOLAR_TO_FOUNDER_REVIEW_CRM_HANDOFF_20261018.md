@@ -323,6 +323,25 @@ automatically returns to prior 70+80 drop-ins on failed cutover.
 the six receipts to production EmpireDB.** Both latter database changes
 remain explicitly held.
 
+## 18 October — latest Founder historical evidence UI release verified
+
+The founder completed the prepared private UI cutover, returning
+`FOUNDER_HISTORICAL_EVIDENCE_UI_RELEASE_VERIFIED`. Independent production
+readback confirmed the active Founder Console uses the isolated
+`empire_founder_mail_historical_evidence_candidate_20261018` build,
+with the exact expected 70+80+90 systemd overrides. All eight existing
+Founder routes returned HTTP 200. Live HTML explicitly shows six original
+Gmail sends preserved in private custody and **zero** historical receipts
+admitted to EmpireDB while migration 052 remains unapplied. The private
+Gmail, Founder API and restricted CRM pilot services remain active;
+zero incoming candidate replies were observed. Public Founder Mail
+returned HTTP 404.
+
+This **completes the private UI release**, not historical DB admission or
+CRM promotion. Migration 052 and the six-receipt insert remain held for
+separate explicit founder approval; the live CRM still has no authorised
+contact/tenant promotion from these observations.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

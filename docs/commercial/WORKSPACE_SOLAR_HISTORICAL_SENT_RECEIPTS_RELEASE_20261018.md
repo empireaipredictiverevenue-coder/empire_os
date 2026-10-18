@@ -188,6 +188,45 @@ Do NOT claim the new panel is live until its operator output and a live
 port-3001 readback confirm the new working directory. Migration 052 and
 its separate protected importer remain unactivated.
 
+## Private Founder Mail release independently VERIFIED LIVE — 18 October 2026
+
+The founder ran the single private UI cutover command
+`sudo bash scripts/deploy_private_founder_mail_historical_status_20261018.sh
+--apply-approved-private-release`. Its terminal output reported
+`PRECHECK_PASS` and `FOUNDER_HISTORICAL_EVIDENCE_UI_RELEASE_VERIFIED`.
+
+Independent post-release inspection confirmed:
+- `empire-founder-console.service` **active**, running the exact frozen
+  `/home/ubuntu/empire_worktrees/empire_founder_mail_historical_evidence_candidate_20261018`
+  release and the expected systemd drop-ins `70`, `80` and `90`.
+- All eight existing private Founder routes returned HTTP **200**.
+  No other agents' YouTube, Intent Review, Solar or revenue routes were lost.
+- The actual live Founder Mail HTML rendered
+  `Commercial outreach tracking`, `Original Gmail sends`,
+  `6 original sends preserved`,
+  `0 of 6 historical receipts verified in EmpireDB`,
+  and `migration 052 is staged`, together with the real GB NRG and
+  100% Renewables business review cards.
+- The existing private API returned
+  `PRIVATE_CUSTODY_ONLY_DATABASE_SCHEMA_HELD`,
+  six real provider historical receipts in private custody, table
+  `database_historical_receipt_table_active=false`, and **zero**
+  production EmpireDB historical receipts. It reported zero canonical
+  outbound intents created, CRM records created and emails sent.
+- The existing authenticated CRM pilot, Founder read API, and
+  original Gmail-monitoring timer remained **active**. The Gmail reply
+  review still had six original sent messages and zero inbound candidates.
+- The public `https://empire-ai.co.uk/founder/mail` remained HTTP **404**.
+  The application continued serving only from the private listener.
+
+**This private UI deployment is completed**, but it is NOT a database
+activation. The production EmpireDB 052 migration and six-row importer
+remain explicitly HELD pending separate founder authorisation. To revert
+only this UI release, the existing operator-run rollback removes
+`/etc/systemd/system/empire-founder-console.service.d/90-private-historical-evidence-release.conf`,
+reloads systemd and restarts `empire-founder-console.service`, restoring
+the verified prior frozen 70+80 release. No rollback has been needed.
+
 ## Commercial completion gates still open
 
 1. Independently verify the newly admitted historical evidence in the
