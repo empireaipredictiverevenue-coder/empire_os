@@ -1,0 +1,117 @@
+{
+  "schema_version": "empire.marketing_growth.editorial_brief.v1",
+  "campaign_id": "GROWTH-001",
+  "parent_department": "marketing_growth",
+  "source_portfolio": "docs/marketing/ORGANIC_GROWTH_DEPARTMENT_RESEARCH_PORTFOLIO_20261016.json",
+  "status": "DRAFT_ONLY",
+  "execution_authority": "NONE",
+  "publication_authorized": false,
+  "indexing_submission_authorized": false,
+  "outbound_authorized": false,
+  "site_owner": "ASTRA existing website owner",
+  "intended_live_route": "https://empire-ai.co.uk/commercial",
+  "new_page_proposal_authorized": false,
+  "search_intent": "commercial_research_and_vendor_evaluation",
+  "audience": "UK SME decision makers and enterprise operations teams evaluating AI adoption readiness and consultancy",
+  "primary_keyword": "AI readiness assessment UK",
+  "secondary_topics": [
+    "assessment cost",
+    "scope and deliverables",
+    "ROI and payback",
+    "data readiness",
+    "security and governance",
+    "AI adoption evidence"
+  ],
+  "question_intents": [
+    "What is an AI readiness assessment?",
+    "How much does an AI readiness assessment cost in the UK?",
+    "What evidence should a business prepare before an assessment?",
+    "How should a business calculate AI return on investment?"
+  ],
+  "seo_title": "AI Readiness Assessment UK: Cost, Scope and ROI | Empire AI",
+  "meta_description": "Understand AI readiness assessments for UK businesses: likely scope, questions to ask, cost and ROI considerations. Explore a founder-led Empire AI proposal.",
+  "expected_h1": "AI Readiness Assessment for UK Businesses: Cost, Scope and ROI",
+  "planned_cta": "Request a nonbinding Opportunity Assessment proposal",
+  "internal_links_required": [
+    "/commercial",
+    "/trust"
+  ],
+  "sources": [
+    {
+      "url": "https://www.gov.uk/government/publications/ai-adoption-research/ai-adoption-research",
+      "type": "official_uk_primary_research",
+      "fact_scope": "DSIT survey fieldwork February-May 2025; 3,500 business interviews; uses/adoption and barriers, cannot infer 2026 company-specific readiness"
+    },
+    {
+      "url": "https://www.ons.gov.uk/businessindustryandtrade/business/businessservices/bulletins/businessinsightsandimpactontheukeconomy/8october2026",
+      "type": "official_uk_primary_statistical_release",
+      "fact_scope": "Business Insights September 2026 self-reported AI adoption statistics; methodology differs from DSIT study"
+    },
+    {
+      "url": "https://developers.google.com/search/docs/appearance/title-link",
+      "type": "official_google_search_guidance",
+      "fact_scope": "descriptive concise unique title links, no repetition/stuffing"
+    },
+    {
+      "url": "https://developers.google.com/search/docs/fundamentals/ai-optimization-guide",
+      "type": "official_google_search_guidance",
+      "fact_scope": "original helpful material, no artificial FAQ or AEO hacks"
+    }
+  ],
+  "first_party_offer": {
+    "product_code": "consultancy_opportunity_assessment",
+    "starting_price_gbp": 2500,
+    "vat_extra": true,
+    "first_party_readback": "GET https://empire-ai.co.uk/v1/checkout/commercial/offers",
+    "founder_price_approved": true,
+    "delivery_scope_verified": false,
+    "binding_terms_ready": false,
+    "checkout_enabled": false,
+    "disclosure": "The displayed £2,500 amount is a founder-approved starting price for a proposed engagement, excluding applicable VAT; exact scope, timeline, deliverables and acceptance require a separate written proposal."
+  },
+  "commercial_evidence": {
+    "query_search_volume": null,
+    "serp_top_ten_measured": false,
+    "keyword_difficulty_verified": false,
+    "google_indexation_of_commercial_confirmed": false,
+    "first_party_qualified_enquiries_from_campaign": null,
+    "revenue_generated_gbp": null
+  },
+  "publication_holds": [
+    "ASTRA owns the unfinished flagship site: no publication or site source edits",
+    "Current Google indexing status of /commercial not yet confirmed",
+    "Keyword demand and competitive SERP ranking evidence incomplete",
+    "A human must verify source claim wording and offer fulfilment before publication",
+    "Founder explicit permission required for any external publication or outreach",
+    "Do not describe an unscoped founder-led proposal as a finished AI audit or completed implementation"
+  ],
+  "verified_service_catalogue": {
+    "first_party_url": "https://empire-ai.co.uk/v1/checkout/commercial/offers",
+    "observed_date": "2026-10-16",
+    "claim_mode": "FOUNDER_LED_PROPOSAL_ONLY",
+    "offers": [
+      {
+        "product_code": "consultancy_opportunity_assessment",
+        "name": "Opportunity Assessment",
+        "starting_gbp": 2500,
+        "interval": "one_time"
+      },
+      {
+        "product_code": "consultancy_strategy_blueprint",
+        "name": "Strategy Blueprint",
+        "starting_gbp": 7500,
+        "interval": "one_time"
+      },
+      {
+        "product_code": "consultancy_strategic_advisory",
+        "name": "Strategic Advisory",
+        "starting_gbp": 3000,
+        "interval": "monthly"
+      }
+    ],
+    "delivery_scope_verified": false,
+    "binding_terms_ready": false,
+    "checkout_enabled": false,
+    "existing_customers_or_success_claim_verified": false
+  }
+}

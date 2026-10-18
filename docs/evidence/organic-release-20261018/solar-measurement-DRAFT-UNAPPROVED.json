@@ -1,0 +1,33 @@
+{
+  "automatic_outbound": false,
+  "automatic_publication": false,
+  "campaigns": [
+    {
+      "asset_id": "campaign_f6f952e135656e0568e136bb:landing",
+      "campaign_id": "campaign_f6f952e135656e0568e136bb",
+      "html_sha256": "a4525081072f3aaf83cd6fd760491fe4ea48199dacd8ebb448033b275600b40e",
+      "landing_path": "/industries/solar",
+      "sector": "solar",
+      "source_evidence_ref": "govuk:building-an-energy-system-that-delivers-for-all"
+    }
+  ],
+  "deployment_evidence_ref": null,
+  "execution_authority": "none",
+  "payments_enabled": false,
+  "readiness": {
+    "browser_observations_confirmed": false,
+    "campaign_registered_for_events": false,
+    "collector_review_approved": false,
+    "crm_conversions_verified": false,
+    "event_capture_active": false,
+    "founder_review_approved": false,
+    "live_deployment_verified": false,
+    "privacy_review_approved": false,
+    "site_export_hash_inspected": true
+  },
+  "research_release_sha256": "47a093f83e735b361036c620fb7faed615698456f4ff9aa828b711dd9f951fb7",
+  "reviews": {},
+  "schema_version": "empire.owned_industry_measurement_release.v1",
+  "status": "DRAFT_UNAPPROVED",
+  "zero_paid_spend": true
+}
