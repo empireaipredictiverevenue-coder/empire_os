@@ -9,6 +9,7 @@ from empire_os.buyer_allocation import (
     buyer_activation_decision, buyer_evidence_classification,
     buyer_identity_quality_hold,
 )
+from empire_os.buyer_specific_buybox_review import review_single_buyer
 
 
 def _text(value: Any) -> str:
@@ -94,6 +95,18 @@ def summarize_buyer_capacity(
     if now.tzinfo is None:
         raise ValueError("observed_at must include timezone")
 
+    same_record_preparation_count = 0
+    for row in eligible_rows:
+        packet = review_single_buyer(row, as_of=now)
+        if packet is None:
+            continue
+        evidence = packet["recorded_evidence"]
+        if all(evidence.get(field) is True for field in (
+            "buyer_identity", "buyer_review", "market",
+            "configured_capacity", "delivery_destination",
+        )):
+            same_record_preparation_count += 1
+
     return {
         "schema_version": "empire.buyer_capacity_readiness.v1",
         "observed_at": now.astimezone(timezone.utc).isoformat(),
@@ -106,6 +119,8 @@ def summarize_buyer_capacity(
         "is_active_true": active_flag,
         "commercially_activated": commercially_activated,
         "reviewed": reviewed,
+        "same_record_preparation_count": same_record_preparation_count,
+        "same_record_preparation_is_commercial_proof": False,
         "terms_verified": terms_verified,
         "capacity_verified": capacity_verified,
         "delivery_verified": delivery_verified,

@@ -54,6 +54,7 @@ export type PredictiveBuyerCapacityBrief = {
   owner: string;
   next_action: string;
   buyers_seen: number | null;
+  same_record_preparation_count?: number | null;
   verified_specific_buybox_count: number | null;
   first_missing_evidence: string | null;
   evidence_checklist: Array<{

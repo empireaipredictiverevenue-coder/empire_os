@@ -48,6 +48,7 @@ def test_active_flag_is_not_activation_truth():
     assert result["status_active"] == 1
     assert result["is_active_true"] == 1
     assert result["fully_activated"] == 0
+    assert result["same_record_preparation_count"] == 0
     assert result["terms_verified"] == 0
     assert result["allocation_ready"] is False
     assert result["highest_priority_blocker"] == "verified_commercial_terms"
@@ -57,6 +58,8 @@ def test_active_flag_is_not_activation_truth():
 def test_verified_buyer_passes_existing_activation_gate():
     result = summarize_buyer_capacity([activated_buyer()], observed_at=NOW)
     assert result["fully_activated"] == 1
+    assert result["same_record_preparation_count"] == 1
+    assert result["same_record_preparation_is_commercial_proof"] is False
     assert result["terms_verified"] == 1
     assert result["capacity_verified"] == 1
     assert result["delivery_verified"] == 1

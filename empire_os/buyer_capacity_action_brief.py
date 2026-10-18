@@ -45,6 +45,7 @@ def _hold(reason: str, source_status: str = "UNAVAILABLE") -> dict[str, Any]:
         "next_action": "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
         "verified_specific_buybox_count": None,
         "buyers_seen": None,
+        "same_record_preparation_count": None,
         "evidence_checklist": [],
         "first_missing_evidence": None,
         "same_buyer_cross_stage_binding_proven": False,
@@ -86,6 +87,11 @@ def build_buyer_capacity_action_brief(
         if type(value) is not int or not 0 <= value <= MAX_COUNT:
             return _hold("buyer_capacity_aggregate_count_missing_or_invalid", source_status)
         counts[name] = value
+    prepared = capacity.get("same_record_preparation_count")
+    if prepared is not None and (
+        type(prepared) is not int or not 0 <= prepared <= counts["reviewed"]
+    ):
+        return _hold("invalid_same_record_preparation_count", source_status)
     seen = counts["buyers_seen"]
     if any(n > seen for n in counts.values()):
         return _hold("aggregate_count_exceeds_buyer_inventory", source_status)
@@ -125,6 +131,8 @@ def build_buyer_capacity_action_brief(
         "next_action": "VERIFY_DOWNSTREAM_BUYER_TERMS_CAPACITY",
         "verified_specific_buybox_count": 0,
         "buyers_seen": seen,
+        "same_record_preparation_count": prepared,
+        "same_record_preparation_is_commercial_proof": False,
         "evidence_checklist": checklist,
         "first_missing_evidence": first_missing or "BIND_ALL_EVIDENCE_TO_ONE_BUYER_BUYBOX",
         "same_buyer_cross_stage_binding_proven": False,

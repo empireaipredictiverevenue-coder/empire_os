@@ -57,6 +57,13 @@ def review_buyer_capacity(
             or any(type(source.get(key)) is not int or not 0 <= source[key] <= 10_000_000
                    for key in COUNT_FIELDS)):
         return _base("SOURCE_UNTRUSTED")
+    prepared = source.get("same_record_preparation_count")
+    if prepared is not None and (
+        type(prepared) is not int
+        or not 0 <= prepared <= source["reviewed"]
+        or source.get("same_record_preparation_is_commercial_proof") is not False
+    ):
+        return _base("SOURCE_UNTRUSTED")
     seen = source["buyers_seen"]
     if any(source[key] > seen for key in COUNT_FIELDS if key != "buyers_seen"):
         return _base("SOURCE_UNTRUSTED")
@@ -73,6 +80,8 @@ def review_buyer_capacity(
     if not timedelta(0) <= now - stamp <= MAX_AGE:
         return {**_base("SOURCE_STALE"), "observed_at": stamp.isoformat()}
     counts = {name: source[name] for name in COUNT_FIELDS}
+    if prepared is not None:
+        counts["same_record_preparation_count"] = prepared
     complete_aggregates = all(source[k] > 0 for k in (
         "capacity_verified", "terms_verified", "delivery_verified",
         "commercially_activated",

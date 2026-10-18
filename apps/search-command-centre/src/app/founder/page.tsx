@@ -251,6 +251,7 @@ export default async function FounderPage() {
                       <>
                         <div className="mt-4 flex flex-wrap gap-5 text-xs text-slate-300">
                           <span>Buyer records observed: {buyerCapacity.buyers_seen ?? "Unknown"}</span>
+                          <span>Same-record preparation candidates: {buyerCapacity.same_record_preparation_count ?? "Unknown"}</span>
                           <span>Buyer-specific buy-box proof: {buyerCapacity.verified_specific_buybox_count ?? "Unknown"}</span>
                           <span>Owner: {show(buyerCapacity.owner).replaceAll("_", " ")}</span>
                         </div>

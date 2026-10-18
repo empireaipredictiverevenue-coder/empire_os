@@ -203,3 +203,42 @@ ASTRA and other owning agents review and merge the isolated feature. This
 change does not create specific buyer buy-box proof; the actual agreements,
 partner identity, acceptance and economics still have to be obtained and
 verified using existing CRM/revenue pathways.
+
+
+## 18 October continuation — per-buyer evidence review, no parallel CRM
+
+New `empire_os/buyer_specific_buybox_review.py` builds a bounded, read-only
+review of the existing buyer records fetched by
+`BuyerAllocationDataRepository.buyer_page`. It checks fields on the **same
+buyer record**, preserves `buyer_activation_decision`, rejects likely
+fixture/test buyers and future-dated observations, and ranks the nearest
+candidate profiles for **internal follow-up**. It does not claim a signed
+agreement, verified postcode buy-box, price/payout, current acceptance,
+authorised lead delivery or revenue.
+
+The private command is:
+
+```bash
+cd /home/ubuntu/empire_agents/predictive_decision_control_20261018
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -m \
+  scripts.review_existing_buyer_buybox_candidates --niche solar --limit 5
+```
+
+It reuses the existing EmpireDB buyer-page reader without creating a table or
+changing source credentials, writes no file or DB record and redacts company
+names by default. `--include-buyer-names` is reserved for an authorised
+private founder/operator session. Keep these private buyer records out of
+public API responses and logs.
+
+Also improved the existing `buyer_capacity_readiness` summary to add
+`same_record_preparation_count`: a count where buyer identity, prior review,
+market, configured cap and destination coexist **on the same source row**.
+This count is **not buyer commercial readiness** and has an explicit
+`same_record_preparation_is_commercial_proof=false` flag. The existing ASTRA
+validated observer now accepts it as an *optional* additional aggregate;
+older snapshots without it remain compatible. The existing Founder Console
+capacity panel displays Unknown if the optional count is absent.
+
+Production candidate lookup attempted but was blocked by the remote tool
+safety check. Do not claim any verified solar buyer from the absence of that
+result. No production files, terms, outbounds or money were changed.
