@@ -2474,4 +2474,9 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert control["realized_gp_cents"] is None
     assert control["north_star"] == "verified_realized_gross_profit"
     assert control["revenue_truth_status"] == "UNAVAILABLE"
+    assert control["formula_evidence"]["schema_version"] == "empire.predictive_formula_evidence_review.v1"
+    assert control["formula_evidence"]["cloud_prediction_ready"] is None
+    assert control["formula_evidence"]["fresh_opportunity_count"] is None
+    assert control["formula_evidence"]["commercial_execution_authorized"] is False
+    assert control["formula_evidence"]["execution_authority"] == "none"
     assert control["status"] == "EVIDENCE_HOLD"

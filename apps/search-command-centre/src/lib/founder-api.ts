@@ -72,7 +72,26 @@ export type PredictiveBuyerCapacityBrief = {
   work_dispatched: false;
 };
 
+export type PredictiveFormulaEvidence = {
+  schema_version: string;
+  status: string;
+  mode: "OBSERVE";
+  source_status: Record<string, string>;
+  cloud_prediction_ready: boolean | null;
+  cloud_formula_evaluated: boolean | null;
+  cloud_formula_blockers: string[];
+  fresh_opportunity_count: number | null;
+  revenue_formula_bounds_supported: boolean | null;
+  missing_factor_counts: Record<string, number> | null;
+  blockers: string[];
+  model_is_commercially_calibrated: false;
+  forecast_generated_by_this_review: false;
+  commercial_execution_authorized: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  formula_evidence?: PredictiveFormulaEvidence;
   buyer_capacity_action_brief?: PredictiveBuyerCapacityBrief;
   department_handoff?: PredictiveDecisionHandoff;
   schema_version: string;

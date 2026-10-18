@@ -11,7 +11,9 @@ from typing import Any, Mapping
 
 from empire_os.agent_web import public_capabilities
 from empire_os.a2a_discovery import COMMERCE_CAPABILITIES
-from empire_os.predictive_revenue_formula import CORE_FACTORS, predictive_revenue_formula
+from empire_os.predictive_revenue_formula import (
+    CORE_FACTORS, predictive_revenue_formula, revenue_formula_identification_bounds,
+)
 from empire_os.commercial_product_catalog import assess_catalog_item
 from empire_os.revenue_distribution_review import (
     REVIEW_SOURCES, build_human_review_queue, build_publisher_recruitment_summary,
@@ -97,7 +99,7 @@ def _source(name: str, payload: Any, now: datetime, max_age_seconds: int) -> dic
     return result
 
 
-def _prediction(row: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
+def _prediction(row: Mapping[str, Any]) -> tuple[dict[str, Any], list[str], dict[str, Any]]:
     values = row.get("predictive_revenue_inputs")
     refs = row.get("predictive_revenue_evidence_refs")
     values = values if isinstance(values, dict) else {}
@@ -108,7 +110,11 @@ def _prediction(row: Mapping[str, Any]) -> tuple[dict[str, Any], list[str]]:
         if links and _number(value) and (key == "ltv_cents" or value <= 1):
             inputs[key] = value
             evidence.extend(links)
-    return predictive_revenue_formula(inputs), sorted(set(evidence))
+    return (
+        predictive_revenue_formula(inputs),
+        sorted(set(evidence)),
+        revenue_formula_identification_bounds(inputs),
+    )
 
 
 def _conversion_projection(payload: Any, source: dict[str, Any]) -> dict[str, Any]:
@@ -209,7 +215,7 @@ def build_revenue_distribution(
         if not isinstance(key, str) or not key.strip() or not refs or keys.count(key) != 1:
             blockers.append("radar:missing_or_ambiguous_identity_or_evidence")
             continue
-        prediction, factor_refs = _prediction(row)
+        prediction, factor_refs, factor_bounds = _prediction(row)
         missing = list(prediction.get("missing_fields", []))
         codes = _refs(row.get("products"))
         if isinstance(row.get("offer_key"), str) and row["offer_key"].strip():
@@ -245,6 +251,8 @@ def build_revenue_distribution(
             "product_link_state": "EXPLICIT_PRODUCT_REFERENCE" if codes else "UNKNOWN",
             "evidence_refs": sorted(set(refs + factor_refs + sources["radar"]["evidence_refs"])),
             "canonical_prediction": prediction,
+            "canonical_prediction_identification_bounds": factor_bounds,
+            "formula_bounds_are_not_forecast_confidence_intervals": True,
             "expected_canonical_revenue_contribution_cents": prediction.get("predicted_revenue_cents"),
             "missing_evidence": missing,
             "buyer_capacity_verified_for_opportunity": None,

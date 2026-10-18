@@ -12,7 +12,7 @@ No function in this module grants execution or accounting authority.
 """
 from __future__ import annotations
 
-from math import prod
+from math import isfinite, prod
 from typing import Any, Mapping, Sequence
 
 
@@ -76,10 +76,15 @@ STATE_EVIDENCE = {
 
 
 def _number(value: Any, name: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a finite number, not bool")
     try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be numeric") from exc
+    if not isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    return result
 
 
 def _probability(value: Any, name: str) -> float:
@@ -356,5 +361,171 @@ def next_best_action_value(
         "unavailable_actions": unavailable,
         "optimization_target": "expected_incremental_revenue",
         "recommendation_only": True,
+        "execution_authority": "none",
+    }
+
+
+def revenue_formula_identification_bounds(
+    inputs: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Mathematical range with *unknown* funnel probabilities in [0,1].
+
+    This is a partial-identification bound, not a point forecast,
+    Bayesian posterior, statistical confidence interval or buyer revenue.
+    """
+    data = dict(inputs or {})
+    missing = [name for name in CORE_FACTORS if data.get(name) is None]
+    if data.get("ltv_cents") is None:
+        return {
+            "schema_version": "empire.predictive_revenue.bounds.v1",
+            "status": "UNAVAILABLE",
+            "reason": "ltv_unknown",
+            "missing_fields": [*missing, "ltv_cents"],
+            "lower_bound_cents": None,
+            "upper_bound_cents": None,
+            "unknown_is_zero": False,
+            "prediction_only": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        }
+    ltv = _number(data["ltv_cents"], "ltv_cents")
+    if ltv < 0:
+        raise ValueError("ltv_cents must be nonnegative")
+    known = {name: _probability(data[name], name)
+             for name in CORE_FACTORS if name not in missing}
+    upper = prod(known.values()) * ltv
+    lower = 0.0 if missing else upper
+    if not all(isfinite(v) for v in (upper, lower)):
+        raise ValueError("formula bounds must be finite")
+    return {
+        "schema_version": "empire.predictive_revenue.bounds.v1",
+        "status": "PARTIALLY_IDENTIFIED" if missing else "FULLY_SPECIFIED_SCENARIO",
+        "missing_fields": missing,
+        "known_factor_count": len(known),
+        "lower_bound_cents": round(lower, 4),
+        "upper_bound_cents": round(upper, 4),
+        "assumed_unknown_factor_range": [0, 1] if missing else None,
+        "interval_type": "deterministic_hypothetical_bounds_not_statistical_confidence",
+        "source_data_verified": False,
+        "unknown_is_zero": False,
+        "prediction_only": True,
+        "actual_revenue": False,
+        "execution_authority": "none",
+    }
+
+
+def review_revenue_factor_counterfactuals(
+    inputs: Mapping[str, Any],
+    interventions: Sequence[Mapping[str, Any]],
+    *,
+    factor_evidence_refs: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, Any]:
+    """Use the *existing* ten-factor formula to model one change at a time.
+
+    Delta = LTV * (target - baseline) * product(other factors).
+    The arithmetic is exact for the canonical multiplicative model. A proposed
+    target is a hypothesis, NOT a calibrated causal effect or expected ROI.
+    Every baseline factor and LTV must carry its own source provenance; if any
+    are missing there is no numeric intervention ranking.
+    """
+    schema = "empire.predictive_revenue.factor_counterfactuals.v1"
+    data = dict(inputs or {})
+    bounds = revenue_formula_identification_bounds(data)
+    refs = dict(factor_evidence_refs or {})
+    required = (*CORE_FACTORS, "ltv_cents")
+    unproven = [
+        key for key in required
+        if not isinstance(refs.get(key), (list, tuple))
+        or not refs[key]
+        or len(refs[key]) > 12
+        or any(not isinstance(value, str)
+               or not value.strip() or len(value) > 240
+               for value in refs[key])
+    ]
+    missing = [key for key in required if data.get(key) is None]
+    if len(interventions) > 40:
+        raise ValueError("intervention scenario limit exceeded")
+    if missing or unproven:
+        return {
+            "schema_version": schema,
+            "status": "EVIDENCE_HOLD",
+            "reason": "complete_evidenced_baseline_required",
+            "missing_factor_inputs": missing,
+            "missing_factor_evidence_refs": unproven,
+            "identification_bounds": bounds,
+            "scenarios": [],
+            "hypothetical_not_causal": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        }
+    base = predictive_revenue_formula(data)
+    if base["status"] != "AVAILABLE":
+        raise ValueError("baseline funnel unavailable")
+    baseline = base["predicted_revenue_cents"]
+    scenarios: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for proposed in interventions:
+        if not isinstance(proposed, Mapping):
+            raise ValueError("counterfactual must be an object")
+        action = proposed.get("action_key")
+        factor = proposed.get("factor")
+        if (not isinstance(action, str) or not action.strip()
+                or len(action) > 120 or action in seen):
+            raise ValueError("unique bounded action_key required")
+        seen.add(action)
+        if factor not in CORE_FACTORS:
+            raise ValueError("unknown funnel factor")
+        target = _probability(proposed.get("target_value"), "target_value")
+        current = _probability(data[factor], factor)
+        if target < current:
+            raise ValueError("improvement scenario cannot lower a factor")
+        cost = _number(proposed.get("scenario_cost_cents"), "scenario_cost_cents")
+        if cost < 0:
+            raise ValueError("scenario cost must be nonnegative")
+        changed = dict(data)
+        changed[factor] = target
+        scenario = predictive_revenue_formula(changed)
+        hypothetical_delta = scenario["predicted_revenue_cents"] - baseline
+        # Use the unrounded symbolic derivative for the revenue sensitivity.
+        slope = _number(data["ltv_cents"], "ltv_cents") * prod(
+            _probability(data[other], other)
+            for other in CORE_FACTORS if other != factor
+        )
+        net = hypothetical_delta - cost
+        if not all(isfinite(v) for v in (hypothetical_delta, slope, net)):
+            raise ValueError("counterfactual overflow")
+        scenarios.append({
+            "action_key": action,
+            "factor": factor,
+            "baseline_factor": current,
+            "hypothetical_target_factor": target,
+            "marginal_sensitivity_cents_per_unit": round(slope, 4),
+            "hypothetical_incremental_revenue_cents": round(hypothetical_delta, 4),
+            "hypothetical_net_change_cents": round(net, 4),
+            "scenario_cost_cents": cost,
+            "baseline_evidence_refs": list(dict.fromkeys(refs[factor])),
+            "target_is_evidenced": False,
+            "scenario_only": True,
+            "causal_effect_established": False,
+            "commercial_execution_authorized": False,
+        })
+    scenarios.sort(key=lambda row: (
+        -row["hypothetical_net_change_cents"], row["action_key"],
+    ))
+    return {
+        "schema_version": schema,
+        "status": "HYPOTHETICAL_REVIEW" if scenarios else "NO_SCENARIOS",
+        "baseline_formula_status": base["status"],
+        "baseline_predicted_revenue_cents": baseline,
+        "scenarios": scenarios,
+        "scenario_count": len(scenarios),
+        "formula": "LTV*(TARGET-BASELINE)*PRODUCT(OTHER_FUNNEL_FACTORS)",
+        "scenario_values_are_not_causal_estimates": True,
+        "scenario_values_are_not_expected_incremental_profit": True,
+        "independence_and_calibration_not_proven": True,
+        "measurement_required_before_action_optimization": True,
+        "unknown_is_zero": False,
+        "prediction_only": True,
+        "actual_revenue": False,
         "execution_authority": "none",
     }

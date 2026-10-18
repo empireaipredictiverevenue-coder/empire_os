@@ -330,3 +330,32 @@ def test_existing_refresh_includes_multi_pipeline_without_additional_inputs(tmp_
     assert result["multi_pipeline_review"] == build_revenue_multi_pipeline_review(result)
     assert result["multi_pipeline_review"]["independent_pipeline_count"] == 6
     assert result == rd.refresh_revenue_distribution(tmp_path, generated_at=NOW)
+
+
+def test_revenue_distribution_exposes_formula_bounds_without_fake_probability():
+    data = snapshots()
+    out = build(data)["opportunities"][0]
+    bounds = out["canonical_prediction_identification_bounds"]
+    assert bounds["status"] == "FULLY_SPECIFIED_SCENARIO"
+    assert bounds["upper_bound_cents"] == pytest.approx(
+        out["expected_canonical_revenue_contribution_cents"]
+    )
+    assert bounds["lower_bound_cents"] == bounds["upper_bound_cents"]
+    assert out["formula_bounds_are_not_forecast_confidence_intervals"] is True
+    assert out["buyer_capacity_verified_for_opportunity"] is None
+
+    data = snapshots()
+    data["radar"]["candidates"][0]["predictive_revenue_evidence_refs"]["payment"] = []
+    partial = build(data)["opportunities"][0]
+    assert partial["expected_canonical_revenue_contribution_cents"] is None
+    unknown = partial["canonical_prediction_identification_bounds"]
+    assert unknown["status"] == "PARTIALLY_IDENTIFIED"
+    assert unknown["lower_bound_cents"] == 0
+    assert unknown["upper_bound_cents"] > 0
+    assert "payment" in unknown["missing_fields"]
+    assert "payment" in partial["missing_evidence"]
+
+    data["radar"]["candidates"][0]["predictive_revenue_evidence_refs"]["ltv_cents"] = []
+    unidentified = build(data)["opportunities"][0]
+    assert unidentified["canonical_prediction_identification_bounds"]["upper_bound_cents"] is None
+    assert unidentified["expected_canonical_revenue_contribution_cents"] is None

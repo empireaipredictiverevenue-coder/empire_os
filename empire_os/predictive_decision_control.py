@@ -482,6 +482,10 @@ def build_predictive_decision_control_runtime(
     decision["department_handoff"] = build_predictive_decision_handoff(
         decision, root, as_of=as_of,
     )
+    # Existing Cloud/Revenue formula producer snapshots; no new forecast,
+    # data refresh, provider call or additional commercial authority.
+    from empire_os.predictive_formula_evidence_review import review_formula_evidence
+    decision["formula_evidence"] = review_formula_evidence(root, as_of=as_of)
     return decision
 
 

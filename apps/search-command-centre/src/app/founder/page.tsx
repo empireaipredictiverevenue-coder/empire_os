@@ -81,6 +81,7 @@ export default async function FounderPage() {
   const nextPriorities = decision?.top_three ?? [];
   const departmentHandoff = decision?.department_handoff;
   const buyerCapacity = decision?.buyer_capacity_action_brief;
+  const formulaEvidence = decision?.formula_evidence;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -230,6 +231,56 @@ export default async function FounderPage() {
                     <span className="text-slate-500">
                       Currency and independent settlement reconciliation are not asserted by this view.
                     </span>
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Predictive Cloud + Predictive Revenue</p>
+                        <h3 className="mt-1 text-lg font-semibold text-white">
+                          Formula and calibration evidence health
+                        </h3>
+                        <p className="mt-2 text-xs leading-5 text-slate-400">
+                          Formula installed does not mean commercial predictions are ready.
+                          Old opportunity inputs and unknown outcomes cannot become a live revenue forecast.
+                        </p>
+                      </div>
+                      <span className="rounded-lg border border-cyan-300/20 px-3 py-1 text-xs text-cyan-100">
+                        {show(formulaEvidence?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {formulaEvidence ? (
+                      <>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-300 lg:grid-cols-4">
+                          <span>Cloud snapshot: {show(formulaEvidence.source_status?.cloud_formula).replaceAll("_", " ")}</span>
+                          <span>Revenue distribution: {show(formulaEvidence.source_status?.revenue_distribution).replaceAll("_", " ")}</span>
+                          <span>Prediction ready: {formulaEvidence.cloud_prediction_ready === null ? "Unknown" : formulaEvidence.cloud_prediction_ready ? "Yes" : "No"}</span>
+                          <span>Fresh opportunities: {formulaEvidence.fresh_opportunity_count ?? "Unknown"}</span>
+                        </div>
+                        {formulaEvidence.blockers.length > 0 ? (
+                          <div className="mt-4">
+                            <p className="text-xs font-semibold text-amber-200">Evidence to restore</p>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {formulaEvidence.blockers.slice(0, 10).map((blocker) => (
+                                <span key={blocker} className="rounded-md border border-white/10 px-2 py-1 text-[11px] text-slate-300">
+                                  {blocker.replaceAll("_", " ")}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+                        {formulaEvidence.missing_factor_counts ? (
+                          <div className="mt-3 text-xs text-slate-400">
+                            Missing funnel evidence: {Object.entries(formulaEvidence.missing_factor_counts)
+                              .slice(0, 10).map(([factor, count]) => `${factor.replaceAll("_", " ")} (${count})`).join(" · ") || "None reported"}
+                          </div>
+                        ) : null}
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          Diagnostics only · no forecast generated here · no model promotion, outbound or payments.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-xs text-slate-400">Formula evidence view awaits the paired backend release.</p>
+                    )}
                   </div>
                   <div className="mt-5 rounded-2xl border border-amber-300/20 bg-[#171713] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-4">

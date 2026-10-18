@@ -16,7 +16,7 @@ commercial, payment, accounting or model-mutation authority.
 """
 from __future__ import annotations
 
-from math import prod
+from math import isfinite, prod
 from typing import Any, Mapping, Sequence
 
 
@@ -44,10 +44,15 @@ CONSTRAINT_KEYS = (
 
 
 def _number(value: Any, name: str) -> float:
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be a finite number, not bool")
     try:
-        return float(value)
-    except (TypeError, ValueError) as exc:
+        result = float(value)
+    except (TypeError, ValueError, OverflowError) as exc:
         raise ValueError(f"{name} must be numeric") from exc
+    if not isfinite(result):
+        raise ValueError(f"{name} must be finite")
+    return result
 
 
 def _probability(value: Any, name: str) -> float:
@@ -74,7 +79,7 @@ def _portfolio_erv(
         value = row.get("expected_revenue_value_cents")
         status = str(row.get("status") or "").upper()
 
-        if value is None or status == "UNAVAILABLE":
+        if value is None or status != "AVAILABLE":
             unavailable.append({
                 "opportunity_key": key or None,
                 "reason": (
@@ -99,6 +104,10 @@ def _portfolio_erv(
     return {
         "available": available,
         "unavailable": unavailable,
+        "total_opportunity_count": len(available) + len(unavailable),
+        "portfolio_value_scope": "AVAILABLE_ONLY",
+        "complete_portfolio_value_known": bool(available) and not unavailable,
+        "unknown_opportunities_included_as_zero": False,
         "portfolio_expected_revenue_value_cents": round(
             sum(
                 row["expected_revenue_value_cents"]
@@ -303,6 +312,15 @@ def predictive_cloud_formula(
             cloud_adjusted_value,
             4,
         ),
+        # Preserve legacy available-only value, but never represent a
+        # truncated/partially unknown portfolio as its complete value.
+        "cloud_adjusted_portfolio_value_is_partial": (
+            not portfolio["complete_portfolio_value_known"]
+        ),
+        "cloud_adjusted_full_portfolio_value_cents": (
+            round(cloud_adjusted_value, 4)
+            if portfolio["complete_portfolio_value_known"] else None
+        ),
         "weakest_cloud_factor": {
             "name": weakest[0],
             "value": weakest[1],
@@ -364,5 +382,139 @@ def compare_cloud_snapshots(
         "deltas": deltas,
         "improvement_claim": "descriptive_only",
         "causal_claim": False,
+        "execution_authority": "none",
+    }
+
+
+def review_cloud_quality_counterfactuals(
+    *,
+    factors: Mapping[str, Any],
+    residual_uncertainty: Any,
+    opportunities: Sequence[Mapping[str, Any]],
+    constraints: Mapping[str, Any] | None,
+    improvements: Sequence[Mapping[str, Any]],
+    evidence_refs: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, Any]:
+    """Quantify hypothetical trust/uncertainty improvements using Cloud v1.
+
+    No new model or coefficients. The geometric-mean formula is recomputed for
+    each one-factor proposal; predicted portfolio value is only reported when
+    *every* included opportunity has a known ERV and at least one is present.
+    """
+    schema = "empire.predictive_cloud.quality_counterfactuals.v1"
+    if len(improvements) > 40:
+        raise ValueError("cloud scenario limit exceeded")
+    refs = dict(evidence_refs or {})
+    required = (*CLOUD_FACTORS, "residual_uncertainty")
+    absent = [
+        field for field in required
+        if field != "residual_uncertainty" and factors.get(field) is None
+        or field == "residual_uncertainty" and residual_uncertainty is None
+    ]
+    unproven = [
+        field for field in required
+        if not isinstance(refs.get(field), (list, tuple))
+        or not refs[field] or len(refs[field]) > 12
+        or any(not isinstance(ref, str) or not ref.strip() or len(ref) > 240
+               for ref in refs[field])
+    ]
+    if absent or unproven:
+        return {
+            "schema_version": schema,
+            "status": "EVIDENCE_HOLD",
+            "missing_inputs": absent,
+            "missing_evidence_refs": unproven,
+            "hypothetical_scenarios": [],
+            "prediction_only": True,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        }
+    baseline = predictive_cloud_formula(
+        factors=factors,
+        residual_uncertainty=residual_uncertainty,
+        opportunities=opportunities,
+        constraints=constraints,
+    )
+    if baseline["status"] != "AVAILABLE":
+        return {
+            "schema_version": schema,
+            "status": "EVIDENCE_HOLD",
+            "reason": "canonical_cloud_formula_unavailable",
+            "hypothetical_scenarios": [],
+            "execution_authority": "none",
+        }
+
+    scenarios: list[dict[str, Any]] = []
+    names: set[str] = set()
+    for row in improvements:
+        if not isinstance(row, Mapping):
+            raise ValueError("improvement must be a mapping")
+        action = row.get("action_key")
+        factor = row.get("factor")
+        if (not isinstance(action, str) or not action.strip()
+                or len(action) > 120 or action in names):
+            raise ValueError("unique bounded action_key required")
+        names.add(action)
+        if factor not in (*CLOUD_FACTORS, "residual_uncertainty"):
+            raise ValueError("unknown cloud factor")
+        target = _probability(row.get("target_value"), "target_value")
+        current = _probability(
+            residual_uncertainty if factor == "residual_uncertainty"
+            else factors[factor], str(factor),
+        )
+        if ((target > current) if factor == "residual_uncertainty"
+                else (target < current)):
+            raise ValueError("cloud scenario must improve selected factor")
+        factors_new = dict(factors)
+        uncertainty_new = residual_uncertainty
+        if factor == "residual_uncertainty":
+            uncertainty_new = target
+        else:
+            factors_new[str(factor)] = target
+        new = predictive_cloud_formula(
+            factors=factors_new,
+            residual_uncertainty=uncertainty_new,
+            opportunities=opportunities,
+            constraints=constraints,
+        )
+        delta_score = new["cloud_operating_score"] - baseline["cloud_operating_score"]
+        initial_value = baseline["cloud_adjusted_full_portfolio_value_cents"]
+        new_value = new["cloud_adjusted_full_portfolio_value_cents"]
+        value_change = (
+            round(new_value - initial_value, 4)
+            if initial_value is not None and new_value is not None else None
+        )
+        scenarios.append({
+            "action_key": action,
+            "factor": factor,
+            "baseline_factor": current,
+            "hypothetical_target_factor": target,
+            "hypothetical_cloud_score_change": round(delta_score, 4),
+            "hypothetical_complete_portfolio_value_change_cents": value_change,
+            "baseline_factor_evidence_refs": list(dict.fromkeys(refs[factor])),
+            "target_has_observed_causal_evidence": False,
+            "model_calibration_not_established_by_this_review": True,
+            "action_authorized": False,
+        })
+    scenarios.sort(key=lambda row: (
+        -row["hypothetical_cloud_score_change"], row["action_key"],
+    ))
+    return {
+        "schema_version": schema,
+        "status": "HYPOTHETICAL_REVIEW" if scenarios else "NO_SCENARIOS",
+        "baseline_cloud_operating_score": baseline["cloud_operating_score"],
+        "baseline_cloud_adjusted_full_portfolio_value_cents": baseline[
+            "cloud_adjusted_full_portfolio_value_cents"
+        ],
+        "portfolio_scope": baseline["portfolio"]["portfolio_value_scope"],
+        "portfolio_complete": baseline["portfolio"]["complete_portfolio_value_known"],
+        "operating_constraints": baseline["constraints"],
+        "hypothetical_scenarios": scenarios,
+        "monetary_deltas_are_not_realized_profit": True,
+        "improvements_have_no_causal_proof": True,
+        "forecast_and_outcomes_separate": True,
+        "prediction_only": True,
+        "actual_revenue": False,
+        "commercial_authority": "none",
         "execution_authority": "none",
     }
