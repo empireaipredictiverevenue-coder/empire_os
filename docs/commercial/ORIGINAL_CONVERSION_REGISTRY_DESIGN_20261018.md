@@ -53,10 +53,11 @@ It describes:
 - bounded prospective windows and evidence fields
 - separate least-privilege writer and reader functions.
 
-**SQL has not been executed or independently parsed against PostgreSQL.**
-The DBA must review syntax, RLS, privilege and transaction semantics in an
-isolated database using migration and role grants appropriate to the existing
-production configuration. This is not approved for deployment.
+**SQL has now passed an isolated PostgreSQL 18.6 execution and privilege
+test, but it has NOT been applied to production.** The DBA must still
+independently review the staged migration against the authoritative production
+schema, actual resolver owner and role membership before any activation.
+This is not approved for production deployment.
 
 The preflight's older
 `must_store_in_existing_canonical_prediction_registry` flag is now
@@ -103,3 +104,54 @@ time-series forecast registry.
   a genuine terminal outcome before calibration is described as effective.
 
 No production database modifications or financial/outbound action were taken.
+
+
+## Isolated PostgreSQL 18.6 integration verification — 18 October
+
+Added manual reproducible test runner:
+`scripts/check_original_conversion_isolated_pg_20261018.py`.
+
+```bash
+cd /home/ubuntu/empire_agents/predictive_decision_control_20261018
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -u -B \
+  scripts/check_original_conversion_isolated_pg_20261018.py
+```
+
+**Isolation:** launches a newly initialised disposable PostgreSQL 18 cluster
+under a private `/tmp/empconvpg-*/data` directory, Unix socket only,
+`listen_addresses=''`, no network listener, no production credentials,
+no access to the running `/var/lib/postgresql` data directory, and deletes
+the temporary cluster after the test. Its synthetic `empiredb` database
+contains only mock roles, a minimal synthetic session-user tenant resolver,
+and the staged registry SQL. It is NOT the live EmpireDB.
+
+**Verified with real PostgreSQL:** staged DDL execution, tenant-bound
+registrations, existing-row idempotency, independent writer/reader readback,
+denial of table SELECT to runtime roles, cross-tenant read and write denial,
+SQL-level prevention of stale and future proposals, immutable-identity
+collision rejection, UPDATE/DELETE trigger denial even to a superuser, and
+three concurrent submissions yielding one recorded prediction and two
+consistent existing results.
+
+The test initially surfaced a PostgreSQL PL/pgSQL variable collision: a
+row variable named `found` shadowed PL/pgSQL's special `FOUND` boolean.
+Changed the row variable to `existing_row`; the test then exposed and
+helped harden concurrent idempotent inserts with `ON CONFLICT DO NOTHING`
+followed by an exact immutable-payload equality check. A separate harness
+issue involving inherited `pg_ctl` output pipes was also corrected.
+
+All tests use synthetic IDs and predictions; they cannot prove revenue,
+forecast skill, genuine buyer terms or production readiness. No runtime
+permissions were granted in production.
+
+**Still outstanding before actual registration:**
+- Independent DBA review of role/tenant resolver ownership and existing
+  schema before applying this staged DDL.
+- Explicit authorization and independently managed per-tenant runtime
+  credentials and an audited migration/rollback plan.
+- Authenticated DB custody/readback attestation that cannot be spoofed by
+  a client-supplied JSON object.
+- Verified source-provenance checks and an original real conversion forecast
+  generated **before** a future terminal outcome.
+- No calibration promotion or commercial execution without their existing
+  separate gates.

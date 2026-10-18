@@ -183,6 +183,9 @@ def test_staged_sql_is_not_automatic_migration_and_contains_required_guards():
         "SECURITY DEFINER", "NOLOGIN", "NOINHERIT",
         "REVOKE ALL", "GRANT EXECUTE", "CONV_REG_TENANT_NOT_AUTHENTICATED",
         "CONV_REG_IMMUTABLE_IDENTITY_COLLISION",
+        "ON CONFLICT (tenant_id,prediction_ref) DO NOTHING",
+        "existing_row public.original_conversion_predictions%ROWTYPE",
+        "CONV_REG_CONCURRENT_RECORD_UNAVAILABLE",
     ):
         assert required in sql
     assert "GRANT empire_original_conversion_prediction_writer TO " not in sql

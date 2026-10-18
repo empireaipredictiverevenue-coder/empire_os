@@ -125,7 +125,7 @@ SET search_path = ''
 AS $$
 DECLARE
   current_tenant uuid := public.empire_current_tenant_id();
-  found public.original_conversion_predictions%ROWTYPE;
+  existing_row public.original_conversion_predictions%ROWTYPE;
   now_at timestamptz := clock_timestamp();
   proposed timestamptz;
   horizon timestamptz;
@@ -185,22 +185,22 @@ BEGIN
     RAISE EXCEPTION 'CONV_REG_NOT_PROSPECTIVE';
   END IF;
 
-  -- Serialises same-identity submissions for collision checks. The unique
-  -- index still protects concurrency across separate writer transactions.
-  SELECT * INTO found
+  -- Return pre-existing immutable evidence when exactly identical.
+  -- A later ON CONFLICT handles concurrent submissions safely.
+  SELECT * INTO existing_row
   FROM public.original_conversion_predictions
   WHERE tenant_id=current_tenant AND prediction_ref=p_prediction_ref;
   IF FOUND THEN
-    IF found.prediction_json IS DISTINCT FROM p_payload
-       OR found.client_payload_sha256 IS DISTINCT FROM p_client_hash THEN
+    IF existing_row.prediction_json IS DISTINCT FROM p_payload
+       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash THEN
       RAISE EXCEPTION 'CONV_REG_IMMUTABLE_IDENTITY_COLLISION';
     END IF;
     RETURN pg_catalog.jsonb_build_object(
       'status','existing',
-      'prediction_ref',found.prediction_ref,
-      'tenant_id',found.tenant_id::text,
-      'recorded_at',found.recorded_at,
-      'payload_sha256',found.client_payload_sha256
+      'prediction_ref',existing_row.prediction_ref,
+      'tenant_id',existing_row.tenant_id::text,
+      'recorded_at',existing_row.recorded_at,
+      'payload_sha256',existing_row.client_payload_sha256
     );
   END IF;
 
@@ -214,13 +214,34 @@ BEGIN
     probability,p_payload->>'model_name',p_payload->>'model_version',
     proposed,horizon,p_payload->'evidence_refs',p_payload,p_client_hash,
     now_at
-  ) RETURNING * INTO found;
+  )
+  ON CONFLICT (tenant_id,prediction_ref) DO NOTHING
+  RETURNING * INTO existing_row;
+  IF NOT FOUND THEN
+    SELECT * INTO existing_row
+    FROM public.original_conversion_predictions
+    WHERE tenant_id=current_tenant AND prediction_ref=p_prediction_ref;
+    IF NOT FOUND THEN
+      RAISE EXCEPTION 'CONV_REG_CONCURRENT_RECORD_UNAVAILABLE';
+    END IF;
+    IF existing_row.prediction_json IS DISTINCT FROM p_payload
+       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash THEN
+      RAISE EXCEPTION 'CONV_REG_IMMUTABLE_IDENTITY_COLLISION';
+    END IF;
+    RETURN pg_catalog.jsonb_build_object(
+      'status','existing',
+      'prediction_ref',existing_row.prediction_ref,
+      'tenant_id',existing_row.tenant_id::text,
+      'recorded_at',existing_row.recorded_at,
+      'payload_sha256',existing_row.client_payload_sha256
+    );
+  END IF;
   RETURN pg_catalog.jsonb_build_object(
     'status','recorded',
-    'prediction_ref',found.prediction_ref,
-    'tenant_id',found.tenant_id::text,
-    'recorded_at',found.recorded_at,
-    'payload_sha256',found.client_payload_sha256
+    'prediction_ref',existing_row.prediction_ref,
+    'tenant_id',existing_row.tenant_id::text,
+    'recorded_at',existing_row.recorded_at,
+    'payload_sha256',existing_row.client_payload_sha256
   );
 END
 $$;
