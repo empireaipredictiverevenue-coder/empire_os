@@ -68,7 +68,8 @@ WITH
                   FROM capability),false) AS capability_no_login_no_admin,
       EXISTS (SELECT 1 FROM source_func) AS function_exists,
       COALESCE((SELECT prosecdef AND provolatile='s'
-                       AND 'search_path='=ANY(proconfig)
+                       AND (proconfig=ARRAY['search_path=']::text[]
+                            OR proconfig=ARRAY['search_path=""']::text[])
                   FROM source_func),false) AS function_security_definer_stable_locked_path,
       COALESCE((SELECT proowner=(SELECT oid FROM migrator)
                   FROM source_func),false) AS function_owned_by_migrator,
