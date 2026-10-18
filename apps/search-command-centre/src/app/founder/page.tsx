@@ -77,6 +77,8 @@ export default async function FounderPage() {
     getSpatialPhysicalStatus(),
   ]);
   const data = result.data;
+  const decision = data?.predictive_decision_control;
+  const nextPriorities = decision?.top_three ?? [];
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -175,6 +177,99 @@ export default async function FounderPage() {
           </section>
         ) : (
           <>
+            <section className="panel mt-7" aria-labelledby="decision-control-title">
+              <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-start">
+                <div>
+                  <p className="eyebrow">Predictive decision control · Evidence-led</p>
+                  <h2 id="decision-control-title" className="mt-1 text-2xl font-semibold tracking-tight text-white">
+                    What Empire AI should work on next
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">
+                    Live canonical priorities, departmental ownership and clear approval boundaries.
+                    Ranking is a triage heuristic, not a revenue forecast or execution permission.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <span className="rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1 font-medium text-cyan-100">
+                    {show(decision?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                  </span>
+                  <span className="rounded-full border border-white/15 px-3 py-1 text-slate-300">
+                    Observe only · No dispatch
+                  </span>
+                </div>
+              </div>
+              {decision ? (
+                <>
+                  <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-xs text-slate-400">Priorities identified</p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{int(decision.priority_count)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-xs text-slate-400">Internal preparation</p>
+                      <p className="mt-2 text-2xl font-semibold text-cyan-200">{int(decision.internal_preparation?.length)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-xs text-slate-400">Founder decisions</p>
+                      <p className="mt-2 text-2xl font-semibold text-amber-200">{int(decision.founder_decisions?.length)}</p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+                      <p className="text-xs text-slate-400">Work actually dispatched</p>
+                      <p className="mt-2 text-lg font-semibold text-slate-300">{decision.task_dispatch_performed ? "Review" : "None"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-3 lg:grid-cols-3">
+                    {nextPriorities.length ? nextPriorities.map((task, index) => (
+                      <article key={task.task_id} className="rounded-2xl border border-cyan-300/15 bg-[#0a1820] p-5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-widest text-cyan-200">
+                            Priority {index + 1}
+                          </span>
+                          <span className="text-[11px] text-slate-400">{task.department.replaceAll("_", " ")}</span>
+                        </div>
+                        <h3 className="mt-3 break-words text-base font-semibold text-white">
+                          {task.recommended_action.replaceAll("_", " ")}
+                        </h3>
+                        {task.company_name ? (
+                          <p className="mt-1 text-xs text-slate-400">{task.company_name}</p>
+                        ) : null}
+                        <p className="mt-3 text-sm leading-6 text-slate-300">{task.reason ?? task.hold_or_gate_reason}</p>
+                        <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+                          <span className="rounded-md border border-white/15 px-2 py-1 text-slate-200">
+                            {task.lane.replaceAll("_", " ")}
+                          </span>
+                          <span className="rounded-md border border-white/10 px-2 py-1 text-slate-400">
+                            {task.source_freshness.replaceAll("_", " ")}
+                          </span>
+                        </div>
+                        <p className="mt-4 text-xs text-slate-500">
+                          {task.can_prepare_internal_work
+                            ? "Eligible for internal preparation; not authorised to execute."
+                            : task.founder_gate_required
+                              ? "Explicit founder decision required."
+                              : "Review, external evidence or an existing governor is required."}
+                        </p>
+                      </article>
+                    )) : (
+                      <p className="col-span-full rounded-xl border border-white/10 p-5 text-sm text-slate-400">
+                        No trusted current decisions available. Missing evidence is not treated as a task completed.
+                      </p>
+                    )}
+                  </div>
+                  <p className="mt-4 text-xs leading-5 text-slate-500">
+                    Buyer evidence: {show(decision.sources?.buyer_next_best_action)} ·
+                    Executive observer: {show(decision.sources?.astra_executive_observer)} ·
+                    Revenue snapshot: {show(decision.sources?.revenue_pulse).replaceAll("_", " ")}.
+                    No outbound, financial activation or database write is authorised here.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-4 text-sm text-amber-200">
+                  Decision control is not yet exposed by the running Founder Dashboard API.
+                  Existing operations remain unchanged.
+                </p>
+              )}
+            </section>
             <section className="panel mt-7">
               <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
                 <div>

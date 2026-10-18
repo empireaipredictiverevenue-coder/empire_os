@@ -98,6 +98,9 @@ from empire_os.revenue_pulse import (
 from empire_os.revenue_command_queue import (
     build_revenue_command_queue_runtime,
 )
+from empire_os.predictive_decision_control import (
+    build_predictive_decision_control_runtime,
+)
 from empire_os.market_sweep_revenue_gps import (
     build_market_sweep_runtime,
 )
@@ -1481,6 +1484,9 @@ def build_founder_dashboard(repo_root: Path) -> dict[str, Any]:
         "commercial_funnel": build_funnel_runtime(repo_root),
         "revenue_pulse": build_revenue_pulse_runtime(repo_root),
         "revenue_command_queue": build_revenue_command_queue_runtime(
+            repo_root
+        ),
+        "predictive_decision_control": build_predictive_decision_control_runtime(
             repo_root
         ),
         "revenue_capacity_board": _read_json(

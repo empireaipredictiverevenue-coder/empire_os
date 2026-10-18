@@ -2455,3 +2455,20 @@ def test_founder_reports_only_aggregate_exact_recipient_history_not_addresses(tm
     assert d["exact_recipient_suppression_holds"]==1
     assert d["outbound_authorized"] is False
     assert "PRIVATE_" not in str(d) and "@example.org" not in str(d)
+
+
+
+def test_founder_overview_includes_read_only_predictive_decision_control(tmp_path):
+    app = FastAPI()
+    app.include_router(create_founder_dashboard_router(make_root(tmp_path)))
+    response = TestClient(app).get("/v1/founder-dashboard/overview")
+    assert response.status_code == 200
+    control = response.json()["predictive_decision_control"]
+    assert control["schema_version"] == "empire.predictive_decision_control.v1"
+    assert control["mode"] == "OBSERVE"
+    assert control["task_dispatch_performed"] is False
+    assert control["execution_authority"] == "none"
+    assert control["outbound_authorized"] is False
+    assert control["database_mutation_authorized"] is False
+    assert control["recognized_revenue_cents"] is None
+    assert control["status"] == "EVIDENCE_HOLD"

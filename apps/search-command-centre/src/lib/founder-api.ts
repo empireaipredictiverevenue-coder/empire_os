@@ -5,7 +5,46 @@ export type FounderStage = {
   detail?: string | null;
 };
 
+export type PredictiveDecisionTask = {
+  task_id: string;
+  source: string;
+  company_name?: string | null;
+  department: string;
+  recommended_action: string;
+  current_commercial_state: string;
+  lane: string;
+  triage_rank: number;
+  reason?: string | null;
+  hold_or_gate_reason: string;
+  existing_blocker?: string | null;
+  source_freshness: string;
+  can_prepare_internal_work: boolean;
+  can_execute: false;
+  founder_gate_required: boolean;
+  waiting_external: boolean;
+};
+
+export type PredictiveDecisionControl = {
+  schema_version: string;
+  generated_at: string;
+  status: string;
+  mode: "OBSERVE";
+  sources: Record<string, string>;
+  priority_count: number;
+  truncated_count: number;
+  lane_counts: Record<string, number>;
+  department_counts: Record<string, number>;
+  top_three: PredictiveDecisionTask[];
+  founder_decisions: PredictiveDecisionTask[];
+  internal_preparation: PredictiveDecisionTask[];
+  items: PredictiveDecisionTask[];
+  recognized_revenue_cents: number | null;
+  task_dispatch_performed: false;
+  execution_authority: "none";
+};
+
 export type FounderDashboard = {
+  predictive_decision_control?: PredictiveDecisionControl;
   mode?: string;
   generated_at?: string;
   commercial_loop?: {
