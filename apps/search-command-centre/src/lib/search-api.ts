@@ -30,11 +30,37 @@ export type SearchConsoleStatus = {
   site_url?: string | null;
 };
 
+export type GscDailyChart = {
+  schema_version: "empire.search.gsc_daily_chart_evidence.v1";
+  status: "DATE_DIMENSION_ROWS_OBSERVED" | "HELD_GSC_DAILY_SOURCE_UNAVAILABLE";
+  source: "google_search_console_date_dimension";
+  mode: "READ_ONLY";
+  date_window: [string, string];
+  days_observed: number | null;
+  days_missing_unreported: string[] | null;
+  rows: Array<{
+    date: string;
+    clicks: number;
+    impressions: number;
+    gsc_reported_ctr: number;
+    gsc_reported_average_position: number;
+  }>;
+  reported_date_dimension_clicks: number | null;
+  reported_date_dimension_impressions: number | null;
+  missing_days_treated_as_zero: false;
+  gsc_average_position_is_independent_serp_rank: false;
+  independent_google_rank_positions_verified: false;
+  buyer_enquiries_verified: false;
+  realised_revenue_verified: false;
+  execution_authority: "NONE";
+};
+
 export type SeoDepartmentReview = {
   schema_version: "empire.search_growth.department_integration.v1";
   status: "DEPARTMENT_CONNECTED_EVIDENCE_GAPS_OPEN";
   mode: "OBSERVE";
   gsc_final_page_window: [string, string];
+  gsc_daily_chart?: GscDailyChart;
   gsc_returned_page_rows: number;
   gsc_returned_page_sample_clicks: number;
   gsc_returned_page_sample_impressions: number;

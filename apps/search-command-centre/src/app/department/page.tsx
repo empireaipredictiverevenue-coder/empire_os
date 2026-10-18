@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 import { getSeoDepartmentReview, type SeoDepartmentReview } from "@/lib/search-api";
+import { ObservedGscTrend } from "./observed-trend";
 
 export const metadata = {
   title: "SEO Evidence | Empire AI Search Command Centre",
@@ -48,6 +49,7 @@ function Content({ report: d }: { report: SeoDepartmentReview }) {
         <Metric label="Historical 404 rows" value={d.legacy_missing_404_count_in_returned_page_sample} note={d.legacy_missing_404_impressions_in_returned_page_sample + " impressions; " + d.legacy_missing_404_clicks_in_returned_page_sample + " clicks."} />
       </div>
     </section>
+    <ObservedGscTrend chart={d.gsc_daily_chart} />
     <div className="mt-7 grid gap-6 xl:grid-cols-2">
       <section className="panel">
         <p className="eyebrow">Original content recovery</p>
