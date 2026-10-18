@@ -52,6 +52,22 @@ def evidence():
             "indexation_verified":False,"commercial_conversion_verified":False,
             "outbound_authorized":False,"publishing_authorized":False,
         },
+        "serp_cache": {
+            "schema_version":"empire.search_intelligence.serp_cache_inventory.v1",
+            "status":"CACHE_INVENTORY_OBSERVED",
+            "source":"existing_search_fabric_local_cache","mode":"READ_ONLY",
+            "ttl_hours":24,"cache_files_seen":3,
+            "cache_envelopes_valid":2,"cache_envelopes_invalid":1,
+            "cache_fresh_candidate_count":1,"cache_stale_candidate_count":1,
+            "cache_fresh_candidates_by_engine":{"bing_html":1},
+            "live_serp_engine_probed":False,
+            "external_search_queries_sent":False,"paid_api_calls":0,
+            "independent_google_rank_positions_verified":False,
+            "cached_engine_positions_are_google_ranks":False,
+            "target_buyer_queries_verified":False,
+            "customer_records_accessed":False,"database_writes":False,
+            "outbound_sent":False,"execution_authority":"NONE",
+        },
         "semantic": {
             "schema_version":"live_semantic_site_quality_review.v1",
             "mode":"OBSERVE","source_type":"read_only_public_html",
@@ -127,6 +143,9 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     assert d["realised_revenue_verified"] is False
     assert d["campaigns_approved_to_launch"]==0
     assert d["zero_spend_gbp"]==0
+    assert d["search_fabric_cache_fresh_candidates_24h"]==1
+    assert d["search_fabric_cache_invalid_envelopes"]==1
+    assert d["live_serp_provider_current_buyer_query_verified"] is False
     assert d["semantic_live_priority_pages_checked"]==4
     assert d["semantic_editorial_review_candidates"]==2
     assert d["semantic_owned_pages_commercial_route_verified"] is True
@@ -153,6 +172,10 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     ("semantic","revenue_verified",True,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
     ("legacy","missing_review_queue",[],"LEGACY_EDITORIAL_REVIEW_LEDGER_UNVERIFIED"),
     ("legacy","returned_page_clicks",100,"LEGACY_SAMPLE_TOTALS_CONTRADICTED"),
+    ("serp_cache","independent_google_rank_positions_verified",True,
+     "SERP_CACHE_PROVENANCE_UNVERIFIED"),
+    ("serp_cache","paid_api_calls",1,"SERP_CACHE_PROVENANCE_UNVERIFIED"),
+    ("serp_cache","cache_fresh_candidate_count",5,"SERP_CACHE_COUNTS_INCONSISTENT"),
     ("legacy","redirect_authorized",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","database_writes",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","returned_page_rows",27,"INCONSISTENT_PAGE_DIMENSION_SAMPLE"),

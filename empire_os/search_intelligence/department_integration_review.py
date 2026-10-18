@@ -31,6 +31,7 @@ def reconcile_department(
     gsc: Mapping[str, Any],
     legacy: Mapping[str, Any],
     semantic: Mapping[str, Any],
+    serp_cache: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Accept only reviewed first-party/owner evidence; every gap stays visible."""
     if (not isinstance(four, Mapping) or four.get("schema")
@@ -178,6 +179,42 @@ def reconcile_department(
     core_topics = (groups["BUYER_INTENT_EDITORIAL_REVIEW"]
                    + groups["EMPIRE_PRODUCT_TOPIC_REVIEW"]
                    + groups["ROOFING_RESEARCH_REVIEW"])
+    # Cached Search Fabric evidence is useful source-health context, NOT an
+    # independent Google SERP position, live buyer-query rank or demand count.
+    if (not isinstance(serp_cache, Mapping)
+            or serp_cache.get("schema_version")
+                != "empire.search_intelligence.serp_cache_inventory.v1"
+            or serp_cache.get("status") != "CACHE_INVENTORY_OBSERVED"
+            or serp_cache.get("source") != "existing_search_fabric_local_cache"
+            or serp_cache.get("mode") != "READ_ONLY"
+            or serp_cache.get("ttl_hours") != 24
+            or serp_cache.get("live_serp_engine_probed") is not False
+            or serp_cache.get("external_search_queries_sent") is not False
+            or serp_cache.get("paid_api_calls") != 0
+            or serp_cache.get("independent_google_rank_positions_verified") is not False
+            or serp_cache.get("cached_engine_positions_are_google_ranks") is not False
+            or serp_cache.get("target_buyer_queries_verified") is not False
+            or serp_cache.get("customer_records_accessed") is not False
+            or serp_cache.get("database_writes") is not False
+            or serp_cache.get("outbound_sent") is not False
+            or serp_cache.get("execution_authority") != "NONE"):
+        raise IntegrationEvidenceHeld("SERP_CACHE_PROVENANCE_UNVERIFIED")
+    cache_files = _exact_nonnegative(serp_cache.get("cache_files_seen"),max_value=2500)
+    valid_cache = _exact_nonnegative(serp_cache.get("cache_envelopes_valid"),max_value=2500)
+    invalid_cache = _exact_nonnegative(serp_cache.get("cache_envelopes_invalid"),max_value=2500)
+    fresh_cache = _exact_nonnegative(serp_cache.get("cache_fresh_candidate_count"),max_value=2500)
+    stale_cache = _exact_nonnegative(serp_cache.get("cache_stale_candidate_count"),max_value=2500)
+    engines = serp_cache.get("cache_fresh_candidates_by_engine")
+    allowed_cache_engines = {
+        "bing_html", "bing_rss", "duckduckgo_html", "duckduckgo_lite",
+        "brave_web", "mojeek",
+    }
+    if (cache_files != valid_cache + invalid_cache
+            or valid_cache != fresh_cache + stale_cache
+            or not isinstance(engines, Mapping)
+            or set(engines) - allowed_cache_engines
+            or sum(_exact_nonnegative(v,max_value=2500) for v in engines.values()) != fresh_cache):
+        raise IntegrationEvidenceHeld("SERP_CACHE_COUNTS_INCONSISTENT")
     ready = (
         all(p.get("http") == 200 and p.get("available") is True for p in pages.values())
         and seo.get("sitemap_http") == 200
@@ -250,6 +287,12 @@ def reconcile_department(
         "campaigns_approved_to_launch": 0,
         "zero_spend_gbp": 0,
         "open_gates": blocks,
+        "search_fabric_cache_files_observed": cache_files,
+        "search_fabric_cache_fresh_candidates_24h": fresh_cache,
+        "search_fabric_cache_stale_candidates": stale_cache,
+        "search_fabric_cache_invalid_envelopes": invalid_cache,
+        "search_fabric_fresh_candidates_by_engine": dict(sorted(engines.items())),
+        "live_serp_provider_current_buyer_query_verified": False,
         "search_rankings_verified": False,
         "buyer_enquiries_verified": False,
         "realised_revenue_verified": False,
@@ -273,6 +316,7 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
     from scripts.review_live_gsc_page_performance import build_live_priority_page_report
     from scripts.review_live_search_page_404_revenue_readonly import run as legacy_run
     from scripts.review_live_semantic_site_quality import build_live_site_quality_review
+    from empire_os.search_intelligence.serp_cache_inventory import inspect_cache
 
     end = end or date.today() - timedelta(days=2)
     start = start or end - timedelta(days=12)
@@ -290,4 +334,5 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
         four=discovery_run(), organic=integrity_run(), growth=growth,
         gsc=page_report, legacy=legacy,
         semantic=build_live_site_quality_review(),
+        serp_cache=inspect_cache(),
     )
