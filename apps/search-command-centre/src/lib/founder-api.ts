@@ -125,7 +125,33 @@ export type PredictiveFormulaEvidence = {
   execution_authority: "none";
 };
 
+export type RevenueStreamMining = {
+  schema_version: string;
+  status: string;
+  source_count: number;
+  lane_count: number;
+  sources: Record<string, {status: string; aggregate: Record<string, unknown> | null}>;
+  department_lanes: Array<{
+    stream: string;
+    status: string;
+    department: string;
+    next_internal_action: string;
+    review_code: string;
+    counts: Record<string, number>;
+    source_ref: string;
+    evidence_fingerprint: string;
+    genuine_buyer_proven: false;
+    revenue_verified: false;
+    external_execution_authorized: false;
+  }>;
+  worker_dispatched: false;
+  paid_api_called: false;
+  commercial_execution_authorized: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  data_stream_mining?: RevenueStreamMining;
   formula_evidence?: PredictiveFormulaEvidence;
   buyer_capacity_action_brief?: PredictiveBuyerCapacityBrief;
   department_handoff?: PredictiveDecisionHandoff;

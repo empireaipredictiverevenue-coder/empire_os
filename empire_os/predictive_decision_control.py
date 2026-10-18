@@ -486,6 +486,10 @@ def build_predictive_decision_control_runtime(
     # data refresh, provider call or additional commercial authority.
     from empire_os.predictive_formula_evidence_review import review_formula_evidence
     decision["formula_evidence"] = review_formula_evidence(root, as_of=as_of)
+    # Mining routes over the existing acquisition/radar/Quant source streams.
+    # This is a deterministic read-only report, not a queue dispatch.
+    from empire_os.revenue_stream_mining import build_revenue_stream_mining
+    decision["data_stream_mining"] = build_revenue_stream_mining(root, as_of=as_of)
     return decision
 
 

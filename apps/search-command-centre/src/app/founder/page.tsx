@@ -82,6 +82,7 @@ export default async function FounderPage() {
   const departmentHandoff = decision?.department_handoff;
   const buyerCapacity = decision?.buyer_capacity_action_brief;
   const formulaEvidence = decision?.formula_evidence;
+  const streamMining = decision?.data_stream_mining;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -231,6 +232,61 @@ export default async function FounderPage() {
                     <span className="text-slate-500">
                       Currency and independent settlement reconciliation are not asserted by this view.
                     </span>
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
+                    <div className="flex flex-wrap justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Predictive Cloud · Intelligence mining</p>
+                        <h3 className="mt-1 text-lg font-semibold text-white">
+                          Existing data streams and research teams
+                        </h3>
+                        <p className="mt-2 text-xs leading-5 text-slate-400">
+                          Mine existing source evidence without creating contacts,
+                          guessed probabilities or fictional commercial outcomes.
+                        </p>
+                      </div>
+                      <span className="text-xs text-cyan-200">
+                        {show(streamMining?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {streamMining ? (
+                      <>
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-300">
+                          <span>Source adapters: {streamMining.source_count}</span>
+                          <span>Department workstreams: {streamMining.lane_count}</span>
+                          <span>External spend: £0</span>
+                        </div>
+                        <div className="mt-3 grid gap-2 md:grid-cols-2">
+                          {streamMining.department_lanes.map((lane) => (
+                            <div key={lane.stream} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                              <div className="flex flex-wrap justify-between gap-2 text-xs font-medium text-white">
+                                <span>{lane.stream.replaceAll("_", " ")}</span>
+                                <span className={lane.status === "FRESH" || lane.status === "OBSERVED" ? "text-cyan-200" : "text-amber-200"}>
+                                  {lane.status.replaceAll("_", " ")}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-300">
+                                Owner: {lane.department.replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                {lane.next_internal_action.replaceAll("_", " ")}
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-slate-400">
+                                {Object.entries(lane.counts).slice(0, 4).map(([key, value]) => (
+                                  <span key={key}>{key.replaceAll("_", " ")}: {value}</span>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          Same source records may appear in several desks; counts are not additive.
+                          This panel is read-only and does not dispatch work.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-xs text-slate-400">Existing source-stream mining waits for the paired backend release.</p>
+                    )}
                   </div>
                   <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">

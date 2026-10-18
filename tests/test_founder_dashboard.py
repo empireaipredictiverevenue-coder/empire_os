@@ -2475,6 +2475,9 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert control["north_star"] == "verified_realized_gross_profit"
     assert control["revenue_truth_status"] == "UNAVAILABLE"
     assert control["formula_evidence"]["schema_version"] == "empire.predictive_formula_evidence_review.v1"
+    assert control["data_stream_mining"]["schema_version"] == "empire.revenue_stream_mining.review.v1"
+    assert control["data_stream_mining"]["worker_dispatched"] is False
+    assert control["data_stream_mining"]["cross_lane_counts_are_not_additive"] is True
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False
