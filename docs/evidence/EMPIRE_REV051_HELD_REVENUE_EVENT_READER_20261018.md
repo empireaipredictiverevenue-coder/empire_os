@@ -60,3 +60,52 @@ If the founder approves the *exact role+single-event function* DDL, apply it onc
 ## Relationship to existing app and commercial work
 
 The existing Founder API evidence guards remain live. The unchanged other-agent Python reader and source reconciler remain owned by their worktree. This release does not add an endpoint, app, timer, model, new database or payment authority, and does not mutate the existing buyer, order or revenue tables. Its only live-affecting action **if independently approved in the future** would be to create the missing dedicated database capability objects.
+
+## 18 October founder approval / guarded deployment preparation
+
+The founder has now **explicitly approved applying only REV051's restricted NOLOGIN
+capability role and exact one-event read-only function**, after the existing
+production backup, WAL-archive, schema and object-collision preflight. The
+approval does **not** include a new login, tenant binding, broader privileges,
+financial event write, customer-report entitlement or unrelated production
+migration.
+
+A bounded release helper has been added:
+
+`  scripts/deploy_approved_rev051_guarded_20261018.sh  `
+
+This shell script runs only from the local EmpireOS server and only with the
+explicit `--apply-approved-role-function-only` flag as root. It first verifies
+an immutable SHA256 digest of the reviewed migration, checks that an existing
+pgBackRest repository has a recent completed backup, confirms the active
+canonical PostgreSQL primary has archiving enabled, and verifies via the
+existing read-only database catalogue probe that the specific capability role
+and function do not yet exist. If any prerequisite is not demonstrated it
+**stops without DDL**.
+
+The only potential database mutation is the exact, already tested, atomic
+`051_predictive_revenue_event_reader_held.sql` transaction. Afterward the
+same catalogue probe must show a hardened NOLOGIN role, correct SECURITY
+DEFINER/STABLE function, locked search path, migrator ownership, restricted
+function EXECUTE and no direct ledger-table access. The post-deploy catalogue
+status still intentionally **HOLDs on dedicated_login_member_exists=false**.
+
+The connected remote terminal can inspect local files and application services,
+but cannot access the privileged pgBackRest configuration or PostgreSQL
+administrator session. Therefore backup status and actual live migration
+must be checked from an authorised local administrator shell. Do not claim the
+role/function has been installed until the guarded script reports
+`REV051_DEPLOYMENT_DONE=ROLE_FUNCTION_ONLY_LOGIN_AND_PAYMENTS_UNCHANGED`.
+
+After the prepared script is committed in the canonical checkout, the founder
+can execute exactly:
+
+```bash
+cd /srv/empire_os
+sudo bash scripts/deploy_approved_rev051_guarded_20261018.sh --apply-approved-role-function-only
+```
+
+If the script emits `REV051_DEPLOYMENT_HOLD`, inspect its precise blocker.
+Do not bypass any failed backup or catalogue check and do not provision a
+login as a workaround. No service restart is necessary to install a PostgreSQL
+reader capability with zero connected application callers.
