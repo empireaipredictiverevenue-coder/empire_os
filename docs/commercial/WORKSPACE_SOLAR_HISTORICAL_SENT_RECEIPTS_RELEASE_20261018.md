@@ -68,32 +68,111 @@ receipts, verifies exact six-row readback and commits. Any contradiction
 fails the entire transaction. It never writes `outbound_intents`,
 `outbound_replies`, CRM, tenant, suppression, payments or email.
 
-## Operator commands — staged, no DB activation automatically approved
+## Founder approved migration 052 — operator activation pending
 
-Read-only preflight is safe to rerun:
+On **18 October 2026**, the founder explicitly approved **migration 052**,
+which creates only the separate historical sent-evidence table. This is
+**schema-only approval**; it does not approve the separate historical
+six-receipt INSERT, creation of canonical outbound intents, CRM mutation,
+outbound sends or financial activity.
+
+The one-time operator release script is
+`scripts/activate_workspace_historical_receipts_migration_052_20261018.sh`.
+It pins the unchanged migration source digest, checks private custody and
+read-only API evidence, and on its explicit privileged branch verifies the
+actual live EmpireDB name, archive health, PostgreSQL role and schema
+authority. It uses postgres peer authentication and a single transaction
+to apply the frozen migration 052 SQL, then checks forced RLS, the
+append-only trigger, SELECT-only closer grants, **zero** database receipt
+rows and the existing private Founder reader's honest post-migration state.
+It does not restart any application service or import any receipts.
+
+The read-only nonprivileged preflight has passed on EmpireOS. An attempt
+to run privileged SQL directly through the connected remote command
+interface was denied before execution; this permission boundary was
+respected. Consequently **migration 052 is NOT YET active on production
+EmpireDB**. From the founder's trusted Ubuntu shell, use the already
+approved narrow operator action:
 
 ```bash
 cd /srv/empire_os
-./.venv/bin/python -B -m scripts.prepare_workspace_solar_historical_evidence_20261018 --preview
-./.venv/bin/python -B -m scripts.import_workspace_historical_sent_receipts_20261018 --preflight
+bash scripts/activate_workspace_historical_receipts_migration_052_20261018.sh --preflight
+sudo bash scripts/activate_workspace_historical_receipts_migration_052_20261018.sh --apply-founder-approved-migration-052
 ```
 
-**Do not execute the following until the founder explicitly approves
-DB migration 052 and the historical-evidence insert**, and the privileged
-DBA confirms current schema/role compatibility and recovery status:
+The exact success marker is `EMPIREDB_MIGRATION_052_SCHEMA_VERIFIED`,
+together with `historical_table=active rows=0`. If any role, archiver,
+schema or security check fails, the operator must report the HOLD marker;
+do not work around it or import receipts. The SQL migration is already
+transactional, and the preflight refuses to run a second create.
+After activation, the live private status should read
+`SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS`. No automatic DB INSERT occurs.
+
+The original six receipts remain preserved in private custody.
+`scripts/import_workspace_historical_sent_receipts_20261018.py`
+is a separately gated import, **not included in this approval**. Its
+privilege-drop flow was fixed to validate the protected provider snapshot
+before permanently dropping from root to OS `postgres`, carrying only
+the prevalidated in-memory evidence into SQL. Conflict and replay checks
+were tested on a separate PostgreSQL 18 scratch instance. A future import
+must never be launched by cron, CI, backend startup or a generic deploy.
+
+
+## Concurrent Founder API release — read-only endpoint recovery staged
+
+After the founder's schema-only approval, the existing private Founder API
+was found running another agent's **newer frozen release**:
+`/opt/empire-ai/founder-read-releases/bridge-sources-history-75912015`.
+Its Gmail and canonical-intent endpoints remained healthy, but it had
+not included the preexisting
+`/v1/founder-mailbox/workspace-solar-historical-evidence-status`
+read-only route. That endpoint had been live earlier, but now returned
+HTTP 404. The approved migration operator refused this unverifiable
+precondition, correctly making **no production schema change**.
+
+To preserve all that agent's other work, a fresh isolated copy of the
+currently running release was prepared at
+`/home/ubuntu/empire_worktrees/empire_founder_api_hist052_bridge_additive_20261018`.
+It differs only by the safe `empire_os/founder_mailbox_api.py`
+read-only route and the existing
+`empire_os/workspace_solar_historical_status.py` module. All other
+source matches the newer active release by content comparison. An
+isolated port-8776 preview verified health and route presence without
+production credentials; live protected DB results were intentionally
+unavailable in that sandbox.
+
+The operator-only, rollback-protected script
+`scripts/deploy_private_founder_hist052_read_api_20261018.sh`
+checks the exact active new release, source hashes, existing Gmail and
+canonical routes, services and public Founder URL. It adds only a new
+`95-private-historical-evidence-read-api.conf` override for the
+existing 8766 service, and confirms that the restored read-only status
+returns **six genuine private receipts, zero EmpireDB rows and an
+unapplied table**. If that or any previous route check fails, it removes
+the new override and restarts the previous 90-owned agent release.
+
+**The additive private read-API release is prepared, but not applied.**
+It does not authorise or execute migration 052; it simply restores the
+previously verified readback necessary to deploy migration 052 safely.
+The existing role and systemd credential are reused without copying
+private credentials.
+
+Since the founder has ALREADY approved schema migration 052, the
+trusted Ubuntu operator can run the two separate, fail-closed steps
+below, in order:
 
 ```bash
 cd /srv/empire_os
-sudo -u postgres psql -X -v ON_ERROR_STOP=1 -d empiredb \
-  -f migrations/empiredb/052_workspace_historical_send_receipts_observe_only.sql
-sudo ./.venv/bin/python -B -m scripts.import_workspace_historical_sent_receipts_20261018 \
-  --apply-founder-approved-historical-receipts-only
+sudo bash scripts/deploy_private_founder_hist052_read_api_20261018.sh --apply-approved-additive-private-read-api
+bash scripts/activate_workspace_historical_receipts_migration_052_20261018.sh --preflight
+sudo bash scripts/activate_workspace_historical_receipts_migration_052_20261018.sh --apply-founder-approved-migration-052
 ```
 
-Those actions mutate only the dedicated historical proof table. They do
-not create or backfill canonical sent intents. Do not use these commands
-under a generic agent deploy, CI pipeline, cron or server startup. Keep the
-existing backup/PITR recovery evidence verified before privileged DDL.
+Each command must succeed before moving to the next. The required final
+markers are `FOUNDER_HISTORICAL_READ_API_ADDITIVE_RELEASE_VERIFIED`
+and `EMPIREDB_MIGRATION_052_SCHEMA_VERIFIED` with an **empty table**.
+The six-receipt historical importer remains a **separately gated INSERT**
+and must not be run under this schema-only approval.
 
 ## Verified against isolated PostgreSQL 18 (not production)
 
@@ -240,6 +319,9 @@ the verified prior frozen 70+80 release. No rollback has been needed.
    existing outbound programme; six sent emails by themselves are not
    verified demand or revenue.
 
-**Status:** six authentic Gmail original-sent receipts in private custody;
-migration 052 and DB importer built/staged; DB activation held for
-explicit founder authorisation; zero new commercial revenue.
+**Status as of the live preflight:** six authentic Gmail original-sent
+receipts in private custody. Migration 052 has **founder approval** but
+its production application is still pending the privileged operator
+command and readback. The separate six-receipt import remains unapproved
+and unapplied. No verified buyer reply, CRM opportunity or revenue was
+created by this work.

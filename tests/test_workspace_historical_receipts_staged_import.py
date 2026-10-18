@@ -103,6 +103,35 @@ def test_privileged_import_rejects_tampered_field_even_with_original_digest(
     assert conn.commit_count==0
 
 
+def test_privilege_dropped_import_uses_provider_proof_prevalidated_before_setuid(monkeypatch):
+    # The real root operator snapshots provider evidence in memory, then
+    # irreversibly becomes postgres, which cannot reopen ubuntu-owned 0600.
+    data=manifest(monkeypatch)
+    conn=Connection()
+    def private_file_unreadable_after_drop():
+        raise PermissionError("EXPECTED_POSTGRES_CANNOT_OPEN_PRIVATE_SOURCE")
+    monkeypatch.setattr(importer,"read_source_build_manifest",private_file_unreadable_after_drop)
+    result=importer.import_exact_six_receipts(
+        data,verified_source=deepcopy(data),
+        connect_factory=lambda *a,**kw:conn,
+    )
+    assert result["new_receipts"]==6
+    assert conn.commit_count==1
+
+
+def test_preverified_source_cannot_be_different_from_private_custody(monkeypatch):
+    data=manifest(monkeypatch)
+    fake=deepcopy(data)
+    fake["items"][0]["recipient_sha256"]="a"*64
+    conn=Connection()
+    with pytest.raises(importer.HistoricalImportHeld, match="LIVE_WORKSPACE_SOURCE_DRIFT"):
+        importer.import_exact_six_receipts(
+            data,verified_source=fake,
+            connect_factory=lambda *a,**kw:conn,
+        )
+    assert conn.commit_count==0
+
+
 def test_conflicting_previous_receipt_is_rejected_no_new_inserts(monkeypatch):
     data=manifest(monkeypatch)
     conn=Connection()

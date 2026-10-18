@@ -342,6 +342,76 @@ CRM promotion. Migration 052 and the six-receipt insert remain held for
 separate explicit founder approval; the live CRM still has no authorised
 contact/tenant promotion from these observations.
 
+## Founder approved EmpireDB 052 schema — privileged operator handoff
+
+The founder has explicitly approved applying the **052 historical receipt
+table migration only**. The existing authenticated Workspace monitor and
+Founder Console remain live, six original sent receipts remain in private
+0600 custody and no genuine inbound candidate has appeared.
+
+`scripts/activate_workspace_historical_receipts_migration_052_20261018.sh`
+was added as a source-pinned, guarded operator release for that permission.
+Its **read-only production preflight PASSED**. It will apply only the
+transactional 052 SQL via the existing postgres peer account, then
+verify forced RLS, immutable trigger, SELECT-only observer access,
+empty table and private Founder readback. It does not import receipts,
+modify `outbound_intents`, send messages or restart application services.
+
+The connected remote execution interface denied privileged SQL; no
+permission workaround was attempted. **Production migration 052 is not
+yet verified as applied**. The founder can run the approved single
+operator command in the trusted Ubuntu terminal, as detailed in
+`docs/commercial/WORKSPACE_SOLAR_HISTORICAL_SENT_RECEIPTS_RELEASE_20261018.md`,
+and must observe `EMPIREDB_MIGRATION_052_SCHEMA_VERIFIED` before
+claiming schema activation.
+
+The separate six-historical-receipt insertion remains **not approved**
+by that schema-only instruction. Its existing importer was hardened to
+validate source proof before dropping privileges to the PostgreSQL peer
+user, and regression tests plus isolated PostgreSQL 18 import/replay tests
+passed. No CRM contact, buyer conversation, payment or revenue can be
+concluded from this migration.
+
+## Migration 052 approved — restored read API required before DBA apply
+
+The founder explicitly approved migration 052 (schema only) on
+18 October 2026. Production EmpireDB did not mutate in the remote
+session: privileged PostgreSQL commands were denied by the remote
+command interface, and the active Founder Read API had been switched
+by another agent to the newer isolated
+`bridge-sources-history-75912015` release, where the previously
+verified historical-status endpoint was missing (HTTP 404).
+Existing Gmail, canonical-intent and CRM services stayed healthy.
+
+An additive isolated candidate at
+`/home/ubuntu/empire_worktrees/empire_founder_api_hist052_bridge_additive_20261018`
+preserves every file from the currently active other-agent release,
+except for restoring the single read-only historical-status GET and
+module. The exact two-file patch and rollback-protected
+`scripts/deploy_private_founder_hist052_read_api_20261018.sh`
+passed an isolated loopback preview and live nonprivileged preflight.
+Its separate operator-owned 95 drop-in will preserve the original
+90 agent release as automatic rollback.
+
+`scripts/activate_workspace_historical_receipts_migration_052_20261018.sh`
+contains the already-approved single migration transaction, pinned
+SHA-256, local PostgreSQL 18/5432 peer socket, archive/readiness/role
+checks, forced-RLS/append-only verification and Founder readback. It
+does not import the six receipts, create CRM cases or send emails.
+The exact command order, held state and expected success markers are
+recorded in
+`docs/commercial/WORKSPACE_SOLAR_HISTORICAL_SENT_RECEIPTS_RELEASE_20261018.md`.
+
+The separate six-receipt importer was hardened so the root operator
+prevalidates the protected source in memory before permanently dropping
+to the postgres peer user; it passed unit and isolated real-PostgreSQL
+import/replay tests. This IMPORT is still a separately held operation,
+not authorised by the 052 schema-only directive.
+
+**Until both operator commands succeed, migration 052 is NOT confirmed
+live, and production EmpireDB historic receipts remain 0/6.** Do not
+claim an approved outbound intent, CRM buyer, payment or revenue.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

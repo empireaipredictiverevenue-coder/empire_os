@@ -71,7 +71,9 @@ def main():
         from scripts.import_workspace_historical_sent_receipts_20261018 import (
             load_private_custody,import_exact_six_receipts
         )
+        from empire_os.workspace_solar_historical_manifest import read_source_build_manifest
         manifest=load_private_custody()
+        verified_source=read_source_build_manifest()
         assert manifest["evidence_count"]==6
         from empire_os.workspace_solar_historical_status import (
             review_six_historical_receipt_admission,
@@ -84,9 +86,9 @@ def main():
         assert before["database_historical_receipts_verified"]==0
         print("REAL_POSTGRES_PRIVATE_FOUNDER_READ_BEFORE=0")
         connstr=f"host={sock} port={PORT} dbname=empiredb user=postgres"
-        first=import_exact_six_receipts(manifest,connect_factory=psycopg.connect,dsn=connstr)
+        first=import_exact_six_receipts(manifest,verified_source=verified_source,connect_factory=psycopg.connect,dsn=connstr)
         assert first["new_receipts"]==6 and first["crm_rows_created"]==0
-        second=import_exact_six_receipts(manifest,connect_factory=psycopg.connect,dsn=connstr)
+        second=import_exact_six_receipts(manifest,verified_source=verified_source,connect_factory=psycopg.connect,dsn=connstr)
         assert second["new_receipts"]==0 and second["replayed_identical_receipts"]==6
         after=review_six_historical_receipt_admission(
             connect_factory=psycopg.connect,dsn=observer_dsn

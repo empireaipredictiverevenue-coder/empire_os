@@ -44,7 +44,9 @@ class HistoricalImportHeld(ValueError):
     pass
 
 
-def _items_from_manifest(manifest: dict) -> list[dict]:
+def _items_from_manifest(
+    manifest: dict, *, verified_source: dict | None = None,
+) -> list[dict]:
     if (not isinstance(manifest, dict)
             or manifest.get("schema_version") != SCHEMA
             or manifest.get("evidence_count") != 6
@@ -54,7 +56,12 @@ def _items_from_manifest(manifest: dict) -> list[dict]:
             or not isinstance(manifest.get("items"),list)
             or len(manifest["items"])!=6):
         raise HistoricalImportHeld("CUSTODY_CONTRACT_INVALID")
-    current=read_source_build_manifest()
+    # The root operator must obtain verified_source BEFORE irrevocably
+    # dropping to OS postgres: the source is 0600 owned by ubuntu.
+    current=(read_source_build_manifest() if verified_source is None
+             else verified_source)
+    if not isinstance(current,dict) or not isinstance(current.get("items"),list):
+        raise HistoricalImportHeld("SOURCE_PROOF_CONTRACT_INVALID")
     original = current["items"]
     preserved = manifest["items"]
     if sorted(original, key=lambda x:x["gmail_thread_id"]) != sorted(
@@ -94,8 +101,9 @@ def _expected(item: dict, source_scan: str) -> tuple:
 def import_exact_six_receipts(
     manifest: dict, *, connect_factory: Callable[...,Any],
     dsn: str="dbname=empiredb user=postgres",
+    verified_source: dict | None = None,
 ) -> dict:
-    items=_items_from_manifest(manifest)
+    items=_items_from_manifest(manifest,verified_source=verified_source)
     expected={x["original_provider_message_id"]:_expected(
         x,manifest["source_scanned_at"]) for x in items}
     if len(expected)!=6:
@@ -219,8 +227,14 @@ def main() -> int:
         if args.apply_founder_approved_historical_receipts_only:
             if os.geteuid() != 0:
                 raise HistoricalImportHeld("ROOT_PRIVATE_CUSTODY_OPERATOR_REQUIRED")
+            # Capture the authenticated provider-derived source while root
+            # can read the mode-0600 snapshot. The peer connection then
+            # permanently drops to postgres; no private-file reread follows.
+            root_verified_source=read_source_build_manifest()
+            _items_from_manifest(manifest,verified_source=root_verified_source)
             result=import_exact_six_receipts(
                 manifest,
+                verified_source=root_verified_source,
                 connect_factory=_connect_as_postgres_after_private_custody_validation,
             )
             report.update(result,database_mutation=result["new_receipts"]>0)
