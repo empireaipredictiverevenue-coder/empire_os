@@ -46,7 +46,8 @@ PREFIX = (
 def pg(sql: str) -> str:
     """Local trusted postgres peer only; SQL via stdin, never argv or logs."""
     completed = subprocess.run(
-        ["runuser","-u","postgres","--","psql","-X","-q","-w","-A","-t",
+        ["/usr/sbin/runuser","-u","postgres","--","/usr/bin/psql",
+         "-X","-q","-w","-A","-t",
          "-v","ON_ERROR_STOP=1","-h","/var/run/postgresql","-p","5432",
          "-U","postgres","-d",DB],
         input=sql,capture_output=True,text=True,timeout=18,
@@ -314,9 +315,11 @@ def main(argv: list[str]|None=None) -> int:
     apply=args==["--apply-approved-one-tenant-login"]
     changed=False
     committed=False
+    stage="LOCK_PREFLIGHT"
     try:
         with LOCK.open("a+") as lock:
             fcntl.flock(lock.fileno(),fcntl.LOCK_EX|fcntl.LOCK_NB)
+            stage="CATALOG_READONLY"
             source=catalog()
             required=(
                 "canonical","postgres18","tenant_resolver",
@@ -333,10 +336,13 @@ def main(argv: list[str]|None=None) -> int:
             if VAULT.exists():
                 print("REV052_STATUS=HOLD_PRIVATE_CREDENTIAL_VAULT_ALREADY_EXISTS")
                 return 2
+            stage="HBA_FILE_READONLY"
             st,original=strict_hba()
+            stage="BACKUP_ARCHIVE_READONLY"
             if not backup_ready() or not archive_matches_active_repository():
                 print("REV052_STATUS=HOLD_RECENT_BACKUP_OR_ARCHIVE_NOT_PROVEN")
                 return 2
+            stage="RELEASE_SOURCE_READONLY"
             if apply and not reviewed_script():
                 print("REV052_STATUS=HOLD_UNREVIEWED_RELEASE_SOURCE")
                 return 2
@@ -345,20 +351,26 @@ def main(argv: list[str]|None=None) -> int:
                 print("REV052_EXECUTION_AUTHORITY=none")
                 return 0
 
+            stage="HBA_BACKUP"
             save_hba_backup(original)
             amended=PREFIX.encode("ascii")+original
+            stage="HBA_UPDATE"
             write_hba(amended,st)
             changed=True
+            stage="HBA_RELOAD_CHECK"
             active_hba_reload()
             if pg("SELECT count(*) FROM pg_catalog.pg_hba_file_rules WHERE error IS NOT NULL")!="0":
                 raise RuntimeError("POST_RELOAD_HBA_PARSE_ERROR")
             password=secrets.token_urlsafe(48)
             verifier=scram_verifier(password)
+            stage="CREDENTIAL_CREATION"
             private_credential(password)
             # Exact bounded DB mutation in one atomic transaction.
+            stage="LOGIN_DB_TRANSACTION"
             pg(provision_sql(verifier))
             committed=True
             # Admin-only readback: role tenant binding, no customer records.
+            stage="TENANT_BINDING_READBACK"
             binding=pg(
                 "SELECT count(*) FROM public.empire_tenant_role_bindings "
                 f"WHERE role_name='{LOGIN}' AND tenant_id='{TENANT}'::uuid "
@@ -366,6 +378,7 @@ def main(argv: list[str]|None=None) -> int:
             )
             if binding!='1':
                 raise RuntimeError("DEDICATED_TENANT_BINDING_READBACK_FAILED")
+            stage="AUTHENTICATED_FUNCTION_PROOF"
             if not live_login_proof(password):
                 raise RuntimeError("AUTHENTICATED_TENANT_FUNCTION_PROOF_NOT_VERIFIED")
             print("REV052_TENANT_BOUND_AUTHENTICATED_FUNCTION_PROOF=PASS")
@@ -393,6 +406,7 @@ def main(argv: list[str]|None=None) -> int:
                     VAULT.rmdir()
                 except OSError:
                     print("REV052_UNUSED_VAULT_RECONCILIATION_REQUIRED=YES")
+        print("REV052_FAILURE_STAGE="+stage)
         print("REV052_STATUS=HOLD_OR_UNVERIFIED_NO_BLIND_RETRY")
         if committed:
             print("REV052_DATABASE_TRANSACTION_COMMITTED_VERIFY_CREDENTIALS=REQUIRED")

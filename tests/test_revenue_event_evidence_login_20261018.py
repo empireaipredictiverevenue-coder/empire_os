@@ -151,9 +151,36 @@ def test_admin_psql_uses_quiet_local_stdin(monkeypatch):
     monkeypatch.setattr(rev.subprocess,"run",fake_run)
     assert rev.pg("SELECT 1")=="1"
     argv,kwargs=calls[0]
-    assert argv[:5]==["runuser","-u","postgres","--","psql"]
+    assert argv[:5]==["/usr/sbin/runuser","-u","postgres","--","/usr/bin/psql"]
     assert "-q" in argv
     assert argv[-2:]==["-d","empiredb"]
     assert kwargs["input"]=="SELECT 1"
     assert kwargs["capture_output"] is True
     assert "SELECT 1" not in " ".join(argv)
+
+
+def test_pinned_runuser_exec_starts_under_restricted_path():
+    # Exercise the actual executable, not just the monkeypatched call.
+    # --version is unprivileged, read-only, and cannot touch EmpireDB.
+    import subprocess
+    assert os.path.isfile("/usr/sbin/runuser")
+    assert os.path.isfile("/usr/bin/psql")
+    result=subprocess.run(
+        ["/usr/sbin/runuser","--version"],
+        env={"PATH":"/usr/bin:/bin","HOME":"/var/lib/postgresql"},
+        capture_output=True,text=True,timeout=4,
+    )
+    assert result.returncode==0
+    assert "runuser" in result.stdout.lower()
+
+
+def test_readonly_preflight_reports_stage_not_exception_or_credentials(monkeypatch,tmp_path,capsys):
+    monkeypatch.setattr(rev.os,"geteuid",lambda:0)
+    monkeypatch.setattr(rev,"LOCK",tmp_path/"rev052.lock")
+    monkeypatch.setattr(rev,"catalog",lambda:(_ for _ in ()).throw(
+        FileNotFoundError("private secret path that must not be printed")))
+    assert rev.main(["--preflight"])==4
+    output=capsys.readouterr().out
+    assert "REV052_FAILURE_STAGE=CATALOG_READONLY" in output
+    assert "REV052_STATUS=HOLD_OR_UNVERIFIED_NO_BLIND_RETRY" in output
+    assert "private secret path" not in output

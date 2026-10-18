@@ -152,6 +152,24 @@ assert x["function_exists"] is True and x["capability_exists"] is True
 assert x["dedicated_login_member_exists"] is False
 PYREAD
 
+# Execute the exact generated production read-only preflight SQL against
+# the isolated fixture. Only its data_directory and HBA location should
+# differ from real EmpireDB. This catches SQL catalogue incompatibility.
+PYTHONPATH="$repo" /srv/empire_os/.venv/bin/python - <<'PYSQL' > "$scratch/rev052-preflight.sql"
+from scripts.provision_revenue_event_evidence_login_20261018 import readiness_sql
+print(readiness_sql())
+PYSQL
+psql -U fixture_admin -d empiredb -Atq -f "$scratch/rev052-preflight.sql" \
+  > "$scratch/rev052-preflight.json"
+python3 - "$scratch/rev052-preflight.json" <<'PYVERIFY'
+import json,sys
+with open(sys.argv[1]) as handle:
+    data=json.load(handle)
+excepted={'hba_file_matches','data_directory_matches'}
+assert all(v is True for k,v in data.items() if k not in excepted),data
+assert all(data.get(k) is False for k in excepted),data
+print('REV052_ISOLATED_READONLY_SQL_CATALOG_PREFLIGHT=PASS')
+PYVERIFY
 # The fixture uses its *own* pg_hba.conf and temporary Unix socket. The
 # real EmpireDB HBA, credentials, tenant member records remain untouched.
 PYTHONPATH="$repo" /srv/empire_os/.venv/bin/python - "$scratch/db/pg_hba.conf" <<'PYHBA'
