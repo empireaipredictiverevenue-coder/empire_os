@@ -440,7 +440,7 @@ def build_predictive_decision_control_runtime(
     as_of: datetime | None = None,
 ) -> dict[str, Any]:
     root = Path(repo_root)
-    return build_predictive_decision_control(
+    decision = build_predictive_decision_control(
         queue=build_revenue_command_queue_runtime(root),
         next_best=build_next_best_action_runtime(root),
         executive=read_executive_founder_status(
@@ -449,6 +449,13 @@ def build_predictive_decision_control_runtime(
         revenue_pulse=build_revenue_pulse_runtime(root),
         as_of=as_of,
     )
+    # A read-only view over Astra's existing departmental queue: never queue
+    # or claim work simply because a recommended action is ready to prepare.
+    from empire_os.predictive_decision_handoff import build_predictive_decision_handoff
+    decision["department_handoff"] = build_predictive_decision_handoff(
+        decision, root, as_of=as_of,
+    )
+    return decision
 
 
 def main() -> int:

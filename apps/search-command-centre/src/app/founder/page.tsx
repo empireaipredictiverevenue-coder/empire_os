@@ -79,6 +79,7 @@ export default async function FounderPage() {
   const data = result.data;
   const decision = data?.predictive_decision_control;
   const nextPriorities = decision?.top_three ?? [];
+  const departmentHandoff = decision?.department_handoff;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -253,6 +254,56 @@ export default async function FounderPage() {
                     )) : (
                       <p className="col-span-full rounded-xl border border-white/10 p-5 text-sm text-slate-400">
                         No trusted current decisions available. Missing evidence is not treated as a task completed.
+                      </p>
+                    )}
+                  </div>
+                  <div className="mt-6 rounded-2xl border border-white/10 bg-[#071620] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Existing department queue · Handoff</p>
+                        <h3 className="mt-1 text-lg font-semibold text-white">Internal work prepared for review</h3>
+                        <p className="mt-2 max-w-2xl text-xs leading-5 text-slate-400">
+                          Read-only review packets, not queue submissions. Existing work is checked before suggesting
+                          any new task, and completed work is not counted as commercial revenue.
+                        </p>
+                      </div>
+                      <span className="rounded-lg border border-white/10 px-3 py-1 text-xs text-slate-300">
+                        {show(departmentHandoff?.status, "NOT AVAILABLE").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {departmentHandoff ? (
+                      <>
+                        <div className="mt-4 flex flex-wrap gap-4 text-xs text-slate-300">
+                          <span>Review packets: {int(departmentHandoff.candidate_count)}</span>
+                          <span>Not yet queued: {int(departmentHandoff.ready_for_review_count)}</span>
+                          <span>Existing work: {int(departmentHandoff.existing_work_count)}</span>
+                          <span>Held: {int(departmentHandoff.held_count)}</span>
+                        </div>
+                        <div className="mt-4 grid gap-2 md:grid-cols-2">
+                          {departmentHandoff.candidates.map((candidate) => (
+                            <div key={candidate.task_id ?? candidate.source_action}
+                              className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+                              <p className="text-sm font-medium text-white">
+                                {show(candidate.source_action).replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                {show(candidate.owner).replaceAll("_", " ")} ·
+                                {show(candidate.current_work_status, "EVIDENCE HOLD").replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                {show(candidate.queue_observation_reason, "Review required").replaceAll("_", " ")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          No execution bus lease, email send, paid API call, financial movement or task submission
+                          is authorised by these review packets.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-xs text-amber-200">
+                        Department handoff is unavailable until the matching backend release is deployed.
                       </p>
                     )}
                   </div>

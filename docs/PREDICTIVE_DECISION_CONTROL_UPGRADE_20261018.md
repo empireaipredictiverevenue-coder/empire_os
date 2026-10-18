@@ -106,3 +106,63 @@ the existing server dependency install. It is not tracked in git.
 Check `git status` and `git log` in the feature worktree for the exact
 commit, tests and diff. The dirty canonical `/srv/empire_os` worktree was
 not reset, staged, merged or overwritten as part of this isolated upgrade.
+
+
+## 18 October continuation — Department Handoff bridge
+
+Added `empire_os/predictive_decision_handoff.py`. This feature translates
+**only** current, provenance-matched `INTERNAL_PREPARATION` decisions into
+non-executable work-step proposals in ASTRA's established
+`DepartmentWorkQueue` format. It uses the queue's deterministic work ID
+function for idempotent review identity, **without constructing the queue**
+or changing any file, lease, or job state. The live Gtm execution bus and
+department worker have not been modified or enabled.
+
+Safeguards:
+
+- Snapshot freshness, provenance, source authority and task identity must agree.
+- Actions and department-to-component mappings are hard allowlists.
+- Auto-dispatch is always `false`, enqueuing authorisation is always `false`,
+  and the proposed work step has `authority=observe`.
+- It reads at most six queue-state files per proposed task and rejects
+  symlinks, oversized, malformed, contradictory or duplicate states.
+- Existing `ready/running/review` work is observed, never re-created;
+  `blocked/failed` is escalated rather than retried; `done` is not
+  mistaken for verified sales or economic outcomes.
+- No match in this specific handoff plan does **not** prove no related work
+  exists in other ASTRA plans. Cross-plan semantic deduplication is a
+  separate remaining integration requirement.
+- Existing Economic Memory already understands linked completed work and
+  verified commercial feedback. No counterfeit feedback is inserted.
+
+The existing Founder Console has a handoff section showing review packets,
+already queued work and evidence holds; it does not expose an "Execute"
+button because the current preview has no safe execution authority.
+
+### Current production-evidence OBSERVE snapshot (not deployed)
+
+From the isolated feature worktree reading `/srv/empire_os` snapshots:
+`decision_status=REVIEW_READY`,
+`handoff_status=REVIEW_READY`,
+`candidate_count=2`,
+`ready_for_review_count=2`,
+`existing_work_count=0`,
+`held_count=0`,
+`queue_mutated=false`,
+`work_dispatched=false`.
+
+The two preview actions are `verify_decision_maker` and `research_more`.
+This is not evidence those activities were actually executed, nor that any
+buyer or payment became commercially verified.
+
+### Production integration still outstanding
+
+Merge coordinated backend/frontend versions with ASTRA's current feature
+work and independently validate the running Founder Console login and
+server-side visibility. Before any autonomous work submission, build a
+separately governed dispatcher with supported low-risk *read-only* adapters,
+cross-plan duplicate detection, owner leases, bounded budgets, current
+source rechecks and signed outcome receipts. The existing worker claims
+`READY` items and supports adapters with side effects: a queue entry must
+never substitute for that independent execution authorisation. No current
+`candidate` flag alone is an approval.

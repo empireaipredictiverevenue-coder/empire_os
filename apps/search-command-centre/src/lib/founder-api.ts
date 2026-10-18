@@ -24,7 +24,30 @@ export type PredictiveDecisionTask = {
   waiting_external: boolean;
 };
 
+export type PredictiveDecisionHandoff = {
+  schema_version: string;
+  status: string;
+  candidate_count: number;
+  ready_for_review_count: number;
+  existing_work_count: number;
+  held_count: number;
+  candidates: Array<{
+    task_id?: string;
+    work_id?: string;
+    owner?: string;
+    source_action?: string;
+    current_work_status?: string;
+    queue_observation_reason?: string;
+    review_only?: boolean;
+    enqueuing_authorized?: boolean;
+  }>;
+  queue_mutated: false;
+  work_dispatched: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  department_handoff?: PredictiveDecisionHandoff;
   schema_version: string;
   generated_at: string;
   status: string;
