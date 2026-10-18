@@ -1,6 +1,7 @@
 "use client";
 import { ArrowLeft, ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { commercialTouchFromSearch, type OrganicTouch } from "@/lib/organic-campaign-touch";
 
 type Offer = { product_code: string; name: string; offer_family: string; currency: string; approved_price_cents: number; price_interval: string; implementation_fee_cents?: number };
 type Catalog = { status: string; offers: Offer[] };
@@ -26,6 +27,11 @@ export default function CommercialPage() {
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<Receipt | null>(null);
+  const [organicTouch, setOrganicTouch] = useState<OrganicTouch | null>(null);
+  useEffect(() => {
+    // One-hop first-party link claim only; never a tracked session or consent.
+    setOrganicTouch(commercialTouchFromSearch(window.location.search));
+  }, []);
   useEffect(() => {
     let mounted = true;
     fetch("/v1/checkout/commercial/offers", { cache: "no-store" })
@@ -52,6 +58,7 @@ export default function CommercialPage() {
           product_code: code, business_name: business, email, domain,
           industry, geography: region, desired_outcome: outcome,
           contact_consent: consent, idempotency_key: crypto.randomUUID(), website,
+          ...(organicTouch ? { organic_touch: organicTouch } : {}),
         }),
       });
       const body = await response.json() as Receipt;

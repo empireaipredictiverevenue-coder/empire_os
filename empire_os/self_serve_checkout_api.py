@@ -128,6 +128,7 @@ class FounderLedCommercialInterestRequest(BaseModel):
     contact_consent: bool
     idempotency_key: str = Field(min_length=8, max_length=128)
     website: str = Field(default="", max_length=300)
+    organic_touch: dict[str, str] | None = None
 
 
 class ExchangeInterestRequest(BaseModel):
@@ -320,6 +321,7 @@ def commercial_interest(req: FounderLedCommercialInterestRequest):
             contact_consent=req.contact_consent,
             idempotency_key=req.idempotency_key,
             website=req.website,
+            organic_touch=req.organic_touch,
         )
     except CommercialInterestError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

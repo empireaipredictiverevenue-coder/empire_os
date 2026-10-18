@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from empire_os.sb import request_json
+from empire_os.organic_campaign_touch import normalize_organic_touch
 from empire_os.digital_avatar_approved_catalog_preview import (
     APPROVAL_REF as AVATAR_PRICE_APPROVAL_REF,
     has_recorded_price_only_founder_approval,
@@ -202,6 +203,7 @@ def record_founder_led_interest(
     contact_consent: bool,
     idempotency_key: str,
     website: str = "",
+    organic_touch: Mapping[str, str] | None = None,
     root: str | Path = "/srv/empire_os",
     request: Request = request_json,
     now: datetime | None = None,
@@ -211,6 +213,10 @@ def record_founder_led_interest(
         raise CommercialInterestError("specific_contact_consent_required")
     if website:
         raise CommercialInterestError("invalid_submission")
+    try:
+        validated_touch = normalize_organic_touch(organic_touch) if organic_touch is not None else None
+    except ValueError as exc:
+        raise CommercialInterestError("invalid_organic_campaign_touch") from exc
     code = _text(product_code, "product_code", limit=120)
     catalog = founder_led_commercial_offers(root=root)
     offer = next((o for o in catalog["offers"] if o["product_code"] == code), None)
@@ -266,6 +272,10 @@ def record_founder_led_interest(
         "actual_revenue": False,
         "execution_authority": "none",
     }
+    if validated_touch is not None:
+        # Store the buyer-supplied campaign code alongside the existing
+        # consent-bound prospect evidence, NOT as a verified visit or sale.
+        evidence["organic_campaign_touch"] = validated_touch
     result = request(
         "POST",
         "/rest/v1/rpc/ingest_prospect_atomic",
