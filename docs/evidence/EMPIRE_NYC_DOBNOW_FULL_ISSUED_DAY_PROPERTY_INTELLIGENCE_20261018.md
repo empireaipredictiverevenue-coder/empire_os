@@ -20,17 +20,19 @@ Official sources: NYC DOB NOW Build Permit Issuance `rbx6-tga4`, NYC DOB NOW Job
 | Distinct DOB NOW job filing references after consolidating work permits | **312** |
 | DOB BIN + OTI building physical BASE_BBL + DCP lot match | **236** |
 | DOB BIN + OTI MAPPLUTO_BBL condominium/billing-lot + DCP lot match, physical base lot differs | **24** |
-| **Total confirmed DOB–OTI–DCP reference chains (not unique physical sites)** | **260** |
-| DOB BBL differs from both OTI base and MAPPLUTO BBL (unresolved reference discrepancy) | **9** |
+| **Total confirmed DOB–OTI–DCP reference chains (event references, not unique sites)** | **260** |
+| Distinct permit BIN + DOB BBL reference pairs across the **312** job filings | **260** |
+| DOB BBL differs from both OTI base and MAPPLUTO BBL (unresolved mismatch **events**) | **9** |
+| Distinct unresolved BIN + DOB BBL reference pairs within those nine jobs | **2** |
 | DCP tax lot matches, OTI building BIN unconfirmed | **41** |
 | OTI BIN present but DCP tax lot missing | **1** |
 | Neither building reference nor tax-lot match | **1** |
-| Commercial/office PLUTO tax-lot category, irrespective of building trust state | **73** |
+| Commercial/office PLUTO tax-lot category, irrespective of building trust state | **73 permit jobs / 56 BIN–BBL pairs** |
 | Industrial/manufacturing PLUTO tax-lot category, irrespective of building trust state | **5** |
-| Industrial/manufacturing PLUTO tax-lot with corroborated three-agency reference chain | **4** |
+| Industrial/manufacturing PLUTO tax-lot with corroborated three-agency reference chain | **4 permit jobs / 2 BIN–BBL pairs** |
 | Physically operating warehouses, verified owners, paying customers or realised revenue | **0 verified** |
 
-The observed 312 jobs **cannot** be equated to 312 unique real-world construction sites or separate assets. Multiple DOB jobs and BIN references can map to one building/lot. Four industrial-lot candidates are tax-lot classifications and reference matches only, **not verified warehouse operations**. The original 33 apparent base-lot conflicts were not all actual DCP-join conflicts: **24 reconciled** through OTI MAPPLUTO_BBL, the city-documented correct DCP join key for condo billing lots. **Nine** remain unresolved, including a group of records on one Bronx block. Do not conflate permit-job counts with distinct physical building counts.
+The observed 312 jobs **cannot** be equated to 312 unique real-world construction sites or separate assets. Multiple DOB jobs and BIN references can map to one building/lot. Four industrial-lot *permit events* correspond to only two distinct BIN/BBL reference pairs. These are tax-lot classifications and reference matches only, **not verified warehouse operations**. The original 33 apparent base-lot conflicts were not all actual DCP-join conflicts: **24 reconciled** through OTI MAPPLUTO_BBL, the city-documented correct DCP join key for condo billing lots. **Nine** remain unresolved, including a group of records on one Bronx block. Do not conflate permit-job counts with distinct physical building counts.
 
 These numbers came from a single live **read-only** cross-source exercise. The one-day count is an official source snapshot at the observation time, not a serializable government-data transaction; identical counts cannot rule out within-period edits or a later backfill.
 
@@ -39,7 +41,7 @@ These numbers came from a single live **read-only** cross-source exercise. The o
 - `empire_os/permit_property_full_day_review.py`: synchronously iterates the existing keyset DOB reader, checks the same official initial-issued-day row-count before and after scan, requires every row accounted for, reuses the current DOB source project merger and the existing three-agency property matcher; prevents incomplete or internally inconsistent results.
 - Max **30 x 40** official DOB rows / on-demand single-day review (1,200 bounded), <=40 verified job references per OTI/DCP query, no paid endpoints, no new timer/agent/database. A day >1,200 rows is a **hold**; no silent incomplete/day label.
 - `scripts/review_dobnow_building_landuse_readonly.py --issued-day YYYY-MM-DD`: read-only result summary by default. An explicit `--record-private` writes a new derived report to `runtime/data_brokerage/nyc_dobnow_property_three_agency_full_day_latest.json` and SHA-256 receipt `...provenance.json`, mode 0600, without overwriting the original smaller `nyc_dobnow_property_three_agency_latest.json` 36-job sample. Includes selected API JSON SHA-256 per DOB page and OTI/DCP chunk, source count proofs, observational timestamp and guarded source categories.
-- `empire_os/property_source_evidence_runtime.py` prefers the fully reconciled research packet when available, validates count/page/chunk/diagnostic status totals and per-job uniqueness, then exposes **only aggregate counts**, never raw property references or identities. It continues to accept the previous 36-job v1 packet when no v2 exists. Rejects invalid, future-dated, stale or contradictory source packets, and never falls back from an invalid full-day packet to misleading earlier partial data.
+- `empire_os/property_source_evidence_runtime.py` prefers the fully reconciled research packet when available, validates count/page/chunk/diagnostic status totals, per-job uniqueness and the event-to-distinct-(BIN,BBL)-pair totals by recomputing them from individual diagnostics, then exposes **only aggregate counts**, never raw property references or identities. It continues to accept the previous 36-job v1 packet when no v2 exists. Rejects invalid, future-dated, stale or contradictory source packets, and never falls back from an invalid full-day packet to misleading earlier partial data.
 - `empire_os/source_intelligence_handoff.py` already owns the Property/Warehouse lanes. It now exposes `full_issued_day_source_count_reconciled`, `reviewed_official_permit_event_count`, reference matches/conflicts and industrial-lot-context counts. It does **not** inflate `verified_property_opportunity_count`, `warehouse_operation_verified_count`, revenue, CRM, prospect queue, outbound permission or actual industry operation.
 - `tests/test_permit_property_full_day_20261018.py` verifies exact-day counts, 3-page resume, independent OTI/DCP join, reader/department integration, duplicate conflict bounds, source count-change hold, raw source row overrun, unsupported day, fabrication/forgery rejection and v1 backward compatibility.
 

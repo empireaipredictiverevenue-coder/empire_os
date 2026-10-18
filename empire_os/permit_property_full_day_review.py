@@ -144,6 +144,25 @@ def review_full_official_day(
            or x.get("commercial_contact_authorized") is not False
            for x in all_diagnostics):
         raise ValueError("UNEXPECTED_COMMERCIAL_AUTHORITY_FROM_SOURCE_JOIN")
+    def distinct_pairs(records):
+        return len({(r["permit_building_bin"],r["permit_tax_lot_bbl"])
+                    for r in records})
+    industrial_records=[x for x in all_diagnostics
+                        if x["industrial_tax_lot_context_corroborated"] is True]
+    unresolved_records=[x for x in all_diagnostics
+                        if x["building_tax_lot_evidence_state"] in (
+                            "BUILDING_TAX_LOT_CONFLICT","DCP_BOROUGH_CONFLICT")]
+    commercial_records=[x for x in all_diagnostics
+                        if x["dcp_land_use_category"]=="COMMERCIAL_OFFICE"]
+    distinct_ref_metrics={
+        "all_permit_events_distinct_bin_bbl_pairs":distinct_pairs(all_diagnostics),
+        "corroborated_industrial_permit_events_distinct_bin_bbl_pairs":
+            distinct_pairs(industrial_records),
+        "unresolved_reference_mismatch_events_distinct_bin_bbl_pairs":
+            distinct_pairs(unresolved_records),
+        "commercial_office_permit_events_distinct_bin_bbl_pairs":
+            distinct_pairs(commercial_records),
+    }
 
     return {
         "schema":SCHEMA,"mode":"OBSERVE",
@@ -170,6 +189,8 @@ def review_full_official_day(
         "event_level_join_status_counts":dict(sorted(statuses.items())),
         "event_level_landuse_category_counts":dict(sorted(uses.items())),
         "event_level_industrial_lot_context_count":industrial,
+        "distinct_bin_bbl_reference_pair_counts":distinct_ref_metrics,
+        "reference_pair_basis":"OFFICIAL_DOB_BIN_AND_DOB_BBL_NOT_INDEPENDENT_PROPERTY_IDENTITY",
         "diagnostics":sorted(all_diagnostics,
                              key=lambda x:x["permit_job_filing_ref"]),
         "input_dob_sample_may_be_incomplete":False,

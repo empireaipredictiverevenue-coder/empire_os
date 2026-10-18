@@ -295,6 +295,10 @@ def build_source_intelligence_handoffs(
                 three_agency.get("building_tax_lot_reference_conflict_count")),
             "tri_agency_billing_lot_match_count": (
                 three_agency.get("three_agency_billing_lot_reference_match_count")),
+            "distinct_permit_bin_bbl_reference_pairs": (
+                three_agency.get("distinct_permit_bin_bbl_reference_pair_count")),
+            "distinct_unresolved_bin_bbl_reference_pairs": (
+                three_agency.get("distinct_unresolved_bin_bbl_reference_pair_count")),
         },
         warnings=[
             "same_permit_source_as_permit_lane_not_additional_leads",
@@ -353,6 +357,8 @@ def build_source_intelligence_handoffs(
             "verified_warehouse_opportunity_count": None,
             "industrial_manufacturing_lot_context_only_count": (
                 three_agency.get("industrial_manufacturing_tax_lot_context_count")),
+            "industrial_manufacturing_distinct_bin_bbl_pairs": (
+                three_agency.get("distinct_industrial_bin_bbl_reference_pair_count")),
             "warehouse_operation_verified_count": 0,
             "full_issued_day_source_count_reconciled": (
                 three_agency.get("source_day_count_reconciled")),

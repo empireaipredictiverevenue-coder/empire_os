@@ -163,6 +163,28 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
                         or category!="INDUSTRIAL_MANUFACTURING"):
                     return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
                 industrial+=1
+        if use_full:
+            def distinct_pairs(records):
+                return len({(r["permit_building_bin"],r["permit_tax_lot_bbl"])
+                            for r in records})
+            pairs={
+                "all_permit_events_distinct_bin_bbl_pairs":distinct_pairs(raw),
+                "corroborated_industrial_permit_events_distinct_bin_bbl_pairs":
+                    distinct_pairs([r for r in raw
+                                    if r["industrial_tax_lot_context_corroborated"] is True]),
+                "unresolved_reference_mismatch_events_distinct_bin_bbl_pairs":
+                    distinct_pairs([r for r in raw
+                                    if r["building_tax_lot_evidence_state"] in (
+                                        "BUILDING_TAX_LOT_CONFLICT",
+                                        "DCP_BOROUGH_CONFLICT")]),
+                "commercial_office_permit_events_distinct_bin_bbl_pairs":
+                    distinct_pairs([r for r in raw
+                                    if r["dcp_land_use_category"]=="COMMERCIAL_OFFICE"]),
+            }
+            if (review.get("reference_pair_basis")!=
+                    "OFFICIAL_DOB_BIN_AND_DOB_BBL_NOT_INDEPENDENT_PROPERTY_IDENTITY"
+                    or review.get("distinct_bin_bbl_reference_pair_counts")!=pairs):
+                return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
         if (dict(statuses)!=review.get("event_level_join_status_counts")
                 or dict(use)!=review.get("event_level_landuse_category_counts")
                 or industrial!=review.get("event_level_industrial_lot_context_count")):
@@ -182,6 +204,17 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
                 statuses["TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"],
             "building_tax_lot_reference_conflict_count":
                 statuses["BUILDING_TAX_LOT_CONFLICT"]+statuses["DCP_BOROUGH_CONFLICT"],
+            "distinct_permit_bin_bbl_reference_pair_count":
+                pairs["all_permit_events_distinct_bin_bbl_pairs"] if use_full else None,
+            "distinct_industrial_bin_bbl_reference_pair_count":
+                pairs["corroborated_industrial_permit_events_distinct_bin_bbl_pairs"]
+                if use_full else None,
+            "distinct_unresolved_bin_bbl_reference_pair_count":
+                pairs["unresolved_reference_mismatch_events_distinct_bin_bbl_pairs"]
+                if use_full else None,
+            "distinct_commercial_office_bin_bbl_reference_pair_count":
+                pairs["commercial_office_permit_events_distinct_bin_bbl_pairs"]
+                if use_full else None,
             "tax_lot_only_unconfirmed_building_count":
                 statuses["DCP_LOT_ONLY_BIN_UNCONFIRMED"],
             "commercial_office_tax_lot_context_count":use["COMMERCIAL_OFFICE"],

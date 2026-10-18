@@ -65,6 +65,12 @@ def test_entire_source_day_reconciles_and_routes_counts_without_prospects(tmp_pa
     assert r["official_day_count_before_scan"]==r["official_day_count_after_scan"]==85
     assert r["event_level_join_status_counts"]=={"TRI_AGENCY_BIN_AND_LOT_MATCH":3}
     assert r["event_level_industrial_lot_context_count"]==3
+    assert r["distinct_bin_bbl_reference_pair_counts"]=={
+        "all_permit_events_distinct_bin_bbl_pairs":1,
+        "corroborated_industrial_permit_events_distinct_bin_bbl_pairs":1,
+        "unresolved_reference_mismatch_events_distinct_bin_bbl_pairs":0,
+        "commercial_office_permit_events_distinct_bin_bbl_pairs":0,
+    }
     assert f.calls==["count",("page",0),("page",1),("page",2),"count"]
     p=tmp_path/FULL_DAY_FILENAME;p.parent.mkdir(parents=True)
     p.write_text(json.dumps(r))
@@ -72,6 +78,9 @@ def test_entire_source_day_reconciles_and_routes_counts_without_prospects(tmp_pa
     assert got["status"]=="FULL_ISSUED_DAY_PROPERTY_REFERENCES_REVIEWED"
     assert got["official_source_row_count"]==85
     assert got["three_agency_bin_bbl_reference_match_count"]==3
+    assert got["distinct_permit_bin_bbl_reference_pair_count"]==1
+    assert got["distinct_industrial_bin_bbl_reference_pair_count"]==1
+    assert got["distinct_unresolved_bin_bbl_reference_pair_count"]==0
     assert got["warehouse_operation_verified_count"]==0
     assert got["verified_property_opportunity_count"] is None
     project=build_property_intelligence_runtime(tmp_path)
@@ -80,6 +89,8 @@ def test_entire_source_day_reconciles_and_routes_counts_without_prospects(tmp_pa
     routes={x["lane"]:x for x in build_source_intelligence_handoffs(tmp_path,now=NOW)["routes"]}
     assert routes["warehouse"]["counts"]["industrial_manufacturing_lot_context_only_count"]==3
     assert routes["warehouse"]["counts"]["warehouse_operation_verified_count"]==0
+    assert routes["warehouse"]["counts"]["industrial_manufacturing_distinct_bin_bbl_pairs"]==1
+    assert routes["property"]["counts"]["distinct_permit_bin_bbl_reference_pairs"]==1
 
 def test_source_count_changed_at_end_fails_closed():
     f=Pages();calls=[]
@@ -112,6 +123,8 @@ def test_reader_refuses_forged_volume_buyer_date_and_chunk_claims(tmp_path):
       lambda x:x["diagnostics"][0].update(permit_job_filing_ref="B00000001-I1"),
       lambda x:x["source_page_receipts"][0].update(official_rows=39),
       lambda x:x["property_chunks"][0].update(job_count=2),
+      lambda x:x["distinct_bin_bbl_reference_pair_counts"].update(
+          all_permit_events_distinct_bin_bbl_pairs=3),
     ):
         data=json.loads(json.dumps(r));edit(data);p.write_text(json.dumps(data))
         assert load_property_reference_summary(tmp_path,now=NOW)["status"]=="UNTRUSTED_REVIEW_FILE"
