@@ -1,6 +1,6 @@
 # Empire AI — Historical Google Workspace Sends / Canonical Evidence Release
 
-**18 October 2026 | Private proof custody completed; EmpireDB migration STAGED, NOT APPLIED**
+**18 October 2026 | Migration 052 VERIFIED LIVE; six historical receipt inserts remain separately held**
 
 ## Why this release exists
 
@@ -42,10 +42,10 @@ EmpireOS's canonical original-intent approval workflow.
 - No messages were sent, no CRM/database/customer/payment row was created,
   and no external account or extra timer was provisioned.
 
-## Staged only — EmpireDB 052 historical-receipt extension
+## EmpireDB 052 historical-receipt extension — verified production schema
 
 `migrations/empiredb/052_workspace_historical_send_receipts_observe_only.sql`
-is **prepared but unapplied**. It creates
+was applied to production EmpireDB on 18 October 2026. It creates
 `public.workspace_historical_sent_receipts` solely for externally observed
 historical sent evidence, separate from `public.outbound_intents`. It
 enforces unique provider-message and Gmail-thread keys, original sender
@@ -68,7 +68,7 @@ receipts, verifies exact six-row readback and commits. Any contradiction
 fails the entire transaction. It never writes `outbound_intents`,
 `outbound_replies`, CRM, tenant, suppression, payments or email.
 
-## Founder approved migration 052 — operator activation pending
+## Founder-approved migration 052 — archived operator procedure (now completed)
 
 On **18 October 2026**, the founder explicitly approved **migration 052**,
 which creates only the separate historical sent-evidence table. This is
@@ -90,9 +90,10 @@ It does not restart any application service or import any receipts.
 The read-only nonprivileged preflight has passed on EmpireOS. An attempt
 to run privileged SQL directly through the connected remote command
 interface was denied before execution; this permission boundary was
-respected. Consequently **migration 052 is NOT YET active on production
-EmpireDB**. From the founder's trusted Ubuntu shell, use the already
-approved narrow operator action:
+respected. At that earlier checkpoint, migration 052 had not yet been applied.
+**The founder subsequently completed this operator action successfully.**
+The command below is preserved as historical release evidence, NOT a
+command to rerun on the activated database:
 
 ```bash
 cd /srv/empire_os
@@ -118,7 +119,7 @@ were tested on a separate PostgreSQL 18 scratch instance. A future import
 must never be launched by cron, CI, backend startup or a generic deploy.
 
 
-## Concurrent Founder API release — read-only endpoint recovery staged
+## Concurrent Founder API release — historical recovery procedure (now completed)
 
 After the founder's schema-only approval, the existing private Founder API
 was found running another agent's **newer frozen release**:
@@ -151,7 +152,7 @@ returns **six genuine private receipts, zero EmpireDB rows and an
 unapplied table**. If that or any previous route check fails, it removes
 the new override and restarts the previous 90-owned agent release.
 
-**The additive private read-API release is prepared, but not applied.**
+**The additive private read-API release was subsequently applied and independently verified.**
 It does not authorise or execute migration 052; it simply restores the
 previously verified readback necessary to deploy migration 052 safely.
 The existing role and systemd credential are reused without copying
@@ -298,13 +299,56 @@ Independent post-release inspection confirmed:
 - The public `https://empire-ai.co.uk/founder/mail` remained HTTP **404**.
   The application continued serving only from the private listener.
 
-**This private UI deployment is completed**, but it is NOT a database
-activation. The production EmpireDB 052 migration and six-row importer
-remain explicitly HELD pending separate founder authorisation. To revert
+**At that earlier private UI checkpoint**, the UI release was complete
+but neither database operation was active. Migration 052 was subsequently
+approved and successfully activated; only the separate six-row importer
+remains HELD pending its own founder authorisation. To revert
 only this UI release, the existing operator-run rollback removes
 `/etc/systemd/system/empire-founder-console.service.d/90-private-historical-evidence-release.conf`,
 reloads systemd and restarts `empire-founder-console.service`, restoring
 the verified prior frozen 70+80 release. No rollback has been needed.
+
+## Production activation confirmed — 18 October 2026, 22:16–22:18 UTC
+
+The founder ran the operator-approved three-command sequence in the
+trusted Ubuntu terminal. The first command reported:
+`FOUNDER_HISTORICAL_READ_API_ADDITIVE_RELEASE_VERIFIED`, restoring the
+read-only historical endpoint on the **currently active newer Founder
+bridge** with the prior 90 drop-in retained for rollback.
+
+The migration command reported all its preconditions passed:
+`MIGRATION_052_SOURCE_AND_PRIVATE_EVIDENCE_PREFLIGHT_PASS` and
+`LIVE_EMPIREDB_ROLE_ARCHIVER_AND_SCHEMA_PREFLIGHT_PASS`. PostgreSQL
+executed `BEGIN`, created the table/function/trigger/policy and granted
+SELECT, then returned `COMMIT`,
+`MIGRATION_052_SQL_TRANSACTION_RETURNED_SUCCESS` and
+`EMPIREDB_MIGRATION_052_SCHEMA_VERIFIED`. The release readback
+confirmed forced RLS, the append-only trigger, observer SELECT without
+INSERT/UPDATE/DELETE and exactly **zero** receipt rows.
+
+An independent subsequent live read from the existing loopback Founder
+API (port 8766) returned the precise JSON state
+`SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS` with:
+- `private_custody_receipts_verified=6`
+- `database_historical_receipt_table_active=true`
+- `database_historical_receipts_verified=0`
+- `canonical_outbound_intents_created=0`
+- `crm_records_created=0`
+- `outbound_sent=false` and `database_writes=false` (reader path)
+
+All four existing Founder Console / read API / CRM pilot / Gmail timer
+units remained active. The Gmail review still showed the original six
+genuine sent messages and zero new inbound header candidates. Public
+`https://empire-ai.co.uk/founder/mail` remained HTTP 404.
+
+**Closed gap:** migration 052 schema and owner-preserving private API
+readback are live and verified. **Open gap:** import the six preserved
+historical receipts into the new table, which is a separate six-row
+database write and was NOT included in the migration approval. Its
+importer remains gated pending explicit founder authorisation.
+Even after such an import, historical receipts remain `UNBOUND`, not
+approved outbound intents, verified tenants, genuine replies, CRM
+customers or realised revenue.
 
 ## Commercial completion gates still open
 
@@ -319,9 +363,8 @@ the verified prior frozen 70+80 release. No rollback has been needed.
    existing outbound programme; six sent emails by themselves are not
    verified demand or revenue.
 
-**Status as of the live preflight:** six authentic Gmail original-sent
-receipts in private custody. Migration 052 has **founder approval** but
-its production application is still pending the privileged operator
-command and readback. The separate six-receipt import remains unapproved
-and unapplied. No verified buyer reply, CRM opportunity or revenue was
-created by this work.
+**Current verified status:** six authentic Gmail original-sent receipts
+in private custody. Migration 052 is active with forced RLS and an
+append-only trigger, and its production table remains **empty**. The
+separate six-receipt import is still unapproved and unapplied. No
+verified buyer reply, CRM opportunity or revenue resulted from the migration.

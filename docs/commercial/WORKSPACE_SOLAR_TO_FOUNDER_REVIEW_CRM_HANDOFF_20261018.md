@@ -408,9 +408,39 @@ to the postgres peer user; it passed unit and isolated real-PostgreSQL
 import/replay tests. This IMPORT is still a separately held operation,
 not authorised by the 052 schema-only directive.
 
-**Until both operator commands succeed, migration 052 is NOT confirmed
-live, and production EmpireDB historic receipts remain 0/6.** Do not
-claim an approved outbound intent, CRM buyer, payment or revenue.
+**At the earlier pre-activation checkpoint**, migration 052 was
+unconfirmed and production EmpireDB historical receipts were 0/6.
+The newer production verification immediately below supersedes that
+schema status. Do not claim an approved outbound intent, CRM buyer,
+payment or revenue.
+
+## Production 052 verified after founder Ubuntu activation — 18 October 2026
+
+**Founder-approved schema migration 052 is now VERIFIED LIVE.** The
+founder executed the source-pinned additive read API recovery and
+migration 052 commands in sequence. The terminal returned
+`FOUNDER_HISTORICAL_READ_API_ADDITIVE_RELEASE_VERIFIED` and
+`EMPIREDB_MIGRATION_052_SCHEMA_VERIFIED`, with a committed transaction,
+forced RLS, append-only trigger and exactly zero receipt rows.
+
+Independent live loopback readback of the existing Founder API returned
+`SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS`,
+`private_custody_receipts_verified=6`,
+`database_historical_receipt_table_active=true`,
+`database_historical_receipts_verified=0`,
+`canonical_outbound_intents_created=0`,
+`crm_records_created=0`, and `outbound_sent=false`.
+The active 8766 service retains the newer other-agent Founder bridge
+with the additive 95 read-only override; its other Gmail/canonical routes
+and the existing Founder Console, CRM pilot and Gmail timer remained active.
+Public Founder Mail remains HTTP 404.
+
+**Now closed:** missing private historical read API and unapplied 052
+schema. **Still held:** separate six-receipt evidence INSERT, canonical
+outbound intent/tenant linkage and real buyer reply qualification.
+The six receipt insert was NOT part of the founder's approval for 052
+and has NOT been executed. Do not rerun migration 052 or retrospectively
+declare the six sends approved, tenant-bound or revenue-producing.
 
 ## What remains conditional / NOT verified
 
