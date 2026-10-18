@@ -134,3 +134,59 @@ def test_three_real_router_paths_never_render_or_json_publish_false_claim(
     assert "9999999" not in response.text
     assert response.json()["detail"]==EVIDENCE_HOLD_DETAIL
     assert response.json()["detail"]["customer_delivery_authorized"] is False
+
+
+
+def test_live_route_verification_requires_three_guarded_replies():
+    from empire_os.predictive_revenue_enterprise_report import (
+        build_enterprise_diagnostic_report,
+    )
+    from empire_os.enterprise_report_http_guard import guarded_enterprise_http_response
+    from scripts.verify_enterprise_report_route_enforcement_readonly import (
+        check_live_routes,
+    )
+    from pathlib import Path
+
+    packet=build_enterprise_diagnostic_report(Path("/srv/empire_os"))
+    resp={
+        "json":guarded_enterprise_http_response(packet,format="json"),
+        "html":guarded_enterprise_http_response(packet,format="html"),
+        "markdown":guarded_enterprise_http_response(packet,format="markdown"),
+    }
+
+    class Reply:
+        def __init__(self,live):
+            self.live=live
+            self.status=live.status_code
+            self.headers=live.headers
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,limit):return self.live.body[:limit]
+
+    calls=[]
+    def get(request,timeout):
+        assert timeout==8
+        if request.full_url.endswith("/preview"):
+            route="html"
+        elif request.full_url.endswith("/markdown"):
+            route="markdown"
+        else:route="json"
+        calls.append(route)
+        return Reply(resp[route])
+
+    actual=check_live_routes(opener=get)
+    assert actual["status"]=="LIVE_REPORT_GUARDS_VERIFIED"
+    assert calls==["json","html","markdown"]
+    assert actual["customer_delivery_authorized"] is False
+
+    class UnguardedReply(Reply):
+        @property
+        def headers(self):
+            return {"Content-Type":"application/json"}
+        @headers.setter
+        def headers(self,x):pass
+
+    def old_server(request,timeout):
+        return UnguardedReply(resp["json"])
+    denied=check_live_routes(opener=old_server)
+    assert denied["status"]=="HOLD_LIVE_REPORT_GUARD_UNVERIFIED"

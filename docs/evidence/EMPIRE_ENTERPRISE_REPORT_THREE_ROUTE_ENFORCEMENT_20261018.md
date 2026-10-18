@@ -27,6 +27,16 @@ cd /srv/empire_os
 
 For the HTTP API, test `http://127.0.0.1:8766/v1/predictive-revenue/product-workbench/enterprise-report`, `.../preview` and `.../markdown` **after** the service has loaded the router changes. Check HTTP 200 and no-store/nosniff headers for an unverified internal draft, and HTTP 409 generic evidence HOLD for a simulated falsified packet *through TestClient only*, not by injecting fabricated claims into the production service.
 
+The existing unit was verified as **`empire-founder-dashboard-api.service`** (NOT `founder-dashboard-api.service`), with `uvicorn empire_os.founder_dashboard_service:app --host 127.0.0.1 --port 8766`. The unprivileged plugin connection cannot restart that systemd service: an attempted noninteractive restart returned **Access denied / interactive authentication required**. Therefore the disk changes and TestClient cannot be misreported as a reloaded live production listener. The server owner must run:
+
+```bash
+sudo systemctl restart empire-founder-dashboard-api.service
+cd /srv/empire_os
+./.venv/bin/python -B -m scripts.verify_enterprise_report_route_enforcement_readonly --read-only
+```
+
+Only the above specific **existing read-only Founder API unit** is required. The verifier fails until *all three* live routes have returned HTTP 200, `Cache-Control: no-store`, `X-Content-Type-Options: nosniff`, the correct content type and an explicitly unverified internal report. The expected successful status is `LIVE_REPORT_GUARDS_VERIFIED`, `customer_delivery_authorized=false`. Any `HOLD_LIVE_REPORT_GUARD_UNVERIFIED` means the live release remains unverified and should not be claimed complete. A process restart only proves code-loading after the smoke test; it does not verify user access controls or underlying finance sources.
+
 ## Existing governance
 
 - No customer delivery, verified client findings, source-verified actual revenue, terms, payments, email, CRM import, public URL, tenant permission grant, data source activation or database write.
