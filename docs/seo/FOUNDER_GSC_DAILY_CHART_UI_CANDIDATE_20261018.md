@@ -66,3 +66,31 @@ Release prerequisites:
 4. Verify public /department remains 404, rollback preserved. Do not
    claim authentication in the private frontend until application-level
    founder identity is independently verified.
+
+## Frozen release candidate completed after source commit
+
+Canonical source: 00db5be5 (five-file scoped update).
+Candidate built from the actually active 96 SEO Founder Console release:
+  /home/ubuntu/empire_worktrees/empire_founder_gsc_trends_candidate_20261018
+Build ID: E5JJkmG7iQBqBch6bYSBT
+
+Existing /founder/commercial-pipeline, Mail and eight other paths
+preserved. Ten out of ten routes returned HTTP 200 on the disposable
+Next.js process, as did mobile + desktop chromium chart/data tests.
+The disposable updated Search Intelligence API confirmed 13 observed
+GSC dates and showed the charts. Neither disposable process is live.
+
+One-shot fail-closed preflight (no restart, no DB):
+  cd /srv/empire_os
+  ./.venv/bin/python -m scripts.review_private_gsc_trend_release_20261018 --read-only
+
+Currently expected status:
+  FROZEN_CANDIDATE_GSC_BACKEND_ACTIVATION_PENDING
+
+The preflight checks pinned binary hashes, exact source deltas from the
+currently active console, ten existing route statuses, public HTTP 404
+boundary, and daily source provenance. It will not mark the candidate
+backend-ready until the existing API starts returning gsc_daily_chart.
+Future API restart and frontend release require separate explicit
+founder approval. No privileged apply function has been introduced by
+this commit, so it cannot accidentally promote the candidate.
