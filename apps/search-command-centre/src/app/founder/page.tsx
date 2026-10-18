@@ -80,6 +80,7 @@ export default async function FounderPage() {
   const decision = data?.predictive_decision_control;
   const nextPriorities = decision?.top_three ?? [];
   const departmentHandoff = decision?.department_handoff;
+  const buyerCapacity = decision?.buyer_capacity_action_brief;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -224,11 +225,64 @@ export default async function FounderPage() {
                       Economic north star: realised gross profit
                     </span>
                     <span>Revenue evidence: {show(decision.revenue_truth_status).replaceAll("_", " ")}</span>
-                    <span>Recognised revenue: {int(decision.recognized_revenue_cents)} minor units</span>
-                    <span>Realised GP: {int(decision.realized_gp_cents)} minor units</span>
+                    <span>Recognised revenue: {decision.recognized_revenue_cents == null ? "Unknown" : `${decision.recognized_revenue_cents.toLocaleString()} minor units`}</span>
+                    <span>Realised GP: {decision.realized_gp_cents == null ? "Unknown" : `${decision.realized_gp_cents.toLocaleString()} minor units`}</span>
                     <span className="text-slate-500">
                       Currency and independent settlement reconciliation are not asserted by this view.
                     </span>
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-amber-300/20 bg-[#171713] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <p className="eyebrow">Predictive Revenue · First commercial bottleneck</p>
+                        <h3 className="mt-2 text-lg font-semibold text-white">
+                          Verify an actual paying buyer and their buy-box
+                        </h3>
+                        <p className="mt-2 text-sm text-slate-300">
+                          Existing buyer counts are aggregate evidence, not proof that one customer has
+                          a verified market, volume, price and acceptance path.
+                        </p>
+                      </div>
+                      <span className="rounded-lg border border-amber-300/25 px-3 py-1 text-xs text-amber-100">
+                        {show(buyerCapacity?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {buyerCapacity ? (
+                      <>
+                        <div className="mt-4 flex flex-wrap gap-5 text-xs text-slate-300">
+                          <span>Buyer records observed: {buyerCapacity.buyers_seen ?? "Unknown"}</span>
+                          <span>Buyer-specific buy-box proof: {buyerCapacity.verified_specific_buybox_count ?? "Unknown"}</span>
+                          <span>Owner: {show(buyerCapacity.owner).replaceAll("_", " ")}</span>
+                        </div>
+                        <p className="mt-4 text-sm font-semibold text-amber-100">
+                          Next evidence: {show(buyerCapacity.first_missing_evidence, "Refresh trusted evidence").replaceAll("_", " ")}
+                        </p>
+                        <div className="mt-4 grid gap-2 md:grid-cols-2">
+                          {buyerCapacity.evidence_checklist.map((stage) => (
+                            <div key={stage.evidence_key} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                              <div className="flex justify-between gap-3 text-xs">
+                                <span className="font-semibold text-slate-100">
+                                  {stage.action_code.replaceAll("_", " ")}
+                                </span>
+                                <span className="shrink-0 text-slate-400">Aggregate: {stage.aggregate_observed_count}</span>
+                              </div>
+                              <p className="mt-2 text-xs leading-5 text-slate-300">{stage.requirement}</p>
+                              <p className="mt-2 text-[11px] text-amber-200">
+                                {stage.status.replaceAll("_", " ")}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-xs text-slate-500">
+                          No buy-box verified, payout quotation, lead delivery or email send is approved
+                          by this evidence review. No work has been dispatched.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-4 text-sm text-amber-100">
+                        The buyer-capacity evidence checklist will appear when the paired backend is released.
+                      </p>
+                    )}
                   </div>
                   <div className="mt-5 grid gap-3 lg:grid-cols-3">
                     {nextPriorities.length ? nextPriorities.map((task, index) => (

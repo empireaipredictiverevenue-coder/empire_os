@@ -46,7 +46,33 @@ export type PredictiveDecisionHandoff = {
   execution_authority: "none";
 };
 
+export type PredictiveBuyerCapacityBrief = {
+  schema_version: string;
+  status: string;
+  reason: string;
+  source_status: string;
+  owner: string;
+  next_action: string;
+  buyers_seen: number | null;
+  verified_specific_buybox_count: number | null;
+  first_missing_evidence: string | null;
+  evidence_checklist: Array<{
+    evidence_key: string;
+    action_code: string;
+    requirement: string;
+    owner: string;
+    aggregate_observed_count: number;
+    status: string;
+    same_buyer_verified: false;
+  }>;
+  same_buyer_cross_stage_binding_proven: false;
+  publisher_payout_can_be_quoted: false;
+  lead_delivery_authorized: false;
+  work_dispatched: false;
+};
+
 export type PredictiveDecisionControl = {
+  buyer_capacity_action_brief?: PredictiveBuyerCapacityBrief;
   department_handoff?: PredictiveDecisionHandoff;
   schema_version: string;
   generated_at: string;

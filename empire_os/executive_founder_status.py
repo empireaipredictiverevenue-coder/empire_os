@@ -78,6 +78,10 @@ def _base(reason: str) -> dict[str, Any]:
             "downstream_buyer_capacity": {
                 "status": "SOURCE_MISSING",
                 "buyers_seen": None,
+                "reviewed": None,
+                "market_defined": None,
+                "positive_capacity_configured": None,
+                "delivery_destination_present": None,
                 "capacity_verified": None,
                 "terms_verified": None,
                 "delivery_verified": None,
@@ -232,8 +236,10 @@ def read_executive_founder_status(
         "downstream_buyer_capacity": {
             "status": buyer["status"] if buyer else "SOURCE_MISSING",
             **{k: (buyer.get("counts") or {}).get(k) if buyer else None for k in (
-                "buyers_seen", "capacity_verified", "terms_verified",
-                "delivery_verified", "commercially_activated",
+                "buyers_seen", "reviewed", "market_defined",
+                "positive_capacity_configured", "delivery_destination_present",
+                "capacity_verified", "terms_verified", "delivery_verified",
+                "commercially_activated",
             )},
             "specific_buybox_verified": False,
             "publisher_payout_can_be_quoted": False,

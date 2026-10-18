@@ -225,6 +225,10 @@ def test_founder_projection_surfaces_real_buyer_terms_hold_without_sensitive_dat
     cap = r["business_development"]["downstream_buyer_capacity"]
     assert cap["status"] == "NO_VERIFIED_COMMERCIAL_CAPACITY"
     assert cap["buyers_seen"] == 1057
+    assert cap["reviewed"] == 1
+    assert cap["market_defined"] == 107
+    assert cap["positive_capacity_configured"] == 121
+    assert cap["delivery_destination_present"] == 485
     assert cap["terms_verified"] == 0
     assert cap["capacity_verified"] == 0
     assert cap["publisher_payout_can_be_quoted"] is False

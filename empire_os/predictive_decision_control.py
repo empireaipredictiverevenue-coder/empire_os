@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.buyer_capacity_action_brief import build_buyer_capacity_action_brief
 from empire_os.executive_founder_status import read_executive_founder_status
 from empire_os.next_best_action import build_next_best_action_runtime
 from empire_os.revenue_command_queue import build_revenue_command_queue_runtime
@@ -443,6 +444,7 @@ def build_predictive_decision_control(
         "realized_gp_cents": realized_gp,
         "revenue_truth_status": pulse_status,
         "north_star": "verified_realized_gross_profit",
+        "buyer_capacity_action_brief": build_buyer_capacity_action_brief(executive),
         "estimated_revenue_from_scores": None,
         "expected_revenue_claimed": False,
         "commercial_intent_inferred": False,

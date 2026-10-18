@@ -169,3 +169,37 @@ source rechecks and signed outcome receipts. The existing worker claims
 `READY` items and supports adapters with side effects: a queue entry must
 never substitute for that independent execution authorisation. No current
 `candidate` flag alone is an approval.
+
+
+## 18 October continuation — verified buyer-capacity action bridge
+
+The existing validated ASTRA Executive → Founder status projection now retains
+the safe aggregate readiness counters previously dropped: reviewed buyers,
+market-defined buyers, configured capacity and present delivery destination.
+It still excludes raw buyer identity/contact details, secrets and per-buyer
+commercial terms.
+
+A small stateless helper, `empire_os/buyer_capacity_action_brief.py`,
+reconciles those counts with the validated source status, rejects malformed or
+contradictory state, and produces an eight-stage **read-only evidence checklist**
+for Business Development. It never equates aggregate counts with one specific
+paying buyer, payout authorisation, a working delivery route or actual revenue.
+
+The existing Predictive Decision Control response and Founder Console panel now
+show the source state, next missing proof, safe stage counts and next reviewing
+owner. Missing revenue/GP values render as **Unknown** rather than artificial
+zero. No worker/job was queued, no external contact performed and no production
+service changed.
+
+Read-only production observation from 18 October: buyer inventory 1,057;
+reviewed 1; market-defined 107; positive configured capacity 121; destinations
+present 485; independently verified capacity, terms, delivery and activation
+aggregates all zero. **These are source aggregates, not commercially verified
+buyers in any one market or corridor.** First current evidence task:
+`VERIFY_CURRENT_BUYER_CAPACITY_EVIDENCE`.
+
+Production integration remains a coordinated backend/frontend deployment after
+ASTRA and other owning agents review and merge the isolated feature. This
+change does not create specific buyer buy-box proof; the actual agreements,
+partner identity, acceptance and economics still have to be obtained and
+verified using existing CRM/revenue pathways.
