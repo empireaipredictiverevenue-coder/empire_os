@@ -30,6 +30,12 @@ class IntelligenceDataProduct:
         data["compatible_usage_modes"] = [
             mode.value for mode in self.compatible_usage_modes
         ]
+        # Contracts advertise a product category, not evidence-backed
+        # fulfilment, customer rights, pricing or a verified buyer.
+        data["every_material_claim_requires_source_receipt"] = True
+        data["customer_claim_release_ready"] = False
+        data["unverified_claim_output_enabled"] = False
+        data["evidence_gate_status"] = "PRODUCT_CLAIM_REQUIRES_SOURCE_RECEIPT"
         return data
 
 

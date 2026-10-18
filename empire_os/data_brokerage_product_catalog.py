@@ -10,6 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Any, Mapping
+from pathlib import Path
 import json
 import re
 
@@ -19,6 +20,7 @@ from empire_os.data_exchange_canonical_rights_docket import (
 from empire_os.founder_asset_provenance import SCHEMA as FOUNDER_RECEIPT_SCHEMA
 from empire_os.free_dataset_intelligence import SCHEMA as GRAPH_SCHEMA
 from empire_os.permit_project_intelligence import SCHEMA as PERMIT_SCHEMA
+from empire_os.data_product_claim_gate import source_bound_catalog_summary
 
 SCHEMA = "empire.data_brokerage.internal_product_catalog.v1"
 _SHA = re.compile(r"[0-9a-f]{64}\Z")
@@ -192,6 +194,7 @@ def build_data_brokerage_product_catalog(
     permit_intelligence: Mapping[str, Any] | None = None,
     graph_intelligence: Mapping[str, Any] | None = None,
     founder_asset_receipt: Mapping[str, Any] | None = None,
+    repo_root: Path | None = None,
 ) -> dict[str, Any]:
     if not isinstance(assessed_at, datetime) or (
         assessed_at.tzinfo is None or assessed_at.utcoffset() is None
@@ -201,6 +204,15 @@ def build_data_brokerage_product_catalog(
     permit = _permit_review(permit_intelligence)
     graph = _graph_review(graph_intelligence)
     founder = _founder_review(founder_asset_receipt)
+    property_claims=(source_bound_catalog_summary(repo_root,now=assessed_at)
+                     if repo_root is not None else {
+                         "status":"NO_CURRENT_VERIFIED_CLAIM_RECEIPT",
+                         "reference_pair_count":None,
+                         "warehouse_class_reference_pair_count":None,
+                         "operating_businesses_verified":0,
+                         "customer_claim_delivery_authorized":False,
+                         "source_specific_licence_approved":False,
+                     })
     sources = {
         PRODUCT_IDS[0]: custody,
         PRODUCT_IDS[1]: permit,
@@ -219,6 +231,20 @@ def build_data_brokerage_product_catalog(
             "source_origin_class": ORIGIN_KINDS[ident],
             "internal_source_state": source["status"],
             "source_evidence_summary": source,
+            "claim_evidence_contract": (property_claims
+                if ident=="nyc_permit_project_verification"
+                else {
+                    "status":"NO_PRODUCT_SPECIFIC_CLAIM_RECEIPTS_LINKED",
+                    "reference_pair_count":None,
+                    "warehouse_class_reference_pair_count":None,
+                    "operating_businesses_verified":0,
+                    "customer_claim_delivery_authorized":False,
+                    "source_specific_licence_approved":False,
+                }),
+            "every_material_claim_requires_source_receipt": True,
+            "customer_claim_release_ready": False,
+            "arbitrary_claim_text_authorized": False,
+            "source_claim_support_and_delivery_rights_separate": True,
             "source_licence_state": (
                 "FOUNDER_SELF_DECLARED_OWNERSHIP_NOT_EXTERNAL_COPYRIGHT_PROOF"
                 if is_founder else
@@ -244,6 +270,7 @@ def build_data_brokerage_product_catalog(
             "product_id": p["product_id"],
             "origin": p["source_origin_class"],
             "evidence": p["source_evidence_summary"],
+            "claim_evidence_contract": p["claim_evidence_contract"],
             "source_licence_state": p["source_licence_state"],
         }
         for p in catalogue
@@ -308,6 +335,20 @@ def validate_internal_brokerage_catalog(payload: Mapping[str, Any]) -> bool:
                 if isinstance(p, Mapping)] != list(PRODUCT_IDS)
             or not all(isinstance(p, Mapping) for p in products)):
         return False
+    # An older private snapshot has no claim receipt contract but also has
+    # all customer delivery, payment and resale gates OFF. Preserve it ONLY
+    # as a read-only historic inventory; do not infer newer proof from it.
+    claim_fields={
+        "claim_evidence_contract",
+        "every_material_claim_requires_source_receipt",
+        "customer_claim_release_ready",
+        "arbitrary_claim_text_authorized",
+        "source_claim_support_and_delivery_rights_separate",
+    }
+    legacy=all(not claim_fields.intersection(p) for p in products)
+    modern=all(claim_fields.issubset(p) for p in products)
+    if not (legacy or modern):
+        return False
     for product in products:
         if (product.get("source_origin_class")
                 != ORIGIN_KINDS[product["product_id"]]
@@ -320,11 +361,42 @@ def validate_internal_brokerage_catalog(payload: Mapping[str, Any]) -> bool:
                 or product.get("execution_authority") != "none"
                 or not isinstance(product.get("source_evidence_summary"), Mapping)):
             return False
+        if modern:
+            if (product.get("every_material_claim_requires_source_receipt") is not True
+                    or product.get("customer_claim_release_ready") is not False
+                    or product.get("arbitrary_claim_text_authorized") is not False
+                    or product.get("source_claim_support_and_delivery_rights_separate") is not True):
+                return False
+            proof=product.get("claim_evidence_contract")
+            if (not isinstance(proof, Mapping)
+                    or proof.get("customer_claim_delivery_authorized") is not False
+                    or proof.get("source_specific_licence_approved") is not False
+                    or proof.get("operating_businesses_verified") != 0):
+                return False
+            if product["product_id"]=="nyc_permit_project_verification":
+                if proof.get("status") not in (
+                    "NO_CURRENT_VERIFIED_CLAIM_RECEIPT",
+                    "FOUR_SOURCE_BOUND_REFERENCE_CLAIMS_FOR_INTERNAL_REVIEW",
+                ):
+                    return False
+                if proof["status"]=="FOUR_SOURCE_BOUND_REFERENCE_CLAIMS_FOR_INTERNAL_REVIEW":
+                    if (proof.get("reference_pair_count")!=4
+                            or proof.get("warehouse_class_reference_pair_count")!=2):
+                        return False
+                elif (proof.get("reference_pair_count") is not None
+                        or proof.get("warehouse_class_reference_pair_count") is not None):
+                    return False
+            elif (proof.get("status")!="NO_PRODUCT_SPECIFIC_CLAIM_RECEIPTS_LINKED"
+                  or proof.get("reference_pair_count") is not None
+                  or proof.get("warehouse_class_reference_pair_count") is not None):
+                return False
     scope = [
         {
             "product_id": p["product_id"],
             "origin": p["source_origin_class"],
             "evidence": p["source_evidence_summary"],
+            **({"claim_evidence_contract":p["claim_evidence_contract"]}
+               if modern else {}),
             "source_licence_state": p["source_licence_state"],
         }
         for p in products

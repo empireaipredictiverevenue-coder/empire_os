@@ -151,6 +151,7 @@ def main(argv: list[str] | None = None, *,
                 if root == CANONICAL_ROOT else None
             ),
             founder_asset_receipt=founder_asset,
+            repo_root=root,
         )
         if not validate_internal_brokerage_catalog(catalog):
             raise ValueError("catalog_internal_preflight_failed")
@@ -170,6 +171,9 @@ def main(argv: list[str] | None = None, *,
             "product_ids": [r["product_id"] for r in catalog["products"]],
             "source_custody_state": catalog["products"][0][
                 "source_evidence_summary"]["status"],
+            "nyc_claim_preflight_status": catalog["products"][1][
+                "claim_evidence_contract"]["status"],
+            "customer_claim_release_authorized":False,
             "licensed_third_party_resale_authorized": False,
             "founder_owned_assets_registered": catalog[
                 "registered_founder_owned_asset_count"],
