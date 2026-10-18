@@ -18,6 +18,9 @@ from empire_os.empiredb_founder_reply_mailbox import EmpireDBFounderReplyMailbox
 from empire_os.workspace_solar_founder_review import (
     WorkspaceReviewHeld, read_workspace_review,
 )
+from empire_os.workspace_solar_canonical_intent_review import (
+    CanonicalIntentReviewUnavailable, review_six_workspace_canonical_intents,
+)
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -287,6 +290,17 @@ def create_founder_mailbox_router(
             ],
         }
 
+
+    @router.get("/workspace-solar-canonical-intent-review")
+    def workspace_solar_canonical_intent_review():
+        """Six exact canonical intent counts, never a CRM promotion or write."""
+        try:
+            return review_six_workspace_canonical_intents()
+        except (CanonicalIntentReviewUnavailable, OSError, ValueError):
+            raise HTTPException(
+                status_code=503,
+                detail="workspace_solar_canonical_intent_review_unavailable",
+            ) from None
 
     @router.get("/workspace-solar-reply-review")
     def workspace_solar_reply_review():

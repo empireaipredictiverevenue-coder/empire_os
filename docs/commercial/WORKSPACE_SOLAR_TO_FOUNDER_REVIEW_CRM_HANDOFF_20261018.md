@@ -164,6 +164,39 @@ The founder ran the approved private release successfully. Independent service i
 
 The Gmail-to-Founder review interface is deployed. Actual Gmail-to-CRM promotion still requires a genuine inbound message, exact contact and canonical-intent linkage, tenant authority and suppression review.
 
+## 18 October night — six-thread canonical intent existence reconciliation
+
+New **read-only** `empire_os/workspace_solar_canonical_intent_review.py`
+uses only the existing `empire_closer_observer` role and previously
+configured systemd `founder_reply_reader_dsn` credential. It runs ONE
+parameterised, time-bounded READ ONLY transaction (exact six Gmail thread
+IDs, original intended recipients, original provider sent-message IDs)
+against `public.outbound_intents`. The SQL returns count aggregates only,
+not addresses, IDs, bodies, terms or message content to Python or HTTP.
+
+New private loopback GET endpoint:
+`/v1/founder-mailbox/workspace-solar-canonical-intent-review`.
+
+The endpoint distinguishes a missing **visible** canonical Gmail-thread
+record, a thread/recipient disagreement, multiple exact-recipient sent
+intents, missing canonical approval evidence, an unbound provider
+original-sent message ID, and a structurally matching review candidate.
+It explicitly NEVER establishes tenant authority, signed sender identity,
+suppression clearance, commercial buyer interest, authorised CRM promotion
+or recognised revenue. A zero means `not visible to this restricted
+reader`, NOT `proved absent globally`. A reader/SQL/access failure is an
+HTTP 503, not a false zero.
+
+Tests are isolated using a fake least-privilege database transport:
+no live SQL mutation, OAuth, sender, CRM service or secret changed.
+The new route reuses the existing Founder read API and requires only that
+service's ordinary read-only reload; no migration, new credential, new
+timer, CRM write, payment or public publication is part of this change.
+
+**Live canonical evidence result:** to be independently filled in after
+service readback; do not confuse Gmail's six verified SENT anchors with
+six EmpireDB approved intents.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
