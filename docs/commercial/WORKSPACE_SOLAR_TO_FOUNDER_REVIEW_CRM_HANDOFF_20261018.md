@@ -156,10 +156,13 @@ Preflight passed against the previous live service and its exact
 incremental release would create only
 `80-private-reply-triage-release.conf` and restart the existing private
 Founder Console, returning to the previous 70 drop-in on failure.
-The new frontend release is **NOT yet live** until the operator applies it
-and a live HTTP readback proves the new working directory. Backend rollout
-requires only a read-only Founder API restart; the five-minute worker
-launches fresh Python code on its next existing run.
+The new frontend release was **activated successfully by the founder** and independently verified live. The read-only Founder API had already been reloaded, and the existing five-minute worker is active; no additional timer or outbound authority was introduced.
+
+## Private Founder reply-triage release — verified live
+
+The founder ran the approved private release successfully. Independent service inspection confirmed the active console uses the new isolated reply-triage build and preserves all eight existing routes at HTTP 200. The live Founder Mail page contains the six-company Gmail panel. The Founder API, CRM pilot and five-minute Gmail tracker remain active. The read-only API reported six verified sent messages, zero incoming candidates, zero new CRM conversations and no outbound send. The public Founder Mail URL remained 404. The prior service configuration is preserved for rollback.
+
+The Gmail-to-Founder review interface is deployed. Actual Gmail-to-CRM promotion still requires a genuine inbound message, exact contact and canonical-intent linkage, tenant authority and suppression review.
 
 ## What remains conditional / NOT verified
 
