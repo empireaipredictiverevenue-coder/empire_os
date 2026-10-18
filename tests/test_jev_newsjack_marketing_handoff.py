@@ -124,3 +124,36 @@ def test_empty_review_has_no_assets_or_actions():
     p = prepare_marketing_director_handoff(r, generated_at=NOW)
     assert p["campaign_preview_count"] == 0
     assert p["external_publish_authorized"] is False
+
+
+def test_low_confidence_jev_never_promotes_publish_readiness():
+    packet = review()
+    packet["review_queue"][0]["jev_classification"] = {
+        "label": "content_brief",
+        "confidence": 0.1233,
+        "source_ref": "laya:shadow:fixture",
+    }
+    job = prepare_marketing_director_handoff(
+        packet, generated_at=NOW
+    )["campaign_previews"][0]
+    assert job["jev_suggested_content_brief_above_threshold"] is False
+    assert job["publication_ready"] is False
+    assert job["content_draft"]["claim_verification_complete"] is False
+    assert job["marketing_agency_ingested"] is False
+
+
+def test_strong_model_cannot_authorize_publication_or_claimed_results():
+    packet = review()
+    packet["review_queue"][0]["jev_classification"] = {
+        "label": "content_brief",
+        "confidence": 0.98,
+        "source_ref": "laya:shadow:fixture",
+    }
+    out = prepare_marketing_director_handoff(packet, generated_at=NOW)
+    job = out["campaign_previews"][0]
+    assert job["jev_suggested_content_brief_above_threshold"] is True
+    assert out["external_publish_authorized"] is False
+    assert job["publication_ready"] is False
+    assert job["attribution_plan"]["visitor_sessions"] is None
+    assert job["attribution_plan"]["enquiries"] is None
+    assert job["attribution_plan"]["recognized_revenue"] is None
