@@ -15,6 +15,9 @@ from empire_os.empire_mailbox import build_mailbox, mailbox_thread
 from empire_os.owned_imap_mailbox import OwnedIMAPMailboxProvider
 from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
 from empire_os.empiredb_founder_reply_mailbox import EmpireDBFounderReplyMailbox
+from empire_os.workspace_solar_founder_review import (
+    WorkspaceReviewHeld, read_workspace_review,
+)
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -284,6 +287,22 @@ def create_founder_mailbox_router(
             ],
         }
 
+
+    @router.get("/workspace-solar-reply-review")
+    def workspace_solar_reply_review():
+        """Founder-only local read surface; no canonical CRM promotion.
+
+        This router runs on the existing loopback-only Founder Read API.
+        Source is a private authenticated Gmail metadata snapshot, not a
+        tenant-scoped canonical CRM relationship or a public intake record.
+        """
+        try:
+            return read_workspace_review()
+        except (WorkspaceReviewHeld, OSError, ValueError):
+            raise HTTPException(
+                status_code=503,
+                detail="workspace_solar_review_evidence_unavailable",
+            ) from None
 
     @router.get("/draft-preview")
     def draft_preview(
