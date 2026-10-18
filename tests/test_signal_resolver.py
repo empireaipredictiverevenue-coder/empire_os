@@ -18,9 +18,12 @@ def permit_signal():
         "niche": "general_contractor",
         "metro": "NYC",
         "state": "NY",
-        "url": "https://example.gov/permit/123",
+        "url": "https://a810-biswebportal.nyc.gov/bisweb/PropertyOverflowDetails.jsp?job=402424051",
         "raw": {
-            "job__": "123",
+            "job__": "402424051",
+            "filing_date": "09/20/2026",
+            "permit_status": "IN PROCESS",
+            "dobrundate": "2026-09-21T00:00:00.000",
             "permittee_s_business_name": "Example Contracting LLC",
             "permittee_s_first_name": "Alex",
             "permittee_s_last_name": "Smith",
@@ -34,7 +37,8 @@ def permit_signal():
 
 
 def test_permit_signal_builds_strong_identity_candidate():
-    candidate, reason = candidate_from_signal(permit_signal())
+    candidate, reason = candidate_from_signal(
+        permit_signal(), now=datetime(2026, 9, 21, tzinfo=timezone.utc))
     assert reason == "permittee_identity_complete"
     assert candidate is not None
     assert candidate.name == "Example Contracting LLC"
@@ -167,3 +171,37 @@ def test_network_materialization_occurs_outside_inbox_lock(tmp_path):
         now=datetime(2026, 9, 21, 12, 0, tzinfo=timezone.utc),
     )
     assert result["resolved"] == 1
+
+def test_historical_permit_never_promotes_complete_permittee_to_prospect(tmp_path):
+    record=permit_signal()
+    record["created_at"]="2026-10-18T08:00:00+00:00"
+    record["raw"]["dobrundate"]="2026-10-18T00:00:00.000"
+    record["raw"]["filing_date"]="02/09/2007"
+    record["raw"]["permit_status"]="ISSUED"
+    record["raw"]["issuance_date"]="02/09/2007"
+    current=datetime(2026,10,18,9,0,tzinfo=timezone.utc)
+    candidate,reason=candidate_from_signal(record,now=current)
+    assert candidate is None
+    assert reason=="permit_event_not_recent_actual_filing_or_issuance"
+    inbox=tmp_path/"signal_inbox.json"
+    inbox.write_text(json.dumps({record["signal_id"]:record}))
+    def forbidden(*args,**kwargs):
+        raise AssertionError("stale permit must not touch canonical prospect store")
+    result=run_signal_resolution(
+        1,inbox=inbox,lock=tmp_path/"signal_inbox.lock",
+        reader=forbidden,writer=forbidden,now=current,
+    )
+    assert result["resolved"]==0
+    assert result["deferred"]==1
+    assert result["outbound_sent"] is False
+    assert result["payment_mutation"] is False
+
+
+def test_permittee_with_recent_import_but_spoofed_source_not_promoted():
+    r=permit_signal()
+    r["url"]="https://a810-biswebportal.nyc.gov.evil.example/bisweb/PropertyOverflowDetails.jsp?job=402424051"
+    candidate,reason=candidate_from_signal(
+        r,now=datetime(2026,9,21,tzinfo=timezone.utc),
+    )
+    assert candidate is None
+    assert reason=="permit_official_event_source_untrusted"

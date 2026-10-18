@@ -26,6 +26,7 @@ from empire_os.vertical_intelligence_runtime import (
     build_private_capital_intelligence_runtime,
 )
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.permit_project_intelligence import analyze_permit_project_intelligence
 
 
 CANONICAL_ROOT = Path("/srv/empire_os")
@@ -169,6 +170,9 @@ def _lane(name: str, *, status: str, counts: Mapping[str, Any],
         "source_age_hours", "observed_or_refreshed_last_24h",
         "first_recorded_last_24h", "new_filing_type_mix",
         "new_underlying_permit_signals_last_24h",
+        "newly_imported_actual_filing_or_issuance_last_30d",
+        "newly_imported_historical_filing_or_issuance",
+        "recent_actual_filing_or_issuance_unverified",
     }
     fingerprint_input["counts"] = {
         k: v for k, v in safe_counts.items()
@@ -192,6 +196,8 @@ def build_source_intelligence_handoffs(
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     permit = build_permit_intelligence_runtime(root)
     activity = _permit_activity(root, now)
+    permit_projects = analyze_permit_project_intelligence(root, now=now)
+    project_cohort = permit_projects["cohort"]
     property_ = build_property_intelligence_runtime(root)
     capital = build_private_capital_intelligence_runtime(root)
     storm = _read(root / STORM)
@@ -216,6 +222,9 @@ def build_source_intelligence_handoffs(
         perm_blockers.append("fresh_official_permit_data_required")
     else:
         perm_blockers.append("source_rows_not_verified_company_decision_makers")
+    if project_cohort["first_imported_last_24h"] and not project_cohort["recent_original_filing_or_issuance"]:
+        perm_blockers.append("recent_imports_have_no_recent_filing_or_issuance")
+    perm_blockers.append("project_event_date_distinct_from_source_run_date")
     markets = list((permit.get("by_metro") or {}).keys())
     permit_lane = _lane(
         "permit",
@@ -236,6 +245,10 @@ def build_source_intelligence_handoffs(
                 "first_recorded_last_24h"],
             "new_filing_type_mix": activity["new_filing_type_mix"],
             "latest_record_identity_digest": activity["latest_record_identity_digest"],
+            "official_project_source_semantics_digest": permit_projects["total_retained_source_semantics_digest"],
+            "newly_imported_actual_filing_or_issuance_last_30d": project_cohort["recent_original_filing_or_issuance"],
+            "newly_imported_historical_filing_or_issuance": project_cohort["historical_project_source_only"],
+            "market_gps_context_state": permit_projects["market_gps"]["state"],
             "markets": ",".join(sorted(markets)[:5]),
             "source_age_hours": (round(permit_age / 3600, 1)
                                  if permit_age is not None and permit_age >= 0 else None),
@@ -257,6 +270,8 @@ def build_source_intelligence_handoffs(
                 "first_recorded_last_24h"],
             "new_filing_type_mix": activity["new_filing_type_mix"],
             "latest_record_identity_digest": activity["latest_record_identity_digest"],
+            "official_project_source_semantics_digest": permit_projects["total_retained_source_semantics_digest"],
+            "recent_actual_filing_or_issuance_unverified": project_cohort["recent_original_filing_or_issuance"],
             "physical_observation_count": property_count,
             "volumetric_observation_count": property_.get("volumetric_observation_count"),
             "verified_property_opportunity_count": None,
@@ -331,6 +346,7 @@ def build_source_intelligence_handoffs(
             x["status"] == "CURRENT_OBSERVED" for x in routes
         ),
         "unique_underlying_nyc_permit_signal_count": permit_count,
+        "permit_project_intelligence": permit_projects,
         "raw_customer_records_exported": False,
         "automatic_outreach_sent": False,
         "paid_model_invoked": False,
@@ -563,6 +579,8 @@ def deliver_source_intelligence_review(
                 if isinstance(v, dict) and v.get("lane") == lane), None)
     if row is None or row.get("evidence_fingerprint") != fingerprint:
         raise ValueError("source_handoff_evidence_superseded")
+    reviewed = payload.get("permit_project_intelligence")
+    reviewed = reviewed if isinstance(reviewed, dict) else {}
     result = {
         "adapter": "existing_department_source_analysis_receipt",
         "lane": lane,
@@ -573,6 +591,18 @@ def deliver_source_intelligence_review(
         "source_quality_summary": dict(row["counts"]),
         "followup_evidence_requirements": list(row["blockers"]),
         "next_internal_action": row["next_internal_action"],
+        "project_intelligence_review": (
+            {
+                "schema_version": reviewed.get("schema_version"),
+                "market_gps": reviewed.get("market_gps"),
+                "cohort": reviewed.get("cohort"),
+                "review_work_state": reviewed.get("review_work_state"),
+                "review_dossiers": list((reviewed.get("review_dossiers") or [])[:3])
+                    if lane == "permit" else [],
+                "same_underlying_permit_source": lane == "property",
+                "real_business_buyer_or_property_identity_verified": False,
+            } if lane in ("permit", "property") else None
+        ),
         "semantic_model_review_performed": False,
         "payable_buyer_verified": False,
         "outbound_sent": False,

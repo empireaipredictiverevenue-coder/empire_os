@@ -14,6 +14,7 @@ from typing import Any, Callable, Mapping
 from empire_os.lead_sources import LeadCandidate
 from empire_os.locale_intelligence import resolve_locale
 from empire_os.signal_inbox import INBOX, LOCK, ROOT
+from empire_os.permit_project_intelligence import classify_permit_event_source
 
 
 Reader = Callable[[str, dict[str, str]], Any]
@@ -37,8 +38,12 @@ def _parse_time(value: Any) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def _permit_candidate(signal: Mapping[str, Any]) -> LeadCandidate | None:
+def _permit_candidate(signal: Mapping[str, Any], *, now: datetime | None = None) -> LeadCandidate | None:
     if str(signal.get("source") or "") != "permits_nyc":
+        return None
+    checked = classify_permit_event_source(signal, now=now)
+    if (not checked["official_source_verified"]
+            or not checked["genuine_recent_project_event_observed"]):
         return None
     raw = signal.get("raw")
     if not isinstance(raw, Mapping):
@@ -103,10 +108,15 @@ def _permit_candidate(signal: Mapping[str, Any]) -> LeadCandidate | None:
     )
 
 
-def candidate_from_signal(signal: Mapping[str, Any]) -> tuple[LeadCandidate | None, str]:
+def candidate_from_signal(signal: Mapping[str, Any], *, now: datetime | None = None) -> tuple[LeadCandidate | None, str]:
     source = str(signal.get("source") or "").strip()
     if source == "permits_nyc":
-        candidate = _permit_candidate(signal)
+        checked = classify_permit_event_source(signal, now=now)
+        if not checked["official_source_verified"]:
+            return None, "permit_official_event_source_untrusted"
+        if not checked["genuine_recent_project_event_observed"]:
+            return None, "permit_event_not_recent_actual_filing_or_issuance"
+        candidate = _permit_candidate(signal, now=now)
         return (
             (candidate, "permittee_identity_complete")
             if candidate is not None
@@ -193,7 +203,7 @@ def run_signal_resolution(
 
     for key, row in claimed:
         attempts = int(row.get("resolution_attempts") or 1)
-        candidate, reason = candidate_from_signal(row)
+        candidate, reason = candidate_from_signal(row, now=current)
         update: dict[str, Any] = {
             "resolution_reason": reason,
         }
