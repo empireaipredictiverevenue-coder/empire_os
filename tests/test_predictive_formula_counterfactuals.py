@@ -313,3 +313,82 @@ def test_cloud_rejects_non_finite_economic_item(value):
                 "expected_revenue_value_cents": value,
             }],
         )
+
+
+def test_joint_counterfactual_attributes_interactions_without_double_counting():
+    from empire_os.predictive_revenue_formula import review_joint_revenue_counterfactual
+    factors = {key: 1 for key in CORE_FACTORS}
+    factors.update(buyer_match=0.5, terms=0.5, ltv_cents=10000)
+    snapshot = deepcopy(factors)
+    result = review_joint_revenue_counterfactual(
+        factors,
+        {"buyer_match": 1.0, "terms": 1.0},
+        scenario_cost_cents=500,
+        factor_evidence_refs=provenance((*CORE_FACTORS, "ltv_cents")),
+    )
+    assert result["status"] == "HYPOTHETICAL_REVIEW"
+    assert result["baseline_predicted_revenue_cents"] == 2500
+    assert result["hypothetical_joint_predicted_revenue_cents"] == 10000
+    assert result["joint_delta_cents"] == 7500
+    assert result["isolated_increment_sum_cents"] == 5000
+    assert result["multi_factor_interaction_cents"] == 2500
+    assert result["hypothetical_net_delta_cents"] == 7000
+    shares = {row["factor"]: row["shapley_mathematical_share_cents"]
+              for row in result["mathematical_factor_attributions"]}
+    assert shares == {"buyer_match": 3750, "terms": 3750}
+    assert result["attributions_not_causal_or_observed"] is True
+    assert result["actual_revenue"] is False
+    assert result["payment_authorized"] is False
+    assert factors == snapshot
+
+
+def test_joint_single_factor_equals_existing_counterfactual_delta():
+    from empire_os.predictive_revenue_formula import review_joint_revenue_counterfactual
+    inputs = revenue_inputs()
+    ref = provenance((*CORE_FACTORS, "ltv_cents"))
+    joint = review_joint_revenue_counterfactual(
+        inputs, {"buyer_match": 0.9}, scenario_cost_cents=20,
+        factor_evidence_refs=ref,
+    )
+    single = review_revenue_factor_counterfactuals(
+        inputs, [{
+            "action_key": "one",
+            "factor": "buyer_match",
+            "target_value": 0.9,
+            "scenario_cost_cents": 20,
+        }], factor_evidence_refs=ref,
+    )
+    assert joint["multi_factor_interaction_cents"] == 0
+    assert joint["joint_delta_cents"] == pytest.approx(
+        single["scenarios"][0]["hypothetical_incremental_revenue_cents"],
+        abs=0.0001,
+    )
+
+
+def test_joint_requires_baseline_provenance_and_keeps_null():
+    from empire_os.predictive_revenue_formula import review_joint_revenue_counterfactual
+    refs = provenance((*CORE_FACTORS, "ltv_cents"))
+    refs.pop("payment")
+    out = review_joint_revenue_counterfactual(
+        revenue_inputs(), {"buyer_match": 0.9},
+        scenario_cost_cents=0, factor_evidence_refs=refs,
+    )
+    assert out["status"] == "EVIDENCE_HOLD"
+    assert out["joint_delta_cents"] is None
+    assert "payment" in out["missing_factor_evidence_refs"]
+
+
+@pytest.mark.parametrize("targets,cost", [
+    ({}, 0),
+    ({"made_up_factor": 1.0}, 0),
+    ({"buyer_match": 0.1}, 0),
+    ({"buyer_match": float("nan")}, 0),
+    ({"buyer_match": 1.0}, -10),
+])
+def test_invalid_joint_hypotheses_fail_closed(targets, cost):
+    from empire_os.predictive_revenue_formula import review_joint_revenue_counterfactual
+    with pytest.raises(ValueError):
+        review_joint_revenue_counterfactual(
+            revenue_inputs(), targets, scenario_cost_cents=cost,
+            factor_evidence_refs=provenance((*CORE_FACTORS, "ltv_cents")),
+        )

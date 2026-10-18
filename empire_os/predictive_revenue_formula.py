@@ -12,7 +12,8 @@ No function in this module grants execution or accounting authority.
 """
 from __future__ import annotations
 
-from math import isfinite, prod
+from itertools import combinations
+from math import factorial, isfinite, prod
 from typing import Any, Mapping, Sequence
 
 
@@ -528,4 +529,121 @@ def review_revenue_factor_counterfactuals(
         "prediction_only": True,
         "actual_revenue": False,
         "execution_authority": "none",
+    }
+
+
+def review_joint_revenue_counterfactual(
+    inputs: Mapping[str, Any],
+    factor_targets: Mapping[str, Any],
+    *,
+    scenario_cost_cents: Any,
+    factor_evidence_refs: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, Any]:
+    """Exact multiplicative multi-factor what-if with Shapley decomposition.
+
+    Unlike adding independent one-factor gains, this includes the interaction
+    of jointly changed factors. Shapley contributions share the mathematical
+    joint scenario uplift; they are NOT causal, measured, or contractual.
+    """
+    schema = "empire.predictive_revenue.joint_counterfactual.v1"
+    baseline = review_revenue_factor_counterfactuals(
+        inputs, [], factor_evidence_refs=factor_evidence_refs,
+    )
+    if baseline["status"] == "EVIDENCE_HOLD":
+        return {
+            "schema_version": schema,
+            "status": "EVIDENCE_HOLD",
+            "reason": "canonical_baseline_or_provenance_incomplete",
+            "missing_factor_inputs": baseline["missing_factor_inputs"],
+            "missing_factor_evidence_refs": baseline["missing_factor_evidence_refs"],
+            "identification_bounds": baseline["identification_bounds"],
+            "joint_delta_cents": None,
+            "causal_attribution_claimed": False,
+            "execution_authority": "none",
+        }
+    if not isinstance(factor_targets, Mapping) or not 1 <= len(factor_targets) <= len(CORE_FACTORS):
+        raise ValueError("joint scenario requires 1 to 10 existing funnel factors")
+    cost = _number(scenario_cost_cents, "scenario_cost_cents")
+    if cost < 0:
+        raise ValueError("scenario cost must be nonnegative")
+    values = dict(inputs)
+    factors = tuple(sorted(factor_targets))
+    for factor in factors:
+        if factor not in CORE_FACTORS:
+            raise ValueError("unknown joint funnel factor")
+        start = _probability(inputs[factor], factor)
+        target = _probability(factor_targets[factor], f"{factor}_target")
+        if target < start:
+            raise ValueError("joint improvement cannot lower a factor")
+        values[factor] = target
+    full = predictive_revenue_formula(values)
+    base = predictive_revenue_formula(inputs)
+    # Calculate on the original (unrounded) canonical product to avoid a
+    # rounding-dependent Shapley residual.
+    ltv = _number(inputs["ltv_cents"], "ltv_cents")
+
+    def value(changed: frozenset[str]) -> float:
+        result = ltv * prod(
+            _probability(
+                factor_targets[factor] if factor in changed else inputs[factor],
+                factor,
+            ) for factor in CORE_FACTORS
+        )
+        if not isfinite(result):
+            raise ValueError("joint counterfactual overflow")
+        return result
+
+    all_factors = frozenset(factors)
+    total_delta = value(all_factors) - value(frozenset())
+    isolated = {
+        factor: value(frozenset({factor})) - value(frozenset())
+        for factor in factors
+    }
+    n = len(factors)
+    attribution: list[dict[str, Any]] = []
+    for factor in factors:
+        others = tuple(key for key in factors if key != factor)
+        contribution = 0.0
+        for size in range(n):
+            for subset in combinations(others, size):
+                fixed = frozenset(subset)
+                weight = factorial(size) * factorial(n - size - 1) / factorial(n)
+                contribution += weight * (
+                    value(fixed | {factor}) - value(fixed)
+                )
+        attribution.append({
+            "factor": factor,
+            "baseline_factor": _probability(inputs[factor], factor),
+            "hypothetical_target_factor": values[factor],
+            "shapley_mathematical_share_cents": round(contribution, 4),
+            "isolated_factor_delta_cents": round(isolated[factor], 4),
+            "baseline_evidence_refs": list(dict.fromkeys(factor_evidence_refs[factor])),
+            "causal_attribution_claimed": False,
+        })
+    if abs(sum(item["shapley_mathematical_share_cents"] for item in attribution)
+           - round(total_delta, 4)) > 0.001:
+        raise ValueError("joint counterfactual attribution mismatch")
+    synergy = total_delta - sum(isolated.values())
+    return {
+        "schema_version": schema,
+        "status": "HYPOTHETICAL_REVIEW",
+        "formula": "JOINT_PRODUCT_OF_TARGET_FACTORS_MINUS_BASELINE_PRODUCT",
+        "baseline_predicted_revenue_cents": base["predicted_revenue_cents"],
+        "hypothetical_joint_predicted_revenue_cents": full["predicted_revenue_cents"],
+        "joint_delta_cents": round(total_delta, 4),
+        "isolated_increment_sum_cents": round(sum(isolated.values()), 4),
+        "multi_factor_interaction_cents": round(synergy, 4),
+        "scenario_cost_cents": cost,
+        "hypothetical_net_delta_cents": round(total_delta - cost, 4),
+        "attribution_method": "exact_shapley_over_scenario_factor_subsets",
+        "mathematical_factor_attributions": attribution,
+        "attributions_not_causal_or_observed": True,
+        "scenario_values_not_expected_profit": True,
+        "calibration_and_independence_not_established": True,
+        "execution_authority": "none",
+        "payment_authorized": False,
+        "outbound_authorized": False,
+        "model_weight_mutation": False,
+        "prediction_only": True,
+        "actual_revenue": False,
     }

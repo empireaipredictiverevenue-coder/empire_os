@@ -152,3 +152,28 @@ cd apps/search-command-centre
 Do not overwrite other agents' canonical work or deploy without coordinating
 the paired API/frontend merge, source-producer refresh and founder-login QA.
 Production is unchanged by this feature worktree commit.
+
+
+## Multi-factor interactions and exact Shapley scenario decomposition
+
+A further canonical function `review_joint_revenue_counterfactual` solves
+one important algebraic problem: **adding separate one-factor improvements is
+generally wrong** for a multiplicative funnel.
+
+For a two-factor example with everything else fixed and LTV 10,000:
+buyer match 0.5 and terms 0.5 give baseline model value 2,500.
+Raising each individually to 1.0 would add 2,500 + 2,500.
+Raising both together produces 10,000, so the **joint increase is 7,500**,
+including a 2,500 interaction.
+
+Exact subset-based Shapley allocation assigns 3,750 of the modeled increase
+to each changed factor in this symmetric example. For up to ten existing
+funnel factors the calculation is bounded to at most 2^10 coalitions.
+This is a **mathematical decomposition of a hypothetical model scenario,
+not causal contribution or a verified commercial outcome**.
+
+The function requires the full evidenced baseline and explicit target factors
+and scenario costs, refuses declines/invalid inputs, never performs actions,
+and does not promote hypothetical improvements into calibrated revenue or
+Economic Memory. It belongs to the original canonical formula module, not
+a new optimizer or autonomous execution service.
