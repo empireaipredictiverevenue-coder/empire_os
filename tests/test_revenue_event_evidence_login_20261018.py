@@ -192,3 +192,13 @@ def test_role_names_strictly_decode_postgres_bytes_without_broadening_access():
     assert rev.role_name_text(b"\xff") is None
     assert rev.role_name_text(None) is None
     assert rev.role_name_text(12345) is None
+
+
+def test_existing_login_proof_never_requires_private_schema_table_lookup():
+    import inspect
+    source=inspect.getsource(rev.live_login_proof)
+    assert 'SELECT session_user,current_user' in source
+    assert 'pg_catalog.has_table_privilege(session_user,' not in source
+    assert 'SET LOCAL ROLE '+ '"'+ '+ROLE' in source
+    assert 'read_predictive_revenue_event_v1(' in source
+    assert rev.role_name_text(b'empire_predictive_revenue_evidence_login')==rev.LOGIN

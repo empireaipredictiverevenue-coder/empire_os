@@ -140,3 +140,19 @@ def test_exact_readonly_cli_flag_required_without_opening_credentials(monkeypatc
     monkeypatch.setattr(audit.os,"geteuid",lambda:1000)
     assert audit.main(["--read-only"])==2
     assert "HOLD_ROOT_READONLY_REQUIRED" in capsys.readouterr().out
+
+
+def test_authenticated_probe_does_not_resolve_forbidden_source_table_names():
+    import inspect
+    implementation=inspect.getsource(audit.bounded_auth_probe)
+    assert "SELECT session_user::text,current_user::text" in implementation
+    assert "has_table_privilege" not in implementation
+    assert "SET LOCAL ROLE "+'"'+"+ROLE" in implementation
+    assert "sentinel_zero_result_verified" in implementation
+    admin=audit.CATALOG_SQL
+    assert "login_no_commercial_select" in admin
+    assert "login_no_orders_select" in admin
+    assert "login_no_buyers_select" in admin
+    full=inspect.getsource(audit.review)
+    assert "ADMIN_READ_ONLY_CATALOG" in full
+    assert "if not all(out[\"catalog_checks\"].values())" in full

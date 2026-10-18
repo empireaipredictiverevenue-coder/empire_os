@@ -288,19 +288,15 @@ def live_login_proof(password: str) -> bool:
         with conn.cursor() as cur:
             cur.execute("SET TRANSACTION READ ONLY")
             cur.execute("SET LOCAL statement_timeout='3000ms'")
-            row=cur.execute(
-                "SELECT session_user,current_user,"
-                "pg_catalog.has_table_privilege(session_user,"
-                "'public.commercial_events','SELECT'),"
-                "pg_catalog.has_table_privilege(session_user,"
-                "'public.fulfilment_orders','SELECT'),"
-                "pg_catalog.has_table_privilege(session_user,"
-                "'public.buyers','SELECT')"
-            ).fetchone()
-            if (row is None or len(row)!=5
+            # Only session identity is queried as the restricted LOGIN.
+            # PostgreSQL can raise 42501 when resolving a relation name in
+            # has_table_privilege() if schema public deliberately denies
+            # USAGE. The preflight and administrator-only catalogue verify
+            # direct table-denial independently; do not grant extra USAGE.
+            row=cur.execute("SELECT session_user,current_user").fetchone()
+            if (row is None or len(row)!=2
                 or role_name_text(row[0])!=LOGIN
-                or role_name_text(row[1])!=LOGIN
-                or row[2:]!=(False,False,False)):
+                or role_name_text(row[1])!=LOGIN):
                 return False
             cur.execute("SET LOCAL ROLE "+ROLE)
             # Do NOT grant direct EXECUTE on the trusted session tenant

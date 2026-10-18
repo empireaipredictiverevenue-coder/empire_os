@@ -117,7 +117,6 @@ def bounded_auth_probe(password:str, *, connector:Callable[...,Any]|None=None)->
     results:dict[str,Any]={
         "auth_connection_verified":False,
         "session_login_identity_verified":False,
-        "login_has_no_direct_source_table_select":False,
         "capability_set_role_verified":False,
         "capability_function_execute_verified":False,
         "sentinel_zero_result_verified":False,
@@ -133,28 +132,21 @@ def bounded_auth_probe(password:str, *, connector:Callable[...,Any]|None=None)->
                 stage="READ_ONLY_SESSION"
                 cur.execute("SET TRANSACTION READ ONLY")
                 cur.execute("SET LOCAL statement_timeout='3000ms'")
-                stage="LOGIN_PRIVILEGES"
+                stage="LOGIN_IDENTITY"
+                # Login must not resolve private public schema relations.
+                # All three table ACL denials are proved separately by the
+                # admin-only read-only CATALOG_SQL before this call.
                 row=cur.execute(
-                    "SELECT session_user::text,current_user::text,"
-                    "pg_catalog.has_table_privilege(session_user,"
-                    "'public.commercial_events','SELECT'),"
-                    "pg_catalog.has_table_privilege(session_user,"
-                    "'public.fulfilment_orders','SELECT'),"
-                    "pg_catalog.has_table_privilege(session_user,"
-                    "'public.buyers','SELECT')"
+                    "SELECT session_user::text,current_user::text"
                 ).fetchone()
-                if (row is None or len(row)!=5):
-                    results["failure_stage"]="LOGIN_PRIVILEGES_SHAPE"
+                if row is None or len(row)!=2:
+                    results["failure_stage"]="LOGIN_IDENTITY_SHAPE"
                     return results
                 results["session_login_identity_verified"]=(
                     role_name_text(row[0])==LOGIN and
                     role_name_text(row[1])==LOGIN)
-                results["login_has_no_direct_source_table_select"]=(
-                    row[2:] == (False,False,False)
-                )
-                if not (results["session_login_identity_verified"]
-                        and results["login_has_no_direct_source_table_select"]):
-                    results["failure_stage"]="LOGIN_IDENTITY_OR_PRIVILEGE_DRIFT"
+                if not results["session_login_identity_verified"]:
+                    results["failure_stage"]="LOGIN_IDENTITY_DRIFT"
                     return results
                 stage="SET_CAPABILITY_ROLE"
                 cur.execute("SET LOCAL ROLE "+ROLE)
@@ -229,6 +221,14 @@ def review(*,admin_query:Callable[[str],str]=pg,
         return out
     probe=bounded_auth_probe(pw,connector=connector)
     out["auth_checks"]={k:v for k,v in probe.items() if isinstance(v,bool)}
+    # Never claim the restricted session itself queried protected source
+    # relations. The three independent DBA-catalog ACL denials were
+    # required true before password access or any authenticated probe.
+    out["auth_checks"]["login_has_no_direct_source_table_select"]=(
+        all(out["catalog_checks"][k] for k in (
+            "login_no_commercial_select","login_no_orders_select",
+            "login_no_buyers_select")))
+    out["direct_source_table_acl_proof"]="ADMIN_READ_ONLY_CATALOG"
     if probe.get("sqlstate"):
         out["sqlstate"]=probe["sqlstate"]
     out["failure_stage"]=probe.get("failure_stage","UNKNOWN")
