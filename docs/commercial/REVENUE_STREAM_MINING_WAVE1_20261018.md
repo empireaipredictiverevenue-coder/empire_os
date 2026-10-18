@@ -101,17 +101,34 @@ create a new timer before coordination.
 
 ## Candidate additional public streams for Wave 2 (not yet running)
 
-### England: official Planning Data API (beta/incomplete)
-- Official: https://www.planning.data.gov.uk/docs
-- Datasets include planning constraints and a developing
-  `planning-application` dataset, with date/geography filters and pagination.
-- API is beta. Local authorities do not universally publish planning
-  applications to this standard. **No absence-of-application inference.**
-- Adapter should use strict allowlisted origin, conservative limits and
-  rate control; no applicant names, domestic addresses or personal contacts
-  in automatic mining packets. Verify per-source licence and attribution.
-- The existing permit/property Source Intelligence specialist remains the
-  consuming department, not a new buyer CRM.
+### England: Planning Data API (property constraints only for now)
+- Official API: https://www.planning.data.gov.uk/docs
+- **18 October 2026 correction:** the live official
+  https://www.planning.data.gov.uk/dataset/planning-application listing shows
+  **zero planning-application records and no active data providers**.
+  Therefore DO NOT present planning-application events from this platform as
+  a usable live demand/lead feed today. Development/staging datasets are not
+  reliable production substitutes.
+- Other published planning/property constraints can inform property/location
+  intelligence, but **are not new application or buyer demand events**.
+- Use date/geography pagination and provenance only after source availability
+  and lawful use are independently confirmed. No applicant names, domestic
+  addresses or contacts in automated review packets.
+
+### England: Environment Agency flood warnings (stronger new pilot candidate)
+- Official: https://www.api.gov.uk/ea/flood-monitoring/
+- API docs: https://environment.data.gov.uk/flood-monitoring/doc/reference
+- Existing API supplies near real-time flood warnings/alerts and river levels
+  as Open Government Licence data, no developer registration required. Use
+  source attribution and conservative rate/response bounds.
+- This is a public event/physical-hazard signal, NOT property damage, an
+  insurance claim, a homeowner identity, or confirmed purchasing intent.
+- Next proposed integration should normalize public warning ID, issued time,
+  severity and geographic scope via the EXISTING Sensor Mesh/Source
+  Intelligence, not build a parallel inbox or send automatic outreach.
+- Pending: implement a bounded, read-only observer, verify geographies and
+  data terms, then join to existing source intelligence. No API poll is
+  enabled by this Wave 1 branch.
 
 ### United States: NYC DOB NOW permits (already implemented)
 - Existing first-party ingestion: `empire_os/dobnow_incremental.py`.
