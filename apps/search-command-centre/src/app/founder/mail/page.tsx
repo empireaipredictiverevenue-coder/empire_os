@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import WorkspaceSolarMailReview from "./workspace-solar-review";
 import {
   getFounderMailboxDraftPreview,
   getFounderMailboxThread,
@@ -208,6 +209,8 @@ export default async function FounderMailPage({
             </span>
           </div>
         </header>
+
+        <WorkspaceSolarMailReview />
 
         {!mailboxResult.ok || !mailbox ? (
           <section className="rounded-3xl border border-amber-400/20 bg-amber-400/[0.05] p-6">
