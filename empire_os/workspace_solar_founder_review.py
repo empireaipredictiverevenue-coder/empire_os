@@ -27,6 +27,10 @@ ALLOWED_RFC_RELATIONS = frozenset((
 ALLOWED_RECIPIENT_ROUTES = frozenset((
     "EXPECTED_WORKSPACE_TO", "RECIPIENT_ROUTE_UNVERIFIED",
 ))
+ALLOWED_SENDER_CORRESPONDENCE = frozenset((
+    "EXACT_ORIGINAL_RECIPIENT", "SAME_DOMAIN_DIFFERENT_ADDRESS",
+    "SENDER_CORRESPONDENCE_UNVERIFIED",
+))
 HEX = re.compile(r"^[a-f0-9]{16,32}$")
 
 
@@ -111,6 +115,20 @@ def project_workspace_review(
             routing = candidate.get("recipient_routing", "RECIPIENT_ROUTE_UNVERIFIED")
             if routing not in ALLOWED_RECIPIENT_ROUTES:
                 raise WorkspaceReviewHeld("UNTRUSTED_RECIPIENT_ROUTING")
+            sender_match = candidate.get(
+                "sender_correspondence", "SENDER_CORRESPONDENCE_UNVERIFIED"
+            )
+            if sender_match not in ALLOWED_SENDER_CORRESPONDENCE:
+                raise WorkspaceReviewHeld("UNTRUSTED_SENDER_CORRESPONDENCE")
+            # An exact From header is still untrusted identity evidence.
+            # This flag prioritizes HUMAN review only, not CRM write authority.
+            next_review = (
+                "VERIFY_CANONICAL_INTENT_TENANT_SUPPRESSION_AND_CONTENT"
+                if sender_match == "EXACT_ORIGINAL_RECIPIENT"
+                and relation == "DIRECT_PARENT_MATCH"
+                and routing == "EXPECTED_WORKSPACE_TO"
+                else "REVIEW_SENDER_THREAD_ROUTING_AND_CONTENT_FIRST"
+            )
             received = _when(candidate.get("received_at"), label="INBOUND_TIME")
             if received <= sent_at or received > scanned_at:
                 raise WorkspaceReviewHeld("INBOUND_TIME_CONFLICT")
@@ -122,6 +140,9 @@ def project_workspace_review(
                 "commercial_intent_verified": False,
                 "rfc_parent_relation": relation,
                 "recipient_routing": routing,
+                "sender_correspondence": sender_match,
+                "next_review_step": next_review,
+                "crm_handoff_authorized": False,
             })
         incoming.sort(key=lambda x: (x["received_at"], x["gmail_message_id"]))
         total += len(incoming)

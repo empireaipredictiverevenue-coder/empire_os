@@ -194,7 +194,12 @@ def review_workspace_solar_threads(
             {"gmail_message_id": mid, "received_at": when.isoformat(),
              "status": "INBOUND_PROVIDER_HEADER_CANDIDATE_NEEDS_HUMAN_REVIEW",
              "rfc_parent_relation": _rfc_relation(outbound_id=sent_rfc_id, incoming=original_headers),
-             "recipient_routing": _workspace_recipient_routing(original_headers)}
+             "recipient_routing": _workspace_recipient_routing(original_headers),
+             "sender_correspondence": (
+                 "EXACT_ORIGINAL_RECIPIENT"
+                 if _email_from(original_headers.get("from", "")) == recipient
+                 else "SAME_DOMAIN_DIFFERENT_ADDRESS"
+             )}
             for mid, when, original_headers in pending_candidates
         ]
         reviewed.append({

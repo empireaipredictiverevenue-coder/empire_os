@@ -118,6 +118,49 @@ read-only founder review API → rendered Founder Mail page.
 canonical sent-intent / contact / tenant CRM join, followed by a founder
 review before prospect promotion.
 
+## 18 October evening — exact-contact reply triage, UI candidate built
+
+**Next gap closed in source:** the same existing authenticated Workspace
+reader also labels a candidate as `EXACT_ORIGINAL_RECIPIENT` or
+`SAME_DOMAIN_DIFFERENT_ADDRESS`. This is compared to the frozen exact
+recipient of the six original sent messages; it does NOT retain or expose
+the incoming personal address. Exact From equality is not proof of email
+authentication, human identity, consent or CRM tenant authority. Older
+snapshots without the field are shown as unverified; all six original
+message anchors and five-minute polling cadence are unchanged.
+
+The Founder API now carries a deterministic read-only `next_review_step`:
+only exact From + direct RFC parent + expected Workspace To can suggest
+checking canonical outbound intent, tenant, suppression and message
+content. Any incomplete match requires sender/thread/routing review first.
+**Both cases remain human review only** and explicitly have
+`crm_handoff_authorized=false`, `contact_identity_verified=false`,
+`commercial_intent_verified=false`, `crm_conversation_created=false`.
+No automatic contact, prospect, conversation, send or payment is created.
+
+The existing Founder Mail panel source was enhanced to show those flags
+and next-review steps only if a real Gmail candidate appears. It displays
+zero candidates honestly otherwise. Full app ESLint + TypeScript checks
+passed, and the new production Next.js 16 Webpack build at
+`/home/ubuntu/empire_worktrees/empire_founder_mail_reply_triage_candidate_20261018`
+passed. The isolated port 3099 preview preserved HTTP 200 on all eight
+current Founder routes, including YouTube and Intent Review. The source
+snapshot differs from the LIVE private prior release **only** in the
+single `workspace-solar-review.tsx` component; no other agents' work is
+replaced.
+
+Operator-gated rollback-safe script:
+`scripts/deploy_private_founder_mail_reply_triage_20261018.sh`.
+Preflight passed against the previous live service and its exact
+`70-private-solar-review-release.conf` drop-in. An approved root-run
+incremental release would create only
+`80-private-reply-triage-release.conf` and restart the existing private
+Founder Console, returning to the previous 70 drop-in on failure.
+The new frontend release is **NOT yet live** until the operator applies it
+and a live HTTP readback proves the new working directory. Backend rollout
+requires only a read-only Founder API restart; the five-minute worker
+launches fresh Python code on its next existing run.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

@@ -6,6 +6,11 @@ type Candidate = {
   state: string;
   contact_identity_verified: false;
   commercial_intent_verified: false;
+  sender_correspondence?: "EXACT_ORIGINAL_RECIPIENT" | "SAME_DOMAIN_DIFFERENT_ADDRESS" | "SENDER_CORRESPONDENCE_UNVERIFIED";
+  rfc_parent_relation?: "DIRECT_PARENT_MATCH" | "ORIGINAL_MESSAGE_REFERENCED_ONLY" | "NOT_PROVEN";
+  recipient_routing?: "EXPECTED_WORKSPACE_TO" | "RECIPIENT_ROUTE_UNVERIFIED";
+  next_review_step?: "VERIFY_CANONICAL_INTENT_TENANT_SUPPRESSION_AND_CONTENT" | "REVIEW_SENDER_THREAD_ROUTING_AND_CONTENT_FIRST";
+  crm_handoff_authorized?: false;
 };
 
 type ReviewItem = {
@@ -106,7 +111,16 @@ function validReview(value: unknown): value is WorkspaceReview {
         !Number.isFinite(Date.parse(c.received_at)) ||
         c.state !== "HEADER_CANDIDATE_REQUIRES_FOUNDER_REVIEW" ||
         c.contact_identity_verified !== false ||
-        c.commercial_intent_verified !== false
+        c.commercial_intent_verified !== false ||
+        (c.crm_handoff_authorized !== undefined && c.crm_handoff_authorized !== false) ||
+        (c.sender_correspondence !== undefined &&
+          !["EXACT_ORIGINAL_RECIPIENT", "SAME_DOMAIN_DIFFERENT_ADDRESS", "SENDER_CORRESPONDENCE_UNVERIFIED"].includes(String(c.sender_correspondence))) ||
+        (c.rfc_parent_relation !== undefined &&
+          !["DIRECT_PARENT_MATCH", "ORIGINAL_MESSAGE_REFERENCED_ONLY", "NOT_PROVEN"].includes(String(c.rfc_parent_relation))) ||
+        (c.recipient_routing !== undefined &&
+          !["EXPECTED_WORKSPACE_TO", "RECIPIENT_ROUTE_UNVERIFIED"].includes(String(c.recipient_routing))) ||
+        (c.next_review_step !== undefined &&
+          !["VERIFY_CANONICAL_INTENT_TENANT_SUPPRESSION_AND_CONTENT", "REVIEW_SENDER_THREAD_ROUTING_AND_CONTENT_FIRST"].includes(String(c.next_review_step)))
       ) return false;
     }
     candidateTotal += entry.inbound_candidate_count;
@@ -180,8 +194,13 @@ export default async function WorkspaceSolarMailReview() {
               </div>
             ))}
           </div>
+          {data.inbound_header_candidate_count > 0 ? (
+            <p role="status" className="mt-4 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-100">
+              Genuine Gmail provider header candidates need founder review. Check the original message and suppression status before treating any response as a CRM opportunity.
+            </p>
+          ) : null}
           <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-            {data.items.map((item) => (
+            {[...data.items].sort((a, b) => b.inbound_candidate_count - a.inbound_candidate_count || a.company.localeCompare(b.company)).map((item) => (
               <article key={item.gmail_thread_id}
                 className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0a1830]/70 p-4">
                 <div>
@@ -194,6 +213,28 @@ export default async function WorkspaceSolarMailReview() {
                   <p className="mt-1 text-[11px] text-slate-500">
                     CRM identity and buyer intent not verified
                   </p>
+                  {item.inbound_candidates.length > 0 ? (
+                    <div className="mt-3 space-y-3 border-t border-white/10 pt-3">
+                      {item.inbound_candidates.map((candidate) => (
+                        <div key={candidate.gmail_message_id} className="rounded-xl border border-amber-300/15 bg-amber-300/[0.035] p-3">
+                          <p className="text-xs font-semibold text-amber-100">Inbound message · review required</p>
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            Original contact: {candidate.sender_correspondence === "EXACT_ORIGINAL_RECIPIENT" ? "Same email address claimed" : candidate.sender_correspondence === "SAME_DOMAIN_DIFFERENT_ADDRESS" ? "Different address at company" : "Not verified"}
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            Reply chain: {candidate.rfc_parent_relation === "DIRECT_PARENT_MATCH" ? "Original sent message referenced directly" : candidate.rfc_parent_relation === "ORIGINAL_MESSAGE_REFERENCED_ONLY" ? "Original message appears in chain" : "Original relationship unverified"}
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-400">
+                            Recipient route: {candidate.recipient_routing === "EXPECTED_WORKSPACE_TO" ? "Empire Workspace address observed" : "Unverified"}
+                          </p>
+                          <p className="mt-2 text-[11px] font-medium text-amber-200">
+                            Next: {candidate.next_review_step === "VERIFY_CANONICAL_INTENT_TENANT_SUPPRESSION_AND_CONTENT" ? "Check original email, suppression, canonical intent and CRM tenant" : "Verify sender, message and reply context before CRM matching"}
+                          </p>
+                          <p className="mt-1 text-[10px] text-slate-500">No automatic CRM promotion or reply</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
                 <a href={item.gmail_thread_url} target="_blank"
                   rel="noopener noreferrer"
