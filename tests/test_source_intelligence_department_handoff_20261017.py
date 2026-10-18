@@ -62,7 +62,7 @@ def test_triad_analysis_routes_real_permits_to_correct_department_without_pii(tm
     assert d["lane_count"] == 5
     assert d["unique_underlying_nyc_permit_signal_count"] == 2
     routes = {row["lane"]:row for row in d["routes"]}
-    assert set(routes) == set(LANES) - {"historical_search_graph"}
+    assert set(routes) == set(LANES) - {"historical_search_graph", "data_brokerage"}
     assert routes["permit"]["department"] == "market_intelligence"
     assert routes["permit"]["counts"]["signal_count"] == 2
     assert routes["permit"]["counts"]["resolved_source_rows"] == 1

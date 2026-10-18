@@ -27,6 +27,9 @@ from empire_os.vertical_intelligence_runtime import (
 )
 from empire_os.department_work_queue import DepartmentWorkQueue
 from empire_os.free_dataset_intelligence import inspect_free_commoncrawl_dataset
+from empire_os.data_brokerage_product_catalog import (
+    validate_internal_brokerage_catalog,
+)
 from empire_os.permit_project_intelligence import analyze_permit_project_intelligence
 
 
@@ -45,6 +48,7 @@ LANES: dict[str, tuple[str, str, int]] = {
     "storm": ("data_quant", "refresh_primary_storm_observations_and_geo_evidence", 64),
     "warehouse": ("market_intelligence", "recover_evidence_backed_industrial_asset_source", 62),
     "historical_search_graph": ("marketing_growth", "review_free_commoncrawl_competitor_domain_graph", 60),
+    "data_brokerage": ("strategy", "qualify_original_data_product_offers_and_source_licences", 76),
 }
 
 
@@ -337,6 +341,39 @@ def build_source_intelligence_handoffs(
         observed_at=None,
     )
     routes = [permit_lane, property_lane, capital_lane, storm_lane, warehouse_lane]
+    # The catalogue must be a previously generated, immutable-scope,
+    # rights-held internal preview. The existing department timer does not
+    # open a protected database connection or sell/download source data.
+    brokerage_file = root / "runtime/data_brokerage/internal_product_catalog_latest.json"
+    brokerage_review = (
+        _read(brokerage_file) if root == CANONICAL_ROOT else None
+    )
+    if brokerage_review is not None and not validate_internal_brokerage_catalog(
+        brokerage_review
+    ):
+        brokerage_review = None
+    if brokerage_review is not None:
+        routes.append(_lane(
+            "data_brokerage",
+            status="INTERNAL_RIGHTS_AWARE_PRODUCT_CATALOG_REVIEW",
+            source="existing_data_exchange_custody_and_free_source_catalog",
+            evidence_refs=["runtime:data_brokerage:internal_product_catalog_latest"],
+            counts={
+                "catalog_evidence_sha256": brokerage_review["evidence_scope_sha256"],
+                "internal_product_count": brokerage_review["product_count"],
+                "founder_asset_origin_declaration_count": brokerage_review[
+                    "registered_founder_owned_asset_count"],
+                "approved_customer_data_exports": 0,
+                "actual_brokerage_sales": 0,
+            },
+            warnings=[
+                "third_party_raw_record_resale_not_authorized",
+                "source_field_licences_and_attribution_required",
+                "self_declared_founder_origin_is_not_independent_copyright_proof",
+                "no_customer_export_or_outbound_activated",
+            ],
+            observed_at=brokerage_review["generated_at"],
+        ))
     # Review only the already downloaded FREE graph metadata, never bulk-copy
     # the 9GB archive, treat historical edges as live links, or use paid APIs.
     graph_review = inspect_free_commoncrawl_dataset() if root == CANONICAL_ROOT else None
@@ -376,6 +413,7 @@ def build_source_intelligence_handoffs(
         "unique_underlying_nyc_permit_signal_count": permit_count,
         "permit_project_intelligence": permit_projects,
         "free_dataset_brain_review": graph_review,
+        "data_brokerage_internal_review": brokerage_review,
         "raw_customer_records_exported": False,
         "automatic_outreach_sent": False,
         "paid_model_invoked": False,
@@ -610,6 +648,8 @@ def deliver_source_intelligence_review(
         raise ValueError("source_handoff_evidence_superseded")
     reviewed = payload.get("permit_project_intelligence")
     reviewed = reviewed if isinstance(reviewed, dict) else {}
+    brokerage_catalog = payload.get("data_brokerage_internal_review")
+    brokerage_catalog = (brokerage_catalog if isinstance(brokerage_catalog, dict) else {})
     free_graph_review = payload.get("free_dataset_brain_review")
     free_graph_review = (
         free_graph_review if isinstance(free_graph_review, dict) else {}
@@ -624,6 +664,25 @@ def deliver_source_intelligence_review(
         "source_quality_summary": dict(row["counts"]),
         "followup_evidence_requirements": list(row["blockers"]),
         "next_internal_action": row["next_internal_action"],
+        "data_brokerage_internal_review": (
+            {
+                "product_count": brokerage_catalog.get("product_count"),
+                "evidence_scope_sha256": brokerage_catalog.get("evidence_scope_sha256"),
+                "products": [
+                    {
+                        "product_id": p.get("product_id"),
+                        "source_state": p.get("internal_source_state"),
+                        "origin_class": p.get("source_origin_class"),
+                        "licence_state": p.get("source_licence_state"),
+                        "buyer_verified": False,
+                        "customer_delivery_enabled": False,
+                    }
+                    for p in brokerage_catalog.get("products", [])
+                ],
+                "customer_distribution_authorized": False,
+                "actual_revenue_verified": False,
+            } if lane == "data_brokerage" else None
+        ),
         "historical_free_dataset_brain_review": (
             free_graph_review if lane == "historical_search_graph" else None
         ),
