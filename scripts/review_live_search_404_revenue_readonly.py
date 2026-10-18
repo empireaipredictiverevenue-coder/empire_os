@@ -49,7 +49,7 @@ class RefuseRedirect(HTTPRedirectHandler):
 def _get(path: str, *, search: bool) -> tuple[int, bytes]:
     if search:
         allowed = ("/search-console/status", "/search-console/daily",
-                   "/search-console/observations")
+                   "/search-console/observations", "/search-console/pages")
         base, suffix = path.split("?", 1) if "?" in path else (path, "")
         if base not in allowed:
             raise ReviewHeld("UNAPPROVED_SEARCH_API")
