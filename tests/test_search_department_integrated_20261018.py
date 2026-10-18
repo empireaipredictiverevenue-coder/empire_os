@@ -52,6 +52,20 @@ def evidence():
             "indexation_verified":False,"commercial_conversion_verified":False,
             "outbound_authorized":False,"publishing_authorized":False,
         },
+        "semantic": {
+            "schema_version":"live_semantic_site_quality_review.v1",
+            "mode":"OBSERVE","source_type":"read_only_public_html",
+            "assessed_public_pages":4,"intended_public_pages":4,
+            "page_to_static_commercial_form_path_observed":True,
+            "editorial_candidate_counts":{
+                "EDITORIAL_REVIEW_HVAC_HEAT_PUMP_CONTEXT":1,
+                "EDITORIAL_REVIEW_SOLAR_PV_EXPLANATION":1,
+            },
+            "read_errors":[],"observed_google_indexing":False,
+            "submission_executed":False,"crm_receipt_verified":False,
+            "revenue_verified":False,"site_mutated":False,
+            "paid_api_requests":0,"execution_authority":"none",
+        },
         "legacy": {
             "schema_version":"empire.organic_search.gsc_page_legacy_404_review.v1",
             "source":"google_search_console_page_dimension_final",
@@ -85,6 +99,10 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     assert d["realised_revenue_verified"] is False
     assert d["campaigns_approved_to_launch"]==0
     assert d["zero_spend_gbp"]==0
+    assert d["semantic_live_priority_pages_checked"]==4
+    assert d["semantic_editorial_review_candidates"]==2
+    assert d["semantic_owned_pages_commercial_route_verified"] is True
+    assert "SEMANTIC_ORIGINAL_CONTENT_EDITORIAL_REVIEW_PENDING" in d["open_gates"]
     assert d["database_writes"] is False
     assert d["outbound_sent"] is False
     assert "INDUSTRY_CAMPAIGN_RELEASE_NOT_VERIFIED" in d["open_gates"]
@@ -102,6 +120,9 @@ def test_all_reviewers_connected_but_actual_search_rank_and_sales_stay_unproven(
     ("gsc","source","query_page","GSC_PAGE_DIMENSION_UNVERIFIED"),
     ("gsc","outbound_authorized",True,"GSC_PAGE_DIMENSION_UNVERIFIED"),
     ("gsc","page_only_aggregation_not_query_page",False,"GSC_PAGE_DIMENSION_UNVERIFIED"),
+    ("semantic","paid_api_requests",1,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
+    ("semantic","site_mutated",True,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
+    ("semantic","revenue_verified",True,"SEMANTIC_SITE_SOURCE_UNVERIFIED"),
     ("legacy","redirect_authorized",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","database_writes",True,"LEGACY_PAGE_REVIEW_UNVERIFIED"),
     ("legacy","returned_page_rows",27,"INCONSISTENT_PAGE_DIMENSION_SAMPLE"),

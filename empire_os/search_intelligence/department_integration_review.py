@@ -30,6 +30,7 @@ def reconcile_department(
     growth: Mapping[str, Any],
     gsc: Mapping[str, Any],
     legacy: Mapping[str, Any],
+    semantic: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Accept only reviewed first-party/owner evidence; every gap stays visible."""
     if (not isinstance(four, Mapping) or four.get("schema")
@@ -95,6 +96,30 @@ def reconcile_department(
             or legacy.get("redirect_authorized") is not False
             or legacy.get("publication_authorized") is not False):
         raise IntegrationEvidenceHeld("LEGACY_PAGE_REVIEW_UNVERIFIED")
+    if (not isinstance(semantic, Mapping) or semantic.get("schema_version")
+            != "live_semantic_site_quality_review.v1"
+            or semantic.get("mode") != "OBSERVE"
+            or semantic.get("source_type") != "read_only_public_html"
+            or semantic.get("site_mutated") is not False
+            or semantic.get("paid_api_requests") != 0
+            or semantic.get("submission_executed") is not False
+            or semantic.get("crm_receipt_verified") is not False
+            or semantic.get("revenue_verified") is not False
+            or semantic.get("observed_google_indexing") is not False
+            or semantic.get("execution_authority") != "none"):
+        raise IntegrationEvidenceHeld("SEMANTIC_SITE_SOURCE_UNVERIFIED")
+    semantic_pages = _exact_nonnegative(semantic.get("assessed_public_pages"),max_value=4)
+    intended_pages = _exact_nonnegative(semantic.get("intended_public_pages"),max_value=4)
+    editorial = semantic.get("editorial_candidate_counts")
+    if (not isinstance(editorial, Mapping) or len(editorial) > 20
+            or any(not isinstance(k,str) or len(k)>120 for k in editorial)
+            or not isinstance(semantic.get("read_errors"), list)
+            or len(semantic["read_errors"]) > 4):
+        raise IntegrationEvidenceHeld("SEMANTIC_SITE_COUNTS_UNTRUSTED")
+    semantic_candidate_count = sum(_exact_nonnegative(v,max_value=100) for v in editorial.values())
+    semantic_sites_ready = (semantic_pages == 4 and intended_pages == 4
+        and not semantic["read_errors"]
+        and semantic.get("page_to_static_commercial_form_path_observed") is True)
     if gsc.get("date_window") != legacy.get("window"):
         raise IntegrationEvidenceHeld("GSC_DATE_WINDOW_MISMATCH")
     gsc_count = _exact_nonnegative(gsc.get("returned_page_rows"), max_value=1000)
@@ -128,6 +153,10 @@ def reconcile_department(
         blocks.append("INDUSTRY_CAMPAIGN_RELEASE_NOT_VERIFIED")
     if missing:
         blocks.append("HISTORIC_GSC_404_EDITORIAL_TRIAGE_PENDING")
+    if not semantic_sites_ready:
+        blocks.append("SEMANTIC_LIVE_PAGE_OR_COMMERCIAL_LINK_REVIEW_REQUIRED")
+    if semantic_candidate_count:
+        blocks.append("SEMANTIC_ORIGINAL_CONTENT_EDITORIAL_REVIEW_PENDING")
     if not ai_proven or not geo_proven:
         blocks.append("INDEPENDENT_AI_ANSWER_CITATION_EVIDENCE_MISSING")
     blocks += [
@@ -156,6 +185,11 @@ def reconcile_department(
         "organic_live_assets_verified": integrity,
         "organic_source_committed_verified": source_owned,
         "live_campaign_measurement_release_verified": release_registered,
+        "semantic_live_priority_pages_checked": semantic_pages,
+        "semantic_owned_pages_commercial_route_verified": semantic_sites_ready,
+        "semantic_editorial_review_candidates": semantic_candidate_count,
+        "semantic_google_indexing_verified": False,
+        "semantic_paid_api_requests": 0,
         "research_campaigns": campaigns_count,
         "growth_specialist_desks": desks,
         "campaigns_approved_to_launch": 0,
@@ -183,6 +217,7 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
     )
     from scripts.review_live_gsc_page_performance import build_live_priority_page_report
     from scripts.review_live_search_page_404_revenue_readonly import run as legacy_run
+    from scripts.review_live_semantic_site_quality import build_live_site_quality_review
 
     end = end or date.today() - timedelta(days=2)
     start = start or end - timedelta(days=12)
@@ -199,4 +234,5 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
     return reconcile_department(
         four=discovery_run(), organic=integrity_run(), growth=growth,
         gsc=page_report, legacy=legacy,
+        semantic=build_live_site_quality_review(),
     )
