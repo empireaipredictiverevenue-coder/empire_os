@@ -70,27 +70,39 @@ Absence of a bounce does **not** prove delivery.
 ```bash
 cd /srv/empire_os
 ./.venv/bin/python -B -m scripts.poll_workspace_solar_outreach_readonly
-# Only AFTER Workspace Gmail readonly token is safely reauthorised:
+# Authenticated Workspace scan; now approved after OAuth completed on 18 Oct:
 ./.venv/bin/python -B -m scripts.poll_workspace_solar_outreach_readonly --write
 ```
 
-Today the non-writing command must **hold** with
-`WORKSPACE_GMAIL_READ_SCOPE_NOT_CONFIGURED` and
-`verified_sent_anchors_in_live_mailbox=0`, NOT falsely return a success
-from the six stored IDs. The six provider-confirmed sends in this document
-remain real historical evidence, separate from an authorised **live**
-Workspace server scan.
+The original Workspace OAuth grant was completed by the founder on
+18 October 2026, with explicit gmail.send AND gmail.readonly scopes.
+The original expected-Gmail-primary identity was corrected separately
+to phil@empire-ai.co.uk; the sending alias remains
+phil@mail.empire-ai.co.uk. A REAL authenticated, non-writing provider
+scan returned six of six verified sent anchors, complete source scan,
+zero inbound header candidates and no send. The approved private
+--write scan then returned snapshot_written=true and exactly six
+anchors with zero new inbound candidates. File
+runtime/buyer_network_intelligence/workspace_solar_outreach_reply_review_latest.json
+was independently verified 0600, owned by ubuntu, containing metadata
+only (no bodies, no subject lines).
 
-Once the existing Workspace reader is explicitly authorised via the
-original Google OAuth process, this same code needs no new list or send
-service; verify real scan completeness and 0600 private file permissions.
+To avoid a duplicate timer, scripts/refresh_buyer_acquisition_team.py now
+also runs the EXISTING Workspace provider monitor through its bounded,
+non-sending, metadata-only --write reader on the already-active
+empire-buyer-acquisition-team.timer (approximately every five minutes).
+The separate process has a 35s upper bound. Failures do not fail the
+original buyer acquisition plan or falsely update the private snapshot.
+The integrated local run returned SIX_THREAD_WORKSPACE_SNAPSHOT_REFRESHED,
+six verified sent anchors, zero new inbound candidates, outbound_sent=false
+and database_writes=false. No new agent, systemd unit, OAuth token, personal
+Gmail importer or sending authority was created.
 A reply candidate then belongs to the **existing founder review/CRM identity
 workflow**, not automatically to `revenue_crm_prospects`, since the latter
 requires independent legitimate business-entity/tenant binding. Never create
 prospect rows from an outbound SENT message or a bare metadata-only reply.
 
-**Still open:** correct Workspace read-only authorisation and the exact
-provider-backed prospective reply → reviewed founder CRM path.
+**Still open:** independent human review of an eventual genuine incoming reply and the exact provider-backed prospective reply → authorised founder CRM lineage. Provider metadata alone is not a sales opportunity. The existing hourly ChatGPT Commercial & PR Reply Watch separately checks both inboxes; its notifications may require user-side enablement.
 No manufactured enquiries, new mail sends or production customer
 mutations were used to demonstrate this release.
 
