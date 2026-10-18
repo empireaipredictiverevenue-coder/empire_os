@@ -84,7 +84,12 @@ def _search_observation(value: Any, as_of: datetime) -> dict[str, Any] | None:
     return {
         "source_kind": "GSC", "source_ref": ref, "query": query.strip(),
         "observed_at": observed.isoformat(), "impressions": impressions,
-        "clicks": clicks, "scope": "provided_reader_observation",
+        "clicks": clicks,
+        "scope": "historical_query_page_not_news_attribution"
+        if value.get("metric_scope") == "historical_query_page_not_news_attribution"
+        else "provided_reader_observation",
+        "observation_window": value.get("observation_window")
+        if isinstance(value.get("observation_window"), list) else None,
     }
 
 
