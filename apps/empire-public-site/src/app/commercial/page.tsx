@@ -1,5 +1,6 @@
 "use client";
 import CommercialBuyerExplanation from "@/components/CommercialBuyerExplanation";
+import BrokeragePremiumDiscovery from "@/components/BrokeragePremiumDiscovery";
 import TamBuyingIntentEvidenceGuide from "@/components/TamBuyingIntentEvidenceGuide";
 import { ArrowLeft, ArrowRight, LoaderCircle, CheckCircle2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -183,6 +184,7 @@ export default function CommercialPage() {
           </form>
         </section>
       </div>
+      <BrokeragePremiumDiscovery />
       <CommercialBuyerExplanation />
       <TamBuyingIntentEvidenceGuide />
     </div>
