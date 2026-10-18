@@ -142,10 +142,21 @@ def normalize_uk_tender_releases(
         deadline_current = bool(
             stage == "active" and deadline is not None and deadline > now
         )
+        # Stable semantic revision, independent of our observation clock.
+        # A status/deadline/CPV change to the same release can now be mined.
+        semantic = sha256(json.dumps({
+            "status": stage,
+            "cpv_codes": sorted(set(codes)),
+            "deadline_as_published": (
+                tender.get("tenderPeriod") or {}
+            ).get("endDate") if isinstance(tender.get("tenderPeriod"), Mapping) else None,
+            "published_release_date": release.get("date"),
+        }, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
         for vertical in verticals:
             counts[vertical] += 1
         states[stage] += 1
         rows.append({
+            "source_semantic_digest": semantic,
             "ocid_digest": sha256(ocid.encode()).hexdigest(),
             "release_digest": sha256(release_id.encode()).hexdigest(),
             "source_record_ref": f"https://www.find-tender.service.gov.uk/api/1.0/ocdsRecordPackages/{ocid}",

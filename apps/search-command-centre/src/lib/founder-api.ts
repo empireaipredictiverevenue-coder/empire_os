@@ -131,6 +131,16 @@ export type RevenueStreamMining = {
     source_count: number;
     by_readiness: Record<string, number>;
     top_new_public_source_choices: string[];
+    uk_tender_incremental?: {
+      schema_version: string;
+      status: string;
+      last_complete_window_end: string | null;
+      inflight_page_count: number | null;
+      inflight_source_records: number | null;
+      completed_source_receipt_count: number | null;
+      complete_source_coverage_claimed: false;
+      source_polling_scheduled: false;
+    };
     source_polling_started: false;
     paid_api_invoked: false;
   };

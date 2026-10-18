@@ -296,7 +296,9 @@ def build_revenue_stream_mining(
     comp = quality["competitor"]
     route_count = routes["aggregate"] or {}
     from empire_os.public_source_sweep import review_public_source_sweep
+    from empire_os.uk_tender_incremental import review_incremental_checkpoint
     discovery = review_public_source_sweep(as_of=now)
+    uk_tender_incremental = review_incremental_checkpoint(root, as_of=now)
     lanes = [
         _lane("acquisition", acquisition["aggregate"], acquisition["status"], SOURCES["acquisition"][0]),
         _lane("public_opportunity", route_count, routes["status"], SOURCES["opportunity_routes"][0]),
@@ -317,6 +319,7 @@ def build_revenue_stream_mining(
             "top_new_public_source_choices": discovery["top_new_public_source_choices"],
             "source_polling_started": False,
             "paid_api_invoked": False,
+            "uk_tender_incremental": uk_tender_incremental,
         },
         "lane_count": len(lanes),
         "sources": quality,

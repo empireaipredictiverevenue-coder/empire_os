@@ -275,6 +275,19 @@ export default async function FounderPage() {
                             Next candidate feeds: {(streamMining.source_discovery?.top_new_public_source_choices ?? [])
                               .slice(0, 5).map((key) => key.replaceAll("_", " ")).join(" · ") || "Source research required"}
                           </p>
+                          <div className="mt-3 rounded-lg border border-cyan-300/10 p-3">
+                            <p className="text-xs font-semibold text-white">UK procurement incremental cursor</p>
+                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-300">
+                              <span>Status: {show(streamMining.source_discovery?.uk_tender_incremental?.status, "Not activated").replaceAll("_", " ")}</span>
+                              <span>Private pages: {streamMining.source_discovery?.uk_tender_incremental?.inflight_page_count ?? "Unknown"}</span>
+                              <span>Private release receipts: {streamMining.source_discovery?.uk_tender_incremental?.inflight_source_records ?? "Unknown"}</span>
+                            </div>
+                            <p className="mt-2 text-[11px] text-slate-500">
+                              Latest completed window: {streamMining.source_discovery?.uk_tender_incremental?.last_complete_window_end ?? "None verified"}.
+                              Only a fully exhausted source cursor can complete a watermark.
+                              Continuous polling and commercial execution remain off.
+                            </p>
+                          </div>
                           <p className="mt-2 text-[11px] text-slate-500">
                             Research catalogue only; new external polling is not scheduled or activated.
                           </p>
