@@ -256,6 +256,29 @@ export default async function FounderPage() {
                           <span>Department workstreams: {streamMining.lane_count}</span>
                           <span>External spend: £0</span>
                         </div>
+                        <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-sm font-semibold text-white">Deeper UK / US source discovery</p>
+                            <span className="text-xs text-cyan-200">
+                              {streamMining.source_discovery?.source_count ?? "Unknown"} official / existing candidates assessed
+                            </span>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-300">
+                            <span>Existing connectors: {streamMining.source_discovery?.by_readiness?.REUSE_EXISTING ?? 0}</span>
+                            <span>Read-only pilots: {streamMining.source_discovery?.by_readiness?.PILOT_READ_ONLY ?? 0}</span>
+                            <span>New adapters to review: {streamMining.source_discovery?.by_readiness?.NEW_ADAPTER_REVIEW ?? 0}</span>
+                            <span>Access/rights/empty holds: {Object.entries(streamMining.source_discovery?.by_readiness ?? {})
+                              .filter(([status]) => !["REUSE_EXISTING", "PILOT_READ_ONLY", "NEW_ADAPTER_REVIEW"].includes(status))
+                              .reduce((sum, [, count]) => sum + count, 0)}</span>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-400">
+                            Next candidate feeds: {(streamMining.source_discovery?.top_new_public_source_choices ?? [])
+                              .slice(0, 5).map((key) => key.replaceAll("_", " ")).join(" · ") || "Source research required"}
+                          </p>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            Research catalogue only; new external polling is not scheduled or activated.
+                          </p>
+                        </div>
                         <div className="mt-3 grid gap-2 md:grid-cols-2">
                           {streamMining.department_lanes.map((lane) => (
                             <div key={lane.stream} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">

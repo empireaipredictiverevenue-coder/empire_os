@@ -126,6 +126,14 @@ export type PredictiveFormulaEvidence = {
 };
 
 export type RevenueStreamMining = {
+  source_discovery: {
+    schema_version: string;
+    source_count: number;
+    by_readiness: Record<string, number>;
+    top_new_public_source_choices: string[];
+    source_polling_started: false;
+    paid_api_invoked: false;
+  };
   schema_version: string;
   status: string;
   source_count: number;

@@ -295,6 +295,8 @@ def build_revenue_stream_mining(
     quant = quality["quant"]
     comp = quality["competitor"]
     route_count = routes["aggregate"] or {}
+    from empire_os.public_source_sweep import review_public_source_sweep
+    discovery = review_public_source_sweep(as_of=now)
     lanes = [
         _lane("acquisition", acquisition["aggregate"], acquisition["status"], SOURCES["acquisition"][0]),
         _lane("public_opportunity", route_count, routes["status"], SOURCES["opportunity_routes"][0]),
@@ -308,6 +310,14 @@ def build_revenue_stream_mining(
             lane["status"] in ("FRESH", "OBSERVED") for lane in lanes)
             else "SOURCE_REFRESH_REQUIRED",
         "source_count": len(SOURCES),
+        "source_discovery": {
+            "schema_version": discovery["schema_version"],
+            "source_count": discovery["source_count"],
+            "by_readiness": discovery["by_readiness"],
+            "top_new_public_source_choices": discovery["top_new_public_source_choices"],
+            "source_polling_started": False,
+            "paid_api_invoked": False,
+        },
         "lane_count": len(lanes),
         "sources": quality,
         "department_lanes": lanes,

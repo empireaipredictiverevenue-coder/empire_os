@@ -92,6 +92,10 @@ def test_mines_existing_sources_into_exact_specialist_lanes(tmp_path):
     result = build_revenue_stream_mining(tmp_path)
     assert result["status"] == "MINING_REVIEW_READY"
     assert result["source_count"] == 4
+    assert result["source_discovery"]["source_count"] >= 18
+    assert result["source_discovery"]["source_polling_started"] is False
+    assert result["source_discovery"]["by_readiness"]["REUSE_EXISTING"] >= 4
+    assert result["source_discovery"]["by_readiness"]["NO_ACTIVE_RECORDS"] >= 1
     assert result["lane_count"] == 5
     assert result["worker_dispatched"] is False
     assert result["cross_lane_counts_are_not_additive"] is True
