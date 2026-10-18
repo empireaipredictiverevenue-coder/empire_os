@@ -306,3 +306,74 @@ def test_existing_baseline_old_bis_job_namespace_does_not_conflict(bounded):
     assert len(json.loads((bounded/"signal_inbox.json").read_text()))==2
     rows=analyze_permit_project_intelligence(bounded.parents[1],now=NOW)
     assert rows["cohort"]["recent_original_filing_or_issuance"]==2
+
+
+def test_bounded_batch_writes_one_private_file_not_one_per_signal(bounded):
+    from empire_os.signal_inbox import enqueue_signals_batch
+    from empire_os.candidate_quality import assess_candidate
+    from empire_os.lead_sources import LeadCandidate
+
+    one=list(to_signal_candidates(current_event_sample(
+        now=NOW,client=FakeOpenData())))[0]
+    batch=[]
+    for i in range(150):
+        entry=LeadCandidate(**{**one.__dict__,
+            "name":f"NYC DOB NOW Permit B{i:08d}-I1",
+            "raw":{**one.raw,"job_filing_number":f"B{i:08d}-I1"}})
+        batch.append(entry)
+    accepted=enqueue_signals_batch(batch,qualities=[assess_candidate(x) for x in batch])
+    assert len(accepted)==150
+    assert {x["decision"] for x in accepted}=={"created"}
+    assert (bounded/"signal_inbox.json").stat().st_mode & 0o777 == 0o600
+    matched=enqueue_signals_batch(batch)
+    assert {x["decision"] for x in matched}=={"matched"}
+    rows=json.loads((bounded/"signal_inbox.json").read_text())
+    assert len(rows)==150
+    assert all(x["prospect_id"] is None for x in rows.values())
+
+
+def test_batch_corrupt_existing_inbox_fails_closed_and_preserves_content(bounded):
+    from empire_os.signal_inbox import enqueue_signals_batch
+    p=bounded/"signal_inbox.json"
+    p.write_text("{corrupt existing customer source")
+    original=p.read_bytes()
+    c=list(to_signal_candidates(current_event_sample(
+        now=NOW,client=FakeOpenData())))[0]
+    with pytest.raises(ValueError):
+        enqueue_signals_batch([c])
+    assert p.read_bytes()==original
+
+
+def test_batch_rejects_mixed_source_or_oversized_payload(bounded):
+    from empire_os.signal_inbox import enqueue_signals_batch
+    c=list(to_signal_candidates(current_event_sample(
+        now=NOW,client=FakeOpenData())))[0]
+    with pytest.raises(ValueError,match="BATCH_LIMITED_TO_DOBNOW_SOURCE_EVENTS"):
+        enqueue_signals_batch([c,{"source":"courtlistener","name":"unknown"}])
+    with pytest.raises(ValueError,match="UNBOUNDED_SIGNAL_BATCH"):
+        enqueue_signals_batch([c]*401)
+    assert not (bounded/"signal_inbox.json").exists()
+
+
+def test_existing_crawler_uses_one_dobnow_batch_without_db(bounded, monkeypatch):
+    from empire_os.crawler_runner import run_source_safe
+    from empire_os.lead_sources import LeadCandidate, SourceInfo
+    from empire_os.lead_sources.nyc_dobnow import to_signal_candidates
+    one=list(to_signal_candidates(current_event_sample(
+        now=NOW,client=FakeOpenData())))[0]
+    def candidates(metro):
+        for i in range(60):
+            yield LeadCandidate(**{**one.__dict__,
+              "name":f"NYC DOB NOW Permit B{i:08d}-I1",
+              "raw":{**one.raw,"job_filing_number":f"B{i:08d}-I1"}})
+    src=SourceInfo(name="permits_dobnow",tier="real",requires=[],
+                   description="test",run_fn=candidates)
+    monkeypatch.setattr("empire_os.crawler_runner.log",lambda *a,**kw:None)
+    observed,accepted,errors=run_source_safe(src,"NYC",dry_run=False)
+    assert (observed,accepted,errors)==(60,60,0)
+    assert len(json.loads((bounded/"signal_inbox.json").read_text()))==60
+    observed,accepted,errors=run_source_safe(src,"NYC",dry_run=False)
+    assert (observed,accepted,errors)==(60,60,0)
+    assert len(json.loads((bounded/"signal_inbox.json").read_text()))==60
+    assert all(r["prospect_id"] is None for r in
+               json.loads((bounded/"signal_inbox.json").read_text()).values())

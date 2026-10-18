@@ -76,94 +76,71 @@ def _load() -> dict[str, dict[str, Any]]:
     return value if isinstance(value, dict) else {}
 
 
-def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
-    ROOT.mkdir(parents=True, exist_ok=True)
-    LOCK.touch(exist_ok=True)
-    row = _data(candidate)
+MAX_OBSERVE_BATCH = 400
+
+
+def _merge_signal(data: dict, row: dict, quality: Any) -> dict[str, Any]:
+    """One canonical signal mutation, shared by one-at-a-time and batch paths."""
     locale = resolve_locale(row)
     fp = _fingerprint(row)
-
-    with LOCK.open("r+") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            data = _load()
-            existing = data.get(fp)
-            if not isinstance(existing, dict) and row.get("source") == "permits_nyc":
-                # The older fingerprint also contains source/owner labels.
-                # A true official NYC job is one source record even if the
-                # owner name or displayed market niche changes on re-download.
-                existing = next(
-                    (prior for prior in data.values()
-                     if isinstance(prior, dict)
-                     and trusted_permit_match(prior, row)),
-                    None,
-                )
-            if (not isinstance(existing, dict)
-                    and row.get("source") == "permits_nyc_dobnow"):
-                existing = next((prior for prior in data.values()
-                                 if isinstance(prior, dict)
-                                 and trusted_dobnow_match(prior, row)), None)
-            revision = {"event_revision_added": False}
-            if isinstance(existing, dict):
-                seen_at = _now()
-                existing["last_seen_at"] = seen_at
-                existing["seen_count"] = int(existing.get("seen_count") or 1) + 1
-                if row.get("source") == "permits_nyc":
-                    revision = refresh_trusted_permit_event(
-                        existing, row, observed_at=seen_at,
-                    )
-                elif row.get("source") == "permits_nyc_dobnow":
-                    revision = refresh_dobnow_event(
-                        existing, row, observed_at=seen_at,
-                    )
-                decision = (
-                    "updated_source_event"
-                    if revision["event_revision_added"] else "matched"
-                )
-                record = existing
-            else:
-                q = (
-                    quality.to_evidence()
-                    if quality is not None and hasattr(quality, "to_evidence")
-                    else {}
-                )
-                record = {
-                    "signal_id": fp,
-                    "status": "unresolved",
-                    "created_at": _now(),
-                    "last_seen_at": _now(),
-                    "seen_count": 1,
-                    "source": str(row.get("source") or "").strip(),
-                    "name": str(row.get("name") or "").strip(),
-                    "niche": str(row.get("niche") or "").strip(),
-                    "metro": str(row.get("metro") or "").strip(),
-                    "state": str(row.get("state") or "").strip(),
-                    "phone": str(row.get("phone") or "").strip(),
-                    "email": str(row.get("email") or "").strip(),
-                    "url": str(row.get("url") or "").strip(),
-                    "details": str(row.get("details") or "").strip(),
-                    "lead_score": row.get("lead_score"),
-                    "raw": row.get("raw"),
-                    "locale": locale.as_dict(),
-                    "quality": q,
-                    "entity_id": None,
-                    "prospect_id": None,
-                    "resolution_attempts": 0,
-                    "next_resolution_at": _now(),
-                    "execution_authority": "none",
-                }
-                data[fp] = record
-                decision = "created"
-
-            tmp = INBOX.with_suffix(".json.tmp")
-            tmp.write_text(
-                json.dumps(data, indent=2, sort_keys=True, default=str) + "\n",
-                encoding="utf-8",
+    existing = data.get(fp)
+    if not isinstance(existing, dict) and row.get("source") == "permits_nyc":
+        existing = next(
+            (prior for prior in data.values()
+             if isinstance(prior, dict) and trusted_permit_match(prior, row)), None,
+        )
+    if not isinstance(existing, dict) and row.get("source") == "permits_nyc_dobnow":
+        existing = next(
+            (prior for prior in data.values()
+             if isinstance(prior, dict) and trusted_dobnow_match(prior, row)), None,
+        )
+    revision = {"event_revision_added": False}
+    if isinstance(existing, dict):
+        seen_at = _now()
+        existing["last_seen_at"] = seen_at
+        existing["seen_count"] = int(existing.get("seen_count") or 1) + 1
+        if row.get("source") == "permits_nyc":
+            revision = refresh_trusted_permit_event(
+                existing, row, observed_at=seen_at,
             )
-            tmp.replace(INBOX)
-        finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-
+        elif row.get("source") == "permits_nyc_dobnow":
+            revision = refresh_dobnow_event(
+                existing, row, observed_at=seen_at,
+            )
+        decision = "updated_source_event" if revision["event_revision_added"] else "matched"
+        record = existing
+    else:
+        q = (quality.to_evidence()
+             if quality is not None and hasattr(quality, "to_evidence")
+             else {})
+        stamp = _now()
+        record = {
+            "signal_id": fp,
+            "status": "unresolved",
+            "created_at": stamp,
+            "last_seen_at": stamp,
+            "seen_count": 1,
+            "source": str(row.get("source") or "").strip(),
+            "name": str(row.get("name") or "").strip(),
+            "niche": str(row.get("niche") or "").strip(),
+            "metro": str(row.get("metro") or "").strip(),
+            "state": str(row.get("state") or "").strip(),
+            "phone": str(row.get("phone") or "").strip(),
+            "email": str(row.get("email") or "").strip(),
+            "url": str(row.get("url") or "").strip(),
+            "details": str(row.get("details") or "").strip(),
+            "lead_score": row.get("lead_score"),
+            "raw": row.get("raw"),
+            "locale": locale.as_dict(),
+            "quality": q,
+            "entity_id": None,
+            "prospect_id": None,
+            "resolution_attempts": 0,
+            "next_resolution_at": stamp,
+            "execution_authority": "none",
+        }
+        data[fp] = record
+        decision = "created"
     return {
         "decision": decision,
         "signal_id": record.get("signal_id") or fp,
@@ -174,6 +151,64 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
         "execution_authority": "none",
     }
 
+
+def enqueue_signals_batch(candidates: list[Any], *,
+                          qualities: list[Any] | None = None) -> list[dict[str, Any]]:
+    """One existing inbox lock / one 0600 atomic file write for <=400 signals.
+
+    This is not a database or sales writer. Results are returned in input order.
+    """
+    if not isinstance(candidates, list) or len(candidates) > MAX_OBSERVE_BATCH:
+        raise ValueError("UNBOUNDED_SIGNAL_BATCH")
+    if qualities is not None and (
+        not isinstance(qualities, list) or len(qualities) != len(candidates)
+    ):
+        raise ValueError("INVALID_SIGNAL_BATCH_QUALITIES")
+    if not candidates:
+        return []
+    rows = [_data(candidate) for candidate in candidates]
+    if len(rows) > 1 and any(row.get("source") != "permits_nyc_dobnow" for row in rows):
+        raise ValueError("BATCH_LIMITED_TO_DOBNOW_SOURCE_EVENTS")
+    if INBOX.is_symlink() or LOCK.is_symlink():
+        raise ValueError("UNSAFE_SIGNAL_INBOX_PATH")
+    ROOT.mkdir(parents=True, exist_ok=True)
+    LOCK.touch(exist_ok=True)
+    with LOCK.open("r+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            # Fail closed on corrupt data; never truncate a shared live store.
+            if INBOX.exists():
+                data = json.loads(INBOX.read_text(encoding="utf-8"))
+                if not isinstance(data, dict):
+                    raise ValueError("UNTRUSTED_SIGNAL_INBOX_OBJECT")
+            else:
+                data = {}
+            results = [
+                _merge_signal(data, row, qualities[i] if qualities is not None else None)
+                for i, row in enumerate(rows)
+            ]
+            import os
+            import tempfile
+            fd, temp = tempfile.mkstemp(prefix=".signal_inbox.",suffix=".tmp",
+                                        dir=ROOT)
+            try:
+                with os.fdopen(fd, "w", encoding="utf-8") as writer:
+                    os.fchmod(writer.fileno(), 0o600)
+                    json.dump(data, writer, indent=2, sort_keys=True, default=str)
+                    writer.write("\n")
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                os.replace(temp, INBOX)
+            finally:
+                if os.path.exists(temp):
+                    os.unlink(temp)
+            return results
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
+    return enqueue_signals_batch([candidate], qualities=[quality])[0]
 
 
 

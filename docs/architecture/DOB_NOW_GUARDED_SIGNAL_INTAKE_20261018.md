@@ -18,6 +18,12 @@ The existing `candidate_quality` classifies `permits_nyc_dobnow` as a **signal**
 
 The existing signal-inbox lock/atomic write retains a stable source fingerprint for each DOB NOW job. Revisits do not duplicate records. Real sanitized source-field changes append bounded revision history; rewound issuance/filing dates are refused. Existing unrelated sources are unchanged.
 
+## Existing signal store high-volume efficiency (additional hardening)
+
+The canonical `runtime/acquisition/signal_inbox.json` had grown to roughly 37 MB, so using the historical one-record `enqueue_signal()` repeatedly for a 400-row DOB NOW cohort would deserialize and rewrite the whole JSON store hundreds of times. Before enabling high-volume ingestion, the same existing `signal_inbox.py` was refactored to expose `enqueue_signals_batch()`: **one existing file lock, one JSON read, one bounded in-memory upsert pass, one fsync and one atomic `0600` file replace**, maximum 400 official source signals. The original one-record API shares the same merge logic and behaviour.
+
+The current canonical crawler uses this batch only for the registered, explicitly enabled `permits_dobnow` source; legacy acquisition sources keep their existing one-record behaviour. No new DB, queue, bus, service or scheduler. If the provider fails mid-stream, the DOB NOW pending batch does not commit; a corrupt pre-existing inbox fails closed rather than being truncated. Live private source data are never transferred to customers. Unit tests cover 150-source batch replay, repeat upsert, invalid store, mixed-source batch refusal, oversize refusal, and one crawler batch for 60 staged events with no canonical prospects.
+
 ## Query limits and operational honesty
 
 - API timeouts 15s per call, two official source GETs per page, at most 40 rows per page, **10 pages / 400 raw work-permit rows maximum** per enabled crawl. No pagination beyond that bound or third-party enrichment.

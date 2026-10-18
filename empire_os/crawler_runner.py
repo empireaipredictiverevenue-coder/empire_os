@@ -38,7 +38,7 @@ from empire_os.prospect_ingest import (
     materialize_prospect,
     prepare_candidate,
 )
-from empire_os.signal_inbox import enqueue_signal
+from empire_os.signal_inbox import enqueue_signal, enqueue_signals_batch
 from empire_os.runtime_env import load_runtime_env
 from empire_os.geo_registry import acquisition_markets
 
@@ -137,6 +137,7 @@ def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
 
     log("INFO", "source_run_start", source=src.name)
     candidates = accepted = errors = 0
+    pending_dobnow_signals = []
 
     try:
         iterator = src.run_fn(metro=metro)
@@ -156,6 +157,12 @@ def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
                             source_role=quality.source_role,
                             entity_kind=quality.entity_kind,
                         )
+                        continue
+                    if (src.name == "permits_dobnow"
+                            and cand.source == "permits_nyc_dobnow"):
+                        # Defer only this bounded official data source until one
+                        # locked commit, not one full-inbox rewrite per event.
+                        pending_dobnow_signals.append((cand, quality))
                         continue
                     signal = enqueue_signal(cand, quality=quality)
                     accepted += 1
@@ -266,6 +273,29 @@ def run_source_safe(src, metro, dry_run, max_candidates=None, niche=None):
             error=str(exc),
             tb=traceback.format_exc()[-200:],
         )
+
+    if pending_dobnow_signals and errors == 0:
+        try:
+            results = enqueue_signals_batch(
+                [c for c, _ in pending_dobnow_signals],
+                qualities=[q for _, q in pending_dobnow_signals],
+            )
+            accepted += len(results)
+            from collections import Counter
+            decisions = Counter(r["decision"] for r in results)
+            log("SIGNAL", "dobnow_bounded_batch_queued",
+                source="permits_nyc_dobnow",
+                queued=len(results),
+                created=decisions["created"],
+                matched=decisions["matched"],
+                updated_source_event=decisions["updated_source_event"],
+                consumer_contacts_exported=False,
+                authority="none")
+        except Exception as exc:
+            errors += 1
+            log("ERROR", "dobnow_batch_atomic_commit_failed",
+                source="permits_nyc_dobnow",
+                error_type=type(exc).__name__)
 
     log(
         "INFO",
