@@ -7,6 +7,16 @@ const assert = require("node:assert/strict");
 const puppeteer = require(process.env.PUPPETEER_MODULE || "puppeteer");
 const origin = process.env.STAGED_SEARCH_CENTRE_ORIGIN || "http://127.0.0.1:3197";
 async function main() {
+  const base = process.env.STAGED_DEPARTMENT_API_ORIGIN || "http://127.0.0.1:8771";
+  if (!/^http:\/\/127\.0\.0\.1:(8771|8871)$/.test(base)) {
+    throw new Error("Only existing local Search Intelligence evidence sources are allowed");
+  }
+  const res = await fetch(base + "/v1/search/department/review", {cache:"no-store"});
+  assert.equal(res.status, 200);
+  const evidence = await res.json();
+  assert.equal(evidence.schema_version, "empire.search_growth.department_integration.v1");
+  assert.equal(evidence.search_rankings_verified, false);
+  const fmt = n => new Intl.NumberFormat("en-GB").format(n);
   const browser = await puppeteer.launch({
     headless:true, executablePath: process.env.CHROME_BIN,
     args:["--no-sandbox","--disable-dev-shm-usage","--disable-gpu"],
@@ -55,9 +65,9 @@ async function main() {
         assert.ok(details.links.includes("/"));
         assert.ok(details.links.includes("/technical"));
         assert.ok(details.text.includes("Not verified"));
-        assert.ok(details.text.includes("34"));
-        assert.ok(details.text.includes("31"));
-        assert.ok(details.text.includes("Fresh cache envelopes"));
+        assert.ok(details.text.includes(fmt(evidence.gsc_returned_page_rows)));
+        assert.ok(details.text.includes(fmt(evidence.legacy_missing_404_count_in_returned_page_sample)));
+        assert.ok(details.text.toLowerCase().includes("fresh cache envelopes"));
         assert.ok(details.noIndex?.includes("noindex"));
         assert.ok(details.scrollWidth <= details.viewportWidth+2,
           "dashboard has no mobile horizontal overflow");
