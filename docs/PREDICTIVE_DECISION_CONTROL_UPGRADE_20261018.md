@@ -46,9 +46,11 @@ New `empire_os.predictive_decision_control` is a stateless, read-only *fusion* l
 6. **Revenue truth separation:** recognized revenue is shown only if the
    separate revenue-pulse observer is available, known-schema, OBSERVE,
    excludes forecasts from truth, and reconciles with the queue. Otherwise
-   it is `null`, not a fabricated zero. Pulse freshness is explicitly
-   `PRESENT_FRESHNESS_UNKNOWN` because the current pulse contract does
-   not expose a verified observation timestamp.
+   it is `null`, not a fabricated zero. As of 18 October, the existing
+   producer supplies `generated_at`; the decision control now validates its
+   age against a six-hour bound and rejects future, malformed or untrusted
+   snapshots. Realised gross profit is independently labelled and also
+   stays `null` unless the trusted pulse and canonical queue agree.
 7. **Founder integration:** adds `predictive_decision_control` to the
    existing Founder Dashboard API response; displays top-three jobs,
    owner, source freshness, readiness, and approval requirements in the
@@ -87,8 +89,9 @@ the existing server dependency install. It is not tracked in git.
   founder-facing deployment; this feature adds *no* new public endpoint.
 - Confirm real founder login displays the new card once the backend and
   frontend versions are deployed together. No claim of live UI activation.
-- Enhance the revenue-pulse producer to include a verified
-  `observed_at` or `generated_at` timestamp and validate its age here.
+- The current revenue-pulse producer supplies `generated_at`, now checked
+  for freshness. Continue to establish independently verified accounting
+  reconciliation rather than mistaking a fresh report for a bank receipt.
 - Add **separately authorised** internal dispatch via the existing execution
   bus: task ownership, idempotency, allowed read-only/internal actions,
   producer/consumer version matching, outcome receipt, cancellation, and

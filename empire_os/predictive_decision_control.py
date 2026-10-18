@@ -22,6 +22,7 @@ from empire_os.revenue_pulse import build_revenue_pulse_runtime
 
 SCHEMA_VERSION = "empire.predictive_decision_control.v1"
 ACTION_SNAPSHOT_MAX_AGE = timedelta(hours=6)
+REVENUE_PULSE_MAX_AGE = timedelta(hours=6)
 MAX_ITEMS = 500
 # Explicit, bounded set of existing NBA actions; a novel label cannot silently
 # acquire an internal-preparation privilege.
@@ -370,18 +371,33 @@ def build_predictive_decision_control(
                            "empire.founder.executive_roles_status.v1")
     pulse = revenue_pulse if isinstance(revenue_pulse, Mapping) else {}
     truth = pulse.get("recognized_revenue_truth")
-    pulse_trusted = (
-        pulse.get("available") is True
-        and pulse.get("schema_version") == "empire.revenue-pulse.v3"
+    pulse_stamp = _stamp(pulse.get("generated_at"))
+    pulse_contract = (
+        pulse.get("schema_version") == "empire.revenue-pulse.v3"
         and pulse.get("mode") == "OBSERVE"
         and pulse.get("execution_authority") == "none"
+        and pulse.get("execution_allowed") is False
+        and pulse.get("payment_mutation") is False
+        and pulse.get("revenue_mutation") is False
+        and pulse.get("accounting_mutation") is False
         and isinstance(truth, Mapping)
         and truth.get("forecast_included_in_truth") is False
     )
+    if pulse.get("available") is not True:
+        pulse_status = "UNAVAILABLE"
+    elif not pulse_contract or pulse_stamp is None:
+        pulse_status = "UNTRUSTED"
+    elif pulse_stamp > now:
+        pulse_status = "FUTURE_HELD"
+    elif now - pulse_stamp > REVENUE_PULSE_MAX_AGE:
+        pulse_status = "STALE"
+    else:
+        pulse_status = "FRESH"
+    pulse_trusted = pulse_status == "FRESH"
     sources = {
         "buyer_next_best_action": freshness,
         "revenue_command_queue": "TRUSTED" if queue_trusted else "UNTRUSTED",
-        "revenue_pulse": "PRESENT_FRESHNESS_UNKNOWN" if pulse_trusted else "UNAVAILABLE",
+        "revenue_pulse": pulse_status,
         "astra_executive_observer": (
             "FRESH" if executive_available and
             executive.get("execution_authority") == "none" else "UNAVAILABLE"
@@ -396,6 +412,12 @@ def build_predictive_decision_control(
                   truth.get("recognized_revenue_cents") else None)
     if type(recognized) is not int or recognized < 0:
         recognized = None
+    realized_gp = (truth.get("realized_gp_cents") if pulse_trusted
+                   and queue_trusted and isinstance(truth, Mapping)
+                   and queue.get("realized_gp_cents") == truth.get("realized_gp_cents")
+                   else None)
+    if type(realized_gp) is not int:
+        realized_gp = None
     status = ("REVIEW_READY" if any(
         row["lane"] != "EVIDENCE_HOLD" for row in ordered
     ) else "EVIDENCE_HOLD")
@@ -418,6 +440,9 @@ def build_predictive_decision_control(
         ],
         "items": ordered,
         "recognized_revenue_cents": recognized,
+        "realized_gp_cents": realized_gp,
+        "revenue_truth_status": pulse_status,
+        "north_star": "verified_realized_gross_profit",
         "estimated_revenue_from_scores": None,
         "expected_revenue_claimed": False,
         "commercial_intent_inferred": False,

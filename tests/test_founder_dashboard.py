@@ -2471,4 +2471,7 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert control["outbound_authorized"] is False
     assert control["database_mutation_authorized"] is False
     assert control["recognized_revenue_cents"] is None
+    assert control["realized_gp_cents"] is None
+    assert control["north_star"] == "verified_realized_gross_profit"
+    assert control["revenue_truth_status"] == "UNAVAILABLE"
     assert control["status"] == "EVIDENCE_HOLD"

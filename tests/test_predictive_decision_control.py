@@ -4,6 +4,7 @@ import pytest
 
 from empire_os.predictive_decision_control import (
     ACTION_SNAPSHOT_MAX_AGE,
+    REVENUE_PULSE_MAX_AGE,
     MAX_ITEMS,
     build_predictive_decision_control,
 )
@@ -56,6 +57,7 @@ def _queue(items=None, **overrides):
         "payment_authorized": False,
         "database_mutation_authorized": False,
         "recognized_revenue_cents": 12345,
+        "realized_gp_cents": 4000,
         "items": [_queue_item()] if items is None else items,
     }
     result.update(overrides)
@@ -82,8 +84,14 @@ def _pulse():
         "schema_version": "empire.revenue-pulse.v3",
         "mode": "OBSERVE",
         "execution_authority": "none",
+        "execution_allowed": False,
+        "payment_mutation": False,
+        "revenue_mutation": False,
+        "accounting_mutation": False,
+        "generated_at": NOW.isoformat(),
         "recognized_revenue_truth": {
             "recognized_revenue_cents": 12345,
+            "realized_gp_cents": 4000,
             "forecast_included_in_truth": False,
         },
     }
@@ -121,6 +129,8 @@ def test_fresh_canonical_internal_review_is_ranked_but_never_executed():
     assert task["task_id"].startswith("buyer-")
     assert "Company" not in task["task_id"]
     assert data["recognized_revenue_cents"] == 12345
+    assert data["realized_gp_cents"] == 4000
+    assert data["sources"]["revenue_pulse"] == "FRESH"
     assert data["estimated_revenue_from_scores"] is None
     assert data["task_dispatch_performed"] is False
     assert data["outbound_authorized"] is False
@@ -371,3 +381,49 @@ def test_revenue_queue_row_not_in_canonical_nba_is_held():
         "revenue_queue_does_not_match_canonical_nba_snapshot"
     )
     assert data["internal_preparation"] == []
+
+
+@pytest.mark.parametrize("age,status", [
+    (REVENUE_PULSE_MAX_AGE + timedelta(seconds=1), "STALE"),
+    (-timedelta(seconds=1), "FUTURE_HELD"),
+])
+def test_revenue_truth_not_promoted_from_old_or_future_snapshot(age, status):
+    pulse = _pulse()
+    pulse["generated_at"] = (NOW - age).isoformat()
+    data = _build(pulse=pulse)
+    assert data["sources"]["revenue_pulse"] == status
+    assert data["recognized_revenue_cents"] is None
+    assert data["realized_gp_cents"] is None
+    assert data["task_dispatch_performed"] is False
+
+
+@pytest.mark.parametrize("change", [
+    {"generated_at": None},
+    {"payment_mutation": True},
+    {"revenue_mutation": True},
+    {"accounting_mutation": True},
+    {"execution_allowed": True},
+    {"execution_authority": "live"},
+])
+def test_revenue_pulse_requires_validated_observe_contract(change):
+    pulse = _pulse()
+    pulse.update(change)
+    data = _build(pulse=pulse)
+    assert data["sources"]["revenue_pulse"] == "UNTRUSTED"
+    assert data["recognized_revenue_cents"] is None
+    assert data["realized_gp_cents"] is None
+
+
+def test_gp_disagreement_is_not_counted_as_realized_profit():
+    data = _build(queue=_queue(realized_gp_cents=123))
+    assert data["realized_gp_cents"] is None
+    assert data["recognized_revenue_cents"] == 12345
+
+
+def test_missing_gp_is_not_inferred_from_revenue_or_forecasts():
+    pulse = _pulse()
+    pulse["recognized_revenue_truth"]["realized_gp_cents"] = None
+    data = _build(pulse=pulse, queue=_queue(realized_gp_cents=None))
+    assert data["realized_gp_cents"] is None
+    assert data["recognized_revenue_cents"] == 12345
+    assert data["north_star"] == "verified_realized_gross_profit"

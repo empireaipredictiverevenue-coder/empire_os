@@ -3,6 +3,26 @@
 Date: 2026-09-19
 Status: CANONICAL BUSINESS + PRODUCT MODEL
 
+### Founder reaffirmation — 18 October 2026
+
+**Predictive Revenue is our original commercial mission; Predictive Cloud remains
+the larger intelligence architecture.** Preserve, strengthen and integrate the
+existing EmpireOS assets rather than rebuilding, replacing or multiplying them.
+Improve current components in place through isolated, tested, minimal-diff
+changes and coordinated releases; no unapproved authority, payments, outbound,
+infrastructure destruction or fabricated economic results.
+
+**Operating order:** verified paying buyer and offer → genuine commercial
+conversation → agreed transaction → payment and fulfilment → recognised
+revenue and realised gross profit → measured prediction error → better next
+decision. Existing research, CRM, Search, Astra, Revenue Exchange, Website and
+other departments should reinforce that loop, not compete to become a new
+standalone mission. Prioritising the first real revenue does not abandon
+our long-term platform work.
+
+This is a clarification of the existing mission, not a new product,
+pricing model, migration or production activation.
+
 This document is the top-level commercial and product blueprint for Empire AI.
 It sits above `BLUEPRINT_V6.md` (engineering/phase roadmap) and
 `COMMERCIAL_BLUEPRINT.md` (buyer/seats/territories/MRR detail).

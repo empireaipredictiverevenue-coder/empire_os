@@ -62,6 +62,9 @@ export type PredictiveDecisionControl = {
   internal_preparation: PredictiveDecisionTask[];
   items: PredictiveDecisionTask[];
   recognized_revenue_cents: number | null;
+  realized_gp_cents: number | null;
+  revenue_truth_status: string;
+  north_star: "verified_realized_gross_profit";
   task_dispatch_performed: false;
   execution_authority: "none";
 };

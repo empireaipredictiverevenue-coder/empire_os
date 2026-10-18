@@ -219,6 +219,17 @@ export default async function FounderPage() {
                       <p className="mt-2 text-lg font-semibold text-slate-300">{decision.task_dispatch_performed ? "Review" : "None"}</p>
                     </div>
                   </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-white/10 bg-white/[0.025] px-4 py-3 text-xs text-slate-300">
+                    <span className="font-semibold text-cyan-200">
+                      Economic north star: realised gross profit
+                    </span>
+                    <span>Revenue evidence: {show(decision.revenue_truth_status).replaceAll("_", " ")}</span>
+                    <span>Recognised revenue: {int(decision.recognized_revenue_cents)} minor units</span>
+                    <span>Realised GP: {int(decision.realized_gp_cents)} minor units</span>
+                    <span className="text-slate-500">
+                      Currency and independent settlement reconciliation are not asserted by this view.
+                    </span>
+                  </div>
                   <div className="mt-5 grid gap-3 lg:grid-cols-3">
                     {nextPriorities.length ? nextPriorities.map((task, index) => (
                       <article key={task.task_id} className="rounded-2xl border border-cyan-300/15 bg-[#0a1820] p-5">
