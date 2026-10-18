@@ -13,6 +13,7 @@ from typing import Any
 PERMIT_SOURCES = {
     "permits",
     "permits_nyc",
+    "permits_nyc_dobnow",
     "building_permits",
     "planning_permits",
 }
@@ -69,7 +70,7 @@ def build_permit_intelligence_runtime(repo_root: Path) -> dict[str, Any]:
         raw = row.get("raw")
         if isinstance(raw, dict) and any(
             raw.get(key) not in (None, "")
-            for key in ("id", "job__", "permit_id", "application_id")
+            for key in ("id", "job__", "job_filing_number", "permit_id", "application_id")
         ):
             with_raw_reference += 1
 

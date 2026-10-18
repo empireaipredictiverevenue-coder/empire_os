@@ -22,6 +22,7 @@ PLACEHOLDER_NAMES = frozenset({
 # themselves verified business identities suitable for canonical prospects.
 SIGNAL_ONLY_SOURCES = frozenset({
     "permits_nyc",
+    "permits_nyc_dobnow",
     "courtlistener",
     "chicago_311",
     "chicago_permits",

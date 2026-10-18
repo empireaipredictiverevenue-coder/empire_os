@@ -134,8 +134,119 @@ def _market_summary(payload: Mapping[str, Any], now: datetime) -> dict[str, Any]
     }
 
 
+
+def _dossier_dobnow(row: Mapping[str, Any], now: datetime,
+                    market: Mapping[str, Any]) -> dict[str, Any]:
+    """DOB NOW alphanumeric job IDs MUST NOT masquerade as old BIS job URLs."""
+    from empire_os.lead_sources.nyc_dobnow import DATASET_PAGE, JOB
+
+    raw = row.get("raw")
+    raw = raw if isinstance(raw, Mapping) else {}
+    job = raw.get("job_filing_number")
+    filed = _official_day(raw.get("filing_date"))
+    issued = _official_day(raw.get("issued_date"))
+    first = _official_day(raw.get("first_permit_date"))
+    bbl = _id(raw.get("bbl"), (10,))
+    bin_id = _id(raw.get("bin"), (7,))
+    codes = raw.get("work_types")
+    valid_codes = (isinstance(codes, list)
+                   and 1 <= len(codes) <= 40
+                   and all(isinstance(x, str) and
+                           re.fullmatch(r"[A-Za-z0-9_ -]{1,60}", x)
+                           for x in codes))
+    trusted = (
+        row.get("source") == "permits_nyc_dobnow"
+        and row.get("url") == DATASET_PAGE
+        and isinstance(job, str) and JOB.fullmatch(job) is not None
+        and raw.get("official_event_crosscheck") is True
+        and filed is not None and issued is not None
+        and first == issued and filed <= issued
+        and raw.get("filing_reason") == "Initial Permit"
+        and raw.get("permit_status") == "Permit Issued"
+        and bbl is not None and bin_id is not None
+        and valid_codes
+    )
+    if not trusted:
+        stage = "UNTRUSTED_SOURCE_OR_MISSING_FILING_DATE"
+    elif filed > now or issued > now:
+        stage = "SOURCE_DATE_CONFLICT"
+    elif _recent(issued, now):
+        stage = "RECENT_ISSUANCE_FOR_PROJECT_REVIEW"
+    else:
+        stage = "HISTORICAL_PROJECT_SOURCE_ONLY"
+    recent = stage == "RECENT_ISSUANCE_FOR_PROJECT_REVIEW"
+    first_seen = _time(row.get("created_at"))
+    last_seen = _time(row.get("last_seen_at"))
+    market_row = (market.get("markets") or {}).get("general_contractor") or {}
+    return {
+        "project_ref": ("nyc_dobnow_job:" + job) if trusted else None,
+        "source_evidence_url": DATASET_PAGE if trusted else None,
+        "source_kind": ("NYC_DOBNOW_TWO_OFFICIAL_DATASET_EVENT"
+                        if trusted else "UNTRUSTED"),
+        "job_type_code": None,
+        "work_type_code": ("MULTI" if valid_codes and len(codes) > 1 else
+                           str(codes[0])[:32] if valid_codes else None),
+        "industry_hypothesis": "general_contractor",
+        "industry_basis": "GENERAL_CATEGORY_UNVERIFIED",
+        "borough": str(raw.get("borough") or "")[:24] if trusted else None,
+        "filing_status": None,
+        "permit_status": "Permit Issued" if trusted else None,
+        "first_imported_at": first_seen.isoformat() if first_seen else None,
+        "last_source_observed_at": last_seen.isoformat() if last_seen else None,
+        "official_source_run_date": None,
+        "original_filing_date": filed.date().isoformat() if filed else None,
+        "original_issuance_date": issued.date().isoformat() if issued else None,
+        "date_truth_classification": stage,
+        "genuine_recent_project_event_observed": recent,
+        "property_reference": {
+            "bbl": bbl if trusted else None,
+            "bin": bin_id if trusted else None,
+            "state": ("OFFICIAL_REFERENCE_NOT_INDEPENDENTLY_PROPERTY_VERIFIED"
+                      if trusted else "MISSING"),
+            "same_source_as_permit": True,
+        },
+        "identity_roles": {
+            "owner_business_name_present_in_original": False,
+            "permittee_business_name_present_in_original": False,
+            "owner_and_permittee_must_not_be_conflated": True,
+            "company_identity_independently_verified": False,
+            "contact_details_exported": False,
+        },
+        "market_gps_context": {
+            "state": market.get("state"), "niche": "general_contractor",
+            "commercial_demand_state": market_row.get("commercial_demand_state"),
+            "observed_reply_count": market_row.get("commercial_reply_count"),
+            "approved_buyer_count": market_row.get("approved_buyer_count"),
+            "matched_to_this_specific_project": False,
+        },
+        "intelligence_checks": {
+            "permit_source_trust": ("TWO_OFFICIAL_DOB_DATASETS_CORROBORATED"
+                                    if trusted else "HOLD"),
+            "project_event_recency": stage,
+            "cross_source_property_join": "NOT_INDEPENDENTLY_VERIFIED",
+            "storm_damage_or_insurance_claim": "UNKNOWN",
+            "real_business_buyer_interest": "UNKNOWN",
+            "commercial_terms_or_revenue": "UNKNOWN",
+            "model_review_performed": False,
+            "resale_rights_independently_verified": False,
+        },
+        "route": {
+            "department": "market_intelligence",
+            "secondary_department": "product" if trusted else None,
+            "action": ("REVIEW_CURRENT_OFFICIAL_ISSUANCE"
+                       if recent else "HISTORICAL_DATA_QUALITY_REVIEW"),
+            "sales_promotion_authorized": False,
+            "external_contact_authorized": False,
+        },
+        "execution_authority": "none",
+        "buyer_demand_proven": False, "realised_revenue_proven": False,
+    }
+
+
 def _dossier(row: Mapping[str, Any], now: datetime,
              market: Mapping[str, Any]) -> dict[str, Any]:
+    if row.get("source") == "permits_nyc_dobnow":
+        return _dossier_dobnow(row, now, market)
     raw = row.get("raw")
     raw = raw if isinstance(raw, Mapping) else {}
     job = _id(raw.get("job__"), (6, 7, 8, 9, 10, 11, 12)) or ""
@@ -293,10 +404,15 @@ def analyze_permit_project_intelligence(
         # rolling 24-hour windows nor raw personal/owner contact information.
         if signal_id and len(signal_id) <= 128:
             durable_digest_inputs.append((
-                signal_id, raw.get("job__"), raw.get("filing_date"),
-                raw.get("issuance_date"), raw.get("permit_status"),
+                signal_id, value.get("source"),
+                raw.get("job__") or raw.get("job_filing_number"),
+                raw.get("filing_date"),
+                raw.get("issuance_date") or raw.get("issued_date"),
+                raw.get("first_permit_date"), raw.get("permit_status"),
                 raw.get("filing_status"), raw.get("work_type"),
-                raw.get("job_type"), raw.get("bbl"), raw.get("bin__"),
+                tuple(raw.get("work_types") or ()),
+                raw.get("job_type"), raw.get("bbl"),
+                raw.get("bin__") or raw.get("bin"),
             ))
         first = _time(value.get("created_at"))
         if first is not None and timedelta(0) <= now - first <= timedelta(hours=COHORT_HOURS):

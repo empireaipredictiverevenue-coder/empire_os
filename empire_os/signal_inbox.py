@@ -20,6 +20,9 @@ from empire_os.locale_intelligence import resolve_locale
 from empire_os.permit_source_revision import (
     trusted_permit_match, refresh_trusted_permit_event,
 )
+from empire_os.dobnow_event_revision import (
+    trusted_dobnow_match, refresh_dobnow_event,
+)
 
 ROOT = Path("/srv/empire_os/runtime/acquisition")
 INBOX = ROOT / "signal_inbox.json"
@@ -54,7 +57,8 @@ def _fingerprint(row: Mapping[str, Any]) -> str:
         "metro": str(row.get("metro") or "").strip().lower(),
         "niche": str(row.get("niche") or "").strip().lower(),
         "raw_id": (
-            str(raw.get("id") or raw.get("job__") or raw.get("permalink") or "")
+            str(raw.get("id") or raw.get("job__") or raw.get("job_filing_number")
+                or raw.get("permalink") or "")
             if isinstance(raw, Mapping)
             else ""
         ),
@@ -94,6 +98,11 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
                      and trusted_permit_match(prior, row)),
                     None,
                 )
+            if (not isinstance(existing, dict)
+                    and row.get("source") == "permits_nyc_dobnow"):
+                existing = next((prior for prior in data.values()
+                                 if isinstance(prior, dict)
+                                 and trusted_dobnow_match(prior, row)), None)
             revision = {"event_revision_added": False}
             if isinstance(existing, dict):
                 seen_at = _now()
@@ -101,6 +110,10 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
                 existing["seen_count"] = int(existing.get("seen_count") or 1) + 1
                 if row.get("source") == "permits_nyc":
                     revision = refresh_trusted_permit_event(
+                        existing, row, observed_at=seen_at,
+                    )
+                elif row.get("source") == "permits_nyc_dobnow":
+                    revision = refresh_dobnow_event(
                         existing, row, observed_at=seen_at,
                     )
                 decision = (

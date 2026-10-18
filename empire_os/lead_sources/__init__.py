@@ -101,10 +101,12 @@ def _import_sources():
     from empire_os.lead_sources import (
         permits, chicago_311, court_listener, reddit_json,
         nyc_hpd, storm_alerts, overpass, business_search, recc_solar,
+        nyc_dobnow,
     )
     for mod in (
         permits, chicago_311, court_listener, reddit_json,
         nyc_hpd, storm_alerts, overpass, business_search, recc_solar,
+        nyc_dobnow,
     ):
         if hasattr(mod, "register_source"):
             mod.register_source(register)

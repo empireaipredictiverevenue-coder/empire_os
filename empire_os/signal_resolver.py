@@ -122,6 +122,8 @@ def candidate_from_signal(signal: Mapping[str, Any], *, now: datetime | None = N
             if candidate is not None
             else (None, "permittee_identity_incomplete")
         )
+    if source == "permits_nyc_dobnow":
+        return None, "dobnow_source_event_never_confers_company_identity"
     if source == "courtlistener":
         return None, "court_party_requires_external_identity_resolution"
     if source.endswith("_intent"):
