@@ -460,11 +460,38 @@ operator instruction and independent exact-six verification runner are
 recorded under
 `docs/commercial/WORKSPACE_SOLAR_HISTORICAL_SENT_RECEIPTS_RELEASE_20261018.md`.
 
-**Current verified production state:** `SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS`,
-six originals in private custody, zero historical evidence rows admitted,
-and zero new CRM conversations. After the approved founder-run import,
-require `SIX_HISTORICAL_GMAIL_RECEIPTS_IN_EMPIREDB_VERIFIED` before
-marking that separate gap closed.
+**At that earlier pre-import checkpoint**, the live state was
+`SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS` and the six originals remained
+in private custody only. The subsequent successful founder import and
+independent readback are recorded in the newer section immediately below.
+No new CRM conversations were created.
+
+## Six historical receipts verified live; canonical CRM readiness evaluated
+
+The founder completed the separately authorised historical import:
+`SIX_EXTERNAL_SENT_OBSERVATIONS_STORED_UNBOUND`,
+six new historical rows, no canonical approvals, CRM writes, email sends
+or payments. Independent source-check runner returned
+`SIX_HISTORICAL_GMAIL_RECEIPTS_IN_EMPIREDB_VERIFIED`. The actual running
+Founder read API subsequently showed six per-company
+`UNBOUND_HISTORICAL_EVIDENCE_IN_EMPIREDB` receipts, no new incoming Gmail
+candidate and all existing Founder/CRM/Gmail services active.
+
+**Historical provider evidence storage is now CLOSED.**
+A new on-demand read-only reconciliation composes three existing private
+Founder sources at the exact six-company boundary:
+`scripts/review_workspace_solar_crm_readiness_20261018.py --read-only`.
+Its live result reports six admitted historical receipts, zero currently
+observed incoming buyer replies, no canonical matching outbound intent
+visible to the restricted reader, and no CRM records. It distinguishes
+two remaining dependencies without promoting either observation:
+original canonical/contact/tenant linkage must be separately established,
+and any actual reply must be reviewed for original chain, sender and
+content, suppressions and commercial intent.
+
+The report adds NO new cron, DB migration, CRM write, sender, public
+endpoint or inbox. It is deliberately advisory, and does not retroactively
+approve the six original sends. Existing Workspace monitoring continues.
 
 ## What remains conditional / NOT verified
 

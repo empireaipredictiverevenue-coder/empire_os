@@ -401,21 +401,81 @@ Even once proven, the imports are historical external-sent **evidence**,
 not canonical-approved sends or sales opportunities. Buyer contact,
 suppression and tenant matching remain their own later review stages.
 
+## Six-receipt production import completed — independently verified
+
+The founder ran the separately approved, explicit one-time historical
+receipt import in the trusted EmpireOS Ubuntu terminal. The importer
+reported `SIX_EXTERNAL_SENT_OBSERVATIONS_STORED_UNBOUND`,
+`verified_receipts=6`, `new_receipts=6`,
+`replayed_identical_receipts=0`, and **zero** canonical outbound
+intents, CRM rows, email sends, payment events and retrospective approvals.
+
+The immediately following independent check reported
+`SIX_HISTORICAL_GMAIL_RECEIPTS_IN_EMPIREDB_VERIFIED`. A second readback
+through the *running* private Founder API confirmed:
+`SIX_HISTORICAL_RECEIPTS_VERIFIED_IN_EMPIREDB`, six original authenticated
+Gmail sent messages, six immutable historical DB receipts and the
+per-company `UNBOUND_HISTORICAL_EVIDENCE_IN_EMPIREDB` classification
+for GB NRG, Perfect Sense Energy, Solar4Good, Sustain Commercial Solar,
+SOL PV Group and 100% Renewables. The standard CRM pilot, Gmail timer,
+Founder Console and read API all stayed active. No incoming Gmail
+candidate, CRM conversation, canonical original approval or revenue
+was verified.
+
+**Evidence import is closed.** Do NOT replay these six historical
+outreach emails or create six synthetic `outbound_intents` in an attempt
+to make the CRM look populated. The separate consent, suppression,
+contact identity and tenant authority checks remain genuine
+commercial dependencies.
+
+## Read-only six-company CRM reconciliation built after import
+
+New `empire_os/workspace_solar_crm_readiness.py` and
+`scripts/review_workspace_solar_crm_readiness_20261018.py` read the
+three **existing** private Founder API surfaces: authenticated Workspace
+reply review, exact canonical thread/recipient intent aggregates, and
+historical six-receipt DB admission. Every company must appear exactly
+once in all sources, and the no-approval/no-CRM-write flags must agree.
+Incomplete, stale, contradictory or forged source authority fails closed
+rather than producing a false commercial opportunity.
+
+The initial live on-demand check passed for all six companies:
+`SIX_COMPANY_HISTORICAL_TO_CRM_GAP_REGISTER_READ_ONLY`,
+`historical_receipts_verified_in_empiredb=6`,
+`inbound_provider_header_candidates=0`,
+`crm_records_created=0`. For each company the restricted canonical
+observer still sees no matching original canonical intent, and no
+genuine incoming buyer reply is observed. These are two **separate**
+unresolved steps; historical evidence storage alone is complete.
+
+Read-only repeat, no sudo or activation required:
+
+```bash
+cd /srv/empire_os
+./.venv/bin/python -B -m scripts.review_workspace_solar_crm_readiness_20261018 --read-only
+```
+
+This command is not a CRM promotion workflow and grants no outbound or
+payment authority. No extra timer, database migration, API listener,
+login or inbox was created. The existing five-minute Workspace monitor
+continues to produce the original independent reply evidence.
+
 ## Commercial completion gates still open
 
-1. Independently verify the newly admitted historical evidence in the
-   existing founder read workflow, without displaying personal addresses.
-2. Only after a genuine inbound response, verify original provider chain,
-   sender, suppression/opt-out state, tenant and contact authority.
-3. Obtain a separately reviewed canonical-admission design if a true CRM
-   sales conversation needs to be created from an external historical
-   send. The new evidence table alone does not authorise that promotion.
-4. Continue sales acquisition and commercial partner conversations in the
-   existing outbound programme; six sent emails by themselves are not
-   verified demand or revenue.
+1. **Closed:** all six historical receipts were independently verified in
+   EmpireDB through the existing private Founder read workflow.
+2. **Open:** when a genuine reply arrives, verify original provider chain,
+   sender and message content, suppression/opt-out state, exact contact
+   and tenant authority before any CRM promotion.
+3. **Open:** design a separately reviewed canonical intent/contact admission
+   if an external historical send produces a real buyer conversation. The
+   evidence table alone cannot backfill previous approvals.
+4. **Open:** continue legitimate commercial acquisition through the existing
+   approved programme. Six sent emails alone are not buyer interest or revenue.
 
 **Current verified status:** six authentic Gmail original-sent receipts
-in private custody. Migration 052 is active with forced RLS and an
-append-only trigger, and its production table remains **empty**. The
-separate six-receipt import is still unapproved and unapplied. No
-verified buyer reply, CRM opportunity or revenue resulted from the migration.
+are stored in EmpireDB under migration 052 with forced RLS and an
+append-only trigger. The separately approved six-row import is complete
+and independently read back; the receipts remain UNBOUND, not canonical
+approved outbound intents. The existing Gmail observer has zero incoming
+reply candidates, with no verified CRM opportunity or recognised revenue.
