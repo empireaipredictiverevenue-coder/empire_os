@@ -46,6 +46,75 @@ const SAFE_COMPANIES = new Set([
   "100% Renewables",
 ]);
 
+type HistoricalEvidenceStatus = {
+  status:
+    | "PRIVATE_CUSTODY_ONLY_DATABASE_SCHEMA_HELD"
+    | "SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS"
+    | "HISTORICAL_DATABASE_IMPORT_PARTIAL_NEEDS_REVIEW"
+    | "SIX_HISTORICAL_RECEIPTS_VERIFIED_IN_EMPIREDB";
+  private_custody_receipts_verified: 6;
+  database_historical_receipts_verified: number;
+  database_historical_receipt_table_active: boolean;
+  canonical_outbound_intents_created: 0;
+  crm_records_created: 0;
+  outbound_sent: false;
+  database_writes: false;
+  items: Array<{
+    company: string;
+    empiredb_historical_evidence_admitted: boolean;
+    historical_approval_verified: false;
+    crm_contact_bound: false;
+  }>;
+};
+
+function validHistoricalEvidence(value: unknown): value is HistoricalEvidenceStatus {
+  if (!value || typeof value !== "object") return false;
+  const x = value as Record<string, unknown>;
+  const n = x.database_historical_receipts_verified;
+  if (
+    x.schema_version !== "empire.workspace_historical_receipt_admission_status.v1" ||
+    x.mode !== "OBSERVE" ||
+    x.exact_historical_receipts !== 6 ||
+    x.private_custody_receipts_verified !== 6 ||
+    typeof n !== "number" || !Number.isInteger(n) || n < 0 || n > 6 ||
+    typeof x.database_historical_receipt_table_active !== "boolean" ||
+    x.canonical_outbound_intents_created !== 0 ||
+    x.crm_records_created !== 0 ||
+    x.outbound_sent !== false ||
+    x.database_writes !== false ||
+    x.crm_handoff_authorized !== false ||
+    x.execution_authority !== "none" ||
+    !Array.isArray(x.items) || x.items.length !== 6
+  ) return false;
+  const companies = new Set<string>();
+  let admittedCount = 0;
+  for (const entry of x.items) {
+    if (!entry || typeof entry !== "object") return false;
+    const item = entry as Record<string, unknown>;
+    if (
+      typeof item.company !== "string" ||
+      !SAFE_COMPANIES.has(item.company) ||
+      companies.has(item.company) ||
+      typeof item.empiredb_historical_evidence_admitted !== "boolean" ||
+      item.historical_approval_verified !== false ||
+      item.crm_contact_bound !== false ||
+      item.canonical_sent_intent_created !== false ||
+      item.commercial_revenue_verified !== false
+    ) return false;
+    companies.add(item.company);
+    if (item.empiredb_historical_evidence_admitted) admittedCount += 1;
+  }
+  if (admittedCount !== n) return false;
+  if (x.database_historical_receipt_table_active === false) {
+    return x.status === "PRIVATE_CUSTODY_ONLY_DATABASE_SCHEMA_HELD" && n === 0;
+  }
+  return (
+    (x.status === "SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS" && n === 0) ||
+    (x.status === "HISTORICAL_DATABASE_IMPORT_PARTIAL_NEEDS_REVIEW" && n > 0 && n < 6) ||
+    (x.status === "SIX_HISTORICAL_RECEIPTS_VERIFIED_IN_EMPIREDB" && n === 6)
+  );
+}
+
 const GMAIL_THREAD = /^[a-f0-9]{16,32}$/;
 const RECENT_AGE_MS = 20 * 60 * 1000;
 
@@ -149,8 +218,27 @@ async function readWorkspaceReview(): Promise<WorkspaceReview | null> {
   }
 }
 
+async function readHistoricalEvidence(): Promise<HistoricalEvidenceStatus | null> {
+  const base = process.env.EMPIRE_API_BASE_URL?.trim();
+  if (base !== "http://127.0.0.1:8766") return null;
+  try {
+    const response = await fetch(
+      base + "/v1/founder-mailbox/workspace-solar-historical-evidence-status",
+      { cache: "no-store", headers: { Accept: "application/json" } },
+    );
+    if (!response.ok) return null;
+    const result: unknown = await response.json();
+    return validHistoricalEvidence(result) ? result : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function WorkspaceSolarMailReview() {
-  const data = await readWorkspaceReview();
+  const [data, historical] = await Promise.all([
+    readWorkspaceReview(),
+    readHistoricalEvidence(),
+  ]);
   return (
     <section
       aria-label="Workspace Gmail solar outreach review"
@@ -173,6 +261,31 @@ export default async function WorkspaceSolarMailReview() {
         <span className="rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-1.5 text-xs font-medium text-cyan-100">
           Read-only · no auto-send
         </span>
+      </div>
+      <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.025] p-4">
+        <p className="text-xs font-semibold text-slate-200">Original Gmail sends · canonical evidence</p>
+        {historical ? (
+          <>
+            <p className="mt-2 text-sm text-slate-300">
+              {historical.private_custody_receipts_verified} original sends preserved in private evidence custody.
+              {" "}{historical.database_historical_receipts_verified} of 6 historical receipts verified in EmpireDB.
+            </p>
+            <p className="mt-1 text-xs text-amber-200">
+              {historical.database_historical_receipt_table_active
+                ? historical.database_historical_receipts_verified === 6
+                  ? "Historical evidence stored; original CRM contact and campaign approval still unverified."
+                  : "EmpireDB historical evidence is incomplete or awaiting reconciliation."
+                : "EmpireDB migration 052 is staged, not activated. No historical database import has occurred."}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Historical evidence does not create approved outreach, CRM contacts, or revenue.
+            </p>
+          </>
+        ) : (
+          <p className="mt-2 text-xs text-amber-200">
+            Historical evidence status is unavailable; no database admission is inferred.
+          </p>
+        )}
       </div>
       {!data ? (
         <p className="mt-5 rounded-xl border border-amber-400/20 bg-amber-400/[0.06] px-4 py-3 text-sm text-amber-200">

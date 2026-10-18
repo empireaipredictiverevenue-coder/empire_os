@@ -143,6 +143,51 @@ curl -fsS http://127.0.0.1:8766/v1/founder-mailbox/workspace-solar-historical-ev
 The readout is **not** a DB activation instruction; the migration/import
 remain separately held pending explicit founder authorisation.
 
+## Founder Mail evidence display — isolated release staged
+
+The existing Founder Mail server-rendered tracking panel now also reads the
+private historical receipt read endpoint and distinguishes
+`6 original sends preserved in private evidence custody` from
+`0 of 6 historical receipts verified in EmpireDB` while migration 052 is
+still held. The text makes clear that preserved evidence is NOT a sent
+intent, an approved campaign, a customer, a CRM case or realised revenue.
+Invalid/stale/unavailable status renders an explicit unavailable state
+instead of guessing zero or implying database completion.
+
+The exact source change is limited to
+`apps/search-command-centre/src/app/founder/mail/workspace-solar-review.tsx`.
+The production Next.js 16 Webpack build completed successfully in the
+frozen isolated release
+`/home/ubuntu/empire_worktrees/empire_founder_mail_historical_evidence_candidate_20261018`.
+An isolated loopback preview on port 3099 rendered the six verified
+original sends and the correct migration-held text; all eight existing
+Founder routes matched the current live console at HTTP 200, including
+YouTube and Intent Review. The live console currently remains on its
+previous isolated reply-triage release.
+
+A rollback-protected, operator-only incremental release script is staged:
+`scripts/deploy_private_founder_mail_historical_status_20261018.sh`.
+Its read-only preflight passed against the running service; it checks
+frozen source hashes, existing private API, prior 70+80 drop-ins, the
+existing routes, service health and public Founder Mail HTTP 404. On
+failure it removes only the new 90 drop-in and restarts the previous
+private console. No database, CRM, sender, payments, public website or
+customer artifact is changed by the UI switch.
+
+**For a separately approved private UI cutover only** (not DB approval):
+
+```bash
+cd /srv/empire_os
+bash scripts/deploy_private_founder_mail_historical_status_20261018.sh --preflight
+sudo bash scripts/deploy_private_founder_mail_historical_status_20261018.sh --apply-approved-private-release
+```
+
+Expected success marker:
+`FOUNDER_HISTORICAL_EVIDENCE_UI_RELEASE_VERIFIED`.
+Do NOT claim the new panel is live until its operator output and a live
+port-3001 readback confirm the new working directory. Migration 052 and
+its separate protected importer remain unactivated.
+
 ## Commercial completion gates still open
 
 1. Independently verify the newly admitted historical evidence in the
