@@ -283,6 +283,12 @@ def build_source_intelligence_handoffs(
             "volumetric_observation_count": property_.get("volumetric_observation_count"),
             "verified_property_opportunity_count": None,
             "three_agency_review_status": three_agency.get("status"),
+            "full_issued_day_source_count_reconciled": (
+                three_agency.get("source_day_count_reconciled")),
+            "reviewed_official_permit_event_count": (
+                three_agency.get("reviewed_permit_event_count")),
+            "full_day_issued_source_row_count": (
+                three_agency.get("official_source_row_count")),
             "tri_agency_bin_bbl_reference_match_count": (
                 three_agency.get("three_agency_bin_bbl_reference_match_count")),
             "tri_agency_reference_conflict_count": (
@@ -346,6 +352,8 @@ def build_source_intelligence_handoffs(
             "industrial_manufacturing_lot_context_only_count": (
                 three_agency.get("industrial_manufacturing_tax_lot_context_count")),
             "warehouse_operation_verified_count": 0,
+            "full_issued_day_source_count_reconciled": (
+                three_agency.get("source_day_count_reconciled")),
         },
         warnings=["original_warehouse_sniper_reuse_requires_primary_sources",
                   "industrial_landuse_is_not_operating_warehouse_evidence",

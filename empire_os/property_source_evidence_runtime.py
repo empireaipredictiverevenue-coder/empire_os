@@ -12,6 +12,8 @@ import json,re
 
 SCHEMA="empire.permit_property_three_agency_evidence.v1"
 FILENAME="runtime/data_brokerage/nyc_dobnow_property_three_agency_latest.json"
+FULL_DAY_FILENAME="runtime/data_brokerage/nyc_dobnow_property_three_agency_full_day_latest.json"
+FULL_DAY_SCHEMA="empire.permit_property_three_agency_full_day.v2"
 STATES={
     "TRI_AGENCY_BIN_AND_LOT_MATCH",
     "BUILDING_TAX_LOT_CONFLICT",
@@ -34,12 +36,19 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
              "verified_property_opportunity_count":None,
              "warehouse_operation_verified_count":0,
              "execution_authority":"none"}
-    p=Path(repo_root)/FILENAME
-    if not p.is_file() or p.is_symlink() or p.stat().st_size>150_000:
+    base=Path(repo_root)
+    full_day=base/FULL_DAY_FILENAME
+    use_full=full_day.exists() or full_day.is_symlink()
+    p=full_day if use_full else base/FILENAME
+    max_size=1_000_000 if use_full else 150_000
+    if not p.is_file():
         return missing
+    if p.is_symlink() or p.stat().st_size>max_size:
+        return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
     try:
         review=json.loads(p.read_text(encoding="utf-8"))
-        if (not isinstance(review,dict) or review.get("schema")!=SCHEMA
+        expect_schema=FULL_DAY_SCHEMA if use_full else SCHEMA
+        if (not isinstance(review,dict) or review.get("schema")!=expect_schema
                 or review.get("mode")!="OBSERVE"
                 or review.get("execution_authority")!="none"
                 or review.get("source_datasets")!=SRC
@@ -50,8 +59,48 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
         raw=review.get("diagnostics")
         count=review.get("permit_event_count")
         if (not isinstance(raw,list) or type(count) is not int
-                or count<1 or count>40 or count!=len(raw)):
+                or count<1 or count>(1200 if use_full else 40)
+                or count!=len(raw)):
             return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+        if use_full:
+            # An unverified volume claim is not a complete date partition.
+            if (review.get("coverage_state") !=
+                    "FULL_ISSUED_DAY_OFFICIAL_COUNT_MATCH_AT_OBSERVATION"
+                    or review.get("input_dob_sample_may_be_incomplete") is not False
+                    or review.get("source_change_caveat") is None
+                    or review.get("person_company_buyer_verified") is not False
+                    or review.get("property_ownership_verified") is not False):
+                return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+            rows=review.get("source_permit_row_count")
+            before=review.get("official_day_count_before_scan")
+            after=review.get("official_day_count_after_scan")
+            pages=review.get("source_page_receipts")
+            chunks=review.get("property_chunks")
+            if (type(rows) is not int or not 0<=rows<=1200
+                    or type(before) is not int or type(after) is not int
+                    or rows!=before or before!=after
+                    or not isinstance(pages,list) or not 1<=len(pages)<=30
+                    or review.get("source_page_count")!=len(pages)
+                    or sum((x.get("official_rows",-999) for x in pages
+                            if isinstance(x,dict)),0)!=rows
+                    or any(not isinstance(x,dict) or x.get("page")!=i
+                           or not isinstance(x.get("two_dob_selected_response_sha256"),dict)
+                           or not isinstance(x.get("two_dob_selected_response_sha256",{}).get("permits"),str)
+                           for i,x in enumerate(pages))
+                    or not isinstance(chunks,list) or not 1<=len(chunks)<=30
+                    or review.get("property_review_chunk_count")!=len(chunks)
+                    or sum((x.get("job_count",-999) for x in chunks
+                            if isinstance(x,dict)),0)!=count
+                    or any(not isinstance(x,dict) or x.get("chunk_index")!=i
+                           or not 1<=x.get("job_count",0)<=40
+                           or not isinstance(x.get("source_selected_response_receipts"),list)
+                           or len(x["source_selected_response_receipts"])!=2
+                           for i,x in enumerate(chunks))):
+                return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+            day=review.get("issued_day")
+            if (not isinstance(day,str) or
+                    not re.fullmatch(r"\d{4}-\d{2}-\d{2}",day)):
+                return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
         stamp=datetime.fromisoformat(review["reviewed_at_utc"].replace("Z","+00:00"))
         clock=now or datetime.now(timezone.utc)
         if stamp.utcoffset() is None or clock.utcoffset() is None:
@@ -72,6 +121,7 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
             state=row.get("building_tax_lot_evidence_state")
             if (not isinstance(job,str) or not re.fullmatch(r"[BMQSX]\d{8}-[A-Z]\d{1,2}",job)
                     or job in jobs or state not in STATES
+                    or (use_full and row.get("permit_original_issued_date")!=day)
                     or row.get("commercial_contact_authorized") is not False
                     or row.get("verified_business_buyer") is not False
                     or row.get("warehouse_operation_verified") is not False):
@@ -91,7 +141,11 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
                 or industrial!=review.get("event_level_industrial_lot_context_count")):
             return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
         return {
-            "status":"OFFICIAL_SOURCE_REFERENCES_REVIEWED",
+            "status":("FULL_ISSUED_DAY_PROPERTY_REFERENCES_REVIEWED"
+                      if use_full else "OFFICIAL_SOURCE_REFERENCES_REVIEWED"),
+            "source_day_count_reconciled":use_full,
+            "official_source_row_count":rows if use_full else None,
+            "issued_day":day if use_full else None,
             "reviewed_at_utc":stamp.isoformat(),
             "reviewed_permit_event_count":count,
             "three_agency_bin_bbl_reference_match_count":
