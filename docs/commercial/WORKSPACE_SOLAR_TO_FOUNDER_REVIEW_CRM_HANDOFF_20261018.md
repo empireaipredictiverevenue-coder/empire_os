@@ -223,6 +223,43 @@ The dedicated Founder API/systemd reader and existing credential were
 reused. No OAuth, backend timer, role, schema, CRM or payment mutation.
 Live outcome recorded after independent endpoint readback.
 
+## 18 October late — historical Gmail receipts prepared for canonical admission
+
+The exact-six provider evidence import path is now **implemented and
+committed**, detailed in
+`docs/commercial/WORKSPACE_SOLAR_HISTORICAL_SENT_RECEIPTS_RELEASE_20261018.md`.
+Live Gmail and restricted EmpireDB checks confirmed six original sent
+messages and **zero** matching thread/recipient canonical intents visible
+to the restricted reader. No second send is needed or authorised.
+
+The append-only private manifest, sourced from the provider-verified
+snapshot, contains six hashed/replay-checked original sent receipts and is
+held `0600` at
+`runtime/buyer_network_intelligence/workspace_solar_historical_evidence_20261018.json`.
+The private custody write and repeat verification PASS. Existing timers,
+Founder UI and CRM service remain untouched.
+
+Migration
+`migrations/empiredb/052_workspace_historical_send_receipts_observe_only.sql`
+and importer
+`scripts/import_workspace_historical_sent_receipts_20261018.py`
+are **STAGED ONLY**, tested and committed. Neither was activated against
+production EmpireDB; explicit founder/DBA approval is needed for that
+database mutation. The historical evidence table is deliberately
+separate from `public.outbound_intents` and always marks receipts
+`UNBOUND_EXTERNAL_SENT_OBSERVED`. It cannot fabricate campaign
+approvals, CRM contact authority, signed buyer responses or revenue.
+No new role, secret or scheduled service is introduced.
+
+The staged import verifies every stored receipt field against a fresh
+provider-derived receipt, rejects duplicates/conflicts and requires a
+root-to-postgres peer-auth privilege drop for its explicit operator-only
+branch. No new CRM opportunity will be created by this import. After a
+real reply arrives, the existing privacy-minimal Founder review still
+needs original sender, suppression, canonical intent, contact and tenant
+authority to justify CRM promotion. **Do not implement another Gmail
+monitor or replay the six original outreach emails.**
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
