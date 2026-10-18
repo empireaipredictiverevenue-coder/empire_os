@@ -350,6 +350,57 @@ Even after such an import, historical receipts remain `UNBOUND`, not
 approved outbound intents, verified tenants, genuine replies, CRM
 customers or realised revenue.
 
+## Founder approval of exactly six evidence inserts — 18 October 2026
+
+The founder subsequently gave **explicit approval** to import the six
+authenticated historical Gmail receipts into the now-active migration 052
+table and continue building the read-only commercial lineage workflow.
+This is a separate authorisation from the earlier **schema-only** approval.
+Its permitted effect is a single idempotent transaction inserting up to six
+previously verified, still-unbound historical sent receipts into
+`public.workspace_historical_sent_receipts`. No `outbound_intents`
+approval, tenant authority, CRM customer, reply, email send or payment is
+authorised or inferred.
+
+The importer's default DSN was pinned to local PostgreSQL socket
+`/var/run/postgresql`, port `5432`, database `empiredb`, OS peer
+account `postgres`. The approved import preflight and regression suite
+PASS. The connected remote command interface explicitly rejected the
+privileged operator command `Command not allowed`, and no bypass was
+attempted. **The production table therefore remains empty pending the
+founder's trusted Ubuntu execution.** The six original provider receipts
+remain intact in the restricted 0600 private custody.
+
+A separate exact six-company, read-only verification runner was built at
+`scripts/verify_workspace_historical_six_import_20261018.py`. It
+reads only two existing private loopback APIs, validates every individual
+receipt as still UNBOUND, verifies independent six original sent anchors,
+and rejects fabricated approval, CRM, outbound or revenue authority. It
+returns a nonzero status until all six historical rows are proven in
+EmpireDB. Its tests pass with no live database mutation.
+
+**Single founder-owned authorised transaction, then independent readback:**
+
+```bash
+cd /srv/empire_os
+sudo /srv/empire_os/.venv/bin/python -B -m scripts.import_workspace_historical_sent_receipts_20261018 --apply-founder-approved-historical-receipts-only
+/srv/empire_os/.venv/bin/python -B -m scripts.verify_workspace_historical_six_import_20261018 --verify-read-only
+```
+
+Expected import marker:
+`SIX_EXTERNAL_SENT_OBSERVATIONS_STORED_UNBOUND`,
+`verified_receipts=6`, `new_receipts=6` (or
+`replayed_identical_receipts=6` on a verified idempotent rerun).
+Expected post-import verification marker:
+`SIX_HISTORICAL_GMAIL_RECEIPTS_IN_EMPIREDB_VERIFIED`.
+Do not proceed as though the transaction succeeded if the importer
+returns `HELD_HISTORICAL_RECEIPT_IMPORT` or the readback runner
+returns `HISTORICAL_SIX_IMPORT_VERIFICATION_HELD`.
+
+Even once proven, the imports are historical external-sent **evidence**,
+not canonical-approved sends or sales opportunities. Buyer contact,
+suppression and tenant matching remain their own later review stages.
+
 ## Commercial completion gates still open
 
 1. Independently verify the newly admitted historical evidence in the

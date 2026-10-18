@@ -442,6 +442,30 @@ The six receipt insert was NOT part of the founder's approval for 052
 and has NOT been executed. Do not rerun migration 052 or retrospectively
 declare the six sends approved, tenant-bound or revenue-producing.
 
+## Six original receipts import approved — operator pending
+
+The founder separately approved importing the exact six authenticated
+historical Gmail sent receipts into the now-live migration 052 table.
+The previously held INSERT permission is therefore granted for that
+bounded evidence-only transaction. Approval does **not** extend to
+backdating `public.outbound_intents`, changing CRM records, automatic
+outbound, payments or invented buyer interest.
+
+Read-only preflight and 46 tests of the importer/status readback passed.
+The importer now pins the local `empiredb` peer socket and compares all
+preserved fields with a fresh original provider-derived manifest. The
+connected remote-command tool denied the approved privileged command,
+so **no six-row import was performed remotely**. A trusted Ubuntu
+operator instruction and independent exact-six verification runner are
+recorded under
+`docs/commercial/WORKSPACE_SOLAR_HISTORICAL_SENT_RECEIPTS_RELEASE_20261018.md`.
+
+**Current verified production state:** `SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS`,
+six originals in private custody, zero historical evidence rows admitted,
+and zero new CRM conversations. After the approved founder-run import,
+require `SIX_HISTORICAL_GMAIL_RECEIPTS_IN_EMPIREDB_VERIFIED` before
+marking that separate gap closed.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

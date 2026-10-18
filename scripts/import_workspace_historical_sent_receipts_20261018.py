@@ -100,7 +100,7 @@ def _expected(item: dict, source_scan: str) -> tuple:
 
 def import_exact_six_receipts(
     manifest: dict, *, connect_factory: Callable[...,Any],
-    dsn: str="dbname=empiredb user=postgres",
+    dsn: str="host=/var/run/postgresql port=5432 dbname=empiredb user=postgres",
     verified_source: dict | None = None,
 ) -> dict:
     items=_items_from_manifest(manifest,verified_source=verified_source)
