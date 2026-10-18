@@ -70,7 +70,7 @@ def test_mismatched_workspace_account_cannot_replace_working_send_token(monkeypa
 def test_explicit_read_consent_scopes_required_before_token_replacement(monkeypatch, tmp_path):
     token = setup(monkeypatch, tmp_path)
     FakeFlow.creds = FakeCredentials([SCOPES[0]])
-    monkeypatch.setattr(authorization, "build_gmail_service", lambda _: ProfileService("phil@mail.empire-ai.co.uk"))
+    monkeypatch.setattr(authorization, "build_gmail_service", lambda _: ProfileService("phil@empire-ai.co.uk"))
     with pytest.raises(SystemExit, match="WORKSPACE_MAILBOX_SCOPES_NOT_GRANTED"):
         authorization.main()
     assert token.read_text() == "ORIGINAL_TOKEN_NOT_REPLACED"
@@ -78,7 +78,7 @@ def test_explicit_read_consent_scopes_required_before_token_replacement(monkeypa
 
 def test_verified_workspace_account_can_replace_token_only_with_explicit_consent(monkeypatch, tmp_path):
     token = setup(monkeypatch, tmp_path)
-    monkeypatch.setattr(authorization, "build_gmail_service", lambda _: ProfileService("phil@mail.empire-ai.co.uk"))
+    monkeypatch.setattr(authorization, "build_gmail_service", lambda _: ProfileService("phil@empire-ai.co.uk"))
     assert authorization.main() == 0
     assert json.loads(token.read_text())["scopes"] == SCOPES
     assert oct(token.stat().st_mode & 0o777) == "0o600"

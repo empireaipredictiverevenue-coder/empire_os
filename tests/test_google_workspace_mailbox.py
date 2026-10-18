@@ -16,7 +16,7 @@ from empire_os.founder_mailbox_api import create_founder_mailbox_router
 
 
 class FakeAPI:
-    def __init__(self, email="phil@mail.empire-ai.co.uk"):
+    def __init__(self, email="phil@empire-ai.co.uk"):
         self.email = email
         self.operation = None
         self.calls = []
