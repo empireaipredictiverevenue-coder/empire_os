@@ -206,6 +206,7 @@ def build_source_intelligence_handoffs(
     project_cohort = permit_projects["cohort"]
     property_ = build_property_intelligence_runtime(root)
     three_agency=property_.get("three_agency_source_reference_review") or {}
+    claim_receipts=property_.get("evidence_bound_property_claims") or {}
     capital = build_private_capital_intelligence_runtime(root)
     storm = _read(root / STORM)
     permit_seen = _time(permit.get("latest_seen_at"))
@@ -295,6 +296,10 @@ def build_source_intelligence_handoffs(
                 three_agency.get("building_tax_lot_reference_conflict_count")),
             "tri_agency_billing_lot_match_count": (
                 three_agency.get("three_agency_billing_lot_reference_match_count")),
+            "source_bound_claim_receipts_status": (
+                claim_receipts.get("status")),
+            "source_bound_claim_reference_pairs": (
+                claim_receipts.get("bounded_reference_pair_count")),
             "distinct_permit_bin_bbl_reference_pairs": (
                 three_agency.get("distinct_permit_bin_bbl_reference_pair_count")),
             "distinct_unresolved_bin_bbl_reference_pairs": (
@@ -359,6 +364,9 @@ def build_source_intelligence_handoffs(
                 three_agency.get("industrial_manufacturing_tax_lot_context_count")),
             "industrial_manufacturing_distinct_bin_bbl_pairs": (
                 three_agency.get("distinct_industrial_bin_bbl_reference_pair_count")),
+            "source_bound_dof_warehouse_class_reference_pairs": (
+                claim_receipts.get("official_warehouse_class_reference_pairs")),
+            "verified_operating_warehouse_businesses": 0,
             "warehouse_operation_verified_count": 0,
             "full_issued_day_source_count_reconciled": (
                 three_agency.get("source_day_count_reconciled")),
