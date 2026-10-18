@@ -15,6 +15,7 @@ from typing import Any, Mapping
 SCHEMA = "empire.workspace_solar_outreach_tracking.v1"
 ACCOUNT = "phil@mail.empire-ai.co.uk"
 HEX = re.compile(r"^[a-f0-9]{16,32}$")
+RFC_ID = re.compile(r"^<[^ <>@]{1,200}@[^ <>@]{1,200}>$")
 ANCHORS = (
     ("GB NRG", "gbnrg.co.uk", "info@gbnrg.co.uk", "1a14f24fdcaa1d01", "1a14f282abf361e4"),
     ("Perfect Sense Energy", "perfectsenseenergy.com", "contactus@perfectsenseenergy.com", "1a14f2505c538311", "1a14f28336a3968c"),
@@ -47,9 +48,9 @@ def _headers(msg: Mapping[str, Any]) -> dict[str, str]:
         if len(h["value"]) > 1024 or "\r" in h["value"] or "\n" in h["value"]:
             raise EvidenceHeld("UNSAFE_PROVIDER_HEADER")
         k = h["name"].lower()
-        if k in ("from", "to") and k in result:
-            raise EvidenceHeld("DUPLICATED_IDENTITY_HEADER")
-        if k in ("from", "to", "subject"):
+        if k in ("from", "to", "message-id", "in-reply-to", "references") and k in result:
+            raise EvidenceHeld("DUPLICATED_PROVIDER_IDENTITY_OR_RFC_HEADER")
+        if k in ("from", "to", "subject", "message-id", "in-reply-to", "references"):
             result[k] = h["value"]
     return result
 
@@ -87,6 +88,29 @@ def _labels(message: Mapping[str, Any]) -> set[str]:
     return set(labels)
 
 
+def _valid_rfc_id(value: str) -> str:
+    """Strict, single RFC 5322 ID; never persist or print its address content."""
+    return (value if (isinstance(value, str) and RFC_ID.fullmatch(value)
+                      and not any(char.isspace() for char in value)) else "")
+
+
+def _rfc_relation(*, outbound_id: str, incoming: Mapping[str, str]) -> str:
+    """Structural ancestry signal only. Never authenticates sender or buyer."""
+    if not outbound_id or not _valid_rfc_id(incoming.get("message-id", "")):
+        return "NOT_PROVEN"
+    parent = _valid_rfc_id(incoming.get("in-reply-to", ""))
+    if parent == outbound_id:
+        return "DIRECT_PARENT_MATCH"
+    raw_refs = incoming.get("references", "").strip()
+    # Fail closed on arbitrary text, excessively long chains and malformed IDs.
+    refs = raw_refs.split()
+    if (refs and len(refs) <= 20
+            and all(_valid_rfc_id(value) for value in refs)
+            and outbound_id in refs):
+        return "ORIGINAL_MESSAGE_REFERENCED_ONLY"
+    return "NOT_PROVEN"
+
+
 def review_workspace_solar_threads(
     results: Mapping[str, Any], *, now: datetime
 ) -> dict[str, Any]:
@@ -110,7 +134,8 @@ def review_workspace_solar_threads(
             raise EvidenceHeld("INCOMPLETE_WORKSPACE_THREAD")
         seen = set()
         sent_when = None
-        candidates = []
+        pending_candidates = []
+        sent_rfc_id = ""
         anchored = False
         for msg in messages:
             if not isinstance(msg, Mapping):
@@ -130,18 +155,26 @@ def review_workspace_solar_threads(
                         or not _to_has(headers, recipient)):
                     raise EvidenceHeld("SENT_ANCHOR_NOT_PROVED_IN_WORKSPACE")
                 sent_when = received_at
+                sent_rfc_id = _valid_rfc_id(headers.get("message-id", ""))
                 anchored = True
                 continue
             if "SENT" in labels or "DRAFT" in labels or "TRASH" in labels or "SPAM" in labels:
                 continue
             if sender.split("@")[-1] != domain:
                 continue
-            candidates.append({"gmail_message_id": mid, "received_at": received_at.isoformat(),
-                               "status": "INBOUND_PROVIDER_HEADER_CANDIDATE_NEEDS_HUMAN_REVIEW"})
+            pending_candidates.append((mid, received_at, headers))
         if not anchored or sent_when is None:
             raise EvidenceHeld("EXACT_SENT_MESSAGE_ANCHOR_MISSING")
-        if any(datetime.fromisoformat(c["received_at"]) <= sent_when for c in candidates):
+        if any(when <= sent_when for _, when, _ in pending_candidates):
             raise EvidenceHeld("INBOUND_PRECEDES_SENT_ANCHOR")
+        # Do not retain raw RFC headers. Only a bounded structural relationship
+        # is kept for future supervised CRM identity review.
+        candidates = [
+            {"gmail_message_id": mid, "received_at": when.isoformat(),
+             "status": "INBOUND_PROVIDER_HEADER_CANDIDATE_NEEDS_HUMAN_REVIEW",
+             "rfc_parent_relation": _rfc_relation(outbound_id=sent_rfc_id, incoming=original_headers)}
+            for mid, when, original_headers in pending_candidates
+        ]
         reviewed.append({
             "company": company, "gmail_thread_id": tid,
             "sent_message_id": sent_id, "sent_at": sent_when.isoformat(),

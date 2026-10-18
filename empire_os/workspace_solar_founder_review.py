@@ -21,6 +21,9 @@ SNAPSHOT = Path(
 )
 MAX_SIZE = 25000
 MAX_AGE_SECONDS = 20 * 60
+ALLOWED_RFC_RELATIONS = frozenset((
+    "DIRECT_PARENT_MATCH", "ORIGINAL_MESSAGE_REFERENCED_ONLY", "NOT_PROVEN",
+))
 HEX = re.compile(r"^[a-f0-9]{16,32}$")
 
 
@@ -99,6 +102,9 @@ def project_workspace_review(
                     != "INBOUND_PROVIDER_HEADER_CANDIDATE_NEEDS_HUMAN_REVIEW"):
                 raise WorkspaceReviewHeld("UNTRUSTED_REPLY_CANDIDATE")
             seen_messages.add(cid)
+            relation = candidate.get("rfc_parent_relation", "NOT_PROVEN")
+            if relation not in ALLOWED_RFC_RELATIONS:
+                raise WorkspaceReviewHeld("UNTRUSTED_RFC_CHAIN_CLASSIFICATION")
             received = _when(candidate.get("received_at"), label="INBOUND_TIME")
             if received <= sent_at or received > scanned_at:
                 raise WorkspaceReviewHeld("INBOUND_TIME_CONFLICT")
@@ -108,6 +114,7 @@ def project_workspace_review(
                 "state": "HEADER_CANDIDATE_REQUIRES_FOUNDER_REVIEW",
                 "contact_identity_verified": False,
                 "commercial_intent_verified": False,
+                "rfc_parent_relation": relation,
             })
         incoming.sort(key=lambda x: (x["received_at"], x["gmail_message_id"]))
         total += len(incoming)

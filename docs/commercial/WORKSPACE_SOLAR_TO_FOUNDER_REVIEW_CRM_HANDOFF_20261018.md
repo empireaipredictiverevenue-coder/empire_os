@@ -30,6 +30,34 @@
   verified sent anchors, zero inbound candidate messages, and
   crm_conversation_created=false. This is the HONEST baseline.
 
+## 18 October addition — RFC reply-chain evidence, no CRM promotion
+
+The existing `empire_os/workspace_solar_reply_tracking.py` now evaluates the
+original SENT message's RFC `Message-ID` against a candidate's RFC
+`In-Reply-To` and `References` headers in the same authenticated, existing
+Gmail metadata scan. It does not make new API calls or retrieve message bodies.
+The private snapshot and founder review projection retain only ONE enum:
+`DIRECT_PARENT_MATCH`, `ORIGINAL_MESSAGE_REFERENCED_ONLY`, or `NOT_PROVEN`.
+They never persist raw RFC IDs, addresses, subject text or Gmail message bodies.
+A missing/invalid header is `NOT_PROVEN`, not a fabricated parent match;
+duplicate identity/RFC headers hold the entire scan.
+
+Direct parent match is stronger **thread ancestry**, not a signed proof of
+identity, authorised tenant access, commercial intent or a sale. All such
+authority flags remain FALSE. The existing scheduled five-minute worker
+automatically collects this header-level evidence when a genuine candidate
+first appears. Old stored candidate snapshots lacking the additional optional
+enum are compatible with the fail-closed founder reviewer and original
+deduplication logic. Scoped runtime and simulated reply tests passed.
+
+The clean committed-code Founder Mail Next.js release was also built in
+`/home/ubuntu/empire_worktrees/empire_founder_mail_clean_release_20261018`
+from commit `65b7b50f` with **zero tracked/untracked changes** and completed
+a successful Next.js 16 Webpack production build. The clean release lacks
+other agents' still-uncommitted Founder routes. It has therefore NOT replaced
+the live `empire-founder-console.service`; its deployment remains under
+coordinated owner review. No company website or auth deployment was made.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
