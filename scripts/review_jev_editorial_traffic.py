@@ -12,6 +12,7 @@ from empire_os.jev_newsjack_official_sources import (
     federal_register_signals, govuk_primary_signal,
 )
 from empire_os.jev_newsjack_traffic_briefs import prepare_editorial_traffic_reviews
+from empire_os.jev_newsjack_marketing_handoff import prepare_marketing_director_handoff
 
 
 def main() -> int:
@@ -30,6 +31,8 @@ def main() -> int:
     parser.add_argument("--include-items", action="store_true")
     parser.add_argument("--local-jev-shadow", action="store_true",
                         help="Use existing local Laya classifier in shadow mode")
+    parser.add_argument("--marketing-handoff", action="store_true",
+                        help="Add Media OS and existing Marketing Agency draft + UTM plan")
     args = parser.parse_args()
 
     if args.govuk_url:
@@ -57,6 +60,11 @@ def main() -> int:
     result = prepare_editorial_traffic_reviews(
         packet["signals"], as_of=args.as_of, provider=provider)
     result["local_jev_shadow_requested"] = args.local_jev_shadow
+    if args.marketing_handoff:
+        handoff = prepare_marketing_director_handoff(result, generated_at=args.as_of)
+        if not args.include_items:
+            handoff["campaign_previews"] = []
+        result["marketing_director_handoff"] = handoff
     if not args.include_items:
         result["review_queue"] = []
         result["observed_owned_pages"] = {
