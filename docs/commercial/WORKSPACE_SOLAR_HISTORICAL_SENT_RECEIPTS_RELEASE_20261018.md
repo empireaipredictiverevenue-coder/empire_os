@@ -95,6 +95,54 @@ not create or backfill canonical sent intents. Do not use these commands
 under a generic agent deploy, CI pipeline, cron or server startup. Keep the
 existing backup/PITR recovery evidence verified before privileged DDL.
 
+## Verified against isolated PostgreSQL 18 (not production)
+
+A reproducible integration test is now included at
+`scripts/verify_workspace_historical_scratch_postgres_20261018.py`.
+It creates a temporary Unix-socket-only PostgreSQL 18 cluster under
+`/tmp`, creates a dummy database named `empiredb` inside that cluster,
+and uses strictly local socket connection strings. It does **not** use the
+production PostgreSQL listener, credentials, cluster, customer database
+or production service configuration.
+
+The real migration 052 ran successfully in the isolated database. A
+duplicate application was rejected. The real six-receipt importer then
+inserted six rows and replayed with zero duplicates. The existing restricted
+observer role could SELECT all six but could not DELETE them; UPDATE,
+DELETE and retrospective approval changes were rejected by the immutable
+trigger. The test automatically stopped and deleted its isolated database.
+
+A separate private Founder API readout now exists at
+`/v1/founder-mailbox/workspace-solar-historical-evidence-status`,
+implemented by `empire_os/workspace_solar_historical_status.py`.
+It compares the currently verified private six-receipt custody against
+the dedicated EmpireDB historical-receipt table using the **existing**
+`empire_closer_observer` login in a read-only transaction.
+
+The isolated PostgreSQL test verified the readout's actual state transition:
+`SCHEMA_ACTIVE_NO_HISTORICAL_RECEIPTS` before import and
+`SIX_HISTORICAL_RECEIPTS_VERIFIED_IN_EMPIREDB` after the six exact inserts.
+For an unapplied production migration, the correct status is
+`PRIVATE_CUSTODY_ONLY_DATABASE_SCHEMA_HELD`, showing zero **database**
+receipts but six genuine provider receipts in private custody. A
+partial/contradictory source cannot report completed admission, and
+no result implies canonical sent-intent creation, tenant binding, approved
+outbound, CRM opportunity or revenue.
+
+The readout is mounted only on the existing loopback Founder read API
+(port 8766); the public site and authenticated CRM tenant API are not
+changed. The underlying original Workspace tracking and five-minute timer
+remain unchanged.
+
+Read-only private status check once deployed:
+
+```bash
+curl -fsS http://127.0.0.1:8766/v1/founder-mailbox/workspace-solar-historical-evidence-status
+```
+
+The readout is **not** a DB activation instruction; the migration/import
+remain separately held pending explicit founder authorisation.
+
 ## Commercial completion gates still open
 
 1. Independently verify the newly admitted historical evidence in the

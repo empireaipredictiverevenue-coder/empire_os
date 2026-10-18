@@ -21,6 +21,9 @@ from empire_os.workspace_solar_founder_review import (
 from empire_os.workspace_solar_canonical_intent_review import (
     CanonicalIntentReviewUnavailable, review_six_workspace_canonical_intents,
 )
+from empire_os.workspace_solar_historical_status import (
+    HistoricalReadStatusUnavailable, review_six_historical_receipt_admission,
+)
 
 
 DEFAULT_OUTBOUND_ENV = Path("/srv/empire_os/runtime/secrets/outbound.env")
@@ -290,6 +293,17 @@ def create_founder_mailbox_router(
             ],
         }
 
+
+    @router.get("/workspace-solar-historical-evidence-status")
+    def workspace_solar_historical_evidence_status():
+        """Private six-receipt DBA-admission check; NEVER an intake endpoint."""
+        try:
+            return review_six_historical_receipt_admission()
+        except (HistoricalReadStatusUnavailable, OSError, ValueError):
+            raise HTTPException(
+                status_code=503,
+                detail="workspace_solar_historical_evidence_status_unavailable",
+            ) from None
 
     @router.get("/workspace-solar-canonical-intent-review")
     def workspace_solar_canonical_intent_review():
