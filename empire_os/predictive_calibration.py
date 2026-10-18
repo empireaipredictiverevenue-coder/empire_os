@@ -156,3 +156,101 @@ def review_commercial_prediction(*, prediction, feedback, tenant_id, as_of):
         prediction=deepcopy(prediction), feedback=deepcopy(feedback),
         calibration_ready=True, learning_stage='SHADOW_LEARNING', shadow_only=True,
         model_weight_mutation=False, promoted_learning=False, execution_authority='none')
+
+
+def prepare_prospective_conversion_prediction(
+    *,
+    tenant_id: str,
+    opportunity_key: str,
+    predicted_probability: float,
+    predicted_at: str,
+    horizon_until: str,
+    evidence_refs: list[str] | tuple[str, ...],
+    model_name: str,
+    model_version: str,
+    assessed_at: datetime,
+) -> dict[str, Any]:
+    """Prepare an original forecast *candidate* before future commercial results.
+
+    This is a deterministic input contract, NOT an immutable registry receipt.
+    Its creation does not prove what was known historically; canonical recording
+    and a separate trusted pre-outcome readback remain required. It deliberately
+    never sets original_prediction_registered=True or activates learning.
+    """
+    from datetime import datetime
+    from hashlib import sha256
+    from math import isfinite
+    import json
+
+    def required(value, name):
+        if (not isinstance(value, str) or not value.strip()
+                or value != value.strip() or len(value) > 128):
+            raise ValueError(f"{name} required and bounded")
+        return value
+
+    def timestamp(value, name):
+        if not isinstance(value, str) or len(value) > 60:
+            raise ValueError(f"{name} timestamp required")
+        try:
+            result = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"{name} timestamp invalid") from exc
+        if result.utcoffset() is None:
+            raise ValueError(f"{name} timezone required")
+        return result
+
+    tenant = required(tenant_id, "tenant_id")
+    opportunity = required(opportunity_key, "opportunity_key")
+    model = required(model_name, "model_name")
+    version = required(model_version, "model_version")
+    if (type(predicted_probability) not in (int, float)
+            or not isfinite(predicted_probability)
+            or not 0 <= predicted_probability <= 1):
+        raise ValueError("finite predicted_probability between 0 and 1 required")
+    if not isinstance(assessed_at, datetime) or assessed_at.utcoffset() is None:
+        raise ValueError("assessed_at timezone required")
+    predicted = timestamp(predicted_at, "predicted_at")
+    horizon = timestamp(horizon_until, "horizon_until")
+    if not (predicted <= assessed_at < horizon):
+        raise ValueError("prospective forecast timestamps required")
+    if not isinstance(evidence_refs, (list, tuple)) or not 1 <= len(evidence_refs) <= 20:
+        raise ValueError("bounded original evidence refs required")
+    if (any(not isinstance(ref, str) or not ref.strip()
+            or ref != ref.strip() or len(ref) > 240 for ref in evidence_refs)
+            or len(set(evidence_refs)) != len(evidence_refs)):
+        raise ValueError("distinct original evidence refs required")
+    # Do not infer a conversion likelihood from general opportunity scores.
+    # A probability here is provided explicitly by the upstream model, and
+    # must be durably registered before an eventual outcome can be evaluated.
+    canonical = {
+        "tenant_id": tenant,
+        "opportunity_key": opportunity,
+        "prediction_type": "conversion_probability",
+        "predicted_probability": float(predicted_probability),
+        "predicted_at": predicted.isoformat(),
+        "horizon_until": horizon.isoformat(),
+        "model_name": model,
+        "model_version": version,
+        "evidence_refs": sorted(evidence_refs),
+    }
+    material = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    ref = "conversion_prediction_candidate:" + sha256(material.encode()).hexdigest()[:32]
+    return {
+        "schema_version": "empire.original_conversion_prediction_preflight.v1",
+        "status": "REGISTRY_PROOF_REQUIRED",
+        "candidate_prediction_ref": ref,
+        "proposed_prediction": dict(canonical, prediction_ref=ref),
+        "original_prediction_registered": False,
+        "canonical_registry_readback_verified": False,
+        "pre_outcome_immutability_proven": False,
+        "source_refs_independently_authenticated": False,
+        "may_use_in_verified_calibration": False,
+        "must_store_in_existing_canonical_prediction_registry": True,
+        "no_prediction_accuracy_claim": True,
+        "prediction_only": True,
+        "actual_revenue": False,
+        "execution_authority": "none",
+        "database_writes": False,
+        "outbound_sent": False,
+        "payments_moved": False,
+    }

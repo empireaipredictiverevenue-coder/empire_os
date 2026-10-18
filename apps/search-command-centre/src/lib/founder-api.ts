@@ -95,7 +95,18 @@ export type PredictiveLearningReadiness = {
   execution_authority: "none";
 };
 
+export type QuantPredictionReadiness = {
+  candidate_count: number;
+  available_quant_decision_count: number;
+  missing_quant_economics_count: number;
+  missing_input_counts: Record<string, number>;
+  source_rows_are_original_conversion_predictions: false;
+  immutable_prediction_receipt_verified: false;
+  next_evidence_action: string;
+};
+
 export type PredictiveFormulaEvidence = {
+  quant_original_prediction_readiness: QuantPredictionReadiness | null;
   verified_outcome_learning: PredictiveLearningReadiness;
   schema_version: string;
   status: string;

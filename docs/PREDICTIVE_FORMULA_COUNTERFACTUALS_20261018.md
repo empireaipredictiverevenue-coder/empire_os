@@ -261,3 +261,80 @@ cd apps/search-command-centre
 After the coordinated feature merge, independently verify the authenticated
 Founder Console and current producer outputs. Do not infer readiness from
 test fixtures or silently change the existing financial/outbound gates.
+
+
+## 18 October continuation — original prediction capture preflight and Quant lineage
+
+**Revenue-first integration gap:** a Quant opportunity score and an original
+conversion probability prediction are not interchangeable. A retrospective
+score is not proof of what EmpireOS actually predicted *before* a commercial
+transaction or loss became known. Economic Memory must not calibrate these
+post-hoc values as genuine original predictions.
+
+### Reuse canonical Opportunity Factory → Quant evidence
+
+The existing `predictive_formula_evidence_review` now consumes the existing
+`runtime/opportunity_factory/quant_review_latest.json` snapshot, applying
+schema, OBSERVE-only authority, 6-hour freshness, bounded record, unique
+opportunity identity and recomputed source-count validations. Private tenant,
+buyer, opportunity or input records never leave the reader.
+
+The Founder Console now shows:
+- source freshness for Opportunity Factory's Quant review
+- bounded candidate count and the number of available Quant decision inputs
+- which canonical Quant economic inputs are currently missing, with counts
+- a specific next evidence action.
+
+Observed against existing production snapshots (read-only, 18 October):
+11 reviewed opportunities; zero available complete Quant economics packets.
+The original Quant inputs lacking evidence include `probability_success`,
+`conditional_revenue_cents`, `fixed_cost_cents`, risk, uncertainty,
+time-to-revenue and bounded cost/revenue ranges. These are source counts, NOT
+sales opportunities known to be profitable. The snapshot may change and must
+be revalidated on each use.
+
+Even if a Quant decision packet becomes available, the new view explicitly
+states it is **not** an immutable original conversion forecast.
+
+### Prepare a prospective original conversion forecast without guessing
+
+The existing `empire_os/predictive_calibration.py` now includes
+`prepare_prospective_conversion_prediction`. Given a caller-supplied,
+time-aware probability, tenant scope, opportunity key, bounded model identity,
+prospective horizon and evidence references, it constructs a deterministic
+candidate prediction ref and a structured proposal compatible with the
+existing conversion calibration fields.
+
+This **does not** write the record to EmpireDB, reassign the existing
+Predictive Registry, or independently establish that the original forecast was
+recorded before the eventual outcome. Therefore the returned packet ALWAYS
+has:
+- `status=REGISTRY_PROOF_REQUIRED`
+- `original_prediction_registered=false`
+- `canonical_registry_readback_verified=false`
+- `pre_outcome_immutability_proven=false`
+- `may_use_in_verified_calibration=false`
+- `database_writes=false`, `execution_authority=none`.
+
+A later independently authorized canonical registry write, timestamped
+readback and matching verified outcome are still required before the
+existing `review_commercial_prediction` and Economic Memory may use an
+original prediction for calibrated real-world learning. A hash alone is
+not an independently authenticated timestamp or immutability guarantee.
+
+**Do not** generate probabilities from missing Quant inputs, force synthetic
+forecast defaults, or relabel these candidate proposals as registered
+predictions.
+
+### Verification and production handling
+
+Dedicated regression tests cover source freshness, count tampering,
+duplicate/invalid factor labels, protection against customer-data leakage,
+deterministic candidate identity, prospective date validation, NaN/Infinity,
+absence of commercial authority and no schema breakage in Founder Console.
+
+The feature was developed only in
+`feature/predictive-decision-control-20261018`. Production source data was
+read in bounded OBSERVE mode. No production services, database schema, sender,
+checkout or website were modified; merging/deploying requires coordination
+with ASTRA and the owning agents.

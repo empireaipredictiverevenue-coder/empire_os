@@ -196,3 +196,83 @@ def test_formula_health_does_not_expose_scoped_outcome_data(tmp_path):
     assert learning["verified_review_count"] is None
     assert "private-tenant" not in json.dumps(report)
     assert "private-customer-data" not in json.dumps(report)
+
+
+def _quant(root, *, missing_fields=None):
+    from empire_os.quant_brain import _DECISION_PACKET_REQUIRED
+    missing_fields = (
+        list(_DECISION_PACKET_REQUIRED)
+        if missing_fields is None else list(missing_fields)
+    )
+    available = not missing_fields
+    row = {
+        "opportunity_key": "private-opportunity",
+        "tenant_id": "do-not-expose-tenant",
+        "prediction_ref": "quant_prediction:example" if available else None,
+        "decision_packet": {
+            "status": "AVAILABLE" if available else "UNAVAILABLE",
+            "missing_fields": missing_fields,
+            "private_context": "never-output-customer",
+        },
+    }
+    data = {
+        "schema_version": SOURCES["opportunity_quant"][1],
+        "mode": "OBSERVE",
+        "execution_authority": "none",
+        "generated_at": NOW.isoformat(),
+        "candidate_count": 1,
+        "available_decision_packet_count": int(available),
+        "unavailable_decision_packet_count": int(not available),
+        "missing_field_counts": {name: 1 for name in missing_fields},
+        "items": [row],
+    }
+    path = root / SOURCES["opportunity_quant"][0]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data))
+    return data, path
+
+
+def test_quant_inputs_gap_is_visible_without_customer_or_forecast_leak(tmp_path):
+    _sources(tmp_path)
+    _quant(tmp_path)
+    report = review_formula_evidence(tmp_path, as_of=NOW)
+    review = report["quant_original_prediction_readiness"]
+    assert report["source_status"]["opportunity_quant"] == "FRESH"
+    assert review["candidate_count"] == 1
+    assert review["available_quant_decision_count"] == 0
+    assert review["missing_input_counts"]["probability_success"] == 1
+    assert review["next_evidence_action"] == "VERIFY_ORIGINAL_QUANT_INPUT_ECONOMICS"
+    assert review["source_rows_are_original_conversion_predictions"] is False
+    assert review["immutable_prediction_receipt_verified"] is False
+    assert "never-output-customer" not in json.dumps(report)
+    assert "do-not-expose-tenant" not in json.dumps(report)
+
+
+def test_quant_available_packet_still_is_not_original_conversion_forecast(tmp_path):
+    _sources(tmp_path)
+    _quant(tmp_path, missing_fields=[])
+    report = review_formula_evidence(tmp_path, as_of=NOW)
+    review = report["quant_original_prediction_readiness"]
+    assert review["available_quant_decision_count"] == 1
+    assert review["next_evidence_action"] == "RECORD_TIMESTAMPED_CONVERSION_PREDICTION"
+    assert review["source_rows_are_original_conversion_predictions"] is False
+
+
+@pytest.mark.parametrize("mutate", [
+    lambda d: d.update(available_decision_packet_count=1),
+    lambda d: d.update(candidate_count=1000),
+    lambda d: d["items"][0]["decision_packet"].update(
+        missing_fields=["private-customer-secret"]
+    ),
+    lambda d: d.update(missing_field_counts={"probability_success": 77}),
+    lambda d: d["items"][0].update(prediction_ref="forged:available"),
+])
+def test_quant_source_summary_mismatch_is_untrusted(tmp_path, mutate):
+    _sources(tmp_path)
+    data, path = _quant(tmp_path)
+    mutate(data)
+    path.write_text(json.dumps(data))
+    report = review_formula_evidence(tmp_path, as_of=NOW)
+    assert report["source_status"]["opportunity_quant"] == "UNTRUSTED"
+    assert report["quant_original_prediction_readiness"] is None
+    assert "private-customer-secret" not in json.dumps(report)

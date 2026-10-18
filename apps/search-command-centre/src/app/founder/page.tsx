@@ -277,6 +277,38 @@ export default async function FounderPage() {
                         <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.025] p-4">
                           <div className="flex flex-wrap justify-between gap-2">
                             <h4 className="text-sm font-semibold text-white">
+                              Quant → original conversion prediction
+                            </h4>
+                            <span className="text-xs text-slate-400">
+                              Quant source: {show(formulaEvidence.source_status?.opportunity_quant, "Unknown").replaceAll("_", " ")}
+                            </span>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-3 text-xs text-slate-300 lg:grid-cols-3">
+                            <span>Observed Quant candidates: {formulaEvidence.quant_original_prediction_readiness?.candidate_count ?? "Unknown"}</span>
+                            <span>Complete Quant inputs: {formulaEvidence.quant_original_prediction_readiness?.available_quant_decision_count ?? "Unknown"}</span>
+                            <span>Missing economics: {formulaEvidence.quant_original_prediction_readiness?.missing_quant_economics_count ?? "Unknown"}</span>
+                          </div>
+                          {formulaEvidence.quant_original_prediction_readiness ? (
+                            <>
+                              <p className="mt-3 text-xs font-medium text-amber-100">
+                                Next: {formulaEvidence.quant_original_prediction_readiness.next_evidence_action.replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-2 text-xs leading-5 text-slate-400">
+                                Missing input evidence: {Object.entries(formulaEvidence.quant_original_prediction_readiness.missing_input_counts)
+                                  .slice(0, 8).map(([factor, count]) => `${factor.replaceAll("_", " ")} (${count})`).join(" · ") || "None reported"}
+                              </p>
+                            </>
+                          ) : (
+                            <p className="mt-3 text-xs text-amber-100">A current validated Quant review is required.</p>
+                          )}
+                          <p className="mt-2 text-[11px] leading-5 text-slate-500">
+                            Quant scores do not establish an original conversion forecast.
+                            A timestamped canonical prediction receipt is required before learning from an outcome.
+                          </p>
+                        </div>
+                        <div className="mt-5 rounded-xl border border-white/10 bg-white/[0.025] p-4">
+                          <div className="flex flex-wrap justify-between gap-2">
+                            <h4 className="text-sm font-semibold text-white">
                               Learning from verified commercial outcomes
                             </h4>
                             <span className="text-xs text-amber-200">
