@@ -5,7 +5,7 @@ from dataclasses import asdict
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel, Field
 
 from .attribution import preview_search_revenue_attribution
@@ -294,8 +294,11 @@ def create_search_router(
         }
 
     @router.get("/department/review")
-    def department_review():
+    def department_review(response: Response):
         """Cached first-party SEO aggregates; NEVER a ranking or buyer receipt."""
+        # Do not let intermediaries/browser caches retain founder-source aggregates.
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
         from .department_snapshot import (
             DepartmentSnapshotUnavailable, read_department_snapshot,
         )

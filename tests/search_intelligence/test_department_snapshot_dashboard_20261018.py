@@ -95,6 +95,8 @@ def test_api_route_returns_only_safe_aggregates(monkeypatch):
     app.include_router(create_search_router())
     result=TestClient(app).get("/v1/search/department/review")
     assert result.status_code == 200
+    assert result.headers["cache-control"] == "no-store"
+    assert result.headers["x-content-type-options"] == "nosniff"
     assert result.json()["search_rankings_verified"] is False
     assert "private" not in result.text
 
