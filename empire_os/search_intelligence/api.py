@@ -41,6 +41,7 @@ from .postgres_repository import configured_search_repository_from_env
 from .schema import generate_schema_preview
 from .search_console import (
     SearchConsoleAdapter,
+    SearchConsoleUnavailable,
     configured_search_console_adapter,
 )
 from .serp import SearchFabricSerpAdapter, SerpResultEvidence, SerpSnapshot
@@ -319,6 +320,49 @@ def create_search_router(
             "count": len(rows),
             "limit": limit,
             "items": rows,
+        }
+
+    @router.get("/search-console/pages")
+    def search_console_pages(
+        start_date: date,
+        end_date: date,
+        limit: int = Query(default=1000, ge=1, le=25000),
+    ):
+        """Finalized page-only GSC observations, not query/page or indexing proof."""
+        status = search_console.status()
+        if not status.available:
+            raise HTTPException(status_code=503, detail=status.reason)
+        if end_date < start_date or (end_date - start_date).days > 31:
+            raise HTTPException(status_code=422, detail="invalid_date_range")
+        page_method = getattr(search_console, "page_observations", None)
+        if not callable(page_method):
+            raise HTTPException(status_code=503, detail="page_dimension_reader_unavailable")
+        try:
+            rows = [dict(row) for row in page_method(
+                start_date=start_date.isoformat(),
+                end_date=end_date.isoformat(),
+                limit=limit,
+            )]
+        except SearchConsoleUnavailable:
+            raise HTTPException(status_code=503, detail="page_dimension_source_unavailable") from None
+        if len(rows) > limit:
+            raise HTTPException(status_code=503, detail="page_dimension_source_untrusted")
+        return {
+            "schema_version": "empire.search.gsc_page_observations.v1",
+            "mode": "OBSERVE",
+            "available": True,
+            "source": "google_search_console",
+            "site_url": status.site_url,
+            "dimensions": ["page"],
+            "data_state": "final",
+            "window": [start_date.isoformat(), end_date.isoformat()],
+            "count": len(rows),
+            "limit": limit,
+            "items": rows,
+            "indexation_verified": False,
+            "attributed_buyer_verified": False,
+            "actual_revenue_verified": False,
+            "execution_authority": "none",
         }
 
     @router.get("/search-console/daily")

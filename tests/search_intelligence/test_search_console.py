@@ -302,3 +302,115 @@ def test_search_traffic_forecast_endpoint_preserves_shadow_mode():
     assert body["observed_rows"] == 14
     assert body["forecast"]["baseline_impressions"]["available"] is True
     assert body["forecast"]["timesfm_horizon_impressions"] is None
+
+
+def test_page_only_adapter_uses_exact_page_dimension_and_final_data(tmp_path):
+    credential = tmp_path / "gsc.json"
+    credential.write_text("{}")
+    recorded = []
+    def fake_post(url, headers, payload):
+        recorded.append((url, headers, payload))
+        return {"rows": [{
+            "keys": ["https://empire-ai.co.uk/industries/solar"],
+            "clicks": 2, "impressions": 18, "ctr": 2/18,
+            "position": 6.4,
+        }]}
+    adapter = GoogleSearchConsoleAdapter(
+        "sc-domain:empire-ai.co.uk", credential,
+        token_provider=lambda _: "fixture-token", post_json=fake_post,
+    )
+    d = adapter.page_observations(
+        start_date="2026-10-08", end_date="2026-10-17", limit=100,
+    )
+    assert len(d) == 1
+    assert d[0]["keys"] == ["https://empire-ai.co.uk/industries/solar"]
+    url, headers, payload = recorded[0]
+    assert url.endswith("searchAnalytics/query")
+    assert headers["Authorization"] == "Bearer fixture-token"
+    assert payload == {
+        "startDate": "2026-10-08", "endDate": "2026-10-17",
+        "dimensions": ["page"], "rowLimit": 100, "dataState": "final",
+    }
+
+
+@pytest.mark.parametrize("body", [
+    {"rows": [{"keys": ["foo", "bar"]}]},
+    {"rows": [{"keys": []}]},
+    {"rows": [{"keys": [4]}]},
+    {"rows": ["unsafe"]},
+    {"rows": "unsafe"},
+])
+def test_page_dimension_adapter_rejects_untrusted_shapes(tmp_path, body):
+    credential = tmp_path / "gsc.json"
+    credential.write_text("{}")
+    adapter = GoogleSearchConsoleAdapter(
+        "sc-domain:empire-ai.co.uk", credential,
+        token_provider=lambda _: "fixture-token", post_json=lambda *args: body,
+    )
+    with pytest.raises(SearchConsoleUnavailable):
+        adapter.page_observations(start_date="2026-10-08", end_date="2026-10-17")
+
+
+def test_page_only_api_is_503_when_source_disabled(monkeypatch):
+    monkeypatch.setenv("EMPIRE_SEARCH_CONSOLE_ENABLED", "false")
+    r = _client().get(
+        "/v1/search/search-console/pages?start_date=2026-10-08&end_date=2026-10-17"
+    )
+    assert r.status_code == 503
+    assert r.json()["detail"] == "disabled"
+
+
+def test_page_only_api_503_when_adapter_not_extended():
+    app = FastAPI()
+    app.include_router(create_search_router(search_console_adapter=FakeReadySearchConsole()))
+    r = TestClient(app).get(
+        "/v1/search/search-console/pages?start_date=2026-10-08&end_date=2026-10-17"
+    )
+    assert r.status_code == 503
+    assert r.json()["detail"] == "page_dimension_reader_unavailable"
+
+
+def test_page_only_api_exposes_bounded_observations_and_no_execution():
+    class ReadyPageAdapter(FakeReadySearchConsole):
+        def page_observations(self, *, start_date, end_date, limit=1000):
+            assert limit == 17
+            return [{"keys": ["https://empire-ai.co.uk/industries/roofing"],
+                     "clicks": 1, "impressions": 7, "ctr": 1/7,
+                     "position": 13.2}]
+    app = FastAPI()
+    app.include_router(create_search_router(search_console_adapter=ReadyPageAdapter()))
+    r = TestClient(app).get(
+        "/v1/search/search-console/pages?start_date=2026-10-08&end_date=2026-10-17&limit=17"
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["dimensions"] == ["page"]
+    assert body["data_state"] == "final"
+    assert body["count"] == 1
+    assert body["window"] == ["2026-10-08", "2026-10-17"]
+    assert body["indexation_verified"] is False
+    assert body["attributed_buyer_verified"] is False
+    assert body["execution_authority"] == "none"
+
+
+@pytest.mark.parametrize("dates", [
+    "start_date=2026-10-17&end_date=2026-10-08",
+    "start_date=2026-08-01&end_date=2026-10-17",
+])
+def test_page_only_api_rejects_reverse_or_unbounded_dates(dates):
+    app = FastAPI()
+    app.include_router(create_search_router(search_console_adapter=FakeReadySearchConsole()))
+    r = TestClient(app).get("/v1/search/search-console/pages?" + dates)
+    assert r.status_code == 422
+
+
+def test_page_only_limit_guard_denies_extra_returned_rows():
+    class TooMany(FakeReadySearchConsole):
+        def page_observations(self, *, start_date, end_date, limit=1000):
+            return [{"keys": ["https://empire-ai.co.uk/industries/solar"]}] * (limit+1)
+    app=FastAPI()
+    app.include_router(create_search_router(search_console_adapter=TooMany()))
+    r=TestClient(app).get(
+        "/v1/search/search-console/pages?start_date=2026-10-08&end_date=2026-10-17&limit=1")
+    assert r.status_code == 503
+    assert r.json()["detail"] == "page_dimension_source_untrusted"

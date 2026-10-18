@@ -42,6 +42,16 @@ class SearchConsoleAdapter(Protocol):
     ) -> Sequence[Mapping[str, Any]]:
         ...
 
+    def page_observations(
+        self,
+        *,
+        start_date: str,
+        end_date: str,
+        limit: int = 1000,
+    ) -> Sequence[Mapping[str, Any]]:
+        """Read-only page dimension; not proof of Google indexation or buyer intent."""
+        ...
+
     def daily_observations(
         self,
         *,
@@ -62,6 +72,15 @@ class DisabledSearchConsoleAdapter:
         return self._status
 
     def observations(
+        self,
+        *,
+        start_date: str,
+        end_date: str,
+        limit: int = 1000,
+    ) -> Sequence[Mapping[str, Any]]:
+        raise SearchConsoleUnavailable(self._status.reason)
+
+    def page_observations(
         self,
         *,
         start_date: str,
@@ -184,6 +203,55 @@ class GoogleSearchConsoleAdapter:
         if not isinstance(rows, (list, tuple)):
             raise SearchConsoleUnavailable("invalid_search_console_rows")
         return tuple(dict(row) for row in rows if isinstance(row, Mapping))
+
+    def page_observations(
+        self,
+        *,
+        start_date: str,
+        end_date: str,
+        limit: int = 1000,
+    ) -> Sequence[Mapping[str, Any]]:
+        """Read GSC page-level totals without query-level privacy filtering.
+
+        Query dimension can omit anonymised rows. Page totals must never be
+        summed together with query/page dimension reports.
+        """
+        row_limit = max(1, min(int(limit), 25_000))
+        token = self._token_provider(self.credential_file)
+        endpoint = (
+            "https://searchconsole.googleapis.com/webmasters/v3/sites/"
+            + quote(self.site_url, safe="")
+            + "/searchAnalytics/query"
+        )
+        body = self._post_json(
+            endpoint,
+            {
+                "Authorization": f"Bearer {token}",
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+            },
+            {
+                "startDate": str(start_date),
+                "endDate": str(end_date),
+                "dimensions": ["page"],
+                "rowLimit": row_limit,
+                "dataState": "final",
+            },
+        )
+        rows = body.get("rows") or ()
+        if not isinstance(rows, (list, tuple)):
+            raise SearchConsoleUnavailable("invalid_search_console_page_rows")
+        if len(rows) > row_limit:
+            raise SearchConsoleUnavailable("search_console_page_rows_over_limit")
+        if any(
+            not isinstance(row, Mapping)
+            or not isinstance(row.get("keys"), (list, tuple))
+            or len(row["keys"]) != 1
+            or not isinstance(row["keys"][0], str)
+            for row in rows
+        ):
+            raise SearchConsoleUnavailable("invalid_search_console_page_shape")
+        return tuple(dict(row) for row in rows)
 
     def daily_observations(
         self,
