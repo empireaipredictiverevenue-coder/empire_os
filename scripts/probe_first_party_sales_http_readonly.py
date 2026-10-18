@@ -7,6 +7,7 @@ customer records or claim that a buyer->EmpireDB->Founder CRM transfer worked.
 """
 from __future__ import annotations
 
+import argparse
 import json
 import re
 from html.parser import HTMLParser
@@ -162,10 +163,118 @@ def inspect(fetch: Callable[[str, int], tuple[int, str, bytes]] = fetch_local_ge
     return report
 
 
-def main() -> int:
+# These paths are the canonical existing private CRM pilot, not the public
+# website and not the founder's personal account. No authentication attempted.
+PRIVATE_CRM_ORIGIN = "http://127.0.0.1:8783"
+PRIVATE_CRM_PATHS = (
+    "/health", "/v1/revenue-crm/prospects", "/v1/revenue-crm/buyers",
+)
+
+
+def fetch_private_crm_get(path: str) -> tuple[int, str, dict, bytes]:
+    if path not in PRIVATE_CRM_PATHS:
+        raise CanaryHeld("UNAPPROVED_PRIVATE_CRM_PATH")
+    request = Request(
+        PRIVATE_CRM_ORIGIN + path,
+        headers={"User-Agent": "EmpireOS-private-CRM-auth-boundary-canary/1"},
+        method="GET",
+    )
+    opener = build_opener(NoRedirect())
+    try:
+        with opener.open(request, timeout=5) as response:
+            data = response.read(4097)
+            if len(data) > 4096:
+                raise CanaryHeld("PRIVATE_CRM_OVERSIZED_RESPONSE")
+            return response.status, response.headers.get("Content-Type", ""), {
+                "Cache-Control": response.headers.get("Cache-Control", ""),
+                "X-Frame-Options": response.headers.get("X-Frame-Options", ""),
+                "X-Content-Type-Options": response.headers.get("X-Content-Type-Options", ""),
+            }, data
+    except HTTPError as error:
+        # Anonymous access MUST be rejected, and neither a CRM row nor the
+        # exception's private error payload is ever fetched or printed.
+        if error.code in (401, 403):
+            return error.code, "", {
+                "Cache-Control": error.headers.get("Cache-Control", ""),
+                "X-Frame-Options": error.headers.get("X-Frame-Options", ""),
+                "X-Content-Type-Options": error.headers.get("X-Content-Type-Options", ""),
+            }, b""
+        raise CanaryHeld("PRIVATE_CRM_AUTH_BOUNDARY_UNAVAILABLE") from None
+    except (URLError, TimeoutError, OSError):
+        raise CanaryHeld("PRIVATE_CRM_AUTH_BOUNDARY_UNAVAILABLE") from None
+
+
+def inspect_private_crm_auth(
+    fetch: Callable[[str], tuple[int, str, dict, bytes]] = fetch_private_crm_get,
+) -> dict:
+    """Verify the no-credential CRM boundary, NEVER an actual sales receipt."""
+    result = {
+        "private_crm_auth_boundary_checked": True,
+        "private_crm_auth_boundary_verified": False,
+        "private_crm_healthy": False,
+        "anonymous_prospect_access_denied": False,
+        "anonymous_buyer_access_denied": False,
+        "private_crm_customer_rows_read": False,
+        "founder_login_authenticated": False,
+        "founder_crm_delivery_verified": False,
+    }
+    try:
+        status, ctype, headers, body = fetch("/health")
+        if status != 200 or "application/json" not in ctype.lower() or len(body) > 4096:
+            raise CanaryHeld("PRIVATE_CRM_HEALTH_UNVERIFIED")
+        try:
+            health = json.loads(body)
+        except (ValueError, UnicodeDecodeError):
+            raise CanaryHeld("PRIVATE_CRM_HEALTH_UNVERIFIED") from None
+        if (not isinstance(health, dict)
+                or health.get("ok") is not True
+                or health.get("service") != "empire-crm-first-party-pilot"
+                or health.get("mode") != "APPROVED_READ_ONLY_PILOT"
+                or health.get("outbound_authority") != "none"
+                or health.get("payment_authority") != "none"
+                or health.get("database_provisioning") is not False):
+            raise CanaryHeld("PRIVATE_CRM_HEALTH_UNVERIFIED")
+        result["private_crm_healthy"] = True
+        for route, field in (
+            ("/v1/revenue-crm/prospects", "anonymous_prospect_access_denied"),
+            ("/v1/revenue-crm/buyers", "anonymous_buyer_access_denied"),
+        ):
+            code, _ctype, protection, payload = fetch(route)
+            if (code not in (401, 403) or payload
+                    or protection.get("Cache-Control") != "no-store"
+                    or protection.get("X-Frame-Options") != "DENY"
+                    or protection.get("X-Content-Type-Options") != "nosniff"):
+                raise CanaryHeld("PRIVATE_CRM_ANONYMOUS_ACCESS_NOT_VERIFIED")
+            result[field] = True
+        result["private_crm_auth_boundary_verified"] = True
+    except CanaryHeld as exc:
+        result["private_crm_reason_code"] = str(exc)
+    except Exception:
+        result["private_crm_reason_code"] = "PRIVATE_CRM_AUTH_BOUNDARY_UNEXPECTED_FAILURE"
+    return result
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--check-private-inbox", action="store_true",
+        help="Verify ONLY loopback private CRM health and anonymous access denial; never read inbox rows",
+    )
+    args = parser.parse_args(argv)
     result = inspect()
+    if args.check_private_inbox:
+        result.update(inspect_private_crm_auth())
+        if result["status"] == "PUBLIC_ENQUIRY_SURFACE_VERIFIED_CRM_DELIVERY_UNPROVEN":
+            result["status"] = (
+                "PRIVATE_CRM_AUTH_GATE_READY_NO_RECEIPT_READ"
+                if result["private_crm_auth_boundary_verified"]
+                else "HELD_PRIVATE_CRM_AUTH_BOUNDARY_UNVERIFIED"
+            )
     print(json.dumps(result, sort_keys=True))
-    return 0 if result["status"] == "PUBLIC_ENQUIRY_SURFACE_VERIFIED_CRM_DELIVERY_UNPROVEN" else 2
+    return 0 if result["status"] in {
+        "PUBLIC_ENQUIRY_SURFACE_VERIFIED_CRM_DELIVERY_UNPROVEN",
+        "PRIVATE_CRM_AUTH_GATE_READY_NO_RECEIPT_READ",
+    } else 2
 
 
 if __name__ == "__main__":
