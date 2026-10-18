@@ -16,6 +16,7 @@ FULL_DAY_FILENAME="runtime/data_brokerage/nyc_dobnow_property_three_agency_full_
 FULL_DAY_SCHEMA="empire.permit_property_three_agency_full_day.v2"
 STATES={
     "TRI_AGENCY_BIN_AND_LOT_MATCH",
+    "TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH",
     "BUILDING_TAX_LOT_CONFLICT",
     "DCP_LOT_ONLY_BIN_UNCONFIRMED",
     "OTI_BIN_ONLY_TAX_LOT_UNCONFIRMED",
@@ -126,6 +127,30 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
                     or row.get("verified_business_buyer") is not False
                     or row.get("warehouse_operation_verified") is not False):
                 return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+            if use_full:
+                lot=row.get("permit_tax_lot_bbl")
+                base_lot=row.get("footprint_base_bbl")
+                billing_lot=row.get("footprint_mappluto_bbl")
+                basis=row.get("reference_match_basis")
+                if (not isinstance(lot,str) or not re.fullmatch(r"\d{10}",lot)
+                        or basis not in ("BASE_PHYSICAL_LOT",
+                                         "MAPPLUTO_BILLING_LOT","UNCONFIRMED")):
+                    return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+                if state=="TRI_AGENCY_BIN_AND_LOT_MATCH" and (
+                    basis!="BASE_PHYSICAL_LOT" or base_lot!=lot
+                    or billing_lot not in (None,lot)
+                ):
+                    return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+                if state=="TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH" and (
+                    basis!="MAPPLUTO_BILLING_LOT" or billing_lot!=lot
+                    or base_lot==lot
+                ):
+                    return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
+                if state=="BUILDING_TAX_LOT_CONFLICT" and (
+                    base_lot==lot and billing_lot in (None,lot)
+                    or billing_lot==lot
+                ):
+                    return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
             jobs.add(job)
             statuses[state]+=1
             category=row.get("dcp_land_use_category")
@@ -133,7 +158,9 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
                 return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
             use[category]+=1
             if row.get("industrial_tax_lot_context_corroborated") is True:
-                if state!="TRI_AGENCY_BIN_AND_LOT_MATCH" or category!="INDUSTRIAL_MANUFACTURING":
+                if (state not in ("TRI_AGENCY_BIN_AND_LOT_MATCH",
+                                  "TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH")
+                        or category!="INDUSTRIAL_MANUFACTURING"):
                     return {**missing,"status":"UNTRUSTED_REVIEW_FILE"}
                 industrial+=1
         if (dict(statuses)!=review.get("event_level_join_status_counts")
@@ -149,7 +176,10 @@ def load_property_reference_summary(repo_root: Path, *, now=None) -> dict:
             "reviewed_at_utc":stamp.isoformat(),
             "reviewed_permit_event_count":count,
             "three_agency_bin_bbl_reference_match_count":
-                statuses["TRI_AGENCY_BIN_AND_LOT_MATCH"],
+                (statuses["TRI_AGENCY_BIN_AND_LOT_MATCH"]
+                 + statuses["TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"]),
+            "three_agency_billing_lot_reference_match_count":
+                statuses["TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"],
             "building_tax_lot_reference_conflict_count":
                 statuses["BUILDING_TAX_LOT_CONFLICT"]+statuses["DCP_BOROUGH_CONFLICT"],
             "tax_lot_only_unconfirmed_building_count":

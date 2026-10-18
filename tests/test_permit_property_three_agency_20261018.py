@@ -237,3 +237,37 @@ def test_missing_or_stale_private_review_never_claims_revenue(tmp_path):
     x=load_property_reference_summary(tmp_path,now=older)
     assert x["status"]=="STALE_SOURCE_REVIEW"
     assert x["verified_property_opportunity_count"] is None
+
+
+def test_mappluto_condo_billing_lot_resolves_non_base_building_reference():
+    # Per official NYC OTI metadata, MAPPLUTO_BBL is the PLUTO join key,
+    # while BASE_BBL is the footprint's underlying physical tax lot.
+    c=Client(footprints=[footprint(
+        bbl="3002690001", mappluto_bbl="3002697501")])
+    report=review_official_building_landuse([event()],now=NOW,client=c)
+    row=report["diagnostics"][0]
+    assert row["building_tax_lot_evidence_state"]=="TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"
+    assert row["reference_match_basis"]=="MAPPLUTO_BILLING_LOT"
+    assert row["footprint_base_bbl"]=="3002690001"
+    assert row["footprint_mappluto_bbl"]=="3002697501"
+    assert row["industrial_tax_lot_context_corroborated"] is True
+    assert row["warehouse_operation_verified"] is False
+    assert report["event_level_join_status_counts"]=={
+        "TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH":1
+    }
+
+
+def test_explicit_mappluto_join_mismatch_is_not_overridden_by_base_lot():
+    c=Client(footprints=[footprint(
+        bbl="3002697501", mappluto_bbl="3002690001")])
+    x=review_official_building_landuse([event()],now=NOW,client=c)
+    row=x["diagnostics"][0]
+    assert row["building_tax_lot_evidence_state"]=="BUILDING_TAX_LOT_CONFLICT"
+    assert row["industrial_tax_lot_context_corroborated"] is False
+
+
+def test_different_base_and_mappluto_bbl_are_both_unmatched():
+    c=Client(footprints=[footprint(
+        bbl="3002690001", mappluto_bbl="3002690002")])
+    x=review_official_building_landuse([event()],now=NOW,client=c)
+    assert x["diagnostics"][0]["building_tax_lot_evidence_state"]=="BUILDING_TAX_LOT_CONFLICT"

@@ -293,6 +293,8 @@ def build_source_intelligence_handoffs(
                 three_agency.get("three_agency_bin_bbl_reference_match_count")),
             "tri_agency_reference_conflict_count": (
                 three_agency.get("building_tax_lot_reference_conflict_count")),
+            "tri_agency_billing_lot_match_count": (
+                three_agency.get("three_agency_billing_lot_reference_match_count")),
         },
         warnings=[
             "same_permit_source_as_permit_lane_not_additional_leads",

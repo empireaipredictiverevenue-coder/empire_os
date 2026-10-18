@@ -69,3 +69,8 @@ Updated existing:
 - Property ownership, site-level permit scope, parcel/building geometry consistency, data rights, actual changes, private claims, buyer capacity and payments remain unverified.
 
 **Explicit scope:** Existing EmpireDB remains canonical, no Supabase. `EMPIRE_DOBNOW_PERMIT_SOURCE_ENABLED` stays UNSET. No new timers, ports, services, database tables, sender tasks, budget commitments, public site changes or commercial contact actions. This milestone is **data product evidence integrity**, not a claim of revenue.
+
+
+## 18 Oct correction — do not use BASE_BBL as the exclusive DCP join
+
+The original **36-event** partial sample was measured using OTI `base_bbl` alone, which identifies the physical footprint tax lot and can differ from the condominium billing lot published by PLUTO. The official OTI `mappluto_bbl` must also be checked. The subsequent **444/444-row, 312-job full-day** review reconciled 24 of 33 original apparent physical-base-vs-DCP mismatches using `mappluto_bbl`, leaving only nine unresolved. The historical first-pass figures above remain preserved as observed-but-superseded evidence. The updated work is documented in `EMPIRE_NYC_DOBNOW_FULL_ISSUED_DAY_PROPERTY_INTELLIGENCE_20261018.md`. A tax-lot reference match remains separate from a real-world owner, warehouse, buyer, or active site.

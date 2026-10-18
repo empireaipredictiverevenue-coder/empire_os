@@ -165,7 +165,7 @@ def review_official_building_landuse(
     bbls=sorted({e["bbl"] for e in events})
     # IDs are validated digits: no source-controlled string SQL fragments.
     pfoot={
-        "$select":"bin,base_bbl,doitt_id,construction_year,last_status_type",
+        "$select":"bin,base_bbl,mappluto_bbl,doitt_id,construction_year,last_status_type",
         "$where":"bin in ("+",".join(bins)+")",
         "$limit":MAX_SOURCE_ROWS,
     }
@@ -201,8 +201,17 @@ def review_official_building_landuse(
         if len(fs)>1 or len(ps)>1:
             state="AMBIGUOUS_SOURCE_IDENTITY"
         elif fs and ps:
-            same_lot=(_lot(fs[0].get("base_bbl")) == ev["bbl"])
-            state=("TRI_AGENCY_BIN_AND_LOT_MATCH" if same_lot
+            # OTI BASE_BBL is the physical footprint lot, but MAPPLUTO_BBL
+            # is the DCP join key, especially for condominium billing lots.
+            base_match=(_lot(fs[0].get("base_bbl")) == ev["bbl"])
+            pluto_join_bbl=_lot(fs[0].get("mappluto_bbl"))
+            pluto_billing_match=(pluto_join_bbl == ev["bbl"])
+            # If the explicitly published DCP join key is present but
+            # disagrees, a BASE_BBL coincidence alone is not enough.
+            state=("TRI_AGENCY_BIN_AND_LOT_MATCH"
+                   if base_match and (pluto_join_bbl is None or pluto_billing_match)
+                   else "TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"
+                   if pluto_billing_match
                    else "BUILDING_TAX_LOT_CONFLICT")
         elif ps:
             state="DCP_LOT_ONLY_BIN_UNCONFIRMED"
@@ -220,7 +229,15 @@ def review_official_building_landuse(
                 if p and isinstance(p.get("bldgclass"),str) else "")
         if not CLASS_RE.fullmatch(bclass):
             bclass=None
-        industrial=bool(code=="06" and state=="TRI_AGENCY_BIN_AND_LOT_MATCH")
+        trusted_join_states={
+            "TRI_AGENCY_BIN_AND_LOT_MATCH",
+            "TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH",
+        }
+        industrial=bool(code=="06" and state in trusted_join_states)
+        match_basis=("BASE_PHYSICAL_LOT" if state=="TRI_AGENCY_BIN_AND_LOT_MATCH"
+                     else "MAPPLUTO_BILLING_LOT"
+                     if state=="TRI_AGENCY_BIN_AND_BILLING_LOT_MATCH"
+                     else "UNCONFIRMED")
         item={
             "permit_job_filing_ref":ev["job_filing_number"],
             "permit_original_issued_date":ev["issued_date"],
@@ -233,6 +250,8 @@ def review_official_building_landuse(
             "dcp_land_use_category":taxon,
             "dcp_building_class":bclass,
             "footprint_base_bbl":_lot(fs[0].get("base_bbl")) if len(fs)==1 else None,
+            "footprint_mappluto_bbl":_lot(fs[0].get("mappluto_bbl")) if len(fs)==1 else None,
+            "reference_match_basis":match_basis,
             "industrial_tax_lot_context_corroborated":industrial,
             "warehouse_operation_verified":False,
             "building_owner_identity_verified":False,
@@ -271,7 +290,7 @@ def review_official_building_landuse(
         ),
         "truth_limitations":[
             "Official DOB job events are not uniquely identified physical buildings.",
-            "Exact DOB BIN-to-OTI BIN and OTI base BBL-to-DCP lot only validates a source reference chain.",
+            "Exact DOB BIN-to-OTI BIN and OTI BASE_BBL or MAPPLUTO_BBL to DCP lot validates a reference chain, not a verified physical site.",
             "DCP PLUTO landuse describes a tax lot, not the operating use of an individual building.",
             "No consumer identity, business buyer, warehouse operator, paid customer or revenue verified.",
         ],
