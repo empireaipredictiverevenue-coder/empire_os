@@ -152,6 +152,17 @@ def _make_packet(item: Mapping[str, Any], root: Path) -> dict[str, Any]:
 
     work_id = DepartmentWorkQueue.deterministic_id(PLAN_ID, task_id)
     queue_truth = _current_queue_truth(root, work_id, action, task_id)
+    cross_plan = None
+    if queue_truth["status"] == "NOT_QUEUED":
+        from empire_os.predictive_decision_duplicate_guard import review_cross_plan_duplicates
+        cross_plan = review_cross_plan_duplicates(
+            root, action=action, evidence_refs=refs, own_plan_id=PLAN_ID,
+        )
+        if cross_plan["status"] != "NO_EXACT_CROSS_PLAN_MATCH":
+            queue_truth = {
+                "status": cross_plan["status"],
+                "reason": cross_plan["reason"],
+            }
     work_step = {
         "step_id": task_id,
         "goal_key": "review_verified_commercial_bottleneck",
@@ -185,6 +196,7 @@ def _make_packet(item: Mapping[str, Any], root: Path) -> dict[str, Any]:
         "source_action": action,
         "current_work_status": queue_truth["status"],
         "queue_observation_reason": queue_truth["reason"],
+        "cross_plan_duplicate_review": cross_plan,
         "work_step": work_step,
         "review_only": True,
         "enqueuing_authorized": False,
@@ -263,7 +275,7 @@ def build_predictive_decision_handoff(
         ),
         "held_count": sum(
             x.get("status") == "EVIDENCE_HOLD" or
-            x.get("current_work_status") in ("UNTRUSTED_HELD", "CONFLICT_HELD", "ESCALATE_HOLD")
+            x.get("current_work_status") in ("UNTRUSTED_HELD", "CONFLICT_HELD", "ESCALATE_HOLD", "POSSIBLE_DUPLICATE_REVIEW", "CROSS_PLAN_SCAN_INCOMPLETE_HOLD")
             for x in candidates
         ),
         "candidates": candidates,
