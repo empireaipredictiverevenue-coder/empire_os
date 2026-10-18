@@ -190,3 +190,65 @@ def test_live_route_verification_requires_three_guarded_replies():
         return UnguardedReply(resp["json"])
     denied=check_live_routes(opener=old_server)
     assert denied["status"]=="HOLD_LIVE_REPORT_GUARD_UNVERIFIED"
+
+
+
+def test_live_checker_recovers_only_brief_initial_connection_refusal():
+    from pathlib import Path
+    from empire_os.predictive_revenue_enterprise_report import build_enterprise_diagnostic_report
+    from scripts.verify_enterprise_report_route_enforcement_readonly import check_live_routes
+    packet=build_enterprise_diagnostic_report(Path("/srv/empire_os"))
+    responses={
+        "json":guarded_enterprise_http_response(packet,format="json"),
+        "html":guarded_enterprise_http_response(packet,format="html"),
+        "markdown":guarded_enterprise_http_response(packet,format="markdown"),
+    }
+    class Reply:
+        def __init__(self,x):
+            self.status=x.status_code;self.headers=x.headers;self.body=x.body
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,limit):return self.body[:limit]
+    called=[];slept=[]
+    def opener(request,timeout):
+        assert timeout==8
+        url=request.full_url
+        path=("html" if url.endswith("/preview") else
+              "markdown" if url.endswith("/markdown") else "json")
+        called.append(path)
+        if len(called)<=2:
+            raise ConnectionRefusedError(111,"service starting")
+        return Reply(responses[path])
+    proof=check_live_routes(opener=opener,sleeper=lambda n:slept.append(n))
+    assert proof["status"]=="LIVE_REPORT_GUARDS_VERIFIED"
+    assert called==["json","json","json","html","markdown"]
+    assert slept==[1,1]
+    assert proof["checks"][0]["connection_attempts"]==3
+    assert proof["customer_delivery_authorized"] is False
+
+
+def test_live_checker_stops_after_four_refusals_with_hold():
+    from scripts.verify_enterprise_report_route_enforcement_readonly import check_live_routes
+    calls=[];sleeps=[]
+    def refused(request,timeout):
+        calls.append(request.full_url)
+        raise ConnectionRefusedError(111,"startup never finished")
+    proof=check_live_routes(opener=refused,sleeper=lambda n:sleeps.append(n))
+    assert proof["status"]=="HOLD_LIVE_REPORT_GUARD_UNVERIFIED"
+    assert proof["route_count_checked"]==1
+    assert proof["checks"][0]["connection_attempts"]==4
+    assert len(calls)==4 and len(sleeps)==3
+
+
+def test_live_checker_does_not_retry_http_409_or_timeout():
+    from urllib.error import HTTPError
+    from scripts.verify_enterprise_report_route_enforcement_readonly import check_live_routes
+    for error in (HTTPError("http://127.0.0.1:8766",409,"held",{},None),
+                  TimeoutError("slow API")):
+        calls=[];sleeps=[]
+        def failed(request,timeout):
+            calls.append(request.full_url);raise error
+        proof=check_live_routes(opener=failed,sleeper=lambda n:sleeps.append(n))
+        assert proof["status"]=="HOLD_LIVE_REPORT_GUARD_UNVERIFIED"
+        assert proof["checks"][0]["connection_attempts"]==1
+        assert len(calls)==1 and sleeps==[]

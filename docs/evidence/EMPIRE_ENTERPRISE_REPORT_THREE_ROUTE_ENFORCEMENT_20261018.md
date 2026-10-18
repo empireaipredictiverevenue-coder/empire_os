@@ -42,3 +42,9 @@ Only the above specific **existing read-only Founder API unit** is required. The
 - No customer delivery, verified client findings, source-verified actual revenue, terms, payments, email, CRM import, public URL, tenant permission grant, data source activation or database write.
 - Restart the existing Founder read-only service **only after** review/tests and a preflight of its true systemd unit, without restarting adjacent production services. Check health and all three response headers afterward.
 - **Unresolved external-access risk:** these are Founder-oriented internal routes, not customer report endpoints. Source-specific licensing, privacy, tenant scopes, access controls, finance reconciliation and real release conditions require separate review. Evidence truth is a necessary, not sufficient, condition for delivery.
+
+## Post-restart first-request transient (18 October)
+
+The owner restarted the existing Founder read API, but immediately ran the single-shot checker while the previous listener was transitioning. It returned `HOLD_UNREACHABLE_OR_ERROR` for the first JSON route. **Subsequent independent inspection**: systemd unit active/running with new MainPID `3017002`, ready at `127.0.0.1:8766`, health HTTP 200; server journal recorded completed startup at 13:35:17 UTC. A fresh check against all three **running** HTTP routes returned `LIVE_REPORT_GUARDS_VERIFIED` with HTTP 200, no-store/nosniff and explicitly unverified internal draft on all three. No extra service restart was required.
+
+The single-shot verifier has since been hardened to retry only **connection-refused errors on the first loopback JSON route** (four bounded attempts at one-second intervals). It never retries HTTP 409 evidence HOLDS or bad headers, and fails closed if service availability/claim integrity is not proved. This improves the normal post-restart user experience without weakening the substantive guard.

@@ -8,7 +8,8 @@ injection into the production process.
 """
 from __future__ import annotations
 
-import argparse,json
+import argparse,json,time
+from urllib.error import URLError
 from urllib.request import Request,urlopen
 
 ROOT="http://127.0.0.1:8766"
@@ -25,22 +26,50 @@ TYPES={
 }
 
 
-def check_live_routes(*,opener=urlopen):
+def _brief_startup_refusal(exc):
+    """Only connection refusal from the fixed loopback address is retriable.
+
+    A server HTTP error (including HTTP 409), timeout or malformed response
+    is never retried/misrepresented as mere startup latency.
+    """
+    if isinstance(exc, ConnectionRefusedError):
+        return True
+    return (isinstance(exc, URLError)
+            and isinstance(getattr(exc,"reason",None), ConnectionRefusedError))
+
+
+def check_live_routes(*,opener=urlopen,sleeper=time.sleep):
     checks=[]
     for name,path in PATHS.items():
-        # Only the fixed Founder loopback port is queried.
+        # Only the fixed Founder loopback port is queried. The *first* route
+        # may briefly refuse connections while the existing systemd unit
+        # starts. Retry those refusals up to 4 attempts; all other failures
+        # hold immediately and all evidence assertions remain mandatory.
         req=Request(ROOT+path,headers={"Accept":TYPES[name]})
-        try:
-            result=opener(req,timeout=8)
-            with result as resp:
-                body=resp.read(256_000)
-                header=resp.headers
-                status=getattr(resp,"status",200)
-        except (OSError,ValueError,TimeoutError) as ex:
-            checks.append({"route":name,"result":"HOLD_UNREACHABLE_OR_ERROR"})
+        attempt_limit=4 if name=="json" else 1
+        for attempt in range(attempt_limit):
+            try:
+                result=opener(req,timeout=8)
+                with result as resp:
+                    body=resp.read(256_000)
+                    header=resp.headers
+                    status=getattr(resp,"status",200)
+                break
+            except (OSError,ValueError,TimeoutError) as exc:
+                if (attempt+1<attempt_limit
+                        and _brief_startup_refusal(exc)):
+                    sleeper(1)
+                    continue
+                checks.append({"route":name,"result":"HOLD_UNREACHABLE_OR_ERROR",
+                               "connection_attempts":attempt+1})
+                break
+        else:
+            raise AssertionError("unreachable attempt sequence")
+        if len(checks) and checks[-1].get("result")=="HOLD_UNREACHABLE_OR_ERROR":
             break
         meta={
             "route":name,
+            "connection_attempts":attempt+1,
             "http_status":status,
             "no_store":header.get("Cache-Control")=="no-store",
             "no_sniff":header.get("X-Content-Type-Options")=="nosniff",
