@@ -382,5 +382,43 @@ assert report["realised_revenue_verified"] is False
 assert report["complete_daily_revenue_census_verified"] is False
 print("REV053_ISOLATED_ONE_EVENT_READER=PASS")
 PYREV053
+# Existing-founder tenant, aggregate-only lifecycle gate counts. This is a
+# disposable fixture with synthetic records: no real financial assertions.
+PYTHONPATH="$repo" /srv/empire_os/.venv/bin/python - "$scratch/socket" <<'PYREV054'
+import json,subprocess,sys
+from scripts.review_rev054_commercial_lifecycle_gaps_readonly_20261018 import STAGE_SQL,evaluate_counts
+r=subprocess.run(
+ ["/usr/lib/postgresql/18/bin/psql","-X","-q","-A","-t",
+  "-v","ON_ERROR_STOP=1","-h",sys.argv[1],"-p","59631",
+  "-U","fixture_admin","-d","empiredb"],
+ input=STAGE_SQL,capture_output=True,text=True,timeout=12,check=True)
+count=json.loads(r.stdout.strip())
+proof=evaluate_counts(count)
+assert proof["counts"]["founder_buyers_sampled"]==1,proof
+assert proof["counts"]["founder_orders_sampled"]==1,proof
+assert proof["counts"]["tenant_events_sampled"]==1,proof
+assert proof["counts"]["eligible_nonfuture"]==1,proof
+assert proof["counts"]["recognized"]==1,proof
+assert proof["first_zero_gate"]=="ALL_RECOGNITION_GATES_HAVE_A_SAMPLE_MATCH",proof
+assert proof["realised_revenue_verified"] is False
+print("REV054_SYNTHETIC_EXISTING_EVENT_LIFECYCLE_GATES=PASS")
+# Negative synthetic fixture: revoke only the revenue-recognized TRUE flag
+# on the disposable event, then prove the first missing gate is identified.
+mutated=subprocess.run(
+ ["/usr/lib/postgresql/18/bin/psql","-X","-q","-v","ON_ERROR_STOP=1",
+  "-h",sys.argv[1],"-p","59631","-U","fixture_admin","-d","empiredb"],
+ input="UPDATE public.commercial_events SET payload=jsonb_set(payload,'{actual_revenue}','false'::jsonb) WHERE id='abc12345-1234-4234-8234-123412341234';",
+ capture_output=True,text=True,timeout=8,check=True)
+r2=subprocess.run(
+ ["/usr/lib/postgresql/18/bin/psql","-X","-q","-A","-t",
+  "-v","ON_ERROR_STOP=1","-h",sys.argv[1],"-p","59631",
+  "-U","fixture_admin","-d","empiredb"],
+ input=STAGE_SQL,capture_output=True,text=True,timeout=12,check=True)
+negative=evaluate_counts(json.loads(r2.stdout.strip()))
+assert negative["counts"]["recognized"]==1,negative
+assert negative["counts"]["flagged_actual"]==0,negative
+assert negative["first_zero_gate"]=="FIRST_ZERO_AT_FLAGGED_ACTUAL",negative
+print("REV054_SYNTHETIC_MISSING_RECOGNITION_FLAG_GATE=PASS")
+PYREV054
 unset PGPASSWORD
 echo 'REV052_ISOLATED_POSTGRES_PASS dedicated_scram=YES wrong_password=DENIED founder_tenant=BOUND own_event=1 cross_tenant=0 ledger_select=DENIED production=UNTOUCHED'
