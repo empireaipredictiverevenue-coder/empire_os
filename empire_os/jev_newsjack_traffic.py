@@ -7,7 +7,7 @@ A typed-decision provider is optional and MUST remain shadow-only.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 from hashlib import sha256
 from ipaddress import ip_address
 import json
@@ -132,6 +132,17 @@ def review_newsjack_jev_traffic(
         url = _public_https(row.get("primary_source_url"))
         observed = _timestamp(row.get("observed_at"))
         published = _timestamp(row.get("published_at"))
+        # The US Federal Register publishes date-only metadata. Preserve day
+        # precision instead of inventing an instant such as midnight UTC.
+        publication_day = None
+        day = row.get("publication_date")
+        if (published is None and row.get("source_kind") == "federal_register"
+                and row.get("publication_date_verified") is True
+                and isinstance(day, str) and len(day) == 10):
+            try:
+                publication_day = date.fromisoformat(day)
+            except ValueError:
+                pass
         refs = _refs(row.get("evidence_refs"))
         blockers: list[str] = []
         if not isinstance(signal_id, str) or not 1 <= len(signal_id.strip()) <= 128:
@@ -146,12 +157,11 @@ def review_newsjack_jev_traffic(
             blockers.append("invalid_public_source_url")
         if not refs:
             blockers.append("source_evidence_refs_missing")
-        if not published or not observed:
+        if (published is None and publication_day is None) or observed is None:
             blockers.append("dated_source_observations_required")
-        elif (published > observed or observed > clock
-              or published > clock):
+        elif observed > clock or (published and (published > observed or published > clock)) or (publication_day and (publication_day > clock.date() or publication_day > observed.date())):
             blockers.append("future_or_inconsistent_timestamp")
-        elif clock - published > timedelta(days=MAX_AGE_DAYS):
+        elif (published and clock - published > timedelta(days=MAX_AGE_DAYS)) or (publication_day and (clock.date() - publication_day).days > MAX_AGE_DAYS):
             blockers.append("stale_news_signal")
         if isinstance(signal_id, str):
             if signal_id in seen_ids:
@@ -238,6 +248,8 @@ def review_newsjack_jev_traffic(
             "market": market.upper().strip() if isinstance(market, str) else None,
             "primary_source_url": url,
             "published_at": published.isoformat() if published else None,
+            "publication_date": publication_day.isoformat() if publication_day else None,
+            "publication_precision": "instant" if published else "day" if publication_day else "unknown",
             "evidence_refs": list(refs),
             "status": status,
             "missing_evidence": missing,
