@@ -317,6 +317,7 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
     from scripts.review_live_search_page_404_revenue_readonly import run as legacy_run
     from scripts.review_live_semantic_site_quality import build_live_site_quality_review
     from empire_os.search_intelligence.serp_cache_inventory import inspect_cache
+    from empire_os.search_intelligence.gsc_daily_series import read_daily
 
     end = end or date.today() - timedelta(days=2)
     start = start or end - timedelta(days=12)
@@ -330,9 +331,14 @@ def run(*, start: date | None = None, end: date | None = None) -> dict[str, Any]
     legacy = legacy_run(start=start,end=end)
     if legacy.get("status") == "HELD":
         raise IntegrationEvidenceHeld("LIVE_LEGACY_PAGE_OBSERVER_HELD")
-    return reconcile_department(
+    department = reconcile_department(
         four=discovery_run(), organic=integrity_run(), growth=growth,
         gsc=page_report, legacy=legacy,
         semantic=build_live_site_quality_review(),
         serp_cache=inspect_cache(),
     )
+    # Independent DATE dimension, not a sum of the page-only GSC sample.
+    # HELD is allowed so a transient daily reader failure cannot knock out
+    # the existing 404/semantic/rank-truth department evidence.
+    department["gsc_daily_chart"] = read_daily(start=start, end=end)
+    return department

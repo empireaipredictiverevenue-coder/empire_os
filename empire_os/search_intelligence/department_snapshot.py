@@ -81,7 +81,7 @@ def read_department_snapshot(
             "external_geo_mentions_verified",
             "buyer_enquiries_verified", "realised_revenue_verified",
             "growth_specialist_desks", "research_campaigns",
-            "open_gates",
+            "open_gates", "gsc_daily_chart",
         )
         safe = {field: deepcopy(report[field]) for field in keep if field in report}
         if (not isinstance(safe.get("open_gates"), list)
@@ -122,6 +122,21 @@ def read_department_snapshot(
         if (not isinstance(window, list) or len(window) != 2
                 or any(not isinstance(s, str) or len(s) != 10 for s in window)):
             raise DepartmentSnapshotUnavailable("DEPARTMENT_WINDOW_INVALID")
+        # Never leak untrusted row objects into the founder API. Every
+        # chart point is a bounded date-dimension observation with no
+        # query text, cited URL, identifier, session or synthetic zero.
+        if "gsc_daily_chart" in safe:
+            from .gsc_daily_series import (
+                GscDailyEvidenceHeld, validate_chart_contract,
+            )
+            try:
+                safe["gsc_daily_chart"] = validate_chart_contract(
+                    safe["gsc_daily_chart"],
+                    window=safe["gsc_final_page_window"],
+                )
+            except GscDailyEvidenceHeld:
+                raise DepartmentSnapshotUnavailable(
+                    "GSC_DAILY_TREND_ENVELOPE_UNVERIFIED") from None
         # No freshness inference from cached SERP data.
         safe["independent_google_rank_positions_verified"] = False
         safe["customer_identifiers_disclosed"] = False
