@@ -123,3 +123,41 @@ def test_founder_projection_does_not_promote_unsupported_rfc_claim():
     ]="AUTHENTICATED_BUYER_FALSE_CLAIM"
     with pytest.raises(WorkspaceReviewHeld, match="UNTRUSTED_RFC_CHAIN_CLASSIFICATION"):
         project_workspace_review(current,now=NOW)
+
+
+@pytest.mark.parametrize(("to_address","expected"), [
+    ("phil@empire-ai.co.uk", "EXPECTED_WORKSPACE_TO"),
+    ("Founder <phil@mail.empire-ai.co.uk>", "EXPECTED_WORKSPACE_TO"),
+    ("Replies <reply@mail.empire-ai.co.uk>", "EXPECTED_WORKSPACE_TO"),
+    ('"Founder, Phil" <phil@mail.empire-ai.co.uk>, Another <test@external.invalid>',
+     "EXPECTED_WORKSPACE_TO"),
+    ("third-party@unrelated.example", "RECIPIENT_ROUTE_UNVERIFIED"),
+    ("", "RECIPIENT_ROUTE_UNVERIFIED"),
+    ("not-valid@", "RECIPIENT_ROUTE_UNVERIFIED"),
+])
+def test_header_recipient_route_is_corroboration_not_commercial_proof(to_address, expected):
+    rows = sample([("In-Reply-To", PARENT)])
+    incoming = rows[ANCHORS[0][3]]["messages"][1]
+    for header in incoming["payload"]["headers"]:
+        if header["name"] == "To":
+            header["value"] = to_address
+    result = review_workspace_solar_threads(rows, now=NOW)
+    candidate = result["threads"][0]["inbound_header_candidates"][0]
+    assert candidate["recipient_routing"] == expected
+    assert candidate["rfc_parent_relation"] == "DIRECT_PARENT_MATCH"
+    assert result["inbound_header_candidate_count"] == 1
+    assert result["founder_crm_ingest_verified"] is False
+    projected = project_workspace_review(result, now=NOW)
+    shown = next(r for r in projected["items"] if r["inbound_candidate_count"])
+    assert shown["inbound_candidates"][0]["recipient_routing"] == expected
+    assert "third-party@" not in str(projected)
+    assert projected["crm_conversation_created"] is False
+
+
+def test_malformed_recipient_routing_state_cannot_be_promoted_in_founder_api():
+    current = review_workspace_solar_threads(sample(), now=NOW)
+    current["threads"][0]["inbound_header_candidates"][0][
+        "recipient_routing"
+    ] = "PROVEN_BUYER_AND_TENANT"
+    with pytest.raises(WorkspaceReviewHeld, match="UNTRUSTED_RECIPIENT_ROUTING"):
+        project_workspace_review(current, now=NOW)

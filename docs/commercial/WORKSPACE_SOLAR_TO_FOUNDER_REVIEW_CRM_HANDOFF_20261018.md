@@ -58,6 +58,42 @@ other agents' still-uncommitted Founder routes. It has therefore NOT replaced
 the live `empire-founder-console.service`; its deployment remains under
 coordinated owner review. No company website or auth deployment was made.
 
+## Later 18 October — exact Workspace recipient routing review
+
+The same bounded read-only metadata scan now additionally labels **candidate**
+messages with `EXPECTED_WORKSPACE_TO` or `RECIPIENT_ROUTE_UNVERIFIED`
+based only on a strict, bounded match of the original `To` header against
+the three already-known first-party Workspace routes:
+`phil@empire-ai.co.uk`, `phil@mail.empire-ai.co.uk` and
+`reply@mail.empire-ai.co.uk`.
+
+It never copies raw routing addresses from an incoming header into the
+private snapshot or public-facing evidence. The Founder review projection
+accepts only those two states, treating older snapshots without the optional
+field as unverified. A suspicious or indirect To address **does not cause a
+candidate to disappear**; it remains a founder review item with an explicit
+routing gap. A matching To does NOT prove delivery, actual sender identity,
+consent, buyer interest or CRM tenant authority. The original six sent
+Gmail anchor IDs remain unchanged, and the monitor creates no CRM rows.
+
+59 related tests passed including RFC reply chains, unusual To values,
+malformed routing, old-snapshot compatibility, provider IDs and no-send/no-DB
+invariants. A new authenticated live scan still read all six original
+outbound messages and found no inbound header candidates. The refreshed
+snapshot and existing timer need no new scheduled service.
+
+The clean isolated Founder Mail release cannot safely replace the current
+live release yet: a live route parity check confirmed that the running
+console already serves `/founder/youtube` and `/founder/intent-review`,
+while the clean committed-code build lacks those other agents' additions.
+The production frontend remains untouched, with no silent feature rollback.
+
+The already-approved privileged canonical CRM sales intake aggregate is
+NOT an exact Gmail-to-prospect lookup; it cannot be used to claim these six
+sent messages are CRM records. An attempted remote invocation of the
+separately privileged aggregate observer was denied by the command
+interface, and no permission or credential workaround was used.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

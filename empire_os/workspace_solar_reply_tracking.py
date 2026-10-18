@@ -8,12 +8,15 @@ A Gmail thread is NOT a proven buyer reply, qualified lead or revenue.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from email.utils import parseaddr
+from email.utils import parseaddr, getaddresses
 import re
 from typing import Any, Mapping
 
 SCHEMA = "empire.workspace_solar_outreach_tracking.v1"
 ACCOUNT = "phil@mail.empire-ai.co.uk"
+WORKSPACE_RECEIVE_ADDRESSES = frozenset({
+    ACCOUNT, "phil@empire-ai.co.uk", "reply@mail.empire-ai.co.uk",
+})
 HEX = re.compile(r"^[a-f0-9]{16,32}$")
 RFC_ID = re.compile(r"^<[^ <>@]{1,200}@[^ <>@]{1,200}>$")
 ANCHORS = (
@@ -86,6 +89,24 @@ def _labels(message: Mapping[str, Any]) -> set[str]:
     if not isinstance(labels, list) or len(labels) > 50 or any(not isinstance(x, str) or len(x) > 70 for x in labels):
         raise EvidenceHeld("UNTRUSTED_GMAIL_LABELS")
     return set(labels)
+
+
+def _workspace_recipient_routing(headers: Mapping[str, str]) -> str:
+    """Exact configured To-address review; not a delivery or consent proof."""
+    raw = headers.get("to", "")
+    if (not isinstance(raw, str) or len(raw) > 1024
+            or chr(13) in raw or chr(10) in raw):
+        return "RECIPIENT_ROUTE_UNVERIFIED"
+    try:
+        parsed = getaddresses([raw], strict=True)
+        if not 1 <= len(parsed) <= 12:
+            return "RECIPIENT_ROUTE_UNVERIFIED"
+        addresses = [_email_from(address) for _, address in parsed]
+    except (EvidenceHeld, ValueError, TypeError, IndexError):
+        return "RECIPIENT_ROUTE_UNVERIFIED"
+    return ("EXPECTED_WORKSPACE_TO"
+            if any(a in WORKSPACE_RECEIVE_ADDRESSES for a in addresses)
+            else "RECIPIENT_ROUTE_UNVERIFIED")
 
 
 def _valid_rfc_id(value: str) -> str:
@@ -172,7 +193,8 @@ def review_workspace_solar_threads(
         candidates = [
             {"gmail_message_id": mid, "received_at": when.isoformat(),
              "status": "INBOUND_PROVIDER_HEADER_CANDIDATE_NEEDS_HUMAN_REVIEW",
-             "rfc_parent_relation": _rfc_relation(outbound_id=sent_rfc_id, incoming=original_headers)}
+             "rfc_parent_relation": _rfc_relation(outbound_id=sent_rfc_id, incoming=original_headers),
+             "recipient_routing": _workspace_recipient_routing(original_headers)}
             for mid, when, original_headers in pending_candidates
         ]
         reviewed.append({

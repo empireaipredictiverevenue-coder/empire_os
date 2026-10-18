@@ -24,6 +24,9 @@ MAX_AGE_SECONDS = 20 * 60
 ALLOWED_RFC_RELATIONS = frozenset((
     "DIRECT_PARENT_MATCH", "ORIGINAL_MESSAGE_REFERENCED_ONLY", "NOT_PROVEN",
 ))
+ALLOWED_RECIPIENT_ROUTES = frozenset((
+    "EXPECTED_WORKSPACE_TO", "RECIPIENT_ROUTE_UNVERIFIED",
+))
 HEX = re.compile(r"^[a-f0-9]{16,32}$")
 
 
@@ -105,6 +108,9 @@ def project_workspace_review(
             relation = candidate.get("rfc_parent_relation", "NOT_PROVEN")
             if relation not in ALLOWED_RFC_RELATIONS:
                 raise WorkspaceReviewHeld("UNTRUSTED_RFC_CHAIN_CLASSIFICATION")
+            routing = candidate.get("recipient_routing", "RECIPIENT_ROUTE_UNVERIFIED")
+            if routing not in ALLOWED_RECIPIENT_ROUTES:
+                raise WorkspaceReviewHeld("UNTRUSTED_RECIPIENT_ROUTING")
             received = _when(candidate.get("received_at"), label="INBOUND_TIME")
             if received <= sent_at or received > scanned_at:
                 raise WorkspaceReviewHeld("INBOUND_TIME_CONFLICT")
@@ -115,6 +121,7 @@ def project_workspace_review(
                 "contact_identity_verified": False,
                 "commercial_intent_verified": False,
                 "rfc_parent_relation": relation,
+                "recipient_routing": routing,
             })
         incoming.sort(key=lambda x: (x["received_at"], x["gmail_message_id"]))
         total += len(incoming)
