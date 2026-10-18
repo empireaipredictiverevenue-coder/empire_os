@@ -225,6 +225,8 @@ def record_founder_led_interest(
     idempotency_key: str,
     website: str = "",
     claimed_entry_page: str | None = None,
+    source_campaign_key: str | None = None,
+    source_landing_url: str | None = None,
     root: str | Path = "/srv/empire_os",
     request: Request = request_json,
     now: datetime | None = None,
@@ -253,6 +255,19 @@ def record_founder_led_interest(
     moment = now or datetime.now(timezone.utc)
     if moment.tzinfo is None or moment.utcoffset() is None:
         raise CommercialInterestError("contact_consent_clock_untrusted")
+
+    # Registered campaign source is browser-reported, not consent or proof of a click.
+    # Reject invalid issued source before touching the canonical EmpireDB intake.
+    from empire_os.youtube_commercial_source_bridge import review_commercial_video_source_submission
+    try:
+        campaign_source = review_commercial_video_source_submission(
+            source_campaign_key=source_campaign_key,
+            source_landing_url=source_landing_url,
+            registry_root=Path(root),
+            now=moment,
+        )
+    except ValueError as exc:
+        raise CommercialInterestError("commercial_youtube_source_unverified") from exc
 
     digest = hashlib.sha256(address.encode("utf-8")).hexdigest()[:24]
     capture_key = hashlib.sha256(
@@ -303,6 +318,8 @@ def record_founder_led_interest(
             "marketing_consent_granted": False,
             "recognized_revenue_proven": False,
         }
+    if campaign_source is not None:
+        evidence["youtube_buyer_declared_source"] = campaign_source["source_evidence"]
     result = request(
         "POST",
         "/rest/v1/rpc/ingest_prospect_atomic",

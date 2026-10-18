@@ -129,6 +129,8 @@ class FounderLedCommercialInterestRequest(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=128)
     website: str = Field(default="", max_length=300)
     claimed_entry_page: str | None = Field(default=None, max_length=80)
+    source_campaign_key: str | None = Field(default=None, max_length=32)
+    source_landing_url: str | None = Field(default=None, max_length=2048)
 
 
 class ExchangeInterestRequest(BaseModel):
@@ -322,6 +324,8 @@ def commercial_interest(req: FounderLedCommercialInterestRequest):
             idempotency_key=req.idempotency_key,
             website=req.website,
             claimed_entry_page=req.claimed_entry_page,
+            source_campaign_key=req.source_campaign_key,
+            source_landing_url=req.source_landing_url,
         )
     except CommercialInterestError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
