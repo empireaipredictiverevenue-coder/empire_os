@@ -17,6 +17,9 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.locale_intelligence import resolve_locale
+from empire_os.permit_source_revision import (
+    trusted_permit_match, refresh_trusted_permit_event,
+)
 
 ROOT = Path("/srv/empire_os/runtime/acquisition")
 INBOX = ROOT / "signal_inbox.json"
@@ -81,10 +84,29 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
         try:
             data = _load()
             existing = data.get(fp)
+            if not isinstance(existing, dict) and row.get("source") == "permits_nyc":
+                # The older fingerprint also contains source/owner labels.
+                # A true official NYC job is one source record even if the
+                # owner name or displayed market niche changes on re-download.
+                existing = next(
+                    (prior for prior in data.values()
+                     if isinstance(prior, dict)
+                     and trusted_permit_match(prior, row)),
+                    None,
+                )
+            revision = {"event_revision_added": False}
             if isinstance(existing, dict):
-                existing["last_seen_at"] = _now()
+                seen_at = _now()
+                existing["last_seen_at"] = seen_at
                 existing["seen_count"] = int(existing.get("seen_count") or 1) + 1
-                decision = "matched"
+                if row.get("source") == "permits_nyc":
+                    revision = refresh_trusted_permit_event(
+                        existing, row, observed_at=seen_at,
+                    )
+                decision = (
+                    "updated_source_event"
+                    if revision["event_revision_added"] else "matched"
+                )
                 record = existing
             else:
                 q = (
@@ -131,7 +153,8 @@ def enqueue_signal(candidate: Any, *, quality: Any = None) -> dict[str, Any]:
 
     return {
         "decision": decision,
-        "signal_id": fp,
+        "signal_id": record.get("signal_id") or fp,
+        "source_event_revision_added": revision["event_revision_added"],
         "status": record.get("status"),
         "source": record.get("source"),
         "locale": record.get("locale"),

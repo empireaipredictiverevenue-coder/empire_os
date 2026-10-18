@@ -26,6 +26,7 @@ from empire_os.vertical_intelligence_runtime import (
     build_private_capital_intelligence_runtime,
 )
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.free_dataset_intelligence import inspect_free_commoncrawl_dataset
 from empire_os.permit_project_intelligence import analyze_permit_project_intelligence
 
 
@@ -43,6 +44,7 @@ LANES: dict[str, tuple[str, str, int]] = {
     "private_capital": ("strategy", "resolve_canonical_sponsor_portfolio_source_evidence", 66),
     "storm": ("data_quant", "refresh_primary_storm_observations_and_geo_evidence", 64),
     "warehouse": ("market_intelligence", "recover_evidence_backed_industrial_asset_source", 62),
+    "historical_search_graph": ("marketing_growth", "review_free_commoncrawl_competitor_domain_graph", 60),
 }
 
 
@@ -335,6 +337,32 @@ def build_source_intelligence_handoffs(
         observed_at=None,
     )
     routes = [permit_lane, property_lane, capital_lane, storm_lane, warehouse_lane]
+    # Review only the already downloaded FREE graph metadata, never bulk-copy
+    # the 9GB archive, treat historical edges as live links, or use paid APIs.
+    graph_review = inspect_free_commoncrawl_dataset() if root == CANONICAL_ROOT else None
+    if (graph_review and graph_review.get("status")
+            == "REVIEWED_HISTORICAL_RESEARCH_AVAILABLE"):
+        routes.append(_lane(
+            "historical_search_graph",
+            status="HISTORICAL_RESEARCH_REVIEW_READY",
+            source="existing_free_commoncrawl_domain_graph_review",
+            evidence_refs=["source:commoncrawl_2026_historical_domain_graph"],
+            counts={
+                "review_sha256": graph_review["review_sha256"],
+                "historical_relationships": graph_review["historical_relation_count"],
+                "distinct_source_domains": graph_review["distinct_source_domain_count"],
+                "cross_target_source_domains": graph_review["cross_target_source_domain_count"],
+                "confirmed_live_backlinks": 0,
+                "target_count": len(graph_review["target_domains"]),
+            },
+            warnings=[
+                "historical_domain_graph_edges_are_not_verified_live_backlinks",
+                "no_page_level_anchor_proof",
+                "human_review_required_for_all_candidate_domains",
+                "no_automatic_outreach_or_commercial_promotion",
+            ],
+            observed_at=graph_review["reviewed_at_utc"],
+        ))
     return {
         "schema_version": SCHEMA,
         "status": "AVAILABLE",
@@ -347,6 +375,7 @@ def build_source_intelligence_handoffs(
         ),
         "unique_underlying_nyc_permit_signal_count": permit_count,
         "permit_project_intelligence": permit_projects,
+        "free_dataset_brain_review": graph_review,
         "raw_customer_records_exported": False,
         "automatic_outreach_sent": False,
         "paid_model_invoked": False,
@@ -581,6 +610,10 @@ def deliver_source_intelligence_review(
         raise ValueError("source_handoff_evidence_superseded")
     reviewed = payload.get("permit_project_intelligence")
     reviewed = reviewed if isinstance(reviewed, dict) else {}
+    free_graph_review = payload.get("free_dataset_brain_review")
+    free_graph_review = (
+        free_graph_review if isinstance(free_graph_review, dict) else {}
+    )
     result = {
         "adapter": "existing_department_source_analysis_receipt",
         "lane": lane,
@@ -591,6 +624,9 @@ def deliver_source_intelligence_review(
         "source_quality_summary": dict(row["counts"]),
         "followup_evidence_requirements": list(row["blockers"]),
         "next_internal_action": row["next_internal_action"],
+        "historical_free_dataset_brain_review": (
+            free_graph_review if lane == "historical_search_graph" else None
+        ),
         "project_intelligence_review": (
             {
                 "schema_version": reviewed.get("schema_version"),
