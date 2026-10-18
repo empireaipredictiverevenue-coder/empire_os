@@ -205,6 +205,7 @@ def build_source_intelligence_handoffs(
     permit_projects = analyze_permit_project_intelligence(root, now=now)
     project_cohort = permit_projects["cohort"]
     property_ = build_property_intelligence_runtime(root)
+    three_agency=property_.get("three_agency_source_reference_review") or {}
     capital = build_private_capital_intelligence_runtime(root)
     storm = _read(root / STORM)
     permit_seen = _time(permit.get("latest_seen_at"))
@@ -281,9 +282,15 @@ def build_source_intelligence_handoffs(
             "physical_observation_count": property_count,
             "volumetric_observation_count": property_.get("volumetric_observation_count"),
             "verified_property_opportunity_count": None,
+            "three_agency_review_status": three_agency.get("status"),
+            "tri_agency_bin_bbl_reference_match_count": (
+                three_agency.get("three_agency_bin_bbl_reference_match_count")),
+            "tri_agency_reference_conflict_count": (
+                three_agency.get("building_tax_lot_reference_conflict_count")),
         },
         warnings=[
             "same_permit_source_as_permit_lane_not_additional_leads",
+            "tri_agency_source_references_are_not_property_ownership_or_buyer_identity",
             "property_entity_binding_not_verified",
             "observed_storm_exposure_is_not_building_damage",
         ],
@@ -334,8 +341,14 @@ def build_source_intelligence_handoffs(
         status="SOURCE_INTEGRATION_REQUIRED",
         source="existing_industrial_sniper_and_idle_asset_read_models",
         evidence_refs=[],
-        counts={"verified_warehouse_opportunity_count": None},
+        counts={
+            "verified_warehouse_opportunity_count": None,
+            "industrial_manufacturing_lot_context_only_count": (
+                three_agency.get("industrial_manufacturing_tax_lot_context_count")),
+            "warehouse_operation_verified_count": 0,
+        },
         warnings=["original_warehouse_sniper_reuse_requires_primary_sources",
+                  "industrial_landuse_is_not_operating_warehouse_evidence",
                   "old_paid_places_make_webhook_and_legacy_paths_not_authorized",
                   "owner_occupancy_and_damage_not_verified"],
         observed_at=None,

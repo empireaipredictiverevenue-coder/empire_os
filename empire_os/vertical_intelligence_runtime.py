@@ -14,6 +14,7 @@ from typing import Any
 
 from empire_os.permit_intelligence_runtime import build_permit_intelligence_runtime
 from empire_os.spatial_physical_runtime import build_spatial_physical_runtime
+from empire_os.property_source_evidence_runtime import load_property_reference_summary
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -27,6 +28,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def build_property_intelligence_runtime(repo_root: Path) -> dict[str, Any]:
     permit = build_permit_intelligence_runtime(repo_root)
     physical = build_spatial_physical_runtime(repo_root)
+    three_agency = load_property_reference_summary(repo_root)
 
     permit_count = int(permit.get("signal_count") or 0)
     resolved_permits = int(permit.get("resolved_count") or 0)
@@ -61,6 +63,9 @@ def build_property_intelligence_runtime(repo_root: Path) -> dict[str, Any]:
         "permit_sources": permit.get("by_source") or {},
         "permit_markets": permit.get("by_metro") or {},
         "physical_source_state": physical.get("source_state") or {},
+        "three_agency_source_reference_review": three_agency,
+        # No double counting: same underlying permit signals as above.
+        "source_reference_matches_not_extra_properties": True,
         "opportunity_count": None,
         "pricing_observed": False,
         "binding_terms_ready": False,
