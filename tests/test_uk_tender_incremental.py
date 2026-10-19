@@ -80,7 +80,7 @@ def test_resume_cursor_promotes_only_final_page_and_dedupes_process():
     }
     assert len(finished["recent"]) == 2
     assert finished["inflight"] is None
-    assert finished["last_complete_window_end"] == (NOW - timedelta(minutes=5)).strftime("%Y-%m-%dT%H:%M:%S")
+    assert finished["last_complete_window_end"] == (NOW - timedelta(days=7,minutes=5) + timedelta(hours=4)).strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def test_repeated_window_does_not_create_new_procurement_or_fake_revenue():
@@ -354,3 +354,198 @@ def test_trusted_checkpoint_health_holds_corrupt_source(tmp_path):
     assert result["status"] == "UNTRUSTED_PRIVATE_CHECKPOINT"
     assert result["inflight_page_count"] is None
     assert result["next_cursor_or_identifiers_exposed"] is False
+
+
+def test_sector_review_outbox_commits_atomically_with_partial_cursor(tmp_path):
+    from empire_os.uk_tender_incremental import deliver_one_pending_sector_review
+    def first(start,end,cursor):
+        return page(cursor="testCursor001==",from_time=start,to_time=end,
+                    rows=tender()["releases"][:1])
+    result = advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, fetch_page=first, test_only=True,
+    )
+    assert result["window_high_watermark_promoted"] is False
+    assert result["pending_sector_research_count"] == 1
+    state = json.loads((tmp_path/STAGE_PATH).read_text())
+    assert len(state["pending_sector_research"]) == 1
+    assert state["last_complete_window_end"] is None
+    assert "never@exported.com" not in json.dumps(state)
+    preview = deliver_one_pending_sector_review(tmp_path, as_of=NOW, test_only=True)
+    assert preview["status"] == "REVIEW_ONLY"
+    assert preview["queued"] is False
+    assert preview["pending"] == 1
+    assert not (tmp_path/"runtime/departments/work").exists()
+
+
+def test_pending_sector_queue_retries_without_double_send_or_duplicate_job(tmp_path):
+    from empire_os.uk_tender_incremental import deliver_one_pending_sector_review
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True,
+        fetch_page=lambda *args: page(rows=tender()["releases"][:1]),
+        test_only=True,
+    )
+    state_path = tmp_path/STAGE_PATH
+    original = json.loads(state_path.read_text())
+    assert len(original["pending_sector_research"]) == 1
+    work_key = next(iter(original["pending_sector_research"]))
+    prior = deliver_one_pending_sector_review(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        department_repo_root=tmp_path,
+    )
+    assert prior["status"] == "QUEUED"
+    assert prior["pending"] == 0
+    assert prior["outbound_sent"] is False
+    files = list((tmp_path/"runtime/departments/work/ready").glob("*.json"))
+    assert len(files) == 1
+    job = json.loads(files[0].read_text())
+    assert job["authority"] == "observe"
+    assert job["intelligence_request"]["budget"]["requested_external_cost_cents"] == 0
+    assert job["intelligence_request"]["official_tender_source_review"]["crm_admission_authorized"] is False
+    assert "never@exported.com" not in json.dumps(job)
+    assert json.loads(state_path.read_text())["pending_sector_research"] == {}
+    # Simulate crash after queue insertion, before acknowledgement: restore
+    # ONLY the private pending outbox, preserving the already-queued work.
+    state_path.write_text(json.dumps(original))
+    replay = deliver_one_pending_sector_review(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        department_repo_root=tmp_path,
+    )
+    assert replay["status"] == "ALREADY_QUEUED"
+    assert replay["queued"] is False
+    assert len(list((tmp_path/"runtime/departments/work/ready").glob("*.json"))) == 1
+    assert json.loads(state_path.read_text())["pending_sector_research"] == {}
+    assert work_key not in json.dumps(replay)
+    assert deliver_one_pending_sector_review(
+        tmp_path, as_of=NOW, apply=True,
+        department_repo_root=tmp_path, test_only=True,
+    )["status"] == "NO_PENDING_RESEARCH"
+
+
+def test_pending_sector_queue_failure_keeps_original_outbox(tmp_path, monkeypatch):
+    from empire_os.uk_tender_incremental import deliver_one_pending_sector_review
+    from empire_os.department_work_queue import DepartmentWorkQueue
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=tender()["releases"][:1]),
+    )
+    before = (tmp_path/STAGE_PATH).read_bytes()
+    def fail(*args, **kwargs):
+        raise RuntimeError("existing queue temporarily unavailable")
+    monkeypatch.setattr(DepartmentWorkQueue, "enqueue_step", fail)
+    with pytest.raises(RuntimeError, match="temporarily"):
+        deliver_one_pending_sector_review(
+            tmp_path, as_of=NOW, apply=True,
+            department_repo_root=tmp_path, test_only=True,
+        )
+    assert (tmp_path/STAGE_PATH).read_bytes() == before
+
+
+@pytest.mark.parametrize("bad", [
+    {"verticals": ["roofing", "untrusted-sector"]},
+    {"source_ref": "https://evil.example.com/contacts"},
+    {"release_digest": "invalid"},
+    {"source_window_complete": "yes"},
+])
+def test_tampered_research_outbox_held_without_queue(tmp_path, bad):
+    from empire_os.uk_tender_incremental import deliver_one_pending_sector_review
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=tender()["releases"][:1]),
+    )
+    path = tmp_path/STAGE_PATH
+    state = json.loads(path.read_text())
+    pending = next(iter(state["pending_sector_research"].values()))
+    pending.update(bad)
+    path.write_text(json.dumps(state))
+    with pytest.raises(TenderIncrementalHold):
+        deliver_one_pending_sector_review(
+            tmp_path, as_of=NOW, apply=True,
+            department_repo_root=tmp_path, test_only=True,
+        )
+    assert not (tmp_path/"runtime/departments/work").exists()
+
+
+def test_research_pending_does_not_claim_production_dataset_or_activation(tmp_path):
+    from empire_os.uk_tender_incremental import review_incremental_checkpoint
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=tender()["releases"][:1]),
+    )
+    health = review_incremental_checkpoint(tmp_path, as_of=NOW)
+    assert health["pending_sector_research_count"] == 1
+    assert health["source_polling_scheduled"] is False
+    assert health["complete_source_coverage_claimed"] is False
+    assert health["provider_worker_running"] is False
+
+
+def test_initial_seven_day_backfill_uses_contiguous_four_hour_partitions():
+    calls = []
+    def empty(start, end, cursor):
+        calls.append((start, end, cursor))
+        return page(rows=[])
+    state = empty_checkpoint()
+    for index in range(3):
+        state, result = advance_one_public_page(state, as_of=NOW, fetch_page=empty)
+        assert result["bounded_partition_complete"] is True
+        assert result["source_update_window_is_global_complete"] is False
+        assert result["window_high_watermark_promoted"] is True
+        assert state["inflight"] is None
+    for index, (start, end, cursor) in enumerate(calls):
+        assert cursor is None
+        from datetime import datetime as D
+        parsed_start = D.fromisoformat(start)
+        parsed_end = D.fromisoformat(end)
+        assert parsed_end > parsed_start
+        assert parsed_end - parsed_start <= timedelta(hours=4, minutes=5)
+        if index:
+            assert parsed_start == D.fromisoformat(calls[index-1][1]) - timedelta(minutes=5)
+    assert state["last_complete_window_end"] == calls[-1][1]
+    assert D.fromisoformat(calls[0][0]) == (
+        NOW - timedelta(days=7, minutes=5)
+    ).replace(tzinfo=None)
+
+
+def test_original_v1_partial_cursor_preserved_when_v2_starts(tmp_path):
+    from empire_os.uk_tender_incremental import LEGACY_STAGE_PATH
+    old = tmp_path / LEGACY_STAGE_PATH
+    old.parent.mkdir(parents=True,exist_ok=True)
+    old.write_text('{"legacy":"do not destroy historical source receipts"}')
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, test_only=True, apply=True,
+        fetch_page=lambda *args: page(rows=[]),
+    )
+    assert "do not destroy" in old.read_text()
+    assert (tmp_path/STAGE_PATH).exists()
+    assert old != tmp_path/STAGE_PATH
+
+
+def test_source_revisions_detect_changed_requirements_with_same_status_cpv_and_deadline():
+    state, _ = advance_one_public_page(
+        empty_checkpoint(), as_of=NOW, fetch_page=lambda *args: page()
+    )
+    updated = tender()
+    updated["releases"][0]["tender"]["description"] = (
+        "REVISED PROCUREMENT REQUIREMENTS — PRIVATE FREE TEXT"
+    )
+    _, review = advance_one_public_page(
+        state, as_of=NOW+timedelta(hours=1),
+        fetch_page=lambda *args: json.dumps(updated).encode()
+    )
+    assert review["source_change_counts_on_this_page"] == {
+        "CHANGED_EXISTING_RELEASE": 1, "REPEATED_IDENTICAL_RELEASE": 1
+    }
+    assert "REVISED PROCUREMENT REQUIREMENTS" not in json.dumps(review)
+    assert review["recognized_revenue"] is False
+
+
+def test_backfill_status_cannot_masquerade_as_caught_up(tmp_path):
+    from empire_os.uk_tender_incremental import review_incremental_checkpoint
+    advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=[]),
+    )
+    health = review_incremental_checkpoint(tmp_path, as_of=NOW)
+    assert health["status"] == "BACKFILL_BEHIND_CURRENT_WINDOW"
+    assert health["backfill_remaining_hours"] > 24
+    assert health["caught_up_to_latest_safe_window"] is False
+    assert health["complete_source_coverage_claimed"] is False

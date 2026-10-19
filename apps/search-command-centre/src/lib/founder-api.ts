@@ -137,6 +137,9 @@ export type RevenueStreamMining = {
       last_complete_window_end: string | null;
       inflight_page_count: number | null;
       inflight_source_records: number | null;
+      pending_sector_research_count: number | null;
+      backfill_remaining_hours: number | null;
+      caught_up_to_latest_safe_window: boolean;
       completed_source_receipt_count: number | null;
       complete_source_coverage_claimed: false;
       source_polling_scheduled: false;

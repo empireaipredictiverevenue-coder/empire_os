@@ -28,11 +28,15 @@ from empire_os.uk_public_tender_observer import (
     normalize_uk_tender_releases,
 )
 
-SCHEMA = "empire.uk_tender_incremental_checkpoint.v1"
+SCHEMA = "empire.uk_tender_incremental_checkpoint.v2"
 REPORT_SCHEMA = "empire.uk_tender_incremental_page_review.v1"
-STAGE_PATH = "runtime/source_intelligence/uk_tender_incremental_v1.json"
+STAGE_PATH = "runtime/source_intelligence/uk_tender_incremental_v2.json"
+LEGACY_STAGE_PATH = "runtime/source_intelligence/uk_tender_incremental_v1.json"
 MAX_PAGES_PER_WINDOW = 100
+SOURCE_PARTITION_HOURS = 4
+INITIAL_BACKFILL_DAYS = 7
 MAX_RECENT = 1200
+MAX_PENDING_RESEARCH = 100
 MAX_CHECKPOINT_BYTES = 350_000
 CURSOR_PATTERN = re.compile(r"[A-Za-z0-9=]{1,300}\Z")
 DIGEST_PATTERN = re.compile(r"[0-9a-f]{64}\Z")
@@ -57,6 +61,7 @@ def empty_checkpoint() -> dict[str, Any]:
         "last_complete_window_end": None,
         "recent": {},
         "inflight": None,
+        "pending_sector_research": {},
     }
 
 
@@ -86,13 +91,36 @@ def _is_digest(value: Any) -> bool:
     return isinstance(value, str) and DIGEST_PATTERN.fullmatch(value) is not None
 
 
+def _validate_pending_research(key: Any, row: Any) -> None:
+    from empire_os.uk_public_tender_observer import CPV_CLASSES
+    if (not _is_digest(key) or not isinstance(row, Mapping)
+            or set(row) != {"source_ref", "release_digest", "process_digest",
+                           "verticals", "source_window_complete"}
+            or not all(_is_digest(row.get(field))
+                       for field in ("release_digest", "process_digest"))
+            or type(row.get("source_window_complete")) is not bool
+            or not isinstance(row.get("verticals"), list)
+            or not 1 <= len(row["verticals"]) <= 4
+            or len(set(row["verticals"])) != len(row["verticals"])
+            or any(value not in set(CPV_CLASSES.values())
+                   for value in row["verticals"])
+            or not isinstance(row.get("source_ref"), str)
+            or not re.fullmatch(
+                r"https://www\.find-tender\.service\.gov\.uk/api/1\.0/"
+                r"ocdsRecordPackages/ocds-[a-z0-9]{6}-[A-Za-z0-9-]{1,80}",
+                row["source_ref"],
+            )):
+        raise TenderIncrementalHold("untrusted procurement research outbox")
+
+
 def _state(original: Any, now: datetime) -> dict[str, Any]:
     """Validate untrusted persisted progress rather than trusting its flags."""
     if not isinstance(original, Mapping):
         raise TenderIncrementalHold("source checkpoint must be mapping")
     if set(original) != {
         "schema_version", "mode", "execution_authority",
-        "last_complete_window_end", "recent", "inflight"
+        "last_complete_window_end", "recent", "inflight",
+        "pending_sector_research"
     }:
         raise TenderIncrementalHold("source checkpoint contract drift")
     if (original["schema_version"] != SCHEMA
@@ -112,6 +140,11 @@ def _state(original: Any, now: datetime) -> dict[str, Any]:
                     or not _is_digest(value["ocid_digest"])):
                 raise TenderIncrementalHold("invalid source receipt identity")
     check_rows(recent)
+    pending = original["pending_sector_research"]
+    if not isinstance(pending, Mapping) or len(pending) > MAX_PENDING_RESEARCH:
+        raise TenderIncrementalHold("unbounded research outbox")
+    for key, row in pending.items():
+        _validate_pending_research(key, row)
     last = original["last_complete_window_end"]
     if last is not None and _date(last) > now:
         raise TenderIncrementalHold("future source high watermark")
@@ -217,13 +250,18 @@ def advance_one_public_page(
     now = _utc(as_of)
     state = _state(previous, now)
     if state["inflight"] is None:
-        # Initial bounded one-week backfill; later windows overlap by five minutes.
-        # A completed window overlaps by five minutes to detect amendments.
-        end_dt = now - timedelta(minutes=5)
-        start_dt = (
-            _date(state["last_complete_window_end"]) - timedelta(minutes=5)
-            if state["last_complete_window_end"] else end_dt - timedelta(days=7)
-        )
+        # Backfill begins seven days ago but each individually complete source
+        # partition spans at most four hours. A full seven-day cursor run can
+        # exceed provider page budgets and would otherwise never complete.
+        latest_safe_end = now - timedelta(minutes=5)
+        previous_end = state["last_complete_window_end"]
+        if previous_end is None:
+            start_dt = latest_safe_end - timedelta(days=INITIAL_BACKFILL_DAYS)
+            end_dt = min(latest_safe_end, start_dt + timedelta(hours=SOURCE_PARTITION_HOURS))
+        else:
+            last_end = _date(previous_end)
+            start_dt = last_end - timedelta(minutes=5)
+            end_dt = min(latest_safe_end, last_end + timedelta(hours=SOURCE_PARTITION_HOURS))
         if start_dt >= end_dt:
             raise TenderIncrementalHold("no completed new source window available")
         state["inflight"] = {
@@ -313,6 +351,31 @@ def advance_one_public_page(
         state["recent"] = updated
         state["last_complete_window_end"] = end
         state["inflight"] = None
+    # Durable research outbox committed in the SAME atomic checkpoint as the
+    # cursor; replay after crash can never lose a queued sector evidence task.
+    for candidate in build_internal_tender_research(review={
+        "schema_version": REPORT_SCHEMA,
+        "mode": "OBSERVE", "execution_authority": "none",
+        "recognized_revenue": False, "outbound_sent": False,
+        "window_high_watermark_promoted": finished,
+        "non_identical_source_evidence": changes,
+    })["candidates"]:
+        key = sha256((
+            candidate["source_record_digest"] + "|" +
+            flight["seen"][candidate["source_record_digest"]]["semantic_digest"]
+        ).encode()).hexdigest()
+        row = {
+            "source_ref": candidate["source_ref"],
+            "release_digest": candidate["source_record_digest"],
+            "process_digest": candidate["source_process_digest"],
+            "verticals": candidate["sector_codes_matched"],
+            "source_window_complete": finished,
+        }
+        if key not in state["pending_sector_research"] and (
+            len(state["pending_sector_research"]) >= MAX_PENDING_RESEARCH
+        ):
+            raise TenderIncrementalHold("research outbox full: do not advance cursor")
+        state["pending_sector_research"][key] = row
     _state(state, now)
     report = {
         "schema_version": REPORT_SCHEMA,
@@ -323,6 +386,7 @@ def advance_one_public_page(
         "frozen_updated_to": end,
         "pages_in_window_so_far": flight["page_count"],
         "source_page_records": page["record_count_in_bounded_page"],
+        "pending_sector_research_count": len(state["pending_sector_research"]),
         "source_change_counts_on_this_page": dict(sorted(kinds.items())),
         "non_identical_source_evidence": changes,
         "next_cursor_exists": not finished,
@@ -332,7 +396,8 @@ def advance_one_public_page(
         "buyer_terms_verified": False,
         "contact_extracted": False,
         "outbound_sent": False,
-        "source_update_window_is_global_complete": finished,
+        "source_update_window_is_global_complete": False,
+        "bounded_partition_complete": finished,
         "execution_authority": "none",
     }
     report["sector_research"] = build_internal_tender_research(review=report)
@@ -347,6 +412,23 @@ def _private_path(worktree_root: Path, *, test_only: bool = False) -> Path:
     if root == Path("/srv/empire_os"):
         raise PermissionError("production source registry must not be touched")
     return root / STAGE_PATH
+
+
+def _persist_checkpoint(target: Path, state: Mapping[str, Any]) -> None:
+    encoded = _serialized(state)
+    fd, temp = tempfile.mkstemp(
+        dir=target.parent, prefix=".uk_tender_checkpoint.", suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, "wb") as staging:
+            os.fchmod(staging.fileno(), 0o600)
+            staging.write(encoded)
+            staging.flush()
+            os.fsync(staging.fileno())
+        os.replace(temp, target)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
 
 
 def advance_private_checkpoint(
@@ -395,20 +477,7 @@ def advance_private_checkpoint(
             new, result = advance_one_public_page(
                 old, as_of=as_of, fetch_page=fetch_page
             )
-            encoded = _serialized(new)
-            fd, temp = tempfile.mkstemp(
-                dir=target.parent, prefix=".uk_tender_checkpoint.", suffix=".tmp"
-            )
-            try:
-                with os.fdopen(fd, "wb") as staging:
-                    os.fchmod(staging.fileno(), 0o600)
-                    staging.write(encoded)
-                    staging.flush()
-                    os.fsync(staging.fileno())
-                os.replace(temp, target)
-            finally:
-                if os.path.exists(temp):
-                    os.unlink(temp)
+            _persist_checkpoint(target, new)
             return dict(result, checkpoint_written=True)
     finally:
         # fd is owned by the context manager after successful fdopen.
@@ -514,7 +583,10 @@ def review_incremental_checkpoint(
         "inflight_page_count": None,
         "inflight_source_records": None,
         "completed_source_receipt_count": None,
+        "pending_sector_research_count": None,
         "complete_source_coverage_claimed": False,
+        "caught_up_to_latest_safe_window": False,
+        "backfill_remaining_hours": None,
         "next_cursor_or_identifiers_exposed": False,
         "provider_worker_running": False,
         "source_polling_scheduled": False,
@@ -534,12 +606,127 @@ def review_incremental_checkpoint(
             TenderIncrementalHold):
         return dict(baseline, status="UNTRUSTED_PRIVATE_CHECKPOINT")
     inflight = state["inflight"]
+    last = _date(state["last_complete_window_end"]) if state["last_complete_window_end"] else None
+    lag = max(0.0, ((now - timedelta(minutes=5)) - last).total_seconds() / 3600) if last else None
+    caught_up = last is not None and lag is not None and lag <= 0.002
     return dict(
         baseline,
-        status="PARTIAL_BACKFILL" if inflight else "WINDOW_OBSERVED_AND_COMPLETED",
+        status=("PARTIAL_BACKFILL" if inflight
+                else "CAUGHT_UP_TO_OBSERVATION_LAG" if caught_up
+                else "BACKFILL_BEHIND_CURRENT_WINDOW"),
+        caught_up_to_latest_safe_window=caught_up,
+        backfill_remaining_hours=round(lag, 2) if lag is not None else None,
         last_complete_window_end=state["last_complete_window_end"],
         inflight_page_count=inflight["page_count"] if inflight else 0,
         inflight_source_records=len(inflight["seen"]) if inflight else 0,
         completed_source_receipt_count=len(state["recent"]),
+        pending_sector_research_count=len(state["pending_sector_research"]),
         complete_source_coverage_claimed=False,
     )
+
+
+def deliver_one_pending_sector_review(
+    worktree_root: Path,
+    *,
+    as_of: datetime,
+    apply: bool = False,
+    department_repo_root: Path | None = None,
+    test_only: bool = False,
+) -> dict[str, Any]:
+    """Idempotent internal ASTRA handoff, with acknowledgement AFTER queue write.
+
+    One verified source reference per invocation; default is read-only.
+    Queueing source research does NOT establish a prospect, buyer or order.
+    """
+    from empire_os.department_work_queue import DepartmentWorkQueue
+
+    now = _utc(as_of)
+    target = _private_path(worktree_root, test_only=test_only)
+    dept_root = Path(department_repo_root or worktree_root).resolve()
+    if apply and dept_root != Path("/srv/empire_os") and not (
+        test_only and dept_root == Path(worktree_root).resolve()
+    ):
+        raise PermissionError("existing canonical ASTRA department queue required")
+    if not target.exists() or target.is_symlink() or target.parent.is_symlink():
+        return {
+            "status": "NO_TRUSTED_PRIVATE_RESEARCH_CHECKPOINT",
+            "queued": False, "pending": None,
+            "outbound_sent": False, "commercial_execution_authorized": False,
+        }
+    lock = target.with_suffix(".lock")
+    if lock.is_symlink():
+        raise TenderIncrementalHold("unsafe private lock")
+    if not apply:
+        old = _state(json.loads(target.read_text()), now)
+        return {
+            "status": "REVIEW_ONLY",
+            "queued": False,
+            "pending": len(old["pending_sector_research"]),
+            "outbound_sent": False,
+            "commercial_execution_authorized": False,
+        }
+    # Lock serialises source-cursor writer and research acknowledgement.
+    descriptor = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        if not target.is_file() or target.stat().st_size > MAX_CHECKPOINT_BYTES:
+            raise TenderIncrementalHold("unsafe private research checkpoint")
+        state = _state(json.loads(target.read_text()), now)
+        pending = state["pending_sector_research"]
+        if not pending:
+            return {
+                "status": "NO_PENDING_RESEARCH",
+                "queued": False, "pending": 0,
+                "outbound_sent": False, "commercial_execution_authorized": False,
+            }
+        key = sorted(pending)[0]
+        packet = pending[key]
+        step = {
+            "step_id": "tender_rev_" + key[:32],
+            "goal_key": "verify_real_official_sector_procurement_source",
+            "department_keys": ["business_development"],
+            "target_component": "existing_source_intelligence_and_opportunity_factory",
+            "action": "review_official_public_procurement_notice_for_sector_relevance_and_eligibility",
+            "authority": "observe",
+            "evidence_refs": [packet["source_ref"]],
+            "rationale": "Public OCDS tender observation requires individual official notice verification",
+            "success_condition": (
+                "Confirm original active notice, sector and bid eligibility in an internal "
+                "review; do not assume buyer acceptance, contact, paid work or revenue"
+            ),
+            "intelligence_request": {
+                "official_tender_source_review": {
+                    "source_record_digest": packet["release_digest"],
+                    "source_process_digest": packet["process_digest"],
+                    "source_change_receipt": key,
+                    "official_source_ref": packet["source_ref"],
+                    "matched_sectors": packet["verticals"],
+                    "source_window_complete": packet["source_window_complete"],
+                    "source_provenance_independently_recheck_required": True,
+                    "notice_is_not_a_won_contract": True,
+                    "no_contact_or_price_inferred": True,
+                    "crm_admission_authorized": False,
+                    "outbound_or_bid_authorized": False,
+                },
+                "budget": {"requested_model_tokens": 0, "requested_external_cost_cents": 0},
+            },
+        }
+        # The existing queue's deterministic ID protects the handoff if the
+        # process crashes after enqueue, before the checkpoint acknowledgement.
+        item, created = DepartmentWorkQueue(dept_root).enqueue_step(
+            plan_id="uk_tender_sector_source_review_v2", step=step, priority=92
+        )
+        del pending[key]
+        _persist_checkpoint(target, state)
+        return {
+            "schema_version": "empire.uk_tender_sector_source_handoff.v1",
+            "status": "QUEUED" if created else "ALREADY_QUEUED",
+            "queued": created,
+            "work_id": item.id,
+            "pending": len(pending),
+            "existing_queue_reused": True,
+            "external_spend_cents": 0,
+            "outbound_sent": False,
+            "commercial_execution_authorized": False,
+            "execution_authority": "none",
+        }

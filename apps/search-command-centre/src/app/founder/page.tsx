@@ -281,6 +281,8 @@ export default async function FounderPage() {
                               <span>Status: {show(streamMining.source_discovery?.uk_tender_incremental?.status, "Not activated").replaceAll("_", " ")}</span>
                               <span>Private pages: {streamMining.source_discovery?.uk_tender_incremental?.inflight_page_count ?? "Unknown"}</span>
                               <span>Private release receipts: {streamMining.source_discovery?.uk_tender_incremental?.inflight_source_records ?? "Unknown"}</span>
+                              <span>Pending sector research: {streamMining.source_discovery?.uk_tender_incremental?.pending_sector_research_count ?? "Unknown"}</span>
+                              <span>Backfill lag: {streamMining.source_discovery?.uk_tender_incremental?.backfill_remaining_hours ?? "Unknown"} hours</span>
                             </div>
                             <p className="mt-2 text-[11px] text-slate-500">
                               Latest completed window: {streamMining.source_discovery?.uk_tender_incremental?.last_complete_window_end ?? "None verified"}.

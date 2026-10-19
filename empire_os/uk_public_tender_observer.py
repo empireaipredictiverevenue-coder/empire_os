@@ -151,6 +151,12 @@ def normalize_uk_tender_releases(
                 tender.get("tenderPeriod") or {}
             ).get("endDate") if isinstance(tender.get("tenderPeriod"), Mapping) else None,
             "published_release_date": release.get("date"),
+            # Full published tender payload is hashed (never output) so a
+            # requirements amendment is detected even when CPV/deadline stay.
+            "tender_payload_sha256": sha256(json.dumps(
+                tender, sort_keys=True, separators=(",", ":"),
+                allow_nan=False,
+            ).encode()).hexdigest(),
         }, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()).hexdigest()
         for vertical in verticals:
             counts[vertical] += 1
