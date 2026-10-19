@@ -759,3 +759,38 @@ twice an hour after its own immutable release commit; a task may only
 materialise if the upstream Exchange and Buyer Network snapshots are both
 valid and less than six hours old. Cron install/readback is tracked separately
 from code commit; do not claim this code is deployed to a web service.
+
+### Wave 11 deployment receipt — lead-gen private observer
+
+**Verified operational state on EmpireOS, 19 October:**
+- Lead-gen source commit `a0e55412` remains in the unified branch.
+  Pinned immutable detached worktree:
+  `/home/ubuntu/empire_worktrees/leadgen_revenue_queue_release_a0e55412`.
+- The pinned code **executed successfully** against existing production
+  read-only snapshots: state `FOUNDER_RESEARCH_QUEUE_READY`, 25 buyer
+  research targets, 0 qualified buyers, 0 sender authority.
+- New Ubuntu crontab task marker
+  `EMPIRE_LEADGEN_RESEARCH_OBSERVER_20261019`: **:23 and :53 each hour**,
+  `flock -n` to avoid overlap, 30-second timeout and no network/DB
+  ingestion or email send. Runs the immutable code and atomically
+  updates ONLY the private derivative report on successful preflights.
+- Existing RECC Solar sweep cron preserved; ASTRA observer entry preserved;
+  `cron`, `empire-buyer-acquisition-scout.timer` and
+  `empire-commercial-exchange.timer` all observed active.
+- Private runtime directory
+  `/srv/empire_os/runtime/lead_supply/private_leadgen` is 0700 and
+  the last-successful report `research_queue_latest.json` is 0600.
+- **First unattended cron delivery NOT yet observed** as of this receipt;
+  scheduling and manual pinned run are verified, not a future success claim.
+- To disable only the new observer: remove the marker line
+  `EMPIRE_LEADGEN_RESEARCH_OBSERVER_20261019` AND the single immediately
+  following `23,53 * * * *` line from Ubuntu's crontab. Preserve all other
+  crontab entries and systemd timers.
+- This operation does **not** deploy/activate the staged private Founder
+  API route, which still requires the existing UI/service owner to validate
+  auth and service health before release. It also does not enable
+  `empire_tasks` canonical sniper writing or canonical lead ingestion.
+
+**Operational next gate:** independently verified buyer purchase/capacity
+terms and protected EmpireDB business identity reader. A source score or a
+research-domain first-party page is not a verified purchaser.
