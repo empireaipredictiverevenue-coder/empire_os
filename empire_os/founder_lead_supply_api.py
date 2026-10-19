@@ -13,6 +13,7 @@ from empire_os.leadgen_revenue_activation_queue import build_leadgen_revenue_que
 from empire_os.buyer_specification_readiness import build_buyer_specification_readiness
 from empire_os.listmonk_recovery_boundary import inspect_legacy_listmonk
 from empire_os.treg_source_policy import review_treg_for_empire
+from empire_os.twenty_recovery_boundary import inspect_twenty
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
@@ -200,6 +201,27 @@ def read_marketing_tooling_recovery(root: Path = Path("/srv/empire_os")) -> dict
         }
 
 
+def read_twenty_crm_recovery(root: Path = Path("/srv/empire_os")) -> dict:
+    """Private Twenty status. Never read or export legacy contacts."""
+    try:
+        import subprocess
+        commit = subprocess.run(
+            ["git", "-C", str(root), "cat-file", "-e", "42c0f6cc^{commit}"],
+            capture_output=True, timeout=6, check=False,
+        ).returncode == 0
+        result = inspect_twenty(
+            root,
+            plugin_path=Path("/home/ubuntu/.hermes/hermes-agent/plugin-catalog/twenty-crm.yaml"),
+            commit_probe=lambda path: commit,
+        )
+        return {"available": True, **result}
+    except (OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+        return {"available": False, "state": "HOLD",
+                "original_twenty_database_restored": False,
+                "canonical_empiredb_writes": False,
+                "execution_authority": "none"}
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
@@ -225,6 +247,10 @@ def create_founder_lead_supply_router(
     @router.get("/buyer-specifications")
     def buyer_specifications():
         return read_buyer_specification_gap_board(exchange_path, relationship_path)
+
+    @router.get("/twenty-recovery")
+    def twenty_recovery():
+        return read_twenty_crm_recovery()
 
     @router.get("/marketing-tooling")
     def marketing_tooling():

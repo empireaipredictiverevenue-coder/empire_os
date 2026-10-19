@@ -20,6 +20,16 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "twenty_historic_crm_to_canonical_empiredb_identity_review",
+        "empire_os/twenty_recovery_boundary.py",
+        "empire_os/founder_lead_supply_api.py",
+        "original Twenty Docker/PostgreSQL instance, version and secret custody, "
+        "authenticated private workspace, explicit tenant authority and zero "
+        "automatic contacts, send actions or CRM bidirectional sync",
+        "recover optional Twenty CRM interface while EmpireDB keeps all buyer, "
+        "prospect, suppression and first-payer authority",
+    ),
+    IntelligenceEdge(
         "treg_optional_provider_to_own_source_intelligence_policy",
         "empire_os/treg_source_policy.py",
         "empire_os/source_intelligence.py",
