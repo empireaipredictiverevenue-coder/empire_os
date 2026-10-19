@@ -242,7 +242,28 @@ export type PredictiveCommercialEvidenceRequest = {
   execution_authority: "none";
 };
 
+export type FlagshipVendorIntegrations = {
+  schema_version: string;
+  status: string;
+  integrations: Record<string, {
+    purpose: string;
+    upstream: string;
+    license: string;
+    status: string;
+    provider_fork_created: boolean;
+    network_enabled?: boolean;
+    remote_upload_enabled?: boolean;
+    remote_export_enabled_by_this_feature?: boolean;
+    session_recording_enabled?: boolean;
+  }>;
+  external_customer_data_transmitted: false;
+  source_custody_verified_by_vendor: false;
+  actual_model_calibration_performed: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_quality_integrations?: FlagshipVendorIntegrations;
   commercial_evidence_request?: PredictiveCommercialEvidenceRequest;
   evidence_pathways?: PredictiveEvidencePathways;
   data_stream_mining?: RevenueStreamMining;

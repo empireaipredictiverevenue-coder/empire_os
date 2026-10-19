@@ -85,6 +85,7 @@ export default async function FounderPage() {
   const streamMining = decision?.data_stream_mining;
   const evidencePathways = decision?.evidence_pathways;
   const commercialEvidence = decision?.commercial_evidence_request;
+  const vendorStatus = decision?.flagship_quality_integrations;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -343,6 +344,45 @@ export default async function FounderPage() {
                     ) : (
                       <p className="mt-3 text-xs text-slate-400">Existing source-stream mining waits for the paired backend release.</p>
                     )}
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Flagship customer experience · Scientific quality</p>
+                        <h3 className="mt-1 text-lg font-semibold text-white">
+                          Evidence quality, agent traces and product usability
+                        </h3>
+                        <p className="mt-2 text-xs leading-5 text-slate-400">
+                          Four staged open-source adapters. Customer analytics, external
+                          traces and session recording are disabled pending provider and
+                          tenant privacy approvals.
+                        </p>
+                      </div>
+                      <span className="text-xs text-cyan-200">
+                        {show(vendorStatus?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                      {(["evidently", "langfuse", "posthog", "openreplay"] as const).map((name) => {
+                        const provider = vendorStatus?.integrations?.[name];
+                        return (
+                          <div key={name} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                            <p className="text-sm font-semibold capitalize text-white">{name}</p>
+                            <p className="mt-1 text-xs text-slate-300">
+                              {show(provider?.status, "Not configured").replaceAll("_", " ")}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500">
+                              {show(provider?.purpose, "Provider health unavailable").replaceAll("_", " ")}
+                            </p>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-[11px] text-slate-500">
+                      Adapter readiness is not proof of operational provider connection.
+                      No source authenticity, statistical calibration or customer revenue
+                      is established by these observability integrations.
+                    </p>
                   </div>
                   <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">

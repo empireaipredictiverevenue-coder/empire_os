@@ -2486,6 +2486,10 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert control["commercial_evidence_request"]["internal_work_created"] is False
     assert control["commercial_evidence_request"]["buyer_contacted"] is False
     assert control["commercial_evidence_request"]["forecast_created"] is False
+    quality = control["flagship_quality_integrations"]
+    assert quality["schema_version"] == "empire.flagship_scientific_experience_integrations.v1"
+    assert quality["external_customer_data_transmitted"] is False
+    assert quality["integrations"]["openreplay"]["session_recording_enabled"] is False
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False

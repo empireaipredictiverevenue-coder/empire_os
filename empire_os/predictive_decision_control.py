@@ -498,6 +498,10 @@ def build_predictive_decision_control_runtime(
     decision["commercial_evidence_request"] = review_one_commercial_evidence_request(
         root, as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_quality_integrations import flagship_vendor_readiness
+    decision["flagship_quality_integrations"] = flagship_vendor_readiness(
+        as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 

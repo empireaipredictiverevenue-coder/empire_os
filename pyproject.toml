@@ -47,6 +47,12 @@ observability = [
     "opentelemetry-sdk==1.44.0",
     "opentelemetry-exporter-otlp-proto-http==1.44.0",
 ]
+scientific-evaluation = [
+    # Optional offline Evidently evaluation. Never install in live runtime
+    # without version/security/compatibility review and explicit approval.
+    "evidently>=0.7,<0.9",
+    "pandas>=2.2,<3",
+]
 market-benchmarks = [
     "ortools>=9.15,<10",
     "dimod>=0.12.21,<0.13",
