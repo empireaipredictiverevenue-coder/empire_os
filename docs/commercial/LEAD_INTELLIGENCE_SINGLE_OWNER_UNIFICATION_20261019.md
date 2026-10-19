@@ -390,3 +390,52 @@ results, speculative sniper hits, Reddit urgency messages or raw registry rows.
 5. Do not activate public self-serve inventory counters until current
    snapshots, fulfilled entitlement, paid buyer capacity and compliance
    evidence all justify accurate user-facing claims.
+
+## Wave 8 — bounded RECC Solar source sweeps and private inventory reconciliation (19 October)
+
+**Founder directive:** turn on eligible source scanners and start bounded
+research sweeps to grow future canonical supply inventory. Keep existing buyer
+scout and commercial Exchange timers intact; no new trading, paid traffic,
+outbound or public lead-list resale.
+
+- Live source audit: `gb_recc_solar` registered **verified** with
+  `internal_acquisition` and `entity_resolution`, raw resale disallowed.
+  `robots.txt` allowed the member-search and detail paths for the configured
+  source agent. Existing canonical `crawler_runner --source recc_solar
+  --dry-run --max-candidates 8` saw 8 candidate-quality passes, no source
+  errors.
+- `empire_os/recc_supply_sweep.py`: rotates across at most 40 RECC Solar
+  member links; cap **8 member details per sweep, 32 per UTC day**,
+  robots check, first-party HTTPS only, >=0.7s spacing, mutex and persistent
+  source cursor. Compacts source results into a **private, permission-600
+  internal B2B research ledger** with canonical/sale/outbound authority FALSE.
+  No external website follow-up, consumers or claimant profiles. Business
+  names and source detail URLs remain private evidence, NOT exported or
+  sold as raw RECC directory data.
+- `scripts/run_bounded_recc_solar_sweep_20261019.py` uses a required
+  `--run-founder-approved` flag and bounded private runtime folder at
+  `/srv/empire_os/runtime/lead_supply/private_recc_sweeps`.
+- `scripts/review_supply_sweeps_and_exchange_20261019.py` compares the
+  real **canonical EmpireDB selected Exchange snapshot** with the separately
+  deduplicated source research ledger. It never adds research observations
+  to canonical inventory or calls a DB writer. Counts are distinct.
+- The existing `empire-buyer-acquisition-scout.timer` and
+  `empire-commercial-exchange.timer` were observed ACTIVE and left intact.
+- Two live founder-approved private source sweeps completed at ~13:34 UTC;
+  **16 unique research observations**, no detail-fetch errors, no canonical
+  prospect additions. The Exchange stayed 176 selected records: 85 evidence
+  holds, 91 buyer-capacity overflow, 0 allocated/ready. The scraper
+  result is not an assertion of new net canonical contacts.
+- Under current `ubuntu` shell, `CrawlerProspectRepository.from_environment()`
+  returns `DataGatewayUnavailable`: the shell does not have the protected
+  EmpireDB connection context. Do not copy secrets or fake ingest counts.
+  A dedicated existing-service credential and approved atomic canonical
+  ingest path are required to turn source observations into prospects.
+- Approved schedule proposal: four daily UTC slots (01:17, 07:17, 13:17,
+  19:17), at most eight detail requests per slot, capped 32/day and
+  lock-protected. Pin the executed code to an immutable Git commit snapshot.
+  If a source fails robots, source-contract checks or daily caps, the scan
+  stops without promoting or exporting any contacts.
+
+**Commercial truth:** acquisition research growth != qualified inventory,
+buyer activation, signed capacity, purchase, fulfilment or revenue.
