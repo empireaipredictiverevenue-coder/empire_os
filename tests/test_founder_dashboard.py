@@ -2490,6 +2490,10 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert quality["schema_version"] == "empire.flagship_scientific_experience_integrations.v1"
     assert quality["external_customer_data_transmitted"] is False
     assert quality["integrations"]["openreplay"]["session_recording_enabled"] is False
+    source_history = control["source_quality_history"]
+    assert source_history["schema_version"] == "empire.flagship_source_quality_history.v1"
+    assert source_history["buyer_or_revenue_verified"] is False
+    assert source_history["statistical_significance_established"] is False
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False

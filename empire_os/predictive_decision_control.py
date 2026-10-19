@@ -502,6 +502,10 @@ def build_predictive_decision_control_runtime(
     decision["flagship_quality_integrations"] = flagship_vendor_readiness(
         as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_source_quality_history import PATH, review_quality_history
+    decision["source_quality_history"] = review_quality_history(
+        root / PATH, as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 

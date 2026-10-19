@@ -86,6 +86,7 @@ export default async function FounderPage() {
   const evidencePathways = decision?.evidence_pathways;
   const commercialEvidence = decision?.commercial_evidence_request;
   const vendorStatus = decision?.flagship_quality_integrations;
+  const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -377,6 +378,38 @@ export default async function FounderPage() {
                           </div>
                         );
                       })}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
+                      <p className="text-xs font-semibold text-white">
+                        Longitudinal source-quality observations
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-300">
+                        <span>Recorded snapshots: {scientificSourceHistory?.observation_count ?? "Unknown"}</span>
+                        <span>
+                          Review: {show(scientificSourceHistory?.status, "Not connected").replaceAll("_", " ")}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-300">
+                        {scientificSourceHistory?.latest_quality_category_counts
+                          ? "Observed: " + (scientificSourceHistory.latest_quality_category_counts.OBSERVED ?? 0)
+                            + " · Stale: " + (scientificSourceHistory.latest_quality_category_counts.STALE ?? 0)
+                            + " · Held: " + (scientificSourceHistory.latest_quality_category_counts.HELD ?? 0)
+                          : "No historical source-quality distribution available."}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        Next quality action: {show(scientificSourceHistory?.next_internal_quality_action, "Capture real baseline").replaceAll("_", " ")}.
+                      </p>
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        {show(scientificSourceHistory?.comparison_status, "Awaiting recorded observation").replaceAll("_", " ")}.
+                        {scientificSourceHistory?.latest_observed_at
+                          ? " Latest observation: " + scientificSourceHistory.latest_observed_at
+                          : " No production baseline has been activated."}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        Four source adapters are not an independent statistical sample.
+                        Source freshness is not buyer verification, forecast accuracy
+                        or revenue. Evidently is optional and not run by this panel.
+                      </p>
                     </div>
                     <p className="mt-3 text-[11px] text-slate-500">
                       Adapter readiness is not proof of operational provider connection.

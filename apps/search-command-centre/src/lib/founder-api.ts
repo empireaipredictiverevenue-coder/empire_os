@@ -262,7 +262,28 @@ export type FlagshipVendorIntegrations = {
   execution_authority: "none";
 };
 
+export type FlagshipSourceQualityHistory = {
+  schema_version: string;
+  status: string;
+  observation_count: number;
+  comparison_status: string;
+  separation_hours: number | null;
+  absolute_proportion_changes: Record<string, number> | null;
+  earliest_observed_at?: string;
+  latest_observed_at?: string;
+  latest_quality_category_counts?: Record<string, number>;
+  next_internal_quality_action?: string;
+  local_chain_verified?: boolean;
+  externally_anchored_or_signed?: false;
+  evidently_drift_test_executed: false;
+  statistical_significance_established: false;
+  buyer_or_revenue_verified: false;
+  model_retrained: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  source_quality_history?: FlagshipSourceQualityHistory;
   flagship_quality_integrations?: FlagshipVendorIntegrations;
   commercial_evidence_request?: PredictiveCommercialEvidenceRequest;
   evidence_pathways?: PredictiveEvidencePathways;
