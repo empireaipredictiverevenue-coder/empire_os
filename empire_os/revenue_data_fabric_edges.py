@@ -20,6 +20,16 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "legacy_usb_metro_and_modelled_value_archives_to_source_census",
+        "empire_os/legacy_market_archive_review_20261019.py",
+        "empire_os/source_intelligence.py",
+        "USB-only June 2026 historical rows, de-duplicated dimensions, "
+        "source licensing and company provenance, no sensitive contact exports, "
+        "no unverified expected revenue promoted into calibration or CRM",
+        "preserve historical market research and identify genuine novel source "
+        "evidence gaps without polluting verified buyer/revenue datasets",
+    ),
+    IntelligenceEdge(
         "twenty_historic_crm_to_canonical_empiredb_identity_review",
         "empire_os/twenty_recovery_boundary.py",
         "empire_os/founder_lead_supply_api.py",
