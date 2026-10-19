@@ -47,21 +47,43 @@ def load(path: Path) -> dict:
     )
 
 
-def approved_candidate_matches(report: dict, root: Path = Path(".")) -> bool:
-    """Buyer approval is bound to both frozen source copies, never a new page."""
+# The reviewed roofing source remains preserved independently of the live page.
+# e440dc1b changes ONLY the hero link, from a disabled placeholder to the
+# existing ZIP/recording-consent workflow. It does not expose a phone number.
+# Both the source variant and its built HTML are pinned: no arbitrary page
+# change inherits Lead Smart's original review.
+ROOFING_HERO_CTA_SOURCE_SHA256 = (
+    "9cf8437f7cdc1312b43c9ad99248a9663a4c6c0be68b3a387c4f21d2b9a61641"
+)
+ROOFING_HERO_CTA_HTML_SHA256 = (
+    "0e1efde0f12311cd0a722777b91b68ecb95313ef947c4a186a0c90b43a66cc22"
+)
+
+
+def _approved_source_variant(report: dict, root: Path) -> str | None:
     expected = report.get("reviewed_source_sha256")
     if (report.get("approved") is not True
             or report.get("source_ref") != "gmail:1a12bc009d04fcc9"
             or not isinstance(expected, str) or len(expected) != 64):
-        return False
+        return None
+    reviewed = root / "templates/lead_smart/roofing/page.tsx"
+    live = root / "apps/empire-public-site/src/app/roofing/page.tsx"
     try:
-        paths = (root / "templates/lead_smart/roofing/page.tsx",
-                 root / "apps/empire-public-site/src/app/roofing/page.tsx")
-        return all(not p.is_symlink() and hashlib.sha256(p.read_bytes()).hexdigest() == expected
-                   for p in paths)
+        if reviewed.is_symlink() or live.is_symlink():
+            return None
+        if hashlib.sha256(reviewed.read_bytes()).hexdigest() != expected:
+            return None
+        active = hashlib.sha256(live.read_bytes()).hexdigest()
+        if active in (expected, ROOFING_HERO_CTA_SOURCE_SHA256):
+            return active
     except OSError:
-        return False
+        return None
+    return None
 
+
+def approved_candidate_matches(report: dict, root: Path = Path(".")) -> bool:
+    """Preserve original buyer review; admit only the pinned consent-link variant."""
+    return _approved_source_variant(report, root) is not None
 
 
 
@@ -84,13 +106,19 @@ def approved_live_publication(
 ) -> bool:
     """Evidence that the exact approved roofing page is published, not call-ready."""
     site_root = site_root or Path("/srv/empire_os/apps/empire-public-site/out")
-    if not approved_candidate_matches(report, root=repo_root):
+    source_variant = _approved_source_variant(report, repo_root)
+    if source_variant is None:
         return False
     published = site_root / "roofing.html"
     try:
         if published.is_symlink():
             return False
-        return hashlib.sha256(published.read_bytes()).hexdigest() == APPROVED_ROOFING_HTML_SHA256
+        expected_html = (
+            ROOFING_HERO_CTA_HTML_SHA256
+            if source_variant == ROOFING_HERO_CTA_SOURCE_SHA256
+            else APPROVED_ROOFING_HTML_SHA256
+        )
+        return hashlib.sha256(published.read_bytes()).hexdigest() == expected_html
     except OSError:
         return False
 
@@ -148,6 +176,7 @@ def compute_live_launch_readiness(
     # Read the recorded direct founder-witnessed voice connection and buyer
     # route/ANI statements in their truthful scope. They cannot certify an
     # independently observed Ringba CallRoutes API, recording law or payout.
+    witness = None
     try:
         from empire_os.lead_smart_site_handoff import CAMPAIGN, NUMBER
         control = load(evidence_root / 'pilot/approved_control.json')
@@ -175,8 +204,35 @@ def compute_live_launch_readiness(
         }
     except (OSError, RuntimeError, ValueError, TypeError, KeyError):
         supervised_confirmation = None
+    # Read-only, exact-byte review of the actually deployed pre-dial consent
+    # handler and call-specific privacy notice. This is not a statement that
+    # the buyer's Ringba admin permissions or legal certification were obtained.
+    consent_source = repo_root / 'empire_os/lead_smart_pilot_call_api.py'
+    try:
+        from empire_os.empire_ai_public_legal_release import checked_legal_path
+        consent_sha = None if consent_source.is_symlink() else hashlib.sha256(consent_source.read_bytes()).hexdigest()
+        if not isinstance(witness, dict) or witness.get('recording_legal_release_certified') is not False:
+            raise ValueError('legal_certification_not_supported')
+        published_policies = all(checked_legal_path(route) is not None
+                                 for route in ('privacy','terms'))
+        supervised_consumer_disclosure = {
+            'mandatory_recording_source_ref': witness.get('mandatory_recording_buyer_source_ref'),
+            'buyer_disclaimer_test_ref': witness.get('recording_notice_test_ref'),
+            'buyer_deletion_source_ref': witness.get('deletion_if_legally_required_buyer_source_ref'),
+            'buyer_mandatory_recording': witness.get('buyer_recording_is_mandatory'),
+            'buyer_deletes_if_legally_required': witness.get('buyer_agreed_to_required_deletion'),
+            'pre_dial_affirmative_consent_proven': witness.get('caller_pre_dial_site_consent_is_present'),
+            'specific_call_privacy_notice_live': witness.get('public_website_specific_call_privacy_notice_present'),
+            'general_privacy_terms_live': published_policies,
+            'call_api_exact_sha256': consent_sha,
+            'buyer_admin_configuration_proven': witness.get('independent_ringba_admin_api_verified'),
+            'legal_compliance_certified': witness.get('recording_legal_release_certified'),
+        }
+    except (OSError, ValueError, TypeError, AttributeError):
+        supervised_consumer_disclosure = None
     return build_launch_readiness(
         supervised_buyer_confirmation=supervised_confirmation,
+        supervised_consumer_disclosure=supervised_consumer_disclosure,
         tracking=load(evidence_root / 'ringba/tracking_verification/latest.json'),
         zip_gate=load(evidence_root / 'coverage/activation/latest.json'),
         routing=load(evidence_root / 'ringba/routing_observation/latest.json'),

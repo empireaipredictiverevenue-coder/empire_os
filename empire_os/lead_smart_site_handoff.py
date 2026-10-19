@@ -86,17 +86,20 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
     end = _moment(control.get("ends_at"))
     if not (0 < (end-start).total_seconds() <= 7200 and start <= now < end):
         raise HandoffHeld()
-    # Existing founder-authorised launch window still bounds admissions.
-    # Future normal-campaign scheduling is a separate release decision.
-    # Exact start/end must BOTH lie inside that pilot window, even if a
-    # founder/config writer accidentally chooses a weekend or a longer slot.
+    # The first pilot was 10AM-noon Chicago on 19 October, but buyer
+    # approval covers normal weekday offer hours. A *new* explicit config
+    # window can be selected for a supervised retry; no calls are enabled
+    # until the operator activates that exact window. Keep one local day,
+    # weekday business hours and the existing two-hour maximum.
     chicago = ZoneInfo("America/Chicago")
     local_start = start.astimezone(chicago)
     local_end = end.astimezone(chicago)
+    start_min = local_start.hour * 60 + local_start.minute
+    end_min = local_end.hour * 60 + local_end.minute
     if (local_start.weekday() >= 5
             or local_start.date() != local_end.date()
-            or not 600 <= local_start.hour * 60 + local_start.minute < 720
-            or not 600 < local_end.hour * 60 + local_end.minute <= 720):
+            or not 480 <= start_min < 1080
+            or not 480 < end_min <= 1080):
         raise HandoffHeld()
     # Deliberately bound the ledger to the selected window.
     return f"{CAMPAIGN}:{start.isoformat()}:{end.isoformat()}", end
@@ -109,7 +112,15 @@ def _readiness(readiness: Mapping[str, Any], now: datetime) -> None:
     # raw provider verification as false. Consent/privacy and stop stay required.
     substitutions = readiness.get("pilot_admission_substitutions", [])
     if not isinstance(substitutions, list) or substitutions not in (
-        [], ["caller_id_pass_through_verified", "routing_runtime_verified"]
+        [], ["caller_id_pass_through_verified", "routing_runtime_verified"],
+        ["caller_id_pass_through_verified", "legal_release_verified",
+         "recording_notice_and_retention_verified", "routing_runtime_verified"],
+    ):
+        raise HandoffHeld()
+    if "recording_notice_and_retention_verified" in substitutions and not (
+        readiness.get("consumer_notice_process_operational") is True
+        and readiness.get("independent_legal_clearance_certified") is False
+        and readiness.get("buyer_recording_admin_independently_verified") is False
     ):
         raise HandoffHeld()
     if substitutions and not (

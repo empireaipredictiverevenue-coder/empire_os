@@ -382,3 +382,116 @@ def test_recording_claim_string_cannot_grant_launch_authority():
     )
     assert candidate["gates"]["recording_notice_and_retention_verified"] is False
     assert candidate["launch_ready"] is False
+
+
+def test_exact_founder_witnessed_buyer_configuration_is_valid_for_original_window_only():
+    from empire_os.lead_smart_launch_readiness import _supervised_buyer_confirmation
+    now = datetime(2026, 10, 19, 15, 35, tzinfo=timezone.utc)
+    record = {
+        "buyer":"Lead Smart","campaign_id":"CA8278ed3f26e9495b881fe3833174d007",
+        "tracking_number":"+18883579305","source_ref":"gmail:1a145122e620d481",
+        "founder_authority_ref":"docs/evidence/lead_smart_founder_launch_intent_20261011.json",
+        "buyer_confirmed_direct_route":True,"buyer_confirmed_original_ani":True,
+        "founder_witnessed_voice_connection":True,
+        "independently_proven_admin_api":False,
+        "starts_at":"2026-10-19T15:00:00+00:00",
+        "ends_at":"2026-10-19T17:00:00+00:00",
+    }
+    assert _supervised_buyer_confirmation(record,now)
+    assert not _supervised_buyer_confirmation(record,datetime(2026,10,19,17,0,tzinfo=timezone.utc))
+    assert not _supervised_buyer_confirmation({**record,"source_ref":"gmail:invented"},now)
+    assert not _supervised_buyer_confirmation({**record,"independently_proven_admin_api":True},now)
+    assert not _supervised_buyer_confirmation({**record,"founder_witnessed_voice_connection":"true"},now)
+    assert not _supervised_buyer_confirmation({**record,"campaign_id":"wrong"},now)
+    # The buyer's written Direct-route evidence remains scoped to a selected
+    # short weekday window, including a separately scheduled Tuesday retry.
+    retry = {**record, "starts_at":"2026-10-20T15:00:00Z",
+             "ends_at":"2026-10-20T15:15:00Z"}
+    assert _supervised_buyer_confirmation(
+        retry,datetime(2026,10,20,15,5,tzinfo=timezone.utc))
+    assert not _supervised_buyer_confirmation(
+        {**retry,"ends_at":"2026-10-20T23:15:00Z"},
+        datetime(2026,10,20,15,5,tzinfo=timezone.utc))
+    assert not _supervised_buyer_confirmation(
+        {**retry,"starts_at":"2026-10-17T15:00:00Z",
+         "ends_at":"2026-10-17T15:15:00Z"},
+        datetime(2026,10,17,15,5,tzinfo=timezone.utc))
+
+
+def test_source_bound_pilot_substitutes_unreadable_admin_route_not_recording_or_legal():
+    from empire_os.lead_smart_launch_readiness import build_launch_readiness
+    now = datetime(2026, 10, 19, 15, 35, tzinfo=timezone.utc)
+    moment = now.isoformat()
+    record = {
+        "buyer":"Lead Smart","campaign_id":"CA8278ed3f26e9495b881fe3833174d007",
+        "tracking_number":"+18883579305","source_ref":"gmail:1a145122e620d481",
+        "founder_authority_ref":"docs/evidence/lead_smart_founder_launch_intent_20261011.json",
+        "buyer_confirmed_direct_route":True,"buyer_confirmed_original_ani":True,
+        "founder_witnessed_voice_connection":True,"independently_proven_admin_api":False,
+        "starts_at":"2026-10-19T15:00:00Z","ends_at":"2026-10-19T17:00:00Z",
+    }
+    track={"state":"VERIFIED","tracking_verified":True,"verified_at":moment,
+           "source_observed_at":moment}
+    covered={"zip_targeting_gate_verified":True,"zip_coverage_activation_verified":True,
+             "source_fresh_for_targeting":True,"source_observed_at":moment,
+             "verified_freshness":{"source_newest_last_updated":moment}}
+    result=build_launch_readiness(
+        tracking=track,zip_gate=covered,
+        routing={"routing_runtime_verified":False,"observed_at":moment},
+        operating_hours=REPORT,
+        timezone_confirmation=timezone_confirmation(now=now),
+        supervised_buyer_confirmation=record,
+        caller_id_pass_through_verified=False,
+        buyer_landing_page_approved=True,landing_publication_authorized=True,
+        founder_live_traffic_authorized=True,
+        pilot_stop_verified=True,legal_release_verified=False,
+        recording_notice_and_retention_verified=False,now=now
+    )
+    assert result["buyer_attested_supervised_route"] is True
+    assert result["gates"]["routing_runtime_verified"] is False
+    assert result["gates"]["caller_id_pass_through_verified"] is False
+    assert result["independent_route_proven"] is False
+    assert result["revenue_verified"] is False
+    assert result["pilot_admission_substitutions"] == [
+        "caller_id_pass_through_verified","routing_runtime_verified"]
+    assert set(result["blockers"]) == {
+        "legal_release_verified","recording_notice_and_retention_verified"}
+    assert result["launch_ready"] is False
+    assert result["call_cta_enabled"] is False
+
+
+def test_recording_approach_is_exact_source_bound_not_fake_legal_certification():
+    from empire_os.lead_smart_launch_readiness import _supervised_consumer_disclosure
+    proof={
+        "mandatory_recording_source_ref":"gmail:1a13568711da9a5b",
+        "buyer_disclaimer_test_ref":"gmail:1a145b32d742f3b1",
+        "buyer_deletion_source_ref":"gmail:1a145a443180606f",
+        "buyer_mandatory_recording":True,
+        "buyer_deletes_if_legally_required":True,
+        "pre_dial_affirmative_consent_proven":True,
+        "specific_call_privacy_notice_live":True,
+        "general_privacy_terms_live":True,
+        "call_api_exact_sha256":"4ad55e9de33009ce75a9981cd83a962f15004f7a8f9b1a79e5cdf40c1713fb60",
+        "buyer_admin_configuration_proven":False,
+        "legal_compliance_certified":False,
+    }
+    assert _supervised_consumer_disclosure(proof)
+    for field,bad in [
+        ("pre_dial_affirmative_consent_proven",False),
+        ("general_privacy_terms_live",False),
+        ("specific_call_privacy_notice_live",False),
+        ("buyer_deletes_if_legally_required",False),
+        ("call_api_exact_sha256","unreviewed-drift"),
+        ("buyer_admin_configuration_proven",True),
+        ("legal_compliance_certified",True),
+    ]:
+        assert not _supervised_consumer_disclosure({**proof,field:bad})
+
+
+def test_static_provider_number_assignment_two_hour_window_only():
+    source=tracking()
+    for key in ("verified_at","source_observed_at"):
+        source[key]=(NOW-timedelta(minutes=80)).isoformat()
+    assert readiness(track=source)["gates"]["tracking_verified"] is True
+    source["source_observed_at"]=(NOW-timedelta(minutes=121)).isoformat()
+    assert readiness(track=source)["gates"]["tracking_verified"] is False

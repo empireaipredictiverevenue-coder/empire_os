@@ -106,7 +106,7 @@ def test_disabled_control_idempotent_not_reactivated(tmp_path):
     {"tracking_number": "+15550000000"},
     {"schema_version": "invented"},
     {"stop_method": "other"},
-    {"max_site_handoffs": 6},
+    {"max_site_handoffs": 10001},
     {"enabled": "true"},
 ])
 def test_unrecognized_control_is_not_modified(tmp_path, changes):
@@ -197,3 +197,20 @@ def test_stop_serializes_with_live_reservation_and_blocks_next(monkeypatch, tmp_
             "07001", config_path=control_path, ledger_path=ledger,
             readiness=readiness(), eligible_zip=True, now=NOW,
         )
+
+
+def test_emergency_stop_remains_effective_after_removing_fixed_five_cap(tmp_path):
+    path = tmp_path / "approved_control.json"
+    write_protected(path, json.dumps({**control(), "max_site_handoffs": 150}))
+    result = stop_control(control_path=path, apply=True)
+    assert result["status"] == "DISABLED"
+    assert json.loads(path.read_text())["enabled"] is False
+    assert json.loads(path.read_text())["max_site_handoffs"] == 150
+
+@pytest.mark.parametrize("bad_cap", [0, -1, 10001, True, "100", None])
+def test_untrusted_or_unbounded_cap_still_prevents_unsafe_stop_mutation(tmp_path,bad_cap):
+    path = tmp_path / "approved_control.json"
+    write_protected(path, json.dumps({**control(), "max_site_handoffs":bad_cap}))
+    original = path.read_bytes()
+    assert stop_control(control_path=path, apply=True)["status"]=="UNTRUSTED_CONTROL_HELD"
+    assert path.read_bytes()==original

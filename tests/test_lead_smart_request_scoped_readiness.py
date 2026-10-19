@@ -12,25 +12,34 @@ APPROVED_HASH = "faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43ccc
 
 def test_deployed_roofing_hash_stays_verified_and_any_drift_holds(tmp_path, monkeypatch):
     root=tmp_path/"source"
-    for name in ("templates/lead_smart/roofing/page.tsx",
-                 "apps/empire-public-site/src/app/roofing/page.tsx"):
+    names=("templates/lead_smart/roofing/page.tsx",
+           "apps/empire-public-site/src/app/roofing/page.tsx")
+    for name in names:
         f=root/name
         f.parent.mkdir(parents=True,exist_ok=True)
         f.write_bytes(Path(name).read_bytes())
-        assert hashlib.sha256(f.read_bytes()).hexdigest()==APPROVED_HASH
+    reviewed=root/names[0]
+    active=root/names[1]
+    assert hashlib.sha256(reviewed.read_bytes()).hexdigest()==APPROVED_HASH
+    assert hashlib.sha256(active.read_bytes()).hexdigest()==release.ROOFING_HERO_CTA_SOURCE_SHA256
     site=tmp_path/"site"
     site.mkdir()
     html=site/"roofing.html"
-    html.write_bytes(b"approved-html")
-    monkeypatch.setattr(release, "APPROVED_ROOFING_HTML_SHA256",
-                        hashlib.sha256(html.read_bytes()).hexdigest())
+    html.write_bytes(Path("apps/empire-public-site/out/roofing.html").read_bytes()
+        if Path("apps/empire-public-site/out/roofing.html").exists()
+        else Path("/srv/empire_os/apps/empire-public-site/out/roofing.html").read_bytes())
     report={"approved":True, "source_ref":"gmail:1a12bc009d04fcc9",
             "reviewed_source_sha256":APPROVED_HASH}
+    assert release.approved_candidate_matches(report,root=root)
     assert release.approved_live_publication(report,repo_root=root,site_root=site)
     html.write_bytes(b"modified-html")
     assert not release.approved_live_publication(report,repo_root=root,site_root=site)
     html.unlink()
     html.symlink_to(Path("/etc/hosts"))
+    assert not release.approved_live_publication(report,repo_root=root,site_root=site)
+    html.unlink()
+    active.write_text(active.read_text()+"\\n// unauthorised edit\\n")
+    assert not release.approved_candidate_matches(report,root=root)
     assert not release.approved_live_publication(report,repo_root=root,site_root=site)
 
 

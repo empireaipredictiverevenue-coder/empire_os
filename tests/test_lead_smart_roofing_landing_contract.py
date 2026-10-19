@@ -182,7 +182,20 @@ def test_roofing_page_mounts_read_only_zip_preview():
     assert "No phone number will be enabled by this preview" in client
 
 
-def test_roofing_page_public_and_template_source_remain_identical():
-    canonical = PAGE.read_bytes()
-    site = Path("apps/empire-public-site/src/app/roofing/page.tsx").read_bytes()
-    assert canonical == site
+def test_roofing_page_preserves_buyer_review_and_pinned_consent_navigation():
+    import hashlib
+    from scripts.materialize_lead_smart_launch_readiness import (
+        ROOFING_HERO_CTA_SOURCE_SHA256, approved_candidate_matches,
+    )
+    reviewed = PAGE.read_bytes()
+    live = Path("apps/empire-public-site/src/app/roofing/page.tsx").read_bytes()
+    reviewed_sha = hashlib.sha256(reviewed).hexdigest()
+    assert reviewed_sha == "faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43cccb"
+    assert hashlib.sha256(live).hexdigest() == ROOFING_HERO_CTA_SOURCE_SHA256
+    assert b'href="#roofing-zip-check-heading"' in live
+    assert b"tel:${TRACKING_NUMBER_E164}" not in live
+    assert approved_candidate_matches({
+        "approved": True,
+        "source_ref": "gmail:1a12bc009d04fcc9",
+        "reviewed_source_sha256": reviewed_sha,
+    })
