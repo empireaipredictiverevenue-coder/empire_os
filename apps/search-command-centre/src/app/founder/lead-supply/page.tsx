@@ -32,6 +32,7 @@ export default async function FounderLeadSupplyPage({
   const niches = data?.niches ?? [];
   const visible = selected ? niches.filter((v) => v.niche === selected) : niches;
   const seats = data?.exchange?.buyer_seat_states ?? {};
+  const scoring = data?.scoring_coverage;
   const corridors = (data?.corridors ?? []).filter((row) => !selected || row.niche === selected);
 
   return (
@@ -89,6 +90,86 @@ export default async function FounderLeadSupplyPage({
                 note="Canonical prospects without linked acquisition record" />
               <Tile label="Verified market prices" value={fmt(data.exchange?.verified_market_price_count)}
                 note="No estimated or invented prices" />
+            </section>
+
+            <section className="panel mt-7">
+              <p className="eyebrow">OMEGA · CORTEX · Qualification v2 · Enrichment</p>
+              <h2 className="mt-2 text-xl font-semibold">Lead intelligence engine coverage</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                This measures canonical evidence linkages. OMEGA scores are deterministic,
+                not independently calibrated sales probabilities; CORTEX learns from
+                verified outcomes and is not a replacement qualification score.
+              </p>
+              {!scoring?.available ? (
+                <p className="mt-5 text-sm text-amber-200">
+                  Intelligence score reader unavailable. No zero-score assumption.
+                </p>
+              ) : (
+                <>
+                  <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <Tile label="Scoring v2 records" value={fmt(scoring.counts?.v2_scored_rows)}
+                      note="Latest canonical v2 records per prospect" />
+                    <Tile label="Enrichment evidence" value={fmt(scoring.counts?.enrichment_evidence_present)}
+                      note="Evidence attached to qualification result" />
+                    <Tile label="OMEGA evidence matched" value={fmt(scoring.omega_evidence_matched_unique_prospects)}
+                      note="Matched qualification ID and active entity identity" />
+                    <Tile label="Missing qualification" value={fmt(scoring.counts?.unscored)}
+                      note="No canonical v1/v2 score in census" />
+                  </div>
+                  <div className="mt-6 max-h-[430px] overflow-auto">
+                    <table className="w-full min-w-[780px] text-left text-sm">
+                      <thead className="sticky top-0 bg-[#0b1716] text-xs uppercase tracking-wider text-slate-500">
+                        <tr>
+                          <th className="py-3 pr-4">Niche</th>
+                          <th className="py-3 pr-4">v2 scored</th>
+                          <th className="py-3 pr-4">Hot</th>
+                          <th className="py-3 pr-4">Warm</th>
+                          <th className="py-3 pr-4">Evidence missing</th>
+                          <th className="py-3 pr-4">Enriched</th>
+                          <th className="py-3 pr-4">OMEGA matched</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(scoring.by_niche ?? [])
+                          .filter((n) => !selected || n.niche === selected)
+                          .map((n) => (
+                          <tr key={n.niche} className="border-t border-white/[0.06]">
+                            <td className="py-2 pr-4 font-semibold text-cyan-200">{n.niche}</td>
+                            <td className="py-2 pr-4">{fmt(n.v2_scored_rows)}</td>
+                            <td className="py-2 pr-4">{fmt(n.tier_hot)}</td>
+                            <td className="py-2 pr-4">{fmt(n.tier_warm)}</td>
+                            <td className="py-2 pr-4">{fmt(n.insufficient_evidence)}</td>
+                            <td className="py-2 pr-4">{fmt(n.enrichment_evidence_present)}</td>
+                            <td className="py-2 pr-4">{fmt(n.omega_evidence_matched)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+              <div className="mt-6 rounded-xl border border-white/10 p-4">
+                <p className="font-semibold">CORTEX outcome learning</p>
+                <p className="mt-2 text-xs text-slate-400">
+                  Snapshot: {scoring?.cortex?.generated_at ?? "Unavailable"} ·{" "}
+                  {scoring?.cortex?.stale_older_than_24h
+                    ? "STALE" : scoring?.cortex?.available ? "Available" : "Unverified"} ·{" "}
+                  {fmt(scoring?.cortex?.verified_customer_learning_count)} verified customer learning records
+                </p>
+                <p className="mt-2 text-xs text-amber-200">
+                  A CORTEX snapshot does not prove live niche-level model learning.
+                  Verified fulfilled and paid outcomes are required before any learning promotion.
+                </p>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {(scoring?.engine_registry ?? []).map((item) => (
+                  <div key={item.engine} className="rounded-xl border border-white/10 p-4">
+                    <p className="font-semibold">{item.engine}</p>
+                    <p className="mt-2 text-xs text-slate-400">{item.observed_connection.replaceAll("_", " ")}</p>
+                    <p className="mt-2 break-all text-xs text-slate-500">{item.files.join(", ")}</p>
+                  </div>
+                ))}
+              </div>
             </section>
 
             <section className="panel mt-7">

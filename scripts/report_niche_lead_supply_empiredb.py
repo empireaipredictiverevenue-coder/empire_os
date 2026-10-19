@@ -17,6 +17,9 @@ from empire_os.data_query import OrderSpec
 from empire_os.lead_supply_intelligence import (
     build_lead_supply_report, crawler_receipt_summary,
 )
+from empire_os.lead_scoring_inventory_bridge import (
+    ENGINE_REGISTER, build_scoring_coverage, cortex_runtime_summary,
+)
 
 
 COLUMNS = {
@@ -24,7 +27,12 @@ COLUMNS = {
     "prospect_acquisitions": "id,prospect_id,source",
     "prospect_qualifications": (
         "id,prospect_id,scoring_engine,scoring_version,status,tier,"
-        "evidence_confidence,scored_at,entity_id"
+        "evidence_confidence,scored_at,entity_id,result_payload"
+    ),
+    "prospect_entity_links": "id,prospect_id,entity_id,active",
+    "intelligence_scores": (
+        "id,entity_type,entity_id,score_type,model_key,confidence,"
+        "scored_at,features"
     ),
 }
 
@@ -66,12 +74,26 @@ def run(
     page_size: int = 500,
     max_rows_per_table: int = 50000,
 ) -> dict[str, Any]:
+    # Preserve lead count availability when an optional intelligence reader
+    # is unavailable. Never translate missing scoring data into zero scores.
+    required = ("prospects", "prospect_acquisitions", "prospect_qualifications")
     tables = {
         table: read_complete_table(
             gateway, table, page_size=page_size, max_rows=max_rows_per_table
         )
-        for table in COLUMNS
+        for table in required
     }
+    scoring_optional: dict[str, list[dict[str, Any]]] = {}
+    scoring_reader_failure: str | None = None
+    try:
+        for table in ("prospect_entity_links", "intelligence_scores"):
+            scoring_optional[table] = read_complete_table(
+                gateway, table, page_size=page_size,
+                max_rows=max_rows_per_table,
+            )
+    except Exception as exc:
+        scoring_reader_failure = type(exc).__name__
+        scoring_optional = {}
     exchange_path = root / "runtime" / "commercial_exchange" / "latest.json"
     exchange = json.loads(exchange_path.read_text())
     if (
@@ -90,6 +112,33 @@ def run(
         crawl_receipts=crawler_receipt_summary(crawl_path),
         observed_at=datetime.now(timezone.utc),
     )
+    if scoring_optional:
+        report["scoring_coverage"] = {
+            "available": True,
+            **build_scoring_coverage(
+                prospects=tables["prospects"],
+                qualifications=tables["prospect_qualifications"],
+                identity_links=scoring_optional["prospect_entity_links"],
+                intelligence_scores=scoring_optional["intelligence_scores"],
+                cortex_snapshot=cortex_runtime_summary(
+                    root / "runtime/cortex_learning/cortex_learning_latest.json"
+                ),
+            ),
+        }
+        report["table_rows_scanned"].update({
+            key: len(rows) for key, rows in scoring_optional.items()
+        })
+    else:
+        report["scoring_coverage"] = {
+            "available": False,
+            "engine_registry": [dict(item) for item in ENGINE_REGISTER],
+            "reason": "optional_empiredb_scoring_reader_unavailable",
+            "error_class": scoring_reader_failure,
+            "no_scores_does_not_mean_zero": True,
+            "cortex": cortex_runtime_summary(
+                root / "runtime/cortex_learning/cortex_learning_latest.json"
+            ),
+        }
     # Pagination is complete but not a transactionally consistent snapshot.
     report["transactionally_consistent_snapshot_proven"] = False
     report["limitations"] = [
@@ -135,6 +184,7 @@ def main() -> int:
         "niche_count": len(report["niches"]),
         "lead_counts_complete": report["lead_counts_complete"],
         "verified_active_buyer_seat_records": report["exchange"]["buyer_seat_states"].get("active_capacity", 0),
+        "scoring_coverage_available": report["scoring_coverage"]["available"],
         "execution_authority": "none",
     }, sort_keys=True))
     return 0

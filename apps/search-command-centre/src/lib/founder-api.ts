@@ -986,12 +986,47 @@ export function getPredictiveRevenueDemo() {
 }
 
 /** Founder-only EmpireDB lead supply observatory, never public inventory. */
+export type LeadScoringCoverage = {
+  available?: boolean;
+  reason?: string;
+  omega_score_rows_scanned?: number;
+  omega_evidence_matched_unique_prospects?: number;
+  omega_probabilities_outcome_calibrated?: boolean;
+  counts?: Record<string, number>;
+  cortex?: {
+    available?: boolean;
+    generated_at?: string;
+    stale_older_than_24h?: boolean;
+    packet_count?: number;
+    learning_ready_count?: number;
+    verified_customer_learning_count?: number;
+    connected_to_niche_aggregate?: boolean;
+  };
+  engine_registry?: Array<{
+    engine: string;
+    files: string[];
+    observed_connection: string;
+    commercial_authority: boolean;
+  }>;
+  by_niche?: Array<{
+    niche: string;
+    v2_scored_rows: number;
+    tier_hot: number;
+    tier_warm: number;
+    insufficient_evidence: number;
+    enrichment_evidence_present: number;
+    omega_evidence_matched: number;
+    omega_stale_or_mismatched: number;
+  }>;
+};
+
 export type FounderLeadSupply = {
   available?: boolean;
   observed_at?: string;
   mode?: string;
   reason?: string;
   lead_counts_complete?: boolean;
+  scoring_coverage?: LeadScoringCoverage;
   unique_prospects_observed?: number;
   qualified_with_evidence_observed?: number;
   acquisition_events_for_scanned_prospects?: number;

@@ -72,3 +72,35 @@ Historical `runtime/feedback/crawler_runs.jsonl` includes crawler events, duplic
 - Do not infer user consent, lead resale rights, pricing, territory or commitments.
 - Do not introduce Supabase, legacy `seat_corridors.py` SQLite or Stripe dependencies.
 - Service activation, payment, delivery, website publication, public self-serve and tenant authority require independent release gates.
+
+## Lead-scoring tool audit (19 October 2026)
+
+Founder asked to reconnect **CORTEX, OMEGA, lead scoring and enrichment** across the same business section.
+
+Exact files relative to `/srv/empire_os/`:
+- `empire_os/cortex_learning_loop.py` — feedback from account-twin research, verified payment, fulfilment and outcome packets.
+- `empire_os/intelligence/omega.py`, `empire_os/omega_worker.py`, `empire_os/omega_buyer_readiness.py` — Omega 2 opportunity baseline, canonical score reader/writer and buyer identity/readiness checks.
+- `empire_os/omega_os.py` — legacy Omega scorer imported by `empire_os/hub.py`; **not** authoritative Omega 2 scoring evidence.
+- `empire_os/lead_scoring.py`, `empire_os/lead_scoring_v2.py`, `empire_os/qualification_worker_v2.py` — canonical evidence-qualified scoring path.
+- `empire_os/prospect_enrichment.py`, `empire_os/evidence_enrichment_planner.py` — first-party website/identity and evidence enrichment feeding qualification v2.
+- `empire_os/enrichment.py` — legacy generic enrichment imported by hub, not the v2 canonical scoring receipt.
+- `empire_os/hunter/enrichment_worker.py`, `empire_os/buyer_deferred_enrichment.py` — separate buyer and hunter enrichment pipelines.
+- `empire_os/competitor_audience_omega_cortex.py` — competitor-audience research priority projection, not the same as paid-lead outcome CORTEX.
+- `scripts/run_qualification_cycle.py` — scheduled orchestration of signal resolution → v2 qualification → evidence recovery → identity catchup → Omega score → Omega buyer-readiness review.
+- `migrations/empiredb/009_active_schema_parity_wave1.sql` — `prospect_qualifications`.
+- `migrations/empiredb/011_intelligence_schema_parity.sql` — `intelligence_scores`.
+
+Runtime observations:
+- `empire-qualification.timer` active, with successful last `empire-qualification.service` completion on 19 October 10:17 UTC. **Successful process exit does not prove any scored rows or a buyer-ready result.**
+- `empire-buyer-deferred-enrichment.timer` ran 19 October 10:19 UTC; service exit success does not prove useful leads.
+- `empire-enrich-rescore.timer` inactive; its units point to a legacy `/root/.hermes/scripts/` job. Do not enable alongside qualification v2 without ownership and output review.
+- `runtime/cortex_learning/cortex_learning_latest.json` last generated **22 September 2026**, 2 learning packets, 0 learning-ready, 0 verified-customer learning. **Stale**; not a live trained revenue predictor.
+
+Additional additive scoring bridge:
+- `empire_os/lead_scoring_inventory_bridge.py`: model-specific read-only score inventory. It only counts Omega scores linked to the **current** v2 qualification ID and matching active entity identity. Unknown or stale scores remain separate.
+- `scripts/report_niche_lead_supply_empiredb.py`: optionally reads canonical `prospect_entity_links` and `intelligence_scores`; a failed reader explicitly returns unavailable instead of faking zero. Adds CORTEX snapshot age, enrichment receipts and hot/warm/unknown coverage by niche.
+- `/founder/lead-supply`: new private score-coverage and engine-directory section, without any scoring-worker dispatch.
+
+**No live DB census has run under this feature branch:** the shell does not contain protected `EMPIREDB_DSN`; the existing qualification/exchange services use their provisioned environments. Do not copy secrets or bypass service credential boundaries.
+
+Next release checkpoint: approve an isolated, read-only reporting service under an explicitly scoped EmpireDB reader role; validate per-niche score joins on real rows; then release private API and frontend together. CORTEX refresh and any behaviour-changing score promotion need a separate, evidence-backed decision.
