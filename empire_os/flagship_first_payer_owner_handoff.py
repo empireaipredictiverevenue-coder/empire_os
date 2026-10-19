@@ -194,11 +194,20 @@ def summarize_first_payer_owner_handoff(
 def review_current_first_payer_owner_handoff(
     repo_root: str | Path, *, as_of: datetime,
 ) -> dict[str, Any]:
-    """Invoke only the existing, side-effect-free owner read interfaces."""
+    """Invoke read interfaces and diagnose stale source epochs."""
+    from empire_os.flagship_source_epoch_reconciliation import review_source_epoch_reconciliation_runtime
     root = Path(repo_root).resolve(strict=False)
-    return summarize_first_payer_owner_handoff(
+    report = summarize_first_payer_owner_handoff(
         buyer=review_one_commercial_evidence_request(root, as_of=as_of),
         formula=review_formula_evidence(root, as_of=as_of),
         coverage=review_authorized_market_coverage_snapshot(root, as_of=as_of),
         as_of=as_of,
     )
+    if report["status"] != "CURRENT_OPPORTUNITY_NOT_ESTABLISHED":
+        return report
+    epoch = review_source_epoch_reconciliation_runtime(root, as_of=as_of)
+    report["source_epoch_reconciliation"] = epoch
+    if epoch["status"] == "RADAR_AHEAD_OF_FACTORY_STAGES":
+        report["first_priority_owner"] = "existing_opportunity_factory_owner"
+        report["first_priority_action"] = epoch["next_action"]
+    return report
