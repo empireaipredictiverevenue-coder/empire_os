@@ -375,6 +375,16 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
         urls.append(f"{PUBLIC_BASE_URL}/commercial")
     if (base / "predictive-revenue.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/predictive-revenue")
+    # Include the buyer-approved public roofing information page once it
+    # actually declares index,follow. Keep call/consent endpoints out of SEO.
+    roofing = base / "roofing.html"
+    try:
+        if (roofing.is_file() and not roofing.is_symlink()
+                and '<meta name="robots" content="index, follow"' in
+                roofing.read_text(encoding="utf-8")):
+            urls.append(f"{PUBLIC_BASE_URL}/roofing")
+    except (OSError, UnicodeError):
+        pass
     from empire_os.owned_campaign_release import released_paths
     if root is None:
         urls.extend(f"{PUBLIC_BASE_URL}{path}" for path in released_paths())

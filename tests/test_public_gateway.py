@@ -123,6 +123,18 @@ def test_public_site_urls_are_added_to_sitemap(tmp_path):
     assert "/aeo/roofing/DFW/" in xml
 
 
+def test_sitemap_includes_roofing_only_when_page_explicitly_indexable(tmp_path):
+    site = tmp_path / "site"
+    site.mkdir()
+    roofing = site / "roofing.html"
+    roofing.write_text('<meta name="robots" content="noindex, nofollow">')
+    assert "https://empire-ai.co.uk/roofing" not in _public_site_urls(site)
+    roofing.write_text('<meta name="robots" content="index, follow">')
+    assert "https://empire-ai.co.uk/roofing" in _public_site_urls(site)
+    roofing.unlink()
+    assert "https://empire-ai.co.uk/roofing" not in _public_site_urls(site)
+
+
 def test_inline_script_hashes_ignore_external_scripts(tmp_path):
     page = tmp_path / "index.html"
     page.write_text(
