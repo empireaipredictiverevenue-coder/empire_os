@@ -1,0 +1,14 @@
+[Unit]
+Description=Periodic read-only revenue sniper evidence review (NOT ACTIVE)
+
+[Timer]
+OnCalendar=*:0/30
+RandomizedDelaySec=120
+Persistent=false
+Unit=empire-revenue-sniper-observer.service
+
+[Install]
+WantedBy=timers.target
+
+# Staged in isolated git branch only. No production install/enable.
+# Does not start any legacy sniper, send emails, touch funds or run live scans.

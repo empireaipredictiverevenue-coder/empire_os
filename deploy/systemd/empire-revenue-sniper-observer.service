@@ -1,0 +1,31 @@
+[Unit]
+Description=Empire AI revenue sniper OBSERVE-only cross-snapshot reviewer
+ConditionPathExists=/srv/empire_os/runtime/buyer_acquisition/scout_latest.json
+ConditionPathExists=/srv/empire_os/runtime/buyer_acquisition/review_readiness_latest.json
+ConditionPathExists=/srv/empire_os/runtime/commercial_exchange/latest.json
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/srv/empire_os/.venv/bin/python -B -m scripts.review_revenue_sniper_dispatch_readiness_20261019 --read-only --scout /srv/empire_os/runtime/buyer_acquisition/scout_latest.json --review /srv/empire_os/runtime/buyer_acquisition/review_readiness_latest.json --exchange /srv/empire_os/runtime/commercial_exchange/latest.json
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectHome=read-only
+ProtectSystem=strict
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX
+IPAddressDeny=any
+CapabilityBoundingSet=
+AmbientCapabilities=
+UMask=0077
+
+# This service prints a read-only diagnosis only; it never triggers
+# snippets, contact outreach, DB writes, purchases or trading orders.

@@ -169,3 +169,66 @@ cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
    Scrapling/Waterfall; buyer research remains on buyer-authority path.
 4. Only then authorise bounded review-queue materialisation, dashboard
    consumption, and separately approved outreach/contract/financial actions.
+
+## Wave 5 — cross-snapshot revenue sniper readiness (19 October)
+
+**Concrete build**:
+- `empire_os/revenue_sniper_dispatch_readiness.py`: read-only compatibility
+  verifier for THREE independent production evidence populations:
+  `buyer_acquisition/scout_latest.json`, `buyer_acquisition/review_readiness_latest.json`,
+  `commercial_exchange/latest.json`. Strictly checks versioned contracts,
+  age, active delivery state and reconciles buyer-seat/review counters.
+  Distinguishes research priority from legally actionable buyer capacity.
+- `scripts/review_revenue_sniper_dispatch_readiness_20261019.py`:
+  bounded local-file CLI, zero credentials, requests, DB writes, systemd
+  mutations, outreach, financial transfers or activated trade orders.
+- `deploy/systemd/empire-revenue-sniper-observer.service` and `.timer`:
+  **STAGED ONLY, NOT INSTALLED/ENABLED**. Proposes a 30-minute read-only
+  snapshot inspection cadence without adding new scans; service has strict
+  read-only filesystem and denied IP networking. Operator must separately
+  approve production installation, review the service user and validate
+  systemd sandbox compatibility first.
+- `tests/test_revenue_sniper_dispatch_readiness_20261019.py` plus
+  `tests/test_revenue_sniper_staged_observer_20261019.py`.
+
+### Real read-only snapshot evidence (production, 19 October)
+- Buyer scout research: 10 candidates, 4 priority research, 1 insurance/legal
+  regulated hold, 4 source holds, 0 verified buyers.
+- Buyer-review: 200 assessed, 0 review-ready, 200 held. Primary blocking
+  reasons are low first-party-site evidence (90), no direct-buyer evidence
+  (61), official registry identity mismatch (28), permit territory unverified
+  (14), business identity incomplete (5), contact path absent (2).
+- Canonical Exchange: 1,057 buyer-seat records blocked on commercial evidence,
+  0 active seat capacity, 176 bounded supply inventory records, 0 allocated.
+- These are **three separate populations** and none proves 10 + 200 + 176
+  unique market opportunities. The report intentionally does no entity join.
+- The diagnostics are historical point-in-time observations, not a live
+  availability/price/revenue promise.
+
+### One command (no live execution)
+```bash
+cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+/srv/empire_os/.venv/bin/python -m \
+  scripts.review_revenue_sniper_dispatch_readiness_20261019 \
+  --read-only \
+  --scout /srv/empire_os/runtime/buyer_acquisition/scout_latest.json \
+  --review /srv/empire_os/runtime/buyer_acquisition/review_readiness_latest.json \
+  --exchange /srv/empire_os/runtime/commercial_exchange/latest.json
+```
+
+### Actual next gates
+1. Improve first-party source reliability **within** the existing Search
+   Fabric provider and robots/terms policies; HTTP 202/403/circuit-open is
+   a block, not permission for proxy evasion or more aggressive retry.
+2. Resolve independent corporate identity, official-registry/website conflict
+   and relevant UK/US jurisdiction verification; obtain actual purchasing
+   intent through lawful, authorised B2B contact.
+3. Provide real direct-buyer commercial agreement, signed capacity and
+   buyer-seat activation receipts to the owner of canonical Exchange.
+4. Inspect the staged observer unit if automation is desired; it is not
+   installed. The legacy Supabase sniper is still not eligible for activation.
+5. Only when separate approvals and evidence exist may qualified contacts,
+   reviewed offer drafts, fulfilment, payment and recognised revenue advance.
+
+**Production authority:** NONE. This is existing evidence reconciliation,
+not an agent instructed to fire outreach, deliver a lead or execute a trade.

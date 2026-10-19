@@ -20,6 +20,15 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "scout_review_and_empiredb_exchange_readiness",
+        "empire_os/revenue_sniper_scanner_review.py",
+        "empire_os/revenue_sniper_dispatch_readiness.py",
+        "fresh verified contract snapshots from existing buyer scout, review "
+        "readiness, EmpireDB Exchange, with counters reconciled and scopes separate",
+        "identify real source, first-party identity and buyer capacity blockers "
+        "without extra scans, new leads or outbound action",
+    ),
+    IntelligenceEdge(
         "existing_buyer_scout_to_review_only_revenue_sniper",
         "empire_os/buyer_acquisition_scout.py",
         "empire_os/revenue_sniper_scanner_review.py",
