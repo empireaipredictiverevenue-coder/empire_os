@@ -794,3 +794,65 @@ from code commit; do not claim this code is deployed to a web service.
 **Operational next gate:** independently verified buyer purchase/capacity
 terms and protected EmpireDB business identity reader. A source score or a
 research-domain first-party page is not a verified purchaser.
+
+## Wave 12 — Canonical buyer-contact history reconciliation (19 October)
+
+Existing Founder research must not treat already-contacted companies as new
+cold leads. The unified agent reuses the already scheduled and read-only
+`commercial_relationship_registry_latest.json` produced by the existing
+Gmail evidence / Buyer Network owner, without duplicating its database or
+altering the outbound governor.
+
+### Implemented
+- `empire_os/leadgen_contact_history_bridge.py` reads the existing private
+  `empire.commercial_relationship_registry.v1` snapshot, scoped to the
+  current 25-domain shortlist. It combines exact domain-level affirmative
+  outbound/inbound and do-not-pursue evidence, without exposing recipients,
+  private names, thread IDs or message content.
+- `empire_os/leadgen_revenue_activation_queue.py` annotates each research
+  candidate with its actual **existing-thread review**, **history
+  unverified**, **do-not-pursue**, or **technical endpoint** category.
+  Matched inbound responses appear first for manual follow-up research.
+  A stale Gmail capture may still prove prior contact; no absence is
+  interpreted as the address being clear for a new send.
+- The newer upstream Buyer Qualification Actions snapshot introduced
+  `independent_buyer_review_evidence` as an explicit outstanding gap.
+  The unified consumer has an additive, held-proof interpretation instead
+  of dropping the new requirement or touching the other agent's files.
+- The private read-only Founder route and CLI accept the existing commercial
+  relationship snapshot; use `--include-contact-history` with
+  `scripts.review_leadgen_revenue_queue_20261019.py` to require this
+  cross-check. Invalid or unavailable history is a HOLD on that path.
+- No CRM, canonical buyer state, suppression table, outbound intent, email,
+  payment, contract or prospect was changed by this reconciliation.
+
+### Observed operational evidence
+- Existing Gmail relationship snapshot: 58 thread evidence records.
+  Commercial relationship registry: 259 identity relations, read-only,
+  generated 19 October 16:24 UTC; its own `gmail_snapshot_fresh` is
+  FALSE. The operator should not assume silence from an incomplete inbox.
+- Of the current 25 shortlisted company domains, **9 are positively
+  matched to outbound history**, **15 have no positive match in the
+  registry** and must remain `HISTORY_UNVERIFIED`, and **one** is an
+  infrastructure/Sentry-ingestion host rather than a commercial buyer.
+- Lead Smart is an existing conversation with recorded inbound reply;
+  it is a **different organisation** from the Empire AI product.
+- Independent founder mailbox review additionally observed earlier sent
+  contact involving Abstrakt, which is not shown as positive outbound
+  in the server's commercial registry. This is an evidence-reconciliation
+  gap, NOT permission for another first introduction. Such externally
+  observed evidence was not copied into the server as personal Gmail data.
+- Existing relationship history never clears canonical suppression.
+  `new_first_touch_authorized=FALSE` and
+  `followup_authorized=FALSE` for every output row.
+- No duplicate outreach, email sends, added Exchange inventory, funds
+  movement or live production service modification.
+
+### Next steps
+- Run the next existing Gmail evidence cycle and reconcile missing
+  source-domain contact history through its approved owner, retaining
+  opt-outs, bounce evidence, provider provenance and suppression.
+- Independently resolve stale relationship capture before preparing any
+  manually reviewed follow-up drafts. Route approved buyer specifications,
+  price/geo/volume and payment/fulfilment evidence to the *existing*
+  canonical buyer capacity mechanism, never to a parallel side table.

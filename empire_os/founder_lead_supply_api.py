@@ -15,6 +15,7 @@ from empire_os.leadgen_revenue_activation_queue import build_leadgen_revenue_que
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
 DEFAULT_REPORT = Path("/srv/empire_os/runtime/lead_supply/niche_counts_latest.json")
 DEFAULT_BUYER_ACTIONS = Path("/srv/empire_os/runtime/buyer_network_intelligence/founder_qualification_actions_latest.json")
+DEFAULT_RELATIONSHIPS = Path("/srv/empire_os/runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json")
 DEFAULT_SOURCE_LEDGERS = {
     "gb_recc_solar": Path("/srv/empire_os/runtime/lead_supply/private_recc_sweeps/internal_observations.json"),
     "us_cms_nppes_dental_npi2": Path("/srv/empire_os/runtime/lead_supply/private_us_dental_orgs/organizations.json"),
@@ -121,6 +122,7 @@ def read_official_source_readiness(paths: dict[str, Path] | None = None) -> dict
 def read_founder_leadgen_queue(
     exchange_path: Path = DEFAULT_EXCHANGE,
     buyer_path: Path = DEFAULT_BUYER_ACTIONS,
+    relationship_path: Path | None = None,
 ) -> dict:
     """PRIVATE loopback API: verified source-ledger research, never send authority."""
     try:
@@ -129,6 +131,13 @@ def read_founder_leadgen_queue(
             if not path.is_file() or path.stat().st_size > 5_000_000:
                 raise ValueError("buyer_or_exchange_snapshot_missing_or_oversized")
             data[name] = json.loads(path.read_text(encoding="utf-8"))
+        if relationship_path is not None:
+            if (not relationship_path.is_file()
+                    or relationship_path.stat().st_size > 5_000_000):
+                raise ValueError("canonical_relationship_registry_unavailable")
+            data["relationship_history"] = json.loads(
+                relationship_path.read_text(encoding="utf-8")
+            )
         result = build_leadgen_revenue_queue(**data, max_visible=12)
         return {"available": result.get("state") == "FOUNDER_RESEARCH_QUEUE_READY", **result}
     except (OSError, ValueError, TypeError, UnicodeError):
@@ -150,6 +159,7 @@ def create_founder_lead_supply_router(
     exchange_path: Path = DEFAULT_EXCHANGE,
     source_ledger_paths: dict[str, Path] | None = None,
     buyer_actions_path: Path = DEFAULT_BUYER_ACTIONS,
+    relationship_path: Path | None = DEFAULT_RELATIONSHIPS,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/founder-lead-supply",
@@ -162,7 +172,9 @@ def create_founder_lead_supply_router(
 
     @router.get("/leadgen")
     def leadgen():
-        return read_founder_leadgen_queue(exchange_path, buyer_actions_path)
+        return read_founder_leadgen_queue(
+            exchange_path, buyer_actions_path, relationship_path
+        )
 
     @router.get("/source-readiness")
     def source_readiness():

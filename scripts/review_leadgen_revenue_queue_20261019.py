@@ -19,6 +19,7 @@ from scripts.preflight_official_source_empiredb_20261019 import PATHS
 
 EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
 BUYER_ACTIONS = Path("/srv/empire_os/runtime/buyer_network_intelligence/founder_qualification_actions_latest.json")
+RELATIONSHIPS = Path("/srv/empire_os/runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json")
 MAX_BYTES = 5_000_000
 PRIVATE_DIR = Path("/srv/empire_os/runtime/lead_supply/private_leadgen")
 PRIVATE_REPORT = PRIVATE_DIR / "research_queue_latest.json"
@@ -39,6 +40,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--exchange", type=Path, default=EXCHANGE)
     parser.add_argument("--buyer-actions", type=Path, default=BUYER_ACTIONS)
     parser.add_argument("--include-source-readiness", action="store_true")
+    parser.add_argument("--include-contact-history", action="store_true")
+    parser.add_argument("--relationships", type=Path, default=RELATIONSHIPS)
     parser.add_argument("--write-private", action="store_true")
     parser.add_argument("--max-visible", type=int, default=15)
     opts = parser.parse_args(argv)
@@ -52,6 +55,8 @@ def main(argv: list[str] | None = None) -> int:
             exchange=_read(opts.exchange),
             buyer_actions=_read(opts.buyer_actions),
             source_preflight=source,
+            relationship_history=(_read(opts.relationships)
+                                  if opts.include_contact_history else None),
             max_visible=opts.max_visible,
         )
         if opts.write_private and result["state"] == "FOUNDER_RESEARCH_QUEUE_READY":

@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 from typing import Any
 
 from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inventory
+from empire_os.leadgen_contact_history_bridge import build_contact_history_review
 from scripts.build_buyer_qualification_actions import EVIDENCE_TASKS
 
 SCHEMA = "empire.leadgen_revenue_activation_queue.v1"
@@ -26,6 +27,13 @@ NICHE_ALIASES = {
     "roofing": "roofing", "solar": "solar", "hvac": "hvac",
     "plumbing": "plumbing", "restoration": "restoration",
     "dental": "dental", "insurance": "insurance", "legal": "legal",
+}
+SUPPORTED_GAP_TEXT = {
+    **EVIDENCE_TASKS,
+    "independent_buyer_review_evidence": (
+        "Verify the buyer role, current purchasing demand, commercial terms "
+        "and first-party identity before any commercial contact or claims."
+    ),
 }
 MAX_TARGETS = 100
 MAX_VISIBLE = 25
@@ -89,6 +97,7 @@ def build_leadgen_revenue_queue(
     exchange: Mapping,
     buyer_actions: Mapping,
     source_preflight: Mapping | None = None,
+    relationship_history: Mapping | None = None,
     max_visible: int = 15,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -123,6 +132,16 @@ def build_leadgen_revenue_queue(
             or buyer_actions.get("shortlisted_count") != len(targets)):
         return _hold("buyer_qualification_target_count_inconsistent")
 
+    history = None
+    if relationship_history is not None:
+        try:
+            history = build_contact_history_review(
+                relationship_history,
+                [item.get("domain") if isinstance(item, Mapping) else None for item in targets],
+                now=current,
+            )
+        except (ValueError, TypeError):
+            return _hold("existing_relationship_registry_untrusted")
     market_counts = Counter()
     for group in inv["markets"]:
         name = group["niche"].lower().strip()
@@ -155,7 +174,7 @@ def build_leadgen_revenue_queue(
         gaps = item.get("missing_evidence")
         if not isinstance(gaps, list) or len(gaps) > 12:
             return _hold("unbounded_buyer_evidence_requirements")
-        if not all(isinstance(g, str) and g in EVIDENCE_TASKS for g in gaps):
+        if not all(isinstance(g, str) and g in SUPPORTED_GAP_TEXT for g in gaps):
             return _hold("unregistered_buyer_evidence_requirement")
         gaps = list(dict.fromkeys(gaps))
         gap_summary.update(gaps)
@@ -175,8 +194,22 @@ def build_leadgen_revenue_queue(
         research_links = _validated_first_party_urls(
             domain, item.get("existing_first_party_source_urls")
         )
+        contact = (history["by_domain"].get(domain) if history else None) or {
+            "contact_state": "HISTORY_UNVERIFIED",
+            "existing_thread_review_required": False,
+            "last_outbound_observed_at": None,
+            "last_inbound_observed_at": None,
+            "historical_relationship_count": 0,
+            "next_contact_history_action": (
+                "Check canonical contact history, suppression and all founder mailboxes"
+            ),
+            "canonical_suppression_cleared": False,
+            "new_first_touch_authorized": False,
+            "followup_authorized": False,
+        }
         rows.append({
             "domain": domain,
+            "contact_history": contact,
             "tier": item["tier"],
             "founder_research_priority_not_buyer_intent": score,
             "observed_vertical_tags": exact_niches,
@@ -188,12 +221,12 @@ def build_leadgen_revenue_queue(
             ),
             "missing_evidence": gaps,
             "evidence_checklist": [
-                {"evidence_key": g, "required_proof": EVIDENCE_TASKS[g],
+                {"evidence_key": g, "required_proof": SUPPORTED_GAP_TEXT[g],
                  "verified": False}
                 for g in gaps
             ],
             "first_party_research_links_for_manual_review": research_links,
-            "next_action": EVIDENCE_TASKS[gaps[0]] if gaps else (
+            "next_action": SUPPORTED_GAP_TEXT[gaps[0]] if gaps else (
                 "Independent buyer terms, territory, capacity and contact-path confirmation"
             ),
             "action_type": "MANUAL_B2B_BUYER_RESEARCH",
@@ -215,7 +248,19 @@ def build_leadgen_revenue_queue(
         "AUTOMATED_EVIDENCE_HOLD": 3,
         "MANUAL_EVIDENCE_HOLD": 4,
     }
+    # Warm existing conversations receive founder review before further cold
+    # research. Neither category receives permission to contact someone.
+    def relationship_order(row):
+        s = row["contact_history"]["contact_state"]
+        if s == "DO_NOT_PURSUE":
+            return 4
+        if s == "NON_BUYER_TECHNICAL_HOST":
+            return 3
+        if s == "EXISTING_THREAD_REVIEW":
+            return 0 if row["contact_history"]["last_inbound_observed_at"] else 1
+        return 2
     rows.sort(key=lambda row: (
+        relationship_order(row),
         tiers[row["tier"]],
         -int(row["first_party_site_review_current"]),
         -int(row["first_party_buyer_role_corroborated_not_capacity"]),
@@ -255,6 +300,21 @@ def build_leadgen_revenue_queue(
         "buyer_research_observed_at": buyer_actions["generated_at"],
         "canonical_exchange_observed_at": exchange["observed_at"],
         "research_target_count": len(rows),
+        "known_existing_contact_count": (
+            history["counts"]["existing_thread_review"] if history else 0
+        ),
+        "contact_history_unverified_count": (
+            history["counts"]["history_unverified"] if history else len(rows)
+        ),
+        "technical_endpoint_rejected_count": (
+            history["counts"]["technical_host_hold"] if history else 0
+        ),
+        "do_not_pursue_count": history["counts"]["do_not_pursue"] if history else 0,
+        "contact_history_reviewed_against_existing_registry": history is not None,
+        "registry_mailbox_snapshot_fresh": (
+            history["mailbox_snapshot_fresh"] if history else False
+        ),
+        "contact_history_is_send_clearance": False,
         "buyer_research_review_ready_count": buyer_actions["trusted_founder_review_count"],
         "qualified_buyers": 0,
         "verified_buyer_capacity": 0,
