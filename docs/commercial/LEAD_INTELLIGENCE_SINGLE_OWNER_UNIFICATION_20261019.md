@@ -33,3 +33,61 @@
 - Preserve `empire_os/waterfall.py::build_default_waterfall()` unchanged until there is a separately reviewed production activation plan.
 
 **Authorisation:** BUILD/TEST in isolated worktree. NO production migrations, email sends, payments, public portal, service activation, contractual offers or destructive resource cleanup.
+
+## Wave 3 — canonical business-identity reconciliation (19 October)
+
+The unified branch now implements `empire_os/scrapling_identity_review.py` and
+`scripts/review_scrapling_canonical_identity_20261019.py` in the SAME owner
+worktree.
+
+- Takes the already-validated, offline Scrapling source report, not a newly
+  collected web page.
+- Requires an independently authorised, complete, consistent **identity**
+  snapshot with `id,business_name,niche,metro,phone`. The founder Lead Supply
+  census uses `id,niche,metro,status` and is **not sufficient** to identify
+  a specific company; it therefore fails closed if supplied to the matcher.
+- Uses Empire's existing `acquisition_fingerprint()` only as an **observation
+  idempotency key**. The fingerprint is not entity identity or permission to
+  create a new prospect.
+- Outputs `POTENTIAL_EXISTING_REVIEW`, `AMBIGUOUS`, `IDENTITY_CONFLICT`,
+  `CROSS_MARKET_MANUAL_REVIEW`, `NOT_FOUND_IN_COMPLETE_SNAPSHOT`, or
+  `HOLD`. It never outputs an approved merge, a verified canonical lead or
+  a sellable customer contact.
+- Prevents shared phones from merging two distinct businesses; requires
+  business name, niche and metro agreement for even a proposed match;
+  divergent phone evidence and duplicate canonical IDs are blockers.
+- Recognises only the **already registered** `gb_recc_solar -> recc_solar`
+  canonical source alias. All other source adapters are held pending explicit
+  review rather than dynamically declaring registry data to be ingestible.
+- Preserves insurance/legal/mass-tort firm-only scopes and source-permission
+  requirements from `waterfall_source_bridge.py`.
+- Performs **no live EmpireDB query** and no crawler call. The local input's
+  completeness flag and snapshot receipt are operator claims; the CLI cannot
+  independently prove a real production snapshot was complete.
+
+### Example offline review (does not query EmpireDB)
+```bash
+cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+/srv/empire_os/.venv/bin/python \
+  -m scripts.review_scrapling_canonical_identity_20261019 \
+  --read-only \
+  --source-report /tmp/reviewed_source_evidence.json \
+  --canonical-identity-snapshot /tmp/complete_approved_identity_snapshot.json \
+  --snapshot-ref read-only:approved-cohort-snapshot-receipt \
+  --complete-snapshot \
+  --vertical solar --target-kind contractor --jurisdiction GB-ENG \
+  --identity-ref company:independently-verified-001
+```
+Use only permitted local snapshots; never put credentials in CLI arguments.
+A HOLD or potential existing status is **not** a verified live business match.
+Raw snapshot identity fields must remain under existing production access rules.
+
+### Explicit authority split and remaining gates
+- **Built / tested / committed in this wave:** no-write source-to-identity
+  review, existing Waterfall integration, Lead Supply code merge, diagnostics.
+- **Not established:** actual production canonical company match, real
+  rights-reviewed live Scrapling fetch, recipient opt-in, qualified buyer
+  demand/capacity, dashboard consumption of this new review, realised revenue.
+- **No database writes or operational services** are initiated by this feature.
+  Production deployment and any new snapshot-reader privilege need separate
+  approval, not an inferred permission from passing tests.

@@ -20,6 +20,14 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "scrapling_observation_to_canonical_identity_review",
+        "empire_os/scrapling_source_evidence.py",
+        "empire_os/scrapling_identity_review.py",
+        "complete stable read-only canonical identity snapshot and independent "
+        "source rights, no phone-only/cross-market auto-merge or new lead claims",
+        "protect canonical deduplication and lead-supply inventory truth",
+    ),
+    IntelligenceEdge(
         "scrapling_review_to_owned_waterfall",
         "empire_os/scrapling_source_evidence.py",
         "empire_os/waterfall_source_bridge.py",

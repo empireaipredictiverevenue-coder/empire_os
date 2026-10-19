@@ -172,3 +172,46 @@ def test_gov_scrapling_provider_never_calls_network(monkeypatch):
     assert observation["outbound_authorized"] is False
     with pytest.raises(PermissionError, match="offline_source_review"):
         flow.enrich({"company": "Test Solar Company"})
+
+
+def test_one_synthetic_firm_source_to_identity_to_owned_waterfall():
+    """Combined path: source evidence -> no-write identity -> offline Waterfall."""
+    pytest.importorskip("scrapling")
+    from empire_os.scrapling_identity_review import (
+        review_scrapling_canonical_identity,
+    )
+    source = source_report()
+    reviewed = identity_review()
+    identity = review_scrapling_canonical_identity(
+        report=source,
+        review=reviewed,
+        canonical_rows=[{
+            "id": "canonical-synthetic-001",
+            "business_name": "Test Solar Company",
+            "phone": "",
+            "niche": "solar",
+            "metro": "London",
+        }],
+        canonical_snapshot_complete=True,
+        canonical_snapshot_ref="snapshot:synthetic-full-identity-001",
+        now=NOW,
+    )
+    proposal = identity["observation_decisions"][0]
+    assert proposal["state"] == "POTENTIAL_EXISTING_REVIEW"
+    assert proposal["possible_canonical_ids"] == ["canonical-synthetic-001"]
+    assert proposal["canonical_prospect_id_verified"] is None
+    flow, plan = build_reviewed_scrapling_waterfall(
+        source_report=source,
+        review=reviewed,
+        html=HTML,
+        website_page_url="https://solar-firm.example/contact",
+        observed_at=NOW,
+    )
+    observed = flow.observe_scrapling_only({"company": "Test Solar Company"})
+    assert plan["state"] == "EVIDENCE_REVIEW_READY"
+    assert observed["observed"] is True
+    assert observed["existing_gate_would_pass"] is False
+    assert observed["canonical_database_writes"] is False
+    assert identity["unique_canonical_leads_verified_added"] == 0
+    with pytest.raises(PermissionError):
+        flow.enrich({"company": "Test Solar Company"})
