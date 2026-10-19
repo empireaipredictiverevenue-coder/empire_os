@@ -83,6 +83,7 @@ export default async function FounderPage() {
   const buyerCapacity = decision?.buyer_capacity_action_brief;
   const formulaEvidence = decision?.formula_evidence;
   const streamMining = decision?.data_stream_mining;
+  const evidencePathways = decision?.evidence_pathways;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -340,6 +341,69 @@ export default async function FounderPage() {
                       </>
                     ) : (
                       <p className="mt-3 text-xs text-slate-400">Existing source-stream mining waits for the paired backend release.</p>
+                    )}
+                  </div>
+                  <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p className="eyebrow">Predictive Cloud · Evidence reasoning pathways</p>
+                        <h3 className="mt-1 text-lg font-semibold text-white">Source → hypothesis → economics → learning</h3>
+                        <p className="mt-2 text-xs leading-5 text-slate-400">
+                          Typed evidence links, not a trained neural network. Every blocked connection
+                          identifies a fact our teams must independently verify.
+                        </p>
+                      </div>
+                      <span className="text-xs text-cyan-200">
+                        {show(evidencePathways?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    {evidencePathways?.status === "EVIDENCE_PATHWAY_REVIEW_READY" ? (
+                      <>
+                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-slate-300">
+                          <span>Observed candidate records: {evidencePathways.candidate_count ?? "Unknown"}</span>
+                          <span>Complete Quant packets: {evidencePathways.quant_complete_count ?? "Unknown"}</span>
+                          <span>Contradictory records: {evidencePathways.candidates_with_contradictions ?? "Unknown"}</span>
+                        </div>
+                        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                          {evidencePathways.research_shortlist.slice(0, 4).map((item) => (
+                            <div key={item.opportunity_ref} className="rounded-xl border border-white/10 bg-white/[0.025] p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-semibold text-white">
+                                <span>{item.niche || "Unclassified market research"}</span>
+                                <span className="text-amber-200">Evidence hold</span>
+                              </div>
+                              <p className="mt-2 text-xs text-slate-300">
+                                Next missing fact: {show(item.first_unverified_requirement, "Review").replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                Owner: {item.next_owner.replaceAll("_", " ")} ·
+                                Missing Quant factors: {item.missing_quant_factor_count}
+                              </p>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {item.pathway_nodes.map((node) => (
+                                  <span key={node.id} className={node.state === "EVIDENCE_HOLD"
+                                    ? "rounded-md border border-amber-300/15 px-2 py-1 text-[10px] text-amber-200"
+                                    : "rounded-md border border-cyan-300/15 px-2 py-1 text-[10px] text-cyan-200"}>
+                                    {node.stage.replaceAll("_", " ")}
+                                  </span>
+                                ))}
+                              </div>
+                              {item.contradictions_to_investigate.length > 0 && (
+                                <p className="mt-2 text-[11px] text-amber-200">
+                                  Disputed evidence: {item.contradictions_to_investigate.join(", ").replaceAll("_", " ")}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        <p className="mt-3 text-[11px] text-slate-500">
+                          This is an internal evidence-join review. It does not infer a buyer, estimate
+                          commercial probability, execute outreach, train model weights or book revenue.
+                        </p>
+                      </>
+                    ) : (
+                      <p className="mt-3 text-xs text-amber-200">
+                        {show(evidencePathways?.reason_code, "Waiting for trusted matching source snapshots").replaceAll("_", " ")}
+                      </p>
                     )}
                   </div>
                   <div className="mt-5 rounded-2xl border border-cyan-300/15 bg-[#08131d] p-5">

@@ -490,6 +490,10 @@ def build_predictive_decision_control_runtime(
     # This is a deterministic read-only report, not a queue dispatch.
     from empire_os.revenue_stream_mining import build_revenue_stream_mining
     decision["data_stream_mining"] = build_revenue_stream_mining(root, as_of=as_of)
+    # Scientific reasoning pathways: exact join of existing Radar, Factory,
+    # evidence-router and Quant snapshots, with unsupported outcome link held.
+    from empire_os.revenue_evidence_pathways import review_evidence_pathways_runtime
+    decision["evidence_pathways"] = review_evidence_pathways_runtime(root, as_of=as_of)
     return decision
 
 

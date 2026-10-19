@@ -193,7 +193,35 @@ export type RevenueStreamMining = {
   execution_authority: "none";
 };
 
+export type PredictiveEvidencePathways = {
+  schema_version: string;
+  status: string;
+  reason_code?: string;
+  source_snapshot_count: number;
+  candidate_count: number | null;
+  quant_complete_count: number | null;
+  candidates_with_contradictions?: number;
+  source_join_exact_identity_enforced?: boolean;
+  research_shortlist: Array<{
+    opportunity_ref: string;
+    niche: string | null;
+    factory_blocker_count: number;
+    missing_quant_factor_count: number;
+    first_unverified_requirement: string | null;
+    next_owner: string;
+    contradictions_to_investigate: string[];
+    pathway_nodes: Array<{id: string;stage: string;state: string}>;
+    pathway_edges: Array<{from: string;to: string;evidence_connection: string}>;
+    research_triage_rank_is_revenue_probability: false;
+    recognized_revenue_cents: null;
+  }>;
+  model_weights_updated: false;
+  economic_memory_updated: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  evidence_pathways?: PredictiveEvidencePathways;
   data_stream_mining?: RevenueStreamMining;
   formula_evidence?: PredictiveFormulaEvidence;
   buyer_capacity_action_brief?: PredictiveBuyerCapacityBrief;
