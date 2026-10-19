@@ -131,6 +131,7 @@ def build_lead_supply_report(
     qualified_ids = {pid for pid, row in chosen.items() if qualification_decision(row)[0]}
     by_niche: dict[str, dict[str, Any]] = {}
     by_corridor: Counter[tuple[str, str]] = Counter()
+    qualified_by_corridor: Counter[tuple[str, str]] = Counter()
     source_totals: dict[str, set[str]] = defaultdict(set)
     for pid, info in ids.items():
         n, m = info["niche"], info["metro"]
@@ -146,6 +147,7 @@ def build_lead_supply_report(
         by_corridor[(n, m)] += 1
         if pid in qualified_ids:
             item["qualified_with_evidence_observed"] += 1
+            qualified_by_corridor[(n, m)] += 1
         if not sources_by_id.get(pid):
             item["no_acquisition_provenance"] += 1
         for source in sources_by_id.get(pid, ()):
@@ -233,7 +235,11 @@ def build_lead_supply_report(
         "table_rows_scanned": dict(sorted(scanned_tables.items())),
         "niches": sorted(by_niche.values(), key=lambda x: (-x["unique_leads_observed"], x["niche"])),
         "niche_metro_counts": [
-            {"niche": n, "metro": m, "unique_leads_observed": count}
+            {
+                "niche": n, "metro": m, "unique_leads_observed": count,
+                "qualified_with_evidence_observed": qualified_by_corridor[(n, m)],
+                "sellable_inventory_verified": False,
+            }
             for (n, m), count in sorted(by_corridor.items())
         ],
         "exchange": {

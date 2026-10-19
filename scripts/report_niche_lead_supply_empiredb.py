@@ -8,11 +8,17 @@ from __future__ import annotations
 
 import argparse
 import json
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, ContextManager
+import os
 
-from empire_os.canonical_data_gateway import empiredb_gateway_from_environment
+from empire_os.data_backends.empiredb import EmpireDbProvider
+from empire_os.data_backends.postgres import (
+    PostgresConnectionConfig,
+    PostgresConnector,
+)
 from empire_os.data_query import OrderSpec
 from empire_os.lead_supply_intelligence import (
     build_lead_supply_report, crawler_receipt_summary,
@@ -21,13 +27,15 @@ from empire_os.lead_scoring_inventory_bridge import (
     ENGINE_REGISTER, build_scoring_coverage, cortex_runtime_summary,
 )
 from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
+from empire_os.lead_territory_supply_join import join_verified_niche_supply
+from empire_os.lead_supply_read_authority import validate_reader_identity
 
 
 COLUMNS = {
     "prospects": "id,niche,metro,status",
     "prospect_acquisitions": "id,prospect_id,source",
     "prospect_qualifications": (
-        "id,prospect_id,scoring_engine,scoring_version,status,tier,"
+        "id,prospect_id,scoring_engine,scoring_version,status,tier,score,"
         "evidence_confidence,scored_at,entity_id,result_payload"
     ),
     "prospect_entity_links": "id,prospect_id,entity_id,active",
@@ -82,24 +90,30 @@ def run(
     root: Path,
     page_size: int = 500,
     max_rows_per_table: int = 50000,
+    snapshot_factory: Callable[[], ContextManager[Any]] | None = None,
 ) -> dict[str, Any]:
     # Preserve lead count availability when an optional intelligence reader
     # is unavailable. Never translate missing scoring data into zero scores.
     required = ("prospects", "prospect_acquisitions", "prospect_qualifications")
-    tables = {
-        table: read_complete_table(
-            gateway, table, page_size=page_size, max_rows=max_rows_per_table
-        )
-        for table in required
-    }
+    with (snapshot_factory() if snapshot_factory else nullcontext(gateway)) as lease:
+        tables = {
+            table: read_complete_table(
+                lease, table, page_size=page_size,
+                max_rows=max_rows_per_table,
+            )
+            for table in required
+        }
     scoring_optional: dict[str, list[dict[str, Any]]] = {}
     scoring_reader_failure: str | None = None
     try:
-        for table in ("prospect_entity_links", "intelligence_scores"):
-            scoring_optional[table] = read_complete_table(
-                gateway, table, page_size=page_size,
-                max_rows=max_rows_per_table,
-            )
+        # Score+identity rows have a shared snapshot; if either reader fails,
+        # discard the entire optional scoring view, never partial success.
+        with (snapshot_factory() if snapshot_factory else nullcontext(gateway)) as lease:
+            for table in ("prospect_entity_links", "intelligence_scores"):
+                scoring_optional[table] = read_complete_table(
+                    lease, table, page_size=page_size,
+                    max_rows=max_rows_per_table,
+                )
     except Exception as exc:
         scoring_reader_failure = type(exc).__name__
         scoring_optional = {}
@@ -152,10 +166,13 @@ def run(
     package_reader_errors: dict[str, str] = {}
     for table in ("strike_packs", "buyer_subscriptions"):
         try:
-            optional_package_rows[table] = read_complete_table(
-                gateway, table, page_size=page_size,
-                max_rows=max_rows_per_table,
-            )
+            # Optional schemas have independent permissions/availability;
+            # a failed reader must not poison a separate transaction.
+            with (snapshot_factory() if snapshot_factory else nullcontext(gateway)) as lease:
+                optional_package_rows[table] = read_complete_table(
+                    lease, table, page_size=page_size,
+                    max_rows=max_rows_per_table,
+                )
         except Exception as exc:
             package_reader_errors[table] = type(exc).__name__
     report["territory_mrr"] = build_territory_mrr_bridge(
@@ -169,10 +186,28 @@ def run(
     report["table_rows_scanned"].update({
         name: len(rows) for name, rows in optional_package_rows.items()
     })
-    # Pagination is complete but not a transactionally consistent snapshot.
-    report["transactionally_consistent_snapshot_proven"] = False
+    report["transactionally_consistent_snapshot_proven"] = bool(snapshot_factory)
+    report["snapshot_consistency"] = {
+        "lead_counts_same_repeatable_read_snapshot": bool(snapshot_factory),
+        "omega_and_identity_same_repeatable_read_snapshot": (
+            bool(snapshot_factory) and bool(scoring_optional)
+        ),
+        "subscription_and_pack_same_snapshot": False,
+        "cross_source_commercial_consistency_proven": False,
+        "separate_live_exchange_snapshot": True,
+        "catalogue_and_snapshot_observed_at_same_instant": False,
+        "database_transaction_read_only": bool(snapshot_factory),
+    }
+    if snapshot_factory is not None:
+        report["territory_mrr"] = join_verified_niche_supply(
+            territory_mrr=report["territory_mrr"],
+            lead_report=report,
+        )
+    else:
+        report["territory_mrr"]["complete_canonical_niche_supply_join_available"] = False
     report["limitations"] = [
-        "Paginated read was not one repeatable-read DB transaction; ingestion may race the scan",
+        "Lead counts share one repeatable-read snapshot when canonical reader is enabled; "
+        "optional scoring, pack, subscription and exchange observations are separate snapshots",
         "Acquisition source counts overlap where the same prospect has multiple sources",
         "Crawler log counts are historical events, never unique or available leads",
         "Exchange inventory contains only selected qualification records",
@@ -197,11 +232,24 @@ def main() -> int:
     allowed = (Path(args.repo_root).resolve() / "runtime" / "lead_supply").resolve()
     if not target.resolve().is_relative_to(allowed) or target.suffix != ".json":
         parser.error("output must be a JSON file inside runtime/lead_supply")
-    gateway = empiredb_gateway_from_environment()
+    if str(os.environ.get("EMPIRE_DATA_BACKEND") or "empiredb").strip() != "empiredb":
+        parser.error("canonical EmpireDB is required, no legacy fallback")
+    identity_ok, identity_reason = validate_reader_identity(
+        str(os.environ.get("EMPIREDB_DSN") or "")
+    )
+    if not identity_ok:
+        parser.error("dedicated local EmpireDB reader required: " + identity_reason)
+    # Use the existing PostgreSQL provider's database-enforced REPEATABLE
+    # READ READ ONLY transaction lease. The application can only call
+    # read_complete_table(); no write/query mutation API is needed here.
+    provider = EmpireDbProvider(
+        PostgresConnector(PostgresConnectionConfig.from_env())
+    )
     report = run(
-        gateway, root=Path(args.repo_root),
+        provider, root=Path(args.repo_root),
         page_size=args.page_size,
         max_rows_per_table=args.max_rows_per_table,
+        snapshot_factory=provider.read_only_snapshot,
     )
     target.parent.mkdir(parents=True, exist_ok=True)
     temp = target.with_suffix(".tmp")

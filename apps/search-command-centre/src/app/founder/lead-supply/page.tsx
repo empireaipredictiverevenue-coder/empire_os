@@ -62,7 +62,9 @@ export default async function FounderLeadSupplyPage({
           <p className="mt-3 text-xs text-slate-500">
             As of {data?.observed_at ?? "not yet materialized"} · OBSERVE ·{" "}
             {data?.lead_counts_complete
-              ? "Complete bounded table read; not a transactionally consistent snapshot"
+              ? data?.snapshot_consistency?.lead_counts_same_repeatable_read_snapshot
+                ? "Complete read-only transaction for lead counts; exchange and billing observed separately"
+                : "Complete bounded table read; cross-table transaction consistency unverified"
               : "Counts unavailable or incomplete — do not present as total supply"}
           </p>
         </header>
@@ -127,6 +129,20 @@ export default async function FounderLeadSupplyPage({
                   value={fmt(packages.marked_active_subscription_record_count ?? undefined)}
                   note="Database state; not verified receipts or realised MRR" />
               </div>
+              <div className="mt-5 grid gap-4 sm:grid-cols-3">
+                <Tile label="Reconciled unique leads"
+                  value={packages.complete_canonical_niche_supply_join_available
+                    ? fmt(packages.canonical_unique_prospects_reconciled) : "Not verified"}
+                  note="Full same-snapshot EmpireDB census only" />
+                <Tile label="Evidenced qualified leads"
+                  value={packages.complete_canonical_niche_supply_join_available
+                    ? fmt(packages.canonical_qualified_with_evidence_reconciled) : "Not verified"}
+                  note="Qualification score and evidence threshold met" />
+                <Tile label="Supply markets outside Exchange"
+                  value={packages.complete_canonical_niche_supply_join_available
+                    ? fmt(packages.markets_without_exchange_corridor_count) : "Not verified"}
+                  note="Niche/metro leads observed with no corridor route in snapshot" />
+              </div>
               <p className="mt-3 text-xs text-slate-500">
                 Configured recurring price fields and old Stripe references are
                 not financial verification. Direct USDT/BSC receipts, fulfilment,
@@ -146,6 +162,8 @@ export default async function FounderLeadSupplyPage({
                       <tr>
                         <th className="py-3 pr-4">Niche</th>
                         <th className="py-3 pr-4">Territory</th>
+                        <th className="py-3 pr-4">Owned leads</th>
+                        <th className="py-3 pr-4">Qualified leads</th>
                         <th className="py-3 pr-4">Seat records</th>
                         <th className="py-3 pr-4">Capacity-ready</th>
                         <th className="py-3 pr-4">Sampled leads</th>
@@ -162,6 +180,14 @@ export default async function FounderLeadSupplyPage({
                               {item.niche}
                             </td>
                             <td className="py-2 pr-4">{item.metro}</td>
+                            <td className="py-2 pr-4">
+                              {packages.complete_canonical_niche_supply_join_available
+                                ? fmt(item.canonical_unique_leads_observed) : "Unknown"}
+                            </td>
+                            <td className="py-2 pr-4">
+                              {packages.complete_canonical_niche_supply_join_available
+                                ? fmt(item.canonical_qualified_with_evidence_observed) : "Unknown"}
+                            </td>
                             <td className="py-2 pr-4">{fmt(item.buyer_seat_records)}</td>
                             <td className="py-2 pr-4">{fmt(item.verified_active_capacity_records)}</td>
                             <td className="py-2 pr-4">{fmt(item.sampled_qualified_inventory_records)}</td>

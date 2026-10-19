@@ -145,3 +145,128 @@ The live canonical exchange snapshot observed 19 October 10:33:14 UTC projected 
 5. Only after evidence, activate entitlement issuance, territory overlap arbitration, expiry/revocation, allocations and authenticated buyer self-serve views in their respective owning services.
 
 No new payment rail, no public checkout mutation, no schema changes, no billing activation, no production service restart and no conflicting owner changes from this branch.
+
+## 19 October 2026 — Snapshot census & release hardening (additional continuation)
+
+### Accuracy correction
+The original `prospect_qualifications` SELECT excluded `score` although canonical
+`buyer_allocation.qualification_decision()` requires score >= its threshold.
+This caused false unqualified counts. **Corrected:** select `score` and test
+real score/evidence-tied market counts. Never publish a historical result from
+the old version.
+
+### Database snapshot consistency
+The existing PostgreSQL `EmpireDbProvider.read_only_snapshot()` is reused:
+`REPEATABLE READ READ ONLY`, backed by one actual database transaction.
+The three *required* tables—`prospects`, `prospect_acquisitions`,
+`prospect_qualifications`—share one point-in-time database snapshot.
+`prospect_entity_links` + `intelligence_scores` share a **separate**
+point-in-time snapshot. Optional `strike_packs` and `buyer_subscriptions`
+use their own snapshots so an absent optional permission cannot abort the core
+count. The separately written commercial exchange JSON is at a different
+observed time. The API emits exact consistency flags and **never implies one
+atomic commercial snapshot across all these sources**. The record cap,
+duplicate checks and fail-closed required-table behavior remain.
+
+### Market + qualified supply joined
+`empire_os/lead_territory_supply_join.py` reconciles the counted
+`niche_metro_counts` with the existing Phase 4 `territory_markets`:
+- joins on canonical niche family and normalized metro only;
+- includes both matched markets and source-supply-only markets with no
+  exchange corridor;
+- separately counts unique owned leads and score/evidence-qualified leads;
+- verifies market subtotals equal the complete same-snapshot database census;
+- explicitly leaves delivery-route match, sale eligibility, exclusivity,
+  buyer seats and billing unverified;
+- issues an actionable founder-only next step when no verified buyer capacity
+  exists. This is **not** an automated sales entitlement or allocation.
+
+### Held operational packaging
+New staged files:
+- `scripts/preflight_lead_supply_census_20261019.py`
+- `deploy/systemd/empire-lead-supply-census.service`
+- `deploy/systemd/empire-lead-supply-census.timer` (half-hourly proposal only).
+
+**None of these services/timers have been installed.** The service requires
+the main-repo source after a conflict-free release, a dedicated
+`/etc/empire_lead_supply_reader.env` with only the private
+`EMPIREDB_DSN`, and a writable
+`/srv/empire_os/runtime/lead_supply` target. A successful staged unit
+validation does not grant production release authorization.
+
+The preflight is fail-closed and refuses:
+- unrelated DB backends, non-`empiredb` databases, non-local PostgreSQL endpoints;
+- login names other than `empire_lead_supply_reader_login`;
+- missing required SELECT columns, stale/noncanonical exchange snapshots;
+- any privileged role flags, inherited/membership rights, table/column
+  write privileges on the selected tables;
+- missing explicit permissive `USING(true)` SELECT RLS policies for the
+  dedicated reader (or restrictive RLS policy for that role).
+
+**Important governance blocker:** migrations
+`003_prospect_acquisition_ledger.sql`,
+`014_structural_hardening_parity.sql`,
+`015_active_runtime_schema_parity.sql` and
+`018_tenant_context_foundation.sql` enable RLS for these tables. Merely
+granting SELECT to a new role could produce silently filtered zero/partial
+counts. Correct founder-scoped policy and least-privileged role design
+requires a *separately approved and DBA-reviewed DDL change*; no migration,
+login, role grant, RLS policy, credential or DB session with private
+production credentials was created by this branch.
+
+Required selected columns before role-scoped review:
+
+| Source table | Minimum projected columns |
+|---|---|
+| prospects | id, niche, metro, status |
+| prospect_acquisitions | id, prospect_id, source |
+| prospect_qualifications | id, prospect_id, scoring_engine, scoring_version, status, tier, score, evidence_confidence, scored_at, entity_id, result_payload |
+| prospect_entity_links | id, prospect_id, entity_id, active |
+| intelligence_scores | id, entity_type, entity_id, score_type, model_key, confidence, scored_at, features |
+| strike_packs | id, slug, name, tier, monthly_price_cents, price_per_lead_cents, max_leads_per_month, lane_count, niches, is_active, is_public |
+| buyer_subscriptions | id, buyer_id, pack_id, monthly_price_cents, active, status, period_start, period_end |
+
+Core lead counts fail if a required source is unreadable; optional scores and
+subscriptions are marked unknown rather than zero. Do not copy credentials
+from existing applications or widen tenant customer roles just to bypass RLS.
+
+When the database capability has been separately authorized and verified,
+a human can run the explicit private probe using the dedicated reader
+service's environment, then execute one bounded read-only census and
+review the resulting non-PII founder dashboard against the canonical
+Exchange. Only after that release the API/frontend with the existing founder
+authentication. Public `/buy` interest-only behavior stays unchanged.
+
+This continuation did not trigger live crawling, public publication,
+outbound, billing, financial activation, RLS updates, customer entitlement
+creation or a service restart.
+
+### Further safety clarification
+
+The collector's executable entrypoint also rejects DSNs whose database name,
+host or login identity is not the dedicated local EmpireDB reader, even if the
+preflight were skipped. Shared pure validation is in
+`empire_os/lead_supply_read_authority.py`.
+
+The preflight's `audit_dedicated_reader_security` additionally uses a
+database-enforced READ ONLY PostgreSQL catalog transaction. It checks:
+- the login has no superuser, create-role/database, replication or
+  BYPASSRLS attributes;
+- no direct role memberships;
+- no INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES or TRIGGER table
+  privileges, nor column-level writes on the seven selected sources;
+- explicit permissive role-scoped RLS SELECT policies with
+  `USING(true)` for all seven selected source tables, and absence of
+  restrictive policies applicable to the role.
+
+This role-wide cross-tenant *founder-only observatory* scope, especially on
+`buyer_subscriptions`, requires **explicit founder authority expansion and
+a DBA privacy/security review**, not implicit code approval. Service activation
+remains held.
+
+Scoped continuation verification: 157 Python tests passed; the existing
+founder Next.js TypeScript project passed `tsc --noEmit`. Only one external
+Starlette/anyio deprecation warning observed.
+
+The role, RLS, service, timer, new founder endpoint and new Next.js page
+have NOT been released to production in this branch.

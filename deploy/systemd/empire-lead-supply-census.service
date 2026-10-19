@@ -1,0 +1,32 @@
+[Unit]
+Description=EmpireOS private read-only canonical lead supply and MRR evidence census
+After=network-online.target empire-commercial-exchange.service
+Wants=network-online.target
+ConditionPathExists=/srv/empire_os/scripts/report_niche_lead_supply_empiredb.py
+ConditionPathExists=/etc/empire_lead_supply_reader.env
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/srv/empire_os
+EnvironmentFile=/etc/empire_lead_supply_reader.env
+Environment=EMPIRE_DATA_BACKEND=empiredb
+Environment=PYTHONPATH=/srv/empire_os
+ExecStartPre=/srv/empire_os/.venv/bin/python -m scripts.preflight_lead_supply_census_20261019 --repo-root /srv/empire_os --probe-database
+ExecStart=/srv/empire_os/.venv/bin/python -m scripts.report_niche_lead_supply_empiredb --repo-root /srv/empire_os --page-size 500 --max-rows-per-table 50000
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadOnlyPaths=/srv/empire_os
+ReadWritePaths=/srv/empire_os/runtime/lead_supply
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+UMask=0077
+TimeoutStartSec=150
+MemoryMax=768M

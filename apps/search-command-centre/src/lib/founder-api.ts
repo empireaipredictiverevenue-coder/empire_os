@@ -1026,6 +1026,13 @@ export type FounderLeadSupply = {
   mode?: string;
   reason?: string;
   lead_counts_complete?: boolean;
+  transactionally_consistent_snapshot_proven?: boolean;
+  snapshot_consistency?: {
+    lead_counts_same_repeatable_read_snapshot?: boolean;
+    omega_and_identity_same_repeatable_read_snapshot?: boolean;
+    subscription_and_pack_same_snapshot?: boolean;
+    cross_source_commercial_consistency_proven?: boolean;
+  };
   scoring_coverage?: LeadScoringCoverage;
   unique_prospects_observed?: number;
   qualified_with_evidence_observed?: number;
@@ -1113,6 +1120,12 @@ export type FounderTerritoryMrr = {
   }>;
   territory_count?: number;
   territory_market_count?: number;
+  complete_canonical_niche_supply_join_available?: boolean;
+  canonical_unique_prospects_reconciled?: number;
+  canonical_qualified_with_evidence_reconciled?: number;
+  canonical_census_observed_at?: string;
+  markets_without_exchange_corridor_count?: number;
+  market_next_action_counts?: Record<string, number>;
   raw_buyer_and_supply_corridor_keys_not_equivalent?: boolean;
   territory_markets?: Array<{
     niche: string;
@@ -1125,6 +1138,11 @@ export type FounderTerritoryMrr = {
     exact_route_compatibility_verified: boolean;
     sale_ready: boolean;
     readiness: string;
+    next_action?: string;
+    canonical_census_coverage?: string;
+    canonical_unique_leads_observed?: number;
+    canonical_qualified_with_evidence_observed?: number;
+    canonical_supply_market_without_exchange_corridor?: boolean;
   }>;
   territories?: Array<{
     corridor_key: string;

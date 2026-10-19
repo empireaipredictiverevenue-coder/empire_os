@@ -1,0 +1,11 @@
+[Unit]
+Description=EmpireOS private read-only canonical niche count snapshot (30 minute cycle)
+
+[Timer]
+OnCalendar=*-*-* *:00,30:00 UTC
+RandomizedDelaySec=90s
+Persistent=false
+Unit=empire-lead-supply-census.service
+
+[Install]
+WantedBy=timers.target
