@@ -495,3 +495,20 @@ def test_static_provider_number_assignment_two_hour_window_only():
     assert readiness(track=source)["gates"]["tracking_verified"] is True
     source["source_observed_at"]=(NOW-timedelta(minutes=121)).isoformat()
     assert readiness(track=source)["gates"]["tracking_verified"] is False
+
+
+def test_exact_direct_assignment_stays_verified_for_next_day_retry_not_forever():
+    now=NOW+timedelta(hours=26)
+    source=tracking()
+    source.update({
+        "campaign_id":"CA8278ed3f26e9495b881fe3833174d007",
+        "tracking_number":"+18883579305",
+        "tracking_number_assigned":True,
+        "verification_path":"DIRECT_CAMPAIGN_OBJECT",
+        "verification_scope":"NUMBER_TO_CAMPAIGN_BINDING",
+    })
+    assert readiness(track=source,now=now)["gates"]["tracking_verified"] is True
+    assert readiness(track={**source,"campaign_id":"wrong"},now=now)["gates"]["tracking_verified"] is False
+    assert readiness(track={**source,"tracking_number_assigned":False},now=now)["gates"]["tracking_verified"] is False
+    later=NOW+timedelta(hours=49)
+    assert readiness(track=source,now=later)["gates"]["tracking_verified"] is False
