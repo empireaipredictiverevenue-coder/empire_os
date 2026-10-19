@@ -44,6 +44,26 @@ def test_exact_normalized_name_matches_only_and_never_promotes():
     assert not any(x["crm_contact_binding_verified"] for x in result["items"])
 
 
+def test_psycopg_native_uuid_columns_supported_without_loosening_tenant_scope():
+    """Real PostgreSQL uuid columns arrive as UUID, not JSON strings."""
+    first=row("GB NRG",seq=71)
+    first["tenant_id"]=UUID(A)
+    first["prospect_id"]=UUID(first["prospect_id"])
+    result=preview_six_tenant_prospect_name_matches(
+        [first],authenticated_tenant_id=A,
+    )
+    assert result["possible_exact_company_name_matches"]==1
+    assert next(x for x in result["items"] if x["company"]=="GB NRG")[
+        "candidate_prospect_ids"
+    ]==["00000000-0000-0000-0000-000000000071"]
+    assert result["tenant_contact_authority_verified"] is False
+    altered=dict(first,tenant_id=UUID(B))
+    with pytest.raises(TenantProspectMatchHeld,match="CROSS_TENANT_CRM_ROW"):
+        preview_six_tenant_prospect_name_matches(
+            [altered],authenticated_tenant_id=A,
+        )
+
+
 def test_partial_view_is_never_exhaustive_negative():
     items=[row(f"unrelated {i}",seq=i+1) for i in range(500)]
     result=preview_six_tenant_prospect_name_matches(

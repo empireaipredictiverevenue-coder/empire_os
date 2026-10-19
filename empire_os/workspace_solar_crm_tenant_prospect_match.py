@@ -26,6 +26,10 @@ class TenantProspectMatchHeld(ValueError):
 
 
 def _uuid(raw: object) -> str:
+    # psycopg v3 normally returns PostgreSQL uuid columns as uuid.UUID,
+    # whereas the signed request tenant identity is a canonical string.
+    if isinstance(raw, UUID):
+        return str(raw)
     if not isinstance(raw, str):
         raise TenantProspectMatchHeld("INVALID_TENANT_OR_PROSPECT_IDENTIFIER")
     try:

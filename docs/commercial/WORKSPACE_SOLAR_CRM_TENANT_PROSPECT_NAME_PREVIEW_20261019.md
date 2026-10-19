@@ -151,6 +151,22 @@ The corrected stage/parity tests passed and the updated read-only
 release preflight passed; no live CRM switch was performed while fixing
 this verifier. **Do not enable OpenAPI** to make the release succeed.
 
+## Final compatibility fix and operator handoff
+
+A production-parity review caught that the canonical CRM view's
+`tenant_id` and `prospect_id` are PostgreSQL `uuid` columns, which
+`psycopg` can return as native Python `UUID` values. The name matcher
+now validates both canonical UUID strings and native UUID values,
+without weakening exact signed tenant agreement or rejecting
+cross-tenant rows. Its frozen isolated helper and deployment digest were
+updated together. The complete tests passed **81** checks, and the
+exact-source release preflight passed again.
+
+The final short operator handoff (current status, source ownership,
+precise cutover, rollback and next commercial gates) is at
+`docs/commercial/CRM_SOLAR_TENANT_PREVIEW_FINAL_HANDOFF_20261019.md`.
+**The private CRM deployment is still NOT applied.**
+
 ## Remaining commercial authority boundaries
 
 The preview is a deduplication aid, not a CRM intake or an automated

@@ -20,7 +20,7 @@ API=empire_os/revenue_crm_api.py
 HELPER=empire_os/workspace_solar_crm_tenant_prospect_match.py
 OLD_SHA=2cf8a796201d2bd914fb8ee206974606857fd6a4393e6b3234fadd2bba651e49
 NEW_SHA=9ca7e8bc10b68208a5ce3e1444ce64260e1d8fc4152c99c18cb83570d1208507
-HELPER_SHA=6de1291fe18b239a21cb96e5894084f463f85ca98e0f5016b337ccb2e0b0c469
+HELPER_SHA=2449618a5e14ae6a269f53523072ee09029cd91f71b344cde48bf4c05d929b1b
 NEW_ROUTE=/v1/revenue-crm/workspace-solar/prospect-name-matches/preview
 BASE=http://127.0.0.1:8783
 

@@ -75,4 +75,4 @@ def test_every_owned_crm_source_matches_frozen_candidate_checksum():
     assert stage.joinpath("empire_os/workspace_solar_crm_tenant_prospect_match.py").is_file()
     assert "OLD_SHA=2cf8a796201d2bd914fb8ee206974606857fd6a4393e6b3234fadd2bba651e49" in script
     assert "NEW_SHA=9ca7e8bc10b68208a5ce3e1444ce64260e1d8fc4152c99c18cb83570d1208507" in script
-    assert "HELPER_SHA=6de1291fe18b239a21cb96e5894084f463f85ca98e0f5016b337ccb2e0b0c469" in script
+    assert "HELPER_SHA=2449618a5e14ae6a269f53523072ee09029cd91f71b344cde48bf4c05d929b1b" in script
