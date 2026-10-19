@@ -9,10 +9,12 @@ from fastapi import APIRouter
 from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
 from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inventory
 from empire_os.official_source_canonical_preflight import preflight_official_source_ledgers
+from empire_os.leadgen_revenue_activation_queue import build_leadgen_revenue_queue
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
 DEFAULT_REPORT = Path("/srv/empire_os/runtime/lead_supply/niche_counts_latest.json")
+DEFAULT_BUYER_ACTIONS = Path("/srv/empire_os/runtime/buyer_network_intelligence/founder_qualification_actions_latest.json")
 DEFAULT_SOURCE_LEDGERS = {
     "gb_recc_solar": Path("/srv/empire_os/runtime/lead_supply/private_recc_sweeps/internal_observations.json"),
     "us_cms_nppes_dental_npi2": Path("/srv/empire_os/runtime/lead_supply/private_us_dental_orgs/organizations.json"),
@@ -116,10 +118,38 @@ def read_official_source_readiness(paths: dict[str, Path] | None = None) -> dict
         }
 
 
+def read_founder_leadgen_queue(
+    exchange_path: Path = DEFAULT_EXCHANGE,
+    buyer_path: Path = DEFAULT_BUYER_ACTIONS,
+) -> dict:
+    """PRIVATE loopback API: verified source-ledger research, never send authority."""
+    try:
+        data = {}
+        for name, path in (("exchange", exchange_path), ("buyer_actions", buyer_path)):
+            if not path.is_file() or path.stat().st_size > 5_000_000:
+                raise ValueError("buyer_or_exchange_snapshot_missing_or_oversized")
+            data[name] = json.loads(path.read_text(encoding="utf-8"))
+        result = build_leadgen_revenue_queue(**data, max_visible=12)
+        return {"available": result.get("state") == "FOUNDER_RESEARCH_QUEUE_READY", **result}
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return {
+            "available": False,
+            "mode": "READ_ONLY_PRIVATE_LEADGEN",
+            "state": "HOLD",
+            "reason": "founder_leadgen_evidence_unavailable",
+            "qualified_buyers": 0,
+            "ready_for_outbound": 0,
+            "canonical_empiredb_writes": False,
+            "buyer_outreach_authorized": False,
+            "execution_authority": "none",
+        }
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
     source_ledger_paths: dict[str, Path] | None = None,
+    buyer_actions_path: Path = DEFAULT_BUYER_ACTIONS,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/founder-lead-supply",
@@ -129,6 +159,10 @@ def create_founder_lead_supply_router(
     @router.get("/overview")
     def overview():
         return read_lead_supply_report(report_path)
+
+    @router.get("/leadgen")
+    def leadgen():
+        return read_founder_leadgen_queue(exchange_path, buyer_actions_path)
 
     @router.get("/source-readiness")
     def source_readiness():

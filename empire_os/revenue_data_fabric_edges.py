@@ -20,6 +20,16 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "buyer_qualification_and_canonical_exchange_to_leadgen_revenue_queue",
+        "empire_os/leadgen_revenue_activation_queue.py",
+        "empire_os/founder_lead_supply_api.py",
+        "six-hour current founder buyer evidence, verified separate canonical "
+        "Exchange inventory, first-party research references and no false "
+        "buyer-territory match, capacity or send authority",
+        "prioritise truthful B2B buyer verification gaps against existing "
+        "niche supply before founder-approved commercial outreach",
+    ),
+    IntelligenceEdge(
         "official_research_ledgers_to_existing_canonical_prospect_preflight",
         "empire_os/official_source_canonical_preflight.py",
         "empire_os/crawler_data_repository.py",
