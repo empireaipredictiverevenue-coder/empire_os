@@ -85,6 +85,7 @@ export default async function FounderPage() {
   const streamMining = decision?.data_stream_mining;
   const evidencePathways = decision?.evidence_pathways;
   const commercialEvidence = decision?.commercial_evidence_request;
+  const marketCoverage = decision?.flagship_buyer_market_coverage;
   const vendorStatus = decision?.flagship_quality_integrations;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
@@ -494,6 +495,26 @@ export default async function FounderPage() {
                               {show(commercialEvidence?.reason_code, "No verified current handoff").replaceAll("_", " ")}
                             </p>
                           )}
+                        </div>
+                        <div className="mt-3 rounded-xl border border-cyan-200/15 bg-white/[0.025] p-3">
+                          <p className="text-sm font-semibold text-white">
+                            Authorized buyer-market coverage
+                          </p>
+                          <p className="mt-2 text-xs text-slate-300">
+                            {show(marketCoverage?.status, "Not deployed").replaceAll("_", " ")}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                            <span>Observed matching records: {show(marketCoverage?.record_count_bucket, "UNKNOWN").replaceAll("_", " ").toLowerCase()}</span>
+                            <span>Market coverage complete: {marketCoverage?.market_attribute_coverage_complete === true ? "Yes" : "No"}</span>
+                          </div>
+                          <p className="mt-2 text-xs text-slate-300">
+                            Next: {show(marketCoverage?.next_internal_evidence_action, "Verify authorized source projection").replaceAll("_", " ")}
+                          </p>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            Derived only from the existing authorised buyer-capacity service after its
+                            owner releases the code. An incomplete niche or metro is UNKNOWN, not zero.
+                            Matching records do not establish purchase intent or buying capacity.
+                          </p>
                         </div>
                         <p className="mt-3 text-[11px] text-slate-500">
                           This is an internal evidence-join review. It does not infer a buyer, estimate

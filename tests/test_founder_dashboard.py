@@ -2494,6 +2494,11 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert source_history["schema_version"] == "empire.flagship_source_quality_history.v1"
     assert source_history["buyer_or_revenue_verified"] is False
     assert source_history["statistical_significance_established"] is False
+    market = control["flagship_buyer_market_coverage"]
+    assert market["schema_version"] == "empire.predictive_revenue.authorized_market_coverage.v1"
+    assert market["market_no_match_claim_authorized"] is False
+    assert market["buyer_or_revenue_verified"] is False
+    assert market["execution_authority"] == "none"
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False

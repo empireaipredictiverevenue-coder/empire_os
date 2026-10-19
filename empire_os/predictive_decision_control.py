@@ -506,6 +506,12 @@ def build_predictive_decision_control_runtime(
     decision["source_quality_history"] = review_quality_history(
         root / PATH, as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_buyer_market_projection import (
+        review_authorized_market_coverage_snapshot,
+    )
+    decision["flagship_buyer_market_coverage"] = review_authorized_market_coverage_snapshot(
+        root, as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 

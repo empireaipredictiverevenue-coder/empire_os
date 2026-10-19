@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from empire_os.buyer_capacity_readiness import summarize_buyer_capacity
 from empire_os.buyer_allocation_repository import BuyerAllocationDataRepository
 from empire_os.canonical_data_gateway import empiredb_gateway_from_environment as gateway_from_environment
 from empire_os.runtime_env import load_runtime_env
+from empire_os.flagship_buyer_market_projection import (
+    held_authorized_market_coverage, summarize_authorized_market_coverage,
+)
 
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime" / "buyer_capacity_readiness" / "latest.json"
@@ -39,7 +43,20 @@ def fetch_all_buyers(
 
 def main() -> int:
     rows = fetch_all_buyers()
-    payload = summarize_buyer_capacity(rows)
+    now = datetime.now(timezone.utc)
+    payload = summarize_buyer_capacity(rows, observed_at=now)
+    try:
+        # Same already-authorised database read: no second query, credentials,
+        # role, buyer contact export or new backend.
+        payload["flagship_exact_market_coverage"] = summarize_authorized_market_coverage(
+            ROOT, rows, as_of=now,
+        )
+    except Exception:
+        # Do not let an optional flagship market preview break the existing
+        # root-owned capacity snapshot, nor expose a gateway exception.
+        payload["flagship_exact_market_coverage"] = held_authorized_market_coverage(
+            "OPTIONAL_FLAGSHIP_MARKET_PREVIEW_HELD"
+        )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     tmp = OUT.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")

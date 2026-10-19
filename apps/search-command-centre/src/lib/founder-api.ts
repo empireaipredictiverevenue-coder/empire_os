@@ -282,7 +282,24 @@ export type FlagshipSourceQualityHistory = {
   execution_authority: "none";
 };
 
+export type FlagshipBuyerMarketCoverage = {
+  schema_version: string;
+  status: string;
+  hold_code: string | null;
+  opaque_opportunity_ref: string | null;
+  record_count_bucket: string;
+  exact_market_record_count: null;
+  full_buyer_projection_confirmed: boolean;
+  market_attribute_coverage_complete: boolean;
+  market_no_match_claim_authorized: boolean;
+  next_internal_evidence_action: string;
+  first_party_buyer_request_verified: false;
+  buyer_or_revenue_verified: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_buyer_market_coverage?: FlagshipBuyerMarketCoverage;
   source_quality_history?: FlagshipSourceQualityHistory;
   flagship_quality_integrations?: FlagshipVendorIntegrations;
   commercial_evidence_request?: PredictiveCommercialEvidenceRequest;
