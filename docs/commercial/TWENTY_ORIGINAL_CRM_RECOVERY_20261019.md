@@ -16,10 +16,14 @@
   Python SimpleHTTP, **not Twenty**. Its `/healthz` returned 404,
   `/graphql` returned 404. Thus **original Twenty is NOT currently
   verified running**; do not replace the existing process on :3000.
-- Root Docker socket and `/var/lib/docker` are unavailable to the
-  unprivileged Ubuntu MCP account. Neither container names nor volume
-  data can be enumerated by this agent. This is an access limitation,
-  **not evidence that the previous Twenty database was deleted**.
+- **CORRECTION:** July 24 production records identify `twenty-crm` as
+  an LXD/Incus-fleet instance at historical address `10.118.155.248:3000`.
+  The founder-approved Docker audit returned no matching Docker records
+  because Docker was NOT the documented original runtime.
+- The current LXD daemon is active but `lxc list --all-projects` returns
+  **0 instances** and `lxc storage list` returns **0 pools**. This shows
+  that the old instance is not currently registered on this host; it
+  does **not** prove old disks, archives or external backups were deleted.
 - Canonical CRM remains tenant-authorised **EmpireDB PostgreSQL**.
   Existing Founder CRM pilot and buyer records are not to be migrated,
   overwritten or joined on name alone. Twenty will be an optional
@@ -31,32 +35,32 @@
 
 ## Owner-only metadata check, WITHOUT dumping secrets
 
-The bundled script performs only read-only container/volume **name**
-inventory and filters for Twenty. It does not call Docker inspect's
-environment dump or query any customer database:
+The **corrected** audit inspects only current LXD project, instance and
+storage-pool metadata. It does not query a customer database or secrets:
 
 ```bash
 cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
 
-# Unprivileged dry run: HOLD until authorised Docker access.
-/srv/empire_os/.venv/bin/python -B -m scripts.audit_original_twenty_docker_20261019 --read-only
+# LXD metadata on the current host (already verified empty):
+/srv/empire_os/.venv/bin/python -B \
+  -m scripts.audit_legacy_crm_lxd_20261019 --read-only
 
-# Owner may execute on the authorised infrastructure console:
+# Authorised root-only backup *filename* inventory:
 sudo /srv/empire_os/.venv/bin/python -B \
-  -m scripts.audit_original_twenty_docker_20261019 --read-only
+  -m scripts.audit_legacy_crm_lxd_backups_20261019 --read-only
 ```
 
-**Output**: only matching container names, image tags, coarse status and
-volume names. Do not copy Docker `inspect` environment variables or
-Twenty encryption/SMTP/API credentials into chats. If no matching
-volume names are returned, use the backup inventory and known Compose
-project name; Docker labels and names can differ.
+**Output**: only LXD metadata and bounded archive filenames. LXD backups
+under `/var/snap/lxd/common/lxd/backups` are root-restricted; the
+non-root scan cannot establish absence. Never print container environment
+variables or encryption/SMTP/API credentials. An empty LXD catalog must
+not be mistaken for verified deletion of the old database.
 
 ## Restore original Twenty, not an empty replacement
 
-1. **Inventory** the original Compose project, image digests, installed
-   Twenty version, server/worker containers, existing PostgreSQL and
-   Redis services, named DB volume, file-storage volume and backups.
+1. **Inventory** any archived `twenty-crm` LXD instance exports,
+   snapshot/version, guest PostgreSQL/Redis data, file-storage volumes,
+   original encryption custody and preserved offsite backups.
    Record facts first, no restarts, no deletes.
 2. **Verify backups** and confirm the Twenty workspace and company
    record census in an isolated restored snapshot. Backup must match
@@ -69,8 +73,9 @@ project name; Docker labels and names can differ.
    rotate during a planned security window; do not insert old secrets
    in repository files or public logs.
 4. **Private deployment** only after backup and identity verification.
-   Use Twenty's official version-compatible Docker Compose, pinned
-   version/digest, an isolated PostgreSQL service and Redis.
+   Restore a compatible isolated copy of the original LXD instance when
+   its archive exists. A fresh supported Docker Compose installation
+   is a **new Twenty instance**, not restoration of historical records.
    Change the app's loopback bind to a non-conflicting private port;
    :3000 is occupied by another EmpireOS service. No public ingress
    or automatic outbound/email/marketing integration.
@@ -122,3 +127,48 @@ records verified, mail configured, marketing list imported, canonical
 EmpireDB data changed, or funds spent. Root owner access to the
 original Docker volumes / backups is the only blocker that must be
 resolved *before* discussing any restore launch.
+
+
+## Corrected infrastructure checkpoint — LXD confirmed (19 October)
+
+The founder's root-run `audit_original_twenty_docker_20261019` found zero
+Docker containers/volumes matching Twenty. This was **not a valid recovery
+test of the original installation**, because production July 24 evidence in
+`42c0f6cc:STACK_DEPLOY_STATUS.md` and
+`42c0f6cc:empire-os-startup.md` places the historic fleet in
+LXD/Incus containers. Instance name: `twenty-crm`, old address:
+`10.118.155.248:3000`.
+
+Read-only check against the current LXD daemon:
+- Active `snap.lxd.daemon`, `lxc` command available.
+- `lxc list --all-projects`: **zero instances**.
+- `lxc storage list`: **zero pools**.
+- `lxc project list`: default project only.
+- Current `127.0.0.1:3000`: unrelated Python SimpleHTTP, NOT Twenty.
+- Protected LXD archive root
+  `/var/snap/lxd/common/lxd/backups` still exists, but current
+  unprivileged scan cannot read its contents. The broader archive
+  audit also encountered **41 permission-denied paths**.
+- No user-visible archived Twenty database has yet been verified;
+  container removal/disk deletion has NOT been established.
+
+Corrected scripts:
+- `scripts.audit_legacy_crm_lxd_20261019 --read-only`
+  checks LXD instance/pool metadata, and is already verified.
+- `scripts.audit_legacy_crm_lxd_backups_20261019 --read-only`
+  requires an authorised root operator for a complete read-only
+  bounded filename inventory, with no contents, secrets, export
+  or container start.
+
+**Single required recovery-owner command:**
+
+```bash
+cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+sudo /srv/empire_os/.venv/bin/python -B \
+  -m scripts.audit_legacy_crm_lxd_backups_20261019 --read-only
+```
+
+An absence of matching filenames in the two scanned roots still does
+not rule out historical LXD exports stored on another host or in
+offsite backups. A fresh empty Twenty application must never be
+labelled restoration of the old workspace.

@@ -13,8 +13,10 @@
   - `8dc9c512:empire_os/smtp_brevo_relay.py`.
 - **Listmonk is NOT live or confirmed restored:** no current
   `listmonk` command, no 127.0.0.1:9000 listener, no observed systemd
-  Listmonk service. The current Ubuntu account cannot query the root
-  Docker daemon or inspect restricted PostgreSQL database/volumes.
+  Listmonk service. **Historical startup records place Listmonk inside
+  the LXD/Incus fleet as `listmonk-mail` at 10.118.155.153:9000**, not
+  Docker. The current LXD catalog has zero instances/storage pools;
+  archived LXD database/backup contents remain unverified.
 - Old commit messages mention ~628–629 `Empire Leads` records. That is
   a *historical report only*, NOT a current database count, marketing
   opt-in proof, saleable buyer stock or an authorised contact list.
@@ -30,9 +32,9 @@
 
 ## B. Safe path to restore the *existing* Listmonk instance
 
-1. Privileged service owner inventories existing root Docker containers,
-   volumes, image and original Postgres DB (read-only) and checks local
-   encrypted logical/offsite recovery artifacts. Preserve originals and
+1. Privileged service owner inventories archived LXD/Incus container
+   exports/snapshots for `listmonk-mail`, its original Postgres volume
+   and encrypted logical/offsite recovery artifacts (read-only). Preserve originals and
    perform any restore in an isolated, namespaced environment. Do not
    create an empty replacement advertised as restored legacy data.
 2. Use currently supported Listmonk release/documented config rather
@@ -64,8 +66,8 @@ Owner-only suggested read-only inventory (not run by this build):
 
 ```bash
 # Run only within the authorised root/ops console.
-sudo docker ps -a --no-trunc
-sudo docker volume ls
+/srv/empire_os/.venv/bin/python -B -m scripts.audit_legacy_crm_lxd_20261019 --read-only
+sudo /srv/empire_os/.venv/bin/python -B -m scripts.audit_legacy_crm_lxd_backups_20261019 --read-only
 sudo systemctl list-unit-files '*listmonk*' '*smtp*relay*'
 # Do not paste secrets or full container environment into chat.
 ```
