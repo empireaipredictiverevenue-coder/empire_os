@@ -34,3 +34,23 @@ def test_current_repo_manifest_has_code():
     report = inspect_code_edges(root)
     assert report["canonical_database"] == "EmpireDB PostgreSQL"
     assert report["edges"][0]["code_complete"] is True
+
+
+def test_existing_waterfall_and_regulated_verticals_are_explicit():
+    names = {edge.layer for edge in EDGES}
+    assert {
+        "empire_owned_contact_waterfall",
+        "legal_mass_tort_firm_intelligence",
+        "claims_insurance_buyer_governance",
+        "insurance_distribution_b2b_demand",
+    } <= names
+    result = inspect_code_edges(Path(__file__).resolve().parents[1])
+    audited = {item["layer"]: item for item in result["edges"]}
+    for layer in (
+        "empire_owned_contact_waterfall",
+        "legal_mass_tort_firm_intelligence",
+        "claims_insurance_buyer_governance",
+        "insurance_distribution_b2b_demand",
+    ):
+        assert audited[layer]["code_complete"]
+        assert audited[layer]["runtime_linkage_verified"] is False

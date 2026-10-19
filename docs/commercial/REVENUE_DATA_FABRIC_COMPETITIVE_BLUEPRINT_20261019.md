@@ -92,9 +92,29 @@ Reward **verified realised contribution margin per niche/corridor**, paired with
 
 ## Verification receipt — 19 October 2026
 - Temporary isolated Scrapling parser installed under `/tmp/empire-scrapling-20261019` ONLY to validate real CSS extraction. Shared `/srv/empire_os/.venv` remains unchanged.
-- 70 tests passed on this isolated integration branch, including the real Scrapling offline HTML fixture, source-domain controls, URL/port policy holds, rights-reference enforcement, bounded deduplication, lead-supply and intelligence bridge regressions.
-- Static edge audit: 11/11 component source and sink files exist; **0/11 runtime connections established by this audit**.
+- 114 tests passed in the latest expanded targeted suite, covering the real Scrapling offline fixture, Waterfall, legal/mass-tort intelligence, claims exchange, source-domain controls, URL/port policy holds, rights-reference enforcement, bounded deduplication, lead-supply and intelligence bridge regressions.
+- Updated static edge audit: 15/15 component source and sink files exist; **0/15 runtime connections established by this audit** (includes existing Waterfall, insurance distribution, claims governance and B2B legal/mass tort).
 - New evidence proposals carry review evidence references; the tests use synthetic references only. Actual terms, robots and lawful-use reviews must occur before collecting any third-party website.
 - Source link extraction does not prove website ownership, identity, email deliverability, consumer consent, rights to resell, commercially committed buyer seats or revenue.
 - Implementation remains unmerged and unactivated pending a named owner review and source-specific pilot.
 - For a bounded code-edge audit: `/srv/empire_os/.venv/bin/python -m scripts.review_revenue_data_fabric_20261019 --read-only` from the isolated worktree.
+
+## Vertical portfolio correction — insurance, legal and mass tort (19 October)
+**Do not narrow Empire AI to roofing/solar/HVAC/dental.** Canonical ICP/vertical planning must also preserve distinct insurance, legal, mass-tort/personal-injury and claims/managed-repair buyers. These have *different entity types*, evidence pathways and lawful outreach requirements.
+
+| Vertical / buyer class | Existing actual code | Collection → intelligence → safe commercial path | Mandatory separate gate |
+| --- | --- | --- | --- |
+| Roofing / solar / HVAC / restoration | `lead_sources/`, `source_intelligence.py`, `prospect_enrichment.py`, `lead_scoring_v2.py` | Licensed company/installer identity → own Waterfall + v2 qualification → corroborated buyer demand/corridor | Validated supply and buying capacity; no consumer enquiry inferred from company listing |
+| Insurance agents and brokers | `lanes.py` financial/insurance, `buyer_acquisition_scout.py` | Company/broker identity → firm-specific market/SEO research → insurance distribution analytics opportunity | Independent company authority, suppression, proof of demand, jurisdiction |
+| Insurance carriers / TPAs / managed-repair | `claims_exchange/engine.py`, `buyer_claim_provenance.py`, `property_claim_evidence_review.py` | Official insurer/TPA/network B2B research → licensed network and actual procurement route → analytics/service proposal | Distinguish claims partner vs insurance carrier; professional licensing and claim/referral-fee rules |
+| Legal services firms | `legal_mass_tort_intelligence.py`, `source_intelligence.py`, `lanes.py` | Public firm identity, bar/court and practice signals → firm-level legal marketing/demand analysis | Law firm ethical advertising, jurisdiction, data rights, no claimant inference |
+| Mass tort / personal injury | `legal_mass_tort_intelligence.py`, `claims_exchange/`, `lanes.py` | Court activity, publicly published firm programmes, verified legal-sector buyers → B2B aggregate market research | **No medical/legal-vulnerability profiling of individual potential plaintiffs; no automatic referral commission** |
+| Dental | `lanes.py` dental sub-niche, canonical source + enrichment pathways | Public practices and B2B buyer identity → legitimate offer/capacity evidence | Regulated healthcare marketing, no patient-health profiling |
+
+**Waterfall ownership verified:** `empire_os/waterfall.py` defines `Waterfall`, `ValidationGate`, `RegistryScraperProvider`, `SiteCrawlerProvider`, `EmpireHunterProvider`, `SocialScraperProvider`, and `build_default_waterfall()`. The **default** factory currently chooses Registry → SiteCrawler → EmpireHunter, capped at three attempts and requiring confidence >=0.90, email and bound decision-maker evidence. The SocialScraper provider exists but is **not in the default chain**. The Apollo, PeopleDataLabs, Hunter external classes are retired providers. `hub.py` imports the factory; this does **not** prove live scheduling or useful production results.
+
+**Mass-tort module ownership verified:** `legal_mass_tort_intelligence.py` is the authority for *firm-level B2B market evidence*; its `legacy_mass_tort_agent_status()` explicitly marks `agents/mass_tort_agent.py` non-authoritative/retired because of sensitive consumer targeting and obsolete paths. The claims exchange remains OBSERVE; no claim handling or settlement-linked revenue authorisation.
+
+**Proposed additive connection, not deployment:** Scrapling parsing of sources that have separately verified permission feeds an **evidence-only observation**. After canonical identity/rights checks, the existing `Waterfall` and `prospect_enrichment.py` can consume lawful source evidence. Legal/insurance/claims B2B signal routes remain segregated by entity type and compliance policy. Source code presence in this branch does NOT prove those runtime integrations are wired. The static manifest now names all four previously omitted edges.
+
+**Commercial priority remains evidence-led across all verticals:** Do not imply roofing/solar are the only top priorities. Compare verified *buying* demand for firms, contractors, agents/brokers, carriers/TPAs and regulated legal buyers. Initial individual outreach should be founder-reviewed and new-recipient suppression-cleared. Commercial insurance claim handling, plaintiff intake and settlement/referral fees remain independently gated.

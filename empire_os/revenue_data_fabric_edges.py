@@ -20,6 +20,38 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "empire_owned_contact_waterfall",
+        "empire_os/waterfall.py",
+        "empire_os/prospect_enrichment.py",
+        "same business ID, lawful source permission, validated bound contact, "
+        "provenance and expiry; separate offline review of adapter integration",
+        "improve our OWN waterfall, never clone a vendor waterfall",
+    ),
+    IntelligenceEdge(
+        "legal_mass_tort_firm_intelligence",
+        "empire_os/legal_mass_tort_intelligence.py",
+        "empire_os/buyer_demand_graph.py",
+        "firm-level public law and court market signals, jurisdiction and B2B "
+        "buyer evidence; prohibit individual claimant targeting",
+        "evidence-led legal analytics without sensitive consumer profiling",
+    ),
+    IntelligenceEdge(
+        "claims_insurance_buyer_governance",
+        "empire_os/claims_exchange/engine.py",
+        "empire_os/buyer_claim_provenance.py",
+        "carrier, TPA, contractor and licensed claims partner differentiated; "
+        "verify jurisdiction, licences, authority and permitted commercial basis",
+        "lawful fixed-scope analytics and buyer-network research",
+    ),
+    IntelligenceEdge(
+        "insurance_distribution_b2b_demand",
+        "empire_os/buyer_acquisition_scout.py",
+        "empire_os/lead_supply_intelligence.py",
+        "distinguish insurers and TPAs from agents and brokers; prove B2B "
+        "firm identity, buyer need and commercially active capacity",
+        "insurance distribution and enterprise analytics market coverage",
+    ),
+    IntelligenceEdge(
         "source_governance",
         "empire_os/source_intelligence.py",
         "empire_os/scrapling_source_evidence.py",
