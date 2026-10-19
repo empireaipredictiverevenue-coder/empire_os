@@ -165,6 +165,7 @@ def evaluate_shadow_calibration(
     precision_interval = (_wilson_95(selected_wins, len(selected))
                           if enough_selected else None)
     return {
+        "schema_version": "empire.lead_shadow_calibration_benchmark.v1",
         "precision_diagnostic_threshold_predeclared": threshold,
         "precision_diagnostic_min_selected_outcomes": 20,
         "precision_diagnostic_selected_count": len(selected) if adequate else None,

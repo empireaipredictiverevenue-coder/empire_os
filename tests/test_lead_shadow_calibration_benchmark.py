@@ -17,6 +17,7 @@ def test_no_outcome_history_reports_insufficient_evidence():
         "tenant_id": None, "calibration_evidence": [], "verified_learning_feedback": [],
     }
     result = evaluate_shadow_calibration(empty, tenant_id=None, as_of=AS_OF)
+    assert result["schema_version"] == "empire.lead_shadow_calibration_benchmark.v1"
     assert result["verified_review_count"] == 0
     assert result["candidate_brier"] is None
     assert result["candidate_beats_baseline"] is None
