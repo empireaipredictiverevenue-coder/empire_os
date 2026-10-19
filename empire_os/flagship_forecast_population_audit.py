@@ -7,7 +7,7 @@ No missing outcome is ever converted into a failure label.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from math import isfinite
 from typing import Any, Mapping
 
@@ -146,7 +146,9 @@ def review_forecast_population(
         row = item["prediction"]
         predicted, horizon = _prediction(row, tenant_id, now)
         recorded, readback = _when(item["registry_recorded_at"]), _when(item["reader_observed_at"])
-        if not predicted <= recorded <= readback <= now or recorded >= horizon:
+        # The existing original registry tolerates a predicted-at timestamp
+        # up to two minutes ahead of its trusted registration clock.
+        if not predicted - timedelta(minutes=2) <= recorded <= readback <= now or recorded >= horizon:
             raise ValueError("missing prospective registry chronology")
         ref, opportunity = row["prediction_ref"], row["opportunity_key"]
         if ref in refs or opportunity in opportunities:
