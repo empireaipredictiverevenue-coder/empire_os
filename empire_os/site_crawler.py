@@ -77,9 +77,34 @@ class SiteCrawler:
         "/get-quote", "/request-quote",
     ]
 
-    def __init__(self, max_pages: int = 5, timeout: int = 10):
+    def __init__(self, max_pages: int = 5, timeout: int = 10, *, offline_extractor=None):
         self.max_pages = max_pages
         self.timeout = timeout
+        # An optional pre-fetched HTML parser, NEVER a new network crawler.
+        # Existing crawl() and the production Waterfall still use stdlib.
+        self.offline_extractor = offline_extractor
+
+    def extract_offline_html(self, html: str, source_url: str, *,
+                             page_type: str = "contact") -> CrawlResult:
+        """Explicit no-network bridge to optional HTML parser.
+
+        Content provenance must be verified by the calling intelligence layer.
+        Even extracted emails are observations, not bound decision makers.
+        """
+        result = CrawlResult(domain=source_url)
+        if self.offline_extractor is None:
+            result.error = "offline_extractor_not_configured"
+            return result
+        try:
+            contacts = self.offline_extractor.extract_contacts(
+                html, url=source_url, page_type=page_type
+            )
+        except (ValueError, RuntimeError, TypeError) as exc:
+            result.error = type(exc).__name__
+            return result
+        result.contacts = list(contacts)
+        result.pages_crawled = 1
+        return result
 
     def crawl(self, domain_or_url: str) -> CrawlResult:
         """Crawl a site and return all contact candidates found."""
