@@ -233,7 +233,7 @@ export default async function Home() {
                   href="/department"
                   className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-300 hover:text-cyan-200"
                 >
-                  Unified SEO evidence →
+                  Empire Analytics →
                 </Link>
                 <Link
                   href="/technical"

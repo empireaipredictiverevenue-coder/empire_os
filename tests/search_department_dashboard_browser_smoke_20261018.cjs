@@ -39,7 +39,7 @@ async function main() {
       });
       page.on("pageerror",err=>errors.push(err.message));
       try {
-        const resp=await page.goto(origin+"/department",{
+        const resp=await page.goto(origin+"/department/evidence",{
           waitUntil:"networkidle2",timeout:30000,
         });
         assert.equal(resp.status(),200);
