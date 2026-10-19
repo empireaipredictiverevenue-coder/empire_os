@@ -8,10 +8,16 @@ from fastapi import APIRouter
 
 from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
 from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inventory
+from empire_os.official_source_canonical_preflight import preflight_official_source_ledgers
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
 DEFAULT_REPORT = Path("/srv/empire_os/runtime/lead_supply/niche_counts_latest.json")
+DEFAULT_SOURCE_LEDGERS = {
+    "gb_recc_solar": Path("/srv/empire_os/runtime/lead_supply/private_recc_sweeps/internal_observations.json"),
+    "us_cms_nppes_dental_npi2": Path("/srv/empire_os/runtime/lead_supply/private_us_dental_orgs/organizations.json"),
+    "us_nyc_dcwp_home_improvement_companies": Path("/srv/empire_os/runtime/lead_supply/private_nyc_contractors/private_business_observations.json"),
+}
 
 
 def read_lead_supply_report(path: Path = DEFAULT_REPORT) -> dict:
@@ -86,9 +92,34 @@ def read_lead_exchange_inventory(
         }
 
 
+def read_official_source_readiness(paths: dict[str, Path] | None = None) -> dict:
+    """Privacy-safe separate source-to-canonical preparation counts only."""
+    try:
+        selected = paths if paths is not None else DEFAULT_SOURCE_LEDGERS
+        ledgers = {}
+        for key, file in selected.items():
+            if not file.is_file() or file.stat().st_size > 200_000:
+                raise ValueError("source_ledger_unavailable")
+            ledgers[key] = json.loads(file.read_text(encoding="utf-8"))
+        result = preflight_official_source_ledgers(ledgers)
+        return {"available": True, **result}
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return {
+            "available": False,
+            "mode": "OFFICIAL_TO_CANONICAL_REVIEW_ONLY",
+            "state": "HOLD",
+            "reason": "source_readiness_ledger_unavailable",
+            "verified_net_new_empiredb_prospects": 0,
+            "exchange_inventory_added": 0,
+            "outbound_authorized": False,
+            "execution_authority": "none",
+        }
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
+    source_ledger_paths: dict[str, Path] | None = None,
 ) -> APIRouter:
     router = APIRouter(
         prefix="/v1/founder-lead-supply",
@@ -98,6 +129,12 @@ def create_founder_lead_supply_router(
     @router.get("/overview")
     def overview():
         return read_lead_supply_report(report_path)
+
+    @router.get("/source-readiness")
+    def source_readiness():
+        # Private founder aggregate. No company names, licence numbers,
+        # source URLs or contact data exposed, and no canonical DB write.
+        return read_official_source_readiness(source_ledger_paths)
 
     @router.get("/inventory")
     def inventory():

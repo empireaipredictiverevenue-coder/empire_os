@@ -20,6 +20,15 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "official_research_ledgers_to_existing_canonical_prospect_preflight",
+        "empire_os/official_source_canonical_preflight.py",
+        "empire_os/crawler_data_repository.py",
+        "three bounded provenance-verified private official-source ledgers, "
+        "zero intent inflation, limited read-only canonical lookup, no ingest RPC",
+        "make UK solar canonical preparation measurable and hold US sources "
+        "until separate acquisition rights and verified company identities",
+    ),
+    IntelligenceEdge(
         "official_vertical_source_catalog_and_bounded_dental_pilot",
         "empire_os/official_vertical_source_packs.py",
         "empire_os/nppes_dental_source.py",

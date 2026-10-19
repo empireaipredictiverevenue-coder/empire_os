@@ -567,3 +567,83 @@ Next revenue-critical step: source-rights receipts, canonical company ID
 and legal/entity status checks, protected EmpireDB ingest under existing
 least-privilege service owner, then re-materialise Exchange and verify
 buyer capacity. No paid traffic or external outbound enabled by this work.
+
+## Wave 10 — Official source observations → existing EmpireDB prospect preparation
+
+**Date:** 19 October 2026. Founder directive to continue connecting the
+41 recorded official-source business observations into the actual canonical
+Lead Intelligence and Lead Exchange architecture (no new database).
+
+### Implemented
+- `empire_os/official_source_canonical_preflight.py` reads the three bounded
+  private observation ledgers from UK RECC Solar, US CMS NPPES NPI-2 dental and
+  NYC DCWP home-improvement firms, validates each source provenance and
+  outbound/data-use authority, and prepares eligible sources using **existing**
+  `empire_os.prospect_ingest.prepare_candidate()` and
+  `prospect_identity_keys()`.
+- The canonical prep flow deliberately uses **buy_signal_score=0**. A firm
+  in an official directory is a business-identity observation, not an
+  interested buyer; legacy RECC code's high source confidence should never
+  be interpreted as purchase intent in this pipeline.
+- RECC: source `gb_recc_solar` has verified internal acquisition rights.
+  Prepared candidates use existing native crawler `source=recc_solar`,
+  `niche=solar`, `metro=United Kingdom`, source detail URL, conservative
+  identity key and registered provenance. No unverified website is written
+  into a canonical prospect.
+- US CMS NPPES and NYC DCWP: their Source Intelligence source-contract
+  entries remain `production_status=research`, `allowed_uses=(analytics,)`.
+  They are **held for rights review**, regardless of NPI or public licence
+  status. They cannot become canonical contacts or sellable inventory.
+- Optional `--probe-canonical-reader` path reuses existing
+  `CrawlerProspectRepository.from_environment().lookup_existing()` with
+  a hard limit of 0–8 bounded read-only lookups (default 4). No calls to
+  `ingest_atomic`, no new database or unapproved Supabase fallback. A
+  lookup result of `new` is **not** interpreted as verified net-new
+  EmpireDB prospect, buyer or inventory; actual atomic ingest is a later
+  separately approved owner operation.
+- `scripts/preflight_official_source_empiredb_20261019.py --read-only`
+  consumes existing local ledgers, never fetches websites or reveals
+  company/customer fields in its JSON response.
+- `empire_os/founder_lead_supply_api.py` now implements private-loopback
+  `GET /v1/founder-lead-supply/source-readiness` for aggregate observed,
+  prepared, held, source-contract and rights reasoning counts. This code is
+  staged on the unified branch; **the production service has not been
+  redeployed/restarted with this route**.
+- Tests in `tests/test_official_source_canonical_preflight_20261019.py`
+  cover real canonical prep, fake bounded identity reader, no writes,
+  zero buyer intent, aggregate privacy, source tampering, duplicate business
+  observations and endpoint wiring.
+
+### Verified source-ledger checkpoint
+Read-only direct server probe on 19 October:
+- 41 observed entries across 3 source pools.
+- **16 UK RECC Solar** records prepared in memory for *canonical identity
+  review* (not 16 approved new prospects).
+- **25 US** observations held: 16 dental NPPES organisations + 9 NYC
+  home-improvement corporation-format licences. Both sources require
+  further acquisition-rights review.
+- Optional real `CrawlerProspectRepository` reader returned
+  `DataGatewayUnavailable` in this Ubuntu shell; no EmpireDB row-level
+  reconciliation or prospect creation has been confirmed.
+- Canonical Exchange remained at 176 bounded selected inventory records
+  at its previously inspected runtime snapshot. These 41 observations
+  have created **zero additional verified Exchange inventory**.
+
+### Operator commands (read only)
+```bash
+cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+/srv/empire_os/.venv/bin/python -B \
+  -m scripts.preflight_official_source_empiredb_20261019 --read-only
+
+# Optional bounded EmpireDB lookup; currently holds without authorised DSN.
+/srv/empire_os/.venv/bin/python -B \
+  -m scripts.preflight_official_source_empiredb_20261019 \
+  --read-only --probe-canonical-reader --max-lookups 2
+```
+
+**Actual pending activation gates:** source-data reuse rights for CMS/NYC,
+independent corporation identity and niche/territory proof, existing
+least-privilege EmpireDB reader credentials in a service owner context,
+read-only exact-id lookups, separately approved atomic canonical ingest,
+then Exchange refresh and buyer-capacity verification. No traffic spend,
+public resale, automatic outbound, purchase or live trading.
