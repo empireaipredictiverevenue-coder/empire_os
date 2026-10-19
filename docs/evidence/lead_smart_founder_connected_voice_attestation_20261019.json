@@ -1,0 +1,18 @@
+{
+  "schema_version": "empire.lead_smart.founder_voice_connection_attestation.v1",
+  "buyer": "Lead Smart",
+  "campaign_id": "CA8278ed3f26e9495b881fe3833174d007",
+  "tracking_number": "+18883579305",
+  "evidence_source": "founder-direct-chat-20261019",
+  "founder_witnessed_voice_connection": true,
+  "founder_report_exact": "i confimred it went to the conectionand the vice on the phone on my tes call",
+  "buyer_confirmed_direct_route": true,
+  "buyer_confirmed_original_ani": true,
+  "buyer_source_ref": "gmail:1a145122e620d481",
+  "recording_notice_test_ref": "gmail:1a145b32d742f3b1",
+  "independent_ringba_admin_api_verified": false,
+  "recording_legal_release_certified": false,
+  "payable_call_verified": false,
+  "actual_test_call_time_utc": null,
+  "authority_scope": "existing founder-approved bounded 19 October roofing Direct pilot only"
+}

@@ -11,6 +11,36 @@ SCHEMA_VERSION = (
     "launch_readiness.v1"
 )
 
+# Lead Smart's actual written routing and original caller-ID confirmation.
+# An affiliate CallRoutes 403 does not refute a real successful test call.
+ROUTE_CONFIRMATION_SOURCE = "gmail:1a145122e620d481"
+FIVE_CALL_SCOPE = "docs/evidence/lead_smart_founder_launch_intent_20261011.json"
+
+
+def _supervised_buyer_confirmation(record: Mapping[str, Any] | None, now: datetime) -> bool:
+    if not isinstance(record, Mapping):
+        return False
+    if (record.get("buyer") != "Lead Smart"
+            or record.get("campaign_id") != "CA8278ed3f26e9495b881fe3833174d007"
+            or record.get("tracking_number") != "+18883579305"
+            or record.get("source_ref") != ROUTE_CONFIRMATION_SOURCE
+            or record.get("founder_authority_ref") != FIVE_CALL_SCOPE
+            or record.get("buyer_confirmed_direct_route") is not True
+            or record.get("buyer_confirmed_original_ani") is not True
+            or record.get("founder_witnessed_voice_connection") is not True
+            or record.get("independently_proven_admin_api") is not False):
+        return False
+    # The founder approved the existing bounded test, not an open-ended
+    # permanent attestation exception for other campaigns or dates.
+    try:
+        start = datetime.fromisoformat(str(record["starts_at"]).replace("Z", "+00:00"))
+        end = datetime.fromisoformat(str(record["ends_at"]).replace("Z", "+00:00"))
+    except (ValueError, KeyError, TypeError):
+        return False
+    return (start.tzinfo is not None and end.tzinfo is not None
+            and start.astimezone(timezone.utc).isoformat() == "2026-10-19T15:00:00+00:00"
+            and end.astimezone(timezone.utc).isoformat() == "2026-10-19T17:00:00+00:00"
+            and start <= now < end)
 
 
 def _fresh(timestamp: Any, *, now: datetime, max_age_seconds: int) -> bool:
@@ -40,6 +70,7 @@ def build_launch_readiness(
     landing_publication_authorized: bool = False,
     founder_live_traffic_authorized: bool = False,
     pilot_stop_verified: bool = False,
+    supervised_buyer_confirmation: Mapping[str, Any] | None = None,
     now: datetime | None = None,
 ) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
@@ -123,11 +154,22 @@ def build_launch_readiness(
         "founder_live_traffic_authorized": founder_live_traffic_authorized is True,
     }
 
+    # Founder-approved original Direct test may use the named buyer's written
+    # route/ANI configuration confirmation and witnessed voice connection.
+    # This is NOT administrative Ringba verification or proof of payment.
+    buyer_attestation_accepted = (
+        _supervised_buyer_confirmation(supervised_buyer_confirmation, now)
+        and founder_live_traffic_authorized is True
+        and buyer_landing_page_approved is True
+        and landing_publication_authorized is True
+    )
+    attestation_substitutions = (
+        frozenset(("routing_runtime_verified", "caller_id_pass_through_verified"))
+        if buyer_attestation_accepted else frozenset()
+    )
     blockers = [
-        name
-        for name, passed
-        in gates.items()
-        if passed is not True
+        name for name, passed in gates.items()
+        if passed is not True and name not in attestation_substitutions
     ]
 
     ready = not blockers
@@ -151,6 +193,15 @@ def build_launch_readiness(
 
         "gates":
             gates,
+
+        "buyer_attested_supervised_route": buyer_attestation_accepted,
+        "buyer_route_attestation_ref": (
+            ROUTE_CONFIRMATION_SOURCE if buyer_attestation_accepted else None
+        ),
+        "pilot_admission_substitutions": sorted(attestation_substitutions),
+        "independent_route_proven": routing_verified,
+        "independent_ani_proven": caller_id_pass_through_verified is True,
+        "revenue_verified": False,
 
         "operating_hours": hours,
 

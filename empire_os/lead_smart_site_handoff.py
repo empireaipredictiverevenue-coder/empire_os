@@ -104,6 +104,21 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
 
 def _readiness(readiness: Mapping[str, Any], now: datetime) -> None:
     gates = readiness.get("gates")
+    # A source-bound original pilot can accept the buyer's written route/ANI
+    # configuration and the founder's witnessed voice-connected test. Preserve
+    # raw provider verification as false. Consent/privacy and stop stay required.
+    substitutions = readiness.get("pilot_admission_substitutions", [])
+    if not isinstance(substitutions, list) or substitutions not in (
+        [], ["caller_id_pass_through_verified", "routing_runtime_verified"]
+    ):
+        raise HandoffHeld()
+    if substitutions and not (
+        readiness.get("buyer_attested_supervised_route") is True
+        and readiness.get("buyer_route_attestation_ref") == "gmail:1a145122e620d481"
+        and readiness.get("independent_route_proven") is False
+        and readiness.get("revenue_verified") is False
+    ):
+        raise HandoffHeld()
     if (
         readiness.get("schema_version") != "empire.lead_smart.launch_readiness.v1"
         or readiness.get("mode") != "READY"
@@ -113,7 +128,8 @@ def _readiness(readiness: Mapping[str, Any], now: datetime) -> None:
         or readiness.get("buyer_window_open_now") is not True
         or not isinstance(gates, dict)
         or not gates
-        or any(value is not True for value in gates.values())
+        or any(value is not True for name, value in gates.items()
+               if name not in substitutions)
     ):
         raise HandoffHeld()
     evaluated = _moment((readiness.get("operating_hours") or {}).get("evaluated_at"))

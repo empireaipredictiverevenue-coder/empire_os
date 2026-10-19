@@ -145,7 +145,38 @@ def compute_live_launch_readiness(
     admin_ani, admin_recording = verified_buyer_admin_proof(
         evidence_root, now=now,
     )
+    # Read the recorded direct founder-witnessed voice connection and buyer
+    # route/ANI statements in their truthful scope. They cannot certify an
+    # independently observed Ringba CallRoutes API, recording law or payout.
+    try:
+        from empire_os.lead_smart_site_handoff import CAMPAIGN, NUMBER
+        control = load(evidence_root / 'pilot/approved_control.json')
+        witness = load(repo_root / 'docs/evidence/lead_smart_founder_connected_voice_attestation_20261019.json')
+        if (witness.get('schema_version') != 'empire.lead_smart.founder_voice_connection_attestation.v1'
+                or witness.get('evidence_source') != 'founder-direct-chat-20261019'
+                or witness.get('campaign_id') != CAMPAIGN
+                or witness.get('tracking_number') != NUMBER
+                or witness.get('independent_ringba_admin_api_verified') is not False
+                or witness.get('recording_legal_release_certified') is not False
+                or witness.get('payable_call_verified') is not False):
+            raise ValueError('untrusted_witness_record')
+        supervised_confirmation = {
+            'buyer': witness.get('buyer'),
+            'campaign_id': witness.get('campaign_id'),
+            'tracking_number': witness.get('tracking_number'),
+            'source_ref': witness.get('buyer_source_ref'),
+            'buyer_confirmed_direct_route': witness.get('buyer_confirmed_direct_route'),
+            'buyer_confirmed_original_ani': witness.get('buyer_confirmed_original_ani'),
+            'founder_witnessed_voice_connection': witness.get('founder_witnessed_voice_connection'),
+            'independently_proven_admin_api': witness.get('independent_ringba_admin_api_verified'),
+            'founder_authority_ref': control.get('founder_authority_ref'),
+            'starts_at': control.get('starts_at'),
+            'ends_at': control.get('ends_at'),
+        }
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError):
+        supervised_confirmation = None
     return build_launch_readiness(
+        supervised_buyer_confirmation=supervised_confirmation,
         tracking=load(evidence_root / 'ringba/tracking_verification/latest.json'),
         zip_gate=load(evidence_root / 'coverage/activation/latest.json'),
         routing=load(evidence_root / 'ringba/routing_observation/latest.json'),
