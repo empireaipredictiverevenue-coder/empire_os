@@ -19,38 +19,9 @@ export const metadata: Metadata = {
   twitter: { card: "summary" },
 };
 
-const TRACKING_NUMBER_E164 = "+18883579305";
-const TRACKING_NUMBER_DISPLAY = "(888) 357-9305";
-
-/*
- * Fail closed.
- *
- * Assignment of a Ringba tracking number is not verification.
- * Neither this source nor its materialized worker copy can activate
- * calls until the separately evidenced gates are changed.
- */
-// Compile-time defence in depth: all approvals must be independently
-// evidenced. Changing one flag cannot enable customer calls. A future
-// launch must additionally enforce live buyer hours and ZIP eligibility
-// at call time, rather than treating this static page as authority.
-const TRACKING_VERIFIED = false;
-const ZIP_COVERAGE_VERIFIED = false;
-const ROUTING_VERIFIED = false;
-const OPERATING_HOURS_VERIFIED = false;
-const CALLER_ID_PASS_THROUGH_VERIFIED = false;
-const BUYER_LANDING_PAGE_APPROVED = false;
-const LANDING_PUBLICATION_AUTHORIZED = false;
-const FOUNDER_LIVE_TRAFFIC_AUTHORIZED = false;
-
-const CALL_ROUTE_ENABLED =
-  TRACKING_VERIFIED &&
-  ZIP_COVERAGE_VERIFIED &&
-  ROUTING_VERIFIED &&
-  OPERATING_HOURS_VERIFIED &&
-  CALLER_ID_PASS_THROUGH_VERIFIED &&
-  BUYER_LANDING_PAGE_APPROVED &&
-  LANDING_PUBLICATION_AUTHORIZED &&
-  FOUNDER_LIVE_TRAFFIC_AUTHORIZED;
+// The hero sends homeowners to the existing ZIP-guidance and consent flow.
+// The server checks call availability at submission time; no direct-dial link
+// or static compilation flag can bypass the live controls.
 
 const roofingNeeds = [
   [
@@ -132,24 +103,18 @@ export default function RoofingServicePage() {
               Check whether your property's ZIP code appears in recent roofing coverage guidance for roof installation or replacement. Other roofing issues may be considered, but a local contractor or live call route is not guaranteed.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              {CALL_ROUTE_ENABLED ? (
-                <a
-                  href={`tel:${TRACKING_NUMBER_E164}`}
-                  className="inline-flex min-h-14 items-center justify-center gap-4 rounded-xl bg-gradient-to-b from-[#0fb3ff] via-[#087af5] to-[#0057d8] px-7 py-4 text-center text-base font-bold text-white shadow-[0_11px_24px_rgba(0,94,223,.25)]"
-                >
-                  Call {TRACKING_NUMBER_DISPLAY} <ArrowRight className="h-5 w-5" aria-hidden="true" />
-                </a>
-              ) : (
-                <button type="button" disabled aria-disabled="true" className="inline-flex min-h-14 cursor-not-allowed items-center justify-center gap-4 rounded-xl bg-gradient-to-b from-[#10acfb] via-[#0877ee] to-[#0050c9] px-7 py-4 text-base font-bold text-white opacity-80 shadow-[0_10px_24px_rgba(0,91,213,.2)]">
-                  Call route pending verification <ArrowRight className="h-5 w-5" aria-hidden="true" />
-                </button>
-              )}
+              <a
+                href="#roofing-zip-check-heading"
+                className="inline-flex min-h-14 items-center justify-center gap-4 rounded-xl bg-gradient-to-b from-[#0fb3ff] via-[#087af5] to-[#0057d8] px-7 py-4 text-center text-base font-bold text-white shadow-[0_11px_24px_rgba(0,94,223,.25)]"
+              >
+                Check ZIP &amp; request a roofing call <ArrowRight className="h-5 w-5" aria-hidden="true" />
+              </a>
               <a href="#how-it-works" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-[#b7d6ef] bg-white/90 px-5 py-4 text-center text-sm font-bold text-[#06285b] shadow-sm">
                 How it works <ArrowRight className="h-4 w-4 text-[#0069e5]" aria-hidden="true" />
               </a>
             </div>
             <p className="mt-5 max-w-[570px] text-xs leading-6 text-[#435c82]">
-              Calling is not yet available. Service-area eligibility, current buyer hours, routing and caller-ID handling must be verified, and the buyer must approve this page before activation.
+Check your property's ZIP code to see current coverage guidance. If a call is available, you will see its recording/privacy notice and choose whether to proceed. No automatic dialling.
             </p>
           </div>
 
