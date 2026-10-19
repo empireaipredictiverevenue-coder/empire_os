@@ -31,3 +31,9 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.diagnose_flagship_sou
 ```
 
 No forecast registered, no business terms authenticated, no payment or fulfilment verified, no pricing fabricated, no database writes or outbound. The new diagnostic provides **source reconciliation only**, not a prediction, statistical precision claim or go-live approval.
+
+## Subsequent live verification
+
+The original production producers subsequently converged to 14 Radar, 14 intake, 14 routing and 14 Quant records. Canonical pathway validation passed. This branch did not trigger the refresh.
+
+The new first-party request had an unknown niche. The handoff now explicitly holds market identity and routes its verification to Market Intelligence, without guessing that it is roofing or authorising a forecast.

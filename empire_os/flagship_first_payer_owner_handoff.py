@@ -78,8 +78,9 @@ def summarize_first_payer_owner_handoff(
                 or request.get("schema_version") != RESEARCH_SCHEMA
                 or not isinstance(request.get("opportunity_ref"), str)
                 or not _OPPREF.fullmatch(request["opportunity_ref"])
-                or not isinstance(request.get("niche"), str)
-                or not _NICHE.fullmatch(request["niche"])
+                or (request.get("niche") is not None and (
+                    not isinstance(request["niche"], str)
+                    or not _NICHE.fullmatch(request["niche"])))
                 or not isinstance(request.get("source_pathway_fingerprint"), str)
                 or not re.fullmatch(r"[0-9a-f]{64}",
                                     request["source_pathway_fingerprint"])
@@ -145,7 +146,8 @@ def summarize_first_payer_owner_handoff(
     return {
         "schema_version": SCHEMA,
         "status": (
-            "FIRST_PAYER_BUYER_EVIDENCE_BLOCKED" if ready
+            "FIRST_PAYER_MARKET_IDENTITY_HELD" if ready and niche is None
+            else "FIRST_PAYER_BUYER_EVIDENCE_BLOCKED" if ready
             else "CURRENT_OPPORTUNITY_NOT_ESTABLISHED"
         ),
         "mode": "OBSERVE",
@@ -168,16 +170,20 @@ def summarize_first_payer_owner_handoff(
         "source_request_not_equivalent_to_buyer_acceptance": True,
         "global_quant_counts_not_same_opportunity_counts": True,
         "first_priority_owner": (
-            "business_development" if ready else "existing_evidence_pathways_owner"
+            "market_intelligence" if ready and niche is None
+            else "business_development" if ready
+            else "existing_evidence_pathways_owner"
         ),
         "first_priority_action": (
-            "VERIFY_EXISTING_CRM_BUYER_REPLY_PRICE_TERRITORY_AND_CAPACITY"
+            "VERIFY_SOURCE_MARKET_NICHE_BEFORE_BUYER_MATCH"
+            if ready and niche is None
+            else "VERIFY_EXISTING_CRM_BUYER_REPLY_PRICE_TERRITORY_AND_CAPACITY"
             if ready else "RESTORE_CURRENT_FIRST_PARTY_OPPORTUNITY_EVIDENCE"
         ),
-        "second_priority_owner": "scientific_quant" if ready else None,
+        "second_priority_owner": "scientific_quant" if ready and niche is not None else None,
         "second_priority_action": (
             "RECORD_VALIDATED_PROSPECTIVE_PROBABILITY_AND_ECONOMICS"
-            if ready else None
+            if ready and niche is not None else None
         ),
         "existing_work_item_created": False,
         "crm_accessed": False,

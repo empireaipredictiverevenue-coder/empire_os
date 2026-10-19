@@ -140,3 +140,17 @@ def test_untrusted_formula_status_cannot_inject_contacts_to_founder_response(tmp
     formula["source_status"]["opportunity_quant"] = "private@example.com"
     with pytest.raises(ValueError, match="source inventory"):
         review(now, buyer, formula, coverage)
+
+
+def test_live_sourced_opportunity_with_unknown_market_stays_held(tmp_path):
+    now, buyer, formula, coverage = inputs(tmp_path)
+    buyer['request']['niche'] = None
+    result = review(now, buyer, formula, coverage)
+    assert result['status'] == 'FIRST_PAYER_MARKET_IDENTITY_HELD'
+    assert result['market_vertical'] is None
+    assert result['first_priority_owner'] == 'market_intelligence'
+    assert result['first_priority_action'] == 'VERIFY_SOURCE_MARKET_NICHE_BEFORE_BUYER_MATCH'
+    assert result['second_priority_owner'] is None
+    assert result['second_priority_action'] is None
+    assert result['same_buyer_verified_terms'] is False
+    assert result['forecast_issued'] is False
