@@ -10,6 +10,7 @@ from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
 from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inventory
 from empire_os.official_source_canonical_preflight import preflight_official_source_ledgers
 from empire_os.leadgen_revenue_activation_queue import build_leadgen_revenue_queue
+from empire_os.buyer_specification_readiness import build_buyer_specification_readiness
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
@@ -154,6 +155,26 @@ def read_founder_leadgen_queue(
         }
 
 
+def read_buyer_specification_gap_board(
+    exchange_path: Path = DEFAULT_EXCHANGE,
+    relationship_path: Path = DEFAULT_RELATIONSHIPS,
+) -> dict:
+    """Existing partner and canonical Exchange review, no execution."""
+    try:
+        result = build_buyer_specification_readiness(
+            exchange=json.loads(exchange_path.read_text(encoding="utf-8")),
+            relationships=json.loads(relationship_path.read_text(encoding="utf-8")),
+        )
+        return {"available": result.get("state") == "FOUNDER_PARTNER_GAP_BOARD_READY", **result}
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return {"available": False, "state": "HOLD",
+                "verified_buyer_specifications": 0,
+                "commercial_activation_authorized": False,
+                "outbound_authorized": False,
+                "canonical_empiredb_writes": False,
+                "execution_authority": "none"}
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
@@ -175,6 +196,10 @@ def create_founder_lead_supply_router(
         return read_founder_leadgen_queue(
             exchange_path, buyer_actions_path, relationship_path
         )
+
+    @router.get("/buyer-specifications")
+    def buyer_specifications():
+        return read_buyer_specification_gap_board(exchange_path, relationship_path)
 
     @router.get("/source-readiness")
     def source_readiness():

@@ -884,3 +884,40 @@ altering the outbound governor.
 - CRM suppression and any other mailboxes not included in the current
   relationship registry remain mandatory independent checks before
   any outbound approval. Do not automatically follow up with prior contacts.
+
+## Wave 13 — Existing buyer specifications and first-payer gate board
+
+- Built `empire_os/buyer_specification_readiness.py` using the *existing*
+  canonical `empire.commercial_relationship_registry.v1` partner pilot
+  records and `empire.commercial_exchange_snapshot.v1` bounded read-only
+  EmpireDB projection. No additional buyer table, agent or outreach job.
+- Each of nine existing buyer launch requirements is examined independently;
+  missing buybox, geography, payable event and terms, source approval,
+  tracking, routing, landing approval, compliance and founder activation
+  are preserved, never inferred from a web page or a past email.
+- Live preview: **4** existing partner pilot reviews (LeadBank, Validated,
+  Inquirly, Connexis). **0/9** buyer launch gates verified per partner,
+  **0** verified buyer buyboxes, **0** verified buyer capacity and **0**
+  allocatable immediately deliverable units. LeadBank has one *historical
+  reported* requirement but not independently verified current terms.
+  Existing canonical Exchange remains **176 selected records**.
+- Added staged private Founder endpoint:
+  `GET /v1/founder-lead-supply/buyer-specifications`, with missing
+  evidence and next-required-proof per partner, sourced exclusively
+  from the existing registry and Exchange. It does not reveal personal
+  caller/contact information and cannot send, sign, activate traffic,
+  allocate stock or modify EmpireDB.
+- No new endpoint has been deployed to the currently running Founder
+  service. Production feature release still requires the existing
+  Founder service owner's auth/route review and explicit release
+  approval. Existing leadgen observer, RECC scanner, Gmail reply
+  evidence, buyer scout and Exchange timers remain untouched.
+- Unit, API and cross-pipeline regressions: 615 tests passed with only the
+  already-known Starlette/anyio dependency deprecation warning.
+
+**Revenue-first next gate:** capture one authenticated buyer specification
+with product, approved country/geo, expected lead/call quality, capacity,
+price, payable event, source approval, return/refund terms and tracking
+route. Match those to canonical supply with an owner-approved read-only
+corridor comparator *before* any offer, funds movement, launch or
+outbound authority is considered.
