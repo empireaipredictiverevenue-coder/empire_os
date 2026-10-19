@@ -15,7 +15,7 @@ module=importlib.util.module_from_spec(spec)
 sys.modules[spec.name]=module
 spec.loader.exec_module(module)
 
-LIVE=module.LIVE
+LIVE=Path("/home/ubuntu/empire_worktrees/flagship_organic_collector_merged_20261018/apps/empire-public-site/out")
 STAGED=module.STAGED
 
 def stage_fake(tmp):
@@ -31,7 +31,7 @@ def stage_fake(tmp):
     return root
 
 def test_original_and_exact_candidate_match_all_rendered_text():
-    p=module.plan()
+    p=module.plan(LIVE,STAGED)
     assert module.digest(p.baseline)==module.EXPECTED_OLD
     assert module.digest(p.candidate)==module.EXPECTED_NEW
     assert len(p.added)==11

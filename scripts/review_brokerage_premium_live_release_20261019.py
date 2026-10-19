@@ -18,9 +18,10 @@ from urllib.error import HTTPError,URLError
 ROOT=Path("/srv/empire_os")
 CURRENT_HTML=ROOT/"apps/empire-public-site/out/commercial.html"
 STAGED_HTML=Path(
-    "/home/ubuntu/empire_worktrees/brokerage_premium_activation_20261018/"
+    "/home/ubuntu/empire_worktrees/brokerage_premium_exact_live_site_20261019/"
     "apps/empire-public-site/out/commercial.html"
 )
+REVIEWED_COMMERCIAL_HTML_SHA256="89e78031318d3a0a3cba2d9e23289bce52e9e3401fb90b1897dab8924d7f9567"
 PRIVATE_URL="http://127.0.0.1:8098/v1/brokerage/premium-discovery"
 PUBLIC_URL="http://127.0.0.1/v1/checkout/brokerage/premium-discovery"
 SCHEMA="empire.data_brokerage.actual_live_release_readonly.v1"
@@ -58,7 +59,27 @@ def same_site_build(
         return False,False
     for path in (current,staged):
         if path.stat().st_size>2_000_000:raise ValueError("HTML_TOO_LARGE")
-    return True,sha256(current.read_bytes()).digest()==sha256(staged.read_bytes()).digest()
+    same=sha256(current.read_bytes()).digest()==sha256(staged.read_bytes()).digest()
+    if current==CURRENT_HTML and staged==STAGED_HTML:
+        # Live release proof must match the immutable reviewed build, not
+        # simply a same-size or mutually altered copy of the page.
+        same=same and sha256(current.read_bytes()).hexdigest()==REVIEWED_COMMERCIAL_HTML_SHA256
+        if same:
+            from html.parser import HTMLParser
+            class _PageScripts(HTMLParser):
+                def __init__(self):super().__init__();self.pages=[]
+                def handle_starttag(self,tag,attrs):
+                    if tag=="script":
+                        u=dict(attrs).get("src","")
+                        if u.startswith("/_next/static/chunks/app/commercial/page-") and u.endswith(".js"):
+                            self.pages.append(u)
+            parser=_PageScripts();parser.feed(current.read_text())
+            if len(parser.pages)!=1:
+                same=False
+            else:
+                js=current.parent/parser.pages[0].lstrip("/")
+                same=js.is_file() and b"/v1/checkout/brokerage/premium-discovery" in js.read_bytes()
+    return True,bool(same)
 
 def shared_source_pending(root:Path=ROOT)->bool:
     proc=subprocess.run(
