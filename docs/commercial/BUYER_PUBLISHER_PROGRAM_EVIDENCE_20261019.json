@@ -1,0 +1,121 @@
+{
+  "schema_version": "empire.buyer_publisher_program_evidence.v1",
+  "observed_at": "2026-10-19",
+  "source_policy": "PUBLIC_FIRST_PARTY_CLAIMS_NOT_ACCEPTED_COMMERCIAL_TERMS",
+  "execution_authority": "NONE",
+  "programs": [
+    {
+      "domain": "bh-network.com",
+      "source_url": "https://bh-network.com/",
+      "source_kind": "company_first_party_site",
+      "classification": "PUBLIC_US_CALL_AND_LEAD_BUYER_CLAIM",
+      "programme_regions": [
+        "US"
+      ],
+      "verticals": [
+        "roofing",
+        "HVAC",
+        "solar",
+        "home_services",
+        "legal",
+        "insurance"
+      ],
+      "claim_evidence": [
+        "Publishes an inbound calls and leads publisher application route",
+        "States US nationwide coverage and weekly payouts",
+        "Claims no volume cap; actual campaign capacity is unverified"
+      ],
+      "application_url": "https://webuycalls.com/",
+      "route_status": "HISTORICAL_WEBUYCALLS_DELIVERABILITY_HOLD",
+      "traffic_method_status": "CONDITIONAL_REVIEW",
+      "payout_type": "WEEKLY_PAYOUT_CLAIM_NO_PER_CALL_RATE",
+      "accepted_payout_verified": false,
+      "accepted_campaign_verified": false,
+      "actual_capacity_verified": false,
+      "identity_verified_as_buyer": false,
+      "application_submitted": false,
+      "contact_authorised": false,
+      "next_questions": [
+        "Reconcile previous returned/bounced webuycalls.com email before attempting a new route",
+        "Identify the specific payable call or lead definition for roofing, solar or HVAC",
+        "Verify live US ZIP/buyer transfer capacity, consent, recording, ANI, rate, dispute rules and settlement"
+      ]
+    },
+    {
+      "domain": "joinglobalwiz.com",
+      "source_url": "https://joinglobalwiz.com/affiliates",
+      "source_kind": "company_first_party_site",
+      "classification": "PUBLIC_HOME_SERVICES_PAY_PER_CALL_NETWORK",
+      "programme_regions": [
+        "US_TRAFFIC",
+        "UK_AFFILIATE_APPLICANTS"
+      ],
+      "verticals": [
+        "roofing",
+        "HVAC",
+        "plumbing",
+        "restoration",
+        "home_services"
+      ],
+      "claim_evidence": [
+        "States home services Pay Per Call affiliate programme",
+        "Lists SEO and owned-site traffic among reviewed methods",
+        "Notes application, traffic sources and campaigns require individual approval"
+      ],
+      "application_url": "https://joinglobalwiz.com/affiliates",
+      "route_status": "APPLICATION_ROUTE_PRESENT_NOT_SUBMITTED",
+      "traffic_method_status": "SEO_OWNED_MEDIA_SUBJECT_TO_APPROVAL",
+      "payout_type": "NO_PUBLISHED_ACCEPTED_PAYOUT",
+      "accepted_payout_verified": false,
+      "accepted_campaign_verified": false,
+      "actual_capacity_verified": false,
+      "identity_verified_as_buyer": false,
+      "application_submitted": false,
+      "contact_authorised": false,
+      "next_questions": [
+        "Confirm a currently open Chicago roofing and US roofing/solar/HVAC pay-per-call campaign",
+        "Request approved SEO/organic source specification and consumer disclosure requirements",
+        "Request qualified call criteria, recording/ANI routing, live ZIP capacity, payout rates and approved destination terms"
+      ]
+    },
+    {
+      "domain": "centfix.ca",
+      "source_url": "https://centfix.ca/affiliates",
+      "source_kind": "company_first_party_site",
+      "classification": "PUBLIC_CANADIAN_REFERRAL_REVENUE_SHARE",
+      "programme_regions": [
+        "CA_ON",
+        "CA_BC",
+        "CA_AB",
+        "CA_QC"
+      ],
+      "verticals": [
+        "home_services",
+        "renovation",
+        "HVAC",
+        "plumbing",
+        "electrical"
+      ],
+      "claim_evidence": [
+        "Publishes 8–14 percent commission tiers on collected project revenue",
+        "Says affiliate application is reviewed and qualified homeowners must be in Canadian service area",
+        "States monthly payout minimum and an attribution/hold policy"
+      ],
+      "application_url": "https://centfix.ca/affiliates",
+      "route_status": "OUTSIDE_UK_US_TERRITORY_HOLD",
+      "traffic_method_status": "CONSENTED_HOMEOWNER_REFERRALS_ONLY",
+      "payout_type": "PUBLIC_8_TO_14_PERCENT_COLLECTED_REVENUE_CLAIM_NOT_PER_LEAD",
+      "accepted_payout_verified": false,
+      "accepted_campaign_verified": false,
+      "actual_capacity_verified": false,
+      "identity_verified_as_buyer": false,
+      "application_submitted": false,
+      "contact_authorised": false,
+      "next_questions": [
+        "Do not treat published referral commission as a guaranteed per-call or per-lead payout",
+        "Only reconsider if Empire AI launches a compliant Canadian property/service-specific corridor",
+        "Any application requires approved source, service area, consent, and accepted terms"
+      ]
+    }
+  ]
+}

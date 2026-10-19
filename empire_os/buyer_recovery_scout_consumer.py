@@ -13,6 +13,9 @@ import re
 import stat
 from urllib.parse import urlsplit, urlunsplit
 from typing import Any, Mapping
+from empire_os.buyer_publisher_program_evidence import (
+    read_public_program_claims, PublicProgrammeHold,
+)
 
 SCHEMA = "empire.buyer_recovery_scout_observer.v1"
 INPUT = Path("runtime/buyer_network_intelligence/scout_network_review_handoff_latest_20261019.json")
@@ -170,7 +173,19 @@ def read_scout_review(root: Path) -> dict[str, Any]:
     # Repeat consistency check: a live observer may swap inputs concurrently.
     if sha256(_read_source(filepath,limit=MAX_BYTES)).hexdigest() != sha256(raw).hexdigest():
         raise ScoutConsumerHold("review_changed_during_analysis")
+    try:
+        programme_catalog=read_public_program_claims(root)
+    except (PublicProgrammeHold, OSError, UnicodeError, TypeError, KeyError):
+        programme_catalog={"status":"PUBLIC_CLAIM_CATALOG_HELD","programmes":{}}
+    for entry in preview:
+        evidence=programme_catalog["programmes"].get(entry["company_domain"])
+        if evidence is not None:
+            entry["public_publisher_programme_review"]=evidence
     return {
+        "public_programme_evidence_status":programme_catalog["status"],
+        "programme_claim_rows_matched":sum(
+            "public_publisher_programme_review" in entry for entry in preview
+        ),
         "schema_version": SCHEMA, "status": "SOURCE_LINKED_RESEARCH_ONLY",
         "review_task_count": len(preview), "held_source_count": held,
         "independently_verified_buyer_count": 0,
