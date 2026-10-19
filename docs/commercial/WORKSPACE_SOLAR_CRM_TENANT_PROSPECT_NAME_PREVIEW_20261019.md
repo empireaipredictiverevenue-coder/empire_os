@@ -93,12 +93,12 @@ and adds the new isolated
 change the existing
 `50-founder-release-20261018.conf` file. A successful cutover
 requires healthy loopback CRM, the new GET returning HTTP 401 without
-authentication, all previous OpenAPI path/schema contracts unchanged,
+authentication, all 27 previous Python router contracts unchanged,
 the existing prospects endpoint still HTTP 401, no public exposure and
 healthy Founder/Gmail services. On failure the new 60 drop-in is removed,
 systemd reloaded and the previous founder queue release restarted.
 
-Current status: **preflight passed, release staged only; NO production CRM
+Current status: **corrected preflight passed, release staged only; NO production CRM
 cutover**. A valid authenticated CRM owner session is required to
 inspect actual tenant-scoped name-match candidates. It would be incorrect
 to claim a production name match before that authenticated read occurs.
@@ -115,6 +115,41 @@ Expected marker:
 `PRIVATE_CRM_SOLAR_TENANT_NAME_PREVIEW_RELEASE_VERIFIED`.
 No extra database migration, role, timer, CRM write, email send, or
 payment activation is included.
+
+## Failed operator attempt and owner-safe correction — 19 October 2026
+
+The founder ran the staged private CRM operator command. Its initial
+read-only checks passed with
+`FROZEN_28_ROUTE_CRM_PACKAGE_VERIFIED` and `PRECHECK_PASS`, but the
+privileged script stopped at `HOLD_BASELINE_OPENAPI_UNAVAILABLE` after
+receiving HTTP 404 from `/openapi.json`.
+
+This was a mistake in the **release verifier**, not a CRM defect.
+The existing first-party pilot intentionally constructs FastAPI with
+`docs_url=None`, `redoc_url=None` and `openapi_url=None`.
+Independent live checks confirmed all three documentation paths are HTTP
+404, the prior Founder CRM remains ACTIVE from
+`founder-queue-20261018v1`, and neither the proposed 60 systemd drop-in
+nor the new release directory exists. The new preview still returns 404;
+all prior authenticated routes retain expected 401 responses. No
+production CRM or database mutation occurred.
+
+The release script was corrected to use
+`scripts/verify_private_crm_router_parity_20261019.py` instead of
+fetching OpenAPI. That helper uses separate minimal-environment Python
+processes to import the exact pinned old and staged CRM router sources
+**without live CRM credentials**. It asserts all 27 old route paths,
+HTTP methods, endpoint names/signatures, dependencies and route metadata
+are unchanged, and the sole 28th endpoint is the proposed GET.
+After the private service switch, it independently checks the copied
+root-owned target package against the same active baseline. The
+production HTTP smoke checks also confirm authenticated GETs still
+return 401, existing Founder console assets return 200 and
+`/openapi.json`, `/docs` and `/redoc` remain 404.
+
+The corrected stage/parity tests passed and the updated read-only
+release preflight passed; no live CRM switch was performed while fixing
+this verifier. **Do not enable OpenAPI** to make the release succeed.
 
 ## Remaining commercial authority boundaries
 

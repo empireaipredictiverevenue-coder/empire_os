@@ -566,6 +566,29 @@ The exact command, success marker and rollback documentation are in
 `docs/commercial/WORKSPACE_SOLAR_CRM_TENANT_PROSPECT_NAME_PREVIEW_20261019.md`.
 Do not redeploy the old shared source or create synthetic contact matches.
 
+## 19 October — private CRM cutover held by intentionally disabled OpenAPI
+
+The founder attempted the prepared operator-only CRM name-preview
+release. Initial source and service checks passed, but the script
+stopped at `HOLD_BASELINE_OPENAPI_UNAVAILABLE`. The running CRM pilot
+deliberately disables `/openapi.json`, `/docs` and `/redoc`
+(HTTP 404). This was a verifier error, not a production CRM failure.
+Independent inspection confirmed the existing `50` founder release
+still runs, no new `60` override or application release was installed,
+and the new tenant name preview remains unpublished (HTTP 404).
+
+The release script is corrected to use read-only, clean-process Python
+route manifest comparison instead of public OpenAPI. It now requires
+all 27 existing route paths, methods, signatures and other metadata
+to remain identical, plus exactly one tenant-authenticated GET,
+and verifies both source packages again after operator release.
+Public documentation remains disabled, and live tenant/authenticated
+401 and founder static 200 HTTP status checks are retained.
+The corrected `--preflight` has passed and the regression suite is
+green. **Privileged cutover is still pending founder shell rerun**.
+Full exact instructions and safety evidence remain in
+`docs/commercial/WORKSPACE_SOLAR_CRM_TENANT_PROSPECT_NAME_PREVIEW_20261019.md`.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including

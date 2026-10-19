@@ -31,12 +31,15 @@ def test_new_route_is_additive_and_no_authority_or_data_mutation():
         "PRECHECK_PASS:",
         "systemctl restart \"$UNIT\"",
         "PRIVATE_CRM_SOLAR_NAME_PREVIEW_ROLLBACK_TO_FOUNDER_QUEUE",
-        "FOUNDER_CRM_ALL_PRIOR_ROUTE_AND_SCHEMA_PARITY_VERIFIED",
+        "FOUNDER_CRM_ALL_PRIOR_ROUTE_AND_SIGNATURE_PARITY_VERIFIED",
         "PRIVATE_CRM_SOLAR_TENANT_NAME_PREVIEW_RELEASE_VERIFIED",
         "/v1/revenue-crm/prospects",
         "/v1/revenue-crm/partner-conversations/review",
         "/v1/revenue-crm/commercial-loop/review",
-        "set(after)==set(before)|{new}",
+        "verify_private_crm_router_parity_20261019 --compare-staged",
+        "verify_private_crm_router_parity_20261019 --compare-deployed",
+        "PUBLIC_CRM_DOCUMENTATION_UNEXPECTEDLY_EXPOSED",
+        "PUBLIC_CRM_DOCUMENTATION_EXPOSED_AFTER_RELEASE",
         "== 401",
     )
     for key in required:

@@ -82,12 +82,10 @@ fi
 
 [[ "$(id -u)" == 0 ]] || die ROOT_OPERATOR_REQUIRED
 temp_override=''
-baseline=''
 activated=0
 cleanup(){
  local rc="$?"
  [[ -z "$temp_override" ]] || rm -f "$temp_override"
- [[ -z "$baseline" ]] || rm -f "$baseline"
  if [[ "$activated" == 1 && "$rc" != 0 ]];then
   echo 'PRIVATE_CRM_SOLAR_NAME_PREVIEW_ROLLBACK_TO_FOUNDER_QUEUE' >&2
   rm -f "$OVERRIDE"
@@ -98,22 +96,16 @@ cleanup(){
 trap cleanup EXIT
 trap 'exit 98' INT TERM
 umask 077
-baseline="$(mktemp /tmp/empire-crm-route-manifest.XXXXXXXX)"
-curl -fsS --max-time 9 "$BASE/openapi.json" > "$baseline" || die BASELINE_OPENAPI_UNAVAILABLE
-python3 - "$baseline" "$NEW_ROUTE" <<'PY'
-import json,sys
-p=json.load(open(sys.argv[1],encoding='utf-8'))['paths']
-assert len(p)>=20 and sys.argv[2] not in p, 'UNEXPECTED_CRM_ROUTE_BASELINE'
-for route in (
- "/v1/revenue-crm/health",
- "/v1/revenue-crm/prospects",
- "/v1/revenue-crm/journeys/acquisition-scorecard",
- "/v1/revenue-crm/partner-conversations/review",
- "/v1/revenue-crm/commercial-loop/review",
-):
- assert route in p, route
-print("CURRENT_LIVE_CRM_ROUTE_MANIFEST_CAPTURED",len(p))
-PY
+# Intentional security boundary: pilot FastAPI has openapi_url=None.
+# Verify the live web service retains disabled public documentation and
+# compare exact pre/post Python router contracts in isolated clean processes.
+for path in /openapi.json /docs /redoc;do
+ [[ "$(curl -sS --max-time 7 -o /dev/null -w '%{http_code}' "$BASE$path")" == 404 ]] ||
+  die PUBLIC_CRM_DOCUMENTATION_UNEXPECTEDLY_EXPOSED
+done
+/srv/empire_os/.venv/bin/python -B -m scripts.verify_private_crm_router_parity_20261019 --compare-staged ||
+ die EXISTING_CRM_ROUTER_CONTRACT_DRIFT
+echo 'CURRENT_CRM_ROUTER_MANIFEST_VERIFIED_OFFLINE_NO_OPENAPI'
 mkdir -p "$TARGET/empire_os"
 # Do not copy private/root-only historical override files or credentials.
 rsync -a --exclude='__pycache__' --exclude='*.pyc' "$PRIOR/empire_os/" "$TARGET/empire_os/"
@@ -144,18 +136,21 @@ done
 [[ "$(systemctl show "$UNIT" -p ActiveState --value)" == active ]] || die NEW_CRM_NOT_ACTIVE
 [[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' "$BASE/v1/revenue-crm/health")" == 200 ]] || die CRM_HEALTH_REGRESSION
 [[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' "$BASE/v1/revenue-crm/prospects")" == 401 ]] || die AUTH_REQUIRED_REGRESSION
-python3 - "$baseline" "$BASE/openapi.json" "$NEW_ROUTE" <<'PY'
-import json,sys,urllib.request
-before=json.load(open(sys.argv[1],encoding='utf-8'))["paths"]
-with urllib.request.urlopen(sys.argv[2],timeout=9) as resp:
- after=json.load(resp)["paths"]
-new=sys.argv[3]
-assert set(after)==set(before)|{new},'CRM_ROUTING_DRIFT'
-for path,methods in before.items():
- assert after[path]==methods,'EXISTING_CRM_OPENAPI_SCHEMA_DRIFT'
-assert set(after[new])=={"get"},'NAME_PREVIEW_MUST_BE_GET_ONLY'
-print("FOUNDER_CRM_ALL_PRIOR_ROUTE_AND_SCHEMA_PARITY_VERIFIED",len(after))
-PY
+/srv/empire_os/.venv/bin/python -B -m scripts.verify_private_crm_router_parity_20261019 --compare-deployed ||
+ die LIVE_CRM_ROUTER_CONTRACT_DRIFT
+for path in /openapi.json /docs /redoc;do
+ [[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' "$BASE$path")" == 404 ]] ||
+  die PUBLIC_CRM_DOCUMENTATION_EXPOSED_AFTER_RELEASE
+done
+for path in /v1/revenue-crm/partner-conversations/review /v1/revenue-crm/journeys/acquisition-scorecard /v1/revenue-crm/commercial-loop/review;do
+ [[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' "$BASE$path")" == 401 ]] ||
+  die EXISTING_SIGNED_CRM_ROUTE_AUTH_REGRESSION
+done
+for path in /v1/revenue-crm/review-console /v1/revenue-crm/review-console.js;do
+ [[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' "$BASE$path")" == 200 ]] ||
+  die FOUNDER_CRM_CONSOLE_ASSET_REGRESSION
+done
+echo 'FOUNDER_CRM_ALL_PRIOR_ROUTE_AND_SIGNATURE_PARITY_VERIFIED 28'
 for unit in empire-founder-console.service empire-founder-dashboard-api.service empire-buyer-acquisition-team.timer;do
  [[ "$(systemctl is-active "$unit")" == active ]] || die SUPPORTING_SERVICE_REGRESSION
 done
