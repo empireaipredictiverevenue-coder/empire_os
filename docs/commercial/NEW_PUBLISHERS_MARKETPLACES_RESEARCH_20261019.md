@@ -157,3 +157,45 @@ or EmpireDB.
 acceptances, 0 submitted applications, 0 product listings, 0
 independently verified paying buyers, 0 paid traffic activation,
 0 CRM writes and 0 outbound. Existing Scout/sweep owners unchanged.
+
+
+## Recruit external publishers to resell Empire AI products (distinct seller route)
+
+For clarity, **we joining an affiliate programme** (as content
+publisher) pays us when a third-party brand accepts our qualifying
+conversion. **We recruiting affiliates** (as the software vendor)
+requires a separately approved selling programme and merchant setup:
+
+- [Awin for advertisers](https://www.awin.com/gb/getting-started) —
+  advertiser plan (Awin currently displays plans from £99/month).
+- [impact.com for brands](https://impact.com/) —
+  a separately priced brand-side partnership management programme.
+- [PartnerStack vendors](https://partnerstack.com/) —
+  B2B SaaS partner recruitment; quoted vendor pricing.
+
+All three are classified **PAID_VENDOR_PROGRAM_BUDGET_HOLD**
+rather than new free channels. They need (a) an actual ready-to-sell
+Empire SaaS product, (b) an approved merchant checkout and attribution
+model, (c) publisher terms and compliance, and (d) founder-approved
+spend. None is activated, and the current £0 third-party budget is
+preserved.
+
+## Latest isolated branch review output
+
+Source fields inspected: canonical 259-relationship registry and the
+other buyer-network owner's 5-programme fresh sweep. After the
+separate vendor-side recruitment channels were added:
+- 20 marketplace programme **routes** (not 20 unique businesses).
+- 8 **new channel eligibility reviews** available for non-contact
+  qualification.
+- 2 historical relationship/contact holds (Aragon and Marketcall).
+- 3 other-owner/repeated research holds (RingPartner, Home Serv Pro,
+  CallScaler).
+- 4 enterprise seller qualification holds.
+- 3 paid vendor programme budget holds.
+- 0 submissions, 0 accounts created, 0 merchant settlements,
+  0 paid buyer relationships and 0 products made public.
+
+The same domain may legitimately expose multiple publisher/brand-side
+routes; the register keeps them separate while sharing canonical
+prior-contact blocks. Counts are channel routes, not unique prospects.

@@ -127,3 +127,16 @@ def test_bad_source_cli_returns_hold_without_leaking_private_data(tmp_path,capsy
     assert code==2
     assert out["state"]=="HOLD_SOURCE_CONTRACT_OR_MISSING_RESEARCH"
     assert "private@" not in json.dumps(out)
+
+
+def test_publisher_commissions_not_confused_with_recruiting_own_sellers():
+    report=review_marketplace_distribution(*samples(),at=NOW)
+    rows={r["id"]:r for r in report["marketplace_items"]}
+    assert rows["awin-publisher"]["lane"]=="EARN_AFFILIATE_COMMISSIONS"
+    assert rows["awin-advertiser"]["lane"]=="RECRUIT_PRODUCT_AFFILIATES"
+    assert rows["awin-advertiser"]["state"]=="PAID_VENDOR_PROGRAM_BUDGET_HOLD"
+    assert rows["impact-advertiser"]["state"]=="PAID_VENDOR_PROGRAM_BUDGET_HOLD"
+    assert rows["partnerstack-vendor"]["state"]=="PAID_VENDOR_PROGRAM_BUDGET_HOLD"
+    assert report["paid_vendor_budget_holds"]==3
+    assert report["new_registered_publishers"]==0
+    assert report["actual_product_listings_published"]==0
