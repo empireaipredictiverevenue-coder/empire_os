@@ -90,8 +90,11 @@ done
 [[ "$(systemctl show "$UNIT" -p WorkingDirectory --value)" == "$TARGET" ]] || fail WRONG_WORKTREE_ACTIVE
 [[ "$(systemctl show "$UNIT" -p DropInPaths --value)" == "$REQUIRED $DROP" ]] || fail UNEXPECTED_OVERRIDES
 for p in "${NEW_ROUTES[@]}";do [[ "$(code "http://127.0.0.1:3001$p")" == 200 ]] || fail PRIVATE_ROUTE_REGRESSION;done
+# Assert semantic DOM evidence, not exact raw-HTML substrings: the H1 is
+# split by a styled span, while HTML entities need decoding. This validator
+# explicitly rejects script/hydration-only markers and the held-data state.
 curl -fsS --max-time 18 http://127.0.0.1:3001/department |
- "$ROOT/.venv/bin/python" -c 'import sys;s=sys.stdin.read().lower();assert all(x in s for x in ("analytics command centre","visitors &amp; sessions","not connected","observed daily impressions","source availability","noindex"))' || fail BRANDED_METRICS_NOT_RENDERED
+ "$ROOT/.venv/bin/python" -m scripts.verify_private_empire_analytics_html_20261019 --verify-stdin || fail BRANDED_METRICS_NOT_RENDERED
 curl -fsS --max-time 15 http://127.0.0.1:3001/department/evidence |
  "$ROOT/.venv/bin/python" -c 'import sys;s=sys.stdin.read().lower();assert "unified seo evidence" in s and "404 editorial priorities" in s' || fail ARCHIVED_EVIDENCE_NOT_RENDERED
 [[ "$(code http://127.0.0.1:8771/health)" == 200 ]] || fail SEARCH_API_REGRESSION
