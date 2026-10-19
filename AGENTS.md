@@ -2,6 +2,47 @@
 
 This section overrides any conflicting historical wording below.
 
+### Founder directive — 2026-10-19: One task, one implementation owner
+
+Canonical directive: `directive_0f97bbfe46434b1ab0b744d39c09226a`
+(`Single-Owner Agent Scope Enforcement`). This policy applies to EmpireOS,
+ASTRA, Codex, Hermes, Pi and independently operated implementation agents.
+It **does not** give any agent authority to reassign another agent's work.
+
+1. **Check ownership before edits or recommendations to take over work.**
+   Identify the exact founder-assigned objective, current department and owner,
+   permitted paths, and handoff interface. Inspect current production HEAD,
+   relevant worktrees and dirty paths, recent commits, existing agent work and
+   execution leases. A worktree's existence alone does not establish a live
+   operator, and an empty lease list does **not** prove a domain is unowned.
+2. **Stay in your assignment.** Work only on the identified task and its
+   allowed paths; never opportunistically implement adjacent departments,
+   change another owner's files, create parallel modules/agents, or take over
+   remaining work just because an associated gap was discovered. Another
+   agent's related progress is a reason to reconcile, not a new assignment.
+3. **Conflicts fail closed.** If the owner is unknown, an active owner already
+   owns the change, proposed paths are shared/dirty, or responsibilities
+   conflict, do **not** edit, merge, deploy, queue outbound, or auto-reassign.
+   Give the existing owner a factual **read-only handoff** with evidence and
+   changed requirements. Founder reassignment is required before takeover.
+4. **Use existing safeguards, not new governance infrastructure.** Where an
+   executing builder is integrated with the Agent & Tool Execution Plane,
+   supply narrowly scoped allowed paths and acquire its existing exclusive
+   domain/path mutation lease before writing. Leases are temporary collision
+   controls, **not** persistent ownership assignments or grants of production
+   authority. Independently operated sessions must respect the same scope
+   even when they cannot acquire a shared lease.
+5. **Finish then stop:** implement only the assigned change, run focused
+   verification, commit only owned files, report tested versus live outcomes,
+   pass any cross-owner dependency to its owner, and **stop**. Do not invent
+   the next assignment or reopen completed founder/buyer decisions.
+
+This instruction is a shared operating policy, not evidence that every agent
+runtime enforces it. Automated end-to-end coverage must be verified separately
+by the existing execution-plane owner; do not claim it is active everywhere.
+Existing restrictions on production writes, live outreach, finances, secrets
+and protected paths remain in force.
+
 - Blueprint V6 and the verified live runtime are production truth.
 - EmpireDB PostgreSQL is the canonical production business database.
 - `EMPIRE_DATA_BACKEND=empiredb`.
