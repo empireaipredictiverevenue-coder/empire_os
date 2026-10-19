@@ -37,7 +37,9 @@ def test_unknown_owner_scope_stays_explicit_and_no_payer_claim(tmp_path):
     outcome = review(tmp_path, now)
     assert outcome["status"] == "SCOPED_SOURCE_IDENTITY_REQUIRED"
     assert outcome["opaque_opportunity_ref"] == ref
-    assert outcome["original_source_identity_bound"] is False
+    assert outcome["original_source_identity_bound"] is True
+    assert outcome["tenant_scope_authenticated"] is False
+    assert outcome["source_market_checked_from_current_snapshot"] is True
     assert outcome["buyer_terms_authenticated"] is False
     assert outcome["economic_memory_verified_terminal_pairs"] is None
     assert outcome["original_forecast_registered"] is False
@@ -152,3 +154,64 @@ def test_unknown_market_only_held_in_owner_and_not_assigned_to_buyer(tmp_path):
     assert result["status"] == "MARKET_IDENTITY_REQUIRED"
     assert result["original_source_identity_bound"] is False
     assert result["buyer_specific_buybox_authenticated"] is False
+
+
+def test_unowned_market_research_is_a_buyer_research_task_not_a_tenant(tmp_path):
+    now, ref, _ = current(tmp_path)
+    path = tmp_path / SOURCES['radar'][0]
+    original = json.loads(path.read_text())
+    for row in original['candidates']:
+        row['source'] = 'market_sweeps_revenue_gps'
+        row['opportunity_class'] = 'market_research'
+        row['metro'] = ':'.join(row['opportunity_key'].split(':')[2:])
+        row['tenant_id'] = None
+        row['org_id'] = None
+    path.write_text(json.dumps(original))
+    result = review(tmp_path, now)
+    assert result['status'] == 'UNOWNED_MARKET_RESEARCH_NOT_BUYER'
+    assert result['opaque_opportunity_ref'] == ref
+    assert result['source_epoch_status'] == 'FOUR_STAGE_SOURCE_IDENTITIES_ALIGNED'
+    assert result['source_market_checked_from_current_snapshot'] is True
+    assert result['tenant_scope_authenticated'] is False
+    assert result['buyer_identity_observed_in_selected_research'] is False
+    assert result['next_owner'] == 'business_development'
+    assert result['next_action'] == 'VERIFY_FIRST_PARTY_BUYER_INTEREST_TERMS_AND_TENANT_LINK'
+    assert result['quant_preview_checked'] is False
+    assert result['original_forecast_registered'] is False
+    assert result['buyer_terms_authenticated'] is False
+    assert result['database_writes'] is False
+    serialized=json.dumps(result)
+    assert 'market_sweeps_revenue_gps' not in serialized
+    assert 'fixture-tenant' not in serialized
+
+
+def test_source_mutation_never_forges_buyer_or_identity(tmp_path):
+    now, _, key = current(tmp_path)
+    path=tmp_path / SOURCES['radar'][0]
+    original=json.loads(path.read_text())
+    for row in original['candidates']:
+        if row['opportunity_key'] == key:
+            row['source'] = 'market_sweeps_revenue_gps'
+            row['opportunity_class'] = 'market_research'
+            row['metro'] = 'changed metro'
+    path.write_text(json.dumps(original))
+    result=review(tmp_path,now)
+    assert result['status'] in ('SOURCE_EPOCH_HOLD','SOURCE_REVISION_DRIFT',
+                                'NO_CURRENT_FIRST_PAYER_SOURCE')
+    assert result['original_forecast_registered'] is False
+    assert result['buyer_terms_authenticated'] is False
+
+
+def test_exact_key_cannot_hide_niche_drift_between_radar_and_intake(tmp_path):
+    now, _, key = current(tmp_path)
+    target = tmp_path / SOURCES['intake'][0]
+    rows = json.loads(target.read_text())
+    for row in rows['items']:
+        if row['opportunity_key'] == key:
+            row['niche'] = 'unrelated-specialty'
+    target.write_text(json.dumps(rows))
+    result = review(tmp_path, now)
+    assert result['status'] == 'SOURCE_REVISION_DRIFT'
+    assert result['original_source_identity_bound'] is False
+    assert result['buyer_specific_buybox_authenticated'] is False
+    assert result['original_forecast_registered'] is False

@@ -36,3 +36,13 @@ The private in-process API `review_first_payer_scoped_quant_bridge(root,as_of=aw
 ## Production / commercial release
 
 Feature branch only. No production deployment, active phone routing, emails, CRM/data mutations, original prediction recording, BSC funds movement, model training, or customer accuracy claim.
+
+## Live owner-custody clarification (19 October, later review)
+
+The exact opportunity `oppref_04c7a3720313eab3ec97` currently resolves to **Little Rock, Arkansas roofing market-research**, from `market_sweeps_revenue_gps`, rather than a verified tenant lead, signed buybox or the separate Chicago pilot. Its original Radar row has `tenant_id=None`, `org_id=None`, no confirmed buyer intent, and no verified commercial demand. The private buyer-projection inspection returned `CANONICAL_BUYER_GATEWAY_UNAVAILABLE`: **buyer count unknown**, not zero. The canonical four-stage identity join passed at review time; source snapshots can refresh independently.
+
+The default read-only operator now resolves and checks the exact current source reference, current owner evidence fingerprint, market revision, upstream encoded market identity and downstream intake niche/category. It returns `UNOWNED_MARKET_RESEARCH_NOT_BUYER` and owner `business_development`, with next action `VERIFY_FIRST_PARTY_BUYER_INTEREST_TERMS_AND_TENANT_LINK`. This does not authenticate the tenant or establish a payer. The market-encoded source key and downstream niche must remain coherent even if four key sets are identical.
+
+**Existing owner handoff:** Research one genuine organisation/person specifically buying the Little Rock roofing product, get a first-party reply or signed buying brief, exact product/location/postcode eligibility, source and consent/suppression, written price, demonstrable purchase/delivery capacity and commercially authorised offer. Preserve the original provider message/contract source, timestamps and source-key link through the authorised tenant-scoped CRM actor. Only then may the CRM owner provide an authenticated tenant-to-opportunity proof for private Quant review. Do not infer ownership from public market sweeps, assign an arbitrary org ID, or touch Lead Smart's Chicago pilot. After terms and source authentication, Quant still requires all 11 prospectively sourced numeric factors and separately enabled original prediction registry; Economic Memory needs actual independent outcomes before any accuracy claim.
+
+No outbound, CRM mutation, DB read credential escalation, model promotion, forecasting or revenue recognition was performed by this branch. This is not evidence that Little Rock buyer demand or profitability is established.

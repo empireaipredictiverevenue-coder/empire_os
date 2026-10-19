@@ -29,6 +29,32 @@ SCHEMA = "empire.flagship.first_payer_scoped_quant_bridge.v1"
 _GOOD_EPOCH = "FOUR_STAGE_SOURCE_IDENTITIES_ALIGNED"
 
 
+def _market_cross_stage_consistent(root: Path, source: Mapping[str, Any]) -> bool:
+    """Catch market revision drift hidden by an otherwise equal key set."""
+    key = source.get("opportunity_key")
+    category = source.get("opportunity_class")
+    if not isinstance(key, str):
+        return False
+    if category == "market_research" and source.get("source") == "market_sweeps_revenue_gps":
+        niche, metro = source.get("niche"), source.get("metro")
+        if (not isinstance(niche, str) or not isinstance(metro, str)
+                or not niche.strip() or not metro.strip()
+                or key != f"market:{niche}:{metro}".casefold()):
+            return False
+    rows = _read(root, "intake").get("items")
+    if not isinstance(rows, list) or len(rows) > 250:
+        return False
+    matching = [row for row in rows if isinstance(row, Mapping)
+                and row.get("opportunity_key") == key]
+    if len(matching) != 1:
+        return False
+    intake = matching[0]
+    if (intake.get("niche") not in (None, "", source.get("niche"))
+            or intake.get("opportunity_class") not in (None, "", category)):
+        return False
+    return True
+
+
 def review_first_payer_scoped_quant_bridge(
     repo_root: str | Path, *, as_of: datetime,
     tenant_id: str | None = None,
@@ -109,9 +135,51 @@ def review_first_payer_scoped_quant_bridge(
                     next_owner="market_intelligence",
                     next_action="VERIFY_SOURCE_MARKET_NICHE_BEFORE_BUYER_MATCH")
     if tenant_id is None:
+        # Public source records are not automatically owned commercial leads.
+        # Resolve ONLY the existing owner's opaque reference, current epoch,
+        # fingerprint and market digest; never reveal the underlying key.
+        current = review_one_commercial_evidence_request(root, as_of=as_of)
+        if (current.get("status") != "ONE_INTERNAL_EVIDENCE_REQUEST_PREPARED"
+                or not isinstance(current.get("request"), Mapping)
+                or current["request"].get("opportunity_ref") != ref
+                or current["request"].get("source_pathway_fingerprint") !=
+                   owner["existing_source_fingerprint"]):
+            return dict(result, status="SOURCE_REVISION_DRIFT",
+                        next_owner="existing_opportunity_factory_owner",
+                        next_action="RESELECT_CURRENT_FIRST_PAYER_SOURCE")
+        source_rows = _read(root, "radar").get("candidates")
+        if not isinstance(source_rows, list) or len(source_rows) > 250:
+            raise ValueError("unbounded original Radar source")
+        same_ref = [
+            row for row in source_rows if isinstance(row, Mapping)
+            and isinstance(row.get("opportunity_key"), str)
+            and "oppref_" + sha256(row["opportunity_key"].encode()).hexdigest()[:20] == ref
+        ]
+        if (len(same_ref) != 1
+                or market_identity_digest(same_ref[0]) !=
+                   current["request"].get("market_identity_digest")
+                or same_ref[0].get("niche") != owner["market_vertical"]
+                or not _market_cross_stage_consistent(root, same_ref[0])):
+            return dict(result, status="SOURCE_REVISION_DRIFT",
+                        next_owner="existing_opportunity_factory_owner",
+                        next_action="RESELECT_CURRENT_FIRST_PAYER_SOURCE")
+        source = same_ref[0]
+        result["original_source_identity_bound"] = True
+        result["original_market_revision_bound"] = True
+        result["source_market_checked_from_current_snapshot"] = True
+        if (source.get("opportunity_class") == "market_research"
+                and source.get("source") == "market_sweeps_revenue_gps"
+                and source.get("tenant_id") is None
+                and source.get("org_id") is None
+                and source.get("buyer_intent_inferred") is False
+                and source.get("commercial_demand_observed") is False):
+            return dict(result, status="UNOWNED_MARKET_RESEARCH_NOT_BUYER",
+                        next_owner="business_development",
+                        next_action="VERIFY_FIRST_PARTY_BUYER_INTEREST_TERMS_AND_TENANT_LINK",
+                        buyer_identity_observed_in_selected_research=False)
         return dict(result, status="SCOPED_SOURCE_IDENTITY_REQUIRED",
                     next_owner="existing_buyer_crm_owner",
-                    next_action="SUPPLY_EXACT_TENANT_AND_OPPORTUNITY_SOURCE_KEY_READONLY")
+                    next_action="VERIFY_CANONICAL_TENANT_OPPORTUNITY_LINK_READONLY")
 
     if (not isinstance(tenant_id, str) or not tenant_id.strip()
             or len(tenant_id) > 128
@@ -152,6 +220,7 @@ def review_first_payer_scoped_quant_bridge(
     source = matched[0]
     if (market_identity_digest(source) != request.get("market_identity_digest")
             or source.get("niche") != owner["market_vertical"]
+            or not _market_cross_stage_consistent(root, source)
             or source.get("tenant_id") not in (None, tenant_id)):
         return dict(result, status="SOURCE_MARKET_OR_TENANT_MISMATCH",
                     next_owner="existing_buyer_crm_owner",
