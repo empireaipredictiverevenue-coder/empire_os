@@ -439,3 +439,31 @@ outbound or public lead-list resale.
 
 **Commercial truth:** acquisition research growth != qualified inventory,
 buyer activation, signed capacity, purchase, fulfilment or revenue.
+
+### Actual scheduled release receipt — 19 October 2026, Ubuntu user
+
+- A **single Ubuntu crontab** entry named
+  `EMPIRE_RECC_SOLAR_SWEEP_20261019` was installed for
+  `01:17, 07:17, 13:17, 19:17 UTC`. `cron` service observed active.
+- Cron executes a pinned, detached Git worktree snapshot rather than the
+  evolving agent branch. Original release was `962d0347`; latest hardening
+  ensures the daily source-request allowance is *pre-reserved on disk before*
+  the first network call, so interrupted fetches do not reset the cap.
+- Both source detail batches finished: 8 + 8 = 16 distinct private RECC
+  firm observations, 0 source detail failures; saved to the private research
+  ledger with directory mode 0700 and data files 0600. This count is not
+  a verified net increase to EmpireDB.
+- The existing `EMPIRE_ASTRA_OBSERVER` cron entry was preserved and
+  `empire-buyer-acquisition-scout.timer` and
+  `empire-commercial-exchange.timer` remained active. No legacy
+  broad-spectrum 72-hour crawler was started.
+- The real read-only two-population comparison returned 176 **bounded
+  Exchange selected** records vs 16 **research-only** observations.
+  Allocatable/deliverable records: 0. No new canonical DB writes, sales,
+  SMS/email outreach, lead purchase or buyer allocation.
+- Cron installation is a source-research capability only. The next scheduled
+  run has not yet been observed in service logs at the time of this receipt;
+  do not claim ongoing source success until the job actually executes.
+- To disable only this new job, edit the Ubuntu user's crontab and remove
+  the two lines beginning with the marker `EMPIRE_RECC_SOLAR_SWEEP_20261019`
+  and its immediately following cron command. Preserve ASTRA and other jobs.

@@ -97,6 +97,8 @@ def test_robots_disallow_holds_without_state_files(tmp_path):
                            detail=fake_detail, sleep=lambda sec: None)
     assert not (tmp_path / "internal_observations.json").exists()
     assert not (tmp_path / "latest.json").exists()
+    reserved = json.loads((tmp_path / "state.json").read_text())
+    assert reserved["details_today"] == 8
 
 
 def test_no_detail_exception_leaks_and_budget_counts_attempt(tmp_path):
@@ -133,3 +135,27 @@ def test_fetch_blocks_unregistered_hosts():
         _fetch("https://evil.example/robots.txt")
     with pytest.raises(ValueError):
         _fetch("http://www.recc.org.uk/robots.txt")
+
+
+def test_interrupted_directory_fetch_reserves_daily_budget(tmp_path):
+    calls = []
+    def fail_after_robots(url):
+        calls.append(url)
+        if url.endswith("/robots.txt"):
+            return "User-agent: *\\nAllow: /\\n"
+        raise TimeoutError("simulated interrupted member page fetch")
+    for expected_count in (8, 16, 24, 32):
+        with pytest.raises(TimeoutError):
+            sweep_recc_members(
+                tmp_path, now=NOW, fetch=fail_after_robots,
+                detail=fake_detail, sleep=lambda sec: None
+            )
+        saved = json.loads((tmp_path / "state.json").read_text())
+        assert saved["details_today"] == expected_count
+    result = sweep_recc_members(
+        tmp_path, now=NOW, fetch=fail_after_robots,
+        detail=fake_detail, sleep=lambda sec: None
+    )
+    assert result["state"] == "DAILY_SOURCE_BUDGET_EXHAUSTED"
+    assert len(calls) == 8
+    assert not (tmp_path / "internal_observations.json").exists()

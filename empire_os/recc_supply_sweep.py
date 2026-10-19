@@ -161,6 +161,19 @@ def sweep_recc_members(
                 "canonical_empiredb_writes": False,
                 "outbound_authorized": False,
             }
+        # Reserve the full bounded request budget DURABLY before the first
+        # public fetch. A crash/timeout may waste allowance but can never
+        # reset it and hammer the registered source on the next attempt.
+        index = state.get("cursor", 0)
+        if type(index) is not int or not 0 <= index < MAX_LINKS:
+            raise ValueError("invalid_persisted_cursor")
+        _atomic_private_json(state_path, {
+            "schema_version": STATE_SCHEMA,
+            "utc_day": day,
+            "details_today": spent + available,
+            "cursor": index,
+            "last_reserved_at": stamp.isoformat(),
+        })
         if not _robots_allowed(fetch=fetch):
             raise ValueError("source_robots_disallowed")
         search = BASE + "/scheme/members?technology=Solar%20PV&submitbutton=submit"
@@ -172,7 +185,6 @@ def sweep_recc_members(
         if type(index) is not int or not 0 <= index < MAX_LINKS:
             raise ValueError("invalid_persisted_cursor")
         cursor = index % len(links)
-        examined = 0
         observed = []
         attempts = 0
         failures = 0
