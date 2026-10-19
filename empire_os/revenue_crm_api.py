@@ -32,6 +32,9 @@ from empire_os.search_intelligence.ai_visibility import AiCitationObservation
 from empire_os.search_intelligence.backlinks import BacklinkObservation
 from empire_os.revenue_crm_readiness import assess_close_readiness
 from empire_os.revenue_crm_reply_qualification import review_crm_reply_qualification
+from empire_os.workspace_solar_crm_tenant_prospect_match import (
+    TenantProspectMatchHeld, preview_six_tenant_prospect_name_matches,
+)
 from empire_os.opportunity_commercial_source_health import assess_sources
 from empire_os.revenue_crm_retention import (
     RevenueCrmRetentionEvidence,
@@ -751,6 +754,29 @@ def create_revenue_crm_router(
             "items": rows,
             "read_only": True,
         }
+
+    @router.get("/workspace-solar/prospect-name-matches/preview")
+    def workspace_solar_tenant_prospect_name_preview(request: Request):
+        """Six-company name-only duplicate preview, signed tenant scope only.
+
+        This is deliberately not a historical receipt-to-contact binding.
+        Existing source RLS/tenant membership decides rows first.
+        """
+        repo = require_repository(request)
+        tenant = getattr(repo, "tenant_id", None)
+        if not isinstance(tenant, str):
+            raise HTTPException(
+                status_code=503, detail="crm_tenant_scope_unavailable"
+            )
+        rows = guarded_crm_read(lambda: repo.prospects(limit=500))
+        try:
+            return preview_six_tenant_prospect_name_matches(
+                rows, authenticated_tenant_id=tenant, window_limit=500,
+            )
+        except (TenantProspectMatchHeld, ValueError, TypeError):
+            raise HTTPException(
+                status_code=503, detail="crm_tenant_name_match_source_invalid"
+            ) from None
 
     @router.get("/buyers")
     def buyers(request: Request, limit: int = Query(default=100, ge=1, le=500)):

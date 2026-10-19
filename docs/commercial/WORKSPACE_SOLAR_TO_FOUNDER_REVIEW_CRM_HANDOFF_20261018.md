@@ -493,6 +493,48 @@ The report adds NO new cron, DB migration, CRM write, sender, public
 endpoint or inbox. It is deliberately advisory, and does not retroactively
 approve the six original sends. Existing Workspace monitoring continues.
 
+## 19 October — tenant-authenticated CRM duplicate preview staged
+
+An on-demand six-company historical-to-CRM gap report is live as a
+read-only script and now shows the six stored EmpireDB historical
+receipts, six missing original canonical-intent relationships and
+zero new Gmail buyer replies. The 19 October provider scan remains
+fresh and independently shows no inbound candidates.
+
+The next owner-scoped CRM feature is staged in
+`empire_os/workspace_solar_crm_tenant_prospect_match.py`, with one
+additional authenticated route in
+`empire_os/revenue_crm_api.py`:
+`GET /v1/revenue-crm/workspace-solar/prospect-name-matches/preview`.
+It reuses the existing signed CRM tenant resolver and dedicated
+tenant-bound `PostgresRevenueCrmRepository`. Its name-only
+duplicate preview reads up to 500 existing tenant-visible prospects;
+cross-tenant rows, invalid identities and duplicate prospect IDs
+fail closed. All flags for verified contact authority, canonical sent
+intent, CRM mutation and outbound remain FALSE. Name matches are
+possible CRM duplicates to review, never buyer proof.
+
+**Important owner-release caution:** the running CRM pilot has a
+newer isolated founder queue release containing other agents'
+partner, calendar and commercial features absent from the
+canonical shared `revenue_crm_api.py` source. A copy of that exact
+active `empire_os/` package was prepared and only the
+two-file additive route/helper patch applied under
+`/home/ubuntu/empire_worktrees/empire_crm_solar_tenant_name_preview_20261019`.
+Imports and 64 tests passed with both files pinned to that isolated
+candidate. Its existing 28 API routes were inspected and preserved.
+The live CRM service has **NOT** been switched and the new
+endpoint correctly remains 404 in production.
+
+Before private CRM activation, the CRM release owner must first
+verify the current release still matches this frozen candidate,
+complete a non-secret configuration and route-parity preflight, and
+prepare rollback to the existing `50-founder-release-20261018.conf`.
+Do not overwrite the current CRM release, bypass tenant authentication,
+or assert any particular prospect is a match before the signed
+tenant-scoped live read proves it. Detailed handoff:
+`docs/commercial/WORKSPACE_SOLAR_CRM_TENANT_PROSPECT_NAME_PREVIEW_20261019.md`.
+
 ## What remains conditional / NOT verified
 
 - A reply candidate requires founder review of actual Gmail message including
