@@ -103,6 +103,7 @@ def _fingerprint(item: Mapping[str, Any]) -> str:
     # facts/blockers differ. No raw names or personally identifying records.
     source = {
         "opportunity_ref": item["opportunity_ref"],
+        "market_identity_digest": item["market_identity_digest"],
         "next_owner": item["next_owner"],
         "first_unverified_requirement": item["first_unverified_requirement"],
         "missing_quant_factors": sorted(item["missing_quant_factors"]),
@@ -146,6 +147,7 @@ def review_one_commercial_evidence_request(
             else None
         ),
         "source_pathway_fingerprint": _fingerprint(item),
+        "market_identity_digest": item["market_identity_digest"],
         "first_missing_evidence": item["first_unverified_requirement"],
         "required_authoritative_source": EVIDENCE_CUSTODY[REQUIRED_FIRST_FACT],
         "quant_gaps": [

@@ -101,6 +101,17 @@ def _validate(source: Mapping[str, Any], name: str, now: datetime):
     return {r["opportunity_key"]: r for r in rows}, stamp
 
 
+def market_identity_digest(row: Mapping[str, Any]) -> str:
+    """Opaque market revision receipt; never output original source free text."""
+    source = {
+        "niche": row.get("niche") if isinstance(row.get("niche"), str) else None,
+        "metro": row.get("metro") if isinstance(row.get("metro"), str) else None,
+    }
+    if any(isinstance(value, str) and len(value) > 180 for value in source.values()):
+        raise PathwayEvidenceHold("unbounded_source_market_identity")
+    return sha256(json.dumps(source, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
 def _node(key: str, stage: str) -> str:
     return "path_" + sha256((key + "|" + stage).encode()).hexdigest()[:22]
 
@@ -248,6 +259,7 @@ def review_evidence_pathways(
         summaries.append({
             "opportunity_ref": "oppref_" + sha256(key.encode()).hexdigest()[:20],
             "niche": radar.get("niche") if isinstance(radar.get("niche"), str) else None,
+            "market_identity_digest": market_identity_digest(radar),
             "source_stage": "OPPORTUNITY_RADAR_MARKET_RESEARCH",
             "pathway_nodes": nodes,
             "pathway_edges": edges,
