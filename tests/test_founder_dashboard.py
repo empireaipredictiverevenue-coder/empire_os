@@ -2505,6 +2505,15 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert market_features["brier_evaluation_available"] is False
     assert market_features["independent_validation_available"] is False
     assert market_features["execution_authority"] == "none"
+    physical = control["flagship_geo_material_context"]
+    assert physical["schema_version"] == "empire.flagship.geo_material_knowledge.v1"
+    assert physical["material_categories"] >= 10
+    assert physical["canonical_geographic_market_anchors"] >= 140
+    assert physical["staged_area_observation_rows"] == 0
+    assert physical["actual_historical_storm_events_imported"] == 0
+    assert physical["building_damage_verified"] is False
+    assert physical["physical_context_changes_forecast_probability"] is False
+    assert physical["execution_authority"] == "none"
     triage = control["flagship_buyer_enrichment"]
     assert triage["schema_version"] == "empire.predictive_revenue.buyer_enrichment_triage.v1"
     assert triage["independent_first_party_buying_intent_verified"] is False

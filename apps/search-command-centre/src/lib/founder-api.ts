@@ -429,7 +429,38 @@ export type FlagshipPredictiveMarketFeatures = {
   execution_authority: "none";
 };
 
+export type FlagshipGeoMaterialContext = {
+  schema_version: string;
+  status: string;
+  canonical_geographic_market_anchors: number;
+  official_source_references: number;
+  material_categories: number;
+  hazard_topics: number;
+  research_question_topics: number;
+  staged_area_observation_rows: number;
+  actual_historical_storm_events_imported: number;
+  staged_historical_storm_source_rows: number;
+  market_anchor_is_official_county_mapping: false;
+  site_materials_installed_verified: false;
+  building_damage_verified: false;
+  physical_context_changes_forecast_probability: false;
+  due_diligence_previews: Record<string, {
+    market_id: string;
+    metro_label: string;
+    region_code: string;
+    status: string;
+    source_references_to_research: string[];
+    sources_held_for_jurisdiction: string[];
+    official_country_area_crosswalk_loaded: false;
+    weather_or_storm_property_damage_proven: false;
+    research_questions: string[];
+    historical_local_area_event_count: null;
+  }>;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_geo_material_context?: FlagshipGeoMaterialContext;
   flagship_predictive_market_features?: FlagshipPredictiveMarketFeatures;
   flagship_market_knowledge?: FlagshipMarketKnowledge;
   flagship_signed_model_preview?: FlagshipSignedModelPreview;

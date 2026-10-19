@@ -91,6 +91,7 @@ export default async function FounderPage() {
   const customerModelOptions = decision?.flagship_customer_model_options;
   const signedModelPreview = decision?.flagship_signed_model_preview;
   const marketKnowledge = decision?.flagship_market_knowledge;
+  const geoMaterial = decision?.flagship_geo_material_context;
   const predictiveMarketFeatures = decision?.flagship_predictive_market_features;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
@@ -466,6 +467,45 @@ export default async function FounderPage() {
                         Chat examples require explicit approved, de-identified import.
                         No private transcript ingestion, model retraining, contact consent,
                         verified buyer conversion or customer ROI is implied.
+                      </p>
+                    </div>
+                    <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
+                      <p className="text-xs font-semibold text-white">
+                        Physical-world knowledge · Materials, weather and places
+                      </p>
+                      <p className="mt-1 text-xs text-slate-300">
+                        {show(geoMaterial?.status, "Not connected").replaceAll("_", " ")}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                        <span>Places: {geoMaterial?.canonical_geographic_market_anchors ?? "Unknown"}</span>
+                        <span>Official research sources: {geoMaterial?.official_source_references ?? "Unknown"}</span>
+                        <span>Materials: {geoMaterial?.material_categories ?? "Unknown"}</span>
+                        <span>Hazard themes: {geoMaterial?.hazard_topics ?? "Unknown"}</span>
+                        <span>Verified imported historical events: {geoMaterial?.actual_historical_storm_events_imported ?? "Unknown"}</span>
+                      </div>
+                      <div className="mt-3 grid gap-2 md:grid-cols-2">
+                        {(["US-IL", "US-TX", "GB-MAN", "US-FL", "GB-LON"] as const).map((key) => {
+                          const place = geoMaterial?.due_diligence_previews?.[key];
+                          return (
+                            <div key={key} className="rounded-lg border border-white/10 p-2">
+                              <p className="text-xs font-semibold text-slate-200">
+                                {place?.metro_label ?? key}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-400">
+                                Jurisdictional source references: {place?.source_references_to_research.length ?? "Unknown"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-300">
+                                {place?.research_questions[0] ?? "Verify local material and historical hazard evidence"}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        City anchors are not verified counties or storm zones. Sources are
+                        discoverable but bulk history has not yet been imported. No building
+                        damage, installed roof type, insurance claim or buyer intent is inferred.
+                        Static material knowledge does not change Quant probabilities.
                       </p>
                     </div>
                     <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">

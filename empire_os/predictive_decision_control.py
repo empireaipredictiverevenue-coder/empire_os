@@ -540,6 +540,43 @@ def build_predictive_decision_control_runtime(
     decision["flagship_predictive_market_features"] = review_market_feature_prediction_gap(
         frozen_market_features,
     )
+    from empire_os.flagship_geo_material_context import (
+        build_geophysical_knowledge_context, augment_market_graph_with_geo_materials,
+        prepare_geophysical_market_brief,
+    )
+    # Physical layer is useful for due diligence but has NO verified
+    # historical county event imports yet: do not feed static material
+    # questions into empirical Quant features or inferred damage models.
+    physical = build_geophysical_knowledge_context(
+        as_of=as_of or datetime.now(timezone.utc),
+    )
+    market_graph = augment_market_graph_with_geo_materials(market_graph, physical)
+    decision["flagship_geo_material_context"] = {
+        "schema_version":physical["schema_version"],
+        "status":physical["status"],
+        "canonical_geographic_market_anchors":physical["canonical_geographic_market_anchors"],
+        "official_source_references":physical["official_source_references"],
+        "material_categories":physical["material_categories"],
+        "hazard_topics":physical["hazard_topics"],
+        "research_question_topics":physical["research_question_topics"],
+        "staged_area_observation_rows":physical["staged_area_observation_rows"],
+        "actual_historical_storm_events_imported":physical["actual_historical_storm_events_imported"],
+        "staged_historical_storm_source_rows":physical["staged_historical_storm_source_rows"],
+        "market_anchor_is_official_county_mapping":False,
+        "site_materials_installed_verified":False,
+        "building_damage_verified":False,
+        "physical_context_changes_forecast_probability":False,
+        "due_diligence_previews": {
+            market:prepare_geophysical_market_brief(
+                physical, market_id=market, vertical=vertical,
+            ) for market, vertical in (
+                ("US-IL","roofing"), ("US-TX","roofing"),
+                ("GB-MAN","roofing"), ("US-FL","solar"),
+                ("GB-LON","hvac"),
+            )
+        },
+        "execution_authority":"none",
+    }
     decision["flagship_market_knowledge"] = {
         "schema_version": market_graph["schema_version"],
         "status": market_graph["status"],
