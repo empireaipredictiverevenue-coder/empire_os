@@ -12,6 +12,9 @@ from empire_os.runtime_env import load_runtime_env
 from empire_os.flagship_buyer_market_projection import (
     held_authorized_market_coverage, summarize_authorized_market_coverage,
 )
+from empire_os.flagship_buyer_enrichment_triage import (
+    held_buyer_enrichment_triage, summarize_buyer_enrichment_triage,
+)
 
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime" / "buyer_capacity_readiness" / "latest.json"
@@ -56,6 +59,22 @@ def main() -> int:
         # root-owned capacity snapshot, nor expose a gateway exception.
         payload["flagship_exact_market_coverage"] = held_authorized_market_coverage(
             "OPTIONAL_FLAGSHIP_MARKET_PREVIEW_HELD"
+        )
+    try:
+        # No second DB read: classify only niche and territory field gaps from
+        # the same authorised in-memory EmpireDB buyer projection.
+        payload["flagship_buyer_enrichment_triage"] = summarize_buyer_enrichment_triage(
+            rows, as_of=now,
+        )
+    except ValueError:
+        payload["flagship_buyer_enrichment_triage"] = held_buyer_enrichment_triage(
+            "BUYER_MARKET_FIELDS_UNTRUSTED"
+        )
+    except Exception:
+        # Preserve the legacy buyer-capacity worker if this optional adapter
+        # is unavailable. Never emit a source exception containing contacts.
+        payload["flagship_buyer_enrichment_triage"] = held_buyer_enrichment_triage(
+            "BUYER_ENRICHMENT_UNAVAILABLE"
         )
     OUT.parent.mkdir(parents=True, exist_ok=True)
     tmp = OUT.with_suffix(".json.tmp")

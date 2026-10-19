@@ -86,6 +86,7 @@ export default async function FounderPage() {
   const evidencePathways = decision?.evidence_pathways;
   const commercialEvidence = decision?.commercial_evidence_request;
   const marketCoverage = decision?.flagship_buyer_market_coverage;
+  const buyerEnrichment = decision?.flagship_buyer_enrichment;
   const vendorStatus = decision?.flagship_quality_integrations;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
@@ -514,6 +515,42 @@ export default async function FounderPage() {
                             Derived only from the existing authorised buyer-capacity service after its
                             owner releases the code. An incomplete niche or metro is UNKNOWN, not zero.
                             Matching records do not establish purchase intent or buying capacity.
+                          </p>
+                        </div>
+                        <div className="mt-3 rounded-xl border border-cyan-200/15 bg-white/[0.025] p-3">
+                          <p className="text-sm font-semibold text-white">
+                            Buyer niche and territory evidence recovery
+                          </p>
+                          <p className="mt-1 text-xs text-slate-300">
+                            {show(buyerEnrichment?.status, "Awaiting authorised worker release").replaceAll("_", " ")}
+                          </p>
+                          <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                            <span>Records observed: {buyerEnrichment?.source_records_observed ?? "Unknown"}</span>
+                            <span>Market fields complete: {buyerEnrichment?.market_fields_complete ?? "Unknown"}</span>
+                            <span>Missing / held: {buyerEnrichment?.market_fields_incomplete_or_held ?? "Unknown"}</span>
+                          </div>
+                          <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                            {(buyerEnrichment?.workload ?? [])
+                              .filter((item) => item.requires_work)
+                              .slice(0, 4)
+                              .map((item) => (
+                                <div key={item.source_state} className="rounded-lg border border-white/10 p-2 text-xs">
+                                  <p className="font-semibold text-slate-200">
+                                    {item.source_state.replaceAll("_", " ")}
+                                  </p>
+                                  <p className="mt-1 text-slate-400">
+                                    Records: {item.observed_record_bucket.replaceAll("_", " ").toLowerCase()}
+                                  </p>
+                                  <p className="mt-1 text-cyan-200">
+                                    {item.owner.replaceAll("_", " ")} · {item.next_internal_action.replaceAll("_", " ")}
+                                  </p>
+                                </div>
+                              ))}
+                          </div>
+                          <p className="mt-2 text-[11px] text-slate-500">
+                            Reuses the existing Buyer Acquisition and buyer qualifier workflows.
+                            This is an internal evidence workload, never automatic enrichment,
+                            contact permission or verified purchasing intent.
                           </p>
                         </div>
                         <p className="mt-3 text-[11px] text-slate-500">

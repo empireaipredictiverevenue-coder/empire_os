@@ -77,6 +77,8 @@ def summarize_authorized_market_coverage(
         not isinstance(row, Mapping) for row in rows
     ):
         return held_authorized_market_coverage("INCOMPLETE_OR_INVALID_EXISTING_BUYER_PROJECTION")
+    if any("org_id" not in row for row in rows):
+        return held_authorized_market_coverage("CANONICAL_ORGANISATION_SCOPE_NOT_PROJECTED")
     try:
         prepared = review_one_commercial_evidence_request(
             repo_root, as_of=at,
@@ -245,6 +247,7 @@ def review_authorized_market_coverage_snapshot(
                         "CANONICAL_CAPACITY_PROJECTION_NOT_READY",
                         "CAPACITY_SNAPSHOT_NOT_FRESH",
                         "CANONICAL_MARKET_EVIDENCE_UNAVAILABLE",
+                        "CANONICAL_ORGANISATION_SCOPE_NOT_PROJECTED",
                         "INCOMPLETE_OR_INVALID_EXISTING_BUYER_PROJECTION",
                         "MARKET_JOIN_NOT_AUTHENTICATED",
                         "UNTRUSTED_MARKET_PROJECTION_OUTPUT",

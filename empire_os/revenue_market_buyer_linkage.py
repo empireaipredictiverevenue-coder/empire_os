@@ -102,7 +102,10 @@ def review_existing_buyer_market_linkage(
     for row in buyer_inventory:
         # This founder-global research review has no tenant authority.
         # Even a niche/metro match cannot override a tenant-scoped record.
-        if row.get("tenant_id") not in (None, ""):
+        # public.buyers tenant owner is org_id. An absent projection field
+        # MUST NOT be interpreted as globally visible buyer data.
+        if ("org_id" not in row or row.get("org_id") is not None
+                or row.get("tenant_id") not in (None, "")):
             tenant_held += 1
             continue
         niche = _normalize(row.get("niche"), SAFE_NICHE)

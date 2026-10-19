@@ -2499,6 +2499,10 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert market["market_no_match_claim_authorized"] is False
     assert market["buyer_or_revenue_verified"] is False
     assert market["execution_authority"] == "none"
+    triage = control["flagship_buyer_enrichment"]
+    assert triage["schema_version"] == "empire.predictive_revenue.buyer_enrichment_triage.v1"
+    assert triage["independent_first_party_buying_intent_verified"] is False
+    assert triage["execution_authority"] == "none"
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False

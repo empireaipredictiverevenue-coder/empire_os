@@ -512,6 +512,10 @@ def build_predictive_decision_control_runtime(
     decision["flagship_buyer_market_coverage"] = review_authorized_market_coverage_snapshot(
         root, as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_buyer_enrichment_triage import review_enrichment_triage_snapshot
+    decision["flagship_buyer_enrichment"] = review_enrichment_triage_snapshot(
+        root, as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 

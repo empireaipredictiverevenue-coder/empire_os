@@ -298,7 +298,32 @@ export type FlagshipBuyerMarketCoverage = {
   execution_authority: "none";
 };
 
+export type FlagshipBuyerEnrichment = {
+  schema_version: string;
+  status: string;
+  source_records_observed: number | null;
+  market_fields_complete: number | null;
+  market_fields_incomplete_or_held: number | null;
+  coverage_percent_of_observed_records: number | null;
+  source_market_state_buckets: Record<string, string>;
+  observed_vertical_family_buckets: Record<string, string>;
+  workload: Array<{
+    source_state: string;
+    observed_record_bucket: string;
+    requires_work: boolean;
+    owner: string;
+    existing_workflow: string;
+    next_internal_action: string;
+    priority: number;
+    first_party_source_required: true;
+    automatic_enrichment_authorized: false;
+  }>;
+  independent_first_party_buying_intent_verified: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_buyer_enrichment?: FlagshipBuyerEnrichment;
   flagship_buyer_market_coverage?: FlagshipBuyerMarketCoverage;
   source_quality_history?: FlagshipSourceQualityHistory;
   flagship_quality_integrations?: FlagshipVendorIntegrations;

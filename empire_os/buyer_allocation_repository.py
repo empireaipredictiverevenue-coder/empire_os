@@ -22,7 +22,7 @@ IDENTITY_COLUMNS = (
 )
 
 BUYER_COLUMNS = (
-    "id,buyer_name,niche,metro,is_active,status,"
+    "id,org_id,buyer_name,niche,metro,is_active,status,"
     "daily_cap,calls_today,base_payout,per_lead_rate,priority,"
     "destination_phone,webhook_url,reviewed_at,"
     "commercial_activation_state,commercial_activated_at,"

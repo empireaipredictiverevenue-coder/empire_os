@@ -31,6 +31,7 @@ def sources(tmp_path):
 def buyer(**updates):
     row = {
         "id": "local-buyer-42",
+        "org_id": None,
         "buyer_name": "Acme Clean Solar",
         "niche": "Solar",
         "metro": "Little Rock, AR",
