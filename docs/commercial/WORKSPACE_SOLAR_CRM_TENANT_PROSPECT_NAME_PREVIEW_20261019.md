@@ -68,18 +68,60 @@ been deployed**.
 Read-only test suite passed across original CRM authentication,
 tenant reader, existing CRM API and new bounded name-match tests.
 
-## Remaining activation boundary
+## Rollback-protected private release staged and preflighted
 
-This is a **staged, owner-coordinated private CRM enhancement**.
-A verified isolated runtime release based on the current active
-snapshot and a privileged operator cutover are still required. Do
-not restart the existing CRM service, overwrite its 50 founder
-release drop-in, or use the canonical repository version as a full
-replacement. No new database schema or role is required.
+The operator-owned, hash-pinned release
+`scripts/deploy_private_crm_solar_tenant_name_preview_20261019.sh`
+now installs the exact frozen two-file addition from the copied **active**
+CRM owner release—not the older canonical CRM source. Only the existing
+`empire_os/` Python application package is copied; root-only override
+files, older release operation directories and private credentials are
+excluded. The protected systemd environment file, existing signed
+tenant membership verifier and existing database reader are reused.
 
-Once privately deployed, the actual authenticated Founder CRM session
-can view whether any of the six companies already appears in
-the correctly scoped CRM prospect list. The result is a deduplication
-lead, not a buyer or contact identity. The next genuine reply is still
-subject to content, sender, suppression and canonical original lineage
-review before CRM promotion.
+The read-only preflight verifies the active owner version, the pinned
+checksums of both changed source files, byte-for-byte parity of all
+unmodified application code, all 28 resulting CRM routes, existing
+authenticated-route HTTP 401, current health, other service health
+and public Founder HTTP 404.
+
+If the owner separately authorises the private CRM UI/API deployment,
+the operator-only apply creates the new root-owned application release at
+`/opt/empire-ai/crm-pilot-releases/founder-queue-solar-name-20261019v1`
+and adds the new isolated
+`60-solar-tenant-prospect-name-preview.conf` drop-in. It does **not**
+change the existing
+`50-founder-release-20261018.conf` file. A successful cutover
+requires healthy loopback CRM, the new GET returning HTTP 401 without
+authentication, all previous OpenAPI path/schema contracts unchanged,
+the existing prospects endpoint still HTTP 401, no public exposure and
+healthy Founder/Gmail services. On failure the new 60 drop-in is removed,
+systemd reloaded and the previous founder queue release restarted.
+
+Current status: **preflight passed, release staged only; NO production CRM
+cutover**. A valid authenticated CRM owner session is required to
+inspect actual tenant-scoped name-match candidates. It would be incorrect
+to claim a production name match before that authenticated read occurs.
+
+Operator commands (private-release authorisation required):
+
+```bash
+cd /srv/empire_os
+bash scripts/deploy_private_crm_solar_tenant_name_preview_20261019.sh --preflight
+sudo bash scripts/deploy_private_crm_solar_tenant_name_preview_20261019.sh --apply-founder-approved-private-crm-name-preview
+```
+
+Expected marker:
+`PRIVATE_CRM_SOLAR_TENANT_NAME_PREVIEW_RELEASE_VERIFIED`.
+No extra database migration, role, timer, CRM write, email send, or
+payment activation is included.
+
+## Remaining commercial authority boundaries
+
+The preview is a deduplication aid, not a CRM intake or an automated
+prospect-ingest system. Only verified founder-tenant session users can
+access it. A name match does not establish a verified original contact
+identity or tenant relationship for that Gmail thread. No genuine buyer
+reply has been detected in the Workspace scan so far; subsequent
+original provider chain, sender, content, suppression and commercial
+intent checks remain required before any canonical CRM promotion.
