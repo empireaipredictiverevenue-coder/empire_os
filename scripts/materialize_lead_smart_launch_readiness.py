@@ -58,6 +58,14 @@ ROOFING_HERO_CTA_SOURCE_SHA256 = (
 ROOFING_HERO_CTA_HTML_SHA256 = (
     "0e1efde0f12311cd0a722777b91b68ecb95313ef947c4a186a0c90b43a66cc22"
 )
+# Buyer permitted indexing of the public information page. This variant
+# changes robots metadata only; the ZIP/recording/stop admission path is exact.
+ROOFING_INDEXABLE_SOURCE_SHA256 = (
+    "62e922bd99b32fec96e0053656050527013120ccb593f669fdaa4c5010ccefcf"
+)
+ROOFING_INDEXABLE_HTML_SHA256 = (
+    "8e5d0b360832cf3753a85d4683a93b7f361d6b7212f5545063f65447af04966b"
+)
 
 
 def _approved_source_variant(report: dict, root: Path) -> str | None:
@@ -74,7 +82,10 @@ def _approved_source_variant(report: dict, root: Path) -> str | None:
         if hashlib.sha256(reviewed.read_bytes()).hexdigest() != expected:
             return None
         active = hashlib.sha256(live.read_bytes()).hexdigest()
-        if active in (expected, ROOFING_HERO_CTA_SOURCE_SHA256):
+        if active in (
+            expected, ROOFING_HERO_CTA_SOURCE_SHA256,
+            ROOFING_INDEXABLE_SOURCE_SHA256,
+        ):
             return active
     except OSError:
         return None
@@ -113,11 +124,10 @@ def approved_live_publication(
     try:
         if published.is_symlink():
             return False
-        expected_html = (
-            ROOFING_HERO_CTA_HTML_SHA256
-            if source_variant == ROOFING_HERO_CTA_SOURCE_SHA256
-            else APPROVED_ROOFING_HTML_SHA256
-        )
+        expected_html = {
+            ROOFING_HERO_CTA_SOURCE_SHA256: ROOFING_HERO_CTA_HTML_SHA256,
+            ROOFING_INDEXABLE_SOURCE_SHA256: ROOFING_INDEXABLE_HTML_SHA256,
+        }.get(source_variant, APPROVED_ROOFING_HTML_SHA256)
         return hashlib.sha256(published.read_bytes()).hexdigest() == expected_html
     except OSError:
         return False

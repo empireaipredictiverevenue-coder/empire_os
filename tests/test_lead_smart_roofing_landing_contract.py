@@ -185,13 +185,14 @@ def test_roofing_page_mounts_read_only_zip_preview():
 def test_roofing_page_preserves_buyer_review_and_pinned_consent_navigation():
     import hashlib
     from scripts.materialize_lead_smart_launch_readiness import (
-        ROOFING_HERO_CTA_SOURCE_SHA256, approved_candidate_matches,
+        ROOFING_INDEXABLE_SOURCE_SHA256, approved_candidate_matches,
     )
     reviewed = PAGE.read_bytes()
     live = Path("apps/empire-public-site/src/app/roofing/page.tsx").read_bytes()
     reviewed_sha = hashlib.sha256(reviewed).hexdigest()
     assert reviewed_sha == "faea59c0d8c6d510db8af876a53af439eac41e294f8d348e20576c75bd43cccb"
-    assert hashlib.sha256(live).hexdigest() == ROOFING_HERO_CTA_SOURCE_SHA256
+    assert hashlib.sha256(live).hexdigest() == ROOFING_INDEXABLE_SOURCE_SHA256
+    assert b"robots: { index: true, follow: true }" in live
     assert b'href="#roofing-zip-check-heading"' in live
     assert b"tel:${TRACKING_NUMBER_E164}" not in live
     assert approved_candidate_matches({

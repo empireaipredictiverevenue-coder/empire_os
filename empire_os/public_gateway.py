@@ -1164,7 +1164,7 @@ def roofing_page():
     path = _site_html_path("roofing")
     if path is None:
         return JSONResponse({"error": "roofing_page_unavailable"}, status_code=404)
-    return FileResponse(path, media_type="text/html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
+    return FileResponse(path, media_type="text/html", headers={"Cache-Control": "no-store"})
 
 @app.head("/privacy")
 @app.get("/privacy")

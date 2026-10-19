@@ -21,7 +21,7 @@ def test_deployed_roofing_hash_stays_verified_and_any_drift_holds(tmp_path, monk
     reviewed=root/names[0]
     active=root/names[1]
     assert hashlib.sha256(reviewed.read_bytes()).hexdigest()==APPROVED_HASH
-    assert hashlib.sha256(active.read_bytes()).hexdigest()==release.ROOFING_HERO_CTA_SOURCE_SHA256
+    assert hashlib.sha256(active.read_bytes()).hexdigest()==release.ROOFING_INDEXABLE_SOURCE_SHA256
     site=tmp_path/"site"
     site.mkdir()
     html=site/"roofing.html"

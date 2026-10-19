@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import RoofingCoverageCheck from "./coverage-check";
 import { ArrowRight, Check, ChevronRight, Droplets, FileText, House, MapPin, MessageSquareText, Phone, ShieldCheck, Wind } from "lucide-react";
 
-// SEO-ready but deliberately withheld from indexing until every activation
-// gate, buyer landing review and live-service evidence is independently met.
+// Buyer-approved public roofing information is indexable. Call admission
+// remains separately controlled by the live ZIP, recording and stop process.
 export const metadata: Metadata = {
   title: "Roof Replacement & Installation | Roofing ZIP Check",
   description:
     "Planning a roof replacement or installation? Check recent service-area guidance by ZIP. Independent contractor availability varies and is not guaranteed.",
   alternates: { canonical: "/roofing" },
-  robots: { index: false, follow: false },
+  robots: { index: true, follow: true },
   openGraph: {
     title: "Roof Replacement & Installation Service Availability",
     description: "Review roofing service-area guidance for roof replacement and installation enquiries. Contractor availability varies by ZIP.",
