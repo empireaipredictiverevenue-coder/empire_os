@@ -90,6 +90,7 @@ export default async function FounderPage() {
   const vendorStatus = decision?.flagship_quality_integrations;
   const customerModelOptions = decision?.flagship_customer_model_options;
   const signedModelPreview = decision?.flagship_signed_model_preview;
+  const marketKnowledge = decision?.flagship_market_knowledge;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -382,6 +383,54 @@ export default async function FounderPage() {
                           </div>
                         );
                       })}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
+                      <p className="text-xs font-semibold text-white">
+                        Predictive Intelligence · Market knowledge graph
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        First-party research graph: markets, source venues, public problem
+                        themes, data products and approved conversation lessons.
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-300">
+                        <span>Nodes: {marketKnowledge?.node_count ?? "Unknown"}</span>
+                        <span>Links: {marketKnowledge?.edge_count ?? "Unknown"}</span>
+                        <span>Sources: {marketKnowledge?.research_sources ?? "Unknown"}</span>
+                        <span>Public observations: {marketKnowledge?.public_observations_indexed ?? "Unknown"}</span>
+                        <span>Approved examples: {marketKnowledge?.approved_scenario_lessons ?? "Unknown"}</span>
+                      </div>
+                      <p className="mt-2 text-xs text-cyan-100">
+                        Research health: {show(marketKnowledge?.public_research_health, "Not connected").replaceAll("_", " ")}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-400">
+                        {marketKnowledge?.unattributed_or_invalid_observations ?? "Unknown"} held public observations;
+                        {" "}{marketKnowledge?.unmapped_source_diagnostic_rows ?? "Unknown"} unmapped research diagnostics.
+                        Community source counts are not verified buyer demand.
+                      </p>
+                      <div className="mt-2 grid gap-2 md:grid-cols-2">
+                        {(["roofing", "solar", "hvac", "agency", "b2b", "law"] as const).map((niche) => {
+                          const brief = marketKnowledge?.market_research_previews?.[niche];
+                          return (
+                            <div key={niche} className="rounded-lg border border-white/10 p-2">
+                              <p className="text-xs font-semibold capitalize text-slate-200">{niche}</p>
+                              <p className="mt-1 text-[11px] text-slate-400">
+                                Research sources: {brief?.source_count ?? "Unknown"} ·
+                                Categorized posts: {brief?.public_observation_count ?? "Unknown"}
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-300">
+                                {brief?.topics?.[0]
+                                  ? brief.topics[0].problem_theme.replaceAll("_", " ") + " · ask what result the buyer needs"
+                                  : "No attributable recent discussion; research more."}
+                              </p>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Chat examples require explicit approved, de-identified import.
+                        No private transcript ingestion, model retraining, contact consent,
+                        verified buyer conversion or customer ROI is implied.
+                      </p>
                     </div>
                     <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
                       <p className="text-xs font-semibold text-white">

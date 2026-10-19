@@ -359,7 +359,43 @@ export type FlagshipSignedModelPreview = {
   execution_authority: "none";
 };
 
+export type FlagshipMarketKnowledge = {
+  schema_version: string;
+  status: string;
+  node_count: number;
+  edge_count: number;
+  research_sources: number;
+  intelligence_data_products: number;
+  public_observations_indexed: number;
+  approved_scenario_lessons: number;
+  unattributed_or_invalid_observations: number;
+  community_learning_health: string;
+  community_source_diagnostic_rows: number;
+  unmapped_source_diagnostic_rows: number;
+  public_research_health: string;
+  market_research_previews: Record<string, {
+    status: string;
+    niche: string;
+    source_count?: number;
+    public_observation_count?: number;
+    topics: Array<{
+      problem_theme: string;
+      distinct_public_observation_count: number;
+      truth_level: string;
+      next_human_question: string;
+      existing_source_research_next_action: string;
+    }>;
+    lessons: string[];
+    buyer_proof: false;
+  }>;
+  buyer_conversation_verified: false;
+  model_weights_updated: false;
+  approved_chat_import_connected: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_market_knowledge?: FlagshipMarketKnowledge;
   flagship_signed_model_preview?: FlagshipSignedModelPreview;
   flagship_customer_model_options?: FlagshipCustomerModelOptions;
   flagship_buyer_enrichment?: FlagshipBuyerEnrichment;

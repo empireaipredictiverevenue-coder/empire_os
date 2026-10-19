@@ -522,6 +522,39 @@ def build_predictive_decision_control_runtime(
     )
     from empire_os.flagship_signed_model_preview import review_signed_model_preview_readiness
     decision["flagship_signed_model_preview"] = review_signed_model_preview_readiness()
+    # The flagship-owned market knowledge graph is a privacy-safe projection
+    # over the EXISTING source atlas, community research and product map.
+    # It does not ingest chat history or register buyer intent.
+    from empire_os.flagship_market_knowledge_graph import (
+        build_market_knowledge_graph, prepare_market_conversation_brief,
+    )
+    market_graph = build_market_knowledge_graph(
+        root, as_of=as_of or datetime.now(timezone.utc),
+    )
+    decision["flagship_market_knowledge"] = {
+        "schema_version": market_graph["schema_version"],
+        "status": market_graph["status"],
+        "node_count": market_graph["node_count"],
+        "edge_count": market_graph["edge_count"],
+        "research_sources": market_graph["research_sources"],
+        "intelligence_data_products": market_graph["intelligence_data_products"],
+        "public_observations_indexed": market_graph["public_observations_indexed"],
+        "approved_scenario_lessons": market_graph["approved_scenario_lessons"],
+        "unattributed_or_invalid_observations": market_graph["unattributed_or_invalid_observations"],
+        "community_learning_health": market_graph["community_learning_health"],
+        "community_source_diagnostic_rows": market_graph["community_source_diagnostic_rows"],
+        "unmapped_source_diagnostic_rows": market_graph["unmapped_source_diagnostic_rows"],
+        "public_research_health": market_graph["public_research_health"],
+        "market_research_previews": {
+            niche: prepare_market_conversation_brief(market_graph, niche=niche)
+            for niche in ("roofing", "solar", "hvac", "agency", "b2b", "law")
+        },
+        "buyer_conversation_verified": False,
+        "model_weights_updated": False,
+        "approved_chat_import_connected": False,
+        "external_crawler_run": False,
+        "execution_authority": "none",
+    }
     return decision
 
 
