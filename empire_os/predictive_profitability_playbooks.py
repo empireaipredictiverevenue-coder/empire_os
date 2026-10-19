@@ -149,6 +149,18 @@ def review_profitability_playbook(
             if contribution_per_attempt>0 else 0
             if fixed+overhead==0 and contribution_per_attempt==0 else None
         )
+        # Break-even stress thresholds are algebraic what-if requirements,
+        # not measured prices, conversion rates, or contractual terms.
+        unit_before_acquisition = conditional_revenue-conditional_cogs
+        required_conversion = (
+            (acquisition+fixed+overhead)/(attempts*unit_before_acquisition)
+            if attempts>0 and unit_before_acquisition>0 else None
+        )
+        required_price = (
+            ((acquisition+fixed+overhead)/(attempts*conversion)+conditional_cogs)
+            / (expected_cycles*(1-refunds))
+            if attempts>0 and conversion>0 and expected_cycles>0 and refunds<1 else None
+        )
         # Conservative "no cash collections yet" expected-cost exposure;
         # no claim this is an actual bank balance or worst-case cash drawdown.
         cash_exposure=expected_cogs+acquisition+fixed+overhead
@@ -185,6 +197,16 @@ def review_profitability_playbook(
             "acquisition_spend_minor_hypothetical":acquisition,
             "fixed_and_overhead_minor_hypothetical":fixed+overhead,
             "expected_operating_profit_minor_hypothetical":round(operating_profit,4),
+            "required_conversion_rate_to_break_even_hypothetical":(
+                round(required_conversion,8) if required_conversion is not None else None
+            ),
+            "break_even_conversion_feasible_within_probability_one":(
+                required_conversion<=1 if required_conversion is not None else False
+            ),
+            "required_unit_price_minor_to_break_even_hypothetical":(
+                round(required_price,4) if required_price is not None else None
+            ),
+            "expected_contribution_per_attempt_minor_hypothetical":round(contribution_per_attempt,4),
             "break_even_qualified_attempts_hypothetical":breakeven_attempts,
             "break_even_within_assumed_volume":(
                 attempts>=breakeven_attempts if breakeven_attempts is not None else False
@@ -254,6 +276,7 @@ def review_profitability_playbook(
         "schema_version":SCHEMA,"mode":"OBSERVE",
         "status":"HYPOTHETICAL_PROFITABILITY_PLAYBOOK_READY",
         "opportunity_key":pilot["opportunity_key"],
+        "original_pilot_design_sha256":pilot["design_revision_sha256"],
         "original_pilot_design_revision_matched":True,
         "scenario_set_exhaustive_or_calibrated":False,
         "currency":currency,"product_type":kind,
