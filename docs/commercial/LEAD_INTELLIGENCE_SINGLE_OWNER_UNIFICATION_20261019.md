@@ -921,3 +921,38 @@ price, payable event, source approval, return/refund terms and tracking
 route. Match those to canonical supply with an owner-approved read-only
 corridor comparator *before* any offer, funds movement, launch or
 outbound authority is considered.
+
+## Wave 14 — 19 October 2026 — Scout recovery from production timeout
+
+Production alert observed live: the existing
+`empire-buyer-acquisition-scout.service` failed with systemd timeout after
+10 minutes. The provider diagnostics contained repeated DuckDuckGo HTTP
+202, Mojeek 403, rejected Bing results and fallback searches. This was a
+real failed production scan, despite the timer itself remaining active.
+Never report the active timer as evidence of a successful scan.
+
+Added `scripts/run_resilient_buyer_scout_20261019.py`, which calls the
+existing `empire_os.buyer_acquisition_scout.refresh_buyer_scout`
+with `search_enabled=False` and at most 8 independently held source
+research domains from the existing Buyer Network qualification shortlist.
+It rotates four windows over up to 25 eligible domains, rejects known
+technical hosts, uses only first-party HTTPS reference URLs, probes at
+most three first-party sites in the operational release and refuses source
+snapshot data older than six hours. No provider search retry storms,
+canonical lead ingest, CRM writes, email, payment, buyer activation or
+contact-approval action.
+
+The recovery only runs when the original systemd buyer scout is not
+active/activating. Its sole canonical output is the existing Scout
+review-only snapshot. It is not a replacement for buyer qualification or
+the original Scout's downstream reconciliation/persist/materialization
+pipeline. Existing credentials and root-owned systemd units are not
+modified from this Ubuntu execution environment.
+
+Two direct real-source recoveries passed (one pre-hardening, one after
+rotation and primary-service collision guard). Latest run: 8 reviewed
+company seeds, 8 domain candidates, three bounded first-party checks,
+three evidence candidates, 0 external search requests, 0 outward sends,
+0 confirmed purchasers or paid inventory. Unit regression: 17 passed.
+The old systemd service still needs owner-side repair and root-authorised
+configuration before its own scheduled full pipeline succeeds.
