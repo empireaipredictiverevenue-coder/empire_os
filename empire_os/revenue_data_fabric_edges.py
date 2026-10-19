@@ -20,6 +20,14 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "legacy_lead_sniper_to_canonical_empiredb_review_queue",
+        "empire_os/agents/lead_sniper_agent.py",
+        "empire_os/lead_sniper_repository.py",
+        "registered firm-only source rights and corporate identity, existing "
+        "EmpireDB review reader, independent queue write authority and dedup",
+        "retire Supabase endpoint without creating another sniper platform",
+    ),
+    IntelligenceEdge(
         "scout_review_and_empiredb_exchange_readiness",
         "empire_os/revenue_sniper_scanner_review.py",
         "empire_os/revenue_sniper_dispatch_readiness.py",

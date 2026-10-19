@@ -8,46 +8,46 @@ Sniper differs from scout in 3 ways:
      "looking for emergency plumber", "who do you recommend for..."
      NOT generic posts. Scorer requires urgency keyword + niche fit.
   2. **Faster cycle.** 2 min vs scout's 5 min. Snipers move fast.
-  3. **Writes directly to si_outbox.** No lead-handler re-routing —
-     sniper already validated niche fit. Sniper knows the lane.
+  3. **EmpireDB B2B review only.** No outbox or messaging route. Existing
+     scoring is a research heuristic, not purchase intent or verified leads.
 
 Data sources (free, public):
-  - Reddit JSON API (urgency-keyword search)
-  - County permits filed in last 24h (high recency = high intent)
-  - Google "near me" via SerpAPI free tier (optional)
+  - Legacy Reddit RSS urgency research (explicitly disabled by default)
+  - Legacy permit RSS monitoring (explicitly disabled by default)
+  - Approved B2B source evidence must be corroborated by Empire Source Intelligence
 
 Scoring (per lead):
   intent_score     = urgency-keyword matches (0..1)
   niche_fit        = synthetic_intelligence.score_niche_fit()
   recency_bonus    = 1.0 if filed in 24h, else 0.5
   sniper_score     = (0.5*intent + 0.3*fit + 0.2*recency)
-  Only sends to outbox if sniper_score >= 0.6
+  Only eligible independently evidenced B2B firms may enter a held review
+  proposal at sniper_score >= 0.6; score alone never proves a buyer.
 
 Output:
-  /root/sniper/             — JSONL log of every "shot"
-  si_outbox (via hub)        — high-score leads queued for outreach
-  hermes-gateway alert      — every successful "kill" (sniper_score >= 0.8)
+  /srv/empire_os/runtime/sniper/ — diagnostic log when process runs
+  Canonical EmpireDB gateway   — gated human B2B review tasks only
+  No outbox, SMTP, customer promotion, or unapproved alert
 """
 from __future__ import annotations
 import json
 import os
 import re
-import sqlite3
-import sys
 import time
 import urllib.request
 import urllib.error
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
-sys.path.insert(0, "/root/empire_os")
-
-from empire_os.agent_core import OllamaClient
 from empire_os.synthetic_agents import SyntheticAgent
 from empire_os.synthetic_intelligence import score_niche_fit
+from empire_os.lead_sniper_repository import (
+    LeadSniperRepository, review_b2b_sniper_candidate,
+)
 
-ROLE_DIR = Path("/root/sniper")
-ROLE_DIR.mkdir(parents=True, exist_ok=True)
+ROLE_DIR = Path(os.environ.get(
+    "SNIPER_FEEDBACK_DIR", "/srv/empire_os/runtime/sniper"
+))
 SHOTS_LOG = ROLE_DIR / "shots.jsonl"
 TICK_INTERVAL = 120  # 2 min — snipers move fast
 
@@ -69,41 +69,25 @@ SNIPER_THRESHOLD = 0.6   # below this, don't queue
 KILL_THRESHOLD = 0.8     # above this, alert operator
 
 # ── Guard rails (operator-review mode) ──────────────────────────────────
-# lead-sniper FINDSt leads only. It never auto-emails. Finds land in the
-# empire_tasks review queue (task_type='sniper_review') for human promotion.
-# NO si_outbox writes. NO founder@ spam. NO simulation.
+# Sniper scans research sources only. B2B company evidence must independently
+# pass review before EmpireDB can queue any task. Queue disabled by default.
+# No si_outbox writes, no auto-email, no founder spam, no consumer targeting.
 MAX_PER_CYCLE = int(os.environ.get("SNIPER_MAX_PER_CYCLE", "5"))
 DEDUP_HOURS = int(os.environ.get("SNIPER_DEDUP_HOURS", "24"))
-REVIEW_TABLE = "empire_tasks"   # Supabase; task_type='sniper_review'
-_seen_urls = set()              # in-process dedup for the current run
+REVIEW_TABLE = "empire_tasks"   # Canonical EmpireDB via LeadSniperRepository
+_seen_urls = set()              # process-local secondary dedup
 
-def _already_reviewed(url: str) -> bool:
-    """Skip if url seen this run or already in the review table recently."""
-    if not url:
-        return False
-    if url in _seen_urls:
+def _already_reviewed(url: str, *, repository=None) -> bool:
+    """Fail closed if the primary EmpireDB review dedup is unavailable."""
+    if not url or url in _seen_urls:
         return True
     try:
-        import empire_os.sb as sb
-        rows = sb.select(REVIEW_TABLE,
-                         filters={"task_type": "sniper_review"},
-                         limit=1000)
-        # sb returns all rows; filter by payload.url + recency client-side
-        from datetime import timedelta
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=DEDUP_HOURS)
-        for r in rows:
-            p = r.get("payload") or {}
-            if p.get("url") == url:
-                try:
-                    if datetime.fromisoformat(r["created_at"].replace("Z","+00:00")) >= cutoff:
-                        return True
-                except Exception:
-                    return True
+        store = repository or LeadSniperRepository.from_environment()
+        return store.pending_review_exists(url, dedup_hours=DEDUP_HOURS)
     except Exception:
-        pass
-    return False
+        return True
 
-RULES_PATH = os.environ.get("SNIPER_RULES", "/root/empire_os/empire_os/agents/sniper_rules.md")
+RULES_PATH = os.environ.get("SNIPER_RULES", str(Path(__file__).with_name("sniper_rules.md")))
 
 def _load_rules(path: str = RULES_PATH) -> dict:
     """Parse sniper_rules.md into a dict. Falls back to built-ins if missing.
@@ -155,33 +139,20 @@ def _load_rules(path: str = RULES_PATH) -> dict:
 
 RULES = _load_rules()
 
-def _queue_review(lead: dict, niche: str, score: float) -> dict:
-    """Route a sniper find to the human-review queue. Never emails."""
-    url = (lead.get("details") or {}).get("url", "")
-    if _already_reviewed(url):
-        return {"ok": True, "status": "deduped", "url": url[:80]}
+def _queue_review(lead: dict, niche: str, score: float, *, repository=None) -> dict:
+    """Canonical EmpireDB review adapter. Never emails or promotes contacts."""
+    proposed = review_b2b_sniper_candidate(lead, niche, score)
+    if proposed["decision"] != "B2B_REVIEW_PROPOSAL":
+        return {"ok": False, "status": "held", "reasons": proposed["reasons"]}
     try:
-        import empire_os.sb as sb
-        row = {
-            "task_type": "sniper_review",
-            "status": "pending",
-            "payload": {
-                "niche": niche,
-                "source": lead.get("source"),
-                "url": url,
-                "title": (lead.get("details") or {}).get("title", ""),
-                "score": round(score, 3),
-                "queued_at": datetime.now(timezone.utc).isoformat(),
-            },
-        }
-        sb.insert(REVIEW_TABLE, row)
-        _seen_urls.add(url)
-        return {"ok": True, "status": "review_queued", "url": url[:80]}
-    except Exception as e:
-        return {"ok": False, "error": str(e)[:200]}
+        store = repository or LeadSniperRepository.from_environment()
+        result = store.queue_review(proposed)
+        if result.get("status") == "review_queued":
+            _seen_urls.add(proposed["url"])
+        return result
+    except Exception as exc:
+        return {"ok": False, "status": "held", "reason": type(exc).__name__}
 
-DB_PATH = os.environ.get("DB_PATH", "/root/empire_os/empire_os.db")
-HUB_URL = os.environ.get("HUB_URL", "http://127.0.0.1:8000")
 HERMES_GATEWAY_URL = os.environ.get(
     "HERMES_GATEWAY_URL", "http://10.118.155.156:9100")
 
@@ -227,6 +198,9 @@ class RedditUrgentScope(_BaseScope):
     }
 
     def scan(self, niche: str) -> list[dict]:
+        if os.environ.get("EMPIRE_SNIPER_LEGACY_PUBLIC_FETCH_APPROVED") != "1":
+            self._fail("legacy_public_source_not_approved")
+            return []
         import xml.etree.ElementTree as ET
         from email.utils import parsedate_to_datetime as parse_dt
 
@@ -313,6 +287,9 @@ class CountyPermitsUrgentScope(_BaseScope):
     }
 
     def scan(self, niche: str) -> list[dict]:
+        if os.environ.get("EMPIRE_SNIPER_LEGACY_PUBLIC_FETCH_APPROVED") != "1":
+            self._fail("legacy_public_source_not_approved")
+            return []
         kws = self.NICHE_KW.get(niche, [niche])
         out = []
         try:
@@ -377,7 +354,7 @@ class CountyPermitsUrgentScope(_BaseScope):
 # ──────────────────────────────────────────────────────────────────────
 
 class LeadSniperAgent(SyntheticAgent):
-    """High-intent lead sniper. Fast cycle. Direct to outbox."""
+    """Rule-based scanner with gated canonical B2B human-review endpoint."""
 
     NICHES = ["roofing", "hvac", "plumbing", "electrical",
               "pest_control", "landscaping", "solar"]
@@ -476,9 +453,8 @@ class LeadSniperAgent(SyntheticAgent):
             if score < SNIPER_THRESHOLD:
                 shots.append({**shot, "decision": "skip"})
                 continue
-            if score >= KILL_THRESHOLD:
-                kills.append(shot)
-                self._cycle_kills += 1
+            # A high score is only a research heuristic, not a successful
+            # commercial outcome, so track accepted review queues separately.
             # guard rail: cap reviews per cycle
             if queued_this_cycle >= MAX_PER_CYCLE:
                 shots.append({**shot, "decision": "cap_reached"})
@@ -487,7 +463,12 @@ class LeadSniperAgent(SyntheticAgent):
             shots.append({**shot, "decision": post.get("status", "queue"), "post": post})
             if post.get("status") == "review_queued":
                 queued_this_cycle += 1
-            if score >= KILL_THRESHOLD:
+                if score >= KILL_THRESHOLD:
+                    kills.append(shot)
+                    self._cycle_kills += 1
+            if (post.get("status") == "review_queued"
+                    and score >= KILL_THRESHOLD
+                    and os.environ.get("EMPIRE_SNIPER_ALERTS_APPROVED") == "1"):
                 self._emit_kill_alert(lead, niche, score)
 
         # Log
@@ -501,8 +482,13 @@ class LeadSniperAgent(SyntheticAgent):
             "shots": shots,
             "scope_health": {n: s.stats for n, s in self.scopes.items()},
         }
-        with SHOTS_LOG.open("a") as f:
-            f.write(json.dumps(record) + "\n")
+        try:
+            SHOTS_LOG.parent.mkdir(parents=True, exist_ok=True)
+            with SHOTS_LOG.open("a") as f:
+                f.write(json.dumps(record) + "\n")
+        except OSError:
+            # Diagnostics may fail without granting a network or DB fallback.
+            pass
         return {
             "summary": (f"{niche}: {len(all_leads)} targets, "
                         f"{record['n_queued']} queued, "

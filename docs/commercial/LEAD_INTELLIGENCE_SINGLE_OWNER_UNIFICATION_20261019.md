@@ -232,3 +232,81 @@ cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
 
 **Production authority:** NONE. This is existing evidence reconciliation,
 not an agent instructed to fire outreach, deliver a lead or execute a trade.
+
+## Wave 6 — legacy Lead Sniper canonical endpoint replacement (19 October)
+
+**User directive:** replace the legacy Lead Sniper's old review endpoint with
+our canonical EmpireDB review boundary. The original agent, scores, scopes
+and `empire_tasks` review queue are preserved in the ONE unified branch.
+
+**Exact changes**
+- `empire_os/agents/lead_sniper_agent.py`: `_queue_review()` no longer
+  imports/calls `empire_os.sb`, `sb.select`, `sb.insert`, Supabase or
+  old `/root/empire_os` path. The agent's review path now calls
+  `empire_os.lead_sniper_repository.LeadSniperRepository`, not a new CRM
+  endpoint. The canonical table remains `empire_tasks` with
+  `task_type='sniper_review'`, `status='pending'`.
+- `empire_os/lead_sniper_repository.py`: `CanonicalDataGateway` from
+  existing `gateway_from_environment`, **EmpireDB-only**, no fallback or
+  dual-write. Review dedup is scoped to `task_type`, pending status and
+  exact `payload->>url` through `DataFilter`. Bounded count and timestamps
+  fail closed; writes, when independently enabled, require positive readback.
+- Registered sources: `gb_recc_solar` and other entries with **identity**
+  role and internal acquisition permission in `source_intelligence.SOURCES`.
+  An operator receipt is NOT independent proof by itself. The source's
+  jurisdiction, vertical scope and domain must agree, and any consumer/
+  claimant/patient content is rejected. Unknown US legacy feeds and Reddit
+  authors do not become business review records.
+- Legacy public Reddit RSS and permit RSS fetches are **OFF by default** and
+  require `EMPIRE_SNIPER_LEGACY_PUBLIC_FETCH_APPROVED=1` after their source
+  permissions and relevance are reviewed. No crawling or API call was
+  triggered in this change.
+- Legacy alerts are also OFF by default: any outbound-style operator alert
+  needs `EMPIRE_SNIPER_ALERTS_APPROVED=1`, and only after a canonical review
+  task is actually queued. No SMTP, customer lead delivery, outreach runner
+  or financial action was enabled.
+- Import-time creation of `/root/sniper` and the obsolete SQLite/hub
+  endpoint references were eliminated. Internal diagnostics now default to
+  `/srv/empire_os/runtime/sniper` only when a running agent logs activity.
+- `scripts/probe_lead_sniper_canonical_endpoint_20261019.py --read-only`
+  verifies the existing canonical reader using a non-sensitive probe task
+  URL. It NEVER inserts any task, approves a sender, or tests actual writes.
+
+**Write authority remains OFF.** Runtime flags needed for a *subseparately
+approved* canonical task-queue launch are both:
+```text
+EMPIRE_SNIPER_REVIEW_QUEUE_ENABLE=1
+EMPIRE_SNIPER_CANONICAL_WRITES_APPROVED=1
+```
+These have **not been added to production configuration or enabled**.
+Enabling them alone would still not prove safe production launch: first verify
+the exact EmpireDB `empire_tasks` schema/privileges; guarantee atomic
+idempotency under concurrent sniper cycles; independently verify real source
+rights and privacy; decide approved source cadence; run a canary and inspect
+the results; preserve suppression/outbound approval. The current client
+read-before-insert/readback path is not claimed atomic across processes;
+do not activate simultaneous writers without a DB-level uniqueness contract.
+Separate per-vertical legal/insurance/dental review remains required.
+
+**No proof:** Production agent enablement, a completed EmpireDB task insert,
+live buyer commercial capacity, first-party company contact validation or any
+revenue. Tests verify code behaviour using a fake canonical gateway. The
+older supervisor registry may still refer to the old Supabase behaviour and
+must not be used as launch authority without owner review.
+
+**Actual no-write endpoint probe receipt (19 October 2026):**
+`scripts.probe_lead_sniper_canonical_endpoint_20261019 --read-only`
+returned `HOLD_CANONICAL_READER_UNAVAILABLE` with
+`DataGatewayUnavailable` when run as the currently available ubuntu
+shell on EmpireOS. No DB table read was verified; no secret is logged.
+This is an unprovisioned/unauthorised reader in that execution context,
+**not proof that the EmpireDB table is missing**. Do not activate queue
+writes or the sniper daemon until the owner has provided a dedicated,
+least-privilege EmpireDB task reader and a bounded read-only schema/ACL
+probe passes. Preserve existing operational gates.
+
+The new dedup checks all statuses of `sniper_review` with matching exact
+`payload->>url` over the configured recent window, not just pending tasks.
+It refuses to guess if multiple matching rows prevent a complete stable
+decision. Serial read-before-write + readback is **not atomic across workers**;
+a database uniqueness contract remains a launch gate.
