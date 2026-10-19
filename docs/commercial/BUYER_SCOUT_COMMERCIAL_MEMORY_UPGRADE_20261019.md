@@ -92,10 +92,11 @@ or the CRM agent's buyer records.
 - Existing bounded fallback cron was deployed earlier with pinned
   source at
   `/home/ubuntu/empire_worktrees/resilient_buyer_scout_release_ace45fb2`
-  and runs at :06 and :36. The new code is a staged replacement.
-  Current production cron is NOT automatically repointed by a Git commit.
-- An optional owner-approved deployment must create a pinned clean
-  release worktree at the new commit, verify a read-only preflight,
+  and runs at :06 and :36. The new code was first staged and then
+  explicitly released at pinned commit 996946a3 after the full regression.
+  Git commits alone do NOT repoint the production fallback cron.
+- Future owner-approved deployments must create a pinned clean
+  release worktree at their new commit, verify a read-only preflight,
   replace **only the known tagged fallback cron entry**, preserve a
   rollback copy, and demonstrate the new metadata cache stays within
   owned `runtime/buyer_acquisition/resilient`. No other cron lines,
@@ -116,3 +117,37 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
 to resolve a new real commercial question, recover existing conversations
 before cold introductions, and demonstrate verified buyer demand through
 canonical first-party evidence rather than domain counts.
+
+
+## Deployed OBSERVE fallback verification — 19 October, 20:06 UTC
+
+The founder requested a smarter, duplicate-resistant Buyer Scout. After
+**693 tests passed**, the bounded existing Ubuntu fallback cron (and no
+other line of crontab) was repointed to a **detached, clean Git release**
+`/home/ubuntu/empire_worktrees/resilient_buyer_scout_business_release_996946a3`
+at `996946a3`. The pre-existing
+`empire-buyer-acquisition-scout.service` was not edited or restarted.
+Previous fallback cron definition saved (mode 0600) under:
+
+`/srv/empire_os/runtime/buyer_acquisition/resilient/crontab.rollback.before_buyer_scout_996946a3`
+
+**Live first run at 20:06 UTC:**
+- `state=COMPLETED`, `mode=OBSERVE`
+- 8 reviewed domains in the research batch; 3 research candidates
+  observed, **not three buyers or approved contacts**
+- 3 first-party probes within the existing budget
+- 19 relationship-domain exclusions counted (includes identity aliases,
+  not necessarily 19 of the 25 founder shortlist)
+- 7 already probed/cooldown domains skipped
+- Cooldown cache now stores 10 aggregate domain/time entries,
+  permission **0600**, no email addresses.
+- 0 public search-engine calls, 0 outbound sends, 0 canonical EmpireDB
+  writes, 0 buyer activations, `execution_authority=none`.
+- A separate overlapping manual smoke command exited on the shared
+  advisory lock (exit=1) and **did not duplicate the scheduled probe**.
+
+IMPORTANT: This release changes only the fallback cycle's permissible
+research allocation; the canonical Buyer Scout and CRM owner remain in
+control of buyer qualification, contact, approved commercial terms,
+suppression and active orders. The original release and rollback cron
+remain available if the new cache/selection behaves unexpectedly.
