@@ -520,6 +520,8 @@ def build_predictive_decision_control_runtime(
     decision["flagship_customer_model_options"] = review_customer_model_delivery_options(
         as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_signed_model_preview import review_signed_model_preview_readiness
+    decision["flagship_signed_model_preview"] = review_signed_model_preview_readiness()
     return decision
 
 

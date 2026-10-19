@@ -341,7 +341,26 @@ export type FlagshipCustomerModelOptions = {
   execution_authority: "none";
 };
 
+export type FlagshipSignedModelPreview = {
+  schema_version: string;
+  status: string;
+  signed_audience: string;
+  signed_scope: string;
+  existing_crm_read_scope_is_separate: true;
+  fresh_canonical_membership_required: true;
+  owner_or_admin_only: true;
+  independent_preview_public_keys_deployed: false;
+  signed_issuer_active: false;
+  durable_atomic_nonce_and_quota_admission_active: false;
+  server_tenant_binding_connected: false;
+  hosted_byom_secret_vault_connected: false;
+  public_model_preview_route_created: false;
+  customer_model_activation_authorized: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_signed_model_preview?: FlagshipSignedModelPreview;
   flagship_customer_model_options?: FlagshipCustomerModelOptions;
   flagship_buyer_enrichment?: FlagshipBuyerEnrichment;
   flagship_buyer_market_coverage?: FlagshipBuyerMarketCoverage;

@@ -89,6 +89,7 @@ export default async function FounderPage() {
   const buyerEnrichment = decision?.flagship_buyer_enrichment;
   const vendorStatus = decision?.flagship_quality_integrations;
   const customerModelOptions = decision?.flagship_customer_model_options;
+  const signedModelPreview = decision?.flagship_signed_model_preview;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -405,10 +406,16 @@ export default async function FounderPage() {
                           </div>
                         ))}
                       </div>
-                      <p className="mt-2 text-[11px] text-slate-500">
+                      <p className="mt-2 text-[11px] text-slate-400">
+                        Signed preview identity: {show(signedModelPreview?.status, "Not connected").replaceAll("_", " ")}.
+                        {signedModelPreview?.fresh_canonical_membership_required === true
+                          ? " Fresh owner/admin membership and model-only token required."
+                          : " Identity policy unavailable."}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-500">
                         {show(customerModelOptions?.status, "Not connected").replaceAll("_", " ")}.
-                        No customer provider credentials, autonomous tools, hosted
-                        requests or commercial execution are enabled by this view.
+                        No live preview issuer, atomic usage ledger, customer provider
+                        credentials, autonomous tools or commercial execution are enabled.
                       </p>
                     </div>
                     <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">

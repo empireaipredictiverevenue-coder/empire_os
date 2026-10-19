@@ -2510,6 +2510,14 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert model_options["api_key_capture_endpoint_created"] is False
     assert model_options["production_customer_model_routing_authorized"] is False
     assert model_options["execution_authority"] == "none"
+    signed_preview = control["flagship_signed_model_preview"]
+    assert signed_preview["status"] == "DEDICATED_SIGNED_PREVIEW_TESTED_NOT_DEPLOYED"
+    assert signed_preview["existing_crm_read_scope_is_separate"] is True
+    assert signed_preview["owner_or_admin_only"] is True
+    assert signed_preview["signed_issuer_active"] is False
+    assert signed_preview["durable_atomic_nonce_and_quota_admission_active"] is False
+    assert signed_preview["public_model_preview_route_created"] is False
+    assert signed_preview["execution_authority"] == "none"
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False
