@@ -91,3 +91,81 @@ Raw snapshot identity fields must remain under existing production access rules.
 - **No database writes or operational services** are initiated by this feature.
   Production deployment and any new snapshot-reader privilege need separate
   approval, not an inferred permission from passing tests.
+
+## Wave 4 — Snipers + scanners (19 October)
+
+The founder requested the existing snipers/scanners to produce live-relevant
+results as part of ONE unified Lead Intelligence/Waterfall system.
+
+**Observed production 19 Oct 12:13–12:19 UTC**:
+- `empire-buyer-acquisition-scout.timer`: active/enabled, executes existing
+  buyer-scout read-only research, with periods of poor search-source yield.
+- `empire-buyer-acquisition-team.timer`: active/enabled.
+- Search Fabric reported DuckDuckGo HTML/Lite HTTP 202 (rate/anti-bot), Mojeek
+  403, fallback engine irrelevant-result rejections; existing circuit breakers
+  already skip blocked engines. Never defeat provider blocks or assume a 202
+  response is successful evidence.
+- The current observed buyer-scout artifact was read directly from
+  `/srv/empire_os/runtime/buyer_acquisition/scout_latest.json` with
+  `--read-only`; at that moment there were 10 research candidates, 4
+  `PRIORITY_RESEARCH`, 1 `REGULATED_HOLD`, 1 `RESEARCH_REVIEW`, and
+  4 `SOURCE_HOLD`, with 2 homepage fetch failures. These are transient
+  research snapshot counts, NOT verified opportunities or live sales.
+  There were zero verified buyers or outreach approvals.
+
+### Concrete addition
+- `empire_os/revenue_sniper_scanner_review.py`: consumes the **existing
+  running buyer_acquisition_scout.v1** evidence snapshot; deduplicates by
+  corporate domain/lane (conflicting duplicates become hold), validates source
+  state/time/authority, ranks enterprise/home-service B2B research via
+  transparent observed proxies (not actual buyer intent), and holds
+  legal/insurance/mass-tort without specialist review. It does NOT call
+  `agents/lead_sniper_agent.py` or schedule anything.
+- `scripts/review_existing_scanners_and_snipers_20261019.py`: read-only one
+  shot to inspect **current existing production scanner evidence** (no API
+  fetch, network, database, review queue write or email send):
+```bash
+cd /home/ubuntu/empire_worktrees/lead_revenue_fabric_unified_20261019
+/srv/empire_os/.venv/bin/python \
+  -m scripts.review_existing_scanners_and_snipers_20261019 \
+  --read-only \
+  --scout-snapshot /srv/empire_os/runtime/buyer_acquisition/scout_latest.json
+```
+- `empire_os/scanner_source_contract_bridge.py`: adapts bounded **legacy
+  scanner.py-shaped observations** to current source-rights review. Existing
+  US `dbpr`, `sunbiz`, `county-appraiser`, `permits`, `bbb`, `web-search`
+  sources are HELD until source registry rights, business-only identity,
+  privacy, origin and territory are proven. No fake source approval.
+- Tests `tests/test_revenue_sniper_scanner_review_20261019.py` and
+  `tests/test_scanner_source_contract_bridge_20261019.py` cover no outbound,
+  no data mutation, source restrictions, freshness, dedup, regulated niches and
+  preservation of existing scouts.
+
+### Explicit do-not-activate warnings
+- `empire_os/agents/lead_sniper_agent.py` imports legacy
+  `empire_os.sb`, writes `empire_tasks`, relies on `/root/` and on
+  historical scoring/urgency heuristics, and has discrepancies between the
+  old module prose and current review-only implementation. Do **not** start
+  it unchanged; that is not canonical EmpireDB review authority.
+- `empire_os/reddit_sniper.py` needs valid Reddit credentials and rights;
+  the keyword/engagement score is NOT independently verified company intent.
+- `empire_os/neural_scout.py` and `empire_os/scanner.py` contain older
+  SQLite/requests flows; source uses require source contract/governance.
+- The Satellite Scanner's image heuristics cannot verify a roof is damaged;
+  no drone/imagery-based claims or homeowner targeting may be sold.
+- The separate personal-market/crypto *trading sniper* is not part of this
+  revenue-lead scope and no live financial orders have been authorised.
+- No new cron, systemd timer, outbound governor, production env credentials or
+  production service restart were created.
+
+### Next actions
+1. Fix search-source reliability within the *existing* Search Fabric
+   owner/provider terms, prioritising current authorised first-party sources
+   rather than anti-bot workarounds.
+2. Connect independent canonical buyer firm proof, compliance checks, business
+   identity and real buying reply to the current reviewer.
+3. After the approved source-contract and EmpireDB reader proofs, connect
+   legitimately qualified *supply* business IDs to our optional enhanced
+   Scrapling/Waterfall; buyer research remains on buyer-authority path.
+4. Only then authorise bounded review-queue materialisation, dashboard
+   consumption, and separately approved outreach/contract/financial actions.

@@ -20,6 +20,22 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "existing_buyer_scout_to_review_only_revenue_sniper",
+        "empire_os/buyer_acquisition_scout.py",
+        "empire_os/revenue_sniper_scanner_review.py",
+        "fresh OBSERVE scout evidence, B2B company/lane validation and buyer "
+        "verification holds; never auto-send or invent buyer capacity",
+        "triage live scanner discoveries without activating legacy sniper",
+    ),
+    IntelligenceEdge(
+        "legacy_neural_scanner_to_source_rights_gate",
+        "empire_os/scanner.py",
+        "empire_os/scanner_source_contract_bridge.py",
+        "explicit registered source and country rights, provenance, firm-only "
+        "review and sensitive data exclusion",
+        "reuse existing US/UK scanner shapes without false canonical leads",
+    ),
+    IntelligenceEdge(
         "scrapling_observation_to_canonical_identity_review",
         "empire_os/scrapling_source_evidence.py",
         "empire_os/scrapling_identity_review.py",
