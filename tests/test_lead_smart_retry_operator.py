@@ -85,6 +85,7 @@ def test_timer_is_installed_before_site_call_switch(monkeypatch,tmp_path):
         if command[:3]==["sudo","-n","systemd-run"]:
             assert json.loads(cfg.read_text())["enabled"] is False
             assert "--property=WorkingDirectory=/srv/empire_os" in command
+            assert "--property=User=ubuntu" in command
             assert "--on-active=" in " ".join(command)
         return type("Result",(),{"returncode":0})()
     monkeypatch.setattr(op.subprocess,"run",simulate)

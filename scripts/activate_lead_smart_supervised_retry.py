@@ -131,6 +131,7 @@ def run(start_local: str, minutes: int, max_handoffs: int,
             "--on-active="+str(seconds)+"s",
             "--timer-property=AccuracySec=1s",
             "--property=WorkingDirectory=/srv/empire_os",
+            "--property=User=ubuntu",
             str(PYTHON), "-B", "-m",
             "scripts.disable_lead_smart_pilot_control", "--apply",
         ], cwd=ROOT, check=True, timeout=30)
