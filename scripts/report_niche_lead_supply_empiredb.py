@@ -20,6 +20,7 @@ from empire_os.lead_supply_intelligence import (
 from empire_os.lead_scoring_inventory_bridge import (
     ENGINE_REGISTER, build_scoring_coverage, cortex_runtime_summary,
 )
+from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
 
 
 COLUMNS = {
@@ -33,6 +34,14 @@ COLUMNS = {
     "intelligence_scores": (
         "id,entity_type,entity_id,score_type,model_key,confidence,"
         "scored_at,features"
+    ),
+    "strike_packs": (
+        "id,slug,name,tier,monthly_price_cents,price_per_lead_cents,"
+        "max_leads_per_month,lane_count,niches,is_active,is_public"
+    ),
+    "buyer_subscriptions": (
+        "id,buyer_id,pack_id,monthly_price_cents,active,status,"
+        "period_start,period_end"
     ),
 }
 
@@ -139,6 +148,27 @@ def run(
                 root / "runtime/cortex_learning/cortex_learning_latest.json"
             ),
         }
+    optional_package_rows: dict[str, list[dict[str, Any]]] = {}
+    package_reader_errors: dict[str, str] = {}
+    for table in ("strike_packs", "buyer_subscriptions"):
+        try:
+            optional_package_rows[table] = read_complete_table(
+                gateway, table, page_size=page_size,
+                max_rows=max_rows_per_table,
+            )
+        except Exception as exc:
+            package_reader_errors[table] = type(exc).__name__
+    report["territory_mrr"] = build_territory_mrr_bridge(
+        exchange=exchange,
+        strike_packs=optional_package_rows.get("strike_packs"),
+        buyer_subscriptions=optional_package_rows.get("buyer_subscriptions"),
+        strike_packs_reader_available="strike_packs" in optional_package_rows,
+        subscriptions_reader_available="buyer_subscriptions" in optional_package_rows,
+    )
+    report["territory_mrr"]["optional_reader_error_classes"] = package_reader_errors
+    report["table_rows_scanned"].update({
+        name: len(rows) for name, rows in optional_package_rows.items()
+    })
     # Pagination is complete but not a transactionally consistent snapshot.
     report["transactionally_consistent_snapshot_proven"] = False
     report["limitations"] = [
@@ -185,6 +215,8 @@ def main() -> int:
         "lead_counts_complete": report["lead_counts_complete"],
         "verified_active_buyer_seat_records": report["exchange"]["buyer_seat_states"].get("active_capacity", 0),
         "scoring_coverage_available": report["scoring_coverage"]["available"],
+        "territory_mrr_catalog_count": report["territory_mrr"]["product_catalog_count"],
+        "subscription_reader_available": report["territory_mrr"]["buyer_subscriptions_reader_available"],
         "execution_authority": "none",
     }, sort_keys=True))
     return 0

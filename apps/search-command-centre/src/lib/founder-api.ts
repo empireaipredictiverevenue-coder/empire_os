@@ -1088,3 +1088,83 @@ export type FounderLeadSupply = {
 export function getFounderLeadSupply() {
   return getFounderRead<FounderLeadSupply>("/v1/founder-lead-supply/overview");
 }
+
+/** Founder-only, non-binding Phase 4 MRR/territory projection. */
+export type FounderTerritoryMrr = {
+  available?: boolean;
+  mode?: string;
+  reason?: string;
+  observed_at?: string;
+  exchange_observed_at?: string;
+  product_catalog_count?: number;
+  product_catalog?: Array<{
+    code: string;
+    name: string;
+    currency: string;
+    monthly_price_cents: number;
+    corridor_limit: number | null;
+    territory_model: string;
+    lead_classes: string[];
+    delivery_modes: string[];
+    exclusivity_eligible: boolean;
+    usage_discount_bps: number | null;
+    pricing_state: string;
+    binding_terms_ready: boolean;
+  }>;
+  territory_count?: number;
+  territory_market_count?: number;
+  raw_buyer_and_supply_corridor_keys_not_equivalent?: boolean;
+  territory_markets?: Array<{
+    niche: string;
+    metro: string;
+    distinct_corridor_keys: number;
+    buyer_seat_records: number;
+    verified_active_capacity_records: number;
+    sampled_qualified_inventory_records: number;
+    sampled_overflow_records: number;
+    exact_route_compatibility_verified: boolean;
+    sale_ready: boolean;
+    readiness: string;
+  }>;
+  territories?: Array<{
+    corridor_key: string;
+    niche: string;
+    metro: string;
+    buyer_seat_records: number;
+    verified_active_capacity_records: number;
+    sampled_qualified_inventory_records: number;
+    sampled_overflow_records: number;
+    subscription_rows_marked_active: number | null;
+    ready_for_binding_sale: boolean;
+    exclusivity_granted: boolean;
+  }>;
+  strike_packs_reader_available?: boolean;
+  strike_pack_record_count?: number | null;
+  strike_packs?: Array<{
+    code: string;
+    name: string;
+    tier: string;
+    niche_families: string[];
+    monthly_price_cents?: number;
+    max_leads_per_month?: number;
+    catalog_active: boolean;
+    seat_entitlement_verified: boolean;
+  }>;
+  buyer_subscriptions_reader_available?: boolean;
+  buyer_subscription_record_count?: number | null;
+  buyer_subscription_status_counts?: Record<string, number>;
+  marked_active_subscription_record_count?: number | null;
+  nominal_monthly_contract_field_cents_unverified?: number | null;
+  subscription_rows_with_no_buyer_seat_match?: number | null;
+  subscription_rows_matching_active_capacity?: number | null;
+  actual_mrr_cents?: number | null;
+  source_of_recognized_mrr?: string;
+  payment_verified?: boolean;
+  signed_contract_verified?: boolean;
+  territory_exclusivity_verified?: boolean;
+  subscription_entitlement_verified?: boolean;
+};
+
+export function getFounderLeadSupplyPackages() {
+  return getFounderRead<FounderTerritoryMrr>("/v1/founder-lead-supply/packages");
+}

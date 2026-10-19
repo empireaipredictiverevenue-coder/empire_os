@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { connection } from "next/server";
-import { getFounderLeadSupply, type FounderLeadSupply } from "@/lib/founder-api";
+import {
+  getFounderLeadSupply,
+  getFounderLeadSupplyPackages,
+  type FounderLeadSupply,
+  type FounderTerritoryMrr,
+} from "@/lib/founder-api";
 
 const fmt = (v: number | undefined) =>
   typeof v === "number" ? v.toLocaleString("en-GB") : "Unknown";
@@ -26,8 +31,13 @@ export default async function FounderLeadSupplyPage({
 }) {
   await connection();
   const query = await searchParams;
-  const result = await getFounderLeadSupply();
+  const [result, packageResult] = await Promise.all([
+    getFounderLeadSupply(),
+    getFounderLeadSupplyPackages(),
+  ]);
   const data: FounderLeadSupply | null = result.data?.available ? result.data : null;
+  const packages: FounderTerritoryMrr | null =
+    packageResult.data?.available ? packageResult.data : null;
   const selected = typeof query.niche === "string" ? query.niche.trim().slice(0, 120) : "";
   const niches = data?.niches ?? [];
   const visible = selected ? niches.filter((v) => v.niche === selected) : niches;
@@ -56,6 +66,118 @@ export default async function FounderLeadSupplyPage({
               : "Counts unavailable or incomplete — do not present as total supply"}
           </p>
         </header>
+
+        <section className="panel mt-7">
+          <p className="eyebrow">Commercial Exchange · Recurring Revenue</p>
+          <h2 className="mt-2 text-2xl font-semibold">MRR seats and territory packages</h2>
+          <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-400">
+            Existing founder-approved monthly product tiers, linked to the current
+            qualified lead corridors and buyer seat evidence. A listed package is
+            not an active customer subscription; nominated territory is not exclusive
+            and buyer-stated demand is not a binding reservation.
+          </p>
+          {!packages ? (
+            <p className="mt-5 text-sm text-amber-200">
+              Package/corridor preview not yet released.
+              The existing checkout catalogue remains a separate interest-only surface.
+            </p>
+          ) : (
+            <>
+              <p className="mt-3 text-xs text-slate-500">
+                Exchange evidence: {packages.exchange_observed_at ?? "Unknown"} ·
+                Subscriptions reader: {packages.buyer_subscriptions_reader_available
+                  ? "observed" : "not connected"} ·
+                Verified monthly revenue: not established by this source
+              </p>
+              <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                {(packages.product_catalog ?? []).map((item) => (
+                  <div key={item.code} className="rounded-xl border border-white/10 p-5">
+                    <p className="text-sm font-semibold text-white">{item.name}</p>
+                    <p className="mt-3 text-3xl font-semibold text-cyan-200">
+                      ${(item.monthly_price_cents / 100).toLocaleString("en-GB")}/mo
+                    </p>
+                    <p className="mt-2 text-sm text-slate-400">
+                      {item.corridor_limit == null
+                        ? "Custom contract territory"
+                        : `Up to ${item.corridor_limit} ${item.corridor_limit === 1 ? "corridor" : "corridors"}`}
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      {item.territory_model.replaceAll("_", " ")} ·
+                      Exclusivity {item.exclusivity_eligible ? "eligible, not granted" : "not included"}
+                    </p>
+                    <p className="mt-3 text-xs text-amber-200">
+                      {item.binding_terms_ready
+                        ? "Binding terms flagged ready in catalog"
+                        : "Not activated · binding terms outstanding"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <Tile label="Observed package definitions"
+                  value={fmt(packages.product_catalog_count)}
+                  note={`${fmt(packages.territory_market_count)} niche/territory markets in the exchange snapshot`} />
+                <Tile label="Legacy strike-pack rows"
+                  value={fmt(packages.strike_pack_record_count ?? undefined)}
+                  note="Read-only EmpireDB count, if accessible" />
+                <Tile label="Buyer subscription records"
+                  value={fmt(packages.buyer_subscription_record_count ?? undefined)}
+                  note="Includes paused, expired and unverified subscriptions" />
+                <Tile label="Marked active subscription rows"
+                  value={fmt(packages.marked_active_subscription_record_count ?? undefined)}
+                  note="Database state; not verified receipts or realised MRR" />
+              </div>
+              <p className="mt-3 text-xs text-slate-500">
+                Configured recurring price fields and old Stripe references are
+                not financial verification. Direct USDT/BSC receipts, fulfilment,
+                contracts and entitlements require their own evidence.
+              </p>
+              <div className="mt-7">
+                <h3 className="text-lg font-semibold">Niche and territory seat coverage</h3>
+                <p className="mt-2 text-xs text-slate-400">
+                  Qualified exchange sample, grouped by niche and metro. Raw buyer
+                  delivery corridors (webhook/phone) and lead-supply corridors
+                  use different route identities; market overlap is not proof of
+                  a deliverable route, signed territory or exclusivity.
+                </p>
+                <div className="mt-4 max-h-[500px] overflow-auto">
+                  <table className="w-full min-w-[850px] text-left text-sm">
+                    <thead className="sticky top-0 bg-[#0b1716] text-xs uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="py-3 pr-4">Niche</th>
+                        <th className="py-3 pr-4">Territory</th>
+                        <th className="py-3 pr-4">Seat records</th>
+                        <th className="py-3 pr-4">Capacity-ready</th>
+                        <th className="py-3 pr-4">Sampled leads</th>
+                        <th className="py-3 pr-4">Overflow</th>
+                        <th className="py-3 pr-4">Operational readiness</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(packages.territory_markets ?? [])
+                        .filter((item) => !selected || item.niche === selected)
+                        .map((item) => (
+                          <tr key={item.niche + ":" + item.metro} className="border-t border-white/[0.06]">
+                            <td className="py-2 pr-4 font-semibold text-cyan-200">
+                              {item.niche}
+                            </td>
+                            <td className="py-2 pr-4">{item.metro}</td>
+                            <td className="py-2 pr-4">{fmt(item.buyer_seat_records)}</td>
+                            <td className="py-2 pr-4">{fmt(item.verified_active_capacity_records)}</td>
+                            <td className="py-2 pr-4">{fmt(item.sampled_qualified_inventory_records)}</td>
+                            <td className="py-2 pr-4">{fmt(item.sampled_overflow_records)}</td>
+                            <td className="py-2 pr-4 text-xs text-amber-200">
+                              {item.readiness.replaceAll("_", " ")}
+                            </td>
+                          </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
 
         {!data ? (
           <section className="panel mt-8">

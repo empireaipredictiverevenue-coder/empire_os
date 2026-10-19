@@ -104,3 +104,44 @@ Additional additive scoring bridge:
 **No live DB census has run under this feature branch:** the shell does not contain protected `EMPIREDB_DSN`; the existing qualification/exchange services use their provisioned environments. Do not copy secrets or bypass service credential boundaries.
 
 Next release checkpoint: approve an isolated, read-only reporting service under an explicitly scoped EmpireDB reader role; validate per-niche score joins on real rows; then release private API and frontend together. CORTEX refresh and any behaviour-changing score promotion need a separate, evidence-backed decision.
+
+## Current Phase 4 MRR / territory package linkage (19 October 2026)
+
+The customer package architecture was previously built and must be **reused**:
+- `empire_os/phase4_exchange_mrr_products.py` — current, founder-approved monthly seat catalogue:
+  - `exchange_seat_starter` USD $99/mo, **1** corridor
+  - `exchange_seat_growth` USD $249/mo, **5** corridors
+  - `exchange_seat_pro` USD $499/mo, **25** corridors; eligible for negotiated exclusivity only
+  - `exchange_seat_enterprise` USD $999/mo, **custom** corridor limit; eligible for negotiated exclusivity only.
+- `empire_os/exchange_self_serve.py` — collects niche, territory, stated capacity, requested seat tier, preferred delivery, exclusivity interest **as nonbinding demand**. No capacity/contract/payment verification.
+- `empire_os/founder_approved_commercial_sync.py` — existing canonical product identity/approved price sync, not guaranteed fulfilment economics.
+- `migrations/empiredb/000_empiredb_canonical_base.sql` — `strike_packs` and `buyer_subscriptions` as legacy-compatible canonical records; historical Stripe fields do not prove a USDT/BSC receipt.
+- `empire_os/mrr_product_recovery.py` and `empire_os/marketplace.py` — legacy Bronze/Silver/Gold/etc. are migration references only; never substitute historic price or SQLite seats for Phase 4 terms.
+- `empire_os/data_brokerage_monetization_portfolio.py` — research hypotheses for derived territory-intelligence licences; **not** interchangeable with lead delivery packages or published customer agreements.
+
+### Additive territory/MRR bridge implemented in this branch
+
+`empire_os/lead_territory_mrr_bridge.py` projects the four existing product tiers against canonical exchange seat records and observed qualified supply, with optional separate read-only inventories of `strike_packs` and `buyer_subscriptions`.
+
+It distinguishes:
+- product catalogue fee **vs** a canonical subscription row's nominal monthly amount **vs** independently verified recurring revenue (unknown here);
+- buyer seat record **vs** buyer-capacity-ready seat **vs** commercially granted customer entitlement (unverified here);
+- a niche+metro market **vs** an exact delivery corridor identity **vs** a contracted territory right or exclusivity (unverified here);
+- a subscription row marked active **vs** a valid receipt and accepted contract (not demonstrated by status alone).
+- Buyer-delivery corridor keys often end in `webhook` or `phone`; lead-supply keys end in `lead`. Never treat these distinct corridors as an exact delivery match. The new `territory_markets` groups by normalized niche+metro for analysis only.
+
+`scripts/report_niche_lead_supply_empiredb.py` optionally reads existing canonical `strike_packs` and `buyer_subscriptions` with bounded pages and fail-closed unknown states. This does **not** activate payments, renewals, entitlements or record recognised MRR.
+
+`GET /v1/founder-lead-supply/packages` is a *new private founder read-only route*. It can show a Phase 4 catalogue and current exchange-market snapshot before the full DB lead census is deployed; if the census exists, it uses the counted package/subscription evidence. The frontend `/founder/lead-supply` has a separate package panel so the catalogue remains available even when the optional census has not been released.
+
+The live canonical exchange snapshot observed 19 October 10:33:14 UTC projected four existing product tiers, 157 distinct buyer/supply corridor keys, 58 corridor keys with overflow and zero buyer-capacity-ready corridors. **Do not interpret these as 157 unique geographic territories or verified subscriptions.** The full `buyer_subscriptions` and `strike_packs` census has not yet run in the private reader role.
+
+### Next revenue-facing work
+
+1. Run a bounded, authorized **read-only** EmpireDB inventory census for current packs and subscriptions. Compare with buyer seat state and commercial terms; do not count legacy Stripe fields or a status flag as paid revenue.
+2. Reconcile requested `requested:niche:territory` self-serve keys against canonical niche/metro, preserving jurisdiction, granularity and original request evidence. No automatic acceptance/territory reservation.
+3. Confirm exactly one first paid buyer/pilot with independently verified capacity, terms and supported delivery, then expose limited, agreement-backed inventory in the tenant self-serve portal.
+4. Attribute recurring membership invoices, USDT/BSC verification and actual realised MRR through the existing Revenue Truth/Metering and Economic Memory layers. Never infer from hypothetical package pricing.
+5. Only after evidence, activate entitlement issuance, territory overlap arbitration, expiry/revocation, allocations and authenticated buyer self-serve views in their respective owning services.
+
+No new payment rail, no public checkout mutation, no schema changes, no billing activation, no production service restart and no conflicting owner changes from this branch.
