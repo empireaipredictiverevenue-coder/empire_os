@@ -44,6 +44,8 @@ async def handle_intake(request, kind, *, origin='https://empire-ai.co.uk'):
     headers = {'Cache-Control': 'no-store'}
     def error(code, status):
         return JSONResponse({'accepted': False, 'error': code}, status_code=status, headers=headers)
+    if kind not in ('event', 'enquiry', 'industry_event'):
+        return error('unsupported_intake_kind', 404)
     if request.headers.get('origin') != origin or request.headers.get('sec-fetch-site', 'same-origin') not in ('same-origin', 'none'):
         return error('same_origin_required', 403)
     if request.headers.get('content-type', '').split(';')[0].strip() != 'application/json':
@@ -63,9 +65,25 @@ async def handle_intake(request, kind, *, origin='https://empire-ai.co.uk'):
     marketing = await run_in_threadpool(load_release)
     if marketing is None:
         return error('campaign_intake_unavailable', 503)
+    if kind == 'industry_event':
+        from empire_os.owned_campaign_industry_extension import (
+            load_industry_release, validate_industry_event, validate_industry_referrer,
+        )
+        release = await run_in_threadpool(
+            lambda: load_industry_release(research_release=marketing)
+        )
+        if release is None:
+            return error('industry_campaign_unreleased', 503)
     try:
         repository = OwnedCampaignRepository.from_environment()
-        result = await run_in_threadpool(accept, kind, payload, marketing, repository)
+        if kind == 'industry_event':
+            normalized = validate_industry_event(payload, release)
+            validate_industry_referrer(request.headers.get('referer'), normalized, release)
+            receipt = await run_in_threadpool(repository.event, normalized)
+            result = {'accepted': True, 'receipt_id': receipt,
+                      'campaign_id': normalized['campaign_id']}
+        else:
+            result = await run_in_threadpool(accept, kind, payload, marketing, repository)
     except ValueError:
         return error('invalid_request', 422)
     except Exception:

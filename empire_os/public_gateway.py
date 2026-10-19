@@ -27,6 +27,8 @@ from fastapi.staticfiles import StaticFiles
 from empire_os.agent_web import a2a_agent_card, capability_manifest, webmcp_manifest
 from empire_os.lead_smart_public_coverage_api import router as roofing_coverage_router
 from empire_os.lead_smart_pilot_call_api import router as roofing_pilot_handoff_router
+from empire_os.public_canonical_host_review import review_canonical_host_redirect
+from empire_os.affiliate_ingress import raw_request_host
 from empire_os.affiliate_ingress import (
     SAFE_RESPONSE_HEADERS as AFFILIATE_SAFE_HEADERS,
     allowed_gateway_host,
@@ -40,6 +42,11 @@ from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
 from empire_os.owned_campaign_http import LIMITER as FIRST_PARTY_INTAKE_LIMITER
+from empire_os.empire_ai_public_legal_release import checked_legal_path as checked_empire_ai_legal_path
+from empire_os.public_flagship_asset_policy import reviewed_flagship_asset_path
+from empire_os.flagship_static_release_routes import (
+    INSIGHT_PAGES, create_flagship_static_release_router,
+)
 
 GATEWAY_VERSION = "agent-web-v1.1"
 PUBLIC_BASE_URL = os.getenv("EMPIRE_PUBLIC_BASE_URL", "https://empire-ai.co.uk").rstrip("/")
@@ -82,6 +89,8 @@ app.include_router(roofing_coverage_router)
 app.include_router(roofing_pilot_handoff_router)
 app.include_router(create_affiliate_ingress_router())
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
+# First-party, byte-pinned flagship release routes precede legacy asset handlers.
+app.include_router(create_flagship_static_release_router(SITE_OUT))
 
 
 _INLINE_SCRIPT_RE = re.compile(
@@ -126,6 +135,58 @@ def _site_csp(route: str) -> str:
     )
 
 
+
+
+def _approved_www_redirect(request: Request) -> RedirectResponse | None:
+    """Only documented public HTML GET/HEAD. No trusted proxy scheme guessing.
+
+    A www Host might be spoofed outside the tunnel, but destinations are fixed
+    HTTPS apex URLs; never reflect arbitrary Host or scheme values.
+    """
+    if request.method not in {"GET", "HEAD"}:
+        return None
+    if raw_request_host(request) != "www.empire-ai.co.uk":
+        return None
+    raw = request.scope.get("raw_path")
+    if not isinstance(raw, bytes):
+        return None
+    try:
+        path = raw.decode("ascii", errors="strict")
+        raw_query = request.scope.get("query_string", b"").decode(
+            "ascii", errors="strict"
+        )
+    except (UnicodeError, AttributeError):
+        return None
+    plan = review_canonical_host_redirect(
+        method=request.method,
+        raw_host="www.empire-ai.co.uk",
+        raw_path=path,
+        raw_query=raw_query,
+    )
+    if plan.get("eligible_for_site_owner_review") is not True:
+        return None
+
+    # The policy expresses only which paths are safe to *consider*. Verify
+    # the destination is actually published, preventing redirects of the
+    # dynamically shaped industry/AEO paths to unreleased 404 pages.
+    if path in {"/privacy", "/terms"}:
+        released = checked_empire_ai_legal_path(path.removeprefix("/")) is not None
+    elif path.startswith("/aeo/"):
+        pieces = path.strip("/").split("/")
+        released = (
+            len(pieces) == 3
+            and released_aeo_file(pieces[1], pieces[2]) is not None
+        )
+    else:
+        released = _site_html_path(path) is not None
+    if not released:
+        return None
+
+    return RedirectResponse(
+        plan["proposed_location"], status_code=308,
+        headers={"Cache-Control": "no-store", "Vary": "Host"},
+    )
+
 @app.middleware("http")
 async def security_headers(request, call_next):
     # A separate affiliate Host may use this same FastAPI process only for
@@ -141,7 +202,8 @@ async def security_headers(request, call_next):
             headers=AFFILIATE_SAFE_HEADERS,
         )
     else:
-        response = await call_next(request)
+        redirect = _approved_www_redirect(request)
+        response = redirect if redirect is not None else await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     if request.url.path.startswith("/avatar/presence"):
@@ -176,6 +238,13 @@ def _site_html_path(route: str, root: Path | None = None) -> Path | None:
         candidate = base / "index.html"
     elif clean == "trust":
         candidate = base / "trust.html"
+    elif clean == "about":
+        candidate = base / "about.html"
+    elif clean.startswith("insights/"):
+        slug = clean.split("/", 1)[1]
+        if slug not in INSIGHT_PAGES:
+            return None
+        candidate = base / INSIGHT_PAGES[slug]
     elif clean == "industries":
         candidate = base / "industries.html"
     elif clean == "buy":
@@ -296,6 +365,8 @@ def _public_site_urls(root: Path | None = None) -> list[str]:
     urls: list[str] = []
     if (base / "trust.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/trust")
+    if (base / "about.html").is_file():
+        urls.append(f"{PUBLIC_BASE_URL}/about")
     if (base / "industries.html").is_file():
         urls.append(f"{PUBLIC_BASE_URL}/industries")
     if (base / "buy.html").is_file():
@@ -961,7 +1032,9 @@ def webmcp_bootstrap():
 
 
 
+@app.head("/aeo/{niche}/{metro}/")
 @app.get("/aeo/{niche}/{metro}/")
+@app.head("/aeo/{niche}/{metro}")
 @app.get("/aeo/{niche}/{metro}")
 def released_aeo_page(niche: str, metro: str):
     path = released_aeo_file(niche, metro)
@@ -977,6 +1050,7 @@ def released_aeo_page(niche: str, metro: str):
         headers={"Cache-Control": "public, max-age=900", "X-Robots-Tag": "index, follow"},
     )
 
+@app.head("/sitemap.xml")
 @app.get("/sitemap.xml")
 def sitemap():
     return Response(
@@ -986,6 +1060,7 @@ def sitemap():
     )
 
 
+@app.head("/robots.txt", response_class=PlainTextResponse)
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots():
     return (
@@ -1006,6 +1081,13 @@ _PUBLIC_BRAND_ASSETS = {
 
 @app.get("/brand/{asset_name}")
 def brand_asset(asset_name: str):
+    if asset_name == "empire-ai-official-brand-logo-lockup.png":
+        item = reviewed_flagship_asset_path("/brand/" + asset_name, SITE_OUT)
+        if item is None:
+            return JSONResponse({"error": "reviewed_brand_asset_unavailable"}, status_code=404)
+        path, content_type = item
+        return FileResponse(path, media_type=content_type,
+                            headers={"Cache-Control": "public, max-age=86400"})
     if asset_name not in _PUBLIC_BRAND_ASSETS:
         return JSONResponse({"error": "brand_asset_not_found"}, status_code=404)
     path = SITE_OUT / "brand" / asset_name
@@ -1016,6 +1098,40 @@ def brand_asset(asset_name: str):
         media_type="image/svg+xml",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@app.get("/art/earth-detail-v2.webp")
+@app.head("/art/earth-detail-v2.webp")
+def flagship_earth_art():
+    item = reviewed_flagship_asset_path("/art/earth-detail-v2.webp", SITE_OUT)
+    if item is None:
+        return JSONResponse({"error": "reviewed_earth_art_unavailable"}, status_code=404)
+    path, content_type = item
+    return FileResponse(path, media_type=content_type,
+                        headers={"Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/art/earth/credits.html")
+@app.head("/art/earth/credits.html")
+def flagship_earth_credits():
+    item = reviewed_flagship_asset_path("/art/earth/credits.html", SITE_OUT)
+    if item is None:
+        return JSONResponse({"error": "reviewed_earth_credits_unavailable"}, status_code=404)
+    path, content_type = item
+    return FileResponse(path, media_type=content_type,
+                        headers={"X-Robots-Tag": "noindex, follow",
+                                 "Cache-Control": "public, max-age=86400"})
+
+
+@app.get("/fonts/{asset_name}")
+@app.head("/fonts/{asset_name}")
+def flagship_owned_font(asset_name: str):
+    item = reviewed_flagship_asset_path("/fonts/" + asset_name, SITE_OUT)
+    if item is None:
+        return JSONResponse({"error": "reviewed_font_unavailable"}, status_code=404)
+    path, content_type = item
+    return FileResponse(path, media_type=content_type,
+                        headers={"Cache-Control": "public, max-age=86400"})
 
 
 @app.get("/icon.svg")
@@ -1042,6 +1158,7 @@ def favicon():
     )
 
 
+@app.head("/roofing")
 @app.get("/roofing")
 def roofing_page():
     path = _site_html_path("roofing")
@@ -1049,29 +1166,31 @@ def roofing_page():
         return JSONResponse({"error": "roofing_page_unavailable"}, status_code=404)
     return FileResponse(path, media_type="text/html", headers={"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"})
 
+@app.head("/privacy")
 @app.get("/privacy")
 def public_privacy_policy():
-    path = _approved_static_content_path("privacy")
+    path = checked_empire_ai_legal_path("privacy")
     if path is None:
         return JSONResponse(
             {"error": "policy_not_released"}, status_code=404,
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
         )
     return FileResponse(path, media_type="text/html", headers={
-        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
     })
 
 
+@app.head("/terms")
 @app.get("/terms")
 def public_website_terms():
-    path = _approved_static_content_path("terms")
+    path = checked_empire_ai_legal_path("terms")
     if path is None:
         return JSONResponse(
             {"error": "terms_not_released"}, status_code=404,
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},
         )
     return FileResponse(path, media_type="text/html", headers={
-        "Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow",
+        "Cache-Control": "no-store",
     })
 
 
@@ -1102,6 +1221,7 @@ def roofing_hero():
     return FileResponse(path, media_type="image/webp")
 
 
+@app.head("/trust")
 @app.get("/trust")
 def trust_page():
     path = _site_html_path("trust")
@@ -1110,6 +1230,7 @@ def trust_page():
     return FileResponse(path, media_type="text/html")
 
 
+@app.head("/predictive-revenue")
 @app.get("/predictive-revenue")
 def predictive_revenue_page():
     path = _site_html_path("predictive-revenue")
@@ -1131,6 +1252,7 @@ def founder_led_sales_redirect():
     return RedirectResponse("/commercial", status_code=308)
 
 
+@app.head("/commercial")
 @app.get("/commercial")
 def commercial_page():
     path = _site_html_path("commercial")
@@ -1151,6 +1273,7 @@ def checkout_entrypoint():
     )
 
 
+@app.head("/buy")
 @app.get("/buy")
 def buy_page():
     path = _site_html_path("buy")
@@ -1162,6 +1285,7 @@ def buy_page():
     return FileResponse(path, media_type="text/html")
 
 
+@app.head("/industries")
 @app.get("/industries")
 def industries_page():
     path = _site_html_path("industries")
@@ -1170,6 +1294,7 @@ def industries_page():
     return FileResponse(path, media_type="text/html")
 
 
+@app.head("/industries/{slug}")
 @app.get("/industries/{slug}")
 def industry_page(slug: str):
     path = _site_html_path(f"industries/{slug}")
@@ -1178,6 +1303,7 @@ def industry_page(slug: str):
     return FileResponse(path, media_type="text/html")
 
 
+@app.head("/", response_class=HTMLResponse)
 @app.get("/", response_class=HTMLResponse)
 def home():
     path = _site_html_path("")
@@ -1195,6 +1321,7 @@ def home():
 
 
 # Existing gateway owns these routes; no second service or autonomous publisher.
+@app.head('/research/{campaign_id}')
 @app.get('/research/{campaign_id}')
 def research_page(campaign_id: str):
     from empire_os.owned_campaign_release import released_html
@@ -1224,6 +1351,12 @@ async def research_enquiry(request: Request):
 async def research_event(request: Request):
     from empire_os.owned_campaign_http import handle_intake
     return await handle_intake(request, 'event', origin=PUBLIC_BASE_URL)
+
+@app.post('/api/industry/event')
+async def industry_campaign_event(request: Request):
+    """Fail-closed owned industry observations; no prospect or payment action."""
+    from empire_os.owned_campaign_http import handle_intake
+    return await handle_intake(request, 'industry_event', origin=PUBLIC_BASE_URL)
 
 
 # NOTE: Presence routes are intentionally exact allowlisted paths. They proxy to

@@ -128,6 +128,7 @@ class FounderLedCommercialInterestRequest(BaseModel):
     contact_consent: bool
     idempotency_key: str = Field(min_length=8, max_length=128)
     website: str = Field(default="", max_length=300)
+    organic_touch: dict[str, str] | None = None
     claimed_entry_page: str | None = Field(default=None, max_length=80)
     source_campaign_key: str | None = Field(default=None, max_length=32)
     source_landing_url: str | None = Field(default=None, max_length=2048)
@@ -323,6 +324,7 @@ def commercial_interest(req: FounderLedCommercialInterestRequest):
             contact_consent=req.contact_consent,
             idempotency_key=req.idempotency_key,
             website=req.website,
+            organic_touch=req.organic_touch,
             claimed_entry_page=req.claimed_entry_page,
             source_campaign_key=req.source_campaign_key,
             source_landing_url=req.source_landing_url,

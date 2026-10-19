@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from empire_os.sb import request_json
+from empire_os.organic_campaign_touch import normalize_organic_touch
 from empire_os.digital_avatar_approved_catalog_preview import (
     APPROVAL_REF as AVATAR_PRICE_APPROVAL_REF,
     has_recorded_price_only_founder_approval,
@@ -224,6 +225,7 @@ def record_founder_led_interest(
     contact_consent: bool,
     idempotency_key: str,
     website: str = "",
+    organic_touch: Mapping[str, str] | None = None,
     claimed_entry_page: str | None = None,
     source_campaign_key: str | None = None,
     source_landing_url: str | None = None,
@@ -236,6 +238,10 @@ def record_founder_led_interest(
         raise CommercialInterestError("specific_contact_consent_required")
     if website:
         raise CommercialInterestError("invalid_submission")
+    try:
+        validated_touch = normalize_organic_touch(organic_touch) if organic_touch is not None else None
+    except ValueError as exc:
+        raise CommercialInterestError("invalid_organic_campaign_touch") from exc
     code = _text(product_code, "product_code", limit=120)
     catalog = founder_led_commercial_offers(root=root)
     offer = next((o for o in catalog["offers"] if o["product_code"] == code), None)
@@ -256,8 +262,10 @@ def record_founder_led_interest(
     if moment.tzinfo is None or moment.utcoffset() is None:
         raise CommercialInterestError("contact_consent_clock_untrusted")
 
-    # Registered campaign source is browser-reported, not consent or proof of a click.
-    # Reject invalid issued source before touching the canonical EmpireDB intake.
+    # NewsJack URL tags remain explicitly unverified buyer claims.
+    if validated_touch is not None and (source_campaign_key is not None or source_landing_url is not None):
+        raise CommercialInterestError("conflicting_campaign_source_claims")
+    # Registered YouTube source is checked independently and cannot co-exist with JEV.
     from empire_os.youtube_commercial_source_bridge import review_commercial_video_source_submission
     try:
         campaign_source = review_commercial_video_source_submission(
@@ -320,6 +328,8 @@ def record_founder_led_interest(
         }
     if campaign_source is not None:
         evidence["youtube_buyer_declared_source"] = campaign_source["source_evidence"]
+    if validated_touch is not None:
+        evidence["organic_campaign_touch"] = validated_touch
     result = request(
         "POST",
         "/rest/v1/rpc/ingest_prospect_atomic",
