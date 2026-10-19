@@ -88,6 +88,7 @@ export default async function FounderPage() {
   const marketCoverage = decision?.flagship_buyer_market_coverage;
   const buyerEnrichment = decision?.flagship_buyer_enrichment;
   const vendorStatus = decision?.flagship_quality_integrations;
+  const customerModelOptions = decision?.flagship_customer_model_options;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -380,6 +381,35 @@ export default async function FounderPage() {
                           </div>
                         );
                       })}
+                    </div>
+                    <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
+                      <p className="text-xs font-semibold text-white">
+                        Predictive Intelligence · Customer AI options
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        Empire-managed or bring-your-own-model. Models explain source
+                        evidence; tenant permissions and tool authority remain in EmpireOS.
+                      </p>
+                      <div className="mt-2 grid gap-2 lg:grid-cols-2">
+                        {(customerModelOptions?.deployment_options ?? []).map((option) => (
+                          <div key={option.mode} className="rounded-lg border border-white/10 p-2">
+                            <p className="text-xs font-semibold text-white">
+                              {option.mode === "empire_managed" ? "Empire-managed AI" : "Customer BYO model"}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-300">
+                              {option.description}
+                            </p>
+                            <p className="mt-1 text-[11px] text-slate-500">
+                              {option.availability.replaceAll("_", " ")}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        {show(customerModelOptions?.status, "Not connected").replaceAll("_", " ")}.
+                        No customer provider credentials, autonomous tools, hosted
+                        requests or commercial execution are enabled by this view.
+                      </p>
                     </div>
                     <div className="mt-3 rounded-xl border border-cyan-200/10 p-3">
                       <p className="text-xs font-semibold text-white">

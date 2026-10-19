@@ -93,12 +93,15 @@ def test_second_observation_after_24h_only_descriptive_quality_counts(tmp_path):
     second = deepcopy(first)
     second["observed_at"] = (NOW+timedelta(days=1)).isoformat()
     categories = second["source_quality_categories"]
-    if categories["OBSERVED"] > 0:
-        categories["OBSERVED"] -= 1
-        categories["HELD"] += 1
-    else:
-        categories["MISSING"] -= 1
-        categories["HELD"] += 1
+    # Any source status may dominate across different valid test clocks;
+    # change one actual positive category, never subtract from a zero.
+    source = next((key for key in CATEGORIES
+                   if key != "HELD" and categories[key] > 0), None)
+    destination = "HELD"
+    if source is None:
+        source, destination = "HELD", "STALE"
+    categories[source] -= 1
+    categories[destination] += 1
     append_quality_observation(path, second, apply=True)
     result = review_quality_history(path, as_of=NOW+timedelta(days=1))
     assert result["status"] == "DESCRIPTIVE_SOURCE_QUALITY_CHANGE_REVIEW"

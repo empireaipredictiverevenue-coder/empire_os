@@ -516,6 +516,10 @@ def build_predictive_decision_control_runtime(
     decision["flagship_buyer_enrichment"] = review_enrichment_triage_snapshot(
         root, as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_customer_agent_sandbox import review_customer_model_delivery_options
+    decision["flagship_customer_model_options"] = review_customer_model_delivery_options(
+        as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 

@@ -2503,6 +2503,13 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert triage["schema_version"] == "empire.predictive_revenue.buyer_enrichment_triage.v1"
     assert triage["independent_first_party_buying_intent_verified"] is False
     assert triage["execution_authority"] == "none"
+    model_options = control["flagship_customer_model_options"]
+    assert model_options["status"] == "TWO_MODEL_MODES_DESIGNED_ONLY"
+    assert len(model_options["deployment_options"]) == 2
+    assert model_options["tenant_credential_storage_activated"] is False
+    assert model_options["api_key_capture_endpoint_created"] is False
+    assert model_options["production_customer_model_routing_authorized"] is False
+    assert model_options["execution_authority"] == "none"
     assert control["formula_evidence"]["cloud_prediction_ready"] is None
     assert control["formula_evidence"]["fresh_opportunity_count"] is None
     assert control["formula_evidence"]["commercial_execution_authorized"] is False

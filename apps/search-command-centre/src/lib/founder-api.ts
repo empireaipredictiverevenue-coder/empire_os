@@ -322,7 +322,27 @@ export type FlagshipBuyerEnrichment = {
   execution_authority: "none";
 };
 
+export type FlagshipCustomerModelOptions = {
+  schema_version: string;
+  status: string;
+  deployment_options: Array<{
+    mode: string;
+    description: string;
+    customer_api_key_required: boolean;
+    source: string;
+    availability: string;
+    service_cost_or_price_verified: false;
+    can_access_tenant_data_without_server_auth: false;
+    may_execute_outbound_or_payment: false;
+  }>;
+  production_customer_model_routing_authorized: false;
+  tenant_credential_storage_activated: false;
+  api_key_capture_endpoint_created: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_customer_model_options?: FlagshipCustomerModelOptions;
   flagship_buyer_enrichment?: FlagshipBuyerEnrichment;
   flagship_buyer_market_coverage?: FlagshipBuyerMarketCoverage;
   source_quality_history?: FlagshipSourceQualityHistory;
