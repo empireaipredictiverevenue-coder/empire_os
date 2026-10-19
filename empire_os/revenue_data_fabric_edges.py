@@ -20,6 +20,24 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "treg_optional_provider_to_own_source_intelligence_policy",
+        "empire_os/treg_source_policy.py",
+        "empire_os/source_intelligence.py",
+        "zero-spend cap, read-only business-only purpose, third-party processor "
+        "and individual source-use rights, no secret upload or paid tool calls",
+        "compare vendor discovery/enrichment capabilities without replacing "
+        "EmpireDB, Scrapling or our existing Waterfall",
+    ),
+    IntelligenceEdge(
+        "listmonk_historic_audience_to_consent_suppression_recovery_gate",
+        "empire_os/listmonk_recovery_boundary.py",
+        "empire_os/founder_lead_supply_api.py",
+        "original PostgreSQL volume verification, password rotation, active "
+        "double opt-in and canonical suppression/opt-out reconciliation; no send",
+        "recover newsletter system only after verifying historical data and "
+        "separately approved private restoration, without mass-mailing cold leads",
+    ),
+    IntelligenceEdge(
         "buyer_qualification_and_canonical_exchange_to_leadgen_revenue_queue",
         "empire_os/leadgen_revenue_activation_queue.py",
         "empire_os/founder_lead_supply_api.py",

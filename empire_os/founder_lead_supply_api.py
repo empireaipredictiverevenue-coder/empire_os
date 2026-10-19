@@ -11,6 +11,8 @@ from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inve
 from empire_os.official_source_canonical_preflight import preflight_official_source_ledgers
 from empire_os.leadgen_revenue_activation_queue import build_leadgen_revenue_queue
 from empire_os.buyer_specification_readiness import build_buyer_specification_readiness
+from empire_os.listmonk_recovery_boundary import inspect_legacy_listmonk
+from empire_os.treg_source_policy import review_treg_for_empire
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
@@ -175,6 +177,29 @@ def read_buyer_specification_gap_board(
                 "execution_authority": "none"}
 
 
+def read_marketing_tooling_recovery(root: Path = Path("/srv/empire_os")) -> dict:
+    """Private safe recovery state: no legacy credentials or marketing sends."""
+    try:
+        return {
+            "available": True,
+            "mode": "READ_ONLY_RECOVERY",
+            "listmonk": inspect_legacy_listmonk(root),
+            "treg": review_treg_for_empire(),
+            "paid_external_calls": 0,
+            "marketing_messages_sent": 0,
+            "execution_authority": "none",
+        }
+    except (ValueError, OSError, TypeError):
+        return {
+            "available": False,
+            "mode": "READ_ONLY_RECOVERY",
+            "state": "HOLD",
+            "paid_external_calls": 0,
+            "marketing_messages_sent": 0,
+            "execution_authority": "none",
+        }
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
@@ -200,6 +225,10 @@ def create_founder_lead_supply_router(
     @router.get("/buyer-specifications")
     def buyer_specifications():
         return read_buyer_specification_gap_board(exchange_path, relationship_path)
+
+    @router.get("/marketing-tooling")
+    def marketing_tooling():
+        return read_marketing_tooling_recovery()
 
     @router.get("/source-readiness")
     def source_readiness():
