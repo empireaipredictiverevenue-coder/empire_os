@@ -20,6 +20,14 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "scrapling_sniper_handoff_to_canonical_exchange_inventory_preview",
+        "empire_os/scrapling_sniper_handoff.py",
+        "empire_os/lead_exchange_live_inventory.py",
+        "review packet separation, canonical EmpireDB Exchange bounded selection, "
+        "fresh verified read-only snapshot, no inventory promotion or buyer allocation",
+        "show honest observed inventory by niche and corridor in private founder console",
+    ),
+    IntelligenceEdge(
         "legacy_lead_sniper_to_canonical_empiredb_review_queue",
         "empire_os/agents/lead_sniper_agent.py",
         "empire_os/lead_sniper_repository.py",

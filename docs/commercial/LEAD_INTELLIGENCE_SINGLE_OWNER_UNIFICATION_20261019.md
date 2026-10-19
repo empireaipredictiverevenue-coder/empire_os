@@ -310,3 +310,83 @@ The new dedup checks all statuses of `sniper_review` with matching exact
 It refuses to guess if multiple matching rows prevent a complete stable
 decision. Serial read-before-write + readback is **not atomic across workers**;
 a database uniqueness contract remains a launch gate.
+
+## Wave 7 — Scrapling/Sniper to Lead Exchange private inventory (19 October 2026)
+
+User requested a connected Lead Exchange showing real inventory. This is built
+from **canonical EmpireDB-backed Exchange projections**, not counted crawler
+results, speculative sniper hits, Reddit urgency messages or raw registry rows.
+
+### One reviewed B2B intake chain
+- `empire_os/scrapling_sniper_handoff.py` connects the existing reviewed
+  `Scrapling` source report → `scrapling_identity_review` →
+  `scrapling_waterfall_provider` → `lead_sniper_repository`'s review
+  contract, in-memory, without network/DB writes/auto-send. Supports
+  arbitrary bounded source record index, checked against that exact company's
+  separately supplied canonical ID and independent provenance receipts.
+- `scripts/preview_scrapling_sniper_handoff_20261019.py` is an operator
+  read-only local-file proof of that full pipeline.
+- Even the successful state `SNIPER_REVIEW_PACKET_PREPARED` is NOT a
+  canonical confirmed identity link, sellable lead, converted buyer,
+  newly inserted EmpireDB record or approved review-queue write.
+
+### Private Exchange inventory feed
+- `empire_os/lead_exchange_live_inventory.py` reads the existing
+  `commercial_exchange/latest.json` produced by canonical EmpireDB
+  `scripts/refresh_commercial_exchange.py`.
+- Requires `empire.commercial_exchange_snapshot.v1`, OBSERVE mode,
+  `canonical_backend=empiredb`, `source=canonical_empiredb_projection`,
+  bounded lists, exact row/state reconciliations, unique canonical
+  prospect IDs and a timezone-aware freshness stamp (6-hour budget).
+- Displays selected count, blocked-evidence count, buyer-capacity waitlist,
+  allocation candidates, allocated count, active buyer seat *records*, and
+  market groupings. Missing market identities remain separately labelled
+  unclassified evidence holds, NOT discarded.
+- Displays only aggregate niche/metro/corridor counts; **never** emits
+  prospect IDs, buyer names, private emails, personal details or raw
+  source/scraper records. The source selected population is a bounded sample
+  of qualified candidates, NOT the full EmpireDB lead census.
+- Reviewed sniper packets can be summarized as separate pending research
+  items; they NEVER add to canonical inventory or imply buying intent.
+- Freshness means **recently refreshed snapshot**, not a streaming, atomic
+  real-time orderbook. Price, buyer capacity, entitlement, delivery and
+  binding sale remain independently gated. `delivery_ready_now=0`
+  unless a future owner supplies an independently verified allocation/
+  fulfilment authority receipt through a separately reviewed design.
+- `empire_os/founder_lead_supply_api.py` now mounts the **private-loopback**
+  `GET /v1/founder-lead-supply/inventory` route in the existing
+  `founder_dashboard_service`. The public gateway is deliberately
+  unchanged, and no new unauthenticated public catalogue is deployed.
+- `scripts/review_lead_exchange_live_inventory_20261019.py --read-only
+  --snapshot /srv/empire_os/runtime/commercial_exchange/latest.json`
+  shows the current aggregate feed with no server restart or DB mutation.
+
+### Direct read-only runtime evidence (19 Oct ~13:10 UTC)
+- The existing source snapshot showed 176 canonical selected inventory
+  records: 85 held for missing evidence, 91 overflow/no buyer capacity,
+  0 allocation candidates, 0 allocated, 0 active buyer seats out of
+  1,057 seat records. Snapshot rows grouped into 92 inventory market
+  groups; the separate overall Exchange corridor count was 157 (buyer
+  corridors also contribute).
+- This count is **not** new revenue, 176 immediately marketable contacts
+  or available-to-buy consumer data. No outbound or payment action.
+- A passing API/unit test against the isolated feature branch does
+  NOT prove the private founder service has been restarted with this
+  code. The user-facing console route remains **staged until explicitly
+  installed/reloaded through the existing production owner process**.
+
+### Next production prerequisites
+1. Run the separate protected EmpireDB census through its existing
+   least-privilege reader before displaying full-platform lead totals.
+2. Repair/provision dedicated canonical `empire_tasks` reader; read-only
+   sniper preflight currently fails with `DataGatewayUnavailable`
+   under Ubuntu's unprivileged execution environment.
+3. Independently review source rights, business/website identity, and
+   legal/insurance/mass-tort practice data restrictions. Add real
+   source and buyer receipts without treating paper intent as sale.
+4. Review the existing founder console's loopback/token boundary,
+   deploy the new read-only inventory route as a minimal-diff release
+   only after service ownership/activation approval.
+5. Do not activate public self-serve inventory counters until current
+   snapshots, fulfilled entitlement, paid buyer capacity and compliance
+   evidence all justify accurate user-facing claims.

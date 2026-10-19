@@ -7,6 +7,7 @@ import json
 from fastapi import APIRouter
 
 from empire_os.lead_territory_mrr_bridge import build_territory_mrr_bridge
+from empire_os.lead_exchange_live_inventory import build_lead_exchange_live_inventory
 
 
 DEFAULT_EXCHANGE = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
@@ -62,6 +63,29 @@ def read_territory_package_preview(
         }
 
 
+def read_lead_exchange_inventory(
+    exchange_path: Path = DEFAULT_EXCHANGE,
+) -> dict:
+    """Founder-loopback-only safe, fresh canonical Exchange inventory view."""
+    try:
+        if not exchange_path.is_file() or exchange_path.stat().st_size > 5_000_000:
+            raise ValueError("exchange_snapshot_not_found_or_unbounded")
+        snapshot = json.loads(exchange_path.read_text(encoding="utf-8"))
+        result = build_lead_exchange_live_inventory(snapshot)
+        return {"available": result["state"] != "HOLD", **result}
+    except (OSError, ValueError, TypeError, UnicodeError):
+        return {
+            "available": False,
+            "mode": "READ_ONLY_EXCHANGE_SNAPSHOT",
+            "state": "HOLD",
+            "reason": "canonical_exchange_snapshot_unavailable",
+            "delivery_ready_now": 0,
+            "public_inventory_claim_allowed": False,
+            "outbound_authorized": False,
+            "execution_authority": "none",
+        }
+
+
 def create_founder_lead_supply_router(
     report_path: Path = DEFAULT_REPORT,
     exchange_path: Path = DEFAULT_EXCHANGE,
@@ -74,6 +98,12 @@ def create_founder_lead_supply_router(
     @router.get("/overview")
     def overview():
         return read_lead_supply_report(report_path)
+
+    @router.get("/inventory")
+    def inventory():
+        # This route is only mounted on the existing loopback Founder read API.
+        # It is NOT part of the public marketplace, and reveals no prospect IDs.
+        return read_lead_exchange_inventory(exchange_path)
 
     @router.get("/packages")
     def packages():

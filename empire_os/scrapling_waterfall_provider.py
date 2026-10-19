@@ -122,7 +122,7 @@ class ReviewedOfflineWaterfall(Waterfall):
 
 def build_reviewed_scrapling_waterfall(
     *, source_report: dict, review, html: str, website_page_url: str,
-    observed_at=None,
+    observed_at=None, record_index: int = 0,
 ) -> tuple[ReviewedOfflineWaterfall, dict]:
     """Build EXISTING Waterfall with one offline parser enhancement.
 
@@ -132,7 +132,7 @@ def build_reviewed_scrapling_waterfall(
     from empire_os.waterfall_source_bridge import build_waterfall_source_review
 
     plan = build_waterfall_source_review(
-        source_report, record_index=0, review=review, now=observed_at,
+        source_report, record_index=record_index, review=review, now=observed_at,
     )
     if plan.get("state") != "EVIDENCE_REVIEW_READY":
         raise ValueError("governed source evidence review held")
