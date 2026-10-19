@@ -37,3 +37,11 @@ No forecast registered, no business terms authenticated, no payment or fulfilmen
 The original production producers subsequently converged to 14 Radar, 14 intake, 14 routing and 14 Quant records. Canonical pathway validation passed. This branch did not trigger the refresh.
 
 The new first-party request had an unknown niche. The handoff now explicitly holds market identity and routes its verification to Market Intelligence, without guessing that it is roofing or authorising a forecast.
+
+## Source churn discovered on subsequent inspection
+
+The independently refreshed Radar later returned to 11 opportunities while intake, routing and Quant retained 14. The three downstream-only rows were all existing `community_pain` research hypotheses with a null niche. This is not evidence of three dropped buyers, conversion failures or lost revenue.
+
+The current Community Intent snapshot advertised four pain briefs, none with the `opportunity_event` required by the existing Radar builder, and its latest Radar source contribution was zero. A previous Opportunity Loop had reported 14. Multiple existing workflows refresh the same Radar source without simultaneously rebuilding every downstream stage, so a passing momentary snapshot can later become inconsistent.
+
+The read-only epoch diagnostic now reports the restricted source contribution, allowed class buckets, and number of downstream-only rows without niche. When exactly these original Community Intent entries disappear, it routes a `COMMUNITY_SOURCE_POPULATION_CHANGED` hold to the existing Opportunity Factory owner, with a dependency on its existing Community Intent source owner. It never edits original pain briefs, invents taxonomy, runs another scheduler or promotes an unknown niche into buyer matches. The canonical full four-stage join remains required before resuming buyer-specific evidence work.

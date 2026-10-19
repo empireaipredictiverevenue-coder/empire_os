@@ -6,6 +6,7 @@ exact four-source join. An epoch mismatch is NEVER a buyer or Quant forecast.
 """
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -43,6 +44,10 @@ def _base() -> dict[str, Any]:
         "radar_missing_from_downstream_counts": {stage: None for stage in _STAGES[1:]},
         "downstream_without_radar_counts": {stage: None for stage in _STAGES[1:]},
         "downstream_three_stage_identities_agree": None,
+        "downstream_only_opportunity_class_buckets": {},
+        "downstream_only_missing_niche_count": None,
+        "radar_community_intent_source_available": None,
+        "radar_community_intent_contribution_count": None,
         "join_result": "NOT_PROVEN",
         "canonical_pathway_reason": None,
         "next_owner": _OWNER,
@@ -69,17 +74,38 @@ def review_source_epoch_reconciliation(
         raise ValueError("exact existing four source snapshots required")
     now = as_of.astimezone(timezone.utc)
     indexes = {}
+    rows_by_stage = {}
     timestamps = {}
     result = _base()
     for stage in _STAGES:
         rows, stamp = _validate(sources[stage], stage, now)
         indexes[stage] = set(rows)
+        rows_by_stage[stage] = rows
         timestamps[stage] = stamp
     skew = max(timestamps.values()) - min(timestamps.values())
     radar = indexes["radar"]
     deficits = {stage: len(radar - indexes[stage]) for stage in _STAGES[1:]}
     extras = {stage: len(indexes[stage] - radar) for stage in _STAGES[1:]}
     downstream_agree = len({frozenset(indexes[stage]) for stage in _STAGES[1:]}) == 1
+    downstream_only = indexes["intake"] - radar
+    # Source identity is intentionally never exported: only known type buckets.
+    known_classes = {"community_pain", "market_research", "competitive_research_gap"}
+    class_buckets = Counter()
+    missing_niche = 0
+    for key in downstream_only:
+        entry = rows_by_stage["intake"][key]
+        category = entry.get("opportunity_class")
+        class_buckets[category if isinstance(category, str) and category in known_classes else "OTHER"] += 1
+        if entry.get("niche") in (None, ""):
+            missing_niche += 1
+    community = sources["radar"].get("source_status", {})
+    community = community.get("community_intent") if isinstance(community, Mapping) else None
+    community_available = community.get("available") if isinstance(community, Mapping) else None
+    community_count = community.get("candidate_count") if isinstance(community, Mapping) else None
+    if type(community_available) is not bool:
+        community_available = None
+    if type(community_count) is not int or not 0 <= community_count <= 250:
+        community_count = None
     report = dict(
         result,
         source_counts={stage: len(indexes[stage]) for stage in _STAGES},
@@ -91,6 +117,10 @@ def review_source_epoch_reconciliation(
         radar_missing_from_downstream_counts=deficits,
         downstream_without_radar_counts=extras,
         downstream_three_stage_identities_agree=downstream_agree,
+        downstream_only_opportunity_class_buckets=dict(sorted(class_buckets.items())),
+        downstream_only_missing_niche_count=missing_niche,
+        radar_community_intent_source_available=community_available,
+        radar_community_intent_contribution_count=community_count,
     )
     if skew > MAX_SKEW:
         return dict(report, status="EPOCH_SKEW_HOLD",
@@ -115,6 +145,12 @@ def review_source_epoch_reconciliation(
             and not any(extras.values())):
         return dict(report, status="RADAR_AHEAD_OF_FACTORY_STAGES",
                     next_action="REGENERATE_EXISTING_INTAKE_ROUTER_QUANT_FROM_CURRENT_RADAR")
+    if (downstream_agree and not any(deficits.values())
+            and downstream_only
+            and class_buckets == {"community_pain": len(downstream_only)}
+            and community_count == 0):
+        return dict(report, status="COMMUNITY_SOURCE_POPULATION_CHANGED",
+                    next_action="REVIEW_COMMUNITY_INTENT_SOURCE_THEN_RECONCILE_FACTORY_EPOCH")
     return dict(report, status="MULTI_STAGE_IDENTITY_DRIFT",
                 next_action="RECONCILE_CANONICAL_SOURCE_IDENTITIES_WITH_OWNER")
 

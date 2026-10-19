@@ -58,6 +58,29 @@ def test_radar_only_additions_provide_precise_owner_recovery_not_partial_forecas
     assert "someone@example.net" not in serialized
 
 
+def test_dropped_community_candidates_are_not_promoted_or_disclosed():
+    sources = payloads(n=3)
+    # The standalone Radar source lost an earlier community-pain entry.
+    sources["radar"]["candidates"].pop()
+    sources["intake"]["items"][-1]["opportunity_class"] = "community_pain"
+    sources["intake"]["items"][-1]["niche"] = None
+    sources["intake"]["items"][-1]["private_customer_email"] = "do-not-disclose@example.com"
+    sources["radar"]["source_status"] = {
+        "community_intent": {"available": True, "candidate_count": 0}
+    }
+    result = review(sources)
+    assert result["status"] == "COMMUNITY_SOURCE_POPULATION_CHANGED"
+    assert result["next_action"] == "REVIEW_COMMUNITY_INTENT_SOURCE_THEN_RECONCILE_FACTORY_EPOCH"
+    assert result["downstream_without_radar_counts"]["intake"] == 1
+    assert result["downstream_only_opportunity_class_buckets"] == {"community_pain": 1}
+    assert result["downstream_only_missing_niche_count"] == 1
+    assert result["radar_community_intent_source_available"] is True
+    assert result["radar_community_intent_contribution_count"] == 0
+    assert result["join_result"] == "NOT_PROVEN"
+    assert "do-not-disclose@example.com" not in json.dumps(result)
+    assert result["forecast_issued"] is False
+
+
 def test_unrelated_downstream_identity_is_drift_not_fresh_radar():
     sources = payloads(n=2)
     sources["quant"]["items"][0]["opportunity_key"] = "different-key"
@@ -145,3 +168,26 @@ def test_existing_owner_handoff_surfaces_epoch_recovery(tmp_path):
     assert result['source_epoch_reconciliation']['status'] == 'RADAR_AHEAD_OF_FACTORY_STAGES'
     assert result['opaque_opportunity_ref'] is None
     assert result['existing_work_item_created'] is False
+
+
+def test_owner_routes_current_community_epoch_hold_to_existing_factory(tmp_path):
+    from empire_os.flagship_first_payer_owner_handoff import review_current_first_payer_owner_handoff
+    from test_revenue_buyer_evidence_handoff import fixture
+    now = fixture(tmp_path)
+    radar_path = tmp_path / SOURCES['radar'][0]
+    radar = json.loads(radar_path.read_text())
+    radar['candidates'].pop()
+    radar['source_status'] = {'community_intent': {'available': True, 'candidate_count': 0}}
+    radar_path.write_text(json.dumps(radar))
+    intake_path = tmp_path / SOURCES['intake'][0]
+    intake = json.loads(intake_path.read_text())
+    intake['items'][-1]['opportunity_class'] = 'community_pain'
+    intake['items'][-1]['niche'] = None
+    intake_path.write_text(json.dumps(intake))
+    result = review_current_first_payer_owner_handoff(tmp_path, as_of=now)
+    assert result['status'] == 'CURRENT_OPPORTUNITY_NOT_ESTABLISHED'
+    assert result['first_priority_owner'] == 'existing_opportunity_factory_owner'
+    assert result['first_priority_action'] == 'REVIEW_COMMUNITY_INTENT_SOURCE_THEN_RECONCILE_FACTORY_EPOCH'
+    assert result['source_epoch_reconciliation']['status'] == 'COMMUNITY_SOURCE_POPULATION_CHANGED'
+    assert result['opaque_opportunity_ref'] is None
+    assert result['forecast_issued'] is False

@@ -213,7 +213,10 @@ def review_current_first_payer_owner_handoff(
         return report
     epoch = review_source_epoch_reconciliation_runtime(root, as_of=as_of)
     report["source_epoch_reconciliation"] = epoch
-    if epoch["status"] == "RADAR_AHEAD_OF_FACTORY_STAGES":
+    if epoch["status"] in (
+        "RADAR_AHEAD_OF_FACTORY_STAGES", "COMMUNITY_SOURCE_POPULATION_CHANGED",
+        "MULTI_STAGE_IDENTITY_DRIFT",
+    ):
         report["first_priority_owner"] = "existing_opportunity_factory_owner"
         report["first_priority_action"] = epoch["next_action"]
     return report
