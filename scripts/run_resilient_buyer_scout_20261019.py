@@ -14,14 +14,24 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from empire_os.buyer_acquisition_scout import refresh_buyer_scout
-from empire_os.leadgen_contact_history_bridge import DOMAIN, TECHNICAL_HOSTS
+from empire_os.leadgen_contact_history_bridge import (
+    DOMAIN, TECHNICAL_HOSTS, build_contact_history_review,
+)
+from empire_os.buyer_scout_probe_cooldown import (
+    load_probe_history, merge_observed_probes, save_probe_history,
+)
 
 DEFAULT_ROOT = Path("/srv/empire_os")
 SOURCE = "runtime/buyer_network_intelligence/founder_qualification_actions_latest.json"
+PROBE_CACHE = "runtime/buyer_acquisition/resilient/research_cooldown_latest.json"
+LAST_SCOUT = "runtime/buyer_acquisition/scout_latest.json"
+RELATIONSHIPS = "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json"
 
 
 def reviewed_seed_records(snapshot: dict, *, limit: int = 8,
-                          rotation: int = 0) -> list[dict]:
+                          rotation: int = 0,
+                          recently_probed_domains: set[str] | None = None,
+                          existing_relationship_domains: set[str] | None = None) -> list[dict]:
     if (snapshot.get("schema_version") != "empire.buyer_qualification_actions.v1"
             or snapshot.get("mode") != "OBSERVE"
             or snapshot.get("outbound_enabled") is not False
@@ -37,7 +47,9 @@ def reviewed_seed_records(snapshot: dict, *, limit: int = 8,
             raise ValueError("untrusted_existing_buyer_seed")
         domain = item.get("domain")
         if (not isinstance(domain, str) or not DOMAIN.fullmatch(domain)
-                or domain.endswith(TECHNICAL_HOSTS) or domain in domains):
+                or domain.endswith(TECHNICAL_HOSTS) or domain in domains
+                or domain in (recently_probed_domains or set())
+                or domain in (existing_relationship_domains or set())):
             continue
         # This source's buyer-role assessment is research only, not approval.
         urls = item.get("existing_first_party_source_urls")
@@ -104,10 +116,56 @@ def main(argv=None):
     age_seconds = (datetime.now(timezone.utc) - observed).total_seconds()
     if age_seconds < -300 or age_seconds > 6 * 3600:
         raise SystemExit("buyer_seed_snapshot_stale")
-    slot = int(datetime.now(timezone.utc).timestamp() // 1800)
-    seeds = reviewed_seed_records(data, limit=args.max_seeds, rotation=slot)
+    now = datetime.now(timezone.utc)
+    memory_file = args.repo_root / PROBE_CACHE
+    recent = load_probe_history(memory_file, now=now)
+    # Bootstrap a previous successful first-party probe without re-probing.
+    # This is a snapshot from the EXISTING Scout, not a new search/scan.
+    prior_path = args.repo_root / LAST_SCOUT
+    if prior_path.is_file() and not prior_path.is_symlink() and prior_path.stat().st_size <= 2_500_000:
+        prior = json.loads(prior_path.read_text(encoding="utf-8"))
+        observed_at = datetime.fromisoformat(str(prior.get("generated_at") or "").replace("Z", "+00:00"))
+        if (observed_at.tzinfo is not None
+                and 0 <= (now-observed_at).total_seconds() <= 24*3600):
+            recent = merge_observed_probes(recent, prior, now=now)
+    relpath = args.repo_root / RELATIONSHIPS
+    if (relpath.is_symlink() or not relpath.is_file()
+            or relpath.stat().st_size > 2_500_000):
+        raise SystemExit("existing_relationship_registry_required")
+    registry = json.loads(relpath.read_text(encoding="utf-8"))
+    all_target_domains = sorted({str(row.get("domain"))
+        for row in data.get("targets", []) if isinstance(row, dict)
+        and isinstance(row.get("domain"), str)
+        and DOMAIN.fullmatch(row["domain"])})
+    history_review = build_contact_history_review(registry, all_target_domains, now=now)
+    already_engaged = {domain for domain, result in history_review["by_domain"].items()
+        if result["contact_state"] in ("DO_NOT_PURSUE", "EXISTING_THREAD_REVIEW",
+                                       "NON_BUYER_TECHNICAL_HOST")}
+    # Bounce evidence is a permanent research hold until CRM verifies a
+    # different permitted contact route; never accidentally re-recruit.
+    for relationship in registry["relationships"]:
+        if relationship.get("bounced_addresses"):
+            already_engaged.update(d for d in relationship.get("identity_domains", [])
+                                   if isinstance(d, str) and DOMAIN.fullmatch(d))
+    slot = int(now.timestamp() // 1800)
+    seeds = reviewed_seed_records(
+        data, limit=args.max_seeds, rotation=slot,
+        recently_probed_domains=set(recent),
+        existing_relationship_domains=already_engaged,
+    )
     if not seeds:
-        raise SystemExit("no_reviewed_b2b_seeds")
+        save_probe_history(memory_file, recent)
+        print(json.dumps({
+            "schema_version": "empire.buyer_scout_resilient_recovery.v1",
+            "state": "COOLDOWN_NO_UNPROBED_RESEARCH_DOMAINS",
+            "mode": "OBSERVE", "reviewed_seed_count": 0,
+            "recent_first_party_domain_count": len(recent),
+            "existing_relationship_domains_excluded": len(already_engaged),
+            "first_party_probes_attempted": 0,
+            "canonical_empiredb_writes": False,
+            "outbound_sent": False, "execution_authority": "none",
+        }, sort_keys=True))
+        return 0
     out = refresh_buyer_scout(
         args.repo_root,
         max_queries=4,
@@ -119,9 +177,14 @@ def main(argv=None):
         search_enabled=False,
         low_yield_canonical_limit=0,
     )
+    if out.get("schema_version") != "empire.buyer_acquisition_scout.v1":
+        raise SystemExit("untrusted_scout_result")
+    save_probe_history(memory_file, merge_observed_probes(recent, out, now=datetime.now(timezone.utc)))
     print(json.dumps({
         "schema_version": "empire.buyer_scout_resilient_recovery.v1",
         "state": "COMPLETED",
+        "research_cooldown_skipped_domain_count": len(recent),
+        "existing_relationship_domains_excluded": len(already_engaged),
         "mode": "OBSERVE",
         "public_search_engine_calls": 0,
         "reviewed_seed_count": len(seeds),
