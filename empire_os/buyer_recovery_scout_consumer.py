@@ -181,7 +181,21 @@ def read_scout_review(root: Path) -> dict[str, Any]:
         evidence=programme_catalog["programmes"].get(entry["company_domain"])
         if evidence is not None:
             entry["public_publisher_programme_review"]=evidence
+    publisher_programmes=[
+        {
+            "company_domain":domain,
+            "matched_current_scout_review":any(
+                x["company_domain"]==domain for x in preview
+            ),
+            "programme_evidence":evidence,
+            "buyer_verified":False,
+            "outreach_authorized":False,
+        }
+        for domain,evidence in sorted(programme_catalog["programmes"].items())
+    ]
     return {
+        "publisher_programme_research":publisher_programmes,
+        "publisher_programme_research_count":len(publisher_programmes),
         "public_programme_evidence_status":programme_catalog["status"],
         "programme_claim_rows_matched":sum(
             "public_publisher_programme_review" in entry for entry in preview
