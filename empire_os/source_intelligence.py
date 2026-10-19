@@ -72,6 +72,84 @@ def _source(
 
 
 SOURCES: dict[str, SourceContract] = {
+    # New verified official source *discovery* contracts for the consolidated
+    # Revenue Data Fabric. These are RESEARCH ONLY, not automatic prospect
+    # ingestion: specific API keys, source data-use rights, firm identity and
+    # jurisdiction gates must be satisfied independently.
+    "us_nyc_dcwp_home_improvement_companies": _source(
+        "us_nyc_dcwp_home_improvement_companies",
+        "NYC Department of Consumer and Worker Protection", "US",
+        "official_contractor_license_open_data", "bounded_socrata_public_api",
+        "https://data.cityofnewyork.us/Business/Active-Home-Improvement-Contractor-Licenses/acd4-wkax",
+        ("roofing", "hvac", "solar"), ("business_licence_observation",),
+        "weekly", "city_open_data_terms_apply",
+        production_status="research", allowed_uses=("analytics",),
+        notes="Home improvement licence not evidence of specific trade; exclude natural persons and contact details.",
+    ),
+    "us_cms_nppes_dental_npi2": _source(
+        "us_cms_nppes_dental_npi2", "CMS NPPES", "US",
+        "official_healthcare_registry", "limited_npi2_api",
+        "https://npiregistry.cms.hhs.gov/api/", ("dental",),
+        ("business_identity_observation", "healthcare_taxonomy"),
+        "current", "public_registry_api_restricts_bulk_queries",
+        production_status="research", raw_resale_allowed=False,
+        allowed_uses=("analytics",),
+        notes="NPI-2 only; API narrow human-reviewed queries; DDS required for bulk; NPI does not prove licensure",
+    ),
+    "us_cslb_official_contractor_csv": _source(
+        "us_cslb_official_contractor_csv",
+        "California Contractors State License Board", "US",
+        "official_license_dataset", "offline_authorised_csv_import",
+        "https://www.cslb.ca.gov/Onlineservices/DataPortal/",
+        ("roofing", "hvac", "solar"), ("license_observation", "trade_class"),
+        "periodic", "official_free_download_conditions_apply",
+        production_status="research", raw_resale_allowed=False,
+        allowed_uses=("analytics",),
+        notes="Company-only classification C-39/C-20/C-46; independent active licence check still required",
+    ),
+    "us_nyserda_solar_participants": _source(
+        "us_nyserda_solar_participants", "NYSERDA", "US",
+        "approved_solar_participant_directory", "interactive_lookup",
+        "https://portal.nyserda.ny.gov/FindAContractor",
+        ("solar",), ("installer_listing",), "current",
+        "official_directory_terms_require_review",
+        production_status="research", allowed_uses=("analytics",),
+    ),
+    "gb_sra_firm_api": _source(
+        "gb_sra_firm_api", "Solicitors Regulation Authority", "GB",
+        "official_firm_registry", "keyed_api",
+        "https://www.sra.org.uk/datasharing",
+        ("legal", "mass_torts"), ("firm_identity", "regulated_status"),
+        "daily", "attribution_and_api_registration_required",
+        production_status="research", allowed_uses=("analytics",),
+        notes="Legal firms only. No individual/claimant collection or implied mass tort niche without practice-area evidence.",
+    ),
+    "gb_fca_insurance_firm_api": _source(
+        "gb_fca_insurance_firm_api", "Financial Conduct Authority", "GB",
+        "official_financial_regulator", "keyed_single_entity_api",
+        "https://www.fca.org.uk/firms/financial-services-register",
+        ("insurance",), ("firm_identity", "regulated_status"),
+        "current", "single_entity_api_registration_required",
+        production_status="research", allowed_uses=("analytics",),
+        notes="Not bulk; FCA company verification only, no protected policyholder/customer data.",
+    ),
+    "us_naic_carrier_lookup": _source(
+        "us_naic_carrier_lookup", "National Association of Insurance Commissioners",
+        "US", "insurance_company_lookup", "company_lookup_only",
+        "https://content.naic.org/cis_consumer_information.htm",
+        ("insurance",), ("firm_identity_lookup",), "current",
+        "lookup_terms_require_review",
+        production_status="research", allowed_uses=("analytics",),
+    ),
+    "us_state_bar_firms": _source(
+        "us_state_bar_firms", "State lawyer and bar regulators", "US",
+        "jurisdiction_specific_firm_lookup", "state_by_state_lookup",
+        "https://www.americanbar.org/groups/legal_services/flh-home/flh-bar-directories-and-lawyer-finders/",
+        ("legal", "mass_torts"), ("firm_or_lawyer_verification",), "current",
+        "jurisdiction_specific_terms",
+        production_status="research", allowed_uses=("analytics",),
+        notes="No national US law-firm data feed; individual lawyers not canonical B2B firm inventory.",
+    ),
     "gb_companies_house": _source(
         "gb_companies_house", "Companies House", "GB", "official_registry", "api",
         "https://api.company-information.service.gov.uk/", ("all",),

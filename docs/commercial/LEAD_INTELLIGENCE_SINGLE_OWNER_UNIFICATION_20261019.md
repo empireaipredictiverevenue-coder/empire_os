@@ -467,3 +467,103 @@ buyer activation, signed capacity, purchase, fulfilment or revenue.
 - To disable only this new job, edit the Ubuntu user's crontab and remove
   the two lines beginning with the marker `EMPIRE_RECC_SOLAR_SWEEP_20261019`
   and its immediately following cron command. Preserve ASTRA and other jobs.
+
+## Wave 9 — eight researched official source connectors (19 October)
+
+Founder directive: source new US and UK business-identity feeds covering roofing,
+solar, HVAC, dental, insurance, legal firms and mass tort law firms, add them to
+the unified intelligence stack and run approved bounded pilots.
+
+**Existing** RECC Solar sweeper remains the only new daily scheduled source.
+All newly researched sources are explicitly `production_status=research` with
+`allowed_uses=("analytics",)` in `empire_os/source_intelligence.py`.
+Source metadata does NOT grant automatic prospect import, outbound, scraping
+rights or resale.
+
+### Registered official source pack status
+- `us_cslb_official_contractor_csv`: California CSLB free license-master
+  CSV, roofing C-39, HVAC C-20 and solar C-46. Implemented **offline
+  narrow file parser**, not arbitrary licence-search scraping. Require an
+  independently downloaded official CSV and source-rights receipt;
+  `empire_os/cslb_contractor_csv_source.py`. Current license state must
+  be separately verified. Official: https://www.cslb.ca.gov/Onlineservices/DataPortal/
+- `us_nyc_dcwp_home_improvement_companies`: NYC DCWP official Socrata API
+  `acd4-wkax` (Home Improvement Contractor Licenses), **manual bounded
+  company-only pilot** implemented with one limited 20-row query/day, active
+  unexpired licences, discard individual-named records, no contact fields.
+  This source only establishes general home-improvement licence observations:
+  *roofing/HVAC/solar speciality is unproven*.
+  https://data.cityofnewyork.us/Business/Active-Home-Improvement-Contractor-Licenses/acd4-wkax
+- `us_cms_nppes_dental_npi2`: CMS NPPES public API, **NPI-2
+  organisations only**, 8 per bounded query and two different selected
+  geo queries per day maximum, no automatic cron. As CMS directs bulk
+  users to its downloadable DDS file, do not use registry API for bulk
+  lead harvesting. Ignore medical practitioners/patients and returned
+  personal contact fields. A provider NPI does not prove licensure.
+  https://npiregistry.cms.hhs.gov/
+- `us_nyserda_solar_participants`: official NY-Sun participating solar
+  contractor directory, research/individual company lookup only until
+  automation/bulk rights verified. https://portal.nyserda.ny.gov/FindAContractor
+- `gb_sra_firm_api`: UK SRA public law-firm data API, registration/key
+  required; API attribution required. No individuals or claimant profiles;
+  firm's mass-tort specialism needs separate practice-area proof.
+  https://www.sra.org.uk/datasharing
+- `gb_fca_insurance_firm_api`: UK FCA FS Register API (registration/key
+  required). Its free lookup API is **single-entity, NOT bulk discovery**;
+  bulk extract is a separately purchased service. Insurer/broker legal
+  entity and regulatory status only, no policyholders.
+  https://www.fca.org.uk/firms/financial-services-register
+- `us_naic_carrier_lookup`: NAIC Consumer Insurance Search, manual
+  per-carrier verification only; no approved bulk connector or consumer
+  insurance records. https://content.naic.org/cis_consumer_information.htm
+- `us_state_bar_firms`: US state bar individual jurisdiction firm and
+  law-office licensing lookups. No fictitious nationwide lawyer data API;
+  natural-person attorney search is not a qualified law-firm or mass-tort
+  claimant source.
+
+### Real bounded pilot receipts (EmpireOS)
+- UK RECC Solar: 16 distinct private firm observations collected in two
+  earlier licensed source sweeps.
+- US CMS NPPES: **8 Dallas TX** + **8 Chicago IL** NPI-2 dental
+  organisations, 16 unique organization research observations, HTTP 200.
+- NYC DCWP: 20 sampled source rows, **9 company-format active licences**
+  after removing individual-like/expired/no-company records.
+- **Total 41 observations in three separate research pools**. The pools
+  are not reconciled to the full EmpireDB company corpus and are not sold
+  contacts; only their aggregated source research counts are combined.
+- Existing canonical Exchange remains **176 bounded selected inventory
+  records**, 85 evidence holds, 91 capacity waitlist, 0 buyer allocations
+  and 0 verified immediately deliverable leads.
+- Independent primary `CrawlerProspectRepository` still fails to obtain
+  an EmpireDB connection under Ubuntu's current unprivileged shell.
+  No new prospect inserts or claims of newly verified canonical inventory.
+
+### Command references
+```bash
+# This one reads only private aggregate receipts, not company contact data.
+/srv/empire_os/.venv/bin/python -m \
+  scripts.review_multivertical_source_inventory_20261019 \
+  --read-only \
+  --exchange /srv/empire_os/runtime/commercial_exchange/latest.json \
+  --recc /srv/empire_os/runtime/lead_supply/private_recc_sweeps/latest.json \
+  --nppes /srv/empire_os/runtime/lead_supply/private_us_dental_orgs/latest.json \
+  --nyc /srv/empire_os/runtime/lead_supply/private_nyc_contractors/latest.json
+
+# Read-only source catalogue and access blockers.
+/srv/empire_os/.venv/bin/python -m \
+  scripts.review_official_vertical_sources_20261019 --read-only
+```
+
+### Launch boundary
+Only the previous RECC sweep is **actually scheduled**; NPPES and NYC
+were **manual one-time bounded pilots**. The SRA and FCA integrations
+need founder-managed API registration and terms; NAIC and state bar
+are manual checks; CSLB needs an official selected download file.
+Do not enable placeholder URLs in legacy `contractor_scraper_agent.py`;
+its `SOURCES` values include non-existent endpoints and its old hub
+POST path is not canonical EmpireDB ingestion.
+
+Next revenue-critical step: source-rights receipts, canonical company ID
+and legal/entity status checks, protected EmpireDB ingest under existing
+least-privilege service owner, then re-materialise Exchange and verify
+buyer capacity. No paid traffic or external outbound enabled by this work.

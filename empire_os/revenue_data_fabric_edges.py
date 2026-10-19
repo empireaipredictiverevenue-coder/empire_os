@@ -20,6 +20,21 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "official_vertical_source_catalog_and_bounded_dental_pilot",
+        "empire_os/official_vertical_source_packs.py",
+        "empire_os/nppes_dental_source.py",
+        "CMS NPI-2 organisation-only limited API, no patient/provider records, "
+        "no automatic bulk download or canonical lead claims",
+        "observed US dental business entity evidence for private source research",
+    ),
+    IntelligenceEdge(
+        "official_cslb_contractor_csv_review",
+        "empire_os/official_vertical_source_packs.py",
+        "empire_os/cslb_contractor_csv_source.py",
+        "licence and file-use review, local official CSV, roofing/HVAC/solar classifications",
+        "add US licensed-contractor evidence without unverified state APIs",
+    ),
+    IntelligenceEdge(
         "scrapling_sniper_handoff_to_canonical_exchange_inventory_preview",
         "empire_os/scrapling_sniper_handoff.py",
         "empire_os/lead_exchange_live_inventory.py",
