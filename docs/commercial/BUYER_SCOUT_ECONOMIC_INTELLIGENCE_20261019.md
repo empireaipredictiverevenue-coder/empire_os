@@ -126,3 +126,39 @@ verify exact known cron line and backup/rollback, and observe one
 scheduled cycle with `buyer_economic_gap_observation` but no added
 search/contacts/DB writes. The original
 `empire-buyer-acquisition-scout.service` must stay unchanged.
+
+
+## Verified production fallback release — 19 October 2026
+
+- Full worktree regression: **708 passed**, one existing dependency
+  deprecation warning. Architecture manifest reports **31/31** source
+  files present and 0 independently verified runtime data-graph edges
+  (a code manifest must not be mistaken for executed integrations).
+- Code commit **f0b125b6ab961c67ec3c90ef07709a5f69805cc5**.
+- Pinned detached, clean release:
+  `/home/ubuntu/empire_worktrees/resilient_buyer_scout_economics_release_f0b125b6`.
+- Updated exactly **one pre-existing own fallback cron line** at :06/:36
+  to refer to the immutable pinned release. **No other cron, primary
+  Buyer Scout, Lead Smart, CRM, payments or Predictive agent changes.**
+- Previous cron snapshot, mode 0600, at
+  `/srv/empire_os/runtime/buyer_acquisition/resilient/crontab.rollback.before_buyer_scout_economics_f0b125b6`.
+- First direct release runtime observation (same lock and limited
+  first-party probe budget) exited successfully and reported:
+  - `state=COMPLETED`, `mode=OBSERVE`
+  - reviewed seed domains=8, raw research candidates=1
+  - first-party probes=1
+  - existing relationship aliases excluded=19
+  - cooldown-memory domains skipped=10
+  - `buyer_economic_gap_observation.state=READ_ONLY_ECONOMIC_GAP_BOARD`
+  - partner pilots reviewed=4; missing buyboxes=4;
+    missing verified payable terms=4
+  - verified paying buyer capacity=0
+  - public search-engine calls=0, outbound emails=0,
+    canonical EmpireDB writes=0, buyer activation=false,
+    execution authority=none.
+
+**Status:** Economic-gap summary wired into live *fallback observations*
+and verified by a successful limited run. Primary Scout remains
+unchanged. Partner pilot owner still must verify genuine buyer terms,
+funded capacity, product/geography and first-party commercial evidence
+before any traffic/transaction authority.
