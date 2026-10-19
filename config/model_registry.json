@@ -394,6 +394,60 @@
         "economic_memory_required": true,
         "policy_basis": "observed installed local model; uncalibrated; fail closed"
       }
+    },
+    {
+      "model_id": "ling-3.1-flash-zen-free",
+      "provider": "opencode",
+      "model": "ling-3.1-flash-free",
+      "capabilities": [
+        "general",
+        "reasoning",
+        "research",
+        "classification",
+        "summarization",
+        "agentic"
+      ],
+      "reasoning": true,
+      "vision": false,
+      "quality": {
+        "default": 0.5,
+        "reasoning": 0.5,
+        "research": 0.5,
+        "classification": 0.5
+      },
+      "cost_per_1k_input": 0,
+      "cost_per_1k_output": 0,
+      "free": true,
+      "pricing_known": true,
+      "enabled": false,
+      "available": false,
+      "health": "unavailable",
+      "priority": 85,
+      "max_stakes": "normal",
+      "allow_untrusted_input": false,
+      "disallowed_tasks": [
+        "revenue_truth",
+        "payment",
+        "identity_inference",
+        "buyer_activation",
+        "commercial_activation",
+        "tool_routing",
+        "outbound",
+        "financial_decision"
+      ],
+      "metadata": {
+        "context_tokens_advertised_by_openrouter": 262144,
+        "provider_free_model_slug": "ling-3.1-flash-free",
+        "source": "https://opencode.ai/docs/zen/",
+        "cost_policy": "only_explicit_free_slug_no_paid_fallback",
+        "task_scope": "internal_seo_research_and_scientific_hypothesis_review",
+        "model_quality": "NOT_CALIBRATED_ON_EMPIREOS",
+        "runtime_probe": "OPEN_CODE_ZEN_HTTP_400_UPSTREAM_MODEL_UNAVAILABLE_20261019",
+        "alternative_probe": "OPENROUTER_FREE_HTTP_404_20261019",
+        "model_inference_activated": false,
+        "automatic_route_allowed": false,
+        "separate_founder_review_required_to_activate": true
+      }
     }
   ],
   "policy": {

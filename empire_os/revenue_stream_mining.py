@@ -306,7 +306,7 @@ def build_revenue_stream_mining(
         _lane("quant_economics", quant["aggregate"], quant["status"], SOURCES["quant"][0]),
         _lane("competitor", comp["aggregate"], comp["status"], SOURCES["competitor"][0]),
     ]
-    return {
+    report = {
         "schema_version": SCHEMA, "mode": "OBSERVE", "generated_at": now.isoformat(),
         "status": "MINING_REVIEW_READY" if any(
             lane["status"] in ("FRESH", "OBSERVED") for lane in lanes)
@@ -335,6 +335,19 @@ def build_revenue_stream_mining(
         "payment_authorized": False,
         "execution_authority": "none",
     }
+    from empire_os.ling31_research_readiness import (
+        review_ling31_free_readiness, scientific_research_protocol,
+    )
+    from empire_os.model_registry import ModelRegistry
+
+    report["scientific_validation"] = scientific_research_protocol(
+        report, as_of=now,
+    )
+    report["ling31_specialist"] = review_ling31_free_readiness(
+        as_of=now,
+        registry=ModelRegistry(str(root / "config" / "model_registry.json")),
+    )
+    return report
 
 
 def enqueue_existing_department_mining(

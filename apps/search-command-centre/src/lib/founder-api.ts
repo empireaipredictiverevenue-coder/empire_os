@@ -126,6 +126,23 @@ export type PredictiveFormulaEvidence = {
 };
 
 export type RevenueStreamMining = {
+  ling31_specialist?: {
+    schema_version: string;
+    status: string;
+    free_model_slug: string;
+    router_blocks_unverified_model: boolean;
+    actual_live_inference_verified: boolean;
+    automatic_model_activation_allowed: false;
+  };
+  scientific_validation?: {
+    schema_version: string;
+    heuristic_priority_indicator: number;
+    probability_calibrated: false;
+    controls_to_execute: string[];
+    control_results_verified: false;
+    scientific_agent_invoked: false;
+    openmanus_executed: false;
+  };
   source_discovery: {
     schema_version: string;
     source_count: number;

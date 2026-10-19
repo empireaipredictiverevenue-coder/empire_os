@@ -293,6 +293,19 @@ export default async function FounderPage() {
                               Continuous polling and commercial execution remain off.
                             </p>
                           </div>
+                          <div className="mt-3 rounded-lg border border-cyan-300/10 p-3">
+                            <p className="text-xs font-semibold text-white">Scientific Agent · Ling 3.1 specialist</p>
+                            <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-300">
+                              <span>Ling free route: {show(streamMining.ling31_specialist?.status, "Not configured").replaceAll("_", " ")}</span>
+                              <span>Scientific controls: {streamMining.scientific_validation?.controls_to_execute.length ?? "Unknown"}</span>
+                              <span>Calibrated probability: no</span>
+                            </div>
+                            <p className="mt-2 text-[11px] text-slate-500">
+                              Scientific method checklists are available for review.
+                              Ling and OpenManus have not been invoked by this dashboard.
+                              Model-generated findings cannot create buyer, conversion or revenue evidence.
+                            </p>
+                          </div>
                           <p className="mt-2 text-[11px] text-slate-500">
                             Research catalogue only; new external polling is not scheduled or activated.
                           </p>
