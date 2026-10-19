@@ -25,6 +25,53 @@ HEADERS = {
 router = APIRouter()
 
 
+@router.get("/roofing/call-privacy", response_class=HTMLResponse)
+def roofing_call_privacy_notice():
+    """A specific, always-visible recording/data-handling notice; no call authority.
+
+    The live general privacy policy was issued for Google/YouTube disclosures,
+    so homeowners deserve an accurate call-specific supplement rather than
+    being told a Google notice certifies Ringba recording governance.
+    """
+    return HTMLResponse(
+        "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<meta name='robots' content='noindex,nofollow'>"
+        "<title>Roofing call privacy and recording | Empire AI</title></head>"
+        "<body><main><h1>Roofing call privacy and recording</h1>"
+        "<p>Empire AI provides this first-party roofing information page "
+        "and an optional connection to an independent third-party roofing service. "
+        "We do not guarantee that a contractor will answer or quote.</p>"
+        "<h2>Call recording and consent</h2>"
+        "<p>The Lead Smart roofing buyer programme uses Ringba for call routing. "
+        "The buyer has told us that recording is mandatory and an in-call "
+        "recording announcement plays. Depending on the buyer's call-flow "
+        "configuration, recording may begin when a call is answered or earlier. "
+        "Before we offer a link to dial, the caller must affirmatively "
+        "acknowledge the recording notice. If you do not agree, do not call.</p>"
+        "<h2>Call data and retention</h2>"
+        "<p>Your caller number and information you provide on a call may be "
+        "shared with the routing platform, Lead Smart and the receiving "
+        "service provider as needed to route and handle your enquiry. "
+        "Ringba documents that its account call recordings are generally "
+        "retained indefinitely. Lead Smart has said recordings can be "
+        "deleted if required. Empire AI does not independently control "
+        "the buyer's Ringba recording settings or deletion actions.</p>"
+        "<h2>Privacy requests</h2>"
+        "<p>For questions about this website, the call handoff, or a request "
+        "relating to your personal information or a recording, contact "
+        "<a href='mailto:founder@empire-ai.co.uk'>founder@empire-ai.co.uk</a>. "
+        "Empire AI can review matters it controls and, where necessary, "
+        "relay a request to the responsible call operator; requests are "
+        "handled subject to applicable law and verified identity. "
+        "Do not send sensitive personal data in your first email.</p>"
+        "<p><a href='/privacy'>General privacy policy</a> · "
+        "<a href='/terms'>Terms</a> · "
+        "<a href='/roofing'>Roofing page</a></p></main></body></html>",
+        headers=HEADERS,
+    )
+
+
 def _in_current_coverage(zip_code: str) -> bool:
     # Reuse the exact hash/freshness checked first-party ZIP preview.
     manifest = generate_from_files(
@@ -113,7 +160,8 @@ async def public_roofing_pilot_handoff(request: Request):
             "required> I understand the recording and sharing described above "
             "and agree to proceed with a recorded call.</label>"
             "<button type='submit'>Continue to optional call</button>"
-            "</form><p><a href='/privacy'>Privacy</a> · "
+            "</form><p><a href='/roofing/call-privacy'>Call privacy and recording</a> · "
+            "<a href='/privacy'>General privacy</a> · "
             "<a href='/terms'>Terms</a></p></main></body></html>",
             headers=HEADERS,
         )
@@ -139,7 +187,9 @@ async def public_roofing_pilot_handoff(request: Request):
         "consent requirements still apply.</p>"
         f"<p><a href='{phone_uri}'>Tap to call the roofing service</a></p>"
         "<p>Independent contractors may receive your call. "
-        "<a href='/privacy'>Privacy</a> · <a href='/terms'>Terms</a></p>"
+        "<a href='/roofing/call-privacy'>Call privacy and recording</a> · "
+        "<a href='/privacy'>General privacy</a> · "
+        "<a href='/terms'>Terms</a></p>"
         "</main></body></html>",
         headers=HEADERS,
     )
