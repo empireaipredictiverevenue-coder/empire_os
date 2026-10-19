@@ -384,6 +384,55 @@ def _run_one_department_work_impl(
             "execution_authority": "none",
         }
 
+    if item.target_component in (
+        "existing_source_intelligence_and_opportunity_factory",
+        "existing_source_intelligence_and_sensor_mesh",
+    ):
+        # Reuse the original ASTRA department worker for the mining tasks.
+        # This is a bounded, deterministic desk triage, NOT independently
+        # completed research or evidence of paid-buyer interest.
+        from empire_os.source_mining_specialist_adapter import (
+            SpecialistEvidenceHold, complete_source_mining_desk_review,
+        )
+        try:
+            result = complete_source_mining_desk_review(root, item)
+        except (SpecialistEvidenceHold, ValueError, OSError, KeyError, TypeError) as exc:
+            held = queue.block(
+                item, "source_mining_snapshot_or_contract_hold",
+                {
+                    "reason_code": str(exc)[:120],
+                    "outbound_sent": False,
+                    "paid_model_invoked": False,
+                    "execution_authority": "none",
+                },
+            )
+            return {
+                "ok": True,
+                "state": "BLOCKED",
+                "work_id": held.id,
+                "blocker": held.error,
+                "queue_counts": queue.counts(),
+                "execution_authority": "none",
+            }
+        done = queue.complete(
+            item, result,
+            evidence_refs=tuple(item.evidence_refs),
+            execution_completed=False,
+        )
+        return {
+            "ok": True,
+            "state": "DONE",
+            "work_id": done.id,
+            "target_component": done.target_component,
+            "status": result["status"],
+            "internal_desk_triage_completed": True,
+            "independent_source_research_completed": False,
+            "outbound_sent": False,
+            "paid_model_invoked": False,
+            "execution_authority": "none",
+            "queue_counts": queue.counts(),
+        }
+
     if item.target_component == "source_intelligence_review":
         # Read-only specialist SOURCE review on the existing team work queue.
         # Delivers a verified snapshot reference; never promotes a company,
