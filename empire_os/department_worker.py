@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 from typing import Any
@@ -382,6 +383,49 @@ def _run_one_department_work_impl(
             "budget": budget_decision.as_dict(),
             "queue_counts": queue.counts(),
             "execution_authority": "none",
+        }
+
+    if item.target_component == "existing_opportunity_factory_commercial_evidence":
+        from empire_os.revenue_buyer_evidence_handoff import (
+            CommercialResearchHold, complete_one_buyer_evidence_desk_review,
+        )
+        try:
+            result = complete_one_buyer_evidence_desk_review(
+                root, item, as_of=datetime.now(timezone.utc),
+            )
+        except (CommercialResearchHold, ValueError, KeyError, TypeError) as exc:
+            held = queue.block(
+                item, "buyer_evidence_snapshot_or_contract_hold",
+                {
+                    "reason_code": str(exc)[:120],
+                    "crm_mutated": False,
+                    "outbound_sent": False,
+                    "execution_authority": "none",
+                },
+            )
+            return {
+                "ok": True,
+                "state": "BLOCKED",
+                "work_id": held.id,
+                "blocker": held.error,
+                "execution_authority": "none",
+                "queue_counts": queue.counts(),
+            }
+        done = queue.complete(
+            item, result,
+            evidence_refs=tuple(item.evidence_refs),
+            execution_completed=False,
+        )
+        return {
+            "ok": True,
+            "state": "DONE",
+            "work_id": done.id,
+            "status": result["status"],
+            "first_party_buyer_verification_completed": False,
+            "internal_desk_triage_completed": True,
+            "outbound_sent": False,
+            "execution_authority": "none",
+            "queue_counts": queue.counts(),
         }
 
     if item.target_component in (

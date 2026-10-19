@@ -84,6 +84,7 @@ export default async function FounderPage() {
   const formulaEvidence = decision?.formula_evidence;
   const streamMining = decision?.data_stream_mining;
   const evidencePathways = decision?.evidence_pathways;
+  const commercialEvidence = decision?.commercial_evidence_request;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
   const source = data?.source_health;
@@ -394,6 +395,32 @@ export default async function FounderPage() {
                               )}
                             </div>
                           ))}
+                        </div>
+                        <div className="mt-3 rounded-xl border border-amber-200/15 bg-white/[0.025] p-3">
+                          <p className="text-sm font-semibold text-white">First-party commercial evidence handoff</p>
+                          <p className="mt-1 text-xs text-slate-300">
+                            {show(commercialEvidence?.status, "NOT CONNECTED").replaceAll("_", " ")}
+                          </p>
+                          {commercialEvidence?.request ? (
+                            <>
+                              <p className="mt-2 text-xs text-slate-300">
+                                Priority: {commercialEvidence.request.niche || "Unclassified"} ·
+                                {commercialEvidence.request.first_missing_evidence.replaceAll("_", " ")}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-400">
+                                Required proof: {commercialEvidence.request.required_authoritative_source.replaceAll("_", " ")}.
+                                Outstanding Quant factors: {commercialEvidence.request.quant_gaps.length}.
+                              </p>
+                              <p className="mt-1 text-[11px] text-slate-500">
+                                This prepares a review for Business Development only. No buyer checked,
+                                no contact sent, no economics estimated and no prediction registered.
+                              </p>
+                            </>
+                          ) : (
+                            <p className="mt-2 text-xs text-amber-200">
+                              {show(commercialEvidence?.reason_code, "No verified current handoff").replaceAll("_", " ")}
+                            </p>
+                          )}
                         </div>
                         <p className="mt-3 text-[11px] text-slate-500">
                           This is an internal evidence-join review. It does not infer a buyer, estimate

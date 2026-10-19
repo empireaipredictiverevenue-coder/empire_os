@@ -220,7 +220,30 @@ export type PredictiveEvidencePathways = {
   execution_authority: "none";
 };
 
+export type PredictiveCommercialEvidenceRequest = {
+  schema_version: string;
+  status: string;
+  reason_code?: string;
+  candidate_count_in_authoritative_view: number | null;
+  quant_complete_count?: number | null;
+  request: null | {
+    opportunity_ref: string;
+    niche: string | null;
+    first_missing_evidence: string;
+    required_authoritative_source: string;
+    quant_gaps: Array<{factor: string; required_source: string}>;
+    evidence_required_to_progress: string[];
+    automatic_email_or_offer_authorized: false;
+  };
+  internal_work_created: false;
+  buyer_contacted: false;
+  forecast_created: false;
+  actual_revenue_verified: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  commercial_evidence_request?: PredictiveCommercialEvidenceRequest;
   evidence_pathways?: PredictiveEvidencePathways;
   data_stream_mining?: RevenueStreamMining;
   formula_evidence?: PredictiveFormulaEvidence;

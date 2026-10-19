@@ -494,6 +494,10 @@ def build_predictive_decision_control_runtime(
     # evidence-router and Quant snapshots, with unsupported outcome link held.
     from empire_os.revenue_evidence_pathways import review_evidence_pathways_runtime
     decision["evidence_pathways"] = review_evidence_pathways_runtime(root, as_of=as_of)
+    from empire_os.revenue_buyer_evidence_handoff import review_one_commercial_evidence_request
+    decision["commercial_evidence_request"] = review_one_commercial_evidence_request(
+        root, as_of=as_of or datetime.now(timezone.utc),
+    )
     return decision
 
 
