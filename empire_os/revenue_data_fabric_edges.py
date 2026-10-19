@@ -20,6 +20,14 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "scrapling_review_to_owned_waterfall",
+        "empire_os/scrapling_source_evidence.py",
+        "empire_os/waterfall_source_bridge.py",
+        "independent company identity, source rights, niche/jurisdiction policy; "
+        "no inferred first-party site, customer lead or outbound authority",
+        "safely plan vertical-specific use of OUR existing Waterfall",
+    ),
+    IntelligenceEdge(
         "empire_owned_contact_waterfall",
         "empire_os/waterfall.py",
         "empire_os/prospect_enrichment.py",

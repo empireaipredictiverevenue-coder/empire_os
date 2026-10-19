@@ -118,3 +118,49 @@ Reward **verified realised contribution margin per niche/corridor**, paired with
 **Proposed additive connection, not deployment:** Scrapling parsing of sources that have separately verified permission feeds an **evidence-only observation**. After canonical identity/rights checks, the existing `Waterfall` and `prospect_enrichment.py` can consume lawful source evidence. Legal/insurance/claims B2B signal routes remain segregated by entity type and compliance policy. Source code presence in this branch does NOT prove those runtime integrations are wired. The static manifest now names all four previously omitted edges.
 
 **Commercial priority remains evidence-led across all verticals:** Do not imply roofing/solar are the only top priorities. Compare verified *buying* demand for firms, contractors, agents/brokers, carriers/TPAs and regulated legal buyers. Initial individual outreach should be founder-reviewed and new-recipient suppression-cleared. Commercial insurance claim handling, plaintiff intake and settlement/referral fees remain independently gated.
+
+## Wave 2 implementation — governed owned-Waterfall bridge (19 October 2026)
+**Owner branch:** `feature/scrapling-revenue-data-fabric-20261019`. No merge, website change, service restart, DB schema or live provider execution. Build is read-only and opt-in.
+
+### New exact files
+- `empire_os/waterfall_source_bridge.py`: accepts only source-governed offline Scrapling observations and explicit target-kind/jurisdiction/company proof claims. Rechecks against the current `source_intelligence.SOURCES` registry, source domain, licensed purpose and vertical scope. It never silently upgrades a directory listing into an owned website or contact.
+- `scripts/review_vertical_waterfall_evidence_20261019.py`: bounded offline operator CLI accepting a local report. It reports HOLD or reviewable provider sequence only. It cannot send emails, hit providers, write EmpireDB or activate any business workflow.
+- `tests/test_waterfall_source_bridge_20261019.py`, `tests/test_waterfall_evidence_cli_20261019.py`: source-to-Waterfall integration tests, regulated vertical holds, replay of *existing* `ValidationGate`, stale/source/cross-territory and unsafe-consumer-path rejection.
+- `revenue_data_fabric_edges.py`: adds a named 16th planned edge for Scrapling evidence → existing Waterfall preview. A code-file presence audit remains **0 runtime links verified**.
+
+### Precise default behavior preserved
+- `empire_os/waterfall.py` untouched. The existing default runs Registry Scraper → Site Crawler → Empire Hunter, 3 maximum attempts, requiring email + bound-to-decision-maker evidence + >=0.90 confidence.
+- An extracted source `source_link_observed` (typically a directory detail page) does **not** count as a business-owned website. Without independent first-party site verification, the preview contains **registry only**.
+- If an independently verified company-owned site reference is supplied, the reviewable order becomes Empire Hunter → Registry → Site Crawler. This is a *proposal*, not an execution request.
+- Legal and mass-tort law-firm proposals require jurisdiction-specific B2B compliance proof. Insurance brokers/carriers/TPAs/managed-repair likewise require insurance B2B review. Dental medical-practice profiles require healthcare B2B review.
+- Policyholders, patients, injured people and individual mass-tort claimants cannot enter this business-enrichment route. The canonical `legal_mass_tort_intelligence.py` continues to own aggregate firm-level market evidence. Claim settlement/claims handling and referral fees remain separately gated.
+- Every result has `execution_authority=none`, `outbound_authorized=false`, `canonical_insert_authorized=false` or equivalent, `contact_promotion_authorized=false` and `verified_lead_count=0`.
+- Explicit evidence reference strings are *claims* from the operator requiring independent audit. Their presence does NOT independently establish source rights, verified domain ownership, buyer intent or customer permission.
+
+### Intelligence-driven waterfall enhancements
+- `review_provider_order_by_verified_yield` consumes separately validated, niche/territory-matched, provenance-referenced provider statistics **offline**.
+- All candidate providers require >=20 observed attempts and <=14-day-old sampling. If any receipt is missing, wrong market, impossible, stale or lacks provenance, the current proposed sequence remains unchanged.
+- Ranks by actual decision-maker-gate wins / observed attempts, cross-multiplying ratios to avoid fake precision. Tie-breaks preserve original priority. It neither changes model weights nor executes the recommended provider.
+- Existing `Waterfall.metrics` lack persisted niche/jurisdiction/time/provenance and therefore are **not** accepted as sufficient ground truth by themselves.
+- **CORTEX, Omega, Predictive Cloud and Economic Memory remain unverified at the new source-to-waterfall runtime boundary.** After real provider outcome evidence is connected, use calibrated results for prioritisation, but never claim predictive accuracy from stale CORTEX snapshots or arbitrary heuristics.
+
+### Example dry-run review
+Save an independently reviewed local JSON source-evidence report first; the script cannot fetch one. From this branch worktree:
+```bash
+/srv/empire_os/.venv/bin/python -m scripts.review_vertical_waterfall_evidence_20261019 \
+  --read-only \
+  --report /tmp/approved_source_report.json \
+  --vertical insurance --target-kind insurance_broker \
+  --jurisdiction GB-ENG \
+  --company-identity-ref entity:independently-reviewed-firm-123 \
+  --jurisdiction-policy-ref compliance:insurance-b2b-review-123
+```
+A synthetic/draft fixture **does not** establish actual approval. The CLI returns HOLD where evidence is missing, and even an offline-ready review does not grant live execution.
+
+### Next owner-gated work
+1. Collect real source contract and rights review receipts; begin with official company identity sources, not random scraped personal information. No live fetch added here.
+2. Connect source evidence to the existing canonical identity-resolution review, preserving duplicates and conflict flags; require an actual canonical ID/ingestion receipt before incrementing unique lead counts.
+3. Create *persisted* provider-result metrics with niche, territory, timestamp, acceptance gate and evidence refs, never treating provider attempts as customer leads.
+4. Connect lawful first-party contact verification to buyer account identity, suppressed-recipient clearance, reviewed offers and separately verified buyer capacity.
+5. Treat insurance claims, settlement payouts, plaintiff intake and personal medical/legal distress entirely outside ordinary B2B waterfall operations.
+6. Bring read-only visibility into the private lead-supply portal only through its existing owner after package and role review, rather than editing another agent's feature branch.
