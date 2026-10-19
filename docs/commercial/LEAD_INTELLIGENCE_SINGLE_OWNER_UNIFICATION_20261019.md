@@ -856,3 +856,31 @@ altering the outbound governor.
   manually reviewed follow-up drafts. Route approved buyer specifications,
   price/geo/volume and payment/fulfilment evidence to the *existing*
   canonical buyer capacity mechanism, never to a parallel side table.
+
+### Wave 12 operational release receipt
+
+- Full unified regression: **619 tests passed**, one existing dependency
+  warning. No failed tests.
+- Feature commit: `ac61871f`, clean unified agent worktree.
+- Detached scheduled release:
+  `/home/ubuntu/empire_worktrees/leadgen_revenue_queue_release_ac61871f`.
+- Existing hourly Ubuntu cron observer retained its two runs at minute
+  **23 and 53**; pinned path changed from `a0e55412` to `ac61871f` and
+  `--include-contact-history` made mandatory for private materialization.
+  Preserves the existing RECC and ASTRA cron entries.
+- Manually verified production snapshot with new pinned code:
+  `FOUNDER_RESEARCH_QUEUE_READY`, 25 domains, 9 existing contacts,
+  15 history-unverified, 1 technical ingestion host excluded from
+  commercial targeting, 0 send authority. Private report remains 0600
+  inside a 0700 directory.
+- `empire-buyer-gmail-evidence.timer`, buyer acquisition scout and
+  Commercial Exchange timers all verified active; the latest Gmail
+  evidence service execution returned success. The underlying mailbox
+  capture reported partial/stale and **does not establish that 15 domains
+  were never contacted**.
+- New scheduled code **has run manually**. The next unattended cron
+  execution was not yet observed at receipt time; don't equate
+  an installed schedule with historical delivery.
+- CRM suppression and any other mailboxes not included in the current
+  relationship registry remain mandatory independent checks before
+  any outbound approval. Do not automatically follow up with prior contacts.
