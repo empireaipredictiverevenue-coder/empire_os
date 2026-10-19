@@ -20,6 +20,8 @@ from empire_os.leadgen_contact_history_bridge import (
 from empire_os.buyer_scout_probe_cooldown import (
     load_probe_history, merge_observed_probes, save_probe_history,
 )
+from empire_os.buyer_scout_commercial_awareness import review_buyer_scout_awareness
+from empire_os.buyer_scout_economic_intelligence import build_buyer_economic_gap_review
 
 DEFAULT_ROOT = Path("/srv/empire_os")
 SOURCE = "runtime/buyer_network_intelligence/founder_qualification_actions_latest.json"
@@ -83,6 +85,26 @@ def reviewed_seed_records(snapshot: dict, *, limit: int = 8,
         raise ValueError("invalid_seed_rotation")
     window = (rotation % ((len(selected) + limit - 1) // limit)) * limit
     return (selected[window:] + selected[:window])[:limit]
+
+
+def economics_only_summary(scout: dict, actions: dict, registry: dict, *, now: datetime) -> dict:
+    """Never fail or authorise the Scout because an economic source is missing."""
+    try:
+        awareness = review_buyer_scout_awareness(scout, actions, registry, as_of=now)
+        board = build_buyer_economic_gap_review(awareness, registry, as_of=now)
+        return {
+            "state": "READ_ONLY_ECONOMIC_GAP_BOARD",
+            "existing_partner_pilots_reviewed": board["partner_pilots_reviewed"],
+            "partner_buyboxes_missing": board["partner_pilots_without_verified_buybox"],
+            "partner_payment_terms_missing": board["partner_pilots_without_verified_payable_terms"],
+            "scout_domains_triaged": board["scout_domains_triaged"],
+            "verified_paying_buyer_capacity": 0,
+            "outbound_authorized": False,
+        }
+    except (ValueError, TypeError, KeyError):
+        return {"state": "HOLD_ECONOMIC_REVIEW_SOURCE",
+                "verified_paying_buyer_capacity": 0,
+                "outbound_authorized": False}
 
 
 def main(argv=None):
@@ -180,7 +202,9 @@ def main(argv=None):
     if out.get("schema_version") != "empire.buyer_acquisition_scout.v1":
         raise SystemExit("untrusted_scout_result")
     save_probe_history(memory_file, merge_observed_probes(recent, out, now=datetime.now(timezone.utc)))
+    economics = economics_only_summary(out, data, registry, now=datetime.now(timezone.utc))
     print(json.dumps({
+        "buyer_economic_gap_observation": economics,
         "schema_version": "empire.buyer_scout_resilient_recovery.v1",
         "state": "COMPLETED",
         "research_cooldown_skipped_domain_count": len(recent),

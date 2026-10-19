@@ -20,6 +20,15 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "buyer_scout_commercial_memory_to_economic_gap_review",
+        "empire_os/buyer_scout_commercial_awareness.py",
+        "empire_os/buyer_scout_economic_intelligence.py",
+        "bounded fresh Scout/founder buyer qualification/CRM relationship snapshots, "
+        "existing nine partner activation gates, no false price, capacity or funded buyer",
+        "stop duplicate company research and advance existing buyer discussions "
+        "toward genuine verified buyboxes, payable terms and paid pilot conditions",
+    ),
+    IntelligenceEdge(
         "legacy_usb_metro_and_modelled_value_archives_to_source_census",
         "empire_os/legacy_market_archive_review_20261019.py",
         "empire_os/source_intelligence.py",
