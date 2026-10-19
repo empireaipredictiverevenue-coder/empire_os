@@ -138,6 +138,11 @@ export type RevenueStreamMining = {
       inflight_page_count: number | null;
       inflight_source_records: number | null;
       pending_sector_research_count: number | null;
+      completed_receipt_slots_remaining: number | null;
+      pending_research_slots_remaining: number | null;
+      previous_checkpoint_recovery: string;
+      receipt_history_capacity_near_limit: boolean;
+      next_safe_operator_action: string;
       backfill_remaining_hours: number | null;
       caught_up_to_latest_safe_window: boolean;
       completed_source_receipt_count: number | null;

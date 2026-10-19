@@ -283,10 +283,13 @@ export default async function FounderPage() {
                               <span>Private release receipts: {streamMining.source_discovery?.uk_tender_incremental?.inflight_source_records ?? "Unknown"}</span>
                               <span>Pending sector research: {streamMining.source_discovery?.uk_tender_incremental?.pending_sector_research_count ?? "Unknown"}</span>
                               <span>Backfill lag: {streamMining.source_discovery?.uk_tender_incremental?.backfill_remaining_hours ?? "Unknown"} hours</span>
+                              <span>Receipt slots remaining: {streamMining.source_discovery?.uk_tender_incremental?.completed_receipt_slots_remaining ?? "Unknown"}</span>
+                              <span>Previous checkpoint: {show(streamMining.source_discovery?.uk_tender_incremental?.previous_checkpoint_recovery, "Unknown").replaceAll("_", " ")}</span>
                             </div>
                             <p className="mt-2 text-[11px] text-slate-500">
                               Latest completed window: {streamMining.source_discovery?.uk_tender_incremental?.last_complete_window_end ?? "None verified"}.
                               Only a fully exhausted source cursor can complete a watermark.
+                              Next internal action: {show(streamMining.source_discovery?.uk_tender_incremental?.next_safe_operator_action, "Review source readiness").replaceAll("_", " ")}.
                               Continuous polling and commercial execution remain off.
                             </p>
                           </div>

@@ -549,3 +549,116 @@ def test_backfill_status_cannot_masquerade_as_caught_up(tmp_path):
     assert health["backfill_remaining_hours"] > 24
     assert health["caught_up_to_latest_safe_window"] is False
     assert health["complete_source_coverage_claimed"] is False
+
+
+def test_previous_generation_created_and_recoverable_only_explicitly(tmp_path):
+    from empire_os.uk_tender_incremental import (
+        _private_backup, recover_previous_private_checkpoint, review_incremental_checkpoint
+    )
+    state_path = tmp_path/STAGE_PATH
+    first = advance_private_checkpoint(
+        tmp_path, as_of=NOW, apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=[]),
+    )
+    assert first["checkpoint_written"] is True
+    original = state_path.read_bytes()
+    assert not _private_backup(state_path).exists()
+    second = advance_private_checkpoint(
+        tmp_path, as_of=NOW+timedelta(hours=1), apply=True, test_only=True,
+        fetch_page=lambda *args: page(rows=tender()["releases"][:1]),
+    )
+    assert second["checkpoint_written"] is True
+    backup = _private_backup(state_path)
+    assert backup.read_bytes() == original
+    assert backup.stat().st_mode & 0o777 == 0o600
+    assert state_path.read_bytes() != original
+    with pytest.raises(TenderIncrementalHold, match="active checkpoint valid"):
+        recover_previous_private_checkpoint(tmp_path, as_of=NOW+timedelta(hours=1),
+                                            apply=True, test_only=True)
+    corrupted = b'{"corrupt_source":"contact-secret@example.com"}'
+    state_path.write_bytes(corrupted)
+    health = review_incremental_checkpoint(tmp_path, as_of=NOW+timedelta(hours=1))
+    assert health["status"] == "UNTRUSTED_PRIVATE_CHECKPOINT"
+    assert health["previous_checkpoint_recovery"] == "PREVIOUS_GENERATION_VALIDATED"
+    assert health["next_safe_operator_action"] == "MANUAL_RECOVERY_REVIEW"
+    assert "contact-secret@example.com" not in json.dumps(health)
+    preview = recover_previous_private_checkpoint(
+        tmp_path, as_of=NOW+timedelta(hours=1), test_only=True)
+    assert preview["restored"] is False
+    assert state_path.read_bytes() == corrupted
+    restored = recover_previous_private_checkpoint(
+        tmp_path, as_of=NOW+timedelta(hours=1), apply=True, test_only=True)
+    assert restored["status"] == "PREVIOUS_GENERATION_RESTORED_EXPLICITLY"
+    assert restored["restored"] is True
+    assert restored["replay_source_window_required"] is True
+    assert state_path.read_bytes() == original
+    assert backup.read_bytes() == original
+    evidence = list(state_path.parent.glob(state_path.name+".corrupt-*"))
+    assert len(evidence) == 1
+    assert evidence[0].read_bytes() == corrupted
+    assert evidence[0].stat().st_mode & 0o777 == 0o600
+
+
+def test_corrupt_active_refuses_new_checkpoint_and_preserves_previous_backup(tmp_path):
+    from empire_os.uk_tender_incremental import _private_backup
+    state_path = tmp_path/STAGE_PATH
+    for at in (NOW,NOW+timedelta(hours=1)):
+        advance_private_checkpoint(
+            tmp_path, as_of=at, apply=True, test_only=True,
+            fetch_page=lambda *args: page(rows=[]),
+        )
+    backup_path = _private_backup(state_path)
+    before_backup = backup_path.read_bytes()
+    state_path.write_bytes(b"not-json")
+    with pytest.raises((TenderIncrementalHold,ValueError)):
+        advance_private_checkpoint(
+            tmp_path, as_of=NOW+timedelta(hours=2), apply=True, test_only=True,
+            fetch_page=lambda *args: page(rows=[]),
+        )
+    assert state_path.read_bytes() == b"not-json"
+    assert backup_path.read_bytes() == before_backup
+
+
+def test_atomic_rename_failure_preserves_active_and_valid_previous(tmp_path,monkeypatch):
+    import empire_os.uk_tender_incremental as module
+    state_path = tmp_path/STAGE_PATH
+    advance_private_checkpoint(tmp_path,as_of=NOW,apply=True,test_only=True,
+                               fetch_page=lambda *args:page(rows=[]))
+    first_bytes = state_path.read_bytes()
+    original_writer = module._write_atomic_private
+    calls = []
+    def injected(target, encoded):
+        calls.append(target)
+        if target == state_path:
+            raise OSError("simulated active checkpoint rename failure")
+        return original_writer(target,encoded)
+    monkeypatch.setattr(module,"_write_atomic_private",injected)
+    with pytest.raises(OSError,match="simulated"):
+        advance_private_checkpoint(
+            tmp_path, as_of=NOW+timedelta(hours=1),apply=True,test_only=True,
+            fetch_page=lambda *args:page(rows=[]),
+        )
+    assert state_path.read_bytes() == first_bytes
+    assert module._private_backup(state_path).read_bytes() == first_bytes
+    assert len(calls) == 2
+
+
+def test_health_warns_of_receipt_capacity_before_history_hold(tmp_path):
+    from empire_os.uk_tender_incremental import MAX_RECENT, review_incremental_checkpoint
+    from hashlib import sha256
+    checkpoint = empty_checkpoint()
+    checkpoint["last_complete_window_end"] = NOW.strftime("%Y-%m-%dT%H:%M:%S")
+    checkpoint["recent"] = {
+        sha256(str(i).encode()).hexdigest(): {
+            "semantic_digest": sha256(f"s{i}".encode()).hexdigest(),
+            "ocid_digest": sha256(f"o{i}".encode()).hexdigest(),
+        } for i in range(MAX_RECENT - MAX_RECENT//10)
+    }
+    path = tmp_path/STAGE_PATH
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps(checkpoint))
+    out = review_incremental_checkpoint(tmp_path,as_of=NOW)
+    assert out["receipt_history_capacity_near_limit"] is True
+    assert out["completed_receipt_slots_remaining"] == MAX_RECENT//10
+    assert out["next_safe_operator_action"] == "REVIEW_SOURCE_RECEIPT_RETENTION"
+    assert out["complete_source_coverage_claimed"] is False

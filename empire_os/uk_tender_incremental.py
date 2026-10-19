@@ -414,8 +414,16 @@ def _private_path(worktree_root: Path, *, test_only: bool = False) -> Path:
     return root / STAGE_PATH
 
 
-def _persist_checkpoint(target: Path, state: Mapping[str, Any]) -> None:
-    encoded = _serialized(state)
+def _fsync_directory(folder: Path) -> None:
+    """Persist rename metadata as well as file contents (POSIX fsync)."""
+    fd = os.open(folder, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_atomic_private(target: Path, encoded: bytes) -> None:
     fd, temp = tempfile.mkstemp(
         dir=target.parent, prefix=".uk_tender_checkpoint.", suffix=".tmp"
     )
@@ -426,9 +434,50 @@ def _persist_checkpoint(target: Path, state: Mapping[str, Any]) -> None:
             staging.flush()
             os.fsync(staging.fileno())
         os.replace(temp, target)
+        _fsync_directory(target.parent)
     finally:
         if os.path.exists(temp):
             os.unlink(temp)
+
+
+def _private_backup(target: Path) -> Path:
+    return target.with_suffix(".previous.json")
+
+
+def _persist_checkpoint(target: Path, state: Mapping[str, Any], *, as_of: datetime) -> None:
+    encoded = _serialized(_state(state, _utc(as_of)))
+    previous = None
+    if target.exists():
+        if (target.is_symlink() or not target.is_file()
+                or not 0 < target.stat().st_size <= MAX_CHECKPOINT_BYTES):
+            raise TenderIncrementalHold("unsafe active checkpoint before backup")
+        try:
+            old_bytes = target.read_bytes()
+            _state(json.loads(old_bytes), _utc(as_of))
+        except (UnicodeError, ValueError, TypeError, OSError) as exc:
+            raise TenderIncrementalHold("active checkpoint corrupt: refusing backup overwrite") from exc
+        previous = old_bytes
+    if previous is not None:
+        backup = _private_backup(target)
+        if backup.is_symlink():
+            raise TenderIncrementalHold("unsafe checkpoint backup")
+        _write_atomic_private(backup, previous)
+    _write_atomic_private(target, encoded)
+
+
+def _previous_checkpoint_health(target: Path, now: datetime) -> str:
+    backup = _private_backup(target)
+    if not backup.exists():
+        return "NONE"
+    if backup.is_symlink() or not backup.is_file():
+        return "UNTRUSTED"
+    try:
+        if not 0 < backup.stat().st_size <= MAX_CHECKPOINT_BYTES:
+            return "UNTRUSTED"
+        _state(json.loads(backup.read_text(encoding="utf-8")), now)
+    except (ValueError, OSError, TypeError, UnicodeError, TenderIncrementalHold):
+        return "UNTRUSTED"
+    return "PREVIOUS_GENERATION_VALIDATED"
 
 
 def advance_private_checkpoint(
@@ -477,7 +526,7 @@ def advance_private_checkpoint(
             new, result = advance_one_public_page(
                 old, as_of=as_of, fetch_page=fetch_page
             )
-            _persist_checkpoint(target, new)
+            _persist_checkpoint(target, new, as_of=as_of)
             return dict(result, checkpoint_written=True)
     finally:
         # fd is owned by the context manager after successful fdopen.
@@ -590,11 +639,21 @@ def review_incremental_checkpoint(
         "next_cursor_or_identifiers_exposed": False,
         "provider_worker_running": False,
         "source_polling_scheduled": False,
+        "previous_checkpoint_recovery": "NONE",
+        "completed_receipt_slots_remaining": None,
+        "pending_research_slots_remaining": None,
+        "receipt_history_capacity_near_limit": False,
+        "next_safe_operator_action": "CHECK_SOURCE_ACTIVATION",
         "commercial_execution_authorized": False,
         "execution_authority": "none",
     }
+    backup_status = _previous_checkpoint_health(target, now)
     if not target.exists():
-        return baseline
+        return dict(baseline, status=(
+            "ACTIVE_MISSING_RECOVERY_REVIEW_REQUIRED"
+            if backup_status == "PREVIOUS_GENERATION_VALIDATED"
+            else "NOT_ACTIVATED"
+        ), previous_checkpoint_recovery=backup_status)
     try:
         if (target.is_symlink() or target.parent.is_symlink()
                 or (root / "runtime").is_symlink()
@@ -604,17 +663,41 @@ def review_incremental_checkpoint(
         state = _state(json.loads(target.read_text(encoding="utf-8")), now)
     except (ValueError, TypeError, OSError, UnicodeError,
             TenderIncrementalHold):
-        return dict(baseline, status="UNTRUSTED_PRIVATE_CHECKPOINT")
+        return dict(
+            baseline,
+            status="UNTRUSTED_PRIVATE_CHECKPOINT",
+            previous_checkpoint_recovery=backup_status,
+            next_safe_operator_action=(
+                "MANUAL_RECOVERY_REVIEW" if backup_status ==
+                "PREVIOUS_GENERATION_VALIDATED" else "INVESTIGATE_CHECKPOINT_INTEGRITY"
+            ),
+        )
     inflight = state["inflight"]
     last = _date(state["last_complete_window_end"]) if state["last_complete_window_end"] else None
     lag = max(0.0, ((now - timedelta(minutes=5)) - last).total_seconds() / 3600) if last else None
     caught_up = last is not None and lag is not None and lag <= 0.002
+    remaining = MAX_RECENT - len(state["recent"])
+    pending_remaining = MAX_PENDING_RESEARCH - len(state["pending_sector_research"])
+    near_limit = remaining <= MAX_RECENT // 10
+    action = (
+        "REVIEW_SOURCE_RECEIPT_RETENTION" if near_limit
+        else "DISPATCH_PENDING_SOURCE_RESEARCH" if pending_remaining <=
+        MAX_PENDING_RESEARCH // 10
+        else "RESUME_SOURCE_CURSOR" if inflight
+        else "CONTINUE_BOUNDED_BACKFILL" if not caught_up
+        else "SOURCE_CURRENT_REVIEW_ONLY"
+    )
     return dict(
         baseline,
         status=("PARTIAL_BACKFILL" if inflight
                 else "CAUGHT_UP_TO_OBSERVATION_LAG" if caught_up
                 else "BACKFILL_BEHIND_CURRENT_WINDOW"),
         caught_up_to_latest_safe_window=caught_up,
+        previous_checkpoint_recovery=backup_status,
+        completed_receipt_slots_remaining=remaining,
+        pending_research_slots_remaining=pending_remaining,
+        receipt_history_capacity_near_limit=near_limit,
+        next_safe_operator_action=action,
         backfill_remaining_hours=round(lag, 2) if lag is not None else None,
         last_complete_window_end=state["last_complete_window_end"],
         inflight_page_count=inflight["page_count"] if inflight else 0,
@@ -717,7 +800,7 @@ def deliver_one_pending_sector_review(
             plan_id="uk_tender_sector_source_review_v2", step=step, priority=92
         )
         del pending[key]
-        _persist_checkpoint(target, state)
+        _persist_checkpoint(target, state, as_of=now)
         return {
             "schema_version": "empire.uk_tender_sector_source_handoff.v1",
             "status": "QUEUED" if created else "ALREADY_QUEUED",
@@ -730,3 +813,75 @@ def deliver_one_pending_sector_review(
             "commercial_execution_authorized": False,
             "execution_authority": "none",
         }
+
+
+def recover_previous_private_checkpoint(
+    worktree_root: Path,
+    *,
+    as_of: datetime,
+    apply: bool = False,
+    test_only: bool = False,
+) -> dict[str, Any]:
+    """Explicit, local-only previous-generation recovery.
+
+    Never silently uses an older watermark. Verify backup and inspect the
+    active state before deciding to restore. If corrupt active bytes exist,
+    preserve them in a private forensic file before replacing the checkpoint.
+    No network, DB, or department queue activity.
+    """
+    root = Path(worktree_root).resolve()
+    target = _private_path(root, test_only=test_only)
+    now = _utc(as_of)
+    backup = _private_backup(target)
+    if backup.is_symlink() or target.is_symlink():
+        raise TenderIncrementalHold("unsafe recovery source path")
+    if not backup.exists() or _previous_checkpoint_health(target, now) != (
+        "PREVIOUS_GENERATION_VALIDATED"
+    ):
+        raise TenderIncrementalHold("no validated previous checkpoint for manual recovery")
+    if not target.parent.is_dir() or target.parent.is_symlink():
+        raise TenderIncrementalHold("unsafe checkpoint recovery directory")
+    lock = target.with_suffix(".lock")
+    if lock.is_symlink():
+        raise TenderIncrementalHold("unsafe recovery lock")
+    descriptor = os.open(lock, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(descriptor, "a+b") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        # Recheck after locking: a concurrent cursor writer might have fixed it.
+        previous = backup.read_bytes()
+        restored = _state(json.loads(previous), now)
+        corrupt = None
+        if target.exists():
+            if not target.is_file() or target.stat().st_size > MAX_CHECKPOINT_BYTES:
+                raise TenderIncrementalHold("active checkpoint unsuitable for recovery")
+            corrupt = target.read_bytes()
+            try:
+                _state(json.loads(corrupt), now)
+            except (UnicodeError, ValueError, TypeError, TenderIncrementalHold):
+                pass
+            else:
+                raise TenderIncrementalHold("active checkpoint valid: recovery not allowed")
+        result = {
+            "schema_version": "empire.uk_tender_manual_recovery_review.v1",
+            "status": "RECOVERY_ELIGIBLE_NOT_APPLIED",
+            "previous_window_end": restored["last_complete_window_end"],
+            "previous_pending_research": len(restored["pending_sector_research"]),
+            "restored": False,
+            "replay_source_window_required": True,
+            "outbound_sent": False,
+            "execution_authority": "none",
+        }
+        if not apply:
+            return result
+        if corrupt:
+            # Preserve corrupted evidence; explicit name is unique to its
+            # bytes, private, and never overwritten by the recovery.
+            evidence = target.with_name(
+                target.name + ".corrupt-" + sha256(corrupt).hexdigest()[:16]
+            )
+            if evidence.exists() or evidence.is_symlink():
+                raise TenderIncrementalHold("forensic checkpoint copy already exists")
+            _write_atomic_private(evidence, corrupt)
+        _write_atomic_private(target, previous)
+        return dict(result, status="PREVIOUS_GENERATION_RESTORED_EXPLICITLY",
+                    restored=True)

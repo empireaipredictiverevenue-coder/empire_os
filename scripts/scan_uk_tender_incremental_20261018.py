@@ -15,6 +15,7 @@ from pathlib import Path
 from empire_os.uk_tender_incremental import (
     TenderIncrementalHold, advance_private_checkpoint,
     deliver_one_pending_sector_review, review_incremental_checkpoint,
+    recover_previous_private_checkpoint,
 )
 
 
@@ -32,6 +33,10 @@ def main() -> int:
         help="Route one existing staged source proof to ASTRA for internal review",
     )
     action.add_argument(
+        "--recover-private-checkpoint", action="store_true",
+        help="Explicitly restore a previously validated local checkpoint after corruption",
+    )
+    action.add_argument(
         "--checkpoint-health", action="store_true",
         help="Read private source progress without network or queue activity",
     )
@@ -40,6 +45,12 @@ def main() -> int:
     if args.checkpoint_health:
         print(json.dumps(review_incremental_checkpoint(
             root, as_of=datetime.now(timezone.utc)), indent=2, sort_keys=True))
+        return 0
+    if args.recover_private_checkpoint:
+        result = recover_previous_private_checkpoint(
+            root, as_of=datetime.now(timezone.utc), apply=True,
+        )
+        print(json.dumps(result, indent=2, sort_keys=True))
         return 0
     if args.enqueue_one_sector_review:
         result = deliver_one_pending_sector_review(
