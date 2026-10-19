@@ -30,6 +30,8 @@ def receipts():
     return {
         key: {
             "source_ref": "canonical:fixture:" + key,
+            "tenant_id": "fixture-tenant",
+            "opportunity_key": "fixture-opportunity",
             "observed_at": (NOW - timedelta(minutes=3)).isoformat(),
             "value": val,
             "source_class": (
@@ -172,3 +174,23 @@ def test_no_extra_quant_fields_or_assumed_verified_sources():
         run(quant_inputs=dict(ECONOMICS, verified_outcomes=[1, 0]))
     with pytest.raises(ValueError):
         run(source_receipts=dict(receipts(), unrelated_contact="text"))
+
+
+@pytest.mark.parametrize("field, value", [
+    ("tenant_id", "another-tenant"),
+    ("opportunity_key", "other-opportunity"),
+    ("tenant_id", ""),
+    ("opportunity_key", ""),
+])
+def test_original_quant_sources_cannot_cross_buyer_or_tenant_boundaries(field, value):
+    sources = receipts()
+    sources["conditional_revenue_cents"][field] = value
+    with pytest.raises(ValueError, match="another opportunity or tenant"):
+        run(source_receipts=sources)
+
+
+def test_original_model_probability_cannot_be_borrowed_from_another_opportunity():
+    sources = receipts()
+    sources["probability_success"]["opportunity_key"] = "unrelated-buyer"
+    with pytest.raises(ValueError, match="another opportunity or tenant"):
+        run(source_receipts=sources)

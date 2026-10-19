@@ -76,8 +76,14 @@ def review_first_payer_quant_preflight(
         if not isinstance(receipt, Mapping):
             unproven.append(field)
             continue
-        if set(receipt) != {"source_ref", "observed_at", "value", "source_class"}:
+        if set(receipt) != {"source_ref", "observed_at", "value", "source_class",
+                            "tenant_id", "opportunity_key"}:
             raise ValueError("original evidence receipt shape mismatch")
+        # Source references alone cannot safely bind costs or buyer terms
+        # from another tenant, opportunity or market corridor.
+        if (receipt["tenant_id"] != tenant_id
+                or receipt["opportunity_key"] != opportunity_key):
+            raise ValueError("original evidence belongs to another opportunity or tenant")
         ref = receipt["source_ref"]
         if not isinstance(ref, str) or not _REF.fullmatch(ref):
             raise ValueError("bounded original evidence reference required")
