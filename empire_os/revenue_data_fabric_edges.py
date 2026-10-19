@@ -20,6 +20,17 @@ class IntelligenceEdge:
 
 EDGES: tuple[IntelligenceEdge, ...] = (
     IntelligenceEdge(
+        "publisher_and_product_marketplace_distribution_readiness",
+        "empire_os/marketplace_distribution_research_20261019.py",
+        "empire_os/data_brokerage_product_catalog.py",
+        "first-party platform documentation, prior buyer-network owner research, "
+        "CRM company contact holds, approved source licensing, signed payer "
+        "buybox and real fulfilment/merchant accounts are separate requirements",
+        "triage new affiliate publisher revenue, public API/software and "
+        "rights-cleared research distribution without duplicate contact, "
+        "synthetic inventory, outbound or unapproved platform activation",
+    ),
+    IntelligenceEdge(
         "buyer_scout_commercial_memory_to_economic_gap_review",
         "empire_os/buyer_scout_commercial_awareness.py",
         "empire_os/buyer_scout_economic_intelligence.py",
