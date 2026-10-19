@@ -24,6 +24,17 @@ ROOT = Path("/srv/empire_os/runtime/revenue/lead_smart/pilot")
 CONFIG = ROOT / "approved_control.json"
 LEDGER = ROOT / "site_handoffs.json"
 
+# No arbitrary fixed five-handoff trial in the reusable campaign engine.
+# A configurable ceiling keeps an explicit operator budget and atomic stop.
+MAX_CONFIGURED_HANDOFFS = 10000
+
+
+def _handoff_limit(control: Mapping[str, Any]) -> int:
+    n = control.get("max_site_handoffs")
+    if type(n) is not int or not 1 <= n <= MAX_CONFIGURED_HANDOFFS:
+        raise HandoffHeld()
+    return n
+
 
 class HandoffHeld(Exception):
     """Return a generic unavailable response; never expose private reasons."""
@@ -58,7 +69,7 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
         or control.get("campaign_id") != CAMPAIGN
         or control.get("tracking_number") != NUMBER
         or type(control.get("max_site_handoffs")) is not int
-        or control["max_site_handoffs"] != 5
+        or not 1 <= control["max_site_handoffs"] <= MAX_CONFIGURED_HANDOFFS
         or control.get("stop_method") != "atomic_site_handoff_gate"
         or not isinstance(control.get("monitoring_owner"), str)
         or len(control["monitoring_owner"].strip()) < 3
@@ -75,8 +86,8 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
     end = _moment(control.get("ends_at"))
     if not (0 < (end-start).total_seconds() <= 7200 and start <= now < end):
         raise HandoffHeld()
-    # The buyer's GENERAL available hours are wider. The first supervised
-    # revenue pilot is deliberately narrower: Chicago weekdays 10:00-12:00.
+    # Existing founder-authorised launch window still bounds admissions.
+    # Future normal-campaign scheduling is a separate release decision.
     # Exact start/end must BOTH lie inside that pilot window, even if a
     # founder/config writer accidentally chooses a weekend or a longer slot.
     chicago = ZoneInfo("America/Chicago")
@@ -150,14 +161,16 @@ def site_handoff_available(
         if eligible_zip is not True or not chicago_buyer_hours_open(now):
             return False
         _readiness(readiness, now)
-        window, _ = _control(_json(config_path), now)
+        control = _json(config_path)
+        window, _ = _control(control, now)
+        limit = _handoff_limit(control)
         state = _json(ledger_path) if ledger_path.exists() else None
         if state is None:
             return True
         return (state.get("schema_version") == LEDGER_SCHEMA
                 and state.get("window") == window
                 and type(state.get("site_handoffs")) is int
-                and 0 <= state["site_handoffs"] < 5)
+                and 0 <= state["site_handoffs"] < limit)
     except (HandoffHeld, OSError, TypeError, ValueError):
         return False
 
@@ -181,7 +194,7 @@ def reserve_site_handoff(
     lock = ledger_path.with_suffix(".lock")
     with lock.open("a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        # Revalidate with the exclusive lock; no sixth concurrent handoff.
+        # Revalidate under the exclusive lock; no permit over configured cap.
         if not site_handoff_available(
             zip_code, config_path=config_path, ledger_path=ledger_path,
             readiness=readiness, eligible_zip=eligible_zip, now=now,
@@ -209,7 +222,9 @@ def verified_site_handoff_control(
     """
     try:
         clock = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        window, _ = _control(_json(config_path), clock)
+        control = _json(config_path)
+        window, _ = _control(control, clock)
+        limit = _handoff_limit(control)
         if not ledger_path.exists():
             return True
         ledger = _json(ledger_path)
@@ -217,7 +232,7 @@ def verified_site_handoff_control(
             ledger.get("schema_version") == LEDGER_SCHEMA
             and ledger.get("window") == window
             and type(ledger.get("site_handoffs")) is int
-            and 0 <= ledger["site_handoffs"] < 5
+            and 0 <= ledger["site_handoffs"] < limit
         )
     except (HandoffHeld, OSError, AttributeError, TypeError, ValueError):
         return False

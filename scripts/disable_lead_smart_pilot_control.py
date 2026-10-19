@@ -20,7 +20,7 @@ import stat
 import tempfile
 
 from empire_os.lead_smart_site_handoff import (
-    CAMPAIGN, CONFIG, NUMBER, SCHEMA,
+    CAMPAIGN, CONFIG, NUMBER, SCHEMA, MAX_CONFIGURED_HANDOFFS,
 )
 
 MAX_BYTES = 16_384
@@ -86,7 +86,7 @@ def _read_known_control(path: Path) -> tuple[dict | None, bytes | None]:
         and obj.get("tracking_number") == NUMBER
         and obj.get("stop_method") == "atomic_site_handoff_gate"
         and type(obj.get("max_site_handoffs")) is int
-        and obj["max_site_handoffs"] == 5
+        and 1 <= obj["max_site_handoffs"] <= MAX_CONFIGURED_HANDOFFS
         and type(obj.get("enabled")) is bool
     ):
         raise UnsafeControl("unrecognized control identity")
