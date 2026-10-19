@@ -148,3 +148,16 @@ def test_naive_as_of_rejected():
         review_verified_learning_readiness(
             empty_memory(), tenant_id=None, as_of=datetime(2026, 10, 18)
         )
+
+
+def test_founder_precision_does_not_turn_sparse_outcomes_into_performance_claims():
+    result = review_verified_learning_readiness(
+        full_memory(), tenant_id=TENANT, as_of=NOW,
+    )
+    assert result["precision_verified_subset"] is None
+    assert result["precision_wilson_95"] is None
+    assert result["precision_selection_count"] is None
+    assert result["precision_status"] == "INSUFFICIENT_VERIFIED_SELECTED_OUTCOMES"
+    assert result["precision_not_full_population"] is True
+    assert result["precision_customer_claim_authorized"] is False
+    assert result["learning_promoted"] is False

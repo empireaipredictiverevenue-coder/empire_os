@@ -166,3 +166,71 @@ def test_unpaired_forged_feedback_cannot_claim_verified_outcomes():
     data["verified_learning_feedback"][0]["verified_outcome"] = False
     with pytest.raises(ValueError, match="unverified"):
         evaluate_shadow_calibration(data, tenant_id=TENANT, as_of=AS_OF)
+
+
+def test_precision_at_fixed_threshold_is_descriptive_not_population_proof(monkeypatch):
+    """Isolated artificial chronology; no synthetic fixture may claim production accuracy."""
+    from datetime import timedelta
+    from empire_os import lead_shadow_calibration_benchmark as target
+
+    sample = deepcopy(memory()["calibration_evidence"][0])
+    start = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    cases = []
+    for i in range(60):
+        row = deepcopy(sample)
+        predicted = start + timedelta(days=2*i)
+        row.update(
+            prediction_ref=f"synthetic-pred-{i}",
+            opportunity_key=f"synthetic-op-{i}",
+            outcome_ref=f"synthetic-out-{i}",
+            predicted_at=predicted.isoformat(),
+            actual_at=(predicted+timedelta(days=1)).isoformat(),
+            predicted_value=0.8 if i % 4 else 0.4,
+            actual_value=int(i % 3 == 0),
+        )
+        row["feedback"]["outcome_ref"] = row["outcome_ref"]
+        cases.append(row)
+
+    mock_memory = dict(
+        deepcopy(memory()),
+        calibration_evidence=cases,
+        verified_learning_feedback=[case["feedback"] for case in cases],
+    )
+    # Benchmarks are separately covered by canonical-source tests. Here
+    # mock ONLY the original evidence validator to challenge summary math.
+    monkeypatch.setattr(target, "validate_verified_feedback", lambda *a, **k: None)
+    monkeypatch.setattr(
+        target, "review_commercial_prediction",
+        lambda *, prediction, feedback, tenant_id, as_of: next(
+            case for case in cases if case["feedback"] is feedback
+        ),
+    )
+    result = target.evaluate_shadow_calibration(
+        mock_memory, tenant_id=TENANT, as_of=AS_OF,
+        min_history=2, min_evaluations=20,
+    )
+    selected = [i for i in range(2, 60) if i % 4]
+    successes = sum(i % 3 == 0 for i in selected)
+    interval = result["precision_diagnostic_wilson_95"]
+    assert result["temporal_holdout_count"] == 58
+    assert result["precision_diagnostic_selected_count"] == len(selected)
+    assert result["precision_diagnostic_verified_success_count"] == successes
+    assert result["precision_diagnostic_positive_predictive_value"] == round(
+        successes / len(selected), 6
+    )
+    assert interval["lower"] < successes / len(selected) < interval["upper"]
+    assert result["precision_diagnostic_status"] == "DESCRIPTIVE_VERIFIED_SUBSET_ONLY"
+    assert result["precision_diagnostic_threshold_predeclared"] == 0.7
+    assert result["precision_unregistered_forecast_denominator_verified"] is False
+    assert result["precision_selection_bias_excluded"] is False
+    assert result["precision_customer_claim_authorized"] is False
+    assert result["model_weight_mutation"] is False
+
+
+def test_precision_never_mints_claim_from_sparse_fixture():
+    result = evaluate_shadow_calibration(memory(), tenant_id=TENANT, as_of=AS_OF)
+    assert result["precision_diagnostic_positive_predictive_value"] is None
+    assert result["precision_diagnostic_wilson_95"] is None
+    assert result["precision_diagnostic_selected_count"] is None
+    assert result["precision_diagnostic_status"] == "INSUFFICIENT_VERIFIED_SELECTED_OUTCOMES"
+    assert result["precision_customer_claim_authorized"] is False

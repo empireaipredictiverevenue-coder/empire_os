@@ -47,6 +47,10 @@ def _held(reason: str) -> dict[str, Any]:
         "improvement_brier_absolute": None,
         "improvement_brier_relative": None,
         "calibration_bias": None,
+        "precision_verified_subset": None,
+        "precision_wilson_95": None,
+        "precision_selection_count": None,
+        "precision_status": "EVIDENCE_HOLD",
         "learning_promoted": False,
         "outbound_authorized": False,
         "model_weight_mutation": False,
@@ -131,6 +135,18 @@ def review_verified_learning_readiness(
         "calibration_bias": (
             benchmark["holdout_signed_probability_bias"] if ready else None
         ),
+        "precision_verified_subset": (
+            benchmark["precision_diagnostic_positive_predictive_value"] if ready else None
+        ),
+        "precision_wilson_95": (
+            benchmark["precision_diagnostic_wilson_95"] if ready else None
+        ),
+        "precision_selection_count": (
+            benchmark["precision_diagnostic_selected_count"] if ready else None
+        ),
+        "precision_status": benchmark["precision_diagnostic_status"],
+        "precision_not_full_population": True,
+        "precision_customer_claim_authorized": False,
         "blockers": list(blockers),
         "next_evidence_action": next_action,
         "calibration_diagnostic_is_not_revenue_attribution": True,

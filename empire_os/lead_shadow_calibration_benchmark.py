@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import datetime
-from math import isfinite
+from math import isfinite, sqrt
 import json
 import os
 from pathlib import Path
@@ -26,6 +26,20 @@ def _time(value: str | datetime) -> datetime:
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("timezone-aware evidence required")
     return parsed
+
+
+def _wilson_95(successes: int, total: int) -> dict[str, float] | None:
+    """Score interval for verified binary successes; not a population guarantee."""
+    if not total:
+        return None
+    z = 1.959963984540054
+    rate = successes / total
+    denom = 1 + z * z / total
+    centre = (rate + z * z / (2 * total)) / denom
+    half = z * sqrt(rate * (1-rate) / total + z*z / (4*total*total)) / denom
+    return {"lower": round(max(0.0, centre-half), 6),
+            "upper": round(min(1.0, centre+half), 6)}
+
 
 
 def evaluate_shadow_calibration(
@@ -137,8 +151,33 @@ def evaluate_shadow_calibration(
         event_rate = round(sum(row[2] for row in scored) / len(scored), 6)
         mean_probability = round(sum(row[0] for row in scored) / len(scored), 6)
         bias = round(mean_probability - event_rate, 6)
+    # Fixed BEFORE evaluation, not optimised against these labels.
+    # This is descriptive positive predictive value among outcomes that were
+    # independently linked and terminally verified. Missing/unresolved offers,
+    # unregistered forecasts and selective feedback mean the full-population
+    # precision is still UNKNOWN even after this sample meets a minimum.
+    threshold = 0.70
+    selected = [row for row in scored if row[0] >= threshold]
+    selected_wins = sum(row[2] for row in selected)
+    enough_selected = adequate and len(selected) >= 20
+    precision = (round(selected_wins / len(selected), 6)
+                 if enough_selected else None)
+    precision_interval = (_wilson_95(selected_wins, len(selected))
+                          if enough_selected else None)
     return {
-        "schema_version": "empire.lead_shadow_calibration_benchmark.v1",
+        "precision_diagnostic_threshold_predeclared": threshold,
+        "precision_diagnostic_min_selected_outcomes": 20,
+        "precision_diagnostic_selected_count": len(selected) if adequate else None,
+        "precision_diagnostic_verified_success_count": selected_wins if adequate else None,
+        "precision_diagnostic_positive_predictive_value": precision,
+        "precision_diagnostic_wilson_95": precision_interval,
+        "precision_diagnostic_status": (
+            "DESCRIPTIVE_VERIFIED_SUBSET_ONLY" if enough_selected
+            else "INSUFFICIENT_VERIFIED_SELECTED_OUTCOMES"
+        ),
+        "precision_unregistered_forecast_denominator_verified": False,
+        "precision_selection_bias_excluded": False,
+        "precision_customer_claim_authorized": False,
         "reviewed_as_of": now.isoformat(),
         "calibration_improvement_brier_absolute": delta,
         "calibration_improvement_brier_relative": relative_delta,
