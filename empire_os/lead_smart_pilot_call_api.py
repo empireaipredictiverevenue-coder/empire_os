@@ -36,9 +36,13 @@ def _in_current_coverage(zip_code: str) -> bool:
 
 
 def _released_privacy_terms() -> bool:
-    # No circular import at app startup: invoked on actual request only.
-    from empire_os.public_gateway import _approved_static_content_path
-    return all(_approved_static_content_path(r) is not None for r in ("privacy", "terms"))
+    # This checks the actual already-published Empire AI legal-page receipts.
+    # The older reviewed_content_release.json belongs to an unrelated staged
+    # guide system and is not the release of public /privacy and /terms.
+    # Presence of these notices is NOT certification of recording compliance;
+    # the independent recording/legal readiness gates remain mandatory.
+    from empire_os.empire_ai_public_legal_release import checked_legal_path
+    return all(checked_legal_path(route) is not None for route in ("privacy", "terms"))
 
 
 def call_available(zip_code: str) -> bool:
