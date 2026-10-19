@@ -99,3 +99,49 @@ and `docs/commercial/NEW_PUBLISHERS_MARKETPLACES_RESEARCH_20261019.md`.
 Its 20 channel routes are eligibility research only. The separate
 buyer-network owner still owns existing RingPartner, Home Serv Pro,
 Marketcall, Aragon and CallScaler contact/application boundaries.
+
+## Seller-dashboard and USD pricing update — 19 October 2026
+
+The founder personally confirmed access to the **Gumroad seller dashboard**
+but subsequently reported **having no photo identification available for
+payout verification**. That is the **current payment blocker**.
+We have not independently observed an authenticated Gumroad product draft,
+uploaded customer ZIP, verified seller account, published listing, live
+purchase, payment, merchant balance or bank payout.
+
+- **Proposed current customer-facing price: USD $39 one-time.**
+  This supersedes the original GBP £29 draft. This proposal has NOT
+  been approved, charged or published.
+- UK bank payouts are ordinarily in GBP regardless of product display
+  currency. Gumroad's published UK bank payout requirements include
+  government-issued photo ID and proof of residence.
+- Business seller status does **not** eliminate personal verification
+  requirements for the account's business representative.
+- PayPal Connect is a checkout integration, not a guaranteed
+  alternative to the UK seller's required payout method or KYC.
+- **HOLD_PUBLIC_SALES_AND_PAYOUTS_UNTIL_ID_VERIFIED**: maintain draft
+  materials, no activation, no purported revenue.
+- The founder may ask support@gumroad.com whether another legitimate
+  verification document is accepted for this UK seller. Do not make
+  promises about acceptance, invent identities or alter the real
+  seller country. A valid driving photocard/provisional licence or
+  passport is an example of government photo ID, not a guaranteed
+  approval for any particular account.
+
+The following original customer ZIP SHA-256 is unchanged:
+`fee8c59f43bd417f40cd6d46cf09a025587e4176b47a4895645dd328a2c534e2`.
+
+Seller handoff and revised USD listing materials were generated in the
+current conversation:
+- `EMPIRE_AI_FIRST_SALE_AND_PAYOUT_HANDOFF_2026-10-19.md`
+- `EMPIRE_AI_Storefront_Listing_Draft_v1.md`
+- `EMPIRE_AI_First_Sale_Activation_Checklist_v1.md`
+- `EMPIRE_AI_Seller_Readiness_Manifest_v1.json`
+- `EMPIRE_AI_First_Sale_Seller_Handoff_Pack_2026-10-19.zip`.
+
+Neither these customer artifact bytes nor raw seller identity credentials
+are stored or modified in the canonical production EmpireOS repository.
+
+**Official requirements:** https://gumroad.com/help/article/260-your-payout-settings-page ,
+https://gumroad.com/help/article/13-getting-paid ,
+https://gumroad.com/help/article/275-paypal-connect .
