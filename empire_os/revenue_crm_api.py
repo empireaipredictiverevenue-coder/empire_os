@@ -17,6 +17,9 @@ from empire_os.revenue_crm_transport import (
 from empire_os.revenue_crm_customer_success import (
     route_customer_success_review,
 )
+from empire_os.revenue_crm_customer_results_experience import (
+    review_customer_results_experience,
+)
 from empire_os.revenue_crm_search_growth import build_crm_search_growth_brief
 from empire_os.revenue_crm_journeys import (
     journey_blueprint, preview_crm_journey, preview_segment_distribution,
@@ -589,6 +592,9 @@ def create_revenue_crm_router(
                 max_age_seconds=req.max_age_seconds,
             )
             route = route_customer_success_review(freshness)
+            customer_results = review_customer_results_experience(
+                evidence, freshness, route,
+            )
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
         return {
@@ -600,6 +606,9 @@ def create_revenue_crm_router(
             "crm_mutation": False,
             "offer_mutation": False,
             "customer_success": route.as_dict(),
+            "customer_results_experience": customer_results,
+            "source_assertions_independently_verified": False,
+            "customer_visible_result_claim_authorized": False,
         }
 
     @router.get("/journeys/designer", response_class=HTMLResponse)
