@@ -984,3 +984,72 @@ export function getPredictiveRevenueDemo() {
     "/v1/predictive-revenue/demo",
   );
 }
+
+/** Founder-only EmpireDB lead supply observatory, never public inventory. */
+export type FounderLeadSupply = {
+  available?: boolean;
+  observed_at?: string;
+  mode?: string;
+  reason?: string;
+  lead_counts_complete?: boolean;
+  unique_prospects_observed?: number;
+  qualified_with_evidence_observed?: number;
+  acquisition_events_for_scanned_prospects?: number;
+  prospects_missing_acquisition_provenance?: number;
+  source_unique_prospect_counts?: Record<string, number>;
+  crawler_receipts?: {
+    available?: boolean;
+    truncated?: boolean;
+    event_totals?: Record<string, number>;
+    by_source?: Record<string, Record<string, number>>;
+  };
+  exchange?: {
+    observed_at?: string;
+    population?: string;
+    inventory_sample_count?: number;
+    buyer_seat_record_count?: number;
+    buyer_seat_states?: Record<string, number>;
+    corridor_count?: number;
+    allocation_candidate_count?: number;
+    verified_market_price_count?: number;
+  };
+  corridors?: Array<{
+    corridor_key: string;
+    niche: string;
+    metro: string;
+    buyer_seat_records: number;
+    active_seat_records: number;
+    blocked_seat_records: number;
+    sampled_supply: number;
+    sampled_overflow: number;
+    sampled_allocation_ready: number;
+  }>;
+  niches?: Array<{
+    niche: string;
+    unique_leads_observed: number;
+    qualified_with_evidence_observed: number;
+    no_acquisition_provenance: number;
+    by_metro: Record<string, number>;
+    by_source: Record<string, number>;
+    buyer_seat_states: Record<string, number>;
+    exchange_sample_states: Record<string, number>;
+  }>;
+  intelligence_connections?: Array<{
+    from: string;
+    to: string;
+    state: string;
+  }>;
+  source_contract_catalog?: Array<{
+    source_id: string;
+    country: string;
+    niches: string[];
+    production_status_in_catalog: string;
+    licence: string;
+    raw_resale_allowed: boolean;
+    live_credential_and_run_status_verified: boolean;
+  }>;
+};
+
+export function getFounderLeadSupply() {
+  return getFounderRead<FounderLeadSupply>("/v1/founder-lead-supply/overview");
+}

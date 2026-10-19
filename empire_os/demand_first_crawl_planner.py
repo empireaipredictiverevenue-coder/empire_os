@@ -18,7 +18,7 @@ MAX_CANDIDATES_PER_PLAN = 25
 
 ALLOWED_SOURCES = frozenset({
     "permits", "chicago_311", "courtlistener", "reddit", "nyc_hpd",
-    "nws_alerts", "overpass", "recc_solar",
+    "nws_alerts", "overpass", "recc_solar", "permits_dobnow",
 })
 
 
