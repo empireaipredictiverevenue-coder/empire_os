@@ -24,6 +24,7 @@ from empire_os.buyer_deferred_enrichment import (
     _recovery_prerequisite,
 )
 from empire_os.buyer_discovery import looks_like_person_name
+from empire_os.buyer_recovery_scout_consumer import read_scout_review, ScoutConsumerHold
 
 
 SCHEMA = "empire.buyer_recovery_action_desk.v1"
@@ -326,6 +327,17 @@ def plan(root: Path) -> dict[str, Any]:
     path = root / SOURCE
     queued, digest = _read_source(path)
     result = make_packet(queued, source_sha256=digest)
+    try:
+        result["scout_network_research_review"] = read_scout_review(root)
+    except (ScoutConsumerHold, OSError, UnicodeError, TypeError, KeyError):
+        # Optional Scout evidence can never corrupt or authorize the existing
+        # deferred-enrichment recovery packets. Treat it as unavailable.
+        result["scout_network_research_review"] = {
+            "schema_version": "empire.buyer_recovery_scout_observer.v1",
+            "status": "SOURCE_UNTRUSTED_HOLD",
+            "review_task_count": 0, "review_tasks": [],
+            "commercial_authority": "NONE",
+        }
     _, after_digest = _read_source(path)
     if after_digest != digest:
         raise RecoveryDeskError("queue_changed_during_analysis")
