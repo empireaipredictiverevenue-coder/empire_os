@@ -2499,6 +2499,12 @@ def test_founder_overview_includes_read_only_predictive_decision_control(tmp_pat
     assert market["market_no_match_claim_authorized"] is False
     assert market["buyer_or_revenue_verified"] is False
     assert market["execution_authority"] == "none"
+    market_features = control["flagship_predictive_market_features"]
+    assert market_features["schema_version"] == "empire.predictive_revenue.market_feature_readiness.v1"
+    assert market_features["prediction_issued"] is False
+    assert market_features["brier_evaluation_available"] is False
+    assert market_features["independent_validation_available"] is False
+    assert market_features["execution_authority"] == "none"
     triage = control["flagship_buyer_enrichment"]
     assert triage["schema_version"] == "empire.predictive_revenue.buyer_enrichment_triage.v1"
     assert triage["independent_first_party_buying_intent_verified"] is False

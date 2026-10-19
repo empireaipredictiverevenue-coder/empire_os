@@ -394,7 +394,43 @@ export type FlagshipMarketKnowledge = {
   execution_authority: "none";
 };
 
+export type FlagshipPredictiveMarketFeatures = {
+  schema_version: string;
+  status: string;
+  market_count: number;
+  market_features_with_observed_public_topics: number;
+  time_safe_packet_sha256: string;
+  ready_quant_packet_count: 0;
+  canonical_quant_brain_missing_inputs: Array<{
+    market_vertical: string;
+    quant_status: "UNAVAILABLE";
+    missing_commercial_inputs: string[];
+    source_feature_lineage_sha256: string;
+    verified_buyer_terms: false;
+    market_features_alone_sufficient_for_quant: false;
+  }>;
+  market_preparation: Array<{
+    market_vertical: string;
+    source_venue_count: number;
+    distinct_public_posts: number;
+    problem_themes: Array<{
+      theme: string;
+      unverified_public_tag_count: number;
+    }>;
+    forecast_ready: false;
+  }>;
+  next_evidence_action: string;
+  missing_ground_truth: string;
+  public_forum_selection_bias: true;
+  independent_validation_available: false;
+  brier_evaluation_available: false;
+  prediction_issued: false;
+  realized_revenue_verified: false;
+  execution_authority: "none";
+};
+
 export type PredictiveDecisionControl = {
+  flagship_predictive_market_features?: FlagshipPredictiveMarketFeatures;
   flagship_market_knowledge?: FlagshipMarketKnowledge;
   flagship_signed_model_preview?: FlagshipSignedModelPreview;
   flagship_customer_model_options?: FlagshipCustomerModelOptions;

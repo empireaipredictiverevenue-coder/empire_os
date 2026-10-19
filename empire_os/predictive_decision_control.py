@@ -531,6 +531,15 @@ def build_predictive_decision_control_runtime(
     market_graph = build_market_knowledge_graph(
         root, as_of=as_of or datetime.now(timezone.utc),
     )
+    from empire_os.flagship_predictive_market_features import (
+        build_point_in_time_market_features, review_market_feature_prediction_gap,
+    )
+    frozen_market_features = build_point_in_time_market_features(
+        market_graph, issued_at=as_of or datetime.now(timezone.utc),
+    )
+    decision["flagship_predictive_market_features"] = review_market_feature_prediction_gap(
+        frozen_market_features,
+    )
     decision["flagship_market_knowledge"] = {
         "schema_version": market_graph["schema_version"],
         "status": market_graph["status"],

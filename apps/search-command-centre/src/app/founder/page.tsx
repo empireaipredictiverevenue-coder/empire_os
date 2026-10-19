@@ -91,6 +91,7 @@ export default async function FounderPage() {
   const customerModelOptions = decision?.flagship_customer_model_options;
   const signedModelPreview = decision?.flagship_signed_model_preview;
   const marketKnowledge = decision?.flagship_market_knowledge;
+  const predictiveMarketFeatures = decision?.flagship_predictive_market_features;
   const scientificSourceHistory = decision?.source_quality_history;
   const loop = data?.commercial_loop;
   const astra = data?.astra;
@@ -425,6 +426,41 @@ export default async function FounderPage() {
                             </div>
                           );
                         })}
+                      </div>
+                      <div className="mt-3 rounded-lg border border-cyan-200/10 p-3">
+                        <p className="text-xs font-semibold text-white">
+                          Quant Brain · Prospective market features
+                        </p>
+                        <p className="mt-1 text-xs text-slate-300">
+                          {show(predictiveMarketFeatures?.status, "Awaiting time-safe market features").replaceAll("_", " ")}
+                        </p>
+                        <p className="mt-2 text-[11px] text-slate-400">
+                          Market cohorts: {predictiveMarketFeatures?.market_count ?? "Unknown"} ·
+                          Public research signals: {predictiveMarketFeatures?.market_features_with_observed_public_topics ?? "Unknown"} ·
+                          Probability forecasts: held · Quant-ready packets: {predictiveMarketFeatures?.ready_quant_packet_count ?? "Unknown"}
+                        </p>
+                        <div className="mt-2 grid gap-2 md:grid-cols-2">
+                          {(predictiveMarketFeatures?.market_preparation ?? [])
+                            .filter((item) => item.distinct_public_posts > 0)
+                            .slice(0, 4)
+                            .map((item) => (
+                              <div key={item.market_vertical} className="rounded-lg border border-white/10 p-2">
+                                <p className="text-xs font-semibold capitalize text-slate-200">
+                                  {item.market_vertical}
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-400">
+                                  {item.distinct_public_posts} attributed posts · {item.source_venue_count} venues
+                                </p>
+                                <p className="mt-1 text-[11px] text-slate-300">
+                                  {item.problem_themes[0]?.theme.replaceAll("_", " ") ?? "No themes"}
+                                </p>
+                              </div>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-[11px] text-slate-500">
+                          Next: {show(predictiveMarketFeatures?.next_evidence_action, "Capture verified prospective evidence").replaceAll("_", " ")}.
+                          Research does not establish buyer conversion, a causal effect or a calibrated forecast.
+                        </p>
                       </div>
                       <p className="mt-2 text-[11px] text-slate-500">
                         Chat examples require explicit approved, de-identified import.
