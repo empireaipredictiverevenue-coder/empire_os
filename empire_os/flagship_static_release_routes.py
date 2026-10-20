@@ -28,6 +28,11 @@ INSIGHT_PAGES: dict[str, str] = {
 # replaced file becomes a 404 rather than serving unreviewed content.
 # Values: SHA-256 hex, exact response content type, size ceiling.
 PINNED_ASSETS: dict[str, tuple[str, str, int]] = {
+    # Exact SHA-pinned asset required by the released ASTRA homepage theme.
+    "brand/empire-orbital-a-reference-mark.webp": (
+        "4dc229208a44d8b8c1d076cc3f55d68255ea004b2aba4cd1bd78d331831c81aa",
+        "image/webp", 10_000,
+    ),
     "brand/empire-ai-founder-reference-orbital-a-transparent.webp": (
         "20f2b586e69307002e10301395fc8a7f0e768311d5b6a22a9143eab9372c6ab7", "image/webp", 30_000
     ),
@@ -121,6 +126,12 @@ def create_flagship_static_release_router(site_out: Path) -> APIRouter:
     )
     async def approved_brand():
         return _asset_response("brand/empire-ai-founder-reference-orbital-a-transparent.webp")
+
+    @router.api_route(
+        "/brand/empire-orbital-a-reference-mark.webp", methods=["GET", "HEAD"],
+    )
+    async def cinematic_homepage_exact_brand():
+        return _asset_response("brand/empire-orbital-a-reference-mark.webp")
 
     @router.api_route("/art/{asset_name}", methods=["GET", "HEAD"])
     async def top_art(asset_name: str):
