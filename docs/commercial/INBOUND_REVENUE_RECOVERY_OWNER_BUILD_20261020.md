@@ -12,10 +12,11 @@ Sell verified business outcomes, not merely an AI receptionist. Businesses shoul
 
 - empire_os/inbound_revenue_recovery.py — deterministic receptionist response policy, tenant profiles, deduplicated recovery ledger, verified outcome and payment attribution.
 - empire_os/inbound_recovery_api.py — dedicated token-gated preview surface disabled unless an explicit environment flag is enabled.
+- empire_os/inbound_provider_contract.py — isolated number-to-tenant registry, explicit DID ownership and disabled/enabled routing contract, and status mapping requiring prior signed provider attestation.
 - empire_os/hub.py — registers only the preview router; leaves existing Vonage live call routes untouched.
 - scripts/review_inbound_revenue_recovery_20261020.py — offline JSONL replay, read-only aggregates and tenant filtering.
 - supabase/migrations/20261020124500_inbound_revenue_recovery_prepared.sql — prepared migration for default-deny tenant profiles and events (not applied).
-- tests/test_inbound_revenue_recovery.py — isolated tests for attribution, synthetic exclusions, idempotency, receptionist claims and preview security.
+- tests/test_inbound_revenue_recovery.py and tests/test_inbound_provider_contract.py — offline evidence, tenant-number ownership, parity and preview safety tests.
 
 ## Existing integration points
 
@@ -43,7 +44,7 @@ IMPORTANT: The verified flag in offline replay simulates receipts from an author
 
 **P0, implemented:** deterministic receptionist policy, AI disclosure, no invented appointment confirmation, emergency/human escalation, opt-out behaviour, scoped event ledger, strict receipt requirements, money deduplication, protected preview and read-only replay.
 
-**P1, pending:** signed inbound Vonage adapter; inbound DID to tenant registry; duplicate/retry reconciliation; durable event persistence; business opening-hours logic; timezone and holiday handling; fallback to human transfers. Preserve the current Lead Smart production routing without change.
+**P1, partially prepared:** inbound DID/tenant mapping contract and canonical Vonage status normalization tested offline. Still pending: actual cryptographic webhook verification, real number registry provisioning and persistence, duplicate/retry reconciliation, durable event storage, business opening-hours logic, timezone and holiday handling, fallback to human transfers. Preserve the current Lead Smart production routing without change.
 
 **P2, pending:** real customer callback consent workflow, verified calendar availability and booking adapter, human approval, permitted follow-up delivery and suppression propagation.
 
