@@ -162,6 +162,43 @@ def run_fixture() -> dict:
                 """)
                 if fk_denied.returncode == 0:
                     raise RuntimeError("fixture_cross_tenant_fk_not_enforced")
+
+                # Both tenants legitimately have the same Google calendar ID,
+                # but tenant B cannot claim an appointment that only A linked.
+                require(run(*psql, stdin="""
+                  INSERT INTO public.inbound_recovery_calendar_links
+                    (tenant_id,calendar_id,appointment_id,call_id,contact_key,
+                     tracked_source_ref) VALUES (
+                    '00000000-0000-0000-0000-000000000101',
+                    'same@example.test','alpha-only-appointment','alpha-call',
+                    repeat('a',64),'alpha-tracked-source');
+                """), "fixture_alpha_booking_link")
+                crossed = run(*psql, stdin="""
+                  INSERT INTO public.inbound_recovery_calendar_status_evidence
+                    (tenant_id,calendar_id,appointment_id,provider_revision_ref,
+                     booking_status,observed_at,source_receipt_sha256)
+                  VALUES ('00000000-0000-0000-0000-000000000102',
+                          'same@example.test','alpha-only-appointment','r1',
+                          'confirmed',clock_timestamp(),repeat('b',64));
+                """)
+                if crossed.returncode == 0:
+                    raise RuntimeError("fixture_provider_booking_tenant_fk_not_enforced")
+
+                # No synthetic or unverified claim may be recorded as paid
+                # even if an amount/currency are present. Fixtures never
+                # count these as real money.
+                for synthetic, verified in (("true", "true"), ("false", "false")):
+                    invalid_payment = run(*psql, stdin=(
+                        "INSERT INTO public.inbound_recovery_events "
+                        "(tenant_id,event_id,call_id,occurred_at,kind,origin,"
+                        "evidence_ref,evidence_verified,synthetic,amount_minor,currency) "
+                        "VALUES ('00000000-0000-0000-0000-000000000101',"
+                        "'fake-payment-" + synthetic + "-" + verified + "','call',"
+                        "clock_timestamp(),'invoice_paid','payments','fixture-only',"
+                        + verified + "," + synthetic + ",100,'USD');"
+                    ))
+                    if invalid_payment.returncode == 0:
+                        raise RuntimeError("fixture_fake_paid_revenue_invariant_broken")
                 # The owner of newly created relations is restricted by
                 # FORCE RLS too, despite being able to hold table privilege.
                 owner_rows = require(run(*psql, "-At", stdin="""
@@ -183,6 +220,8 @@ def run_fixture() -> dict:
                     "crm_identity": "native",
                     "app_role_denials": 2,
                     "cross_tenant_calendar_keys": "verified",
+                    "cross_tenant_provider_booking_fk": "denied",
+                    "fake_paid_revenue_claims_denied": 2,
                     "ephemeral_fixture_result": "PASS",
                     "production_database_changed": False,
                     "cloud_credentials_used": False,

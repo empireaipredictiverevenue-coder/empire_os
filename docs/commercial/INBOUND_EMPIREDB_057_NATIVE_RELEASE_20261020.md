@@ -40,3 +40,36 @@ Do NOT apply 057 yet. Before any permanent DB change, canonical DBA must first:
 5. Keep OAuth, live callbacks, marketing, money movement and agent dispatch disabled until their separately approved gates.
 
 **None of this grants migration, outbound, finance, contact, or Google OAuth authority.**
+
+
+## 20 October — live catalog release preflight (authorised DBA OS account)
+
+Additional READ-ONLY catalog-only preflight:
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m \
+      scripts.inspect_inbound_native_empiredb_057_readonly \
+      --read-only --pg-catalog-only
+
+Run using the EXISTING postgres OS identity with trusted local peer
+authentication. The remote feature-build bridge has no permission to switch
+to that role. Do not bypass that OS boundary.
+
+READ ONLY transaction, no DDL, no customer/tenant row SELECT, no credentials,
+no external service calls. Checks canonical primary EmpireDB, non-login
+migrator role, schema CREATE permission, RLS-enabled existing CRM
+memberships, native trusted tenant resolver, and absence of conflicting
+inbound table names. All results are redacted boolean facts and object counts.
+
+READY_FOR_INDEPENDENT_DBA_MIGRATION_REVIEW is NOT approval or customer
+activation; it is only catalog eligibility. The CLI returns a held status
+when unable to obtain authorised peer access. Unit tests exercise the
+ready and fail-closed branches without a production connection.
+
+The disposable PostgreSQL 18 fixture additionally verifies:
+- Tenant-B cannot claim an appointment belonging only to Tenant-A even
+  when the calendar_id is shared.
+- Two synthetic/unverified invoice_paid attempts fail CHECK constraints.
+
+Production EmpireDB has NOT been modified or queried using a privileged
+database role. Separate DBA approval, audited backup/restore, actual
+RLS/role review and the production migration plan remain required.

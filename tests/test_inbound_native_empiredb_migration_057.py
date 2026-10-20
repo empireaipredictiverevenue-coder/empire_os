@@ -103,5 +103,7 @@ def test_real_isolated_postgres_applies_native_schema_and_denies_app_roles():
     assert evidence["ephemeral_fixture_result"] == "PASS"
     assert evidence["native_tables_force_rls"] == len(EXPECTED)
     assert evidence["app_role_denials"] == 2
+    assert evidence["cross_tenant_provider_booking_fk"] == "denied"
+    assert evidence["fake_paid_revenue_claims_denied"] == 2
     assert evidence["production_database_changed"] is False
     assert evidence["cloud_credentials_used"] is False
