@@ -346,50 +346,21 @@ def run_coder_supervisor(
     queued_implementation = 0
     blocked_dirty = _nonprotected_dirty(root, runner=runner)
 
-    if not active_implement and not blocked_dirty:
-        ready = store.list(statuses={"implementation_ready"})
-        if ready:
-            row = ready[0]
-            task = coder.create_task(
-                (
-                    "Implement this already-planned Founder Directive as "
-                    "production-quality code inside the canonical EmpireOS architecture. "
-                    "Fix root causes rather than layering symptom patches. Reuse or "
-                    "refactor existing modules instead of creating duplicate systems. "
-                    "Include focused tests, adjacent regressions, failure-path coverage "
-                    "and observability appropriate to the production change. Do not "
-                    "deploy, touch production databases, "
-                    "send outbound, accept terms, move funds, recognize revenue, "
-                    "edit protected paths, or widen authority. Directive: "
-                    + row.text
-                )
-            )
-            job = queue.enqueue(
-                task_id=task.id,
-                kind=JobKind.IMPLEMENT,
-                priority=row.priority,
-                payload={
-                    "terms": [
-                        row.category,
-                        "founder",
-                        "directive",
-                        "implementation",
-                        "tests",
-                        "daily_results",
-                    ],
-                    "budget_chars": 8000,
-                    "directive_id": row.id,
-                    "authority": row.authority,
-                },
-            )
-            store.update(
-                row.id,
-                status="implementing",
-                implementation_task_id=task.id,
-                implementation_job_id=job.id,
-                implementation_result={},
-            )
-            queued_implementation = 1
+    # The original FounderDirectiveStore only records internal_plan (advisory)
+    # and founder_gate; it has NO authenticated execution-plane permission
+    # receipt, exact permitted paths, lease resources, or required tests.
+    # A clean Git checkout cannot turn a plan into mutation authority.
+    #
+    # The existing plan-promotion/execution-plane owner is responsible for
+    # validating a real, scoped request and routing it to an isolated
+    # executor. Never directly enqueue IMPLEMENT from advisory directives.
+    ready_for_authorised_handoff = store.list(statuses={"implementation_ready"})
+    implementation_authority_held = len(ready_for_authorised_handoff)
+    implementation_next_action = (
+        "EXISTING_EXECUTION_PLANE_OWNER_VERIFY_SCOPED_REQUEST"
+        if implementation_authority_held
+        else "AWAIT_GENUINE_IMPLEMENTATION_READY_DIRECTIVE"
+    )
 
     snapshot = store.summary()
     return {
@@ -402,6 +373,9 @@ def run_coder_supervisor(
         "queued_verification": queued_verification,
         "commits_created": commits,
         "queued_implementation": queued_implementation,
+        "implementation_authority_held": implementation_authority_held,
+        "implementation_next_action": implementation_next_action,
+        "advisory_directive_promoted_to_execution": False,
         "active_implementation_jobs": len(_active_jobs(queue, JobKind.IMPLEMENT)),
         "active_total_jobs": len(_active_jobs(queue)),
         "repo_blocked_by_nonprotected_dirty": blocked_dirty,
