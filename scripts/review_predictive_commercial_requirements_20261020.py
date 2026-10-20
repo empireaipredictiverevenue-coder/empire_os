@@ -18,6 +18,10 @@ from empire_os.predictive_commercial_supply_readiness import (
     review_lead_readiness_runtime,
 )
 from empire_os.predictive_commercial_fulfilment import plan_commercial_fulfilment
+from empire_os.predictive_existing_owner_pickup import (
+    read_existing_a2a_owner_reports,review_department_owner_pickup,
+)
+from empire_os.enterprise_finance_evidence_readiness import review_finance_source_readiness
 
 MAX_SIZE=200_000
 
@@ -36,6 +40,9 @@ def main()->int:
     parser=argparse.ArgumentParser()
     parser.add_argument("--read-only",required=True,action="store_true")
     parser.add_argument("--repo-root",default="/srv/empire_os")
+    parser.add_argument("--a2a-owner-root",
+                        default="/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020",
+                        help="Original A2A owner runtime, read-only and never published")
     parser.add_argument("--requirement-intake",default=None,
                         help="Exact tenant-scoped existing founder/customer intake JSON")
     parser.add_argument("--example-tampa-roofing",action="store_true",
@@ -93,6 +100,11 @@ def main()->int:
         lead_owner_eligibility_preview=(_read(args.lead_owner_eligibility_preview)
                                         if args.lead_owner_eligibility_preview else None),
     )
+    owner_a2a=read_existing_a2a_owner_reports(
+        args.a2a_owner_root,requirement=req,as_of=now,
+    )
+    finance=review_finance_source_readiness(Path(args.repo_root),as_of=now)
+    owners=review_department_owner_pickup(req,plan,supply,finance,owner_a2a)
     out={
         "schema_version":"empire.predictive_revenue.commercial_requirement_operator.v1",
         "mode":"OBSERVE","status":(
@@ -103,6 +115,14 @@ def main()->int:
         "commercial_requirement":req,
         "original_lead_supply_and_buyer_owner_readiness":supply,
         "governed_fulfilment_and_sourcing_plan":plan,
+        "original_a2a_owner_research_overlap":owner_a2a,
+        "existing_finance_proof_gate_status":{
+            "status":finance["status"],
+            "fresh_internal_source_count":finance["current_internal_source_snapshot_count"],
+            "independent_finance_proof_gaps_remaining":finance["required_proofs_not_admitted_count"],
+            "actual_customer_profit_authenticated":finance["actual_recognised_revenue_independently_verified"],
+        },
+        "department_owner_acceptance_and_next_actions":owners,
         "recorded_live_customer_contract":False,
         "dispatch_performed":False,
         "supplier_contacted":False,

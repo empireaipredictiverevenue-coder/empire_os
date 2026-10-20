@@ -224,3 +224,65 @@ def test_original_request_and_explicit_illustration_cannot_be_combined(
                                    "--example-tampa-roofing"])
     with pytest.raises(SystemExit):
         cli.main()
+
+
+def test_existing_a2a_lead_and_finance_original_source_contracts_join_read_only(
+    tmp_path,monkeypatch,capsys,
+):
+    from test_predictive_existing_owner_pickup import report,receipts
+    fixture_root(tmp_path);fake_clock(monkeypatch)
+    folder=tmp_path/"runtime/a2a_commercial_signal_mining"
+    folder.mkdir(parents=True)
+    (folder/"buyer_owner_research_handoffs_v1.json").write_text(json.dumps(report()))
+    (folder/"owner_signed_receipts_review_v1.json").write_text(json.dumps(receipts()))
+    monkeypatch.setattr("sys.argv",[
+        "operator","--read-only","--example-tampa-roofing",
+        "--repo-root",str(tmp_path),"--a2a-owner-root",str(tmp_path),
+    ])
+    assert cli.main()==0
+    result=json.loads(capsys.readouterr().out)
+    a2a=result["original_a2a_owner_research_overlap"]
+    assert a2a["source_matching_exact_sector_city_region_tickets_count"]==2
+    assert a2a["original_owner_authenticated_reply_count"]==0
+    assert a2a["owner_source_reported_match_is_our_requirement_acknowledgement"] is False
+    finance=result["existing_finance_proof_gate_status"]
+    assert finance["independent_finance_proof_gaps_remaining"]==7
+    assert finance["actual_customer_profit_authenticated"] is False
+    owners=result["department_owner_acceptance_and_next_actions"]
+    assert owners["handoff_draft_count"]==8
+    assert owners["owner_handoffs_dispatched"]==0
+    assert owners["existing_a2a_matching_research_tickets_not_customer_acks"]==2
+    assert all(x["live_service_execution_eligible"] is False
+               for x in owners["owner_required_action_queue"])
+    assert result["dispatch_performed"] is False
+    assert result["database_writes"] is False
+
+
+def test_cross_owner_synthetic_hvac_market_mismatch_reports_no_matching_a2a(
+    tmp_path,monkeypatch,capsys,
+):
+    from test_predictive_existing_owner_pickup import report,receipts
+    fixture_root(tmp_path);fake_clock(monkeypatch)
+    folder=tmp_path/"runtime/a2a_commercial_signal_mining"
+    folder.mkdir(parents=True)
+    (folder/"buyer_owner_research_handoffs_v1.json").write_text(json.dumps(report()))
+    (folder/"owner_signed_receipts_review_v1.json").write_text(json.dumps(receipts()))
+    data=tampa_roofing_founder_example()
+    data.update(country="US",state="TX",city="Houston",industry="solar",
+                requested_qualified_leads=25)
+    intake=tmp_path/"solar_intake.json"
+    intake.write_text(json.dumps(data))
+    monkeypatch.setattr("sys.argv",[
+        "operator","--read-only",
+        "--repo-root",str(tmp_path),"--a2a-owner-root",str(tmp_path),
+        "--requirement-intake",str(intake),
+    ])
+    assert cli.main()==0
+    out=json.loads(capsys.readouterr().out)
+    assert out["commercial_requirement"]["industry"]=="solar"
+    assert out["original_a2a_owner_research_overlap"]["status"]==(
+        "NO_EXACT_PREEXISTING_A2A_SECTOR_CITY_REGION_PROFILE")
+    assert out["department_owner_acceptance_and_next_actions"][
+        "existing_a2a_matching_research_tickets_not_customer_acks"]==0
+    assert out["governed_fulfilment_and_sourcing_plan"]["verified_market_and_customer_eligible_leads"] is None
+    assert out["database_writes"] is False
