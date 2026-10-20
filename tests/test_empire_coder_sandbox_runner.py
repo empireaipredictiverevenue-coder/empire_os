@@ -174,3 +174,63 @@ def test_sandbox_proven_small_llama_cannot_masquerade_as_architecture_writer(
         role="writer",
     )
     assert weak_only.provider == "unconfigured"
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        "../empire_os/example.py",
+        "../../empire_os/example.py",
+        "/empire_os/example.py",
+        r"..\empire_os\example.py",
+        "empire_os/../empire_os/example.py",
+        "empire_os//example.py",
+        "C:/empire_os/example.py",
+        "././empire_os/example.py",
+        "empire_os/./example.py",
+    ],
+)
+def test_sandbox_never_normalizes_unsafe_candidate_into_allowed_scope(candidate):
+    assert not _path_allowed(candidate, ("empire_os/",))
+    assert not _path_allowed(candidate, ("empire_os/example.py",))
+
+
+@pytest.mark.parametrize(
+    "allowed",
+    [
+        "../empire_os/",
+        "/empire_os/",
+        "empire_os/../",
+        r"..\empire_os\example.py",
+        "C:/empire_os/",
+        "empire_os//",
+    ],
+)
+def test_sandbox_denies_unsafe_allowlist_entries(allowed):
+    assert not _path_allowed("empire_os/example.py", (allowed,))
+    with pytest.raises(EmpireCoderSandboxError, match="safe repo-relative"):
+        EmpireCoderSandboxJob(
+            job_id="sandbox-path-regression",
+            objective="Update a small existing unit-test helper",
+            department="engineering",
+            capability="backend_code",
+            allowed_paths=(allowed,),
+            lease_resources=("domain:software_test",),
+            pytest_targets=("tests/test_empire_coder_sandbox_runner.py",),
+        ).validate()
+
+
+def test_sandbox_valid_relative_scopes_still_work_and_tests_must_be_safe():
+    assert _path_allowed("empire_os/search/foo.py", ("empire_os/search/",))
+    assert _path_allowed("./empire_os/search/foo.py", ("empire_os/search/",))
+    assert not _path_allowed("empire_os/searches/foo.py", ("empire_os/search/",))
+    with pytest.raises(EmpireCoderSandboxError, match="invalid pytest"):
+        EmpireCoderSandboxJob(
+            job_id="sandbox-target-regression",
+            objective="Update a small existing unit-test helper",
+            department="engineering",
+            capability="backend_code",
+            allowed_paths=("empire_os/search/",),
+            lease_resources=("domain:software_test",),
+            pytest_targets=("tests/../../unsafe.py",),
+        ).validate()

@@ -111,10 +111,14 @@ class EmpireCoderSandboxJob:
             )
         if not self.allowed_paths:
             raise EmpireCoderSandboxError("allowed_paths required")
+        if any(_scoped_repo_path(target) is None for target in self.allowed_paths):
+            raise EmpireCoderSandboxError("allowed_paths must be safe repo-relative paths")
         if not self.lease_resources:
             raise EmpireCoderSandboxError("lease_resources required")
         for target in self.pytest_targets:
-            if not target.startswith("tests/") or ".py" not in target:
+            if (not target.startswith("tests/")
+                    or not target.endswith(".py")
+                    or _scoped_repo_path(target) is None):
                 raise EmpireCoderSandboxError("invalid pytest target")
 
     def as_dict(self) -> dict[str, Any]:
@@ -139,10 +143,31 @@ def _run(
     )
 
 
+def _scoped_repo_path(value: str) -> str | None:
+    """Accept only repo-relative paths without traversal or empty segments.
+
+    Remove a single conventional './' prefix, NEVER strip '..' or '/'.
+    This must be applied to both the permitted scope and the proposed path
+    before using any prefix-based allowlist comparison.
+    """
+    raw = str(value or "").strip().replace("\\", "/")
+    if not raw or raw.startswith("/") or raw.endswith("//") or "\x00" in raw:
+        return None
+    if raw.startswith("./"):
+        raw = raw[2:]
+    raw = raw.rstrip("/")
+    parts = raw.split("/")
+    if any(not part or part in (".", "..") or ":" in part for part in parts):
+        return None
+    return "/".join(parts)
+
+
 def _path_allowed(path: str, allowed: tuple[str, ...]) -> bool:
-    clean = str(path or "").strip().replace("\\", "/").lstrip("./")
+    clean = _scoped_repo_path(path)
+    if clean is None:
+        return False
     for raw in allowed:
-        prefix = str(raw or "").strip().replace("\\", "/").lstrip("./").rstrip("/")
+        prefix = _scoped_repo_path(raw)
         if prefix and (clean == prefix or clean.startswith(prefix + "/")):
             return True
     return False
