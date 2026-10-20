@@ -405,3 +405,53 @@ def test_shared_inference_lock_released_after_exception(tmp_path):
             raise RuntimeError("synthetic code exception")
     with _shared_coder_ollama_lock(tmp_path):
         pass
+
+
+
+def test_sandbox_model_failures_persist_across_isolated_clones(tmp_path):
+    """Use authentic ProviderHealth logic, never call local inference."""
+    from empire_os.coder.provider_health import ProviderHealth
+    from empire_os.empire_coder_sandbox_runner import _SandboxWriterHealth
+
+    original_path = tmp_path / "runtime/coder/model_health.json"
+    original = ProviderHealth(original_path)
+    original.record_failure("ollama", "qwen3-coder:30b", "TimeoutError")
+    original_before = original_path.read_bytes()
+
+    sandbox = _SandboxWriterHealth(tmp_path)
+    assert ("ollama", "qwen3-coder:30b") in sandbox.excluded_routes()
+    sandbox.record_failure(
+        "llama_cpp", "qwen2.5-coder:1.5b",
+        "EmpireCoderSandboxError:model_inference_deadline_exceeded",
+    )
+    # A new disposable Coder clone reads the original, retained telemetry.
+    new_clone = _SandboxWriterHealth(tmp_path)
+    assert ("llama_cpp", "qwen2.5-coder:1.5b") in new_clone.excluded_routes()
+    assert ("ollama", "qwen3-coder:30b") in new_clone.excluded_routes()
+    first = new_clone.snapshot()["routes"]["llama_cpp:qwen2.5-coder:1.5b"]
+    assert first["cooldown_seconds_applied"] == 300
+    assert "TimeoutError" in first["last_error"]
+    new_clone.record_failure(
+        "llama_cpp", "qwen2.5-coder:1.5b",
+        "EmpireCoderSandboxError:model_inference_deadline_exceeded",
+    )
+    second = new_clone.snapshot()["routes"]["llama_cpp:qwen2.5-coder:1.5b"]
+    assert second["cooldown_seconds_applied"] == 600
+
+    # The original worker's own provider state is never overwritten.
+    assert original_path.read_bytes() == original_before
+    new_clone.record_success("llama_cpp", "qwen2.5-coder:1.5b")
+    assert ("llama_cpp", "qwen2.5-coder:1.5b") not in new_clone.excluded_routes()
+    assert ("ollama", "qwen3-coder:30b") in new_clone.excluded_routes()
+
+
+def test_sandbox_model_health_recovers_malformed_private_cache(tmp_path):
+    from empire_os.empire_coder_sandbox_runner import _SandboxWriterHealth
+
+    private = tmp_path / "runtime/execution_plane/coder_sandbox_model_health.json"
+    private.parent.mkdir(parents=True, exist_ok=True)
+    private.write_text('{"routes": null}')
+    health = _SandboxWriterHealth(tmp_path)
+    assert health.excluded_routes() == ()
+    health.record_failure("llama_cpp", "tiny", "TimeoutError")
+    assert ("llama_cpp", "tiny") in health.excluded_routes()

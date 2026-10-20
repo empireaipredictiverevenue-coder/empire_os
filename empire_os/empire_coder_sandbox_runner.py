@@ -31,6 +31,7 @@ from empire_os.builder_capabilities import (
 )
 from empire_os.coder import EmpireCoder
 from empire_os.coder.context import ContextDocument
+from empire_os.coder.provider_health import ProviderHealth
 from empire_os.coder.models import VerificationVerdict
 from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
 
@@ -45,6 +46,44 @@ DEFAULT_WORK_ROOT = Path("/var/tmp/empire-coder-sandbox")
 
 class EmpireCoderSandboxError(RuntimeError):
     pass
+
+
+class _SandboxWriterHealth:
+    """Read original Coder cooldowns; persist sandbox failures separately.
+
+    The disposable clone owns task state, but must not forget recorded
+    model failures on each launch. Read original worker health without
+    changing it; sandbox telemetry uses a separately leased private file.
+    """
+
+    def __init__(self, original_root: Path) -> None:
+        self.original = ProviderHealth(
+            original_root / "runtime/coder/model_health.json"
+        )
+        self.sandbox = ProviderHealth(
+            original_root / "runtime/execution_plane/coder_sandbox_model_health.json"
+        )
+
+    def excluded_routes(self):
+        return tuple(sorted(set(
+            self.original.excluded_routes()
+        ) | set(self.sandbox.excluded_routes())))
+
+    def record_failure(self, provider: str, model: str, error: str) -> None:
+        # Sandbox deadline alarms are real transport-level time budgets.
+        # Classify them as timeout failures for the original bounded,
+        # escalating cooldown policy; retain the original reason text.
+        reason = str(error)
+        if "model_inference_deadline_exceeded" in reason:
+            reason += ":TimeoutError"
+        self.sandbox.record_failure(provider, model, reason)
+
+    def record_success(self, provider: str, model: str) -> None:
+        self.sandbox.record_success(provider, model)
+
+    def snapshot(self):
+        return self.sandbox.snapshot()
+
 
 
 @contextmanager
@@ -324,7 +363,10 @@ def run_empire_coder_sandbox_job(
         lease = manager.acquire(
             owner="empire_coder",
             job_id=job.job_id,
-            resources=job.lease_resources,
+            resources=tuple(dict.fromkeys((
+                *job.lease_resources,
+                "domain:coder_sandbox_model_health",
+            ))),
             ttl_seconds=job.max_runtime_seconds + 300,
         )
     except ExecutionLeaseError as exc:
@@ -480,7 +522,20 @@ def run_empire_coder_sandbox_job(
                             clone,
                             runtime_root=clone / "runtime/coder",
                         )
+                        # A new clone must not forget prior sandbox failures
+                        # or the original worker's current model cooldowns.
+                        coder.model_health = _SandboxWriterHealth(root)
                         task = coder.create_task(job.objective)
+                        eligible_route = coder.router.route(
+                            task.objective,
+                            role="writer",
+                            exclude=coder.model_health.excluded_routes(),
+                        )
+                        if (eligible_route.provider not in {"ollama", "llama_cpp"}
+                                or not eligible_route.local):
+                            result["status"] = "MODEL_ROUTE_COOLDOWN"
+                            result["reason"] = "no_healthy_eligible_local_writer"
+                            return result
                         context = coder.build_context(
                             task.id,
                             terms=(),
