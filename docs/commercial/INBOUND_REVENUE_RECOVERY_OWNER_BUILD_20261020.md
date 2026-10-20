@@ -338,3 +338,44 @@ https://developers.google.com/identity/protocols/oauth2/web-server
 https://developers.google.com/workspace/calendar/api/auth
 https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/get
 https://developers.google.com/workspace/calendar/api/v3/reference/events/get
+
+
+## 20 October — OpenManus review integration and dark staging deploy package
+
+**Scope:** Revenue Recovery Engine only. No real OpenManus worker was found installed/running on EmpireOS. No live Google OAuth grant, customer calendar, call routing, customer messaging, booking writes or finance operations have been authorised.
+
+### Added
+
+- empire_os/inbound_calendar_connection_api.py — guarded POST /v1/inbound-recovery/calendar-connect/start, GET /callback and GET /status. All are dark by default and 404 when unconfigured. If separately enabled, requires two distinct trustworthy identities: a dedicated Ed25519 calendar-connect Bearer from the existing EmpireOS issuer and an independently authenticated active browser session using live EmpireDB owner/admin membership. Requires same tenant/subject, exact HTTPS origin, explicit customer permission for read-only calendar access and one-time PKCE state. Callback checks the exact browser nonce via HttpOnly Secure SameSite=Lax __Host- cookie; completion must be an independently injected privileged adapter. No provider actions in the default service.
+- empire_os/inbound_calendar_oauth_onboarding.py — binds the customer's requested calendar ID into the authenticated one-time consent ticket. Enrollment checks this exact ID against the Google Calendar role read-back (calendarList.get).
+- empire_os/inbound_manus_review_bridge.py — per-project, offline, idempotent OpenManus owner review-job outbox. Bounded allowlisted task and handoff path, full Git SHA identity, no customer data and no secrets. Stage/read CLI scripts/review_inbound_openmanus_handoff_20261020.py. No dispatch occurs: worker_connected remains false, execution_authority none. Existing autonomous execution bus remains OBSERVE and is not repurposed for browser work.
+- empire_os/inbound_calendar_connection_service.py — private FastAPI dark staging app with secure response headers, no documentation routes. All OAuth HTTP functionality disabled. Its /health endpoint explicitly reports google_calendar_connected=false and openmanus_worker_verified=false.
+- deploy/systemd/empire-inbound-recovery-staging.service and scripts/deploy_inbound_recovery_dark_loopback_20261020.sh — source-pinned new service on 127.0.0.1:8794 ONLY, no public ingress. Root preflight checks reviewed git tree and port, service unit validation, then a separately flagged start-only stage deployment with 200 health /404 OAuth and docs evidence. Unit not enabled on reboot. This is NOT the production SaaS auth runtime.
+
+### Staging lifecycle
+
+Read-only test and preflight:
+    cd /home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q tests/test_inbound_*.py tests/test_voice_gateway_api.py
+    sudo -n bash scripts/deploy_inbound_recovery_dark_loopback_20261020.sh --preflight
+
+Explicit dark loopback install if preflight passes (separate from customer production activation):
+    sudo -n bash scripts/deploy_inbound_recovery_dark_loopback_20261020.sh --apply --founder-approved-dark-loopback-only
+
+OpenManus bounded handoff:
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_openmanus_handoff_20261020 --outbox /private/owner-owned/review-jobs.db --read-only
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_openmanus_handoff_20261020 --outbox /private/owner-owned/review-jobs.db --code-commit FULL_GIT_SHA --stage-offline-only
+
+Job staging is NOT real agent execution. The already installed autonomous execution bus runs OBSERVE. A running authorised OpenManus worker has not been verified; no tasks can be dispatched or accepted until separately provisioned, authenticated and approved.
+
+### Production release blockers
+
+1. Privileged first-party issuer must mint the dedicated calendar-connect Ed25519 audience/scope only after authenticated customer owner/admin approval. Existing CRM read tokens are explicitly rejected.
+2. An independently authenticated same-browser session resolver must validate the callback against the live, canonical EmpireDB owner/admin membership. Do not accept bearer, query, cookie content or nonce alone as a substitute.
+3. Configure verified Google Cloud OAuth client ID and exact callback origin; deploy confidential backend exchange using production KMS-backed refresh-token vault, provider permission revocation and per-tenant audit. Local Fernet SQLite staging vault is not a production secret manager.
+4. Wire the privileged callback completion only when issuer, session authority, public HTTPS ingress, secrets vault, tenant-specific calendar selection, error recovery and audit are fully reviewed. The dark staging service MUST remain disabled until these prerequisites are met.
+5. Privately validate the real selected customer's Google calendar read-back, source marker and retained consent, plus production PostgreSQL/RLS and transactional evidence outbox.
+6. Identify and authenticate a genuine existing OpenManus worker and constrain it to public documentation/browser UX review tasks only. It must not handle tokens, client secrets, customer data, production actions or independent code modification.
+7. Final supervised pilot approval requires owner consent, privacy/retention verification, revocation controls, real-provider readback, monitored rollback and a non-inflated commercial proof model.
+
+Do NOT describe dark staging health=200 as a live customer product deployment.

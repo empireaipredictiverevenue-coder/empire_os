@@ -29,6 +29,7 @@ def ticket(tenant="a"):
         tenant_id=tenant, admin_subject="authorized-admin-1",
         client_id=CLIENT, redirect_uri="https://empire.example.com/calendar/oauth/callback",
         authorization_code="once-only-code", code_verifier="pkce-verifier",
+        selected_calendar_id=CAL,
     )
 
 

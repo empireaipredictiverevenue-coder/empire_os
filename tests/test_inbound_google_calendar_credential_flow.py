@@ -97,7 +97,7 @@ def test_one_time_google_consent_to_verified_booking_projection(tmp_path):
         start = consent.begin(
             tenant_id="pilot-tenant", admin_subject="authenticated-owner",
             client_id=CLIENT, redirect_uri="https://example.org/oauth/callback",
-            now=NOW,
+            now=NOW, selected_calendar_id=CAL,
         )
         state = parse_qs(urlsplit(start.authorization_url).query)["state"][0]
         ticket = consent.consume(

@@ -61,7 +61,8 @@ def enroll_google_calendar_offline(
     binding.check()
     if (not isinstance(owner_approval_evidence_ref, str) or
         not owner_approval_evidence_ref.strip() or
-        ticket.tenant_id != binding.tenant_id):
+        ticket.tenant_id != binding.tenant_id or
+        ticket.selected_calendar_id != binding.calendar_id):
         raise CalendarVerificationError("customer_approval_or_tenant_mismatch")
     if registry.read_only:
         raise CalendarVerificationError("calendar_enrollment_requires_private_writable_registry")

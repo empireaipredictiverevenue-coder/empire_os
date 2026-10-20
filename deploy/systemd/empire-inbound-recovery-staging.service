@@ -1,0 +1,31 @@
+[Unit]
+Description=Empire Revenue Recovery Calendar Connection (dark loopback staging)
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+Environment=PYTHONPATH=/home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=EMPIRE_INBOUND_CALENDAR_CONNECTION_MODE=disabled
+ExecStart=/srv/empire_os/.venv/bin/python -B -m uvicorn empire_os.inbound_calendar_connection_service:app --host 127.0.0.1 --port 8794 --no-proxy-headers --no-access-log --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+UMask=0077
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

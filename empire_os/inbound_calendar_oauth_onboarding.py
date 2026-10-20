@@ -47,6 +47,7 @@ class OneTimeGoogleCodeTicket:
     redirect_uri: str
     authorization_code: str = field(repr=False)
     code_verifier: str = field(repr=False)
+    selected_calendar_id: str = ""
     live_provider_access_granted: bool = False
 
 
@@ -85,6 +86,7 @@ class OfflineGoogleConsentStateStore:
                 redirect_uri TEXT NOT NULL,
                 encrypted_verifier BLOB NOT NULL,
                 browser_nonce_sha256 TEXT NOT NULL DEFAULT '',
+                selected_calendar_id TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 expires_at TEXT NOT NULL,
                 consumed INTEGER NOT NULL DEFAULT 0
@@ -101,6 +103,7 @@ class OfflineGoogleConsentStateStore:
         self, *, tenant_id: str, admin_subject: str,
         client_id: str, redirect_uri: str,
         now: datetime, browser_nonce: str | None = None,
+        selected_calendar_id: str = "",
     ) -> GoogleConsentRequest:
         _as_of(now)
         for field_name, value in (
@@ -109,6 +112,8 @@ class OfflineGoogleConsentStateStore:
         ):
             if not isinstance(value, str) or not value.strip() or len(value) > 200:
                 raise OAuthOnboardingDenied(f"oauth_{field_name}_required")
+        if not isinstance(selected_calendar_id, str) or len(selected_calendar_id) > 240:
+            raise OAuthOnboardingDenied("invalid_requested_calendar_id")
         _https_redirect(redirect_uri)
         if browser_nonce is not None and (
             not isinstance(browser_nonce, str) or
@@ -125,12 +130,13 @@ class OfflineGoogleConsentStateStore:
             self.db.execute(
                 "INSERT INTO oauth_pending "
                 "(state_sha256,tenant_id,admin_subject,client_id,redirect_uri,"
-                "encrypted_verifier,created_at,expires_at,browser_nonce_sha256) "
-                "VALUES(?,?,?,?,?,?,?,?,?)",
+                "encrypted_verifier,created_at,expires_at,browser_nonce_sha256,selected_calendar_id) "
+                "VALUES(?,?,?,?,?,?,?,?,?,?)",
                 (sha256(state.encode()).hexdigest(), tenant_id, admin_subject,
                  client_id, redirect_uri, self.fernet.encrypt(verifier.encode()),
                  now.isoformat(), expire.isoformat(),
-                 sha256(browser_nonce.encode()).hexdigest() if browser_nonce else ""),
+                 sha256(browser_nonce.encode()).hexdigest() if browser_nonce else "",
+                 selected_calendar_id),
             )
         params = urlencode({
             "client_id": client_id,
@@ -165,7 +171,7 @@ class OfflineGoogleConsentStateStore:
         try:
             row = self.db.execute(
                 "SELECT tenant_id,admin_subject,client_id,redirect_uri,"
-                "encrypted_verifier,created_at,expires_at,consumed,browser_nonce_sha256 "
+                "encrypted_verifier,created_at,expires_at,consumed,browser_nonce_sha256,selected_calendar_id "
                 "FROM oauth_pending WHERE state_sha256=?",
                 (sha256(state.encode()).hexdigest(),),
             ).fetchone()
@@ -195,6 +201,7 @@ class OfflineGoogleConsentStateStore:
             return OneTimeGoogleCodeTicket(
                 tenant_id=tenant_id, admin_subject=admin_subject,
                 client_id=row[2], redirect_uri=row[3],
+                selected_calendar_id=row[9],
                 authorization_code=authorization_code, code_verifier=verifier,
             )
         except Exception:
