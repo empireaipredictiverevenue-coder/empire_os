@@ -161,7 +161,10 @@ def review_reader_release_transition(
         ) | {None}
     )
     if valid_prior_transition:
-        last_known = previous_transition["last_confirmed_original_owner_state"]
+        last_known = (
+            previous_transition.get("last_confirmed_original_owner_state")
+            or last_known
+        )
     after = current["status"]
     if after == unknown:
         state = "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"

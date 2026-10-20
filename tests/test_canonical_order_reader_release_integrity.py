@@ -180,3 +180,27 @@ def test_untrusted_previous_transition_does_not_restore_forged_authority(tmp_pat
     out = review_reader_release_transition(source, unavailable, modified)
     assert out["existing_owner_review_eligible"] is False
     assert out["last_confirmed_original_owner_state"] == "VERIFIED_ORDER_READER_NOT_COMMITTED"
+
+
+def test_existing_production_checkpoint_pre_upgrade_has_no_last_confirmed_field(tmp_path):
+    root, source = repo(tmp_path, NO_METHOD)
+    current = inspect_canonical_reader_release_integrity(root)
+    old_packet = {
+        "schema_version": "empire.commercial.canonical_reader_release_transition.v1",
+        "mode": "OBSERVE",
+        "status": "FIRST_ORIGINAL_OWNER_RELEASE_INTEGRITY_CHECK",
+        "previous_allowlisted_owner_state": None,
+        "current_allowlisted_owner_state": current["status"],
+        "existing_owner_review_eligible": False,
+        "new_agent_created": False,
+        "outbound_authorized": False,
+        "database_writes": False,
+        "execution_authority": "none",
+    }
+    unknown = dict(current, status="ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN")
+    after = review_reader_release_transition(
+        current, unknown, previous_transition=old_packet,
+    )
+    assert after["status"] == "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
+    assert after["last_confirmed_original_owner_state"] == current["status"]
+    assert after["outbound_authorized"] is False
