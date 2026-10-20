@@ -1,0 +1,22 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [
+    "empire_os/predictive_canonical_sales_evidence_bridge.py",
+    "tests/test_predictive_canonical_sales_evidence_bridge.py"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-20T17:58:18.121891+00:00",
+  "job_id": "predictive-canonical-sales-owner-evidence-20261020-v1",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/predictive_canonical_sales_evidence_bridge.py",
+    "path:tests/test_predictive_canonical_sales_evidence_bridge.py"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "IMPLEMENT a scoped Predictive Revenue canonical customer-source evidence adapter, not another strategy document. Reuse the existing read-only sales reconciliation owner contract scripts.reconcile_founder_sales_handoff_aggregate_readonly, its schema empire.founder.sales_acquisition_crm_reconciliation.v1 and existing dedicated CRM source-owner readers. Original operator result from 20 Oct has 0 canonical commercial, 0 canonical predictive acquisitions, 0 founder-visible sales, status NO_CANONICAL_SALES_ACQUISITION_OBSERVED. Other Predictive feature branch feature/predictive-decision-control-20261018 commit 9ad315d3420e8703c06eaa72b9366afd86256d95 has newer commercial evidence custody gates; DO NOT overwrite or merge that branch. Implement a pure, bounded, privacy-safe owner reconciliation classification in NEW empire_os/predictive_canonical_sales_evidence_bridge.py, with focused tests in NEW tests/test_predictive_canonical_sales_evidence_bridge.py. Strict input schema/boolean/integer/sum consistency, read-only execution, fail-closed on counts >=1 without exact per-record authenticated source/customer authority; explicitly distinguish ZERO canonical cohort from UNAVAILABLE probe and SOURCE_AND_CRM_NEED_RECEIPT_MATCH. Prevent source reported counts, user/pasted JSON, A2A research tickets, commercial enquiries or prospect visibility from elevating customer order/forecast training/payment authority. No PII in output. Deterministic typed classifications including owner next step and 6-stage original proof still unmet. Preserve Unknown != 0. Return implementation and passing regression evidence. Work only in fresh isolated proposed branch/worktree, never /srv/empire_os dirty live checkout. No privileged command, no production deploy, no CRM writes, no outbound, no keys, no funds. Only the two allowlisted files may be created/modified. If no capable model, fail explicitly, do not invent implementation. Completion is real reviewed code+tests, not a research handoff.",
+  "pytest_targets": [
+    "tests/test_predictive_canonical_sales_evidence_bridge.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
