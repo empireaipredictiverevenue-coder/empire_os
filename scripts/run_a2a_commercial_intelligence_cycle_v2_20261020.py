@@ -22,6 +22,7 @@ from empire_os.a2a_signal_decision_intelligence_v2 import make_decision_intellig
 from empire_os.a2a_opportunity_graph_v2 import make_opportunity_graph
 from empire_os.a2a_evidence_history_v2 import merge_evidence_history
 from empire_os.a2a_founder_targeting_cycle_v1 import build_prompted_research
+from empire_os.a2a_target_owner_handoff_v1 import make_owner_research_handoffs, make_handoff_source_hold
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -69,6 +70,21 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
     prompt_config = _read(Path(__file__).resolve().parents[1] /
                           "config/a2a_candidates/founder_targeting_prompts_v1.json")[0]
     targeting = build_prompted_research(prompt_config, payload["community"][0])
+    try:
+        buyer_scout_snapshot = _read(BASE / "buyer_acquisition/scout_latest.json")[0]
+    except (OSError, ValueError, json.JSONDecodeError):
+        owner_handoffs = make_handoff_source_hold(
+            reason="BUYER_SCOUT_SOURCE_UNAVAILABLE",
+            profile_count=targeting["profile_count"],
+        )
+    else:
+        try:
+            owner_handoffs = make_owner_research_handoffs(targeting, buyer_scout_snapshot)
+        except ValueError:
+            owner_handoffs = make_handoff_source_hold(
+                reason="BUYER_SCOUT_SOURCE_UNTRUSTED",
+                profile_count=targeting["profile_count"],
+            )
     campaigns = build_data_campaign_experiments(current)
     nyc = inspect_nyc_pilot(
         report=payload["nyc"][0],
@@ -89,6 +105,7 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
         "intel": intelligence, "graph": make_opportunity_graph(intelligence, releases),
         "history": evidence_history,
         "targeting": targeting,
+        "buyer_owner_handoffs": owner_handoffs,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -113,6 +130,7 @@ def main() -> int:
             ("opportunity_evidence_graph_v2.json", "graph"),
             ("evidence_history_v2.json", "history"),
             ("founder_prompted_targeting_v1.json", "targeting"),
+            ("buyer_owner_research_handoffs_v1.json", "buyer_owner_handoffs"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -135,6 +153,8 @@ def main() -> int:
         "history_source_snapshots": outcome["history"]["source_snapshots_recorded"],
         "founder_target_profiles": outcome["targeting"]["profile_count"],
         "target_profiles_with_public_research_venues": outcome["targeting"]["targets_with_public_sources"],
+        "prepared_buyer_owner_research_tickets": outcome["buyer_owner_handoffs"]["prepared_handoff_ticket_count"],
+        "actual_owner_tasks_dispatched": outcome["buyer_owner_handoffs"]["tasks_dispatched"],
         "new_source_snapshots_this_run": outcome["history"]["new_source_snapshot_recorded_this_run"],
         "source_health": x["source_health"],
         "catalogue_stale": x["catalogue_stale"],
