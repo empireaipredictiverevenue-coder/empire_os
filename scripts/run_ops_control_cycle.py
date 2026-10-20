@@ -22,6 +22,7 @@ from empire_os.sovereign_infrastructure_observer import collect_sovereign_infras
 from empire_os.conversation_control_operational_truth import inspect_conversation_evidence
 from empire_os.commercial_adaptive_ops_bridge import observe_ops_adaptive_commercial
 from empire_os.commercial_adaptive_event_journal import append_change_once
+from empire_os.first_sale_live_conversion_observer import observe_first_sale_readiness
 from empire_os.supabase_egress_guard import (
     MANAGED_TIMERS,
     supabase_egress_contained,
@@ -504,7 +505,16 @@ def main() -> int:
         conversation_proof=conversation_evidence_review,
         now=datetime.now(timezone.utc),
     )
+    # Existing five-minute Ops owner, not a new commercial daemon.
+    # Only the exact production root performs the original privileged
+    # READ ONLY aggregate and private checkout GET; sandbox runs remain offline.
+    first_sale = observe_first_sale_readiness(
+        root=OUTPUT.parents[2],
+        now=datetime.now(timezone.utc),
+        previous=previous.get("first_sale_conversion_readiness"),
+    )
     health_domains["adaptive_commercial_intelligence"] = adaptive["summary"]["status"]
+    health_domains["first_sale_conversion"] = first_sale["status"]
     # Leadgen historical baseline is separate from adaptive evidence memory.
     # Seed exactly one baseline event when change-only history is first installed.
     if not (OUTPUT.parent / "leadgen_truth_transitions.jsonl").exists():
@@ -524,6 +534,7 @@ def main() -> int:
         "sovereign_infrastructure": sovereign_infrastructure,
         "conversation_evidence_review": conversation_evidence_review,
         "adaptive_commercial_summary": adaptive["summary"],
+        "first_sale_conversion_readiness": first_sale,
         "adaptive_sales_review": adaptive["sales"],
         "adaptive_commercial_review": adaptive["control"],
         "leadgen_truth_transition": transition,
