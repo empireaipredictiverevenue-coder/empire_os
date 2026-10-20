@@ -23,6 +23,9 @@ from empire_os.a2a_opportunity_graph_v2 import make_opportunity_graph
 from empire_os.a2a_evidence_history_v2 import merge_evidence_history
 from empire_os.a2a_founder_targeting_cycle_v1 import build_prompted_research
 from empire_os.a2a_target_owner_handoff_v1 import make_owner_research_handoffs, make_handoff_source_hold
+from empire_os.a2a_owner_research_protocol_v1 import make_owner_pickup_packets
+from empire_os.a2a_owner_receipt_intake_v1 import inspect_owner_receipt_files
+from empire_os.a2a_owner_pickup_change_tracking_v1 import review_pickup_changes
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -62,7 +65,8 @@ def _write(name: str, content: dict) -> None:
         if os.path.exists(path):
             os.unlink(path)
 
-def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
+def run(*, previous: dict | None = None, history: dict | None = None,
+        previous_owner_pickup: dict | None = None) -> dict:
     payload = {name: _read(path) for name, path in SOURCES.items()}
     current = mine_signals(
         community=payload["community"][0], revenue_gps=payload["gps"][0],
@@ -85,6 +89,11 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
                 reason="BUYER_SCOUT_SOURCE_UNTRUSTED",
                 profile_count=targeting["profile_count"],
             )
+    owner_pickup = make_owner_pickup_packets(owner_handoffs)
+    receipt_review = inspect_owner_receipt_files(
+        owner_pickup, LOCAL / "owner_signed_receipts",
+    )
+    pickup_delta = review_pickup_changes(owner_pickup, previous_owner_pickup)
     campaigns = build_data_campaign_experiments(current)
     nyc = inspect_nyc_pilot(
         report=payload["nyc"][0],
@@ -106,6 +115,9 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
         "history": evidence_history,
         "targeting": targeting,
         "buyer_owner_handoffs": owner_handoffs,
+        "owner_pickup": owner_pickup,
+        "owner_receipt_review": receipt_review,
+        "pickup_change_tracking": pickup_delta,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -122,7 +134,11 @@ def main() -> int:
         previous = _read(previous_path)[0]
     history_path = LOCAL / "evidence_history_v2.json"
     history = _read(history_path)[0] if history_path.is_file() and not history_path.is_symlink() else None
-    outcome = run(previous=previous, history=history)
+    prior_pickup_path = LOCAL / "owner_research_pickup_v1.json"
+    prior_pickup = (_read(prior_pickup_path)[0] if prior_pickup_path.is_file()
+                    and not prior_pickup_path.is_symlink() else None)
+    outcome = run(previous=previous, history=history,
+                  previous_owner_pickup=prior_pickup)
     if args.write_local:
         for filename, key in (
             ("latest.json", "signal"),
@@ -131,6 +147,9 @@ def main() -> int:
             ("evidence_history_v2.json", "history"),
             ("founder_prompted_targeting_v1.json", "targeting"),
             ("buyer_owner_research_handoffs_v1.json", "buyer_owner_handoffs"),
+            ("owner_research_pickup_v1.json", "owner_pickup"),
+            ("owner_signed_receipts_review_v1.json", "owner_receipt_review"),
+            ("owner_pickup_change_tracking_v1.json", "pickup_change_tracking"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -155,6 +174,11 @@ def main() -> int:
         "target_profiles_with_public_research_venues": outcome["targeting"]["targets_with_public_sources"],
         "prepared_buyer_owner_research_tickets": outcome["buyer_owner_handoffs"]["prepared_handoff_ticket_count"],
         "actual_owner_tasks_dispatched": outcome["buyer_owner_handoffs"]["tasks_dispatched"],
+        "owner_pickup_requests": outcome["owner_pickup"]["pickup_count"],
+        "authenticated_owner_reply_count": outcome["owner_receipt_review"]["authenticated_owner_replies"],
+        "owner_trust_state": outcome["owner_receipt_review"]["trust_store_state"],
+        "new_owner_pickup_requests": outcome["pickup_change_tracking"]["new_request_count"],
+        "unchanged_owner_pickups_not_reissued": outcome["pickup_change_tracking"]["unchanged_request_count"],
         "new_source_snapshots_this_run": outcome["history"]["new_source_snapshot_recorded_this_run"],
         "source_health": x["source_health"],
         "catalogue_stale": x["catalogue_stale"],
