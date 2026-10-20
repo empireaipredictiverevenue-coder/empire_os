@@ -1,0 +1,22 @@
+{
+  "ai_behavior_change": true,
+  "allowed_paths": [
+    "empire_os/coder_supervisor.py",
+    "tests/test_coder_supervisor.py"
+  ],
+  "authority": "internal_write",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-10-20T13:52:53.324634+00:00",
+  "job_id": "coder-supervisor-approved-execution-repair-20261020",
+  "kind": "code_task",
+  "lease_resources": [
+    "path:empire_os/coder_supervisor.py",
+    "path:tests/test_coder_supervisor.py"
+  ],
+  "max_runtime_seconds": 900,
+  "prompt": "Founder-approved engineering repair of the EXISTING Empire Coder Founder Directive supervisor. Observed blockers: shared checkout has unrelated uncommitted files; two implementation_ready directives lack authenticated execution-plane request IDs, exact allowed paths and required tests; PLAN promotions lack IMPLEMENT contracts. Implement the SMALLEST SAFE change to empire_os/coder_supervisor.py and tests/test_coder_supervisor.py that preserves every original approval and lease, NEVER edits other owners files, NEVER fabricates contracts, and supports explicitly authorised, source-backed implementation via the EXISTING isolated execution-plane route instead of bypassing dirty checkout protections. Make absent execution authorisation remain HELD with explicit reason. Keep legacy tests passing; add checks for dirty checkout and missing authorization. No production deploy, outbound, database writes, commercial activation or changes outside two files. Produce a proposal branch for independent owner review, not an auto-merge.",
+  "pytest_targets": [
+    "tests/test_coder_supervisor.py"
+  ],
+  "schema_version": "empire.hermes.control_job.v1"
+}
