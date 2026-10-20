@@ -84,24 +84,34 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
         raise HandoffHeld()
     start = _moment(control.get("starts_at"))
     end = _moment(control.get("ends_at"))
-    if not (0 < (end-start).total_seconds() <= 7200 and start <= now < end):
+    if not start <= now < end:
         raise HandoffHeld()
-    # The first pilot was 10AM-noon Chicago on 19 October, but buyer
-    # approval covers normal weekday offer hours. A *new* explicit config
-    # window can be selected for a supervised retry; no calls are enabled
-    # until the operator activates that exact window. Keep one local day,
-    # weekday business hours and the existing two-hour maximum.
+    mode = control.get("mode", "SUPERVISED_PILOT")
     chicago = ZoneInfo("America/Chicago")
     local_start = start.astimezone(chicago)
     local_end = end.astimezone(chicago)
-    start_min = local_start.hour * 60 + local_start.minute
-    end_min = local_end.hour * 60 + local_end.minute
-    if (local_start.weekday() >= 5
-            or local_start.date() != local_end.date()
-            or not 480 <= start_min < 1080
-            or not 480 < end_min <= 1080):
+    if mode == "FULL_CAMPAIGN":
+        # An explicit, time-bounded campaign is distinct from the old pilot.
+        # Buyer source is the actual 19 Oct reply: "Yes. You can get started".
+        # Site traffic is controlled here, not by an invented buyer daily cap.
+        if (control.get("buyer_live_authorization_ref") != "gmail:1a1551ac7204ff8a"
+                or control.get("founder_authority_ref")
+                   != "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+                or control.get("traffic_source") != "EMPIRE_FIRST_PARTY_ORGANIC"
+                or not 1 <= (end - start).total_seconds() / 86400 <= 14
+                or type(control.get("max_daily_site_handoffs")) is not int
+                or not 1 <= control["max_daily_site_handoffs"] <= 1000
+                or not chicago_buyer_hours_open(now)):
+            raise HandoffHeld()
+    elif mode == "SUPERVISED_PILOT":
+        if not (0 < (end - start).total_seconds() <= 7200
+                and local_start.weekday() < 5
+                and local_start.date() == local_end.date()
+                and 480 <= local_start.hour * 60 + local_start.minute < 1080
+                and 480 < local_end.hour * 60 + local_end.minute <= 1080):
+            raise HandoffHeld()
+    else:
         raise HandoffHeld()
-    # Deliberately bound the ledger to the selected window.
     return f"{CAMPAIGN}:{start.isoformat()}:{end.isoformat()}", end
 
 
@@ -173,6 +183,31 @@ def chicago_buyer_hours_open(now: datetime) -> bool:
     return start * 60 <= minutes < end * 60
 
 
+def _ledger_available(state: Mapping[str, Any] | None, control: Mapping[str, Any],
+                      window: str, limit: int, now: datetime) -> bool:
+    if state is None:
+        return True
+    if (state.get("schema_version") != LEDGER_SCHEMA
+            or state.get("window") != window
+            or type(state.get("site_handoffs")) is not int
+            or not 0 <= state["site_handoffs"] < limit):
+        return False
+    if control.get("mode") != "FULL_CAMPAIGN":
+        return True
+    # Persist lifetime totals, resetting ONLY the daily usage at Chicago
+    # midnight. Do not erase prior events or rely on the host's timezone.
+    day = now.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
+    counted_day = state.get("local_day")
+    counted = state.get("daily_site_handoffs")
+    if (not isinstance(counted_day, str)
+            or type(counted) is not int or counted < 0
+            or counted > state["site_handoffs"]
+            or counted_day > day):
+        return False
+    used = counted if counted_day == day else 0
+    return used < control["max_daily_site_handoffs"]
+
+
 def site_handoff_available(
     zip_code: str, *, config_path: Path = CONFIG,
     ledger_path: Path = LEDGER, readiness: Mapping[str, Any],
@@ -192,12 +227,7 @@ def site_handoff_available(
         window, _ = _control(control, now)
         limit = _handoff_limit(control)
         state = _json(ledger_path) if ledger_path.exists() else None
-        if state is None:
-            return True
-        return (state.get("schema_version") == LEDGER_SCHEMA
-                and state.get("window") == window
-                and type(state.get("site_handoffs")) is int
-                and 0 <= state["site_handoffs"] < limit)
+        return _ledger_available(state, control, window, limit, now)
     except (HandoffHeld, OSError, TypeError, ValueError):
         return False
 
@@ -216,7 +246,6 @@ def reserve_site_handoff(
         readiness=readiness, eligible_zip=eligible_zip, now=now,
     ):
         raise HandoffHeld()
-    window, _ = _control(_json(config_path), now)
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     lock = ledger_path.with_suffix(".lock")
     with lock.open("a+b") as handle:
@@ -227,9 +256,26 @@ def reserve_site_handoff(
             readiness=readiness, eligible_zip=eligible_zip, now=now,
         ):
             raise HandoffHeld()
-        existing = _json(ledger_path) if ledger_path.exists() else {
+        # The emergency STOP uses this same lock. Re-read the exact current
+        # control in the lock to keep limits and window changes atomic.
+        control = _json(config_path)
+        window, _ = _control(control, now)
+        prior = _json(ledger_path) if ledger_path.exists() else None
+        if not _ledger_available(prior, control, window,
+                                 _handoff_limit(control), now):
+            raise HandoffHeld()
+        existing = prior if prior is not None else {
             "schema_version": LEDGER_SCHEMA, "window": window, "site_handoffs": 0,
         }
+        if control.get("mode") == "FULL_CAMPAIGN":
+            day = now.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
+            if "local_day" not in existing:
+                existing["local_day"] = day
+                existing["daily_site_handoffs"] = 0
+            if existing["local_day"] != day:
+                existing["local_day"] = day
+                existing["daily_site_handoffs"] = 0
+            existing["daily_site_handoffs"] += 1
         existing["site_handoffs"] += 1
         _write_atomic(ledger_path, existing)
         fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
@@ -255,11 +301,6 @@ def verified_site_handoff_control(
         if not ledger_path.exists():
             return True
         ledger = _json(ledger_path)
-        return (
-            ledger.get("schema_version") == LEDGER_SCHEMA
-            and ledger.get("window") == window
-            and type(ledger.get("site_handoffs")) is int
-            and 0 <= ledger["site_handoffs"] < limit
-        )
+        return _ledger_available(ledger, control, window, limit, clock)
     except (HandoffHeld, OSError, AttributeError, TypeError, ValueError):
         return False

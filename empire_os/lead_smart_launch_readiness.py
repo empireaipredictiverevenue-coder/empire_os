@@ -25,7 +25,10 @@ def _supervised_buyer_confirmation(record: Mapping[str, Any] | None, now: dateti
             or record.get("campaign_id") != "CA8278ed3f26e9495b881fe3833174d007"
             or record.get("tracking_number") != "+18883579305"
             or record.get("source_ref") != ROUTE_CONFIRMATION_SOURCE
-            or record.get("founder_authority_ref") != FIVE_CALL_SCOPE
+            or record.get("founder_authority_ref") not in (
+                FIVE_CALL_SCOPE,
+                "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json",
+            )
             or record.get("buyer_confirmed_direct_route") is not True
             or record.get("buyer_confirmed_original_ani") is not True
             or record.get("founder_witnessed_voice_connection") is not True
@@ -46,7 +49,18 @@ def _supervised_buyer_confirmation(record: Mapping[str, Any] | None, now: dateti
     end = end.astimezone(timezone.utc)
     local_start = start.astimezone(ZoneInfo("America/Chicago"))
     local_end = end.astimezone(ZoneInfo("America/Chicago"))
-    return (0 < (end - start).total_seconds() <= 7200
+    if record.get("mode") == "FULL_CAMPAIGN":
+        from empire_os.lead_smart_site_handoff import chicago_buyer_hours_open
+        return (record.get("buyer_live_authorization_ref")
+                == "gmail:1a1551ac7204ff8a"
+                and record.get("founder_authority_ref")
+                == "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+                and 1 <= (end - start).total_seconds() / 86400 <= 14
+                and start <= now < end and chicago_buyer_hours_open(now))
+    if record.get("mode") not in (None, "SUPERVISED_PILOT"):
+        return False
+    return (record.get("founder_authority_ref") == FIVE_CALL_SCOPE
+            and 0 < (end - start).total_seconds() <= 7200
             and start <= now < end
             and local_start.weekday() < 5
             and local_start.date() == local_end.date()
