@@ -30,6 +30,9 @@ def test_constraints_cover_native_bsc_replay_and_recurring_payments():
     for clause in (
         "UNIQUE (membership_id,period_index)",
         "UNIQUE (membership_id,period_start)",
+        "UNIQUE (id,tenant_id,buyer_id)",
+        "FOREIGN KEY (membership_id,tenant_id,buyer_id)",
+        "REFERENCES public.exchange_seat_memberships(id,tenant_id,buyer_id)",
         "payment_request_id uuid UNIQUE",
         "payment_evidence_id uuid UNIQUE",
         "invoice_order_id uuid UNIQUE",

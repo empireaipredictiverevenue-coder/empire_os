@@ -54,6 +54,7 @@ CREATE TABLE public.exchange_seat_memberships (
    CHECK (length(btrim(approved_issuer_ref)) BETWEEN 8 AND 160),
  created_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
  updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
+ UNIQUE (id,tenant_id,buyer_id),
  CHECK (contract_state <> 'accepted' OR accepted_terms_at IS NOT NULL),
  CHECK (contract_state <> 'cancelled' OR cancel_effective_at IS NOT NULL),
  CHECK (cancel_effective_at IS NULL OR cancel_effective_at >= billing_anchor_at)
@@ -66,10 +67,12 @@ CREATE INDEX exchange_seat_memberships_tenant_buyer_idx
 -- finance attestation and secure tenant-scoped owner writer.
 CREATE TABLE public.exchange_seat_invoice_cycles (
  id uuid PRIMARY KEY DEFAULT pg_catalog.gen_random_uuid(),
- membership_id uuid NOT NULL
-   REFERENCES public.exchange_seat_memberships(id) ON DELETE RESTRICT,
+ membership_id uuid NOT NULL,
  tenant_id uuid NOT NULL,
  buyer_id uuid NOT NULL REFERENCES public.buyers(id) ON DELETE RESTRICT,
+ FOREIGN KEY (membership_id,tenant_id,buyer_id)
+   REFERENCES public.exchange_seat_memberships(id,tenant_id,buyer_id)
+   ON DELETE RESTRICT,
  period_index integer NOT NULL CHECK (period_index BETWEEN 0 AND 23),
  period_start timestamptz NOT NULL,
  period_end timestamptz NOT NULL,
@@ -148,6 +151,8 @@ $postcheck$;
 
 -- Further controls REQUIRED BEFORE APPROVAL, not implemented here:
 -- 1. Trusted session tenant and buyer.org_id binding (enforced in DB).
+-- Composite FK already enforces cycle->member tenant/buyer; it does not
+-- prove buyers.org_id against caller tenant or authenticate current role.
 -- 2. Independently authenticated Stripe-free USDT/BSC settlement.
 -- 3. Immutable per-cycle event audit/reversal, concurrent invoice lock.
 -- 4. Terms/FX proof, cancellation, expiry, MRR recognition contracts.
