@@ -13,8 +13,14 @@ def test_synthetic_http_conversation_coverage(intent):
     result = run_demo(intent)
     assert result["status"] == "PASS_SYNTHETIC_SIGNED_WEBHOOK_CONVERSATION"
     assert result["steps"][:3] == ["talk", "input", "talk"]
-    assert result["steps"] == (["talk", "input", "talk", "input"]
-                              if intent == "unknown" else ["talk", "input", "talk"])
+    assert result["steps"] == (
+        ["talk", "input", "talk", "input", "talk", "input", "talk", "input", "talk"]
+        if intent in ("appointment", "callback")
+        else ["talk", "input", "talk", "input"] if intent == "unknown"
+        else ["talk", "input", "talk"]
+    )
+    assert result["review_draft_created"] is (intent in ("appointment", "callback"))
+    assert result["crm_write_performed"] is False
     assert result["voice_provider_connected"] is False
     assert result["actual_revenue"] is False
     assert result["contact_recorded"] is False

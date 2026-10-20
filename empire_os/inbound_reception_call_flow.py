@@ -14,6 +14,10 @@ from typing import Any
 from urllib.parse import urlparse
 
 from empire_os.inbound_provider_contract import InboundNumberRegistry, InboundNumberRoute
+from empire_os.inbound_reception_intake import (
+    CRMEnquiryDraft, MAX_INTAKE_ATTEMPTS, consent_answer, draft_for_call,
+    preferred_window, requested_service,
+)
 from empire_os.inbound_revenue_recovery import (
     TenantReceptionProfile, plan_reception_response,
 )
@@ -111,6 +115,11 @@ class CallSession:
     turns: int = 0
     closed: bool = False
     last_action: str = "greeted"
+    intake_stage: str = ""
+    enquiry_kind: str = ""
+    requested_service: str = ""
+    preferred_time_window: str = ""
+    intake_attempts: int = 0
 
 
 class InboundReceptionCallEngine:
@@ -130,6 +139,7 @@ class InboundReceptionCallEngine:
             raise ValueError("invalid_session_cap")
         self.max_sessions = max_sessions
         self.sessions: dict[str, CallSession] = {}
+        self.pending_handoffs: dict[tuple[str, str], CRMEnquiryDraft] = {}
         self.event_url = event_url
         # Validate the fixed callback URL now instead of at call answer time.
         build_ncco("Configuration check", event_url)
@@ -186,6 +196,36 @@ class InboundReceptionCallEngine:
             return build_ncco("Thank you. This conversation has ended.", None)
         session.turns += 1
         intent = extract_input(body)
+        # A privacy stop, emergency, or request for a person interrupts even
+        # a partially completed appointment/callback questionnaire.
+        if session.intake_stage and intent in {"opt_out", "emergency", "human"}:
+            session.closed = True
+            session.last_action = intent
+            session.intake_stage = ""
+            session.requested_service = ""
+            session.preferred_time_window = ""
+            decision = plan_reception_response(profile, intent)
+            return build_ncco(decision.spoken_text, None)
+        if session.intake_stage:
+            return self._reply_intake(session, profile, body)
+        if intent in {"book", "callback"}:
+            session.enquiry_kind = "appointment" if intent == "book" else "callback"
+            session.intake_stage = "service"
+            session.intake_attempts = 0
+            offerings = [
+                value for value in profile.services
+                if isinstance(value, str)
+                and re.fullmatch(r"[A-Za-z][A-Za-z0-9 -]{0,59}", value)
+            ]
+            services = ", ".join(offerings[:3]) or "general enquiry"
+            session.last_action = "enquiry_service_requested"
+            return build_ncco(
+                "I can prepare your " + session.enquiry_kind
+                + " request, but cannot confirm a time yet. "
+                + "What service do you need? You can say "
+                + services + ", or general enquiry.",
+                self.event_url,
+            )
         if intent == "unknown":
             if session.turns >= MAX_TURNS:
                 session.closed = True
@@ -211,4 +251,116 @@ class InboundReceptionCallEngine:
             + " I have not placed a booking or arranged an outgoing call. "
             "Please contact the business directly if you need immediate follow-up. Goodbye.",
             None,
+        )
+
+
+    def _retry_intake(self, session: CallSession, prompt: str) -> list[dict[str, Any]]:
+        session.intake_attempts += 1
+        if session.intake_attempts >= MAX_INTAKE_ATTEMPTS:
+            session.closed = True
+            session.last_action = "intake_needs_human"
+            session.intake_stage = ""
+            session.requested_service = ""
+            session.preferred_time_window = ""
+            return build_ncco(
+                "Sorry, I couldn't capture that request clearly. "
+                "Nothing was sent or booked. Please contact the business directly. Goodbye.",
+                None,
+            )
+        return build_ncco(prompt, self.event_url)
+
+    def _reply_intake(
+        self,
+        session: CallSession,
+        profile: TenantReceptionProfile,
+        body: dict[str, Any],
+    ) -> list[dict[str, Any]]:
+        if session.intake_stage == "service":
+            category = requested_service(body, profile)
+            if category is None:
+                return self._retry_intake(
+                    session,
+                    "Which service would you like? Please say one of the business's "
+                    "listed services, or say general enquiry.",
+                )
+            session.requested_service = category
+            session.intake_stage = "window"
+            session.intake_attempts = 0
+            session.last_action = "enquiry_preference_requested"
+            return build_ncco(
+                "Thank you. When would you prefer the team to consider your request? "
+                "Say morning, afternoon, evening, or anytime. "
+                "You can also press one, two, three, or four.",
+                self.event_url,
+            )
+        if session.intake_stage == "window":
+            window = preferred_window(body)
+            if window is None:
+                return self._retry_intake(
+                    session,
+                    "Please say morning, afternoon, evening or anytime. "
+                    "Or press one for morning, two for afternoon, three for evening, "
+                    "or four for anytime.",
+                )
+            session.preferred_time_window = window
+            session.intake_stage = "permission"
+            session.intake_attempts = 0
+            session.last_action = "explicit_contact_consent_requested"
+            return build_ncco(
+                "May the business team contact you about this "
+                + session.enquiry_kind + " enquiry? "
+                "Say yes, you may contact me, or press one for yes. "
+                "Say no, or press two for no. "
+                "No appointment will be booked by this request.",
+                self.event_url,
+            )
+        if session.intake_stage == "permission":
+            permission = consent_answer(body)
+            if permission is None:
+                return self._retry_intake(
+                    session,
+                    "To allow this enquiry to be prepared for team review, "
+                    "say yes, you may contact me, or press one. "
+                    "To decline, say no or press two.",
+                )
+            session.closed = True
+            session.intake_stage = ""
+            if permission is False:
+                session.last_action = "contact_permission_declined"
+                session.requested_service = ""
+                session.preferred_time_window = ""
+                return build_ncco(
+                    "Understood. I won't prepare this enquiry for follow-up. "
+                    "No appointment has been booked, and no callback has been arranged. Goodbye.",
+                    None,
+                )
+            packet = draft_for_call(
+                tenant_id=session.tenant_id,
+                call_id=session.call_uuid,
+                kind=session.enquiry_kind,
+                service=session.requested_service,
+                window=session.preferred_time_window,
+            )
+            key = (session.tenant_id, session.call_uuid)
+            if key in self.pending_handoffs and self.pending_handoffs[key] != packet:
+                raise ValueError("conflicting_reception_enquiry")
+            self.pending_handoffs[key] = packet
+            session.last_action = "enquiry_drafted_for_human_review"
+            session.requested_service = ""
+            session.preferred_time_window = ""
+            return build_ncco(
+                "Thank you. I've prepared your enquiry for review, "
+                "but it has not yet been sent to the business team. "
+                "No appointment has been booked or callback arranged. Goodbye.",
+                None,
+            )
+        raise ValueError("unknown_reception_intake_stage")
+
+    def review_handoffs_for_tenant(self, tenant_id: str) -> tuple[CRMEnquiryDraft, ...]:
+        """Private in-process CRM contract, not a customer-facing read route."""
+        if tenant_id not in self.profiles:
+            raise ValueError("unregistered_reception_tenant")
+        return tuple(
+            packet for (tenant, _), packet in self.pending_handoffs.items()
+            if tenant == tenant_id
         )

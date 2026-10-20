@@ -39,6 +39,7 @@ def run_demo(intent: str = "appointment") -> dict:
         business_name=route.business_name,
         callback_capture_allowed=False, booking_integration_verified=False,
         human_transfer_configured=False,
+        services=("roofing", "roof inspection", "gutter repair"),
     )
     engine = InboundReceptionCallEngine(
         (route,), {route.tenant_id: profile}, event_url=EVENT_URL,
@@ -80,14 +81,33 @@ def run_demo(intent: str = "appointment") -> dict:
         "to": DID, "uuid": CALL_ID,
         "speech": {"results": [{"text": speech, "confidence": 0.98}]},
     }, "synthetic-input-jti")
+    steps = [a["action"] for a in first] + [a["action"] for a in second]
+    closing = second
+    if intent in ("appointment", "callback"):
+        for index, customer_utterance in enumerate(
+            ("roofing", "tomorrow morning", "yes, you may contact me"), start=2
+        ):
+            closing = post("input", {
+                "to": DID, "uuid": CALL_ID,
+                "speech": {"results": [
+                    {"text": customer_utterance, "confidence": 0.98}
+                ]},
+            }, "synthetic-input-jti-" + str(index))
+            steps.extend(a["action"] for a in closing)
+    handoffs = engine.review_handoffs_for_tenant(route.tenant_id)
     return {
         "schema": "empire.ai-receptionist.signed-call-demo.v1",
         "status": "PASS_SYNTHETIC_SIGNED_WEBHOOK_CONVERSATION",
         "intent_synthetic": intent,
         "assistant_greeting": first[0]["text"],
         "caller_synthetic_speech": speech,
-        "assistant_reply": second[0]["text"],
-        "steps": [a["action"] for a in first] + [a["action"] for a in second],
+        "assistant_reply": closing[0]["text"],
+        "review_draft_created": bool(handoffs),
+        "review_draft_service": handoffs[0].requested_service if handoffs else None,
+        "review_draft_window": handoffs[0].preferred_time_window if handoffs else None,
+        "human_review_required": True,
+        "crm_write_performed": False,
+        "steps": steps,
         "inbound_phone_call_completed": False,
         "voice_provider_connected": False,
         "appointment_booked": False,
