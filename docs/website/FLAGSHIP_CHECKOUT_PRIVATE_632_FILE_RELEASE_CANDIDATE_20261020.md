@@ -154,3 +154,19 @@ Do not rerun it over the existing candidate; the script refuses replacement.
 **Ownership:** Website & Growth. Existing Ops Core monitors the historical
 checkout HTML hold. Revenue & Buyers retains the first real buyer task.
 No fourth general chat, no new timer, no paid traffic, no false sale.
+
+
+## Additional original public rollback custody
+
+After the release-preparation source commit, a separate root-protected,
+read-only archive of the existing public static folder was created:
+
+- `/var/backups/empire-website/flagship_current_live_20261020_before_union.tar`
+- `/var/backups/empire-website/flagship_current_live_20261020_before_union.tar.sha256`
+
+The archive is root-owned mode 0600 and contains **603** original live
+static files (about 25.5 MB). The web and checkout services remained
+active. This is a **reference recovery copy**, not authority to overwrite
+the public website, and should be superseded by a fresh, owner-reviewed
+pre-switch snapshot if any live static file changes before eventual
+deployment. No rollback has been invoked.
