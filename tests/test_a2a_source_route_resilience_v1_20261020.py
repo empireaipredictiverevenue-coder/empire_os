@@ -84,3 +84,27 @@ def test_escalated_source_and_fake_manus_dispatch_are_rejected():
     m["verified_real_lead_count"]=5
     with pytest.raises(ValueError,match="UNTRUSTED_PUBLIC_MINING"):
         build_source_route_board(s,m,o,h)
+
+
+def test_official_permit_source_is_historical_research_not_buying_demand():
+    source, mining, manus, reach = inputs()
+    official = {
+        "schema_version":"empire.a2a.official_permit_buyer_scout_owner_review.v1",
+        "execution_authority":"NONE",
+        "verified_hvac_lead_buyers":0,
+        "owner_tasks_dispatched":0,
+        "businesses_for_owner_review_count":7,
+        "source_state":"OFFICIAL_SOURCE_OBSERVED_BUT_PERMIT_ISSUE_DATES_STALE",
+    }
+    result = build_source_route_board(
+        source, mining, manus, reach, official_permit_review=official,
+    )
+    assert result["official_permit_source_state"] == official["source_state"]
+    little = next(r for r in result["source_routes"] if r["market"] == "little rock, ar")
+    assert little["official_permit_source_businesses_for_review"] == 7
+    assert little["official_permit_source_is_current_demand"] is False
+    assert not result["keyless_search_restored"]
+    official["owner_tasks_dispatched"] = 1
+    with pytest.raises(ValueError, match="UNTRUSTED_OFFICIAL_PERMIT_REVIEW"):
+        build_source_route_board(source, mining, manus, reach,
+                                 official_permit_review=official)

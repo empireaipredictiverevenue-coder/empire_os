@@ -14,6 +14,7 @@ def build_source_route_board(
     mining: Mapping[str, Any],
     openmanus: Mapping[str, Any],
     agent_reach_doctor: Mapping[str, Any] | None = None,
+    official_permit_review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     if (not isinstance(first_party, Mapping)
             or first_party.get("schema_version") != "empire.a2a.first_party_source_recovery_review.v1"
@@ -37,6 +38,14 @@ def build_source_route_board(
     health = (agent_reach_doctor or {}).get("doctor") or {}
     if not isinstance(health, Mapping):
         raise ValueError("INVALID_AGENT_REACH_CHANNELS")
+    if official_permit_review is not None and (
+            not isinstance(official_permit_review, Mapping)
+            or official_permit_review.get("schema_version") !=
+                "empire.a2a.official_permit_buyer_scout_owner_review.v1"
+            or official_permit_review.get("execution_authority") != "NONE"
+            or official_permit_review.get("verified_hvac_lead_buyers") != 0
+            or official_permit_review.get("owner_tasks_dispatched") != 0):
+        raise ValueError("UNTRUSTED_OFFICIAL_PERMIT_REVIEW")
     routes=[]
     sites=first_party.get("market_coverage")
     if not isinstance(sites, Mapping):
@@ -69,6 +78,11 @@ def build_source_route_board(
             "first_party_route": "AVAILABLE_SOURCE_EVIDENCE_NOT_BUYERS" if count>0 and fresh else
                                   "NO_RECENT_SUCCESSFUL_APPROVED_SOURCES",
             "general_search_route": "PROVIDER_HEALTH_UNVERIFIED",
+            "official_permit_source_businesses_for_review": (
+                official_permit_review.get("businesses_for_owner_review_count")
+                if market == "little rock, ar" and official_permit_review else None
+            ),
+            "official_permit_source_is_current_demand": False,
             "actual_local_buyers_verified": 0,
             "owner_next_action": "BUYER_SCOUT_INDEPENDENT_GEO_AND_COMMERCIAL_NEED_VALIDATION",
         })
@@ -90,6 +104,9 @@ def build_source_route_board(
         "source_routes":routes,
         "first_party_source_state":source_cache_state if isinstance(source_cache_state,str) else "UNKNOWN",
         "owner_public_search_provider_status":provider_status,
+        "official_permit_source_state": (
+            official_permit_review.get("source_state") if official_permit_review else "NOT_CONNECTED"
+        ),
         "keyless_search_restored":False,
         "paid_search_provider_authorized_by_this_plan":False,
         "agent_reach_doctor":channels,

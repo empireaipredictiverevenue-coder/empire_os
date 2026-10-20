@@ -1,0 +1,21 @@
+[Unit]
+Description=Empire A2A official Little Rock mechanical permit business research (read only)
+ConditionPathExists=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/scripts/run_a2a_official_permit_research_20261020.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/
+Environment=PYTHONPATH=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020
+ExecStart=/srv/empire_os/.venv/bin/python -B -m scripts.run_a2a_official_permit_research_20261020 --read-only-public-api --approval FOUNDER_APPROVED_OFFICIAL_PUBLIC_PERMIT_RESEARCH_READONLY_20261020 --lookback-days 45
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/runtime/a2a_commercial_signal_mining
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TimeoutStartSec=35
+MemoryMax=128M
+CPUQuota=20%
+StandardOutput=journal
+StandardError=journal

@@ -33,6 +33,7 @@ from empire_os.a2a_openmanus_scoped_research_bridge_v1 import build_scoped_openm
 from empire_os.a2a_first_party_buyer_scout_handoff_v1 import prepare_verified_scope_buyer_scout_handoff, make_first_party_owner_handoff_hold
 from empire_os.a2a_source_route_resilience_v1 import build_source_route_board
 from empire_os.a2a_optional_source_agents_v1 import review_optional_agents
+from empire_os.a2a_official_permit_owner_review_v1 import permit_owner_review
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -154,8 +155,32 @@ def run(*, previous: dict | None = None, history: dict | None = None,
                                        "empire.a2a.agent_reach_public_channel_health.v1") else None
     except (OSError, ValueError, json.JSONDecodeError):
         agent_reach_doctor = None
+    official_path = LOCAL / "official_little_rock_permit_research_v1.json"
+    try:
+        official_source = (_read(official_path, max_size=250_000)[0]
+                           if official_path.is_file() and not official_path.is_symlink()
+                           else None)
+        official_permit_owner_research = permit_owner_review(
+            official_source, owner_pickup,
+        )
+    except (OSError, ValueError, json.JSONDecodeError):
+        try:
+            official_permit_owner_research = permit_owner_review(None, owner_pickup)
+            official_permit_owner_research["source_state"] = "UNTRUSTED_OFFICIAL_DATA_SOURCE_HOLD"
+        except ValueError:
+            official_permit_owner_research = {
+                "schema_version": "empire.a2a.official_permit_buyer_scout_owner_review.v1",
+                "mode": "OBSERVE", "execution_authority": "NONE",
+                "source_state": "OWNER_PICKUP_UNAVAILABLE",
+                "source_records_scanned": None,
+                "businesses_for_owner_review_count": None,
+                "public_contractor_businesses_for_owner_review": [],
+                "owner_tasks_dispatched": 0, "verified_hvac_lead_buyers": 0,
+                "new_customer_records": 0, "outbound_sent": 0,
+            }
     source_route_board = build_source_route_board(
         first_party_research, mining, openmanus_owner_plan, agent_reach_doctor,
+        official_permit_review=official_permit_owner_research,
     )
     source_agent_readiness = review_optional_agents(
         first_party_research,
@@ -201,6 +226,7 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "first_party_buyer_owner_research": first_party_buyer_owner_research,
         "source_route_board": source_route_board,
         "source_agent_readiness": source_agent_readiness,
+        "official_permit_owner_research": official_permit_owner_research,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -245,6 +271,7 @@ def main() -> int:
             ("first_party_buyer_scout_handoff_v1.json", "first_party_buyer_owner_research"),
             ("source_route_resilience_v1.json", "source_route_board"),
             ("optional_source_agents_readiness_v1.json", "source_agent_readiness"),
+            ("official_permit_buyer_scout_review_v1.json", "official_permit_owner_research"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -282,6 +309,9 @@ def main() -> int:
         "browser_use_jobs_executed": outcome["source_agent_readiness"]["browser_jobs_executed"],
         "openhands_code_jobs_executed": outcome["source_agent_readiness"]["openhands_code_task_executed"],
         "general_search_restored": outcome["source_route_board"]["keyless_search_restored"],
+        "official_permit_business_names_for_owner_review": outcome["official_permit_owner_research"]["businesses_for_owner_review_count"],
+        "official_permit_buyer_owners_dispatched": outcome["official_permit_owner_research"]["owner_tasks_dispatched"],
+        "official_permit_source_state": outcome["official_permit_owner_research"]["source_state"],
         "first_party_city_trade_self_claims": sum(
             x["self_described_sector_and_region_matches"]
             for x in outcome["first_party_research"]["market_coverage"].values()),

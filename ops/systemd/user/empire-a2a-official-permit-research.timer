@@ -1,0 +1,12 @@
+[Unit]
+Description=Once-daily public official Little Rock mechanical permit research
+
+[Timer]
+OnCalendar=*-*-* 06:45:00 UTC
+RandomizedDelaySec=10min
+AccuracySec=1min
+Persistent=true
+Unit=empire-a2a-official-permit-research.service
+
+[Install]
+WantedBy=timers.target
