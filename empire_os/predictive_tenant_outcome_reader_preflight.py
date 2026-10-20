@@ -27,7 +27,8 @@ IDENTITY_SQL = (
     "public.empire_current_tenant_id()::text"
 )
 TABLE_SQL = """
-SELECT c.relname::text,c.relrowsecurity,c.relforcerowsecurity,
+SELECT c.relname::text,c.relrowsecurity,
+       (c.relforcerowsecurity OR c.relowner <> current_user::regrole),
        has_table_privilege(current_user,c.oid,'SELECT')
 FROM pg_catalog.pg_class c
 JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace
@@ -66,14 +67,14 @@ def _catalogue(
     for item in rows:
         if type(item) not in (tuple, list) or len(item) != 4:
             raise TenantEvidencePolicyHold("table metadata invalid")
-        name, enabled, forced, selectable = item
+        name, enabled, effective_rls, selectable = item
         if (type(name) is not str or name not in TABLE_POLICY
                 or name in inventory or any(type(x) is not bool for x in
-                (enabled, forced, selectable))):
+                (enabled, effective_rls, selectable))):
             raise TenantEvidencePolicyHold("table metadata invalid")
         inventory[name] = {
             "rls_enabled": enabled,
-            "rls_forced": forced,
+            "rls_enforced_for_reader": effective_rls,
             "reader_select_granted": selectable,
             "expected_scoped_policy_found": False,
         }
@@ -119,7 +120,7 @@ def _catalogue(
     for name in TABLE_POLICY:
         flags = inventory.get(name) or {
             "rls_enabled": False,
-            "rls_forced": False,
+            "rls_enforced_for_reader": False,
             "reader_select_granted": False,
             "expected_scoped_policy_found": False,
         }
@@ -151,6 +152,7 @@ def review_tenant_outcome_reader_policy(
                 cursor.execute("SET TRANSACTION READ ONLY")
                 cursor.execute("SET LOCAL statement_timeout = '4000ms'")
                 cursor.execute("SET LOCAL ROLE " + READER_ROLE)
+                cursor.execute("SET LOCAL client_encoding = 'UTF8'")
                 cursor.execute(IDENTITY_SQL)
                 identity = cursor.fetchone()
                 if (type(identity) not in (list, tuple) or len(identity) != 5):

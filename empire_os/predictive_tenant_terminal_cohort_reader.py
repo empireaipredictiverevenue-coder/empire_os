@@ -151,6 +151,7 @@ def read_tenant_terminal_candidates(
                 cur.execute("SET TRANSACTION READ ONLY")
                 cur.execute("SET LOCAL statement_timeout = '4000ms'")
                 cur.execute("SET LOCAL ROLE " + READER_ROLE)
+                cur.execute("SET LOCAL client_encoding = 'UTF8'")
                 cur.execute(IDENTITY_SQL)
                 identity = cur.fetchone()
                 if type(identity) not in (list, tuple) or len(identity) != 5:

@@ -117,7 +117,7 @@ def test_authentic_shape_is_only_policy_metadata_not_customer_evidence():
     )
 
 
-def test_missing_outcome_policy_and_force_rls_never_pass():
+def test_missing_outcome_policy_and_nonowner_rls_never_pass():
     tables, policies = fixture_data()
     tables = [
         (n, enabled, False if n == "commercial_outcomes" else forced, granted)
@@ -126,7 +126,7 @@ def test_missing_outcome_policy_and_force_rls_never_pass():
     policies = [x for x in policies if x[0] != "commercial_outcomes"]
     report, _ = run({"tables": tables, "policies": policies})
     assert report["status"] == "TENANT_SOURCE_POLICY_GAPS_OBSERVED"
-    assert "commercial_outcomes.rls_forced" in report["policy_gap_codes"]
+    assert "commercial_outcomes.rls_enforced_for_reader" in report["policy_gap_codes"]
     assert "commercial_outcomes.expected_scoped_policy_found" in report["policy_gap_codes"]
     assert report["customer_forecast_eligible"] is False
 
