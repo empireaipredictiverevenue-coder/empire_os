@@ -23,19 +23,14 @@ SELECT 'RLS_POLICIES_CREATED=' || count(*) FROM pg_policies
  WHERE schemaname='public' AND tablename LIKE 'empire_consumer_%';
 SQL
 
-psql -X -v ON_ERROR_STOP=1 -d empire_consumer_optin_fixture <<'SQL' >/dev/null
-CREATE ROLE consumer_optin_fixture_role NOLOGIN NOSUPERUSER NOBYPASSRLS;
-GRANT USAGE ON SCHEMA public TO consumer_optin_fixture_role;
-GRANT SELECT,INSERT,UPDATE ON ALL TABLES IN SCHEMA public TO consumer_optin_fixture_role;
-DO $$
-DECLARE item record;
-BEGIN
-  FOR item IN SELECT tablename FROM pg_tables WHERE schemaname='public'
-    AND tablename LIKE 'empire_consumer_%'
-  LOOP
-    EXECUTE format('CREATE POLICY fixture_only_access ON public.%I FOR ALL TO consumer_optin_fixture_role USING (true) WITH CHECK (true)', item.tablename);
-  END LOOP;
-END $$;
+psql -X -v ON_ERROR_STOP=1 -d empire_consumer_optin_fixture -c "CREATE ROLE empire_consumer_optin_writer NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION" >/dev/null
+psql -X -v ON_ERROR_STOP=1 -d empire_consumer_optin_fixture -f /home/ubuntu/empire_worktrees/consumer_optin_roofing_20261020/migrations/empiredb/058_consumer_optin_private_role_staged_20261020.sql >/dev/null
+psql -X -v ON_ERROR_STOP=1 -d empire_consumer_optin_fixture -tA <<'SQL'
+SELECT 'SCOPED_PRIVATE_POLICY_COUNT=' || count(*) FROM pg_policies
+WHERE schemaname='public' AND roles::text LIKE '%empire_consumer_optin_writer%';
+SELECT 'NO_PUBLIC_INSERT=' || (NOT has_table_privilege('public','public.empire_consumer_subscriptions','INSERT'));
+SELECT 'WRITER_NOLOGIN=' || (NOT rolcanlogin) FROM pg_roles
+WHERE rolname='empire_consumer_optin_writer';
 SQL
 PYTHONPATH=/home/ubuntu/empire_worktrees/consumer_optin_roofing_20261020 /srv/empire_os/.venv/bin/python -B /home/ubuntu/empire_worktrees/consumer_optin_roofing_20261020/scripts/probe_consumer_optin_ephemeral_db_20261020.py
 

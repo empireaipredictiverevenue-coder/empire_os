@@ -17,7 +17,7 @@ from empire_os.consumer_optin_postgres_repository import ConsumerPostgresReposit
 from empire_os.consumer_optin_token_security import token_fingerprint
 
 DB="empire_consumer_optin_fixture"
-TEST_ROLE="consumer_optin_fixture_role"
+TEST_ROLE="empire_consumer_optin_writer"
 NOW=datetime.now(timezone.utc)
 CONSENT={
  "offer_slug":"roofing-cost-guide",
