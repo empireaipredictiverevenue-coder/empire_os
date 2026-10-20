@@ -79,6 +79,7 @@ def test_original_ops_reports_order_reader_deployment_only_not_sales(
     tmp_path, monkeypatch, capsys,
 ):
     from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
+    monkeypatch.delattr(ExecutionBusDataRepository, "verified_outcome_feedback", raising=False)
     ops_mod = _load_ops()
     ops = _configure_sandbox(monkeypatch, ops_mod, tmp_path)
     _buyer_sources(tmp_path)

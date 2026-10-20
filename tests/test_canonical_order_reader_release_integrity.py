@@ -70,8 +70,9 @@ def test_dirty_uncommitted_source_overrides_runtime_method_presence(tmp_path, mo
     assert proof["verified_buyer_orders"] is None
 
 
-def test_committed_method_not_imported_cannot_claim_operational_release(tmp_path):
+def test_committed_method_not_imported_cannot_claim_operational_release(tmp_path, monkeypatch):
     root, _ = repo(tmp_path, YES_METHOD)
+    monkeypatch.delattr(ExecutionBusDataRepository, "verified_outcome_feedback", raising=False)
     proof = inspect_canonical_reader_release_integrity(root)
     assert proof["verified_outcome_reader_method_checked_in"] is True
     assert proof["status"] == "COMMITTED_OWNER_READER_NOT_LOADED"

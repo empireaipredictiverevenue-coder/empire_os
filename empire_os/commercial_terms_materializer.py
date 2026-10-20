@@ -314,3 +314,101 @@ def run_commercial_terms_materializer(
         blocker_counts=tuple(sorted(blockers.items())),
         errors=tuple(errors),
     )
+
+
+def build_persisted_terms_stage(order, review, events, *, context, as_of):
+    """Observe approved installed terms from existing reviews/events, without RPCs."""
+    import re
+    from empire_os.conversation_qualification import _observed_stage_row, _stage_time
+    for row in (order, review, *events):
+        _observed_stage_row(row, as_of=as_of)
+        for key in ("tenant_id", "buyer_id", "prospect_id", "opportunity_id", "closer_case_id", "outbound_intent_id"):
+            if row.get(key) is not None and row[key] != context.get(key):
+                raise ValueError(f"commercial terms {key} mismatch")
+    payload = order.get("commercial_payload") or {}
+    terms = review.get("terms") or {}
+    for row in (terms, payload, *((event.get("payload") or {}) for event in events)):
+        for key in ("tenant_id", "buyer_id", "prospect_id", "opportunity_id", "closer_case_id", "outbound_intent_id", "fulfilment_order_id"):
+            if row.get(key) is not None and row[key] != context.get(key):
+                raise ValueError(f"terms evidence {key} mismatch")
+    if order.get("id") != context.get("fulfilment_order_id") or review.get("fulfilment_order_id") != order.get("id"):
+        raise ValueError("terms canonical order mismatch")
+    if order.get("state") not in ("offered", "accepted", "delivered", "confirmed", "invoiced", "paid", "settled", "outcome_captured"):
+        raise ValueError("approved terms contradict canonical order progression")
+    if review.get("status") != "approved":
+        raise ValueError("approved commercial terms review required")
+    for row in (review, terms, payload):
+        if row.get("expires_at") and _stage_time(row["expires_at"]) <= as_of:
+            raise ValueError("expired commercial terms")
+    if (not review.get("id") or not review.get("decided_by")
+            or type(review.get("price_cents")) is not int or review["price_cents"] <= 0
+            or str(terms.get("currency") or "").upper() != "USD"
+            or str(terms.get("settlement_asset") or "").upper() != "USDT"
+            or str(terms.get("settlement_chain") or "").upper() != "BSC"
+            or terms.get("price_cents", review.get("price_cents")) != review.get("price_cents")
+            or not re.fullmatch(r"[0-9a-f]{64}", str(review.get("commercial_terms_sha256") or ""))):
+        raise ValueError("approved terms identity price currency and provenance required")
+    decided_at = _stage_time(review.get("decided_at"))
+    if _stage_time(review.get("proposed_at")) > decided_at or decided_at > as_of:
+        raise ValueError("invalid commercial terms decision time")
+    if (payload.get("commercial_terms_review_id") != review["id"]
+            or payload.get("commercial_terms_sha256") != review["commercial_terms_sha256"]
+            or payload.get("commercial_terms") != terms or order.get("price_cents") != review["price_cents"]
+            or payload.get("terms_approved_by") != review["decided_by"]
+            or _stage_time(payload.get("terms_approved_at")) != decided_at):
+        raise ValueError("approved review not coherently installed on canonical order")
+    for event in events:
+        if event.get("review_id") != review["id"] or event.get("fulfilment_order_id") != order["id"]:
+            raise ValueError("commercial terms event identity mismatch")
+    approvals = [e for e in events if e.get("event_type") == "approved"]
+    if len(approvals) != 1:
+        raise ValueError("unique canonical terms approval event required")
+    approval = approvals[0]
+    if (not approval.get("id") or approval.get("actor") != review["decided_by"]
+            or (approval.get("payload") or {}).get("commercial_terms_sha256") != review["commercial_terms_sha256"]
+            or _stage_time(approval.get("occurred_at")) < decided_at):
+        raise ValueError("terms approval evidence mismatch")
+    state, accepted_at = "APPROVED", None
+    acceptance_keys = ("buyer_accepted_at", "buyer_acceptance_kind", "buyer_acceptance_reference", "buyer_acceptance_recorded_by")
+    accepted_events = [e for e in events if e.get("event_type") == "accepted"]
+    if any(payload.get(key) for key in acceptance_keys) or accepted_events:
+        if order.get("state") == "offered":
+            raise ValueError("buyer acceptance contradicts canonical order progression")
+        if len(accepted_events) != 1 or not all(payload.get(key) for key in acceptance_keys):
+            raise ValueError("incomplete canonical buyer acceptance")
+        accepted = accepted_events[0]
+        evidence = accepted.get("payload") or {}
+        accepted_clock = _stage_time(payload["buyer_accepted_at"])
+        if (not accepted.get("id") or payload["buyer_acceptance_kind"] not in ("outbound_reply", "signed_agreement", "manual_verified")
+                or evidence.get("evidence_kind") != payload["buyer_acceptance_kind"]
+                or evidence.get("evidence_reference") != payload["buyer_acceptance_reference"]
+                or accepted.get("actor") != payload["buyer_acceptance_recorded_by"]
+                or evidence.get("commercial_terms_sha256") != review["commercial_terms_sha256"]
+                or _stage_time(evidence.get("accepted_at")) != accepted_clock
+                or accepted_clock < decided_at or _stage_time(accepted.get("occurred_at")) < accepted_clock):
+            raise ValueError("canonical buyer acceptance evidence mismatch")
+        state, accepted_at = "ACCEPTED", accepted_clock.isoformat()
+    if any(e.get("event_type") == "rejected" for e in events):
+        raise ValueError("contradictory rejected terms evidence")
+    return {**context, "schema_version": "empire.outreach-commercial-terms.v1", "state": state,
+            "stage_ref": "canonical:commercial_terms_reviews:" + review["id"],
+            "terms_ref": "canonical:commercial_terms_reviews:" + review["id"],
+            "review_ref": "canonical:commercial_terms_reviews:" + review["id"],
+            "price_cents": review["price_cents"], "currency": "USD",
+            "created_at": review["proposed_at"], "approved_at": decided_at.isoformat(), "accepted_at": accepted_at,
+            "evidence_refs": ["canonical:commercial_terms_events:" + approval["id"]]
+                + (["canonical:commercial_terms_events:" + accepted_events[0]["id"]] if state == "ACCEPTED" else []),
+            "source": "persisted_approved_installed_terms", "canonical_order": dict(order),
+            "terms_review": dict(review), "terms_events": list(events), "execution_authority": "none"}
+
+
+def validate_commercial_terms_stage(stage, record, *, as_of):
+    from empire_os.conversation_qualification import _validate_stage_binding
+    _validate_stage_binding(stage, record, as_of=as_of)
+    if stage.get("schema_version") != "empire.outreach-commercial-terms.v1":
+        raise ValueError("canonical commercial terms contract required")
+    expected = build_persisted_terms_stage(stage.get("canonical_order"), stage.get("terms_review"),
+        stage.get("terms_events"), context=stage, as_of=as_of)
+    for key in ("state", "stage_ref", "terms_ref", "review_ref", "price_cents", "currency", "approved_at", "accepted_at", "evidence_refs", "source"):
+        if stage.get(key) != expected[key]:
+            raise ValueError("commercial terms evidence projection mismatch")

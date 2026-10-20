@@ -29,10 +29,13 @@ def _cli(*flags, dsn=None):
     )
 
 
-def test_owner_not_deployed_does_not_connect_even_with_explicit_order_scope():
-    # This clean base intentionally lacks the other owner's uncommitted reader.
-    assert original_order_reader_capability()["original_reader_method_available_in_running_code"] is False
+def test_owner_not_deployed_does_not_connect_even_with_explicit_order_scope(tmp_path):
+    # An isolated Git owner repository without the reader must fail closed
+    # even if the actual installed Python module already exposes the method.
+    from test_canonical_order_reader_release_integrity import repo, NO_METHOD
+    root, _ = repo(tmp_path, NO_METHOD)
     result = _cli("--read-only", "--tenant-id", TENANT, "--order-id", ORDER,
+                  "--repo-root", str(root),
                   dsn="dont-connect://private-user:private-secret@localhost")
     assert result.returncode == 0
     body = json.loads(result.stdout)
@@ -78,6 +81,7 @@ def test_explicit_scope_validated_aggregate_publishes_no_raw_refs(monkeypatch):
 
 def test_static_owner_capability_can_switch_when_method_published(monkeypatch):
     from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
+    monkeypatch.delattr(ExecutionBusDataRepository, "verified_outcome_feedback", raising=False)
     assert original_order_reader_capability()["status"] == "ORIGINAL_ORDER_OWNER_READER_NOT_DEPLOYED"
     monkeypatch.setattr(
         ExecutionBusDataRepository, "verified_outcome_feedback", lambda *_a, **_k: None,
