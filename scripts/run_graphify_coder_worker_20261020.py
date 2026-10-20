@@ -53,6 +53,34 @@ def attach_approved_graph_context(coder: EmpireCoder, *, workspace: Path) -> str
         return "REJECTED_GRAPH_ONLY_BASE_CODER_INTACT"
 
 
+def attach_approved_prepatch_observer(coder: EmpireCoder) -> str:
+    """Optional read-only hook, only after Graphify source attestation."""
+    if os.getenv("EMPIRE_CODER_GRAPHIFY_PREPATCH_OBSERVE", "").strip() != "1":
+        return "DISABLED_BY_DEFAULT"
+    try:
+        from empire_os.coder.graphify_prepatch import attach_graphify_prepatch_observer
+        attach_graphify_prepatch_observer(coder)
+    except (ValueError, TypeError) as exc:
+        print("GRAPHIFY_PREPATCH_DISABLED_" + type(exc).__name__, file=sys.stderr)
+        return "NO_ATTESTED_GRAPH_BASE_CODER_UNCHANGED"
+    return "READ_ONLY_PREPATCH_OBSERVER_ENABLED"
+
+
+def _print_prepatch_usage(coder: EmpireCoder, job=None) -> None:
+    if job is None:
+        return
+    observer = getattr(coder, "_graphify_prepatch_observer", None)
+    if observer is None:
+        return
+    counts = observer.metrics_snapshot()
+    # Aggregate numbers and job category only; no task identifiers, source
+    # paths, patch contents, prompts or customer/private record fields.
+    counts["job_kind"] = job.kind.value
+    counts["job_status"] = job.status.value
+    print("GRAPHIFY_PREPATCH_USAGE " + json.dumps(counts, sort_keys=True),
+          file=sys.stderr)
+
+
 def _print_context_usage(coder: EmpireCoder, job=None) -> None:
     """Emit count-only telemetry on stderr, never prompt or source metadata."""
     context = getattr(coder, "context", None)
@@ -75,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
     workspace = Path(args.workspace)
     coder = EmpireCoder(workspace, runtime_root=args.runtime_root)
     status = attach_approved_graph_context(coder, workspace=workspace)
+    prepatch_status = attach_approved_prepatch_observer(coder)
     queue = LocalJobQueue(workspace, runtime_root=args.runtime_root)
     job = CoderTaskWorker(
         coder,
@@ -85,6 +114,9 @@ def main(argv: list[str] | None = None) -> int:
         max_attempts=args.max_attempts,
     ).run_once()
     _print_context_usage(coder, job)
+    _print_prepatch_usage(coder, job)
+    if job is not None:
+        print("GRAPHIFY_PREPATCH_" + prepatch_status, file=sys.stderr)
     # Maintain original machine-readable stdout shape and exit codes.
     if job is None:
         print(json.dumps({
