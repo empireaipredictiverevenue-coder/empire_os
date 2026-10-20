@@ -1060,3 +1060,73 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
 Live posting, website deployment and payments were **not** exercised.
 All fabricated fixture email/UUID/payment rows are isolated to
 tests, never written into production CRM, buyer or finance.
+
+## 20 October continuation — Conversion owner release board, live catalog and held SEO aggregate
+
+The existing research form routes, public site, catalogue, Sales Director,
+CRM and Finance remain with their **existing assigned owners**. The campaign
+intelligence code now reuses those source contracts and produces one
+machine-readable, zero-PII handoff instead of another CRM, SEO probe,
+offer catalog, or payout ledger.
+
+### Verified live-source findings
+
+- The current immutable first-party research release identifies **five
+  signed /research/campaign_* pages**. Earlier live HTTP verification
+  confirmed a working HTML form structure pointing to /api/research/enquiry.
+  This is not evidence that the new value-first pages were published.
+- The commercial catalog snapshot from 20 October 12:50 UTC projects
+  **86 products, 35 active, 26 verified for commercial terms**, checked
+  independently through the existing commercial_offer_book.product_ready
+  function. These are catalog readiness counts, not buyer-specific
+  product matches, published prices or verified delivery dates.
+- The existing SEO research-enquiry count-only operator is held for an
+  authorised privileged database owner. Its unprivileged invocation
+  currently returns AUTHORIZED_LOCAL_READONLY_OPERATOR_REQUIRED. We
+  did not elevate privileges, query the private table or report zero
+  enquiries from an inaccessible source.
+- The new aggregate adapter accepts the original count-only observation
+  only when the authorised owner attests a fresh run (under 24 hours),
+  with consistent receipts, verified privacy holds and no contact
+  disclosure. Browser page views and CTA clicks are event counts, NOT
+  unique visitors, buyer identities, lead conversion percentages or sales.
+- Authenticated enquiry-to-CRM linkage, settlement, recognised revenue
+  and actual cost receipt joins remain unknown until their owners provide
+  real evidence.
+
+### Scoped existing-owner actions
+
+1. Flagship website owner — review, legally approve and publish the
+   proof-first experiences through the EXISTING first-party form
+   and immutable release path, with accurate claims and consent.
+2. Commercial catalog and fulfilment owner — approve exact buyer-offer
+   contract, risks, price/scope, acceptance criteria and realistic
+   turnaround; the 26 verified catalog products are not blanket
+   fulfilment or publication approval.
+3. SEO/database owner — run the already-existing privileged count-only
+   research intake observer when authorised. Do not expose contact rows.
+4. Tenant CRM/Sales Director owner — authenticate exact enquiry receipt,
+   prospect identity, reply basis and consent; do not match by an email
+   address or domain guess.
+5. Finance/Revenue owner — reconcile settled orders, fulfilment,
+   recognised money movements and actual costs with a closed financial
+   event window. A payment is not profit.
+
+### Read-only command for other owners
+
+    cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+      -m scripts.review_tam_full_funnel_strategy_20261020 \
+      --read-only --owner-board
+
+The original --read-only command remains intact with the board nested
+in its JSON response. This does NOT automatically send owner messages,
+assign work, move funds, grant DB permissions, merge branches, or deploy.
+Tests: tests/test_tam_conversion_release_owner_board_20261020.py.
+
+**Production completion still requires** an approved proof experience
+published by the website owner, a genuine enquiry in canonical intake,
+an authenticated CRM join, and independently verified finance and
+fulfilment evidence. Current branch readiness is code-tested and
+source-audited, NOT a paid customer or a completed deployment.

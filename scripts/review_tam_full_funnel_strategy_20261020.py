@@ -1154,9 +1154,280 @@ def review_existing_research_release_entrypoints(root: Path) -> dict[str, Any]:
     }
 
 
+# Reuse the independent catalog, SEO and conversion owner interfaces.
+# Never take direct privileged DB reads, create another analytics event table
+# or infer paying buyers from browser submissions.
+def read_existing_commercial_catalog_readonly(root: Path) -> dict[str, Any]:
+    path = root / "runtime/commercial_catalog/latest.json"
+    try:
+        info = path.lstat()
+        if (path.is_symlink() or not path.is_file() or not 0 < info.st_size <= 1_000_000
+                or info.st_mode & 0o002):
+            return {}
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+        return loaded if isinstance(loaded, dict) else {}
+    except (OSError, UnicodeError, ValueError):
+        return {}
+
+
+def review_commercial_catalog_for_conversion(
+    source: Mapping[str, Any] | None, *, now: datetime,
+) -> dict[str, Any]:
+    from empire_os.commercial_offer_book import product_ready
+
+    base = {
+        "schema_version": "empire.gtm.catalog_offer_conversion_readiness.v1",
+        "source_status": "HOLD_MISSING_STALE_OR_UNTRUSTED_CATALOG",
+        "products_catalogued": None,
+        "active_products": None,
+        "verified_commercial_terms_products": None,
+        "buyer_specific_value_offer_match_verified": False,
+        "delivery_capacity_or_start_date_verified": False,
+        "pricing_or_terms_published_by_campaign_owner": False,
+        "payment_or_revenue_inferred": False,
+        "execution_authority": "NONE",
+    }
+    if not isinstance(source, Mapping):
+        return base
+    try:
+        issued = datetime.fromisoformat(source["generated_at"].replace("Z", "+00:00"))
+        if issued.tzinfo is None or issued > now or now - issued > timedelta(hours=36):
+            return base
+        if (source.get("schema_version") != "empire.commercial-product-catalog.v1"
+                or source.get("execution_authority") != "none"
+                or source.get("actual_revenue") is not False):
+            return base
+        rows = source.get("products")
+        if (not isinstance(rows, list) or len(rows) > 500
+                or any(not isinstance(row, Mapping) for row in rows)
+                or source.get("product_count") != len(rows)):
+            return base
+        active = sum(row.get("active") is True for row in rows)
+        ready = sum(product_ready(row) for row in rows)
+        if (type(source.get("active_count")) is not int
+                or type(source.get("binding_terms_ready_count")) is not int
+                or source["active_count"] != active
+                or source["binding_terms_ready_count"] != ready):
+            return base
+    except (ValueError, TypeError, AttributeError, KeyError):
+        return base
+    return {
+        **base,
+        "source_status": "CURRENT_CATALOG_PRODUCT_TERMS_REVIEWED",
+        "products_catalogued": len(rows),
+        "active_products": active,
+        "verified_commercial_terms_products": ready,
+    }
+
+
+def review_existing_enquiry_aggregate_for_conversion(
+    aggregate: Mapping[str, Any] | None, *,
+    owner_operator_attestation_verified: bool,
+    source_observed_at: datetime | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """Interpret the *existing* privileged count-only SEO probe output.
+
+    The observer cannot be invoked by this campaign owner and this function
+    intentionally does not execute SQL. Count fields never establish
+    unique visitors, a person identity, CRM admission, consent or a sale.
+    """
+    from scripts.probe_owned_research_enquiry_aggregate_readonly import SCHEMA, FIELDS
+    result = {
+        "schema_version": "empire.gtm.research_aggregate_conversion_readiness.v1",
+        "source_status": "AWAIT_AUTHORIZED_DATABASE_OPERATOR",
+        "accepted_research_enquiries": None,
+        "page_view_events_not_unique_visitors": None,
+        "cta_click_events_not_unique_buyers": None,
+        "enquiry_started_events": None,
+        "real_unique_visitor_to_lead_rate": None,
+        "exact_campaign_conversions": None,
+        "crm_matched_buyers": None,
+        "sales_or_payment_inferred": False,
+        "first_party_marketing_permission_inferred": False,
+        "execution_authority": "NONE",
+    }
+    if (owner_operator_attestation_verified is not True or aggregate is None):
+        return result
+    if (not isinstance(source_observed_at, datetime)
+            or not isinstance(now, datetime)
+            or source_observed_at.tzinfo is None or now.tzinfo is None
+            or source_observed_at > now
+            or now - source_observed_at > timedelta(hours=24)):
+        return {**result, "source_status": "HOLD_UNVERIFIED_OR_STALE_AGGREGATE_CAPTURE"}
+    if (not isinstance(aggregate, Mapping)
+            or aggregate.get("schema_version") != SCHEMA
+            or aggregate.get("source") != "CANONICAL_EMPIREDB"
+            or aggregate.get("mode") != "OBSERVE"
+            or aggregate.get("read_only") is not True
+            or aggregate.get("status") not in (
+                "NO_RESEARCH_ENQUIRIES_IN_CANONICAL_SOURCE",
+                "RESEARCH_ENQUIRIES_OBSERVED_SEPARATE_FROM_SALES",
+            )
+            or aggregate.get("aggregate_event_consistency_verified") is not True
+            or aggregate.get("lead_transfer_enabled") is not False
+            or aggregate.get("outbound_sent") is not False
+            or aggregate.get("database_writes") is not False
+            or aggregate.get("new_privileges_granted") is not False
+            or aggregate.get("payment_executed") is not False
+            or aggregate.get("customer_identifiers_disclosed") is not False
+            or aggregate.get("contact_data_disclosed") is not False
+            or aggregate.get("raw_customer_rows_read_by_operator") is not False
+            or aggregate.get("individual_enquiry_text_disclosed") is not False
+            or aggregate.get("commercial_sales_status_inferred") is not False
+            or aggregate.get("execution_authority") != "NONE"):
+        return {**result, "source_status": "HOLD_UNTRUSTED_AGGREGATE_EVIDENCE"}
+    fields = {name: aggregate.get(name) for name in FIELDS}
+    if (any(type(n) is not int or not 0 <= n <= 1_000_000_000
+            for n in fields.values())
+            or fields["research_campaigns_with_enquiries"] > fields["research_enquiry_rows"]
+            or fields["server_received_submission_events"] != fields["research_enquiry_rows"]
+            or fields["invalid_submission_events"] != 0
+            or fields["enquiry_marketing_or_outbound_hold_violations"] != 0
+            or (aggregate.get("status") == "NO_RESEARCH_ENQUIRIES_IN_CANONICAL_SOURCE")
+               != (fields["research_enquiry_rows"] == 0)):
+        return {**result, "source_status": "HOLD_UNTRUSTED_AGGREGATE_EVIDENCE"}
+    return {
+        **result,
+        "source_status": "AUTHORIZED_AGGREGATE_RESEARCH_EVIDENCE_REVIEWED",
+        "accepted_research_enquiries": fields["research_enquiry_rows"],
+        "page_view_events_not_unique_visitors": fields["browser_page_view_events"],
+        "cta_click_events_not_unique_buyers": fields["browser_cta_click_events"],
+        "enquiry_started_events": fields["browser_enquiry_started_events"],
+    }
+
+
+def review_conversion_owner_release_board(
+    *,
+    release: Mapping[str, Any],
+    catalog: Mapping[str, Any],
+    research_aggregate: Mapping[str, Any],
+    customer_money_join: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Small factual owner/action ledger, never autonomous task assignment."""
+    release_ok = release.get("release_status") == "EXISTING_RELEASED_RESEARCH_PATHS_VERIFIED"
+    catalog_ok = catalog.get("source_status") == "CURRENT_CATALOG_PRODUCT_TERMS_REVIEWED"
+    enquiries_ready = research_aggregate.get("source_status") == "AUTHORIZED_AGGREGATE_RESEARCH_EVIDENCE_REVIEWED"
+    money_ready = (isinstance(customer_money_join, Mapping)
+                   and customer_money_join.get("finance_receipt_window_closed") is True
+                   and customer_money_join.get("revenue_attribution_basis")
+                   == "EXACT_INTAKE_CRM_ORDER_JOIN_WITH_CLOSED_FINANCE_WINDOW")
+    tasks = [
+        {
+            "owner": "existing_flagship_website_owner",
+            "status": "EXISTING_FORM_RELEASE_VERIFIED" if release_ok else "RELEASE_EVIDENCE_REQUIRED",
+            "next_action": (
+                "REVIEW_SOURCE_BACKED_PROOF_PAGES_AND_PUBLISH_ONLY_WITH_APPROVED_FORMS_AND_CLAIMS"
+                if release_ok else "VERIFY_OR_RESTORE_SIGNED_FIRST_PARTY_RESEARCH_RELEASE"
+            ),
+            "proof_experience_published": False,
+        },
+        {
+            "owner": "existing_commercial_catalog_and_fulfilment_owner",
+            "status": "CATALOG_SNAPSHOT_VERIFIED_BUYER_DELIVERY_OPEN" if catalog_ok else "CATALOG_SOURCE_MISSING",
+            "next_action": "VERIFY_OFFER_SPECIFIC_TERMS_RISK_AND_FULFILMENT_TIMELINE",
+        },
+        {
+            "owner": "existing_seo_research_enquiry_database_owner",
+            "status": "VERIFIED_AGGREGATE_COUNTS" if enquiries_ready else "AUTHORIZED_LOCAL_AGGREGATE_READ_HELD",
+            "next_action": (
+                "REVIEW_GENUINE_INBOUND_RESEARCH_COUNTS_WITHOUT_PROMOTING_TO_SALES"
+                if enquiries_ready else "RUN_EXISTING_PRIVILEGED_COUNT_ONLY_RESEARCH_PROBE_WHEN_AUTHORIZED"
+            ),
+        },
+        {
+            "owner": "existing_tenant_crm_and_sales_owner",
+            "status": "EXACT_ENQUIRY_TO_CRM_JOIN_VERIFIED" if (
+                isinstance(customer_money_join, Mapping)
+                and customer_money_join.get("authenticated_crm_enquiries_linked") is not None
+            ) else "AUTHENTICATED_TENANT_CRM_JOIN_NOT_AVAILABLE",
+            "next_action": "PROVE_REAL_FIRST_PARTY_ENQUIRY_TO_CANONICAL_TENANT_PROSPECT_JOIN",
+        },
+        {
+            "owner": "existing_finance_and_revenue_owner",
+            "status": "CLOSED_CANONICAL_CAMPAIGN_MONEY_WINDOW" if money_ready else "CAMPAIGN_FINANCIAL_EVENT_WINDOW_UNVERIFIED",
+            "next_action": "RECONCILE_SETTLEMENT_FULFILMENT_REVENUE_AND_ACTUAL_COSTS_WITHOUT_ESTIMATES",
+        },
+    ]
+    return {
+        "schema_version": "empire.gtm.first_party_conversion_owner_board.v1",
+        "tasks": tasks,
+        "tasks_total": len(tasks),
+        "website_source_verified": release_ok,
+        "owner_approved_private_value_page_published": False,
+        "buyer_specific_offer_terms_and_timing_verified": False,
+        "real_enquiry_source_available": enquiries_ready,
+        "revenue_and_cost_receipts_joined": money_ready,
+        "automated_handoff_performed": False,
+        "new_workers_or_duplicate_crm_created": False,
+        "production_action_authority": "NONE",
+    }
+
+
+def export_conversion_owner_handoff(
+    output: Mapping[str, Any], *, now: datetime,
+) -> dict[str, Any]:
+    """Compact, zero-PII handoff for already-assigned implementation owners."""
+    board = output["conversion_release_owner_board"]
+    catalog = output["existing_catalog_conversion_readiness"]
+    research = output["research_enquiry_aggregate_conversion_readiness"]
+    release = output["existing_first_party_research_release"]
+    decision = output["decision_intelligence"]
+    money = decision["real_first_party_conversion_journey"]
+    return {
+        "schema_version": "empire.gtm.source_bound_conversion_owner_handoff.v1",
+        "generated_at_utc": now.astimezone(timezone.utc).isoformat(),
+        "feature_branch_review_only": True,
+        "website": {
+            "signed_research_route_count": release.get("verified_research_pages"),
+            "private_proof_experience_publication_proven": False,
+            "canonical_first_party_enquiry_route": (
+                release.get("existing_enquiry_route")
+            ),
+        },
+        "catalog": {
+            "source_status": catalog["source_status"],
+            "products_catalogued": catalog["products_catalogued"],
+            "binding_terms_ready_count": catalog["verified_commercial_terms_products"],
+            "buyer_specific_delivery_timing_verified": False,
+        },
+        "first_party_interest": {
+            "source_status": research["source_status"],
+            "authentic_research_enquiries_observed": research["accepted_research_enquiries"],
+            "visitor_to_buyer_rate_verified": False,
+            "marketing_consent_inferred": False,
+        },
+        "crm": {
+            "authenticated_enquiry_prospect_link_count": (
+                money.get("authenticated_crm_enquiries_linked")
+                if isinstance(money, Mapping) else None
+            ),
+        },
+        "finance": {
+            "recognized_campaign_revenue_cents": (
+                money.get("recognized_campaign_revenue_cents")
+                if isinstance(money, Mapping) else None
+            ),
+            "realized_campaign_profit_cents": (
+                money.get("realized_campaign_gp_cents")
+                if isinstance(money, Mapping) else None
+            ),
+        },
+        "existing_owner_actions": board["tasks"],
+        "execution_authority": "NONE",
+        "messages_sent": False,
+        "database_writes": False,
+        "automatic_tasks_reassigned": False,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
+    parser.add_argument(
+        "--owner-board", action="store_true",
+        help="print only the privacy-safe implementation-owner conversion handoff",
+    )
     options = parser.parse_args(argv)
     if not options.read_only:
         raise ValueError("read-only required")
@@ -1178,8 +1449,29 @@ def main(argv: list[str] | None = None) -> int:
     output["existing_first_party_research_release"] = (
         review_existing_research_release_entrypoints(root)
     )
+    output["existing_catalog_conversion_readiness"] = (
+        review_commercial_catalog_for_conversion(
+            read_existing_commercial_catalog_readonly(root), now=current,
+        )
+    )
+    # The SEO enquiry operator has a held privileged read. Its result
+    # remains UNKNOWN until an independently authorised owner supplies it.
+    output["research_enquiry_aggregate_conversion_readiness"] = (
+        review_existing_enquiry_aggregate_for_conversion(
+            None, owner_operator_attestation_verified=False,
+        )
+    )
+    output["conversion_release_owner_board"] = review_conversion_owner_release_board(
+        release=output["existing_first_party_research_release"],
+        catalog=output["existing_catalog_conversion_readiness"],
+        research_aggregate=output["research_enquiry_aggregate_conversion_readiness"],
+        customer_money_join=output["decision_intelligence"]["real_first_party_conversion_journey"],
+    )
     output["next_real_execution_focus"] = recommend_next_real_execution_focus(output)
-    print(json.dumps(output, sort_keys=True))
+    if options.owner_board:
+        print(json.dumps(export_conversion_owner_handoff(output, now=current), sort_keys=True))
+    else:
+        print(json.dumps(output, sort_keys=True))
     return 0
 
 
