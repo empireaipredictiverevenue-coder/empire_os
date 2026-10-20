@@ -21,6 +21,9 @@ from empire_os.saas_scale import TenantMembership
 AUDIENCE = "empire-inbound-recovery-calendar"
 ISSUER = "empire-os"
 SCOPE = "recovery:calendar:connect"
+BROWSER_AUDIENCE = "empire-inbound-recovery-calendar-browser"
+BROWSER_SCOPE = "recovery:calendar:browser-session"
+BROWSER_COOKIE = "__Host-empire-inbound-owner-session"
 ADMIN_ROLES = frozenset({"owner", "admin"})
 KEY_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 SUBJECT = re.compile(r"^[A-Za-z0-9:@._/-]{1,128}$")
@@ -47,7 +50,10 @@ class SignedCalendarConnectionVerifier:
         public_keys: Mapping[str, bytes | Ed25519PublicKey],
         *, load_membership: Callable[[str, str], TenantMembership | None],
         now: Callable[[], int] | None = None,
+        credential_kind: str = "bearer",
     ) -> None:
+        if credential_kind not in ("bearer", "browser_session"):
+            raise ValueError("unsupported_calendar_credential_kind")
         if not public_keys or not callable(load_membership):
             raise ValueError("canonical_identity_and_membership_required")
         keys: dict[str, Ed25519PublicKey] = {}
@@ -63,6 +69,10 @@ class SignedCalendarConnectionVerifier:
         self.keys = keys
         self.membership = load_membership
         self.now = now or (lambda: int(time.time()))
+        self.credential_kind = credential_kind
+        self.expected_audience = (BROWSER_AUDIENCE if credential_kind == "browser_session" else AUDIENCE)
+        self.expected_scope = (BROWSER_SCOPE if credential_kind == "browser_session" else SCOPE)
+        self.max_lifetime = 600 if credential_kind == "browser_session" else 300
 
     def authenticate(self, bearer: str) -> CalendarConnectionPrincipal:
         try:
@@ -85,7 +95,8 @@ class SignedCalendarConnectionVerifier:
             claims = _object(parts[1], 1536)
             if set(claims) != {"iss", "aud", "sub", "tenant_id", "scope", "iat", "nbf", "exp", "jti"}:
                 raise ValueError("unexpected_calendar_claim")
-            if claims["iss"] != ISSUER or claims["aud"] != AUDIENCE or claims["scope"] != SCOPE:
+            if (claims["iss"] != ISSUER or claims["aud"] != self.expected_audience
+                or claims["scope"] != self.expected_scope):
                 raise ValueError("wrong_calendar_identity_audience")
             subject, jti = claims["sub"], claims["jti"]
             if (not isinstance(subject, str) or not SUBJECT.fullmatch(subject)
@@ -95,7 +106,7 @@ class SignedCalendarConnectionVerifier:
             now = int(self.now())
             if (any(type(x) is not int for x in (iat, nbf, exp))
                 or not (iat <= nbf <= exp) or exp <= iat
-                or exp - iat > 300 or iat > now + 5 or nbf > now + 5
+                or exp - iat > self.max_lifetime or iat > now + 5 or nbf > now + 5
                 or exp <= now):
                 raise ValueError("calendar_token_expired_or_invalid")
             tenant = str(UUID(str(claims["tenant_id"])))

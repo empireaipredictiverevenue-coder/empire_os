@@ -24,6 +24,7 @@ from empire_os.inbound_calendar_oauth_onboarding import (
     OneTimeGoogleCodeTicket,
 )
 from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
+from empire_os.inbound_google_calendar_enrollment import GoogleCalendarEnrollmentResult
 
 PREFIX = "/v1/inbound-recovery/calendar-connect"
 COOKIE = "__Host-empire-inbound-oauth-session"
@@ -47,7 +48,7 @@ def create_calendar_connection_router(
     *, enabled: bool = False,
     verify_bearer: Callable[[Request], CalendarConnectionPrincipal] | None = None,
     verify_browser_session: Callable[[Request], CalendarConnectionPrincipal] | None = None,
-    complete_callback: Callable[[OneTimeGoogleCodeTicket, CalendarConnectionPrincipal], bool] | None = None,
+    complete_callback: Callable[[OneTimeGoogleCodeTicket, CalendarConnectionPrincipal], GoogleCalendarEnrollmentResult] | None = None,
     state_db: Path | None = None,
     state_encryption_key: bytes | None = None,
     google_client_id: str = "",
@@ -152,8 +153,23 @@ def create_calendar_connection_router(
                 raise ValueError("calendar_selection_not_bound")
             # Must be implemented by a privileged server adapter using the
             # matching selected_calendar_id, canonical membership and vault.
-            if complete_callback(ticket, principal) is not True:
-                raise ValueError("connection_not_independently_verified")
+            enrollment = complete_callback(ticket, principal)
+            if not isinstance(enrollment, GoogleCalendarEnrollmentResult):
+                raise ValueError("google_calendar_enrollment_receipt_required")
+            if (enrollment.tenant_id != principal.tenant_id
+                or enrollment.calendar_id != ticket.selected_calendar_id
+                or not enrollment.credential_vault_write):
+                raise ValueError("google_calendar_enrollment_receipt_mismatch")
+            # The completion callback cannot assert success by returning a
+            # truthy placeholder or a receipt alone: independently inspect
+            # the persisted tenant-owned calendar binding before success.
+            with OfflineCalendarRegistry(calendar_db, read_only=True) as registry:
+                persisted = registry.get_binding(ticket.selected_calendar_id)
+            if (persisted is None or persisted.tenant_id != principal.tenant_id
+                or persisted.calendar_id != enrollment.calendar_id
+                or persisted.provider_account_ref != enrollment.provider_account_ref
+                or not persisted.owner_approved or not persisted.account_access_verified):
+                raise ValueError("google_calendar_owner_readback_required")
         except Exception as exc:
             raise HTTPException(status_code=403, detail="calendar_connection_verification_failed") from exc
         return {

@@ -379,3 +379,16 @@ Job staging is NOT real agent execution. The already installed autonomous execut
 7. Final supervised pilot approval requires owner consent, privacy/retention verification, revocation controls, real-provider readback, monitored rollback and a non-inflated commercial proof model.
 
 Do NOT describe dark staging health=200 as a live customer product deployment.
+
+
+## 20 October — Native customer calendar login bridge (opt-in only)
+
+Built on EmpireOS existing customer identity; NOT a customer-visible endpoint.
+
+- empire_os/inbound_calendar_customer_login.py adds an optional owner login router and a reusable identity bundle. It uses PostgresCrmPasswordLogin, canonical EmpireDbCrmMembershipReader and build_account_bound_membership_lookup. Production owners must supply the already provisioned first-party CRM credentials. The module never creates accounts, passwords, tenant memberships, secret keys, or DB roles.
+- Separate Ed25519 audiences: a 300-second calendar-connect bearer token and a 600-second browser session cookie, flagged Secure, HttpOnly, SameSite=Lax and __Host-. An existing crm:read token is not accepted. The browser session cannot act as a calendar-connect bearer. Both recheck live account and membership revocation.
+- Owner/admin only, fresh account status, exact HTTPS Origin, canonical tenant and explicit read-only consent. A session for the same owner and tenant is required at the Google callback.
+- empire_os/inbound_calendar_connection_api.py now requires a typed GoogleCalendarEnrollmentResult plus a fresh readback from the tenant-scoped approved calendar registry before claiming a connected calendar. A plain boolean, forged receipt, mismatched provider account/calendar, or unpersisted claim is denied.
+- Tests cover login and provider-flow fixtures separately. No real Google customer account or actual booking was connected.
+
+Deployment requires the independently approved private CRM account + membership reader, pinned signing keys, exact Google Cloud registered HTTPS callback, production KMS-backed vault, persisted auditable tenant registry, consent, authorized private/public ingress boundaries, revocation and PostgreSQL/RLS checks. Do not mount this opt-in router into the existing dark staging or CRM pilot without explicit release review. The existing deployed service remains dark by design.

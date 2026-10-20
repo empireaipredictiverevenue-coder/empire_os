@@ -12,6 +12,7 @@ from empire_os.inbound_calendar_connection_api import create_calendar_connection
 from empire_os.inbound_calendar_connection_identity import CalendarConnectionPrincipal
 from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
 from empire_os.inbound_google_calendar_adapter import ApprovedCalendarBinding
+from empire_os.inbound_google_calendar_enrollment import GoogleCalendarEnrollmentResult
 
 NOW = datetime(2026, 10, 20, 12, tzinfo=timezone.utc)
 BASE = "https://app.example.test"
@@ -37,9 +38,26 @@ def build(tmp_path, *, enabled=True, session=None, token=None, completed=None):
 
     def complete(ticket, principal):
         records.append((ticket, principal))
-        if completed is not None:
-            return completed(ticket, principal)
-        return False
+        result = completed(ticket, principal) if completed is not None else False
+        if result is True:
+            # Test-only simulated provider read-back AND durable registry write;
+            # production must use enroll_google_calendar_offline with actual
+            # OAuth token exchange and Google calendarList access-role proof.
+            with OfflineCalendarRegistry(calendar_db) as registry:
+                registry.register_binding_offline(ApprovedCalendarBinding(
+                    tenant_id=principal.tenant_id,
+                    calendar_id=ticket.selected_calendar_id,
+                    provider_account_ref="test-mock-provider-account",
+                    owner_approved=True, account_access_verified=True,
+                ), approval_ref="test-mock-provider-readback")
+            return GoogleCalendarEnrollmentResult(
+                tenant_id=principal.tenant_id,
+                calendar_id=ticket.selected_calendar_id,
+                provider_account_ref="test-mock-provider-account",
+                credential_vault_write=True,
+                calendar_binding_created=True,
+            )
+        return result
 
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(create_calendar_connection_router(
@@ -169,3 +187,44 @@ def test_tenant_status_is_scoped_to_authenticated_owner(tmp_path):
     assert other.status_code == 200
     assert other.json()["tenant_id"] == OTHER
     assert other.json()["tracked_appointments"] == 0
+
+
+@pytest.mark.parametrize("variant", [
+    "unverified_boolean", "forged_receipt", "wrong_tenant",
+    "wrong_calendar", "vault_missing", "wrong_provider_account",
+])
+def test_callback_needs_durable_tenant_scoped_provider_enrollment(tmp_path, variant):
+    def completion(ticket, principal):
+        if variant == "unverified_boolean":
+            return 1  # truthy is never accepted
+        return GoogleCalendarEnrollmentResult(
+            tenant_id=OTHER if variant == "wrong_tenant" else principal.tenant_id,
+            calendar_id="elsewhere@example.org" if variant == "wrong_calendar"
+                else ticket.selected_calendar_id,
+            provider_account_ref="unverified-other-account"
+                if variant == "wrong_provider_account" else "test-mock-provider-account",
+            credential_vault_write=variant != "vault_missing",
+            calendar_binding_created=True,
+        )
+    client, _, _, calls, registry_path = build(tmp_path, completed=completion)
+    if variant == "wrong_provider_account":
+        # Even a stored calendar must match the independently attested
+        # provider account, not just the calendar ID.
+        with OfflineCalendarRegistry(registry_path) as registry:
+            registry.register_binding_offline(ApprovedCalendarBinding(
+                tenant_id=TENANT,
+                calendar_id="business-owned-calendar@example.org",
+                provider_account_ref="different-account",
+                owner_approved=True, account_access_verified=True,
+            ), approval_ref="test-only-approved")
+    response = start(client)
+    state = parse_qs(urlsplit(response.json()["authorization_url"]).query)["state"][0]
+    denied = client.get(
+        PREFIX + "/callback", params={"state": state, "code": "test-code"},
+    )
+    assert denied.status_code == 403
+    assert denied.json()["detail"] == "calendar_connection_verification_failed"
+    assert len(calls) == 1
+    assert client.get(
+        PREFIX + "/callback", params={"state": state, "code": "test-code"},
+    ).status_code == 403
