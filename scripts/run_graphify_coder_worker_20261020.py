@@ -14,7 +14,7 @@ from pathlib import Path
 import sys
 
 from empire_os.coder import EmpireCoder
-from empire_os.coder.jobs import JobStatus, LocalJobQueue
+from empire_os.coder.jobs import JobKind, JobStatus, LocalJobQueue
 from empire_os.coder.worker import CoderTaskWorker
 from scripts.empire_coder_worker import _apply_background_priority, parser
 
@@ -77,6 +77,27 @@ def _print_prepatch_usage(coder: EmpireCoder, job=None) -> None:
     # paths, patch contents, prompts or customer/private record fields.
     counts["job_kind"] = job.kind.value
     counts["job_status"] = job.status.value
+    # Read the original result of THIS SAME existing job, not a guessed
+    # temporal join across unrelated log lines. Never emit patch details.
+    source_result = getattr(job, "result", None)
+    result = source_result if isinstance(source_result, dict) else {}
+    completed_implementation = (
+        job.kind is JobKind.IMPLEMENT and job.status is JobStatus.COMPLETED
+    )
+    counts["coder_reported_patch_applied"] = (
+        result.get("applied") if completed_implementation
+        and type(result.get("applied")) is bool else None
+    )
+    verification = result.get("verification")
+    if not completed_implementation or not isinstance(verification, dict):
+        verification = {}
+    verdict = verification.get("verdict")
+    counts["coder_verification_verdict"] = (
+        verdict if verdict in ("PASS", "PASS_WITH_WARNINGS", "FAIL")
+        else "UNKNOWN"
+    )
+    # Source verdict = existing Coder, not external runtime verification.
+    counts["same_job_result_observed"] = completed_implementation
     print("GRAPHIFY_PREPATCH_USAGE " + json.dumps(counts, sort_keys=True),
           file=sys.stderr)
 
