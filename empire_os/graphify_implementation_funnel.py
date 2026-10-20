@@ -16,6 +16,7 @@ import subprocess
 from typing import Any, Mapping
 
 from empire_os.coder.plan_promotion import _validate_contract
+from empire_os.graphify_writer_provider_probe import probe_current_writer_provider
 
 SCHEMA = "empire.graphify.implementation_funnel_readiness.v1"
 MAX_BYTES = 262_144
@@ -218,18 +219,23 @@ def review_implementation_funnel(
         blockers.append("FOUNDER_SUPERVISOR_BLOCKED_BY_SHARED_DIRTY_CHECKOUT")
     if not directives["implementation_ready"]:
         blockers.append("NO_FOUNDER_DIRECTIVE_READY_FOR_IMPLEMENTATION")
+    writer = probe_current_writer_provider(root)
+    historical_warnings = []
     if failure_classes["model_or_provider"]:
-        blockers.append("HISTORICAL_IMPLEMENT_FAILURES_INDICATE_MODEL_PROVIDER_ERRORS")
+        historical_warnings.append("HISTORICAL_IMPLEMENT_MODEL_PROVIDER_ERRORS_EXIST")
         next_actions.append({
             "owner": "existing_empire_coder_inference_reliability_owner",
-            "action": "REVIEW_ORIGINAL_IMPLEMENT_PROVIDER_FAILURES_AND_AUTHORISED_FALLBACK",
+            "action": "RECONCILE_HISTORIC_PROVIDER_FAILURES_WITH_CURRENT_LOCAL_ROUTE",
             "requires": [
-                "retain_original_job_errors_privately",
-                "compare_existing_model_endpoint_and_fallback_state",
-                "do_not_replay_failed_mutations_without_owner_approval",
+                "inspect_original_private_failed_job_receipts",
+                "confirm_existing_writer_endpoint_and_cooldown",
+                "verify_real_authorized_patch_only_after_other_gates",
+                "do_not_replay_prior_mutations_without_owner_approval",
             ],
             "automatic_enqueuing_authorized": False,
         })
+    if not writer["active_writer_route_eligible"]:
+        blockers.append("CURRENT_WRITER_MODEL_ROUTE_UNVERIFIED_OR_UNAVAILABLE")
     return {
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
@@ -241,6 +247,8 @@ def review_implementation_funnel(
         "completed_plan_promotion_eligibility": dict(sorted(plan.items())),
         "founder_directive_state_counts": dict(sorted(directives.items())),
         "historical_implementation_failure_categories": dict(sorted(failure_classes.items())),
+        "historical_warnings": historical_warnings,
+        "current_writer_provider": writer,
         "canonical_checkout": checkout,
         "blockers": blockers,
         "required_existing_owner_actions": next_actions,
