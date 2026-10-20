@@ -37,6 +37,23 @@ class GraphifyContextOverlay:
         self.repo = repo
         self.unavailable = unavailable
         self.last_graph_status = "NOT_QUERIED"
+        self._usage = {
+            "query_attempts": 0,
+            "attested_queries": 0,
+            "stale_or_invalid_queries": 0,
+            "graph_candidate_files": 0,
+            "already_in_base_context": 0,
+            "new_context_files": 0,
+            "new_context_characters": 0,
+        }
+
+    def metrics_snapshot(self) -> dict[str, int | str]:
+        """Aggregate COUNTS only. No prompt text, paths, tenant IDs or revenue."""
+        return {
+            "schema_version": "empire.graphify.context_usage.v1",
+            "status": self.last_graph_status,
+            **self._usage,
+        }
 
     def set_active_knowledge_paths(self, paths: Iterable[str]) -> None:
         self.delegate.set_active_knowledge_paths(paths)
@@ -55,6 +72,7 @@ class GraphifyContextOverlay:
         )
         if not terms and not symbol_terms:
             return result
+        self._usage["query_attempts"] += 1
         # The underlying graph fails closed if its source has changed.
         try:
             graph_docs = self.source.documents(
@@ -65,10 +83,13 @@ class GraphifyContextOverlay:
             )
         except (ValueError, OSError, UnicodeError) as exc:
             self.last_graph_status = "UNAVAILABLE_" + exc.__class__.__name__
+            self._usage["stale_or_invalid_queries"] += 1
             if self.unavailable == "skip":
                 return result
             raise
         self.last_graph_status = "ATTESTED_CODE_CONTEXT_READ"
+        self._usage["attested_queries"] += 1
+        self._usage["graph_candidate_files"] += len(graph_docs)
         documents = list(result.documents)
         existing_paths = {doc.path for doc in documents}
         # Preserve the base Coder's budget by restricting supplementary
@@ -81,6 +102,7 @@ class GraphifyContextOverlay:
             if not self.delegate._knowledge_allowed(item.path):
                 continue
             if item.path in existing_paths:
+                self._usage["already_in_base_context"] += 1
                 # Keep the original source excerpt, avoid duplicate context,
                 # and record that a fresh Graphify relation also selected it.
                 for idx, document in enumerate(documents):
@@ -95,6 +117,8 @@ class GraphifyContextOverlay:
             if len(item.excerpt) > remaining:
                 continue
             documents.append(item)
+            self._usage["new_context_files"] += 1
+            self._usage["new_context_characters"] += len(item.excerpt)
             existing_paths.add(item.path)
             remaining -= len(item.excerpt)
         return ContextPack(

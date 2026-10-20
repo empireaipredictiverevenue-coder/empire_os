@@ -12,7 +12,8 @@ import re
 from typing import Iterable
 
 from empire_os.graphify_code_snapshot import assert_snapshot_current
-from empire_os.graphify_dual_bridge import import_graphify_code, query_evidence
+from empire_os.graphify_dual_bridge import import_graphify_code
+from .graphify_relevance import rank_attested_code_paths
 
 from .context import ContextDocument
 from .repo import RepoIntelligence
@@ -64,23 +65,14 @@ class GraphifyContextSource:
                 if isinstance(value, str) and 2 <= len(value.strip()) <= 128
             )
         )[:8]
-        nodes = {}
-        for term in query_terms:
-            result = query_evidence(
-                {"nodes": imported["nodes"], "edges": imported["edges"]},
-                focus=term, max_hops=1, max_nodes=20,
-            )
-            for item in result["nodes"]:
-                if item.get("domain") != "code" or not item.get("source_file"):
-                    continue
-                src = item["source_file"]
-                if src not in nodes:
-                    nodes[src] = item.get("source_location", "")
-
+        ranked = rank_attested_code_paths(
+            imported, terms=query_terms, max_files=max_docs,
+        )
         documents = []
         left = max_chars
-        for src, location in nodes.items():
-            if len(documents) >= max_docs or left < 100:
+        for item in ranked:
+            src, location = item["source_file"], item["source_location"]
+            if left < 100:
                 break
             # Source allowlist attestation has already verified source_file
             # presence, and RepoIntelligence enforces protected/secret paths.
@@ -93,7 +85,10 @@ class GraphifyContextSource:
                 continue
             documents.append(ContextDocument(
                 path=src,
-                reason="attested Graphify code relationship; source excerpt",
+                reason=(
+                    "attested Graphify code relationship; source excerpt; "
+                    + item["reason"].lower()
+                ),
                 excerpt=text,
             ))
             left -= len(text)

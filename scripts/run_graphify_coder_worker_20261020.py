@@ -53,6 +53,17 @@ def attach_approved_graph_context(coder: EmpireCoder, *, workspace: Path) -> str
         return "REJECTED_GRAPH_ONLY_BASE_CODER_INTACT"
 
 
+def _print_context_usage(coder: EmpireCoder) -> None:
+    """Emit count-only telemetry on stderr, never prompt or source metadata."""
+    context = getattr(coder, "context", None)
+    report = getattr(context, "metrics_snapshot", None)
+    if callable(report):
+        print(
+            "GRAPHIFY_CONTEXT_USAGE " + json.dumps(report(), sort_keys=True),
+            file=sys.stderr,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     _apply_background_priority()
     args = parser().parse_args(argv)
@@ -68,6 +79,7 @@ def main(argv: list[str] | None = None) -> int:
         heartbeat_seconds=args.heartbeat_seconds,
         max_attempts=args.max_attempts,
     ).run_once()
+    _print_context_usage(coder)
     # Maintain original machine-readable stdout shape and exit codes.
     if job is None:
         print(json.dumps({
