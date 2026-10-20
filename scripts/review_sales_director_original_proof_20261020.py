@@ -14,6 +14,15 @@ from empire_os.conversation_control_operational_truth import inspect_conversatio
 from scripts.review_commercial_conversation_casebook_20261020 import build_casebook_runtime
 
 
+def build_original_proof_runtime(root: Path, *, now: datetime):
+    """Reuse one existing owner read path; do not restart observers or dispatch."""
+    book = build_casebook_runtime(root, now=now)
+    truth = inspect_conversation_evidence(root, now=now)
+    return review_sales_director_original_proof(
+        casebook=book, conversation_proof=truth, now=now,
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Exact historical threads vs existing original Conversation OS evidence"
@@ -22,12 +31,7 @@ def main() -> int:
     parser.add_argument("--repo-root", default="/srv/empire_os")
     args = parser.parse_args()
     root = Path(args.repo_root).resolve(strict=True)
-    now = datetime.now(timezone.utc)
-    book = build_casebook_runtime(root, now=now)
-    truth = inspect_conversation_evidence(root, now=now)
-    result = review_sales_director_original_proof(
-        casebook=book, conversation_proof=truth, now=now,
-    )
+    result = build_original_proof_runtime(root, now=datetime.now(timezone.utc))
     print(json.dumps(result, sort_keys=True, indent=2))
     return 0
 

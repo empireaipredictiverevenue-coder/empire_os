@@ -156,3 +156,82 @@ def test_original_proof_cli_requires_readonly_flag(tmp_path):
     )
     assert r.returncode != 0
     assert "required" in r.stderr
+
+
+ADAPTIVE_MODULE = "scripts.review_adaptive_sales_director_20261020"
+
+
+def test_adaptive_cli_first_and_second_observation_deduplicate(tmp_path):
+    _prepare(tmp_path)
+    common = [
+        sys.executable, "-B", "-m", ADAPTIVE_MODULE, "--read-only",
+        "--repo-root", str(tmp_path),
+    ]
+    initial = subprocess.run(
+        common, cwd=ROOT, capture_output=True, text=True, timeout=25,
+    )
+    assert initial.returncode == 0, initial.stderr
+    first = json.loads(initial.stdout)
+    assert first["transition"] == "INITIAL_EVIDENCE_REVIEW"
+    repeated = subprocess.run(
+        common + ["--previous-review-file", "-"],
+        cwd=ROOT, input=initial.stdout, capture_output=True, text=True, timeout=25,
+    )
+    assert repeated.returncode == 0, repeated.stderr
+    second = json.loads(repeated.stdout)
+    assert second["transition"] == "UNCHANGED_HOLD_NO_DUPLICATE_WORK"
+    assert second["operator_attention_due"] is False
+    assert second["existing_owner_review_suggestions"] == []
+    assert "private@" not in repeated.stdout
+    assert "Synthetic Partner" not in repeated.stdout
+    assert second["outbound_authorized"] is False
+    assert second["database_writes"] is False
+
+
+def test_adaptive_cli_rejects_forged_prior_evidence(tmp_path):
+    _prepare(tmp_path)
+    fake = {
+        "schema_version": "empire.commercial.sales_director_adaptive_recheck.v1",
+        "execution_authority": "send",
+    }
+    r = subprocess.run(
+        [sys.executable, "-B", "-m", ADAPTIVE_MODULE,
+         "--read-only", "--repo-root", str(tmp_path),
+         "--previous-review-file", "-"],
+        cwd=ROOT, input=json.dumps(fake),
+        capture_output=True, text=True, timeout=25,
+    )
+    assert r.returncode != 0
+    assert "previous adaptation" in r.stderr
+
+
+def test_adaptive_cli_owner_source_receipts_change_without_false_progress(tmp_path):
+    _prepare(tmp_path)
+    receipt_a = tmp_path / "owner_receipt_a.json"
+    receipt_b = tmp_path / "owner_receipt_b.json"
+    receipt_a.write_text(json.dumps({"conversation_recovery": "a" * 64}))
+    receipt_b.write_text(json.dumps({"conversation_recovery": "b" * 64}))
+    common = [
+        sys.executable, "-B", "-m", ADAPTIVE_MODULE, "--read-only",
+        "--repo-root", str(tmp_path),
+    ]
+    first = subprocess.run(
+        common + ["--owner-source-receipts-file", str(receipt_a)],
+        cwd=ROOT, capture_output=True, text=True, timeout=25,
+    )
+    assert first.returncode == 0, first.stderr
+    checkpoint = tmp_path / "owner_readback.json"
+    checkpoint.write_text(first.stdout)
+    changed = subprocess.run(
+        common + [
+            "--previous-review-file", str(checkpoint),
+            "--owner-source-receipts-file", str(receipt_b),
+        ],
+        cwd=ROOT, capture_output=True, text=True, timeout=25,
+    )
+    assert changed.returncode == 0, changed.stderr
+    report = json.loads(changed.stdout)
+    assert report["transition"] == "OWNER_SOURCE_CHANGED_NO_PROOF_UPGRADE"
+    assert report["changed_owner_source_names"] == ["conversation_recovery"]
+    assert report["operator_attention_due"] is False
+    assert report["outbound_authorized"] is False
