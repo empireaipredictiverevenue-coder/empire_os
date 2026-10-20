@@ -90,3 +90,35 @@ Live operator checkpoint on 20 October 2026: **BLS_OWNER_SOURCE_NOT_CONNECTED**,
 `tests/test_predictive_measurement_instruments.py` also covers absent, reviewed and falsely promoted BLS source packets in the original unified multi-source scorecard.
 
 **No source fetch, provider registration, new feed worker, source-owner overwrite, production data mutation, billing, web publishing, model training, automatic market shock or marketing messages were performed.**
+
+## 20 October 2026 — first actual public BLS API connection (opt-in)
+
+The official documentation names **PCU327320327320** as ready-mix concrete manufacturing (national industry Producer Price Index). The public, unregistered API v1 permits a bounded one-series GET without an API key. The instrument `empire_os/predictive_bls_public_probe.py` and opt-in switch below provide one original live response, and the source keeps its preliminary revision flag.
+
+```bash
+cd /home/ubuntu/empire_agents/predictive_decision_control_20261018
+
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_predictive_multi_index_cost_pressure_20261020 \
+  --read-only --probe-official-bls-v1
+```
+
+**Live read-only probe checkpoint** from the official v1 endpoint:
+- September 2026 published index **402.820** (preliminary, subject to revision);
+- September 2025 index **393.592**;
+- original monthly year-over-year price index change **2.3446%**;
+- 35 original source records returned; 2 included **M13 annual-average** values. Both are now explicitly excluded from monthly analytics; none is silently treated as December.
+- 33 monthly readings examined, with published source periods and no buyer, job invoice or finance owner approval.
+
+The probe makes **one deliberate HTTPS GET** to a hard-coded official BLS URL, checks the final URL, bounds the response, validates status and source IDs, declines malformed source months/duplicate periods/missing year-on-year observations and discloses its freshness/limitations. **No stored source owner packet, API credentials, data warehouse write, cron, agent, scraper, spend or supplier invoice claim.**
+
+`scripts.review_predictive_multi_index_cost_pressure_20261020` now supports `--probe-official-bls-v1` solely for research. It **does not replace** the existing `--bls-owner-review` path, does not set `bls_series_count` for unapproved original owner input, and cannot trigger a hypothetical scenario from public data alone. To issue *even a hypothetical model* on this dataset, the existing Materials/Finance/Economic Source owner must approve the series description, relevance, context and exact original economic scenario assumptions. Public PPI does **not** mean actual Empire paid input costs.
+
+The original `review_bls_cost_index_owner` is also fixed to recognise correctly typed `M13/Annual` observations and exclude them from monthly YoY comparisons. Invalid M13 periods still HOLD. This removes a genuine structural incompatibility with original BLS API v1 responses, with accompanying tests and no other source-owner modifications.
+
+References:
+- https://www.bls.gov/developers/api_signature.htm
+- https://www.bls.gov/developers/api_FAQs.htm
+- https://www.bls.gov/ppi/notices/2013/ppi-introduces-regional-detail-for-ready-mix-concrete-indexes.htm
+
+**Still not a full live connected cost-optimisation engine**. Ready-mix concrete is an initial verifiable proof-of-source series; before using roofing, HVAC, solar or other niche scenarios, source owners must select and verify relevant series, preserve geographic/period meaning, confirm source licences and obtain actual customer/product-level invoices, payments and forecasts. No producer feed was activated in production.

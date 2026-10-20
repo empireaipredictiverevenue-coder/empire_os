@@ -323,3 +323,26 @@ def test_twin_claiming_real_market_authentication_holds():
     t["source_market_conditions_authenticated"]=True
     with pytest.raises(ValueError):
         bind_bls_cost_stress_to_existing_twin(bls,assumption,t)
+
+
+def test_owner_parser_accepts_genuine_bls_m13_annual_without_monthly_misclassification():
+    data=owner()
+    data["bls_api_response"]["Results"]["series"][0]["data"].append({
+        "year":"2025","period":"M13","periodName":"Annual",
+        "value":"900.1","footnotes":[],
+    })
+    result=review(data)
+    assert result["status"]=="BLS_OFFICIAL_INDEX_RESEARCH_REVIEWED"
+    card=result["series_research_cards"][0]
+    assert card["original_annual_m13_source_records_excluded"]==1
+    assert card["latest_observed_month"]=="2026-08"
+    assert card["year_over_year_index_change_pct_research_only"]==10.0
+
+
+def test_owner_parser_rejects_m13_labelled_as_december():
+    data=owner()
+    data["bls_api_response"]["Results"]["series"][0]["data"].append({
+        "year":"2025","period":"M13","periodName":"December",
+        "value":"900.1","footnotes":[],
+    })
+    assert review(data)["status"]=="BLS_SOURCE_VALUE_OR_PERIOD_HOLD"

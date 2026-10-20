@@ -1,8 +1,9 @@
 """Read-only prospective multi-source cost-pressure and profitability scenarios.
 
-Requires two explicitly sourced files: approved original BLS-owner observation
-and an existing pilot/economic-twin owner's proposed what-if assumptions.
-Never invent live data, run a collector, alter DB or activate campaigns.
+Original economic scenarios require approved BLS-owner input and an existing
+owner's hypotheses. An explicit opt-in BLS v1 HTTPS probe can inspect one
+pinned public source but cannot authorise it for profit scenario calibration.
+Never invent a financial outcome, schedule a collector or modify production.
 """
 from __future__ import annotations
 
@@ -13,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.predictive_bls_cost_index import review_bls_cost_index_owner
+from empire_os.predictive_bls_public_probe import probe_bls_public_v1
 from empire_os.predictive_multi_index_economics import review_multi_index_cost_pressure
 
 BUNDLE_FIELDS=frozenset((
@@ -36,15 +38,22 @@ def main()->int:
     parser.add_argument("--read-only",action="store_true",required=True)
     parser.add_argument("--bls-owner-review",default=None)
     parser.add_argument("--hypothesis-bundle",default=None)
+    parser.add_argument("--probe-official-bls-v1",action="store_true",
+                        help="One explicit official BLS public GET; does not approve source for profit scenarios")
     args=parser.parse_args()
+    if args.probe_official_bls_v1 and args.bls_owner_review:
+        parser.error("Choose a reviewed owner packet OR the research-only public probe")
     now=datetime.now(timezone.utc)
     bls=review_bls_cost_index_owner(
         _json(args.bls_owner_review) if args.bls_owner_review else None,as_of=now,
     )
+    public_probe=probe_bls_public_v1(as_of=now) if args.probe_official_bls_v1 else None
     base={
         "schema_version":"empire.predictive_revenue.cost_pressure_operator.v1",
         "mode":"OBSERVE","status":"COST_PRESSURE_SOURCE_OR_ASSUMPTIONS_NOT_CONNECTED",
         "bls_source_status":bls["status"],
+        "official_bls_public_research_probe":public_probe,
+        "public_research_source_is_finance_owner_approved":False,
         "bls_series_count":bls["series_observation_count"],
         "original_hypothesis_bundle_supplied":args.hypothesis_bundle is not None,
         "original_registered_forecast_claimed":False,
@@ -54,6 +63,9 @@ def main()->int:
         "outbound_sent":False,"database_writes":False,
         "execution_authority":"none",
     }
+    if (public_probe is not None and public_probe.get("status")
+            == "BLS_PUBLIC_MONTHLY_INDEX_OBSERVED_RESEARCH_ONLY"):
+        base["status"]="OFFICIAL_BLS_PUBLIC_RESEARCH_OBSERVED_OWNER_APPROVAL_REQUIRED"
     if args.hypothesis_bundle:
         bundle=_json(args.hypothesis_bundle)
         if not isinstance(bundle,dict) or set(bundle)!=BUNDLE_FIELDS:

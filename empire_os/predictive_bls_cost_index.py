@@ -136,9 +136,19 @@ def review_bls_cost_index_owner(
                 raise ValueError("too few or too many original observations")
             periods={}
             prelim=False
+            annual_source_records_excluded=0
             for item in rows:
                 if not isinstance(item,Mapping):
                     raise ValueError("invalid BLS period")
+                # The public BLS v1 monthly result can also include M13
+                # (periodName=Annual). Never interpret it as December.
+                if item.get("period")=="M13":
+                    if (item.get("periodName")!="Annual"
+                            or not isinstance(item.get("year"),str)
+                            or not re.fullmatch(r"(?:19|20)\d{2}",item["year"])):
+                        raise ValueError("malformed BLS annual source row")
+                    annual_source_records_excluded+=1
+                    continue
                 y,m,p=_month(item,now)
                 point=(y,m)
                 if point in periods:
@@ -154,6 +164,8 @@ def review_bls_cost_index_owner(
                         raise ValueError("bad BLS source footnotes")
                     if f.get("code")=="P":
                         prelim=True
+            if len(periods)<2:
+                raise ValueError("too few original monthly observations")
             latest=max(periods)
             if (now-datetime(latest[0],latest[1],1,tzinfo=timezone.utc))>MAX_PERIOD_AGE:
                 raise ValueError("BLS latest data period too old")
@@ -171,6 +183,7 @@ def review_bls_cost_index_owner(
                 "same_month_prior_year_index_value_not_currency":str(periods[previous]) if previous in periods else None,
                 "year_over_year_index_change_pct_research_only":yoy,
                 "original_periods_examined":len(rows),
+                "original_annual_m13_source_records_excluded":annual_source_records_excluded,
                 "any_source_preliminary_footnotes":prelim,
                 "source_original_period_missing_yoy":previous not in periods,
                 "index_movement_is_verified_actual_supplier_cost_change":False,
