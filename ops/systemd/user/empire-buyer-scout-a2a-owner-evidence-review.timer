@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly Buyer Scout existing-owner A2A evidence review sync
+
+[Timer]
+OnCalendar=*-*-* *:25:00 UTC
+RandomizedDelaySec=3min
+AccuracySec=1min
+Persistent=true
+Unit=empire-buyer-scout-a2a-owner-evidence-review.service
+
+[Install]
+WantedBy=timers.target
