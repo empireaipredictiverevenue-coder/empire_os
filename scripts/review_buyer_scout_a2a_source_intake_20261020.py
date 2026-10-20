@@ -13,11 +13,13 @@ from empire_os.buyer_scout_a2a_research_intake_20261020 import (
     stage_a2a_owner_research,read_bounded_json,
 )
 from empire_os.buyer_scout_source_verification_queue_20261020 import make_buyer_scout_source_verification_queue
+from empire_os.buyer_scout_canonical_dedupe_request_v1 import prepare_canonical_lookup_requests
 REPO=Path(__file__).resolve().parents[1]
 A2A=Path("/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/runtime/a2a_commercial_signal_mining")
 CANONICAL=Path("/srv/empire_os/runtime/buyer_acquisition")
 OUT=REPO/"runtime/buyer_acquisition/a2a_research_owner_intake_latest.json"
 QUEUE=REPO/"runtime/buyer_acquisition/a2a_source_verification_queue_latest.json"
+CANONICAL_LOOKUPS=REPO/"runtime/buyer_acquisition/a2a_canonical_domain_lookup_requests_latest.json"
 
 
 def _safe_write(out_path: Path, value: dict) -> None:
@@ -49,9 +51,11 @@ def main() -> int:
     ]
     out=stage_a2a_owner_research(*docs)
     queue=make_buyer_scout_source_verification_queue(out)
+    lookup_requests=prepare_canonical_lookup_requests(queue)
     if args.write_local:
         _safe_write(OUT,out)
         _safe_write(QUEUE,queue)
+        _safe_write(CANONICAL_LOOKUPS,lookup_requests)
     print(json.dumps({
         "schema_version":out["schema_version"],
         "buyer_scout_owner_evidence_read":out["source_evidence_read_into_owner_workspace"],
@@ -64,6 +68,8 @@ def main() -> int:
         "source_policy_held_site_tasks":queue["held_site_count"],
         "historical_permit_name_review_tasks":queue["historical_official_context_count"],
         "owner_verification_tasks_dispatched":queue["tasks_dispatched_to_live_buyer_scout"],
+        "canonical_lookup_requests_prepared":lookup_requests["lookup_request_count"],
+        "canonical_database_read_performed":lookup_requests["canonical_database_read_performed"],
         "canonical_crm_records_created":0,
         "outreach_sent":0,
         "cryptographically_verified_signed_owner_receipts":0,
