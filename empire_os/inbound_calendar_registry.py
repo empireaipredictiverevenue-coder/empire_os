@@ -69,6 +69,26 @@ class OfflineCalendarRegistry:
                 );
                 CREATE INDEX IF NOT EXISTS inbound_calendar_recent_readbacks
                     ON calendar_status_reads(calendar_id,appointment_id,observed_at);
+                CREATE TABLE IF NOT EXISTS calendar_projections (
+                    calendar_id TEXT NOT NULL,
+                    appointment_id TEXT NOT NULL,
+                    proof_id TEXT NOT NULL,
+                    tenant_id TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK(status IN ('pending','complete')),
+                    projected_at TEXT,
+                    PRIMARY KEY(calendar_id,appointment_id,proof_id),
+                    FOREIGN KEY(calendar_id,appointment_id,proof_id)
+                        REFERENCES calendar_status_reads(calendar_id,appointment_id,proof_id)
+                );
+                CREATE INDEX IF NOT EXISTS calendar_projection_tenant_status_idx
+                    ON calendar_projections(tenant_id,status);
+                INSERT OR IGNORE INTO calendar_projections
+                    (calendar_id,appointment_id,proof_id,tenant_id)
+                SELECT r.calendar_id,r.appointment_id,r.proof_id,a.tenant_id
+                FROM calendar_status_reads r
+                JOIN tracked_appointments a
+                  ON a.calendar_id=r.calendar_id AND a.event_id=r.appointment_id;
             """)
 
     def __enter__(self) -> "OfflineCalendarRegistry":
@@ -169,6 +189,10 @@ class OfflineCalendarRegistry:
             if not isinstance(obj, dict) or obj.get("calendar_id") != calendar_id or obj.get("appointment_id") != event_id:
                 raise ValueError("calendar_readback_identity_corrupt")
             results.append(CalendarStatusProof(**obj))
+        results.sort(key=lambda proof: (
+            datetime.fromisoformat(proof.observed_at.replace("Z", "+00:00")),
+            self.proof_version_id(proof),
+        ))
         return tuple(results)
 
     def current_proof(self, *, calendar_id: str, event_id: str) -> CalendarStatusProof | None:
@@ -197,10 +221,7 @@ class OfflineCalendarRegistry:
             token=token, transport=transport, observed_at=observed_at,
             previously_verified=prior,
         )
-        version_id = sha256((
-            proof.canonical_ref + "\x00" + proof.status + "\x00" +
-            (proof.provider_updated_at or proof.observed_at)
-        ).encode()).hexdigest()
+        version_id = self.proof_version_id(proof)
         canonical = asdict(proof)
         data = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
         digest = sha256(data.encode()).hexdigest()
@@ -220,7 +241,108 @@ class OfflineCalendarRegistry:
                 "VALUES(?,?,?,?,?,?)",
                 (calendar_id, event_id, version_id, proof.observed_at, data, digest),
             )
+            self.db.execute(
+                "INSERT INTO calendar_projections "
+                "(calendar_id,appointment_id,proof_id,tenant_id) VALUES(?,?,?,?)",
+                (calendar_id,event_id,version_id,tenant_id),
+            )
         return proof, True
+
+    @staticmethod
+    def proof_version_id(proof: CalendarStatusProof) -> str:
+        """Stable ID for a provider status + revision. Never uses OAuth tokens."""
+        return sha256((
+            proof.canonical_ref + "\x00" + proof.status + "\x00" +
+            (proof.provider_updated_at or proof.observed_at)
+        ).encode()).hexdigest()
+
+    def pending_projection_proofs(
+        self, tenant_id: str, *, limit: int = 200,
+    ) -> tuple[CalendarStatusProof, ...]:
+        """Read only tenant-scoped, unprojected verified calendar state changes."""
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_id_required")
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 2000:
+            raise ValueError("invalid_projection_limit")
+        rows = self.db.execute(
+            "SELECT r.calendar_id,r.appointment_id,r.proof_id,"
+            "r.proof_json,r.proof_sha256 FROM calendar_projections p "
+            "JOIN calendar_status_reads r ON r.calendar_id=p.calendar_id "
+            "AND r.appointment_id=p.appointment_id AND r.proof_id=p.proof_id "
+            "JOIN tracked_appointments a ON a.calendar_id=r.calendar_id "
+            "AND a.event_id=r.appointment_id "
+            "WHERE p.tenant_id=? AND a.tenant_id=? AND p.status='pending' "
+            "ORDER BY r.observed_at,r.proof_id",
+            (tenant_id, tenant_id),
+        ).fetchall()
+        proofs: list[CalendarStatusProof] = []
+        for calendar_id, appointment_id, proof_id, body, digest in rows:
+            if sha256(body.encode("utf-8")).hexdigest() != digest:
+                raise ValueError("calendar_projection_evidence_integrity_failure")
+            payload = json.loads(body)
+            if not isinstance(payload, dict):
+                raise ValueError("invalid_calendar_projection_payload")
+            proof = CalendarStatusProof(**payload)
+            link = self.get_link(calendar_id=calendar_id, event_id=appointment_id)
+            if (proof.tenant_id != tenant_id or proof.calendar_id != calendar_id
+                or proof.appointment_id != appointment_id or link is None
+                or proof.call_id != link.call_id or
+                self.proof_version_id(proof) != proof_id):
+                raise ValueError("calendar_projection_owner_or_version_mismatch")
+            proofs.append(proof)
+        # Sort by actual offset-aware instants; string ISO sorting is not
+        # chronologically safe across different time-zone offsets.
+        proofs.sort(key=lambda p: (
+            datetime.fromisoformat(p.observed_at.replace("Z", "+00:00")),
+            p.canonical_ref, self.proof_version_id(p),
+        ))
+        return tuple(proofs[:limit])
+
+    def acknowledge_projection_offline(
+        self, proof: CalendarStatusProof, *, projected_at: datetime,
+    ) -> bool:
+        """Ack only *after* both target stores accept the same proof."""
+        if self.read_only:
+            raise ValueError("calendar_registry_read_only")
+        if projected_at.tzinfo is None or projected_at.utcoffset() is None:
+            raise ValueError("projection_ack_time_must_be_aware")
+        binding = self.get_binding(proof.calendar_id)
+        link = self.get_link(calendar_id=proof.calendar_id, event_id=proof.appointment_id)
+        if (binding is None or link is None
+            or binding.tenant_id != proof.tenant_id
+            or link.tenant_id != proof.tenant_id
+            or link.call_id != proof.call_id):
+            raise ValueError("calendar_projection_tenant_or_call_mismatch")
+        proof_id = self.proof_version_id(proof)
+        with self.db:
+            cursor = self.db.execute(
+                "UPDATE calendar_projections SET status='complete', projected_at=? "
+                "WHERE calendar_id=? AND appointment_id=? AND proof_id=? "
+                "AND tenant_id=? AND status='pending'",
+                (projected_at.isoformat(), proof.calendar_id,
+                 proof.appointment_id, proof_id, proof.tenant_id),
+            )
+            if cursor.rowcount:
+                return True
+            prior = self.db.execute(
+                "SELECT status FROM calendar_projections WHERE calendar_id=? "
+                "AND appointment_id=? AND proof_id=? AND tenant_id=?",
+                (proof.calendar_id, proof.appointment_id, proof_id, proof.tenant_id),
+            ).fetchone()
+            if prior == ("complete",):
+                return False
+            raise ValueError("calendar_projection_receipt_missing")
+
+    def projection_counts(self, tenant_id: str) -> dict[str, int]:
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_id_required")
+        rows = self.db.execute(
+            "SELECT status,COUNT(*) FROM calendar_projections WHERE tenant_id=? "
+            "GROUP BY status", (tenant_id,),
+        ).fetchall()
+        counts = dict(rows)
+        return {"pending": counts.get("pending", 0),
+                "complete": counts.get("complete", 0)}
 
     def tenant_summary(self, tenant_id: str) -> dict[str, Any]:
         if not isinstance(tenant_id, str) or not tenant_id.strip():
@@ -243,6 +365,8 @@ class OfflineCalendarRegistry:
             "current_confirmed": counts["confirmed"],
             "current_cancelled": counts["cancelled"],
             "not_verified": counts["not_verified"],
+            "projection_pending": self.projection_counts(tenant_id)["pending"],
+            "projection_complete": self.projection_counts(tenant_id)["complete"],
             "customer_contact_authorized": False,
             "calendar_write_authorized": False,
             "bookings_created": False,

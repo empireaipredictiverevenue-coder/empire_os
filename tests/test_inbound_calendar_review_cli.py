@@ -61,6 +61,7 @@ def test_prepared_calendar_schema_is_default_deny_and_has_tenant_fks():
         "inbound_recovery_calendar_bindings",
         "inbound_recovery_calendar_links",
         "inbound_recovery_calendar_status_evidence",
+        "inbound_recovery_calendar_projection_delivery",
     ):
         assert "alter table public." + table + " force row level security" in sql
         assert "revoke all on public." + table + " from public, anon, authenticated" in sql

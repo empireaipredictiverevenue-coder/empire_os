@@ -43,17 +43,46 @@ CREATE TABLE IF NOT EXISTS public.inbound_recovery_calendar_status_evidence (
     adapter_evidence_verified boolean NOT NULL DEFAULT false,
     synthetic boolean NOT NULL DEFAULT true,
     PRIMARY KEY (calendar_id, appointment_id, provider_revision_ref),
+    UNIQUE (calendar_id, appointment_id, provider_revision_ref, tenant_id),
     FOREIGN KEY (calendar_id, appointment_id, tenant_id)
         REFERENCES public.inbound_recovery_calendar_links(
             calendar_id, appointment_id, tenant_id
         )
 );
 
+-- Separate durable projection acknowledgements. Creation of a provider
+-- readback and creation of its PENDING delivery entry must be atomic in the
+-- eventual trusted database adapter. No automatic worker is installed here.
+CREATE TABLE IF NOT EXISTS public.inbound_recovery_calendar_projection_delivery (
+    calendar_id text NOT NULL,
+    appointment_id text NOT NULL,
+    provider_revision_ref text NOT NULL,
+    tenant_id text NOT NULL,
+    delivery_status text NOT NULL DEFAULT 'pending'
+        CHECK (delivery_status IN ('pending', 'complete')),
+    projected_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (calendar_id, appointment_id, provider_revision_ref),
+    FOREIGN KEY (calendar_id, appointment_id, provider_revision_ref, tenant_id)
+        REFERENCES public.inbound_recovery_calendar_status_evidence
+            (calendar_id, appointment_id, provider_revision_ref, tenant_id),
+    CHECK (
+        (delivery_status = 'pending' AND projected_at IS NULL)
+        OR (delivery_status = 'complete' AND projected_at IS NOT NULL)
+    )
+);
+
+CREATE INDEX IF NOT EXISTS inbound_calendar_projection_pending_by_tenant
+    ON public.inbound_recovery_calendar_projection_delivery
+        (tenant_id, delivery_status, created_at);
+
 CREATE INDEX IF NOT EXISTS inbound_recovery_calendar_status_tenant_time_idx
     ON public.inbound_recovery_calendar_status_evidence
        (tenant_id, calendar_id, observed_at DESC);
 
 -- Backend-only evidence, no customer direct reads or writes.
+ALTER TABLE public.inbound_recovery_calendar_projection_delivery ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inbound_recovery_calendar_projection_delivery FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_calendar_bindings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_calendar_bindings FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_calendar_links ENABLE ROW LEVEL SECURITY;
@@ -61,6 +90,7 @@ ALTER TABLE public.inbound_recovery_calendar_links FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_calendar_status_evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_calendar_status_evidence FORCE ROW LEVEL SECURITY;
 
+REVOKE ALL ON public.inbound_recovery_calendar_projection_delivery FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.inbound_recovery_calendar_bindings FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.inbound_recovery_calendar_links FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.inbound_recovery_calendar_status_evidence FROM PUBLIC, anon, authenticated;

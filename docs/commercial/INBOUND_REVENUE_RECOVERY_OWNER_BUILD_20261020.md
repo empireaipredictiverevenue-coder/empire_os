@@ -273,3 +273,40 @@ https://developers.google.com/workspace/calendar/api/v3/reference/events
 5. Apply only after isolated PostgreSQL migration/RLS checks and coordinated production identity, privacy, retention and audit signoff.
 
 The optional HTTP client has NOT been exercised against a live tenant calendar. Passing mocked provider tests is not a successful live calendar connection.
+
+## 20 October — Google OAuth Read-Only Onboarding and Durable Calendar Evidence Projection
+
+Status: isolated feature branch with offline fixtures. NO customer OAuth grant, account tokens, real calendar queries or production deployment. The OAuth callback handler, trusted token exchange/vault, database RLS integration and real-time monitoring are NOT live.
+
+### Implemented
+
+- empire_os/inbound_calendar_oauth_onboarding.py — ten-minute, one-time Google OAuth state and S256 PKCE challenge. Owner/tenant/admin/client/HTTPS callback binding; Calendar events.readonly and freebusy scopes only. PKCE verifier encrypted with a server-only Fernet key and cleared on successful one-time callback. Authorization codes are not persisted. This module does NOT exchange codes, issue tokens, or expose public callback routes.
+- empire_os/inbound_calendar_oauth_boundary.py — read-only lease contract requiring exact account/tenant/calendar matching, restricted Google Calendar read-only scopes, approved owner, independently verified grant and unexpired access. Write-capable or unknown Google scopes are rejected before the provider transport is invoked. A self-declared boolean flag is NOT authoritative proof of provider permissions.
+- empire_os/inbound_calendar_projection.py — operator-driven at-least-once calendar status projection into two independent local SQLite evidence stores. Both writes are idempotent, and the durable projection entry is acknowledged only after both succeed. If the second store fails, the first is retried safely without a duplicate event. This is NOT a distributed atomic transaction. The operator/customer reporting layer must label pending projections and never claim complete reconciliation when evidence delivery is unfinished.
+- empire_os/inbound_calendar_registry.py — pending projection entries created transactionally with read-back proof. Tenant-scoped backlog and acknowledgment operations. SHA-256 corruption detection. Mixed UTC offset history is sorted chronologically.
+- scripts/review_inbound_calendar_projection_20261020.py — read-only backlog inspection and an explicit opt-in LOCAL SQLite replay mode. No remote Google, telephone, customer messaging, payment or calendar changes.
+- supabase/migrations/20261020124503_inbound_calendar_registry_prepared_20261020.sql — UNAPPLIED prepared server-only projection table with pending/complete tracking, tenant-bound foreign keys and FORCE RLS. No migration has been applied.
+
+### Offline operator review
+
+Read an EXISTING local calendar registry:
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_calendar_projection_20261020 --calendar-db /path/to/existing_calendar.db --tenant-id TENANT --read-only
+
+Explicitly replay a verified LOCAL fixture, never a production dataset, into three distinct existing databases:
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_calendar_projection_20261020 --calendar-db /path/to/calendar.db --recovery-db /path/to/recovery.db --workflow-db /path/to/workflow.db --tenant-id TENANT --as-of 2026-10-20T13:00:00+01:00 --apply-local-evidence-replay
+
+No fixture or claimed verified flag proves real recovered revenue. The local projection still has no production-backed provider credential authority.
+
+### Next production release gates
+
+1. Configure Google Cloud OAuth client and registered HTTPS callback; complete required consent-screen verification. Authorize only actual customer-owned calendars via existing EmpireOS tenant-admin identity.
+2. Add server-owned OAuth code exchange, independently verified granted scopes, encrypted revocable token vault, refresh/revoke lifecycle and customer tenant binding. Never store bearer or refresh tokens in Git, SQLite calendar registry, logs or browser code.
+3. Perform real authenticated, read-only Google event.get/freeBusy readbacks and verify appointment private source markers and tenant ownership. Free/busy never confirms availability or creates a booking.
+4. Add a production-grade single-DB transactional outbox, idempotent reconciliation worker, retries/backoff, audit, source signatures, live authorization and PostgreSQL/RLS tests.
+5. Perform customer consent, GDPR/PECR, retention, deletion, provider security and identity review before the supervised customer pilot. Live booking creation, calls, messaging and spending remain OFF.
+
+Official contracts:
+https://developers.google.com/workspace/calendar/api/auth
+https://developers.google.com/identity/protocols/oauth2/web-server
+https://developers.google.com/workspace/calendar/api/v3/reference/events/get
+https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query

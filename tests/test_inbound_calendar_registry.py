@@ -215,3 +215,24 @@ def test_proof_is_not_account_token_or_customer_pii(tmp_path):
         assert CONTACT not in str(report)
         assert not report["revenue_inferred"]
         assert not report["bookings_created"]
+
+
+def test_history_uses_actual_time_across_timezone_offsets(tmp_path):
+    from datetime import timezone
+    path = tmp_path / "timezones.db"
+    with OfflineCalendarRegistry(path) as registry:
+        configure(registry)
+        registry.verified_readback_offline(
+            tenant_id="tenant-a", calendar_id=CAL, event_id="event-a",
+            token="fixture-token", transport=FakeCalendar(raw()),
+            observed_at=NOW.astimezone(timezone(timedelta(hours=2))),
+        )
+        registry.verified_readback_offline(
+            tenant_id="tenant-a", calendar_id=CAL, event_id="event-a",
+            token="fixture-token", transport=FakeCalendar(raw("cancelled")),
+            observed_at=NOW + timedelta(minutes=30),
+        )
+        assert registry.current_proof(
+            calendar_id=CAL, event_id="event-a"
+        ).status == "cancelled"
+        assert registry.tenant_summary("tenant-a")["current_cancelled"] == 1
