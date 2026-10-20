@@ -56,7 +56,12 @@ class GraphifyPrepatchObserver:
                 result = coder.context.review_change_impact(
                     (target,), max_affected=20,
                 )
-            except (ValueError, OSError, UnicodeError, KeyError, TypeError) as exc:
+                count = result["affected_source_count"]
+                if type(count) is not int or not 0 <= count <= 20:
+                    raise ValueError("invalid bounded dependency count")
+            except Exception as exc:
+                # Optional observation must never veto an already-authorised
+                # owner patch, including unexpected graph/policy exceptions.
                 self._counts["unavailable_reviews"] += 1
                 # Classify known lack-of-coverage separately from stale or
                 # unreadable evidence; never export the exception message.
@@ -64,7 +69,6 @@ class GraphifyPrepatchObserver:
                     self._counts["not_indexed_target_reviews"] += 1
             else:
                 self._counts["attested_prepatch_reviews"] += 1
-                count = result["affected_source_count"]
                 self._counts["dependent_source_candidates"] += count
                 if count == 0:
                     self._counts["zero_dependency_reviews"] += 1
