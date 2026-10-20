@@ -12,6 +12,7 @@ import time
 
 SUPPORTED_SCOPES = frozenset({
     "recovery:read", "recovery:queue", "recovery:patterns", "recovery:knowledge",
+    "recovery:workflow",
 })
 ISSUER = "empire-inbound-recovery"
 AUDIENCE = "empire-inbound-recovery-management"

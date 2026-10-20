@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.inbound_recovery_events (
     kind text NOT NULL CHECK (kind IN (
         'ringing','answered','unanswered','busy','rejected','failed','completed',
         'callback_requested','callback_connected','booking_requested','booking_confirmed',
+        'booking_cancelled',
         'invoice_paid','human_transfer','followup_opt_out'
     )),
     origin text NOT NULL CHECK (origin IN ('provider','operator','calendar','payments')),
@@ -46,10 +47,10 @@ CREATE TABLE IF NOT EXISTS public.inbound_recovery_events (
         OR (kind <> 'invoice_paid' AND amount_minor IS NULL AND currency IS NULL)
     ),
     CHECK (
-        kind NOT IN ('callback_connected','booking_confirmed')
+        kind NOT IN ('callback_connected','booking_confirmed','booking_cancelled')
         OR (evidence_verified = true AND length(trim(evidence_ref)) > 0
             AND ((kind = 'callback_connected' AND origin = 'provider')
-                OR (kind = 'booking_confirmed' AND origin = 'calendar')))
+                OR (kind IN ('booking_confirmed','booking_cancelled') AND origin = 'calendar')))
     ),
     CHECK (kind NOT IN ('ringing','answered','unanswered','busy','rejected','failed','completed')
            OR origin = 'provider')

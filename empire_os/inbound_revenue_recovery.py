@@ -13,11 +13,12 @@ CALL_STATUSES = frozenset({"ringing", "answered", "unanswered", "busy", "rejecte
 MISSED_STATUSES = frozenset({"unanswered", "busy", "rejected"})
 ACTION_KINDS = frozenset({
     "callback_requested", "callback_connected", "booking_requested",
-    "booking_confirmed", "invoice_paid", "human_transfer", "followup_opt_out",
+    "booking_confirmed", "booking_cancelled", "invoice_paid", "human_transfer", "followup_opt_out",
 })
 VERIFIED_ORIGINS = {
     "callback_connected": "provider",
     "booking_confirmed": "calendar",
+    "booking_cancelled": "calendar",
     "invoice_paid": "payments",
 }
 
@@ -157,6 +158,22 @@ def plan_reception_response(profile: TenantReceptionProfile, intent: str) -> Rec
     )
 
 
+def active_calendar_confirmations(events: list[RecoveryEvent]) -> dict[str, RecoveryEvent]:
+    """Last verified calendar state by canonical appointment evidence reference.
+
+    A cancellation must carry the same appointment reference and original call ID
+    as the confirmation. Matching event_ids alone is not booking identity.
+    """
+    latest: dict[str, RecoveryEvent] = {}
+    for event in sorted(events, key=lambda e: (
+        datetime.fromisoformat(e.occurred_at.replace("Z", "+00:00")), e.event_id,
+    )):
+        if event.kind in {"booking_confirmed", "booking_cancelled"} and event.verified and not event.synthetic:
+            latest[event.evidence_ref] = event
+    return {reference: event for reference, event in latest.items()
+            if event.kind == "booking_confirmed"}
+
+
 @dataclass
 class RecoveryLedger:
     """Idempotent in-memory ledger for proof and offline replays."""
@@ -197,12 +214,14 @@ class RecoveryLedger:
             missed_calls += int(missed_at is not None)
             answered_calls += int(any(e.kind == "answered" for e in call_events))
             callback_requests += int(any(e.kind == "callback_requested" for e in call_events))
+            active_bookings = active_calendar_confirmations(call_events)
             for e in call_events:
                 if e.kind == "callback_connected" and e.evidence_ref not in seen_connection_receipts:
                     seen_connection_receipts.add(e.evidence_ref)
                     connections += 1
-                if e.kind == "booking_confirmed" and e.evidence_ref not in seen_booking_receipts:
-                    seen_booking_receipts.add(e.evidence_ref)
+            for booking_ref in active_bookings:
+                if booking_ref not in seen_booking_receipts:
+                    seen_booking_receipts.add(booking_ref)
                     bookings += 1
             def later_than_missed(e: RecoveryEvent) -> bool:
                 return bool(
@@ -211,7 +230,8 @@ class RecoveryLedger:
                 )
             qualifying_recovery = [
                 e for e in call_events
-                if e.kind in {"callback_connected", "booking_confirmed"}
+                if (e.kind == "callback_connected" or
+                    (e.kind == "booking_confirmed" and active_bookings.get(e.evidence_ref) == e))
                 and later_than_missed(e)
                 and (e.kind, e.evidence_ref) not in seen_recovery_receipts
             ]

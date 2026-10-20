@@ -12,7 +12,7 @@ def event(kind, minute, *, call="call-a", tenant="customer-one",
           paid=None, currency="", receipt=None, synthetic=False):
     origins = {
         "unanswered": "provider", "callback_connected": "provider",
-        "booking_confirmed": "calendar", "invoice_paid": "payments",
+        "booking_confirmed": "calendar", "booking_cancelled": "calendar", "invoice_paid": "payments",
     }
     return RecoveryEvent(
         tenant_id=tenant, call_id=call,
@@ -162,3 +162,16 @@ def test_no_touch_cannot_claim_roi_or_spend():
     assert result["recovered_calls"] == 0
     assert not result["ad_spend_inferred"]
     assert not result["source_inference_permitted"]
+
+
+def test_cancelled_booking_not_claimed_as_source_recovered_or_paid():
+    data = [
+        event("unanswered", 0),
+        event("booking_confirmed", 10, receipt="calendar-event-01"),
+        event("booking_cancelled", 15, receipt="calendar-event-01"),
+        event("invoice_paid", 20, paid=29000, currency="GBP", receipt="payment-01"),
+    ]
+    result = report(data, [touch("paid_search")])
+    assert result["recovered_calls"] == 0
+    assert result["last_touch_channels"] == {}
+    assert not result["profit_or_roi_inferred"]

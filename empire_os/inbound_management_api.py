@@ -13,6 +13,8 @@ from pathlib import Path
 from fastapi import APIRouter, Header, HTTPException, Query, Response
 
 from empire_os.inbound_access_audit import RecoveryAccessAudit
+from empire_os.inbound_booking_store import OfflineBookingWorkflowStore
+from empire_os.inbound_booking_workflow import WorkflowPolicy
 from empire_os.inbound_knowledge_store import OfflineKnowledgeRepository
 from empire_os.inbound_management_auth import (
     RecoveryAccessDenied, RecoveryActor, authenticate_recovery_reader,
@@ -133,6 +135,30 @@ def create_inbound_management_router() -> APIRouter:
                 result = repository.active_summary(actor.tenant_id)
         except Exception as exc:
             raise HTTPException(status_code=503, detail="management_knowledge_not_ready") from exc
+        result["management_mode"] = "local_read_only_nonproduction"
+        return result
+
+    @router.get("/workflow")
+    def workflow(
+        response: Response,
+        authorization: str | None = Header(default=None),
+        as_of: datetime | None = Query(default=None),
+    ):
+        if not _enabled():
+            raise HTTPException(status_code=404, detail="management_disabled")
+        response.headers["Cache-Control"] = "no-store"
+        actor, _tenant, _events = _read(authorization, "recovery:workflow", "workflow_read")
+        try:
+            with OfflineBookingWorkflowStore(
+                _fixed_path("EMPIRE_INBOUND_MANAGER_WORKFLOW_DB"), read_only=True
+            ) as repository:
+                result = repository.summary(
+                    WorkflowPolicy(actor.tenant_id), as_of=_as_of(as_of),
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="management_workflow_not_ready") from exc
         result["management_mode"] = "local_read_only_nonproduction"
         return result
 

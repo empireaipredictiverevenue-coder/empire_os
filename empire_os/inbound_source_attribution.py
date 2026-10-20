@@ -9,7 +9,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
-from empire_os.inbound_revenue_recovery import MISSED_STATUSES, RecoveryEvent
+from empire_os.inbound_revenue_recovery import (
+    MISSED_STATUSES, RecoveryEvent, active_calendar_confirmations,
+)
 
 
 def _ts(value: str) -> datetime:
@@ -127,9 +129,11 @@ def attribute_recovered_sources(
         first_missed = _ts(missed_events[0].occurred_at)
         if any(e.kind == "followup_opt_out" for e in call_events):
             continue
+        active = active_calendar_confirmations(call_events)
         qualifying = [
             e for e in call_events
-            if e.kind in {"callback_connected", "booking_confirmed"}
+            if (e.kind == "callback_connected" or
+                (e.kind == "booking_confirmed" and active.get(e.evidence_ref) == e))
             and e.verified and e.evidence_ref and _ts(e.occurred_at) > first_missed
         ]
         if not qualifying:

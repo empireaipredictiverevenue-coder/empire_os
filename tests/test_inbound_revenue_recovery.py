@@ -17,6 +17,7 @@ def event(kind, *, event_id=None, call_id="call-1", tenant_id="tenant-a", minute
         "ringing": "provider", "answered": "provider", "unanswered": "provider",
         "busy": "provider", "rejected": "provider", "completed": "provider",
         "callback_connected": "provider", "booking_confirmed": "calendar",
+        "booking_cancelled": "calendar",
         "invoice_paid": "payments",
     }
     return RecoveryEvent(
@@ -248,3 +249,56 @@ def test_hours_preview_rejects_invalid_or_naive_datetime(monkeypatch, client):
             },
         }, headers={"x-empire-preview-token": "only-inside-tests"})
         assert response.status_code == 422
+
+
+def test_cancelled_booking_not_reported_as_active_recovery_or_paid_money():
+    ledger = RecoveryLedger()
+    for item in (
+        event("unanswered", minute=1),
+        event("booking_confirmed", minute=2, verified=True, evidence_ref="calendar-appt-1"),
+        event("booking_cancelled", minute=3, verified=True, evidence_ref="calendar-appt-1"),
+        event("invoice_paid", minute=4, verified=True, evidence_ref="receipt-after-cancel",
+              amount_minor=19000, currency="GBP"),
+    ):
+        ledger.append(item)
+    report = ledger.report("tenant-a")
+    assert report["missed_calls"] == 1
+    assert report["confirmed_bookings"] == 0
+    assert report["verified_recovered_calls"] == 0
+    assert report["verified_paid_recovery_minor_by_currency"] == {}
+
+
+def test_callback_connected_still_counts_when_appointment_cancelled():
+    ledger = RecoveryLedger()
+    for item in (
+        event("unanswered", minute=1),
+        event("booking_confirmed", minute=2, verified=True, evidence_ref="calendar-appt-1"),
+        event("booking_cancelled", minute=3, verified=True, evidence_ref="calendar-appt-1"),
+        event("callback_connected", minute=4, verified=True, evidence_ref="provider-connect-1"),
+    ):
+        ledger.append(item)
+    report = ledger.report("tenant-a")
+    assert report["confirmed_bookings"] == 0
+    assert report["verified_recovered_calls"] == 1
+
+
+def test_calendar_cancel_requires_calendar_provenance():
+    with pytest.raises(ValueError, match="booking_cancelled_requires_verified_calendar_receipt"):
+        event("booking_cancelled", minute=3, origin="operator", verified=True,
+              evidence_ref="calendar-appt-1")
+
+
+def test_calendar_reconfirmation_restores_booking_after_cancel():
+    ledger = RecoveryLedger()
+    for item in (
+        event("unanswered", minute=1),
+        event("booking_confirmed", minute=2, verified=True,
+              evidence_ref="calendar-appt-1"),
+        event("booking_cancelled", minute=3, verified=True,
+              evidence_ref="calendar-appt-1"),
+        event("booking_confirmed", minute=4, verified=True,
+              evidence_ref="calendar-appt-1"),
+    ):
+        ledger.append(item)
+    assert ledger.report("tenant-a")["confirmed_bookings"] == 1
+    assert ledger.report("tenant-a")["verified_recovered_calls"] == 1

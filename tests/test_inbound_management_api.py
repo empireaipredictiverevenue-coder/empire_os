@@ -309,3 +309,65 @@ def test_knowledge_status_fails_closed_without_configured_db(config):
         token(tenant="alpha", scopes=["recovery:knowledge"]),
     )
     assert result.status_code == 503
+
+
+def test_workflow_status_is_tenant_scoped_and_scope_protected(config, monkeypatch, tmp_path):
+    from empire_os.inbound_booking_store import OfflineBookingWorkflowStore
+    from empire_os.inbound_booking_workflow import InboundWorkflowEvent
+    from empire_os.inbound_contact_identity import pseudonymise_inbound_contact
+
+    key = "management-workflow-test-contact-key-32-bytes"
+    def make_event(tenant, call):
+        return InboundWorkflowEvent(
+            tenant_id=tenant, event_id="workflow-" + tenant,
+            call_id=call, contact_key=pseudonymise_inbound_contact(
+                "+442071234567", tenant_id=tenant, signing_key=key,
+            ),
+            kind="callback_requested",
+            occurred_at="2026-10-20T09:00:00+00:00",
+            origin="operator_review", evidence_ref="operator-evidence-" + tenant,
+            verified=True, synthetic=False,
+        )
+
+    file = tmp_path / "workflow.db"
+    with OfflineBookingWorkflowStore(file) as store:
+        store.append_offline(make_event("alpha", "alpha-workflow"))
+        store.append_offline(make_event("beta", "beta-workflow"))
+    monkeypatch.setenv("EMPIRE_INBOUND_MANAGER_WORKFLOW_DB", str(file))
+    client, audit, _ = config
+    unauthorized = get(client, "workflow", token(tenant="alpha"),
+                       as_of="2026-10-20T10:00:00Z")
+    assert unauthorized.status_code == 401
+    granted = get(client, "workflow",
+                  token(tenant="alpha", scopes=["recovery:workflow"]),
+                  as_of="2026-10-20T10:00:00Z", tenant_id="beta")
+    assert granted.status_code == 200, granted.text
+    body = granted.json()
+    assert body["tenant_id"] == "alpha"
+    assert body["call_workflows_total"] == 1
+    assert body["workflows"][0]["call_id"] == "alpha-workflow"
+    assert "beta-workflow" not in granted.text
+    assert body["outbound_sent"] is False
+    assert body["contact_keys_returned"] is False
+    assert granted.headers["cache-control"] == "no-store"
+    with RecoveryAccessAudit(audit, audit_key=AUDIT_KEY) as log:
+        assert log.row_count() == 1
+        assert log.verify_chain()
+
+
+def test_workflow_status_requires_existing_private_store(config):
+    client, audit, _ = config
+    result = get(client, "workflow",
+                 token(tenant="alpha", scopes=["recovery:workflow"]),
+                 as_of="2026-10-20T10:00:00Z")
+    assert result.status_code == 503
+    with RecoveryAccessAudit(audit, audit_key=AUDIT_KEY) as log:
+        assert log.verify_chain()
+
+
+def test_workflow_manager_disabled_mode_never_reads_or_logs(config, monkeypatch):
+    client, audit, _ = config
+    monkeypatch.delenv("EMPIRE_INBOUND_MANAGER_ENABLED")
+    result = get(client, "workflow", token(scopes=["recovery:workflow"]))
+    assert result.status_code == 404
+    assert not audit.exists()

@@ -189,3 +189,42 @@ Example offline knowledge review (existing store only):
 Before any live knowledge use: customer permission to use the source, secure user-to-tenant provisioning, approved fact signer/reviewer identity, robust version approval and rollback, valid signed content provenance, tested semantic safety, locale-specific commercial disclaimers, data retention and explicit founder pilot approval.
 
 The management knowledge database path is an optional extra server-side value EMPIRE_INBOUND_MANAGER_KNOWLEDGE_DB, required only for GET knowledge-status when the management API is enabled. It must refer to a private, existing offline SQLite file. No endpoint accepts a caller-supplied file path.
+
+## 20 October — Appointment Lifecycle, Callback Consent, Suppression and Cancellation Reconciliation
+
+Status: Built and tested offline. No production migration applied, no customer messages/calls, no calendar bookings made, and no verified revenues newly observed.
+
+### New modules
+
+- empire_os/inbound_booking_workflow.py: tenant-scoped appointment and callback lifecycle. Appointment request, calendar-confirmed status, cancellation/reconfirmation, verified callback connection, explicit consent grant/revocation and global opt-out. Opt-outs remain effective beyond normal operational lookback. Competing contact identifiers block review eligibility. Conflicting booking ownership is quarantined.
+- empire_os/inbound_contact_identity.py: tenant-specific HMAC-SHA256 of E.164 phone, not a plaintext number. THIS IS PSEUDONYMISATION, NOT ANONYMISATION; private signing key and privacy review are essential.
+- empire_os/inbound_booking_store.py: offline SQLite, idempotent event persistence, separate tenant read-only reports. SHA-256 detects naive corruption, not privileged tampering.
+- empire_os/inbound_management_api.py: GET /v1/inbound-recovery/management/workflow; separate recovery:workflow scope, tenant approval, tamper-evident audit record, existing read-only workflow database and never any contact or booking authority. Server-side configuration EMPIRE_INBOUND_MANAGER_WORKFLOW_DB must be an existing absolute private SQLite file path.
+- scripts/review_inbound_booking_workflow_20261020.py: read-only tenant and time-scoped command.
+- supabase/migrations/20261020124502_inbound_booking_workflow_prepared_20261020.sql: CLI-created and version-ordered PREPARED database storage for workflow evidence and persistent tenant/contact suppression. FORCE RLS plus revoked browser roles; NO policy, provider webhook, trigger or live database change.
+
+### Important cross-engine consistency fix
+
+The canonical RecoveryEvent now supports booking_cancelled with calendar-origin evidence. The RecoveryLedger, opportunity queue and verified channel attribution use the latest calendar booking status rather than crediting previously confirmed appointments that have been cancelled. A cancellation can reopen a missed-call opportunity, and a payment does not become recovered revenue without an independently verified recovery path.
+
+Canonical linkage convention: for an original opportunity, booking_confirmed and booking_cancelled must carry the same verified calendar appointment identifier as evidence_ref and the original call_id. The dedicated workflow records carry appointment_id and calendar_ref explicitly, and quarantine competing call ownership. This convention must be enforced by a genuine trusted calendar adapter in production.
+
+### Safe offline review
+
+    cd /home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+      -m scripts.review_inbound_booking_workflow_20261020 \
+      --workflow-db /path/to/existing_workflow.db --tenant-id AUTHORIZED_TENANT \
+      --as-of 2026-10-20T13:00:00+01:00 --read-only
+
+No public endpoint ingests workflow claims. verified=True in offline fixtures is NOT independent proof of a booking, caller consent or connected call. Production adapters must authenticate provider read-back, ownership, canonical IDs, replay, consent and cancellations. Current authorization makes records eligible for INTERNAL OPERATOR REVIEW ONLY; it does NOT permit calls, messages, purchases or bookings.
+
+### Release gates
+
+1. Verify real customer-owned calendar accounts, current availability, booking status and cancellation via authenticated provider read-back; never rely on AI assertions.
+2. Connect purpose-limited caller consent and the canonical suppression system, with explicit legal and channel gates before any external contact.
+3. Validate prepared schema in isolated Postgres with real RLS simulations and Supabase security advisors before applying.
+4. Implement operator-approved scheduling, cancellations/no-show/reschedule reconciliations and provider retry handling.
+5. Verify provider/webhook authenticity, tenant boundaries, key rotation, deletion/retention, cost monitoring and UK GDPR/PECR obligations before an explicitly approved supervised pilot.
+
+No live calendar, messages, campaigns, customer-facing number routing or spending has been enabled.

@@ -15,11 +15,11 @@ NOW = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
 def event(kind, minute=0, *, call="C1", tenant="business-1",
           verified=None, synthetic=False, evidence=None):
     if verified is None:
-        verified = kind in {"unanswered", "busy", "answered", "callback_connected", "booking_confirmed"}
+        verified = kind in {"unanswered", "busy", "answered", "callback_connected", "booking_confirmed", "booking_cancelled"}
     origin = {
         "unanswered": "provider", "busy": "provider",
         "answered": "provider", "callback_connected": "provider",
-        "booking_confirmed": "calendar",
+        "booking_confirmed": "calendar", "booking_cancelled": "calendar",
     }.get(kind, "operator")
     return RecoveryEvent(
         tenant_id=tenant, call_id=call,
@@ -224,3 +224,12 @@ def test_unverified_manual_claim_cannot_mark_recovered():
     report = queue([event("unanswered"), event("booking_requested", 2)])
     assert report["already_recovered_calls"] == 0
     assert report["queue_total"] == 1
+
+
+def test_cancelled_booking_reopens_prior_missed_opportunity():
+    booked = event("booking_confirmed", 3, evidence="appt-1")
+    cancel = event("booking_cancelled", 4, evidence="appt-1")
+    result = queue([event("unanswered"), booked, cancel])
+    assert result["queue_total"] == 1
+    assert result["already_recovered_calls"] == 0
+    assert result["tickets"][0]["suggested_internal_action"] == "operator_triage_missing_call"

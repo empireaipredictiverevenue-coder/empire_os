@@ -10,7 +10,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from empire_os.inbound_business_hours import BusinessHoursPolicy, staffed_hours_status
-from empire_os.inbound_revenue_recovery import MISSED_STATUSES, RecoveryEvent
+from empire_os.inbound_revenue_recovery import (
+    MISSED_STATUSES, RecoveryEvent, active_calendar_confirmations,
+)
 
 
 def _stamp(value: str) -> datetime:
@@ -155,8 +157,10 @@ def build_opportunity_queue(
         if any(e.kind == "followup_opt_out" for e in ordered):
             suppressed += 1
             continue
+        active = active_calendar_confirmations(ordered)
         if any(
-            e.kind in {"callback_connected", "booking_confirmed"}
+            (e.kind == "callback_connected" or
+             (e.kind == "booking_confirmed" and active.get(e.evidence_ref) == e))
             and e.verified and e.evidence_ref for e in following
         ):
             recovered += 1
