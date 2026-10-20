@@ -135,11 +135,52 @@ def test_postgres_funnel_uses_restricted_role():
 
 
 def test_runtime_reads_snapshot(tmp_path):
+    from datetime import datetime, timezone
     path = tmp_path / "runtime/commercial_funnel/latest.json"
     write_funnel_snapshot(_raw(), path)
 
-    result = build_funnel_runtime(tmp_path)
+    result = build_funnel_runtime(
+        tmp_path, now=datetime(2026, 9, 22, 15, 5, tzinfo=timezone.utc)
+    )
 
     assert result["available"] is True
     assert result["current_stage"] == "outbound_delivered"
     assert result["counts"]["buyer_reviews_approved"] == 32
+
+
+def test_old_funnel_never_presents_historical_counts_as_current(tmp_path):
+    from datetime import datetime, timezone
+    path = tmp_path / "runtime/commercial_funnel/latest.json"
+    write_funnel_snapshot(_raw(), path)
+    state = build_funnel_runtime(
+        tmp_path, now=datetime(2026, 10, 20, 15, 50, tzinfo=timezone.utc)
+    )
+    assert state["available"] is False
+    assert state["source_status"] == "HISTORICAL_FUNNEL_SNAPSHOT_STALE"
+    assert state["counts"] == {}
+    assert state["current_stage"] == "unavailable"
+    assert state["historical_counts_used_as_current"] is False
+    assert state["recognized_revenue_cents"] is None
+    assert state["realized_margin_cents"] is None
+    assert state["actual_revenue"] is False
+    assert "493" not in str(state)
+
+
+def test_invalid_funnel_authority_and_future_snapshot_are_held(tmp_path):
+    from datetime import datetime, timezone
+    path = tmp_path / "runtime/commercial_funnel/latest.json"
+    raw = _raw()
+    raw["execution_authority"] = "send"
+    write_funnel_snapshot(raw, path)
+    assert build_funnel_runtime(
+        tmp_path, now=datetime(2026, 9, 22, 15, 5, tzinfo=timezone.utc)
+    )["available"] is False
+    raw["execution_authority"] = "none"
+    raw["generated_at"] = "2026-11-20T00:00:00+00:00"
+    write_funnel_snapshot(raw, path)
+    result = build_funnel_runtime(
+        tmp_path, now=datetime(2026, 10, 20, 15, 5, tzinfo=timezone.utc)
+    )
+    assert result["available"] is False
+    assert result["source_status"] == "HISTORICAL_FUNNEL_SNAPSHOT_STALE"
+    assert result["counts"] == {}

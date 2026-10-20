@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -1059,7 +1060,7 @@ def test_dashboard_exposes_real_commercial_funnel(tmp_path):
         root / "runtime/commercial_funnel/latest.json",
         {
             "schema_version": "empire.founder_commercial_funnel.v1",
-            "generated_at": "2026-09-22T15:00:00+00:00",
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "counts": {
                 "prospect_acquisitions": 493,
                 "buyer_reviews": 34,

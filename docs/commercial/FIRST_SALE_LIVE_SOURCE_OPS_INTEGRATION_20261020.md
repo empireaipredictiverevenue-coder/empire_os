@@ -64,3 +64,26 @@ present; **it does not prove POST validation, CRM delivery, or purchase**.
 No synthetic lead, payment token or order is ever submitted. A routing
 change produces an existing website-owner review recommendation in the
 private Founder Console without sending a message or creating a task.
+
+
+## Follow-up: stop Founder Dashboard using old funnel counts
+
+After the live Ops canary was deployed, an independent audit confirmed the
+existing `commercial_funnel.build_funnel_runtime()` still returned
+`available=True` for a 22 September snapshot, including 493 historical
+acquisitions and an outbound-delivered stage. The source refresh path calls
+`public.get_founder_commercial_funnel()`, which is **absent from canonical
+EmpireDB**. A previously checked-in migration 027 references tables not
+available in the present schema and is **not being applied**.
+
+The original funnel reader now requires a bounded, timezone-aware fresh
+snapshot (30 minutes; maximum two minutes future clock drift), a recognized
+schema and non-executing source authority. Missing/stale/untrusted evidence
+returns `available=False`, `counts={}`, current stage `unavailable`,
+unknown revenue/margin, and an explicit existing restricted-reader repair
+instruction. It does not erase historical files or create a second dashboard.
+
+The original unit tests now provide a controlled historic test clock or a
+fresh synthetic timestamp. New tests ensure stale/forged/future samples
+cannot appear as current buyer activity. The fresh first-sale aggregate in
+Ops remains the preferred trustworthy count-only first-party signal.

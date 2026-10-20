@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -138,24 +139,67 @@ def write_funnel_snapshot(
     return target
 
 
-def build_funnel_runtime(repo_root: Path) -> dict[str, Any]:
+def build_funnel_runtime(
+    repo_root: Path, *, now: datetime | None = None,
+) -> dict[str, Any]:
+    """Reject stale historical counts as current Founder funnel truth.
+
+    Existing owner function public.get_founder_commercial_funnel() is missing
+    from canonical EmpireDB. Until its restricted source is repaired, a
+    September snapshot must not appear as today's active pipeline.
+    """
     path = repo_root / "runtime/commercial_funnel/latest.json"
+    status = "SOURCE_UNAVAILABLE"
+    raw = None
+    current = now or datetime.now(timezone.utc)
+    if current.utcoffset() is None:
+        raise ValueError("timezone-aware funnel observation required")
     try:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 2_000_000:
+            raise OSError("bounded funnel source unavailable")
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {
-            "available": False,
-            "schema_version": "empire.founder_commercial_funnel.v1",
-            "mode": "OBSERVE",
-            "counts": {},
-            "current_stage": "unavailable",
-            "next_event": "refresh_commercial_funnel",
-            "recognized_revenue_cents": 0,
-            "realized_margin_cents": 0,
-            "actual_revenue": False,
-            "execution_authority": "none",
-        }
-    return {"available": True, **normalize_funnel_payload(raw)}
+        if not isinstance(raw, Mapping):
+            raise ValueError("funnel packet not a mapping")
+        if (
+            raw.get("schema_version") != "empire.founder_commercial_funnel.v1"
+            or raw.get("execution_authority") != "none"
+            or raw.get("mode", "OBSERVE") != "OBSERVE"
+            or raw.get("actual_revenue") not in (True, False)
+            or not isinstance(raw.get("counts"), Mapping)
+        ):
+            raise ValueError("untrusted original funnel packet")
+        at = datetime.fromisoformat(str(raw.get("generated_at")).replace("Z", "+00:00"))
+        if at.utcoffset() is None:
+            raise ValueError("funnel timestamp lacks timezone")
+        age = (current.astimezone(timezone.utc) -
+               at.astimezone(timezone.utc)).total_seconds()
+        if age < -120 or age > 1800:
+            status = "HISTORICAL_FUNNEL_SNAPSHOT_STALE"
+        else:
+            return {
+                "available": True,
+                "source_status": "FRESH_ORIGINAL_FUNNEL_SNAPSHOT",
+                "historical_counts_used_as_current": False,
+                **normalize_funnel_payload(raw),
+            }
+    except (OSError, TypeError, ValueError, json.JSONDecodeError, OverflowError):
+        status = "SOURCE_UNAVAILABLE_OR_UNTRUSTED"
+    return {
+        "available": False,
+        "schema_version": "empire.founder_commercial_funnel.v1",
+        "mode": "OBSERVE",
+        "source_status": status,
+        "historical_counts_used_as_current": False,
+        "counts": {},
+        "outbound_status_counts": {},
+        "reply_classification_counts": {},
+        "current_stage": "unavailable",
+        "next_event": "REPAIR_EXISTING_RESTRICTED_CANONICAL_FUNNEL_SOURCE",
+        "recognized_revenue_cents": None,
+        "realized_margin_cents": None,
+        "actual_revenue": False,
+        "execution_authority": "none",
+    }
 
 
 def main() -> int:
