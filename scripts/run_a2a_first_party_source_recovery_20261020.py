@@ -20,6 +20,7 @@ from empire_os.a2a_first_party_site_recovery_v1 import (
 )
 from empire_os.a2a_first_party_site_recovery_v1 import SCHEMA
 from empire_os.a2a_scrapling_offline_extraction_v1 import safe_offline_parse
+from empire_os.a2a_crawl4ai_offline_bridge_v1 import parse_crawl4ai_existing_html
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "config/a2a_candidates/approved_first_party_business_sites_v1.json"
@@ -62,6 +63,7 @@ def main() -> int:
         result = collect_approved_first_party_sites(
             doc, session=session, max_sites=args.max_sites,
             offline_html_parser=safe_offline_parse,
+            offline_crawl4ai_parser=parse_crawl4ai_existing_html,
         )
     if result.get("schema_version") != SCHEMA:
         raise ValueError("SOURCE_RECOVERY_SCHEMA_MISMATCH")
@@ -71,6 +73,7 @@ def main() -> int:
         "source_sites_attempted":result["websites_attempted"],
         "first_party_http_200":result["websites_http_200"],
         "scrapling_pages_structured":result["pages_structured_with_scrapling"],
+        "crawl4ai_pages_offline":result["pages_converted_with_crawl4ai_offline"],
         "sector_and_region_self_description_matches":result["self_described_sector_and_region_matches"],
         "status_by_site":[{"url":x["company_site"],"status":x["site_fetch_status"],
                            "robots":x["robots_policy"],"city_claimed":x["self_described_city_or_region_matched"]}

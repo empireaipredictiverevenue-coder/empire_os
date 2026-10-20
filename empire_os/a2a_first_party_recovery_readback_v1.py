@@ -54,6 +54,7 @@ def review_first_party_research(
     }
     reviewed = []
     structured_count = 0
+    crawl4ai_count = 0
     state = "SOURCE_CACHE_MISSING_NEEDS_OPERATOR_COLLECTION"
     captured = None
     if snapshot is not None:
@@ -120,6 +121,21 @@ def review_first_party_research(
                                    or parsed.get("buyer_purchase_intent_verified") is not False
                                    or parsed.get("raw_page_or_private_contacts_exported") is not False):
                     raise ValueError("UNBOUND_SCRAPLING_PARSER_EVIDENCE")
+            markdown = row.get("offline_crawl4ai_extraction")
+            crawl4ai_ok = False
+            if markdown is not None:
+                if (not isinstance(markdown,Mapping)
+                        or markdown.get("schema_version") != "empire.a2a.crawl4ai_offline_markdown.v1"
+                        or markdown.get("raw_markdown_or_pii_exported") is not False
+                        or markdown.get("records_promoted_to_crm") != 0
+                        or markdown.get("source_url_fetched_by_this_module") is not False):
+                    raise ValueError("UNTRUSTED_CRAWL4AI_EXTRACTION")
+                crawl4ai_ok = markdown.get("status") == "CRAWL4AI_MARKDOWN_EXTRACTED"
+                if crawl4ai_ok and (not good or markdown.get("source_html_sha256") != row.get("source_body_sha256")
+                                    or markdown.get("buyer_purchase_intent_verified") is not False
+                                    or markdown.get("headless_browser_launched") is not False):
+                    raise ValueError("UNBOUND_CRAWL4AI_SOURCE_RECEIPT")
+            crawl4ai_count += int(crawl4ai_ok)
             structured_count += int(structured)
             match = (good and row.get("self_described_sector_matched") is True
                      and row.get("self_described_city_or_region_matched") is True)
@@ -129,6 +145,8 @@ def review_first_party_research(
             reviewed.append({
                 "source_url": site, "market": market, "sector": niche,
                 "read_status": row.get("site_fetch_status"),
+                "crawl4ai_offline_markdown_extracted": crawl4ai_ok,
+                "crawl4ai_digest_matches_collector": bool(crawl4ai_ok),
                 "scrapling_structured_page_parsed": structured,
                 "scrapling_document_matches_collector_sha": bool(structured),
                 "scrapling_page_title_present": bool(parsed.get("public_page_title_observed")) if structured else False,
@@ -144,6 +162,7 @@ def review_first_party_research(
         "approved_site_count": len(expected_map),
         "sites_read": len(reviewed),
         "scrapling_structured_site_count": structured_count,
+        "crawl4ai_offline_site_count": crawl4ai_count,
         "market_coverage": empty,
         "source_records": reviewed,
         "source_issuer_signature_verified": False,

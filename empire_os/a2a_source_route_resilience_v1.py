@@ -54,6 +54,12 @@ def build_source_route_board(
         routes.append({
             "market":market,"sector":sector,
             "first_party_reads_verified_by_local_collector": count if fresh else None,
+            "crawl4ai_offline_extractions_from_cached_reads": (
+                sum(1 for r in first_party.get("source_records",[])
+                    if isinstance(r, Mapping) and r.get("market")==market
+                    and r.get("crawl4ai_offline_markdown_extracted") is True)
+                if fresh else None
+            ),
             "scrapling_structured_extractions_from_cached_reads": (
                 sum(1 for r in first_party.get("source_records",[])
                     if isinstance(r, Mapping) and r.get("market")==market

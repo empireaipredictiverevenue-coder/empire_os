@@ -32,6 +32,7 @@ from empire_os.a2a_first_party_recovery_readback_v1 import review_first_party_re
 from empire_os.a2a_openmanus_scoped_research_bridge_v1 import build_scoped_openmanus_plan
 from empire_os.a2a_first_party_buyer_scout_handoff_v1 import prepare_verified_scope_buyer_scout_handoff, make_first_party_owner_handoff_hold
 from empire_os.a2a_source_route_resilience_v1 import build_source_route_board
+from empire_os.a2a_optional_source_agents_v1 import review_optional_agents
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -156,6 +157,15 @@ def run(*, previous: dict | None = None, history: dict | None = None,
     source_route_board = build_source_route_board(
         first_party_research, mining, openmanus_owner_plan, agent_reach_doctor,
     )
+    source_agent_readiness = review_optional_agents(
+        first_party_research,
+        browser_use_installed=Path(
+            "/home/ubuntu/.local/share/empire_a2a_browser_use_venv/lib/python3.14/site-packages/browser_use"
+        ).is_dir(),
+        crawl4ai_installed=Path(
+            "/home/ubuntu/.local/share/empire_a2a_crawl4ai_venv/lib/python3.14/site-packages/crawl4ai"
+        ).is_dir(),
+    )
     receipt_review = inspect_owner_receipt_files(
         owner_pickup, LOCAL / "owner_signed_receipts",
     )
@@ -190,6 +200,7 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "openmanus_owner_plan": openmanus_owner_plan,
         "first_party_buyer_owner_research": first_party_buyer_owner_research,
         "source_route_board": source_route_board,
+        "source_agent_readiness": source_agent_readiness,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -233,6 +244,7 @@ def main() -> int:
             ("openmanus_research_jobs_v1.json", "openmanus_owner_plan"),
             ("first_party_buyer_scout_handoff_v1.json", "first_party_buyer_owner_research"),
             ("source_route_resilience_v1.json", "source_route_board"),
+            ("optional_source_agents_readiness_v1.json", "source_agent_readiness"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -265,6 +277,10 @@ def main() -> int:
         "new_mining_source_snapshot": outcome["mining_history"]["new_snapshot_appended"],
         "first_party_sites_read_from_cache": outcome["first_party_research"]["sites_read"],
         "scrapling_parsed_existing_source_pages": outcome["first_party_research"]["scrapling_structured_site_count"],
+        "crawl4ai_offline_parsed_source_pages": outcome["first_party_research"]["crawl4ai_offline_site_count"],
+        "browser_use_library_present": outcome["source_agent_readiness"]["browser_use_library_installed"],
+        "browser_use_jobs_executed": outcome["source_agent_readiness"]["browser_jobs_executed"],
+        "openhands_code_jobs_executed": outcome["source_agent_readiness"]["openhands_code_task_executed"],
         "general_search_restored": outcome["source_route_board"]["keyless_search_restored"],
         "first_party_city_trade_self_claims": sum(
             x["self_described_sector_and_region_matches"]

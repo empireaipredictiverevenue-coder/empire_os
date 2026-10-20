@@ -136,6 +136,7 @@ def collect_approved_first_party_sites(
     now: datetime | None = None,
     max_sites: int = 9,
     offline_html_parser: Callable[..., dict[str, Any]] | None = None,
+    offline_crawl4ai_parser: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     time = now or datetime.now(timezone.utc)
     if time.tzinfo is None:
@@ -175,6 +176,7 @@ def collect_approved_first_party_sites(
             "robots_policy": "NOT_CHECKED",
             "source_body_sha256": None,
             "offline_structured_extraction": None,
+            "offline_crawl4ai_extraction": None,
             "self_described_sector_matched": False,
             "self_described_city_or_region_matched": False,
             "independently_verified_company_identity": False,
@@ -217,6 +219,27 @@ def collect_approved_first_party_sites(
                                 "network_access_performed_by_parser": False,
                                 "records_promoted_to_crm": 0,
                             }
+                    if offline_crawl4ai_parser is not None:
+                        try:
+                            result = offline_crawl4ai_parser(body, source_url=origin)
+                            if (not isinstance(result,dict) or result.get("schema_version") !=
+                                    "empire.a2a.crawl4ai_offline_markdown.v1"
+                                    or result.get("raw_markdown_or_pii_exported") is not False
+                                    or result.get("records_promoted_to_crm") != 0
+                                    or result.get("source_url_fetched_by_this_module") is not False):
+                                raise ValueError("INVALID_CRAWL4AI_EXTRACTION_RESULT")
+                            if (result.get("status") == "CRAWL4AI_MARKDOWN_EXTRACTED"
+                                    and result.get("source_html_sha256") != entry["source_body_sha256"]):
+                                raise ValueError("INVALID_CRAWL4AI_SOURCE_BINDING")
+                            entry["offline_crawl4ai_extraction"] = result
+                        except Exception:
+                            entry["offline_crawl4ai_extraction"] = {
+                                "schema_version":"empire.a2a.crawl4ai_offline_markdown.v1",
+                                "status":"CRAWL4AI_INVALID_SOURCE_HOLD",
+                                "source_url_fetched_by_this_module":False,
+                                "raw_markdown_or_pii_exported":False,
+                                "records_promoted_to_crm":0,
+                            }
                     entry["self_described_sector_matched"] = any(k in content for k in TRADE[niche])
                     entry["self_described_city_or_region_matched"] = any(k in content for k in SCOPE[metro])
         except Exception:
@@ -231,6 +254,11 @@ def collect_approved_first_party_sites(
         "source_type": "FOUNDER_APPROVED_FIRST_PARTY_COMPANY_WEBSITES",
         "websites_attempted": len(records),
         "websites_http_200": sum(r["site_fetch_status"] == "HTTP_200" for r in records),
+        "pages_converted_with_crawl4ai_offline": sum(
+            isinstance(r["offline_crawl4ai_extraction"], dict) and
+            r["offline_crawl4ai_extraction"].get("status") == "CRAWL4AI_MARKDOWN_EXTRACTED"
+            for r in records
+        ),
         "pages_structured_with_scrapling": sum(
             isinstance(r["offline_structured_extraction"], dict) and
             r["offline_structured_extraction"].get("status") == "SCRAPLING_STRUCTURED_PAGE_PARSED"
