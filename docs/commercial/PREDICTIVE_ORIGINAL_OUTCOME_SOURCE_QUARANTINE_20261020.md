@@ -23,6 +23,16 @@ Source DDL: `migrations/empiredb/036_runtime_causal_lineage_continuity.sql` defi
 
 The patch is currently committed **only on the isolated Predictive feature branch** and included in its immutable OBSERVE review/release. The production timer is still pointed at the existing shared `/srv/empire_os` source; this patch does not modify that dirty checkout, systemd services or the canonical database. Accordingly this does NOT claim production refresh service is protected until the original owner separately reviews and integrates the patch or safely updates the service to exact tested bytes.
 
+## Dedicated tenant-reader policy preflight (OBSERVE)
+
+New `empire-predictive-observe tenant-evidence` runs the policy-only review in `predictive_tenant_outcome_reader_preflight.py`. No privileged fallback, no raw commercial SELECT, and no caller-asserted tenant context. It uses a dedicated connection **only when the owner has independently configured** the `EMPIREDB_TENANT_OUTCOME_READER_DSN` environment variable. The DSN must never be pasted into chat, checked into Git or written to logs.
+
+Within a single read-only transaction the connection sets the `empiredb_tenant_reader` role and inspects authenticated PostgreSQL `session_user`, `public.empire_current_tenant_id()`, login and reader role capabilities, FORCE RLS, table SELECT rights and expected tenant SELECT policies for buyers, fulfilment orders, commercial events and commercial outcomes. Results contain only flags and missing prerequisites. Any full metadata match remains **review readiness only**—not verified RLS semantics, original outcome authenticity, settlement, tenant-access rights, registry freeze, or revenue.
+
+The 018 migration currently provisions tenant-reader policies for `buyers`, `fulfilment_orders`, `commercial_events` and `commercial_evidence_registry`, but does not provision the equivalent policy for `commercial_outcomes` in that migration. The actual production metadata must be assessed separately; migration presence/absence alone cannot certify deployed DB state. No ALTER/GRANT/CREATE or policy changes are authorized by this read-only phase.
+
+As run without a dedicated credential the correct status is `HELD_DEDICATED_TENANT_OUTCOME_READER_CREDENTIAL_MISSING`. Existing personal, owner or superuser credentials must NOT be substituted. The production DBA needs to perform an independent policy/grant/security review and authorize an existing least-privilege reader before any live metadata probe.
+
 ## Real, separately owned tenant reader required
 
 - Existing DB/CRM owner must provide a dedicated least-privilege reader whose **authenticated session identity** binds one tenant and whose DB rows obey tenant policies. A caller-provided tenant ID, JSON `tenant_id` or digest is not sufficient. Reject cross-tenant orders and duplicates before any statistics.
