@@ -34,9 +34,14 @@ def _age(src:Mapping[str,Any],name:str,now:datetime)->float:
 def review_original_lead_readiness(
     supply:Mapping[str,Any]|None,buyer:Mapping[str,Any]|None,
     scout:Mapping[str,Any]|None,*,as_of:datetime,
+    industry:str,country:str,state:str,city:str,
 )->dict[str,Any]:
     if not isinstance(as_of,datetime) or as_of.utcoffset() is None:
         raise ValueError("timezone aware clock required")
+    if (not isinstance(industry,str) or not 3<=len(industry)<=50
+            or not isinstance(country,str) or not isinstance(state,str)
+            or not isinstance(city,str)):
+        raise ValueError("source research must be scoped to a typed customer industry and market")
     now=as_of.astimezone(timezone.utc)
     base={
         "schema_version":SCHEMA,"mode":"OBSERVE",
@@ -45,11 +50,20 @@ def review_original_lead_readiness(
         "source_buyer_capacity_status":"SOURCE_UNAVAILABLE_OR_UNVERIFIED",
         "source_buyer_scout_status":"SOURCE_UNAVAILABLE_OR_UNVERIFIED",
         "global_immediately_sellable_inventory":None,
+        "research_target_industry":industry,
+        "research_target_market_country":country,
+        "research_target_market_state":state,
+        "research_target_market_city":city,
+        "source_target_industry_research_records_not_leads":None,
+        "source_target_industry_bucket_present":False,
         "original_source_roofing_research_records_not_leads":None,
         "canonical_selected_records_not_accepted_consumer_leads":None,
         "canonical_research_waitlist_records":None,
         "buyer_identity_candidates_not_committed_buyers":None,
         "verified_global_buyer_capacity_count":None,
+        "verified_target_market_eligible_leads":None,
+        "verified_target_market_available_inventory":None,
+        "available_to_commit_target_market_units":None,
         "verified_tampa_eligible_leads":None,
         "verified_tampa_available_inventory":None,
         "available_to_commit_tampa_units":None,
@@ -75,7 +89,9 @@ def review_original_lead_readiness(
         research=supply.get("observed_supply_by_vertical_not_buyer_mapped")
         if not isinstance(research,Mapping):
             raise ValueError("original market research buckets unavailable")
-        roof=_count(research.get("roofing"),"roofing research")
+        sector_raw=research.get(industry)
+        sector_count=(_count(sector_raw,industry+" research")
+                      if sector_raw is not None else None)
         sell=_count(supply.get("immediately_sellable_inventory"),"sellable")
         selected=_count(supply.get("canonical_selected_inventory_records"),"selected")
         wait=_count(supply.get("canonical_capacity_waitlist_records"),"waitlist")
@@ -87,7 +103,10 @@ def review_original_lead_readiness(
             source_lead_supply_status="FRESH_RESEARCH_COUNTS_NOT_DELIVERABLE_INVENTORY",
             supply_source_age_hours=age,
             global_immediately_sellable_inventory=sell,
-            original_source_roofing_research_records_not_leads=roof,
+            source_target_industry_research_records_not_leads=sector_count,
+            source_target_industry_bucket_present=sector_count is not None,
+            original_source_roofing_research_records_not_leads=(
+                sector_count if industry=="roofing" else None),
             canonical_selected_records_not_accepted_consumer_leads=selected,
             canonical_research_waitlist_records=wait,
             verified_global_buyer_capacity_count=vcap,
@@ -152,11 +171,14 @@ def _read(root:Path,path:str)->Mapping[str,Any]|None:
         return None
 
 
-def review_lead_readiness_runtime(root:str|Path,*,as_of:datetime)->dict[str,Any]:
+def review_lead_readiness_runtime(
+    root:str|Path,*,as_of:datetime,
+    industry:str,country:str,state:str,city:str,
+)->dict[str,Any]:
     path=Path(root).resolve()
     return review_original_lead_readiness(
         _read(path,"runtime/lead_supply/private_leadgen/research_queue_latest.json"),
         _read(path,"runtime/buyer_capacity_readiness/latest.json"),
         _read(path,"runtime/buyer_acquisition/scout_latest.json"),
-        as_of=as_of,
+        as_of=as_of,industry=industry,country=country,state=state,city=city,
     )

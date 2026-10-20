@@ -1,7 +1,8 @@
-"""Founder-approved OBSERVE only: Tampa 20-lead + roofing materials planning.
+"""Global multi-industry commercial requirement planning (OBSERVE-only).
 
-Reads the existing Lead Supply, Buyer Capacity and Buyer Scout aggregate owner
-snapshots. Builds owner review tickets, not dispatches; proposals, not orders.
+No implicit customer or geographic default. Use --requirement-intake for an
+original typed request; --example-tampa-roofing is explicitly demonstrative.
+Read-only owner snapshots, no dispatch, quotes or commercial promises.
 """
 from __future__ import annotations
 
@@ -37,15 +38,45 @@ def main()->int:
     parser.add_argument("--repo-root",default="/srv/empire_os")
     parser.add_argument("--requirement-intake",default=None,
                         help="Exact tenant-scoped existing founder/customer intake JSON")
+    parser.add_argument("--example-tampa-roofing",action="store_true",
+                        help="Optional illustrative fixture, NOT a customer order or target market")
     parser.add_argument("--original-roof-survey",default=None)
     parser.add_argument("--supplier-owner-quotes",default=None)
     parser.add_argument("--cloud-what-if",default=None)
     parser.add_argument("--lead-owner-eligibility-preview",default=None)
     args=parser.parse_args()
     now=datetime.now(timezone.utc)
+    if args.requirement_intake and args.example_tampa_roofing:
+        parser.error("select original requirement OR an explicit fictional example")
+    if not args.requirement_intake and not args.example_tampa_roofing:
+        if any((args.original_roof_survey,args.supplier_owner_quotes,
+                args.cloud_what_if,args.lead_owner_eligibility_preview)):
+            parser.error("source evidence requires a specific original requirement")
+        out={
+            "schema_version":"empire.predictive_revenue.commercial_requirement_operator.v1",
+            "status":"COMMERCIAL_REQUIREMENT_INPUT_REQUIRED",
+            "mode":"OBSERVE","current_customer_order":None,
+            "default_industry":None,"default_market":None,
+            "example_tampa_roofing_used":False,
+            "next_action":"SUPPLY_ORIGINAL_CUSTOMER_INTAKE_OR_SELECT_EXPLICIT_TEST_EXAMPLE",
+            "recorded_live_customer_contract":False,
+            "dispatch_performed":False,"database_writes":False,
+            "outbound_sent":False,"execution_authority":"none",
+        }
+        print(json.dumps(out,sort_keys=True,allow_nan=False))
+        return 0
     raw=_read(args.requirement_intake) if args.requirement_intake else tampa_roofing_founder_example()
-    req=review_commercial_requirement(raw,as_of=now)
-    supply=review_lead_readiness_runtime(args.repo_root,as_of=now)
+    req=review_commercial_requirement(
+        raw,as_of=now,
+        source_instruction_kind=(
+            "FOUNDER_EXAMPLE_TARGET_NOT_CUSTOMER_ORDER" if args.example_tampa_roofing
+            else "FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT"),
+    )
+    supply=review_lead_readiness_runtime(
+        args.repo_root,as_of=now,
+        industry=req["industry"],country=req["country"],
+        state=req["state"],city=req["city"],
+    )
     quotes=None
     if args.supplier_owner_quotes:
         source=_read(args.supplier_owner_quotes)
@@ -64,9 +95,11 @@ def main()->int:
     )
     out={
         "schema_version":"empire.predictive_revenue.commercial_requirement_operator.v1",
-        "mode":"OBSERVE","status":"TAMPA_ROOFING_REQUIREMENT_READINESS_REVIEWED"
-            if req["industry"]=="roofing" and req["city"]=="Tampa"
-            else "GENERAL_COMMERCIAL_REQUIREMENT_READINESS_REVIEWED",
+        "mode":"OBSERVE","status":(
+            "ILLUSTRATIVE_REQUIREMENT_READINESS_REVIEWED"
+            if args.example_tampa_roofing else
+            "MULTI_INDUSTRY_COMMERCIAL_REQUIREMENT_READINESS_REVIEWED"),
+        "example_tampa_roofing_used":bool(args.example_tampa_roofing),
         "commercial_requirement":req,
         "original_lead_supply_and_buyer_owner_readiness":supply,
         "governed_fulfilment_and_sourcing_plan":plan,

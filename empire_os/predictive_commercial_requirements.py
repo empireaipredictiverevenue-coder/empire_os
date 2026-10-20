@@ -14,6 +14,15 @@ from typing import Any, Mapping
 SCHEMA="empire.predictive_revenue.commercial_requirement.v1"
 SHA=re.compile(r"^[a-f0-9]{64}$")
 ZIP=re.compile(r"^[0-9]{5}$")
+COUNTRY_CURRENCY={
+    "US":"USD","GB":"GBP","CA":"CAD","AU":"AUD","NZ":"NZD",
+    "DE":"EUR","FR":"EUR","IE":"EUR","NL":"EUR","ES":"EUR",
+    "IT":"EUR","BE":"EUR","AT":"EUR","PT":"EUR",
+    "IN":"INR","ZA":"ZAR","SG":"SGD","AE":"AED",
+}
+NON_MATERIAL_INDUSTRIES=frozenset((
+    "insurance","agency","data_brokerage","professional_services","software",
+))
 CODE=re.compile(r"^[a-z][a-z0-9_]{2,48}$")
 KINDS=frozenset(("roofing","hvac","solar","construction","insurance","agency",
                  "data_brokerage","professional_services","software","other"))
@@ -27,6 +36,8 @@ MATERIAL_CATEGORIES={
     "solar":("pv_module_system","inverters","mounting_bos","electric_protection",
              "battery_if_applicable","delivery_freight"),
     "construction":("project_specific_material_specification","delivery_freight"),
+    "insurance":(), "agency":(), "data_brokerage":(),
+    "professional_services":(), "software":(),
 }
 INPUT_FIELDS=frozenset((
     "tenant_ref_sha256","company_ref_sha256","company_authorization_owner_receipt",
@@ -43,11 +54,19 @@ def _digest(record:Mapping[str,Any])->str:
                     allow_nan=False).encode()).hexdigest()
 
 
-def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[str,Any]:
+def review_commercial_requirement(
+    raw:Mapping[str,Any],*,as_of:datetime,
+    source_instruction_kind:str="FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT",
+)->dict[str,Any]:
     if not isinstance(as_of,datetime) or as_of.utcoffset() is None:
         raise ValueError("timezone-aware owner clock required")
     if not isinstance(raw,Mapping) or set(raw)!=INPUT_FIELDS:
         raise ValueError("complete exact commercial requirement schema required")
+    if source_instruction_kind not in (
+        "FOUNDER_EXAMPLE_TARGET_NOT_CUSTOMER_ORDER",
+        "FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT",
+    ):
+        raise ValueError("only original unverified research intent is admissible")
     tenant=raw["tenant_ref_sha256"]
     company=raw["company_ref_sha256"]
     for value in (tenant,company):
@@ -57,12 +76,14 @@ def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[s
                   "material_specs_owner_receipt"):
         if raw[field] is not None:
             raise ValueError("unverified receipt cannot be self-certified in an intake")
-    if (raw["country"] not in ("US","GB")
+    if (raw["country"] not in COUNTRY_CURRENCY
             or not isinstance(raw["state"],str)
-            or not re.fullmatch(r"[A-Z]{2,3}",raw["state"])
+            or not re.fullmatch(r"[A-Z0-9-]{2,8}",raw["state"])
             or not isinstance(raw["city"],str)
-            or not re.fullmatch(r"[A-Za-z][A-Za-z .-]{1,70}",raw["city"])):
-        raise ValueError("explicit typed country region and city required")
+            or not 2<=len(raw["city"])<=70
+            or not raw["city"][0].isalpha()
+            or not all(c.isalpha() or c in " .-\u2019\u0027" for c in raw["city"])):
+        raise ValueError("explicit supported country region and city required")
     industry=raw["industry"]
     if industry not in KINDS:
         raise ValueError("industry taxonomy required")
@@ -72,10 +93,16 @@ def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[s
             raise ValueError("bounded list of "+key+" required")
         if len(value)!=len(set(value)) or any(not isinstance(x,str) or not x for x in value):
             raise ValueError("unique string "+key+" entries required")
-    if any(not (ZIP.fullmatch(x) if raw["country"]=="US" else
-                re.fullmatch(r"[A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2}",x))
-           for x in raw["zip_codes"]):
-        raise ValueError("exact country-specific postal values required")
+    def postal_shape(postcode:str)->bool:
+        if raw["country"]=="US":
+            return bool(ZIP.fullmatch(postcode))
+        if raw["country"]=="GB":
+            return bool(re.fullmatch(r"[A-Z]{1,2}[0-9][A-Z0-9]? [0-9][A-Z]{2}",postcode))
+        # For other countries this is a source-supplied postal token, not a
+        # jurisdiction-authenticated address, valid ZIP, or service radius.
+        return bool(re.fullmatch(r"[A-Z0-9][A-Z0-9 -]{1,11}",postcode))
+    if any(not postal_shape(x) for x in raw["zip_codes"]):
+        raise ValueError("typed source postcode required")
     if any(not CODE.fullmatch(x) for x in raw["service_types"]+raw["exclusions"]):
         raise ValueError("typed service/exclusion tokens required")
     if any(x not in CHANNELS for x in raw["accepted_event_types"]):
@@ -97,10 +124,8 @@ def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[s
         raise ValueError("typed valid billable lead required")
     if raw["exclusivity"] not in ("unconfirmed","exclusive","shared"):
         raise ValueError("exclusive/shared terms must be explicit")
-    if (raw["currency"] not in ("USD","GBP")
-            or (raw["country"]=="US" and raw["currency"]!="USD")
-            or (raw["country"]=="GB" and raw["currency"]!="GBP")):
-        raise ValueError("country-specific currency requires an explicit original declaration")
+    if raw["currency"]!=COUNTRY_CURRENCY[raw["country"]]:
+        raise ValueError("unverified currency mismatch; original exchange contract required")
     for key in ("budget_minor","price_per_accepted_lead_minor"):
         v=raw[key]
         if v is not None and (type(v) is not int or not 0<=v<=10**11):
@@ -132,12 +157,12 @@ def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[s
          raw["budget_minor"] is None or raw["price_per_accepted_lead_minor"] is None),
         ("BUYER_SERVICE_CAPACITY_ORIGINAL_OWNER",True),
         ("CONSENT_COMPLIANCE_PROOF_ORIGINAL_OWNER",True),
-        ("PROJECT_MEASUREMENTS_MATERIALS_AND_CODE_SPEC",True),
+        ("PROJECT_MEASUREMENTS_MATERIALS_AND_CODE_SPEC",industry not in NON_MATERIAL_INDUSTRIES),
     ]
     return {
         "schema_version":SCHEMA,"mode":"OBSERVE",
         "status":"COMMERCIAL_REQUIREMENT_INCOMPLETE",
-        "source_instruction_kind":"FOUNDER_EXAMPLE_TARGET_NOT_CUSTOMER_ORDER",
+        "source_instruction_kind":source_instruction_kind,
         "industry":industry,"country":raw["country"],"state":raw["state"],"city":raw["city"],
         "service_types":list(raw["service_types"]),
         "requested_qualified_leads_target_not_inventory":target,
@@ -155,7 +180,9 @@ def review_commercial_requirement(raw:Mapping[str,Any],*,as_of:datetime)->dict[s
         "source_entered_deadline":raw["delivery_deadline"],
         "source_entered_event_types":list(raw["accepted_event_types"]),
         "material_category_research_scopes":list(MATERIAL_CATEGORIES.get(
-            industry,("project_specific_scope","delivery_freight"))),
+            industry,("owner_specified_physical_materials_if_any",))),
+        "physical_material_procurement_applicable":industry not in NON_MATERIAL_INDUSTRIES,
+        "postal_validation_source_owner_authenticated":False,
         "verified_deliverable_lead_count":None,
         "source_customer_order_authenticated":False,
         "outbound_authorized":False,"procurement_authorized":False,

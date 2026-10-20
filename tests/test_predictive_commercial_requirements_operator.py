@@ -32,11 +32,11 @@ def fixture_root(tmp_path):
 
 def test_end_to_end_tampa_operator_from_original_owner_packets(monkeypatch,tmp_path,capsys):
     fixture_root(tmp_path);fake_clock(monkeypatch)
-    monkeypatch.setattr("sys.argv",["operator","--read-only",
+    monkeypatch.setattr("sys.argv",["operator","--read-only","--example-tampa-roofing",
                                    "--repo-root",str(tmp_path)])
     assert cli.main()==0
     result=json.loads(capsys.readouterr().out)
-    assert result["status"]=="TAMPA_ROOFING_REQUIREMENT_READINESS_REVIEWED"
+    assert result["status"]=="ILLUSTRATIVE_REQUIREMENT_READINESS_REVIEWED"
     req=result["commercial_requirement"]
     supply=result["original_lead_supply_and_buyer_owner_readiness"]
     plan=result["governed_fulfilment_and_sourcing_plan"]
@@ -60,7 +60,7 @@ def test_read_only_operator_does_not_write_files(tmp_path,monkeypatch,capsys):
     fixture_root(tmp_path);fake_clock(monkeypatch)
     paths={p.relative_to(tmp_path):p.read_bytes()
            for p in tmp_path.rglob("*") if p.is_file()}
-    monkeypatch.setattr("sys.argv",["operator","--read-only",
+    monkeypatch.setattr("sys.argv",["operator","--read-only","--example-tampa-roofing",
                                    "--repo-root",str(tmp_path)])
     cli.main()
     capsys.readouterr()
@@ -70,7 +70,7 @@ def test_read_only_operator_does_not_write_files(tmp_path,monkeypatch,capsys):
 
 def test_missing_owner_source_comes_back_unknown_not_zero(tmp_path,monkeypatch,capsys):
     fake_clock(monkeypatch)
-    monkeypatch.setattr("sys.argv",["operator","--read-only",
+    monkeypatch.setattr("sys.argv",["operator","--read-only","--example-tampa-roofing",
                                    "--repo-root",str(tmp_path)])
     cli.main()
     out=json.loads(capsys.readouterr().out)
@@ -85,7 +85,7 @@ def test_example_intake_and_unapproved_quotes_do_not_unlock_procurement(tmp_path
     survey=tmp_path/"survey.json";survey.write_text(json.dumps(roof_scope()))
     owner_quotes=tmp_path/"quotes.json"
     owner_quotes.write_text(json.dumps({"source_owner_quote_claims":[quote()]}))
-    monkeypatch.setattr("sys.argv",["operator","--read-only",
+    monkeypatch.setattr("sys.argv",["operator","--read-only","--example-tampa-roofing",
                                    "--repo-root",str(tmp_path),
                                    "--original-roof-survey",str(survey),
                                    "--supplier-owner-quotes",str(owner_quotes)])
@@ -102,7 +102,7 @@ def test_hypothetical_cloud_scenario_not_deliverable_lead_allocation(tmp_path,mo
     fixture_root(tmp_path);fake_clock(monkeypatch)
     src=tmp_path/"what_if.json"
     src.write_text(json.dumps(assumptions()))
-    monkeypatch.setattr("sys.argv",["operator","--read-only",
+    monkeypatch.setattr("sys.argv",["operator","--read-only","--example-tampa-roofing",
                                    "--repo-root",str(tmp_path),
                                    "--cloud-what-if",str(src)])
     cli.main()
@@ -157,3 +157,70 @@ def test_read_only_operator_accepts_owner_per_lead_preview_without_delivering(tm
     assert p["verified_inventory_reserved_for_customer"] is None
     assert p["lead_duplicates_and_rejections_checked_against_canonical_owner"] is False
     assert result["database_writes"] is False
+
+
+def test_no_request_defaults_to_no_customer_and_no_geography(monkeypatch,tmp_path,capsys):
+    fixture_root(tmp_path);fake_clock(monkeypatch)
+    monkeypatch.setattr("sys.argv",["operator","--read-only",
+                                   "--repo-root",str(tmp_path)])
+    assert cli.main()==0
+    result=json.loads(capsys.readouterr().out)
+    assert result["status"]=="COMMERCIAL_REQUIREMENT_INPUT_REQUIRED"
+    assert result["current_customer_order"] is None
+    assert result["default_industry"] is None
+    assert result["default_market"] is None
+    assert result["example_tampa_roofing_used"] is False
+    assert result["database_writes"] is False
+    assert result["outbound_sent"] is False
+
+
+def test_user_supplied_non_tampa_intake_is_selected_not_example(tmp_path,monkeypatch,capsys):
+    fixture_root(tmp_path);fake_clock(monkeypatch)
+    intake=tampa_roofing_founder_example()
+    intake.update(country="US",state="AZ",city="Phoenix",industry="hvac",
+                  requested_qualified_leads=30,service_types=["hvac_replacement"],
+                  zip_codes=["85001"])
+    p=tmp_path/"customer_intake.json";p.write_text(json.dumps(intake))
+    monkeypatch.setattr("sys.argv",["operator","--read-only",
+                                   "--repo-root",str(tmp_path),
+                                   "--requirement-intake",str(p)])
+    assert cli.main()==0
+    result=json.loads(capsys.readouterr().out)
+    assert result["status"]=="MULTI_INDUSTRY_COMMERCIAL_REQUIREMENT_READINESS_REVIEWED"
+    assert result["example_tampa_roofing_used"] is False
+    req=result["commercial_requirement"]
+    supply=result["original_lead_supply_and_buyer_owner_readiness"]
+    plan=result["governed_fulfilment_and_sourcing_plan"]
+    assert req["source_instruction_kind"]=="FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT"
+    assert req["city"]=="Phoenix" and req["industry"]=="hvac"
+    assert supply["research_target_market_city"]=="Phoenix"
+    assert supply["source_target_industry_research_records_not_leads"]==34
+    assert plan["customer_requested_qualified_leads"]==30
+    assert "equipment_system" in plan["supplier_sourcing_preflight"][
+        "materials_to_scope_not_purchase_quantities"]
+    assert plan["verified_target_market_inventory_units"] is None
+    assert result["database_writes"] is False
+
+
+def test_no_original_customer_request_refuses_material_and_cloud_evidence(
+    tmp_path,monkeypatch,
+):
+    fake_clock(monkeypatch)
+    p=tmp_path/"research.json";p.write_text(json.dumps({}))
+    monkeypatch.setattr("sys.argv",["operator","--read-only",
+                                   "--repo-root",str(tmp_path),
+                                   "--cloud-what-if",str(p)])
+    with pytest.raises(SystemExit):
+        cli.main()
+
+
+def test_original_request_and_explicit_illustration_cannot_be_combined(
+    tmp_path,monkeypatch,
+):
+    fake_clock(monkeypatch)
+    p=tmp_path/"req.json";p.write_text(json.dumps(tampa_roofing_founder_example()))
+    monkeypatch.setattr("sys.argv",["operator","--read-only",
+                                   "--requirement-intake",str(p),
+                                   "--example-tampa-roofing"])
+    with pytest.raises(SystemExit):
+        cli.main()

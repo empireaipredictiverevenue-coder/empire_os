@@ -57,13 +57,18 @@ def source_packets():
     return supply,buyer,scout
 
 
-def readiness(sources=None):
-    return review_original_lead_readiness(*(sources or source_packets()),as_of=NOW)
+def readiness(sources=None, *, intake=None):
+    r=requirement(intake)
+    return review_original_lead_readiness(
+        *(sources or source_packets()),as_of=NOW,
+        industry=r["industry"],country=r["country"],
+        state=r["state"],city=r["city"],
+    )
 
 
 def plan(*,intake=None,sources=None,roof=None,quotes=None,cloud=None):
     return plan_commercial_fulfilment(
-        requirement(intake),readiness(sources),as_of=NOW,
+        requirement(intake),readiness(sources,intake=intake),as_of=NOW,
         original_roof_project=roof,supplier_owner_quotes=quotes,
         hypothetical_cloud=cloud,
     )

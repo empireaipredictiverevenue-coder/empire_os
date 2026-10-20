@@ -27,14 +27,23 @@ mkdir -p "$TMP/bin" "$TMP/metadata"
 cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
-if [[ "$#" -ne 1 ]]; then
-  printf 'Usage: %s {commercial|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
+  printf 'Usage: %s {commercial|commercial-example|commercial-intake FILE|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command="${1}"
+if [[ "$command" == "commercial-intake" ]]; then
+  if [[ "$#" -ne 2 ]]; then
+    echo "COMMERCIAL_INTAKE_REQUIRES_ORIGINAL_SOURCE_FILE" >&2; exit 2
+  fi
+elif [[ "$#" -ne 1 ]]; then
+  echo "UNEXPECTED_EXTRA_ARGS_HOLD" >&2; exit 2
+fi
 case "$command" in
   commercial) module=scripts.review_predictive_commercial_requirements_20261020 ;;
+  commercial-example) module=scripts.review_predictive_commercial_requirements_20261020 ;;
+  commercial-intake) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -45,6 +54,14 @@ case "$command" in
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
+if [[ "$command" == "commercial-example" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \\
+    /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --example-tampa-roofing
+fi
+if [[ "$command" == "commercial-intake" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \\
+    /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --requirement-intake "$2"
+fi
 if [[ "$command" == "cost-sector" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --probe-sector-bls-v1

@@ -170,7 +170,9 @@ def review_roofing_procurement(
                                   x["quote_ref_sha256"]))
     return {
         "schema_version":"empire.predictive_revenue.supplier_rfqs.v1",
-        "status":"PRELIMINARY_RFQ_REQUIREMENTS_NO_PURCHASE_READY_BOM",
+        "status":("PRELIMINARY_RFQ_REQUIREMENTS_NO_PURCHASE_READY_BOM"
+                  if requirement["physical_material_procurement_applicable"]
+                  else "NOT_APPLICABLE_NO_PHYSICAL_MATERIALS_REQUEST"),
         "mode":"OBSERVE","materials_to_scope_not_purchase_quantities":cats,
         "original_roof_project_ref_sha256":project_revision,
         "original_measurements_independently_authenticated":measured,
@@ -199,7 +201,10 @@ def review_cloud_commercial_research(
         "mode":"OBSERVE","scenario_ir":None,
         "existing_cloud_compiler_reused":False,
         "tenant_scope_authenticated":False,
-        "verified_tampa_selling_inventory":readiness.get("verified_tampa_available_inventory"),
+        "verified_target_market_selling_inventory":readiness.get("verified_target_market_available_inventory"),
+        "verified_tampa_selling_inventory":readiness.get("verified_tampa_available_inventory")
+            if requirement["country"]=="US" and requirement["state"]=="FL"
+            and requirement["city"]=="Tampa" else None,
         "verified_buyer_serviceable_lead_capacity":None,
         "original_lead_acceptance_price_verified":False,
         "verified_supplier_landed_cost_available":False,
@@ -269,6 +274,13 @@ def plan_commercial_fulfilment(
             or readiness.get("schema_version")!=SUPPLY
             or readiness.get("execution_authority")!="none"):
         raise ValueError("validated source-research-only requirement and inventory required")
+    if any(readiness.get(rkey)!=requirement[ckey] for rkey,ckey in (
+        ("research_target_industry","industry"),
+        ("research_target_market_country","country"),
+        ("research_target_market_state","state"),
+        ("research_target_market_city","city"),
+    )):
+        raise ValueError("market/industry mismatched owner readiness cannot inform fulfilment")
     target=requirement["requested_qualified_leads_target_not_inventory"]
     if type(target) is not int or target<=0:
         raise ValueError("valid customer-requested target required")
@@ -293,9 +305,14 @@ def plan_commercial_fulfilment(
         "verified_customer_order_count":None,
         "current_source_global_immediately_sellable_inventory":readiness.get(
             "global_immediately_sellable_inventory"),
+        "source_target_industry_research_records_not_deliverable_leads":readiness.get(
+            "source_target_industry_research_records_not_leads"),
         "source_roofing_research_records_not_deliverable_leads":readiness.get(
-            "original_source_roofing_research_records_not_leads"),
+            "original_source_roofing_research_records_not_leads")
+            if requirement["industry"]=="roofing" else None,
         "verified_market_and_customer_eligible_leads":None,
+        "verified_target_market_inventory_units":readiness.get(
+            "verified_target_market_available_inventory"),
         "verified_inventory_reserved_for_customer":None,
         "verified_fulfilment_gap_units":None,
         "unproven_target_units_pending_review":target,
@@ -319,7 +336,8 @@ def plan_commercial_fulfilment(
         "idempotency_keys_persisted_by_owner":False,
         "independent_tenant_A2A_trust_and_signing_verified":False,
         "lead_duplicates_and_rejections_checked_against_canonical_owner":False,
-        "requested_20_is_available_20":False,
+        "requested_target_is_verified_available":False,
+        "requested_20_is_available_20":False if target==20 else None,
         "customer_commitment_authorized":False,
         "marketing_spend_authorized":False,
         "rfq_outbound_authorized":False,
