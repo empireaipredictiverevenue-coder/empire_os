@@ -1,0 +1,6 @@
+Original generated illustrative artwork, 16 October 2026.
+Generated with OpenAI image generation for Empire AI using empire-scroll-concept.png as style/lighting reference.
+Native dimensions: 1672 x 941. WebP derivative at quality 88; no enlargement.
+Purpose: static/reduced-motion fallback and art-direction reference, not a photograph of actual Empire hardware and not live system evidence.
+Prompt: original cinematic data infrastructure atrium, layered galleries, glass bridges, blue central data channel, dark metal and warm gold evidence vault; no words, logos or metrics.
+SHA256 WebP: 64ffb6a8716f712d4a0a831ff8f300124f47360ce20e0500cc41f249617a403d

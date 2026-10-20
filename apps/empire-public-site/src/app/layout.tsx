@@ -1,16 +1,18 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./brand-polish.css";
+import SiteChrome from "@/components/SiteChrome";
 
 const publicBaseUrl = "https://empire-ai.co.uk";
 const publicDescription =
-  "Empire AI discovers global opportunity, predicts economics and turns verified commercial signals into revenue.";
+  "Explore Empire AI’s Predictive Revenue Infrastructure: company intelligence, governed AI workflows, search and content. Discuss capability fit and a scoped engagement.";
 
 const organizationSchema = {
   "@context": "https://schema.org",
   "@type": "Organization",
   name: "Empire AI",
   url: publicBaseUrl,
-  logo: `${publicBaseUrl}/brand/empire-logo.svg`,
+  logo: `${publicBaseUrl}/brand/empire-ai-founder-reference-orbital-a-transparent.webp`,
   description: publicDescription,
 };
 
@@ -22,8 +24,8 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: "/icon.svg",
-    shortcut: "/icon.svg",
+    icon: "/icon.svg?brand=orbital-a-live-20261017-v2",
+    shortcut: "/icon.svg?brand=orbital-a-live-20261017-v2",
   },
   openGraph: {
     title: "Empire AI — Predictive Revenue",
@@ -34,10 +36,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/brand/empire-logo.svg",
-        width: 560,
-        height: 128,
-        alt: "Empire AI Predictive Revenue",
+        url: "/art/empire-atrium.webp",
+        width: 1672,
+        height: 941,
+        alt: "Illustration of Empire AI Predictive Revenue Infrastructure",
       },
     ],
   },
@@ -46,7 +48,7 @@ export const metadata: Metadata = {
     title: "Empire AI — Predictive Revenue",
     description:
       "Global opportunity intelligence, predictive revenue and governed AI execution.",
-    images: ["/brand/empire-logo.svg"],
+    images: ["/art/empire-atrium.webp"],
   },
 };
 
@@ -56,6 +58,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="empire-flagship-source-fingerprint" content={process.env.EMPIRE_FLAGSHIP_SOURCE_FINGERPRINT ?? "UNATTESTED"} />
+        {[400, 500, 700].map(weight => <link key={weight} rel="preload" href={`/fonts/satoshi-${weight}.woff2`} as="font" type="font/woff2" crossOrigin="anonymous" />)}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
@@ -63,7 +67,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body>{children}</body>
+      <body><SiteChrome>{children}</SiteChrome></body>
     </html>
   );
 }
