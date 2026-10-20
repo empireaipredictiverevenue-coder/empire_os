@@ -114,3 +114,47 @@ With --events-jsonl, local fixtures can be read without database access. --signa
 - For source tracking, do not infer a paid click or organic source from message content. Provider/partner-backed call-tracking joins are required; revenue is limited to verified received-payment receipts after independently confirmed recovery.
 - Insufficient history yields no staffing patterns. The analysis highlights observed pressure on a business, not a statistically calibrated revenue estimate or causal proof.
 - Production integration still requires provider-signed intake, owner-authenticated tenants, durable provenance, customer-approved business-hours settings, consent and opt-out enforcement, true CRM/calendar/finance reconciliation and a supervised release.
+
+## 20 October — Protected Tenant Management API and Membership Contract
+
+Implementation branch: feature/inbound-revenue-recovery-20261020
+Status: Built and tested locally; NOT deployed, NOT production-authenticated, and NOT an operating customer portal.
+
+### Added modules
+
+- empire_os/inbound_tenant_directory.py: durable local tenant profiles, timezone, category, review approval and suspension; no public write endpoints.
+- empire_os/inbound_management_auth.py: issuer/audience-scoped HS256 authentication, short-lived tokens (maximum 15 minutes), required subject, tenant, JWT ID, expiry and permission scopes. No self-service issuance.
+- empire_os/inbound_access_audit.py: HMAC-chained local access log with pseudonymous actors. Existing chain tampering blocks subsequent authorised reads. Tamper-evident, NOT immutable against a privileged administrator controlling both key and DB.
+- empire_os/inbound_management_api.py: default-disabled GET profile, scorecard, opportunities and patterns, with tenant derived only from a bearer claim; explicit approved-tenant directory; read-only evidence database; separate mandatory audit logging and fail-closed dependencies.
+- empire_os/hub.py: registers the protected management router without touching provider voice routes.
+- supabase/migrations/20261020124501_inbound_recovery_tenant_access_prepared_20261020.sql: UNAPPLIED migration created by Supabase CLI and ordered after the earlier core recovery schema; adds auth.users-backed tenant memberships, member-only read policies and server-only audit table, while protecting raw provider/payment evidence.
+
+### Local operation
+
+This is a development adapter, NOT a substitute for production identity, membership provisioning, signing key rotation or revocation. Real customer onboarding must reconcile with the existing approved identity system; no module here issues tokens to a client. Do not use short-lived HMAC test tokens as customer credentials.
+
+The API is OFF by default. A private test environment requires:
+- EMPIRE_INBOUND_MANAGER_ENABLED=true (do not activate in production)
+- EMPIRE_INBOUND_MANAGER_JWT_KEY (server-only 32+ byte key)
+- EMPIRE_INBOUND_MANAGER_AUDIT_KEY (separate server-only 32+ byte key)
+- EMPIRE_INBOUND_MANAGER_TENANT_DB (absolute existing local directory file)
+- EMPIRE_INBOUND_MANAGER_EVIDENCE_DB (absolute existing offline evidence file)
+- EMPIRE_INBOUND_MANAGER_AUDIT_DB (absolute server-owned path under an existing private directory)
+
+Public response codes: 404 when disabled, 401 for invalid/scopeless tokens, 403 for unapproved tenant access, 503 for untrusted storage or audit. A manager GET writes only to the separate access audit database, never to the read-only evidence database. It returns Cache-Control: no-store. No user-supplied path or tenant override is accepted.
+
+Reporting approval does not authorise making calls, sending messages, booking appointments, collecting live revenue or altering telecom routing.
+
+### Prepared database release gates
+
+The new membership SQL is NOT applied. Static security tests do not substitute for actual PostgreSQL RLS tests, migration verification or Supabase advisors. Before any production release:
+1. Confirm ordered migrations and current database schema in the selected project.
+2. Test authenticated reads for active members, revoked members, unrelated tenants and unauthenticated roles.
+3. Verify no browser credential can write memberships, call evidence, signed provider receipts or audit logs.
+4. Run security and performance advisors and isolated Postgres migration tests.
+5. Integrate existing user identity and strict session/revocation workflow; use auth.uid() with server-issued memberships rather than user-editable metadata.
+6. Verify key rotation, owner review, access monitoring and audit integrity.
+7. Add retention, deletion, encryption and backup controls.
+8. Complete GDPR, PECR, recording notice and cross-jurisdictional legal review before live call processing.
+
+All commercial execution remains OFF, all backend provider and customer integrations remain unactivated, and no recovered revenue has been claimed.
