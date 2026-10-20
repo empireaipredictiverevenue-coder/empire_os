@@ -22,8 +22,29 @@ from empire_os.predictive_existing_owner_pickup import (
     read_existing_a2a_owner_reports,review_department_owner_pickup,
 )
 from empire_os.enterprise_finance_evidence_readiness import review_finance_source_readiness
+from empire_os.predictive_commercial_intake_readiness import inspect_commercial_intake_draft
 
 MAX_SIZE=200_000
+
+
+def _report_incomplete_intake(status:str,*,readiness=None,code:str)->int:
+    """Print a readable machine-safe hold without leaking user-entered details."""
+    print(json.dumps({
+        "schema_version":"empire.predictive_revenue.commercial_requirement_operator.v1",
+        "status":status,"mode":"OBSERVE","hold_code":code,
+        "commercial_intake_readiness":readiness,
+        "next_action":"COMPLETE_OR_CORRECT_ORIGINAL_INTAKE_BEFORE_PLANNING",
+        "review_command":"empire-predictive-observe commercial-intake /home/ubuntu/commercial_requirement.json",
+        "template_command":"empire-predictive-observe commercial-template",
+        "customer_order_authenticated":False,
+        "lead_inventory_or_price_inferred":False,
+        "owner_handoffs_prepared":0,"owner_handoffs_dispatched":0,
+        "source_owner_reports_read":False,
+        "database_writes":False,"outbound_sent":False,
+        "execution_authority":"none",
+    },sort_keys=True,allow_nan=False))
+    return 0 if status=="COMMERCIAL_INTAKE_MISSING_PLANNING_FIELDS" else 2
+
 
 def _read(pathname:str)->dict:
     p=Path(pathname)
@@ -72,13 +93,36 @@ def main()->int:
         }
         print(json.dumps(out,sort_keys=True,allow_nan=False))
         return 0
-    raw=_read(args.requirement_intake) if args.requirement_intake else tampa_roofing_founder_example()
-    req=review_commercial_requirement(
-        raw,as_of=now,
-        source_instruction_kind=(
-            "FOUNDER_EXAMPLE_TARGET_NOT_CUSTOMER_ORDER" if args.example_tampa_roofing
-            else "FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT"),
-    )
+    if args.requirement_intake:
+        try:
+            raw=_read(args.requirement_intake)
+        except (OSError,ValueError,UnicodeError,TypeError):
+            return _report_incomplete_intake(
+                "COMMERCIAL_INTAKE_FILE_INVALID",code="READABLE_BOUNDED_JSON_OBJECT_REQUIRED",
+            )
+        intake_readiness=inspect_commercial_intake_draft(raw)
+        if intake_readiness["status"]!="COMMERCIAL_INTAKE_PLANNING_FIELDS_SUPPLIED":
+            return _report_incomplete_intake(
+                intake_readiness["status"],readiness=intake_readiness,
+                code="COMPLETE_REQUIRED_PLANNING_FIELDS"
+                if intake_readiness["status"]=="COMMERCIAL_INTAKE_MISSING_PLANNING_FIELDS"
+                else "EXACT_INTAKE_SCHEMA_REQUIRED",
+            )
+    else:
+        raw=tampa_roofing_founder_example()
+        intake_readiness=None
+    try:
+        req=review_commercial_requirement(
+            raw,as_of=now,
+            source_instruction_kind=(
+                "FOUNDER_EXAMPLE_TARGET_NOT_CUSTOMER_ORDER" if args.example_tampa_roofing
+                else "FOUNDER_OR_CUSTOMER_UNVERIFIED_REQUIREMENT_DRAFT"),
+        )
+    except (ValueError,TypeError):
+        return _report_incomplete_intake(
+            "COMMERCIAL_INTAKE_INVALID_VALUES",
+            readiness=intake_readiness,code="REVIEW_FIELD_TYPES_COUNTRY_CURRENCY_AND_APPROVAL_PROOFS",
+        )
     supply=review_lead_readiness_runtime(
         args.repo_root,as_of=now,
         industry=req["industry"],country=req["country"],

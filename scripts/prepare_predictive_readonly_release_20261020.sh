@@ -89,6 +89,8 @@ EOF
   cd "$TMP"
   sha256sum bin/empire-predictive-observe \
     empire_os/predictive_commercial_requirements.py \
+    empire_os/predictive_commercial_intake_readiness.py \
+    scripts/review_predictive_commercial_requirements_20261020.py \
     scripts/print_predictive_commercial_intake_template_20261020.py \
     empire_os/predictive_commercial_supply_readiness.py \
     empire_os/predictive_commercial_lead_eligibility.py \
@@ -103,6 +105,19 @@ EOF
 for profile in commercial commercial-template commercial-example finance owners; do
   "$TMP/bin/empire-predictive-observe" "$profile" > /dev/null
 done
+# The blank downloadable template must round-trip as a structured incomplete
+# customer intake, never an unhandled ValueError or an inferred buyer order.
+"$TMP/bin/empire-predictive-observe" commercial-template > "$TMP/metadata/blank_commercial_intake_template.json"
+"$TMP/bin/empire-predictive-observe" commercial-intake \
+  "$TMP/metadata/blank_commercial_intake_template.json" | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+value=json.load(sys.stdin)
+assert value["status"]=="COMMERCIAL_INTAKE_MISSING_PLANNING_FIELDS"
+assert value["owner_handoffs_dispatched"]==0
+assert value["source_owner_reports_read"] is False
+assert value["database_writes"] is False
+'
 if "$TMP/bin/empire-predictive-observe" commercial-intake /path/to/request.json \
     > /dev/null 2> "$TMP/metadata/missing_intake_error.txt"; then
   echo "RELEASE_VALIDATION_FAILED_ACCEPTED_NONEXISTENT_INTAKE" >&2

@@ -122,7 +122,7 @@ def test_external_source_file_symlinks_fail_closed(tmp_path):
         cli._read(str(link))
 
 
-def test_founder_intake_cannot_self_authorise_money_or_outbound(tmp_path,monkeypatch):
+def test_founder_intake_cannot_self_authorise_money_or_outbound(tmp_path,monkeypatch,capsys):
     fixture_root(tmp_path);fake_clock(monkeypatch)
     intake=tampa_roofing_founder_example()
     intake["permission_proof_owner_receipt"]={"founder_ok":True}
@@ -130,8 +130,13 @@ def test_founder_intake_cannot_self_authorise_money_or_outbound(tmp_path,monkeyp
     monkeypatch.setattr("sys.argv",["operator","--read-only",
                                    "--repo-root",str(tmp_path),
                                    "--requirement-intake",str(p)])
-    with pytest.raises(ValueError):
-        cli.main()
+    assert cli.main()==2
+    out=json.loads(capsys.readouterr().out)
+    assert out["status"]=="COMMERCIAL_INTAKE_INVALID_VALUES"
+    assert out["hold_code"]=="REVIEW_FIELD_TYPES_COUNTRY_CURRENCY_AND_APPROVAL_PROOFS"
+    assert out["owner_handoffs_dispatched"]==0
+    assert out["database_writes"] is False
+    assert out["outbound_sent"] is False
 
 
 def test_read_only_operator_accepts_owner_per_lead_preview_without_delivering(tmp_path,monkeypatch,capsys):
