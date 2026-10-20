@@ -253,3 +253,59 @@ def test_no_reporting_if_directory_downgraded(config, monkeypatch):
             state="suspended", reporting_approved=False,
         ))
     assert get(client, "scorecard", token(tenant="alpha")).status_code == 403
+
+
+def test_knowledge_status_is_tenant_scoped_and_requires_scope(config, monkeypatch, tmp_path):
+    from empire_os.inbound_knowledge_store import OfflineKnowledgeRepository
+    from empire_os.inbound_tenant_knowledge import TenantKnowledgePack, KnowledgeFact
+
+    now = datetime(2026, 10, 20, 12, tzinfo=timezone.utc)
+    path = tmp_path / "knowledge.db"
+    fact = KnowledgeFact(
+        tenant_id="alpha", fact_id="f1",
+        question="Do you fit solar panels",
+        answer="We fit solar systems.",
+        source_ref="reviewed-policy-a", reviewed_by="client-admin",
+        reviewed_at=(now - timedelta(days=1)).isoformat(),
+        expires_at=(now + timedelta(days=30)).isoformat(),
+        topic="services", approved=True, synthetic=False,
+    )
+    pack = TenantKnowledgePack(
+        tenant_id="alpha", business_name="Alpha Roofing",
+        version=1, facts=(fact,), activated=False,
+    )
+    with OfflineKnowledgeRepository(path) as repo:
+        repo.store_draft_offline(pack)
+        repo.activate_offline("alpha", 1, as_of=now)
+    monkeypatch.setenv("EMPIRE_INBOUND_MANAGER_KNOWLEDGE_DB", str(path))
+    client, audit, _ = config
+
+    assert get(client, "knowledge-status", token(tenant="alpha")).status_code == 401
+    allowed_alpha = get(
+        client, "knowledge-status",
+        token(tenant="alpha", scopes=["recovery:knowledge"]),
+    )
+    assert allowed_alpha.status_code == 200, allowed_alpha.text
+    assert allowed_alpha.json()["active_version"] == 1
+    assert allowed_alpha.json()["approved_facts"] == 1
+    assert allowed_alpha.json()["live_knowledge_serving_enabled"] is False
+    assert "We fit solar systems" not in allowed_alpha.text
+
+    allowed_beta = get(
+        client, "knowledge-status",
+        token(tenant="beta", scopes=["recovery:knowledge"]),
+    )
+    assert allowed_beta.status_code == 200
+    assert allowed_beta.json()["active_version"] is None
+    with RecoveryAccessAudit(audit, audit_key=AUDIT_KEY) as log:
+        assert log.row_count() == 2
+        assert log.verify_chain()
+
+
+def test_knowledge_status_fails_closed_without_configured_db(config):
+    client, audit, _ = config
+    result = get(
+        client, "knowledge-status",
+        token(tenant="alpha", scopes=["recovery:knowledge"]),
+    )
+    assert result.status_code == 503

@@ -17,6 +17,9 @@ from empire_os.inbound_business_hours import (
 from empire_os.inbound_revenue_recovery import (
     TenantReceptionProfile, plan_reception_response,
 )
+from empire_os.inbound_tenant_knowledge import (
+    KnowledgeFact, TenantKnowledgePack, answer_from_knowledge,
+)
 
 
 class PreviewStaffedWindow(BaseModel):
@@ -33,6 +36,26 @@ class PreviewStaffedHours(BaseModel):
     simulated_verified: bool = False
 
 
+class PreviewKnowledgeFact(BaseModel):
+    fact_id: str = Field(min_length=1, max_length=120)
+    question: str = Field(min_length=1, max_length=500)
+    answer: str = Field(min_length=1, max_length=500)
+    source_ref: str = Field(min_length=1, max_length=200)
+    reviewed_by: str = Field(min_length=1, max_length=120)
+    reviewed_at: str
+    expires_at: str
+    topic: str = "general"
+    approved: bool = False
+
+
+class PreviewKnowledgePack(BaseModel):
+    version: int = Field(ge=1)
+    activated: bool = False
+    as_of: str
+    question: str = Field(min_length=1, max_length=500)
+    facts: list[PreviewKnowledgeFact] = Field(default_factory=list, max_length=100)
+
+
 class InboundReceptionPreview(BaseModel):
     tenant_id: str = Field(min_length=1, max_length=100)
     business_name: str = Field(min_length=1, max_length=120)
@@ -42,6 +65,7 @@ class InboundReceptionPreview(BaseModel):
     human_transfer_configured: bool = False
     callback_capture_allowed: bool = False
     staffed_hours: PreviewStaffedHours | None = None
+    knowledge_preview: PreviewKnowledgePack | None = None
 
 
 def create_inbound_recovery_router() -> APIRouter:
@@ -100,6 +124,39 @@ def create_inbound_recovery_router() -> APIRouter:
                 "next_open_at": status.next_open_at,
                 "reason": status.reason,
             }
+        knowledge_output = None
+        if payload.intent.strip().lower() == "faq" and payload.knowledge_preview is not None:
+            data = payload.knowledge_preview
+            try:
+                pack = TenantKnowledgePack(
+                    tenant_id=profile.tenant_id,
+                    business_name=profile.business_name,
+                    version=data.version,
+                    activated=data.activated,
+                    facts=tuple(KnowledgeFact(
+                        tenant_id=profile.tenant_id, fact_id=f.fact_id,
+                        question=f.question, answer=f.answer,
+                        source_ref=f.source_ref, reviewed_by=f.reviewed_by,
+                        reviewed_at=f.reviewed_at, expires_at=f.expires_at,
+                        topic=f.topic, approved=f.approved, synthetic=True,
+                    ) for f in data.facts),
+                )
+                when = datetime.fromisoformat(data.as_of.replace("Z", "+00:00"))
+                answer = answer_from_knowledge(pack, data.question, as_of=when, simulated=True)
+            except (ValueError, TypeError, OverflowError) as exc:
+                raise HTTPException(status_code=422, detail="invalid_knowledge_preview") from exc
+            decision = type(decision)(
+                action="faq_preview_" + answer.status,
+                spoken_text=answer.spoken_text,
+                reason="operator_supplied_knowledge_simulation_only",
+            )
+            knowledge_output = {
+                "status": answer.status,
+                "pack_version": answer.pack_version,
+                "evidence_refs": list(answer.evidence_refs),
+                "match_coverage_not_probability": answer.match_coverage,
+                "simulated_not_provider_verified": True,
+            }
         return {
             "mode": "nonlive_preview_only",
             "tenant_id": profile.tenant_id,
@@ -107,6 +164,7 @@ def create_inbound_recovery_router() -> APIRouter:
             "spoken_text": decision.spoken_text,
             "reason": decision.reason,
             "staffed_hours": hours_preview,
+            "knowledge": knowledge_output,
             "booking_confirmed": False,
             "outbound_authorized": False,
             "provider_connected": False,

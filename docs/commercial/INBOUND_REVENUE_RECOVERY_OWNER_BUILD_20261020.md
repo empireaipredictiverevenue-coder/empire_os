@@ -158,3 +158,34 @@ The new membership SQL is NOT applied. Static security tests do not substitute f
 8. Complete GDPR, PECR, recording notice and cross-jurisdictional legal review before live call processing.
 
 All commercial execution remains OFF, all backend provider and customer integrations remain unactivated, and no recovered revenue has been claimed.
+
+
+## 20 October — Versioned Tenant Knowledge & Verified Answering
+
+**Status:** Implemented offline; preview and read-only manager status connected. NOT deployed to production voice, customer administration or automatic learning.
+
+### Implementation
+
+- empire_os/inbound_tenant_knowledge.py: immutable-in-Python FAQ fact and pack contracts with tenant ownership, reviewer/source evidence, approval state, 180-day maximum review window, expiration and deterministic lexical matching. Never treats match coverage as a probability or AI accuracy measure.
+- empire_os/inbound_knowledge_store.py: local SQLite version store for draft packs with explicit second-stage operator activation; activation requires all facts approved, non-synthetic, reviewed and unexpired. Customer-specific active-version pointer and old versions preserved. SQL file integrity hashing detects accidental/casual changes; it is NOT a cryptographic signature against a privileged adversary able to rewrite both data and hashes.
+- empire_os/inbound_recovery_api.py: existing protected preview optionally accepts a simulated versioned FAQ pack, labels all operator-supplied knowledge as simulation and does not let FAQ override emergency or opt-out behavior.
+- empire_os/inbound_management_api.py: GET knowledge-status requires the distinct recovery:knowledge scope, active tenant approval and audit chain; returns only counts/version/status, not arbitrary call content or raw answers.
+- scripts/review_inbound_knowledge_20261020.py: read-only offline answer replay for an existing local knowledge store and specific tenant.
+
+Example offline knowledge review (existing store only):
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_knowledge_20261020 --knowledge-db /path/to/local-knowledge.db --tenant-id TENANT --question "Do you install solar panels" --as-of 2026-10-20T13:00:00+01:00 --read-only
+
+### Conservative answering rules
+
+- General or service facts must be tenant-scoped, approved, current, non-synthetic for ordinary answers, and traceable to a recorded source.
+- Contradictory equally matching facts cause an explicit abstention. Unknown questions cause refusal to invent an answer.
+- Commercially sensitive topics (pricing, payment, refund decisions, availability, booking confirmation, regulated advice) are never completed by this static FAQ path, even if a fact is wrongly labelled as a general answer but contains obvious money/availability language.
+- The sensitive-text guard is a conservative deterministic keyword/amount heuristic; it does not replace semantic QA, legal review, regulated-policy review, or execution gates.
+- No model self-training, unapproved content rewriting, finance transaction, appointment booking, outbound campaign or human-contact authorisation is introduced.
+
+### Release gates
+
+Before any live knowledge use: customer permission to use the source, secure user-to-tenant provisioning, approved fact signer/reviewer identity, robust version approval and rollback, valid signed content provenance, tested semantic safety, locale-specific commercial disclaimers, data retention and explicit founder pilot approval.
+
+The management knowledge database path is an optional extra server-side value EMPIRE_INBOUND_MANAGER_KNOWLEDGE_DB, required only for GET knowledge-status when the management API is enabled. It must refer to a private, existing offline SQLite file. No endpoint accepts a caller-supplied file path.
