@@ -21,6 +21,7 @@ from empire_os.runtime_self_heal import run_runtime_self_heal
 from empire_os.sovereign_infrastructure_observer import collect_sovereign_infrastructure_health
 from empire_os.conversation_control_operational_truth import inspect_conversation_evidence
 from empire_os.commercial_adaptive_ops_bridge import observe_ops_adaptive_commercial
+from empire_os.commercial_adaptive_event_journal import append_change_once
 from empire_os.supabase_egress_guard import (
     MANAGED_TIMERS,
     supabase_egress_contained,
@@ -555,6 +556,13 @@ def main() -> int:
     incident_tmp.write_text(json.dumps(incident_manager, indent=2, sort_keys=True) + "\n")
     incident_tmp.replace(incident_output)
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    # Journal first. If the process crashes before snapshot replacement,
+    # a rerun sees the same stable event_id and does not duplicate it.
+    if adaptive["change_event"] is not None:
+        append_change_once(
+            OUTPUT.parent / "adaptive_commercial_transitions.jsonl",
+            adaptive["change_event"],
+        )
     tmp = OUTPUT.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     tmp.replace(OUTPUT)
@@ -564,11 +572,6 @@ def main() -> int:
         event = {"observed_at": payload["observed_at"], **transition}
         with changes.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event, sort_keys=True) + "\n")
-    # Same owner cycle, change-only privacy-safe history, no second timer.
-    if adaptive["change_event"] is not None:
-        changes = OUTPUT.parent / "adaptive_commercial_transitions.jsonl"
-        with changes.open("a", encoding="utf-8") as stream:
-            stream.write(json.dumps(adaptive["change_event"], sort_keys=True) + "\n")
     print(json.dumps(payload, indent=2, sort_keys=True))
 
     failed_repairs = [row for row in repairs if row.get("ok") is not True]

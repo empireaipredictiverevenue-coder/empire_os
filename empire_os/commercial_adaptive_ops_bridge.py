@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from hashlib import sha256
+import json
 from pathlib import Path
 from typing import Any
 
@@ -109,8 +110,21 @@ def observe_ops_adaptive_commercial(
             "outbound_authorized": False,
             "agent_tasks_created": False,
         }
+        # Stable identity for at-least-once retry after a crash between
+        # change journal append and the existing latest.json replacement.
+        receipt_set_digest = sha256(json.dumps(
+            sales["owner_source_receipts"], sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")).hexdigest()
+        event_id = sha256((
+            control["decision_signature"] + ":" +
+            receipt_set_digest + ":" +
+            ("MATERIAL" if material_change else "SOURCE_ONLY")
+        ).encode("ascii")).hexdigest()
         change_event = (
             {
+                "event_id": event_id,
+                "owner_receipt_set_digest": receipt_set_digest,
                 "observed_at": status["reviewed_at"],
                 "event_code": (
                     "COMMERCIAL_EVIDENCE_STATE_CHANGED"
