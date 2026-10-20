@@ -15,13 +15,18 @@ from .graphify_context import GraphifyContextSource
 
 
 class GraphifyContextOverlay:
-    def __init__(self, delegate, source: GraphifyContextSource):
+    def __init__(
+        self, delegate, source: GraphifyContextSource, *,
+        unavailable: str = "raise",
+    ):
         if not callable(getattr(delegate, "build", None)):
             raise TypeError("existing context builder required")
         if not callable(getattr(delegate, "set_active_knowledge_paths", None)):
             raise TypeError("existing Coder knowledge-guard interface required")
         if not isinstance(source, GraphifyContextSource):
             raise TypeError("source-attested Graphify context required")
+        if unavailable not in {"raise", "skip"}:
+            raise ValueError("Graphify unavailability policy must be raise or skip")
         repo = getattr(delegate, "repo", None)
         if repo is None or Path(repo.root).resolve() != source.workspace:
             raise ValueError("Coder and Graphify workspace mismatch")
@@ -30,6 +35,8 @@ class GraphifyContextOverlay:
         self.delegate = delegate
         self.source = source
         self.repo = repo
+        self.unavailable = unavailable
+        self.last_graph_status = "NOT_QUERIED"
 
     def set_active_knowledge_paths(self, paths: Iterable[str]) -> None:
         self.delegate.set_active_knowledge_paths(paths)
@@ -49,12 +56,19 @@ class GraphifyContextOverlay:
         if not terms and not symbol_terms:
             return result
         # The underlying graph fails closed if its source has changed.
-        graph_docs = self.source.documents(
-            terms=terms + symbol_terms,
-            repo=self.repo,
-            max_docs=3,
-            max_chars=min(2200, max(500, budget_chars // 8)),
-        )
+        try:
+            graph_docs = self.source.documents(
+                terms=terms + symbol_terms,
+                repo=self.repo,
+                max_docs=3,
+                max_chars=min(2200, max(500, budget_chars // 8)),
+            )
+        except (ValueError, OSError, UnicodeError) as exc:
+            self.last_graph_status = "UNAVAILABLE_" + exc.__class__.__name__
+            if self.unavailable == "skip":
+                return result
+            raise
+        self.last_graph_status = "ATTESTED_CODE_CONTEXT_READ"
         documents = list(result.documents)
         existing_paths = {doc.path for doc in documents}
         # Preserve the base Coder's budget by restricting supplementary
@@ -92,7 +106,9 @@ class GraphifyContextOverlay:
         )
 
 
-def attach_graphify_context(coder, source: GraphifyContextSource) -> None:
+def attach_graphify_context(
+    coder, source: GraphifyContextSource, *, unavailable: str = "raise",
+) -> None:
     """Attach to an existing caller-owned Coder; no patches or workers.
 
     The authorized Coder owner chooses whether to call this function. No
@@ -106,5 +122,7 @@ def attach_graphify_context(coder, source: GraphifyContextSource) -> None:
     workspace = getattr(coder, "workspace", None)
     if workspace is None or Path(workspace).resolve() != source.workspace:
         raise ValueError("Coder and Graphify workspace mismatch")
-    enhanced = GraphifyContextOverlay(original, source)
+    enhanced = GraphifyContextOverlay(
+        original, source, unavailable=unavailable,
+    )
     coder.context = enhanced
