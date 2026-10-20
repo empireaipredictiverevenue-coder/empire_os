@@ -30,6 +30,7 @@ from empire_os.a2a_b2b_evidence_mining_v1 import mine_targeted_business_evidence
 from empire_os.a2a_b2b_mining_history_v1 import update_mining_history
 from empire_os.a2a_first_party_recovery_readback_v1 import review_first_party_research
 from empire_os.a2a_openmanus_scoped_research_bridge_v1 import build_scoped_openmanus_plan
+from empire_os.a2a_first_party_buyer_scout_handoff_v1 import prepare_verified_scope_buyer_scout_handoff, make_first_party_owner_handoff_hold
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -124,6 +125,13 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         first_party_research["source_state"] = "SOURCE_CACHE_REJECTED_UNTRUSTED"
     # Cached source reports are supplementary research observations, not the
     # canonical Buyer's Scout source or anything permitting external execution.
+    try:
+        first_party_buyer_owner_research = prepare_verified_scope_buyer_scout_handoff(
+            first_party_research, owner_pickup, mining,
+        )
+    except ValueError:
+        first_party_buyer_owner_research = make_first_party_owner_handoff_hold(
+            "BUYER_OWNER_SOURCE_UNTRUSTED")
     openmanus_owner_plan = (
         build_scoped_openmanus_plan(owner_pickup, first_party_research)
         if owner_pickup.get("pickup_count") else {
@@ -167,6 +175,7 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "mining_history": mining_history,
         "first_party_research": first_party_research,
         "openmanus_owner_plan": openmanus_owner_plan,
+        "first_party_buyer_owner_research": first_party_buyer_owner_research,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -208,6 +217,7 @@ def main() -> int:
             ("targeted_business_mining_history_v1.json", "mining_history"),
             ("first_party_source_readback_v1.json", "first_party_research"),
             ("openmanus_research_jobs_v1.json", "openmanus_owner_plan"),
+            ("first_party_buyer_scout_handoff_v1.json", "first_party_buyer_owner_research"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -245,6 +255,8 @@ def main() -> int:
         "first_party_source_state": outcome["first_party_research"]["source_state"],
         "openmanus_scoped_jobs_prepared": outcome["openmanus_owner_plan"]["jobs_prepared"],
         "openmanus_scoped_jobs_executed": outcome["openmanus_owner_plan"]["jobs_executed"],
+        "buyer_scout_first_party_review_candidates": outcome["first_party_buyer_owner_research"]["research_review_candidates_with_matching_self_descriptions"],
+        "buyer_scout_first_party_tasks_dispatched": outcome["first_party_buyer_owner_research"]["buyer_scout_owner_tasks_dispatched"],
         "authenticated_owner_reply_count": outcome["owner_receipt_review"]["authenticated_owner_replies"],
         "owner_trust_state": outcome["owner_receipt_review"]["trust_store_state"],
         "new_owner_pickup_requests": outcome["pickup_change_tracking"]["new_request_count"],
