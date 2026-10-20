@@ -123,3 +123,26 @@ def test_activation_fails_closed_without_fresh_source(tmp_path,monkeypatch):
     with pytest.raises(ValueError):
         op.activate()
     assert cfg.read_bytes()==original
+
+
+def test_refresh_missing_ringba_token_preserves_provenance_and_source_staleness(monkeypatch):
+    from scripts import refresh_lead_smart_full_campaign_sources as source
+    calls=[]
+    def run(command,**kw):
+        calls.append(command[-1])
+        return type("Result",(),{"returncode": 1 if len(calls)==4 else 0})()
+    monkeypatch.setattr(source.subprocess,"run",run)
+    result=source.refresh()
+    assert result["source_refresh_completed"] is True
+    assert result["tracking_observation_refreshed"] is False
+    assert result["tracking_assignment_checked_separately_by_launch_gate"] is True
+    assert len(calls)==4
+    assert source.STEPS[-1] not in calls  # no synthetic new verified_at
+
+def test_refresh_coverage_failure_blocks_launch(monkeypatch):
+    from scripts import refresh_lead_smart_full_campaign_sources as source
+    monkeypatch.setattr(source.subprocess,"run",lambda *a,**kw:
+                        type("Result",(),{"returncode":1})())
+    result=source.refresh()
+    assert result["source_refresh_completed"] is False
+    assert result["tracking_observation_refreshed"] is False
