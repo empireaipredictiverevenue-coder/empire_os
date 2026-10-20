@@ -533,3 +533,84 @@ live conversions, simulated production success, or revenue.
 **No external messages, retargeting, public tracking, new cron jobs,
 model retraining, audience export, budget movement or production deploy.**
 Output is recommendation-only and evidence-provenance bounded.
+
+
+## 20 October continuation — Adaptive buyer journey, channel and offer intelligence
+
+**Implemented within the existing campaign intelligence owner** rather than
+creating another CRM, automation scheduler or buyer agent.
+
+The two compositional APIs in `empire_os/campaign_intelligence.py` are
+`review_adaptive_buyer_journey` and
+`review_adaptive_buyer_journey_portfolio`. They reuse these pre-existing
+EmpireOS owners:
+
+- `revenue_crm_journeys.preview_crm_journey` for the real canonical CRM
+  lifecycle (engaged conversation, proposal, awaiting payment, fulfilment,
+  contact hold). A stage is never a payment or consent receipt.
+- `revenue_crm_channel_evidence.review_channel_evidence` for separately
+  authenticated, tenant-and-prospect-bound email, SMS and web-push consent,
+  canonical suppression, proof freshness and provider authority.
+- The owned campaign buying committee, same-day signal review, company
+  cooldowns and multi-wave customer/profit experiment learning.
+
+**Information boundaries:** CRM UUIDs and opaque campaign account identifiers
+are distinct identity systems. The canonical CRM owner must attest their exact
+join before this adapter will use either. Unknown/stale source joins hold
+rather than silently matching a domain or email address. No names, emails,
+recipient tokens, company identifiers, case IDs or original CRM records are
+returned. Aggregate portfolio views block repeated account or canonical
+CRM prospect identity across records.
+
+**Example stage choices, all owner-review only:**
+
+| Evidence-backed stage | Recommended internal play |
+|---|---|
+| Unsubscribe, suppression or CRM contact hold | Stop contact |
+| Existing customer evidence | Customer relationship review |
+| Canonical order under fulfilment | Fulfilment owner review |
+| Canonical case awaiting payment | Payment-status owner review; do not invent a payment |
+| Canonical proposal ready | Proposal / terms review |
+| Verified buyer enquiry or engaged CRM conversation with reply basis | Same-business-day sales conversation review |
+| Verified and permitted partner introduction | Warm-intro preparation for human review |
+| Fit and buyer route verified, channel consent/suppression reviewed | Review one offer experiment with the existing sender owner |
+| Missing consent, identity, contact basis or sources | Hold, or internal account research |
+
+**Channel and timing decisions:** Each channel requires its own fresh
+authenticated first-party opt-in and a matching suppression check. A legitimate
+email opt-in does **not** become SMS or push consent. A verified inbound
+conversation may merit human same-business-day review without authorizing
+a separate marketing subscription. A first-touch offer may only be proposed
+for owner review where the channel evidence preconditions are present;
+there is still no send authority. Global suppression removes any apparent
+preferred outbound channel. Timing is an owner-review priority, never a
+scheduling instruction.
+
+**Offer adaptation:** A replicated profitable offer outcome from the existing
+multi-wave engine is exposed only as a candidate for existing-owner causal
+review, not an automatically selected creative or swapped experiment arm.
+Missing learning receipts, small/incompatible tests or financial losses cannot
+train a fictitious winner. No autonomous nurture sequence is activated.
+
+`review_authenticated_campaign_intelligence` now accepts optional
+`adaptive_journey_packets` and shares the same authenticated learning
+wave input with both engines. No real connector means
+`decision_intelligence.adaptive_buyer_journeys = null` in the current
+read-only report; never manufacture counts.
+
+**Verification:**
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+  tests/test_adaptive_campaign_journey_20261020.py \
+  tests/test_campaign_account_route_20261020.py \
+  tests/test_revenue_crm_journeys.py \
+  tests/test_revenue_crm_channel_evidence.py
+```
+
+**Still excluded:** production sender/provider configuration, real buyer
+acquisition by this owner, paid traffic, publishing, public tracking, lead
+admission, customer billing, automatic subscriber enrollment and changes to
+another agent's CRM/Finance source files. Live buyer verification remains
+assigned elsewhere, as directed by the founder.

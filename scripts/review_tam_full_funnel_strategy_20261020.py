@@ -713,6 +713,7 @@ def review_authenticated_campaign_intelligence(
     funnel_stage_receipts: Iterable[Any] | None = None,
     account_route_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
     learning_waves: Iterable[Any] | None = None,
+    adaptive_journey_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -725,7 +726,11 @@ def review_authenticated_campaign_intelligence(
         diagnose_campaign_conversion_bottlenecks,
         review_account_route_portfolio,
         review_multiwave_commercial_learning,
+        review_adaptive_buyer_journey_portfolio,
     )
+    # A single authenticated generator must feed both experiment and journey
+    # review without the latter silently receiving an exhausted iterator.
+    verified_waves = tuple(learning_waves) if learning_waves is not None else None
     return {
         "schema_version": "empire.gtm.full_funnel_decision_intelligence.v1",
         "source_status": (
@@ -751,8 +756,13 @@ def review_authenticated_campaign_intelligence(
             if account_route_packets is not None else None
         ),
         "multiwave_campaign_learning": (
-            review_multiwave_commercial_learning(learning_waves, now=now)
+            review_multiwave_commercial_learning(verified_waves, now=now)
             if learning_waves is not None else None
+        ),
+        "adaptive_buyer_journeys": (
+            review_adaptive_buyer_journey_portfolio(
+                adaptive_journey_packets, now=now, learning_waves=verified_waves,
+            ) if adaptive_journey_packets is not None else None
         ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,

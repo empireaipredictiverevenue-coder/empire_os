@@ -1052,3 +1052,254 @@ def review_multiwave_commercial_learning(
         "auto_reallocation": False, "budget_mutation": False, "campaign_activated": False,
         "execution_authority": "NONE",
     }
+
+# Adaptive campaign journey is a read-only ADAPTER of the pre-existing Revenue
+# CRM journey and channel-evidence contracts. The CRM and Sales Director retain
+# exclusive authority to record identity, permission, conversations and sends.
+@dataclass(frozen=True)
+class TrustedJourneyProjection:
+    account_route: TrustedAccountRoute
+    crm_row: Mapping[str, object]
+    canonical_account_to_crm_binding_verified: bool
+    crm_snapshot_observed_at: datetime
+    channel_receipts: tuple[object, ...]
+
+
+_CRM_JOURNEY_FIELDS = frozenset({
+    "tenant_id", "prospect_id", "prospect_status", "niche",
+    "conversation_id", "conversation_state", "conversation_updated_at",
+    "closer_case_id", "closer_state", "closer_updated_at",
+    "fulfilment_order_id", "fulfilment_state", "fulfilment_updated_at",
+})
+_CHANNEL_PRIORITY = ("email", "sms", "web_push")
+_JOURNEY_REVIEW_TYPES = (
+    "STOP_CONTACT", "HOLD_CANONICAL_SOURCE", "EXISTING_CUSTOMER_REVIEW",
+    "FULFILMENT_OWNER_REVIEW", "PAYMENT_STATUS_OWNER_REVIEW",
+    "PROPOSAL_AND_TERMS_REVIEW", "SAME_DAY_BUYER_CONVERSATION_REVIEW",
+    "WARM_INTRO_OWNER_REVIEW", "OFFER_EXPERIMENT_OWNER_REVIEW",
+    "HOLD_CHANNEL_EVIDENCE", "HOLD_INBOUND_RESPONSE_BASIS",
+    "INTERNAL_ACCOUNT_RESEARCH",
+)
+
+
+def review_adaptive_buyer_journey(
+    projection: TrustedJourneyProjection, *,
+    verified_signals: Iterable[TrustedCampaignSignal],
+    now: datetime,
+    learning_waves: Iterable[TrustedCampaignLearningWave] | None = None,
+) -> dict:
+    """Reconcile real CRM stage, channel proof, account route and offer learning.
+
+    No CRM name/person/contact ID is returned. Verified stage is not consent.
+    Verified opt-in is not legal permission to send or an execution grant.
+    A client-supplied boolean cannot replace owner-authenticated projections.
+    """
+    from empire_os.revenue_crm_journeys import preview_crm_journey
+    from empire_os.revenue_crm_channel_evidence import (
+        CHANNELS, TrustedChannelEvidence, canonical_uuid,
+        review_channel_evidence,
+    )
+    if type(projection) is not TrustedJourneyProjection:
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_PROJECTION_REQUIRED")
+    now = _aware(now)
+    route = projection.account_route
+    if type(route) is not TrustedAccountRoute:
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_ACCOUNT_ROUTE_REQUIRED")
+    _context(route.context)
+    if type(projection.canonical_account_to_crm_binding_verified) is not bool:
+        raise CampaignIntelligenceHeld("JOURNEY_IDENTITY_BINDING_GATE_INVALID")
+    if not isinstance(projection.crm_row, Mapping):
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_CRM_RECORD_REQUIRED")
+    crm = {k: projection.crm_row[k] for k in _CRM_JOURNEY_FIELDS
+           if k in projection.crm_row}
+    try:
+        tenant = canonical_uuid(crm.get("tenant_id"))
+        prospect = canonical_uuid(crm.get("prospect_id"))
+    except ValueError as exc:
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_CRM_ID_INVALID") from exc
+    # CRM identifiers are real UUIDs; marketing experiments use different
+    # opaque keys. Owner-supplied correspondence MUST be independently attested.
+    if type(projection.channel_receipts) is not tuple:
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_CHANNEL_SHAPE_INVALID")
+    if len(projection.channel_receipts) > len(CHANNELS):
+        raise CampaignIntelligenceHeld("TOO_MANY_JOURNEY_CHANNEL_RECEIPTS")
+    if projection.canonical_account_to_crm_binding_verified is not True:
+        return {
+            "schema_version": "empire.gtm.adaptive_buyer_journey_review.v1",
+            "recommended_play": "HOLD_CANONICAL_SOURCE",
+            "reason": "ACCOUNT_TO_CRM_IDENTITY_BINDING_NOT_PROVEN",
+            "crm_journey_stage": None, "preferred_human_channel_review": None,
+            "offer_learning_candidate_for_review": None,
+            "channel_review_states": {},
+            "timing": "NO_EXTERNAL_CONTACT",
+            "personal_identifiers_disclosed": False,
+            "send_authorized": False, "auto_sequence_enabled": False,
+            "auto_paid_retargeting": False, "crm_mutation": False,
+            "execution_authority": "NONE",
+        }
+    observed = _aware(projection.crm_snapshot_observed_at)
+    if observed > now or now - observed > timedelta(hours=24):
+        raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_CRM_SNAPSHOT_STALE")
+    crm["tenant_id"] = tenant
+    crm["prospect_id"] = prospect
+    preview = preview_crm_journey(crm, now=now)
+    route_review = review_account_buying_route(
+        route, verified_signals=verified_signals, now=now,
+    )
+    channel_reviews = {}
+    seen_channels = set()
+    for receipt in projection.channel_receipts:
+        if type(receipt) is not TrustedChannelEvidence:
+            raise CampaignIntelligenceHeld("UNTRUSTED_JOURNEY_CHANNEL_RECEIPT")
+        if receipt.channel in seen_channels:
+            raise CampaignIntelligenceHeld("DUPLICATE_JOURNEY_CHANNEL_RECEIPT")
+        seen_channels.add(receipt.channel)
+        try:
+            review = review_channel_evidence(
+                {"tenant_id": tenant, "prospect_id": prospect,
+                 "prospect_status": crm.get("prospect_status")},
+                channel=receipt.channel, evidence=receipt, now=now,
+            )
+        except ValueError as exc:
+            raise CampaignIntelligenceHeld("JOURNEY_CHANNEL_IDENTITY_OR_EVIDENCE_INVALID") from exc
+        channel_reviews[receipt.channel] = review["review_status"]
+    for channel in CHANNELS:
+        if channel not in channel_reviews:
+            channel_reviews[channel] = "HOLD_MISSING_EVIDENCE"
+    available = [
+        channel for channel in _CHANNEL_PRIORITY
+        if channel_reviews[channel] == "REVIEW_ONLY_EVIDENCE_PRESENT"
+    ]
+    preferred = available[0] if available else None
+    segment = preview["segment"]
+    account_play = route_review["recommended_play"]
+    if segment == "contact_hold" or account_play == "STOP_AND_SUPPRESS":
+        play, timing = "STOP_CONTACT", "NO_EXTERNAL_CONTACT"
+    elif account_play in ("HOLD_CANONICAL_ACCOUNT_IDENTITY",):
+        play, timing = "HOLD_CANONICAL_SOURCE", "NO_EXTERNAL_CONTACT"
+    elif account_play == "EXISTING_CUSTOMER_HUMAN_REVIEW":
+        play, timing = "EXISTING_CUSTOMER_REVIEW", "OWNER_QUEUE"
+    elif segment == "fulfilment_review":
+        play, timing = "FULFILMENT_OWNER_REVIEW", "OWNER_QUEUE"
+    elif segment == "awaiting_payment_review":
+        play, timing = "PAYMENT_STATUS_OWNER_REVIEW", "OWNER_QUEUE"
+    elif segment == "proposal_review":
+        play, timing = "PROPOSAL_AND_TERMS_REVIEW", "OWNER_QUEUE"
+    elif account_play == "COMMERCIAL_TERMS_HUMAN_REVIEW":
+        play, timing = "PROPOSAL_AND_TERMS_REVIEW", "OWNER_QUEUE"
+    elif account_play == "HOLD_INBOUND_REPLY_BASIS":
+        play, timing = "HOLD_INBOUND_RESPONSE_BASIS", "NO_EXTERNAL_CONTACT"
+    elif account_play == "SAME_BUSINESS_DAY_EXISTING_INBOUND_REVIEW":
+        play, timing = "SAME_DAY_BUYER_CONVERSATION_REVIEW", "SAME_BUSINESS_DAY"
+    elif segment == "engaged_conversation_review":
+        if route.context.inbound_response_basis_verified is True:
+            play, timing = "SAME_DAY_BUYER_CONVERSATION_REVIEW", "SAME_BUSINESS_DAY"
+        else:
+            play, timing = "HOLD_INBOUND_RESPONSE_BASIS", "NO_EXTERNAL_CONTACT"
+    elif account_play == "PREPARE_VERIFIED_WARM_INTRO_FOR_OWNER_REVIEW":
+        # A verified human-introduction path is NOT marketing channel
+        # opt-in, and intro text still requires existing owner approval.
+        play, timing = "WARM_INTRO_OWNER_REVIEW", "OWNER_QUEUE"
+    elif account_play == "PREPARE_ONE_CONTACT_OFFER_FOR_OWNER_REVIEW":
+        if preferred is not None:
+            play, timing = "OFFER_EXPERIMENT_OWNER_REVIEW", "OWNER_QUEUE"
+        else:
+            play, timing = "HOLD_CHANNEL_EVIDENCE", "NO_EXTERNAL_CONTACT"
+    else:
+        play, timing = "INTERNAL_ACCOUNT_RESEARCH", "NO_EXTERNAL_CONTACT"
+    learning_result = (
+        review_multiwave_commercial_learning(learning_waves, now=now)
+        if learning_waves is not None else None
+    )
+    candidate = (
+        learning_result["proposed_offer"]
+        if learning_result is not None
+        and learning_result["status"] == "REPLICATED_CANDIDATE_FOR_HUMAN_CAUSAL_REVIEW"
+        else None
+    )
+    # Do not show an apparent preferred outbound channel beside STOP, HOLD,
+    # payment, fulfilment or existing-customer stages. The detailed evidence
+    # remains inspectable for owners, but no channel is recommended there.
+    offer_review_channel = (
+        preferred if play == "OFFER_EXPERIMENT_OWNER_REVIEW" else None
+    )
+    if play != "OFFER_EXPERIMENT_OWNER_REVIEW":
+        candidate = None
+    return {
+        "schema_version": "empire.gtm.adaptive_buyer_journey_review.v1",
+        "recommended_play": play,
+        "reason": "CRM_STAGE_CHANNEL_AND_ACCOUNT_EVIDENCE_RECONCILED",
+        "crm_journey_stage": segment,
+        "crm_stale_conversation_review": preview["engaged_conversation_stale_candidate"],
+        "account_signal_action": route_review["account_signal_action"],
+        "preferred_human_channel_review": offer_review_channel,
+        "channel_review_states": dict(sorted(channel_reviews.items())),
+        "channel_evidence_does_not_grant_send_authority": True,
+        "editorial_interest_hypothesis_not_subscription":
+            preview["editorial_interest_hypothesis_not_subscription"],
+        "offer_learning_candidate_for_review": candidate,
+        "offer_auto_promotion": False,
+        "timing": timing,
+        "personal_identifiers_disclosed": False,
+        "send_authorized": False,
+        "auto_sequence_enabled": False,
+        "auto_paid_retargeting": False,
+        "crm_mutation": False,
+        "execution_authority": "NONE",
+    }
+
+
+def review_adaptive_buyer_journey_portfolio(
+    packets: Iterable[
+        tuple[TrustedJourneyProjection, Iterable[TrustedCampaignSignal]]
+    ], *, now: datetime,
+    learning_waves: Iterable[TrustedCampaignLearningWave] | None = None,
+) -> dict:
+    """Privacy-safe rollup without creating another CRM journey scheduler."""
+    items = list(packets)
+    if len(items) > 500:
+        raise CampaignIntelligenceHeld("ADAPTIVE_JOURNEY_BATCH_TOO_LARGE")
+    plays: Counter[str] = Counter()
+    stages: Counter[str] = Counter()
+    reviewed: set[tuple[str, str, str]] = set()
+    crm_seen: set[tuple[str, str]] = set()
+    from empire_os.revenue_crm_channel_evidence import canonical_uuid
+    # Materialise once: a generator cannot be replayed for every account.
+    learning = tuple(learning_waves) if learning_waves is not None else None
+    for projection, signals in items:
+        if type(projection) is not TrustedJourneyProjection:
+            raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_PROJECTION_REQUIRED")
+        route = projection.account_route
+        _context(route.context)
+        key = (route.context.tenant_ref, route.context.account_key,
+               route.context.campaign_id)
+        if key in reviewed:
+            raise CampaignIntelligenceHeld("DUPLICATE_ADAPTIVE_ACCOUNT_JOURNEY")
+        try:
+            crm_key = (
+                canonical_uuid(projection.crm_row.get("tenant_id")),
+                canonical_uuid(projection.crm_row.get("prospect_id")),
+            )
+        except (ValueError, AttributeError) as exc:
+            raise CampaignIntelligenceHeld("INVALID_ADAPTIVE_CRM_PORTFOLIO_KEY") from exc
+        if crm_key in crm_seen:
+            raise CampaignIntelligenceHeld("DUPLICATE_CANONICAL_CRM_PROSPECT_IN_PORTFOLIO")
+        crm_seen.add(crm_key)
+        reviewed.add(key)
+        result = review_adaptive_buyer_journey(
+            projection, verified_signals=signals, now=now,
+            learning_waves=learning,
+        )
+        plays[result["recommended_play"]] += 1
+        if result["crm_journey_stage"] is not None:
+            stages[result["crm_journey_stage"]] += 1
+    return {
+        "schema_version": "empire.gtm.adaptive_buyer_journey_portfolio.v1",
+        "accounts_reviewed": len(reviewed),
+        "recommended_human_play_counts": dict(sorted(plays.items())),
+        "crm_lifecycle_stage_counts": dict(sorted(stages.items())),
+        "contact_identity_records_exposed": 0,
+        "messages_scheduled": 0, "crm_writes": 0,
+        "automatic_channel_activation": False,
+        "execution_authority": "NONE",
+    }
