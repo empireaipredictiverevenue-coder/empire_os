@@ -1475,6 +1475,10 @@ _PROOF_PLACEMENT_RISKS = {
     "UNKNOWN_SOURCE_MARKET": ("critical", "existing_flagship_website_owner"),
     "COUNTRY_SCOPE_MISMATCH": ("critical", "existing_flagship_website_owner"),
     "SECTOR_SCOPE_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "TERRITORY_SCOPE_UNVERIFIED": ("critical", "existing_flagship_website_owner"),
+    "TERRITORY_SCOPE_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "RESEARCH_RELEASE_OUTBOUND_POLICY_CHANGED": ("critical", "existing_flagship_website_owner"),
     "CONVERSION_OBJECTIVE_MISMATCH": ("critical", "existing_flagship_website_owner"),
     "RESEARCH_FORM_IS_NOT_PRODUCT_CHECKOUT": ("critical", "existing_flagship_website_owner"),
     "PRODUCT_CODE_MISMATCH": ("critical", "existing_commercial_catalog_and_fulfilment_owner"),
@@ -1511,6 +1515,8 @@ def review_proposed_proof_placement(
     source_signals: tuple[Any, ...] | None = None,
     now: datetime | None = None,
     proposed_product_code: str | None = None,
+    proposed_target_geography: str | None = None,
+    target_geography_source_verified: bool = False,
     approvals: Mapping[str, bool] | None = None,
     approval_content_sha256_by_owner: Mapping[str, str] | None = None,
     marketing_or_auto_followup_requested: bool = False,
@@ -1524,6 +1530,8 @@ def review_proposed_proof_placement(
     The result never authorizes publication, outreach, spending or billing.
     """
     from empire_os.owned_campaign_release import load_release
+    from empire_os.owned_campaign_preflight import _landing
+    from empire_os.owned_campaign_content import PRIVACY
     from empire_os.commercial_offer_book import product_ready
     from empire_os.campaign_intelligence import _SCOPES, _CAMPAIGN
     if (not isinstance(root, Path)
@@ -1540,6 +1548,10 @@ def review_proposed_proof_placement(
             or (proposed_product_code is not None
                 and (type(proposed_product_code) is not str
                      or len(proposed_product_code) > 90))
+            or (proposed_target_geography is not None
+                and (type(proposed_target_geography) is not str
+                     or len(proposed_target_geography) > 120))
+            or type(target_geography_source_verified) is not bool
             or type(marketing_or_auto_followup_requested) is not bool
             or type(paid_media_requested) is not bool):
         raise ValueError("UNTRUSTED_OR_UNSUPPORTED_PROOF_PLACEMENT_INTENT")
@@ -1587,10 +1599,32 @@ def review_proposed_proof_placement(
                 problems.add("COUNTRY_SCOPE_MISMATCH")
             if source_niche != niche:
                 problems.add("SECTOR_SCOPE_MISMATCH")
+        # A country+sector match does not establish city/metro fit.
+        # Campaign source owner must independently verify the geography
+        # associated with the actual proof; never infer it from a headline.
+        if not target_geography_source_verified or not proposed_target_geography:
+            problems.add("TERRITORY_SCOPE_UNVERIFIED")
+        elif proposed_target_geography.strip().casefold() != str(
+                campaign.get("geography") or ""
+        ).strip().casefold():
+            problems.add("TERRITORY_SCOPE_MISMATCH")
         if (campaign.get("campaign_objective") != intended_conversion_objective
                 or (campaign.get("conversion_plan") or {}).get("landing_path")
                    != "/research/" + requested_campaign_id):
             problems.add("CONVERSION_OBJECTIVE_MISMATCH")
+        # A previously signed page may have been changed to point at a
+        # different asset or privacy statement while retaining the same URL.
+        # Reuse the canonical existing first-party enquiry contract.
+        try:
+            landing = _landing(campaign)
+            if (landing.get("asset_id") != requested_campaign_id + ":landing"
+                    or landing.get("privacy_notice") != PRIVACY):
+                problems.add("RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH")
+        except (AttributeError, TypeError, ValueError, KeyError):
+            problems.add("RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH")
+        if (campaign.get("outbound_authorized", False) is not False
+                or campaign.get("automatic_followup", False) is not False):
+            problems.add("RESEARCH_RELEASE_OUTBOUND_POLICY_CHANGED")
         if (intended_conversion_objective == "research_enquiry"
                 and proposed_product_code is not None):
             problems.add("RESEARCH_FORM_IS_NOT_PRODUCT_CHECKOUT")
@@ -1711,6 +1745,17 @@ def review_proposed_proof_placement(
         "risk_codes": [r["risk_code"] for r in risks],
         "risks": risks,
         "requested_market_scope": proposed_market_scope,
+        "destination_territory_match_verified": (
+            campaign is not None
+            and "TERRITORY_SCOPE_UNVERIFIED" not in problems
+            and "TERRITORY_SCOPE_MISMATCH" not in problems
+            and "UNKNOWN_SOURCE_MARKET" not in problems
+        ),
+        "destination_first_party_landing_privacy_verified": (
+            campaign is not None
+            and "RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH" not in problems
+            and "RESEARCH_RELEASE_OUTBOUND_POLICY_CHANGED" not in problems
+        ),
         "destination_country_and_sector_match_verified":
             not any(x in problems for x in (
                 "NO_SIGNED_DESTINATION_RELEASE", "CAMPAIGN_NOT_IN_SIGNED_RELEASE",

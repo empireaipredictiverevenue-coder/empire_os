@@ -1278,3 +1278,50 @@ campaign feature branch; it has **not** been wired into the production
 release writer, so we cannot claim automatic production interception
 until the existing website owner accepts the integration and verifies
 it at the publishing boundary.
+
+
+## 20 October — Prepublication guard: territory, landing asset and privacy integrity
+
+After checking the existing signed US roofing/HVAC/legal research routes,
+the campaign owner strengthened the **same** private prepublication risk
+API, not a second website publisher.
+
+### Newly enforced risk holds
+
+- **TERRITORY_SCOPE_UNVERIFIED** — a proposed offer's *actual proof
+  territory* must come from an independently verified source. A
+  country/sector label is not enough: a US roofing page for Denver is
+  not proof that a roofing inventory claim applies to Atlanta.
+- **TERRITORY_SCOPE_MISMATCH** — compare independently attested proposed
+  geography with the destination campaign's exact signed geography,
+  after case-folding and trimming. The gate does not expand source
+  rights or infer city coverage from a buyer's address, webpage
+  headline or market category.
+- **RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH** — reuse the signed
+  campaign's original `_landing` contract: exactly one landing page
+  with `campaign_id:landing` and the existing first-party consent
+  notice. Changed, missing or duplicated landing assets and edited
+  privacy text fail closed even if the route still looks valid.
+- **RESEARCH_RELEASE_OUTBOUND_POLICY_CHANGED** — a signed campaign
+  whose existing owner changes automatic follow-up or outbound flags
+  cannot pass by retaining the same canonical page ID.
+
+The `review_proposed_proof_placement` API now accepts an explicit
+`proposed_target_geography` and
+`target_geography_source_verified` from the existing source owner
+and emits separate boolean evidence for metro match and signed
+landing/privacy compliance. These inputs **are not new authorization
+tokens**: the website publisher must authenticate and recheck source
+reader provenance and actual geography, and then rerun the risk check
+at the final publication write boundary.
+
+An exact city match with owner-attested provenance can progress to
+independent website-owner preflight; it **still does not authorize
+publication**. Tests cover Denver-vs-Atlanta mismatches within one
+US roofing market, unverified geography, wrong asset IDs, modified
+privacy text, duplicated assets and unexpected follow-up activation.
+No real forms were submitted and no production release was changed.
+
+**Status:** implemented and tested in the isolated GTM branch;
+production website enforcement continues to depend on the existing
+flagship owner accepting GitHub issue #68.

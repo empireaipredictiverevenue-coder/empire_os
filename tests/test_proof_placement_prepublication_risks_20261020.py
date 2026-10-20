@@ -11,6 +11,7 @@ from empire_os.campaign_intelligence import (
     build_private_buyer_offer_experience,
 )
 from empire_os.commercial_product_catalog import summarize_catalog
+from empire_os.owned_campaign_content import PRIVACY
 from scripts.review_tam_full_funnel_strategy_20261020 import (
     review_commercial_catalog_for_conversion,
     review_proposed_proof_placement,
@@ -53,6 +54,13 @@ def release(*, niche="roofing", geo="denver, co",
         "campaign_objective": objective,
         "product_code": product,
         "conversion_plan": {"landing_path": "/research/" + CAMPAIGN},
+        "assets": [{
+            "asset_type": "landing_page",
+            "asset_id": CAMPAIGN + ":landing",
+            "privacy_notice": PRIVACY,
+        }],
+        "outbound_authorized": False,
+        "automatic_followup": False,
     }]}
 
 
@@ -87,7 +95,8 @@ def value_case(scope=US, cid=CAMPAIGN):
 
 def preview(monkeypatch, *, scope=US, signed=None, case=None,
             content=None, approval=None, product=None,
-            objective="research_enquiry", auto=False, paid=False):
+            objective="research_enquiry", auto=False, paid=False,
+            territory="denver, co", territory_verified=True):
     monkeypatch.setattr(
         "empire_os.owned_campaign_release.load_release",
         lambda *, root: signed if signed is not None else release(),
@@ -106,6 +115,8 @@ def preview(monkeypatch, *, scope=US, signed=None, case=None,
         catalog_readiness=review_commercial_catalog_for_conversion(data, now=NOW),
         proof_preview=page, source_value_case=c, source_signals=(),
         now=NOW, proposed_product_code=product,
+        proposed_target_geography=territory,
+        target_geography_source_verified=territory_verified,
         approvals=APPROVALS if approval is None else approval,
         approval_content_sha256_by_owner={
             key: sha256(page["private_html"].encode("utf-8")).hexdigest()
@@ -283,6 +294,8 @@ def test_approval_digests_bound_to_exact_page_version(monkeypatch):
         source_value_case=c,
         source_signals=(),
         now=NOW,
+        proposed_target_geography="denver, co",
+        target_geography_source_verified=True,
         approvals=APPROVALS,
     )
     without_digest = review_proposed_proof_placement(**params)
@@ -409,3 +422,94 @@ def test_owner_board_discloses_that_live_publisher_enforcement_is_not_installed(
     assert website["prepublication_proof_risk_api_implemented_in_feature_branch"] is True
     assert website["prepublication_proof_risk_enforced_in_live_release_writer"] is False
     assert website["actual_new_publication_queue_authenticated_here"] is False
+
+
+def test_us_roofing_evidence_from_wrong_metro_is_critical_even_if_country_and_sector_match(monkeypatch):
+    result = preview(monkeypatch, territory="atlanta")
+    assert result["status"] == "CRITICAL_PREPUBLICATION_HOLD"
+    assert "COUNTRY_SCOPE_MISMATCH" not in result["risk_codes"]
+    assert "SECTOR_SCOPE_MISMATCH" not in result["risk_codes"]
+    assert "TERRITORY_SCOPE_MISMATCH" in result["risk_codes"]
+    assert result["destination_territory_match_verified"] is False
+    assert result["publication_authorized"] is False
+
+
+def test_same_metro_without_verified_territory_provenance_holds(monkeypatch):
+    result = preview(monkeypatch, territory_verified=False)
+    assert "TERRITORY_SCOPE_UNVERIFIED" in result["risk_codes"]
+    assert result["destination_territory_match_verified"] is False
+    assert result["publication_authorized"] is False
+    result = preview(monkeypatch, territory=None)
+    assert "TERRITORY_SCOPE_UNVERIFIED" in result["risk_codes"]
+
+
+def test_exact_metro_with_verified_evidence_is_eligible_only_for_owner_preflight(monkeypatch):
+    result = preview(monkeypatch)
+    assert result["destination_territory_match_verified"] is True
+    assert result["destination_first_party_landing_privacy_verified"] is True
+    assert result["blocking_issue_count"] == 0
+    assert result["publication_authorized"] is False
+
+
+@pytest.mark.parametrize("changed_asset", [
+    {"asset_type": "landing_page",
+     "asset_id": "campaign_"+"f"*24+":landing",
+     "privacy_notice": PRIVACY},
+    {"asset_type": "landing_page",
+     "asset_id": CAMPAIGN+":landing",
+     "privacy_notice": "Submitting the form signs you up to marketing."},
+    {"asset_type": "landing_page",
+     "asset_id": CAMPAIGN+":landing"},
+    {"asset_type": "paid_checkout",
+     "asset_id": CAMPAIGN+":landing",
+     "privacy_notice": PRIVACY},
+])
+def test_replaced_landing_asset_or_privacy_text_blocks_publication(monkeypatch, changed_asset):
+    campaign = release()["campaigns"][0]
+    campaign["assets"] = [changed_asset]
+    result = preview(monkeypatch, signed={"campaigns": [campaign]})
+    assert "RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH" in result["risk_codes"]
+    assert result["destination_first_party_landing_privacy_verified"] is False
+
+
+def test_ambiguous_landing_asset_collection_blocks_publication(monkeypatch):
+    campaign = release()["campaigns"][0]
+    campaign["assets"].append(dict(campaign["assets"][0]))
+    result = preview(monkeypatch, signed={"campaigns": [campaign]})
+    assert "RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH" in result["risk_codes"]
+
+
+@pytest.mark.parametrize("flag,value", [
+    ("outbound_authorized", True),
+    ("automatic_followup", True),
+    ("automatic_followup", "False"),
+])
+def test_modified_campaign_followup_authority_fails_closed(monkeypatch, flag, value):
+    campaign = release()["campaigns"][0]
+    campaign[flag] = value
+    result = preview(monkeypatch, signed={"campaigns": [campaign]})
+    assert "RESEARCH_RELEASE_OUTBOUND_POLICY_CHANGED" in result["risk_codes"]
+    assert result["destination_first_party_landing_privacy_verified"] is False
+    assert result["outbound_authorized"] is False
+
+
+@pytest.mark.parametrize("field,value", [
+    ("proposed_target_geography", ["denver, co"]),
+    ("proposed_target_geography", "a"*121),
+    ("target_geography_source_verified", "true"),
+])
+def test_untrusted_territory_provenance_input_is_not_accepted(field, value):
+    data = source()
+    args = dict(
+        root=Path("/offline-fixture"),
+        requested_campaign_id=CAMPAIGN,
+        proposed_market_scope=US,
+        proposed_offer_arm="buyer_inventory_fit_offer",
+        intended_conversion_objective="research_enquiry",
+        catalog_source=data,
+        catalog_readiness=review_commercial_catalog_for_conversion(data, now=NOW),
+        now=NOW,
+    )
+    args[field] = value
+    with pytest.raises(ValueError, match="UNTRUSTED_OR_UNSUPPORTED"):
+        review_proposed_proof_placement(**args)
