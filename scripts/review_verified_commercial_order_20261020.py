@@ -21,13 +21,16 @@ from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 from empire_os.canonical_order_reader_release_integrity import (
     inspect_canonical_reader_release_integrity,
 )
+from empire_os.commercial_order_tenant_session import (
+    TenantOrderSessionHeld, prove_exact_tenant_readonly_session,
+)
 
 SCHEMA = "empire.commercial.verified_order_operator.v1"
 
 
 @contextmanager
-def _canonical_read_only_repository(dsn: str):
-    """Reuse existing owner DB transaction; snapshot rolls back on exit."""
+def _canonical_read_only_repository(dsn: str, *, tenant_id: str):
+    """Tenant-proven original read-only DB transaction; rolls back on exit."""
     from empire_os.canonical_data_gateway import CanonicalDataGateway
     from empire_os.data_backends.empiredb import EmpireDbProvider
     from empire_os.data_backends.postgres import PostgresConnectionConfig, PostgresConnector
@@ -36,6 +39,7 @@ def _canonical_read_only_repository(dsn: str):
         dsn=dsn, application_name="empire-commercial-outcome-observe-only",
     )))
     with provider.read_only_snapshot() as source:
+        prove_exact_tenant_readonly_session(source, tenant_id=tenant_id)
         yield ExecutionBusDataRepository(CanonicalDataGateway(source))
 
 
@@ -114,18 +118,29 @@ def main() -> int:
             "execution_authority": "none",
         }, sort_keys=True))
         return 0
-    dsn = str(os.environ.get("EMPIREDB_DSN") or "").strip()
+    # Never accept the broad application data-cloud DSN as order-read authority.
+    # This MUST be a dedicated tenant-bound nonprivileged login; in-transaction
+    # role/tenant/ACL/RLS checks run before the first commercial SELECT.
+    dsn = str(os.environ.get("EMPIRE_COMMERCIAL_OUTCOME_TENANT_DSN") or "").strip()
     if not dsn:
         print(json.dumps({"schema_version": SCHEMA,
                           "status": "RESTRICTED_CANONICAL_CONNECTION_UNAVAILABLE",
                           "execution_authority": "none"}))
         return 2
     try:
-        with _canonical_read_only_repository(dsn) as owner:
+        with _canonical_read_only_repository(dsn, tenant_id=tenant) as owner:
             report = review_explicit_order_request(
                 repository=owner, tenant_id=tenant, order_ids=orders,
                 repo_root=root, now=datetime.now(timezone.utc),
             )
+    except TenantOrderSessionHeld as exc:
+        print(json.dumps({
+            "schema_version": SCHEMA,
+            "status": str(exc),
+            "outbound_authorized": False, "database_writes": False,
+            "execution_authority": "none",
+        }))
+        return 2
     except Exception:
         # Original DB errors can contain tenant identifiers, SQL or credentials.
         # No raw exception, DSN or parameter is printed.

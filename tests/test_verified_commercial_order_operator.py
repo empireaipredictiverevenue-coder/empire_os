@@ -21,6 +21,7 @@ MODULE = "scripts.review_verified_commercial_order_20261020"
 def _cli(*flags, dsn=None):
     env = dict(os.environ)
     env.pop("EMPIREDB_DSN", None)
+    env.pop("EMPIRE_COMMERCIAL_OUTCOME_TENANT_DSN", None)
     if dsn is not None:
         env["EMPIREDB_DSN"] = dsn
     return subprocess.run(
@@ -106,3 +107,14 @@ def test_error_from_original_owner_is_held_not_leaked(monkeypatch):
     assert r["status"] == "CANONICAL_ORDER_EVIDENCE_PARTIAL_HOLD"
     assert r["original_order_proof"]["recognized_revenue_cents_for_complete_selected_cohort"] is None
     assert "private@example.invalid" not in json.dumps(r)
+
+
+def test_broad_empiredb_dsn_is_never_accepted_as_tenant_scope():
+    r = _cli("--read-only", "--tenant-id", TENANT, "--order-id", ORDER,
+             dsn="postgresql://untrusted:private-secret@localhost/empiredb")
+    assert r.returncode == 2
+    body = json.loads(r.stdout)
+    assert body["status"] == "RESTRICTED_CANONICAL_CONNECTION_UNAVAILABLE"
+    assert body["execution_authority"] == "none"
+    assert "private-secret" not in r.stdout + r.stderr
+    assert ORDER not in r.stdout and TENANT not in r.stdout
