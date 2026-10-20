@@ -328,12 +328,13 @@ def fetch_outcomes(
         "POST",
         "/rest/v1/rpc/get_commercial_outcome_feedback",
         payload={"p_limit": bounded},
-    ) or []
-    if isinstance(payload, Mapping):
-        payload = [payload]
-    if not isinstance(payload, list):
-        raise ValueError("commercial outcome feedback RPC must return a list")
-    return [dict(row) for row in payload if isinstance(row, Mapping)]
+    )
+    # None from an unconfigured gateway is NOT an authenticated empty ledger.
+    if not isinstance(payload, list) or any(
+        not isinstance(row, Mapping) for row in payload
+    ):
+        raise ValueError("commercial outcome feedback source unavailable or malformed")
+    return [dict(row) for row in payload]
 
 
 def fetch_catalog(
@@ -377,6 +378,28 @@ def _fresh_snapshot(
     return payload
 
 
+def _unscoped_cached_snapshot_safe(payload: Mapping[str, Any]) -> bool:
+    """Legacy global-reader output cannot become tenant-qualified training data.
+
+    The old snapshot schema has no issuer-signed source or trusted DB-session
+    tenant receipt. Only a zero-cohort OBSERVE snapshot is safe to reuse.
+    """
+    return (
+        payload.get("tenant_id") is None
+        and payload.get("product_estimates") == {}
+        and type(payload.get("source_outcome_count")) is int
+        and payload["source_outcome_count"] == 0
+        and type(payload.get("matched_outcome_count")) is int
+        and payload["matched_outcome_count"] == 0
+        and type(payload.get("probability_ready_product_count")) is int
+        and payload["probability_ready_product_count"] == 0
+        and type(payload.get("timing_ready_product_count")) is int
+        and payload["timing_ready_product_count"] == 0
+        and payload.get("commercial_authority") == "none"
+        and payload.get("execution_authority") == "none"
+    )
+
+
 def refresh_predictive_intelligence(
     repo_root: str | Path,
     *,
@@ -391,7 +414,7 @@ def refresh_predictive_intelligence(
         path,
         max_age_seconds=max_age_seconds,
     )
-    if fresh is not None:
+    if fresh is not None and _unscoped_cached_snapshot_safe(fresh):
         return {
             **fresh,
             "reused_existing_snapshot": True,
@@ -400,13 +423,25 @@ def refresh_predictive_intelligence(
     catalog = _read(root / CATALOG)
     if not catalog.get("products"):
         catalog = fetch_catalog(request)
-    outcomes = fetch_outcomes(request)
+    # The existing get_commercial_outcome_feedback(p_limit) is a GLOBAL source
+    # reader; it has no trusted tenant argument, scoped original DB session,
+    # or independent issuer receipt. Its rows are never admitted into product
+    # probabilities, even if a row happens to contain a plausible tenant_id.
+    # Do not synthesize tenant identity from a customer field or env variable.
+    unscoped_rows = fetch_outcomes(request)
     payload = build_predictive_intelligence_snapshot(
-        outcomes,
-        catalog,
+        [], catalog,
         min_terminal_samples=min_terminal_samples,
         min_timing_samples=min_timing_samples,
     )
+    payload["source_scope_admission_status"] = (
+        "GLOBAL_UNSCOPED_OUTCOMES_QUARANTINED"
+        if unscoped_rows else "GLOBAL_SOURCE_EMPTY_BUT_ISSUER_UNVERIFIED"
+    )
+    payload["unscoped_source_rows_quarantined_count"] = len(unscoped_rows)
+    payload["original_tenant_source_authenticated"] = False
+    payload["original_outcome_issuer_authenticated"] = False
+    payload["original_forecast_registered_before_outcome"] = False
     payload["reused_existing_snapshot"] = False
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")

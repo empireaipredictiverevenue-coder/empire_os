@@ -98,6 +98,8 @@ EOF
     empire_os/predictive_existing_founder_crm_bridge.py \
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
+    empire_os/predictive_intelligence.py \
+    empire_os/outcome_feedback.py \
     scripts/review_predictive_catalog_readiness_20261020.py \
     empire_os/predictive_product_scientific_holdout.py \
     empire_os/predictive_product_prospective_baseline.py \
@@ -196,7 +198,11 @@ assert x["database_writes"] is False
 import json,sys
 x=json.load(sys.stdin)
 assert x["schema_version"]=="empire.predictive_revenue.scientific_agent_product_protocol.v1"
-assert x["status"].startswith("SCIENTIFIC_AGENT_PROTOCOL_READY_")
+assert x["status"] in (
+  "SCIENTIFIC_AGENT_PROTOCOL_READY_WAITING_FOR_REAL_PRODUCT_COHORT",
+  "SCIENTIFIC_AGENT_PROTOCOL_READY_ORIGINAL_SOURCE_AUTHENTICATION_HOLD",
+  "SCIENTIFIC_AGENT_UNSCOPED_SOURCE_QUARANTINED",
+)
 assert x["existing_scientific_research_agent_skill_custody_verified"] is True
 assert x["existing_experiment_registry_contract_reused"] is True
 assert x["existing_scientific_agent_inference_invoked"] is False

@@ -48,6 +48,7 @@ def _science_summary(source: Mapping[str, Any]) -> tuple[int, int, int]:
             or source.get("mode") != "OBSERVE"
             or source.get("status") not in (
                 "NO_PRODUCT_TERMINAL_OUTCOMES_OBSERVED",
+                "UNSCOPED_ORIGINAL_OUTCOMES_QUARANTINED",
                 "PRODUCT_COHORT_PRESENT_OWNER_AUTHENTICATION_STILL_REQUIRED",
             )
             or source.get("execution_authority") != "none"
@@ -63,6 +64,12 @@ def _science_summary(source: Mapping[str, Any]) -> tuple[int, int, int]:
     probability = _integer(
         source.get("source_reported_probability_ready_product_count"), "probability cohorts"
     )
+    held = _integer(source.get("unscoped_source_rows_quarantined_count", 0),
+                    "unscoped source rows held")
+    if (held > 0) != (source["status"] == "UNSCOPED_ORIGINAL_OUTCOMES_QUARANTINED"):
+        raise ScientificProtocolHold("source quarantine/status contradiction")
+    if held and (outcomes or cohorts or probability):
+        raise ScientificProtocolHold("quarantined rows cannot be science evidence")
     if (cohorts > product_count or probability > cohorts
             or (source["status"] == "NO_PRODUCT_TERMINAL_OUTCOMES_OBSERVED"
                 and (outcomes != 0 or cohorts != 0 or probability != 0))
@@ -204,6 +211,8 @@ def review_product_scientific_agent_protocol(
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
         "status": (
+            "SCIENTIFIC_AGENT_UNSCOPED_SOURCE_QUARANTINED"
+            if science_source["status"] == "UNSCOPED_ORIGINAL_OUTCOMES_QUARANTINED" else
             "SCIENTIFIC_AGENT_PROTOCOL_READY_WAITING_FOR_REAL_PRODUCT_COHORT"
             if outcomes == 0 else
             "SCIENTIFIC_AGENT_PROTOCOL_READY_ORIGINAL_SOURCE_AUTHENTICATION_HOLD"
@@ -218,6 +227,7 @@ def review_product_scientific_agent_protocol(
         "original_forecast_experiment_registered": False,
         "product_skus_mapped": product_count,
         "source_reported_original_outcomes": outcomes,
+        "source_rows_quarantined_from_legacy_reader": science_source.get("unscoped_source_rows_quarantined_count", 0),
         "source_reported_probability_cohorts": probability_count,
         "reported_holdout": metrics,
         "original_tenant_source_authenticated": False,

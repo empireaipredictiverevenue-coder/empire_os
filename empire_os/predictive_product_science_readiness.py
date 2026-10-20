@@ -111,10 +111,37 @@ def science_source_status(
         codes.add(code)
     if not set(estimates).issubset(codes):
         raise ProductContractHold("predictive source product outside original catalog")
+    held_count = _integer(
+        intelligence.get("unscoped_source_rows_quarantined_count", 0),
+        "unscoped_source_rows_quarantined_count",
+    )
+    source_mode = intelligence.get("source_scope_admission_status")
+    if source_mode is not None and source_mode not in (
+        "GLOBAL_UNSCOPED_OUTCOMES_QUARANTINED",
+        "GLOBAL_SOURCE_EMPTY_BUT_ISSUER_UNVERIFIED",
+    ):
+        raise ProductContractHold("unrecognized source admission status")
+    if (source_mode == "GLOBAL_UNSCOPED_OUTCOMES_QUARANTINED") != (held_count > 0):
+        raise ProductContractHold("unscoped source custody count contradiction")
+    if held_count and (tenant is not None or outcomes or estimates or matched):
+        raise ProductContractHold("quarantined rows cannot be product observations")
+    if source_mode == "GLOBAL_SOURCE_EMPTY_BUT_ISSUER_UNVERIFIED" and (
+        held_count or outcomes or estimates or tenant is not None
+    ):
+        raise ProductContractHold("empty global source contradicts admitted cohort")
+    for key in (
+        "original_tenant_source_authenticated", "original_outcome_issuer_authenticated",
+        "original_forecast_registered_before_outcome",
+    ):
+        if key in intelligence and intelligence[key] is not False:
+            raise ProductContractHold("legacy source incorrectly claimed original proof")
     # Snapshot is source-owner material, but no independent source signature,
     # original forecast registry readback or tenant authentication is present.
     # Never surface numerical customer forecasts from snapshot directly.
-    if outcomes == 0:
+    if held_count:
+        status = "UNSCOPED_ORIGINAL_OUTCOMES_QUARANTINED"
+        reason = "GLOBAL_LEGACY_READER_NOT_TENANT_AUTHENTICATED"
+    elif outcomes == 0:
         status = "NO_PRODUCT_TERMINAL_OUTCOMES_OBSERVED"
         reason = "NO_ORIGINAL_VERIFIED_PRODUCT_TERMINAL_COHORT_IN_OWNER_SNAPSHOT"
     else:
@@ -126,6 +153,8 @@ def science_source_status(
         "mode": "OBSERVE",
         "status": status,
         "reason_code": reason,
+        "unscoped_source_rows_quarantined_count": held_count,
+        "source_scope_admission_status": source_mode,
         "catalogue_product_count": len(catalog_products),
         "catalogue_family_count": len(families),
         "catalogue_terms_flag_count": catalog_report["catalogue_terms_ready_count"],
