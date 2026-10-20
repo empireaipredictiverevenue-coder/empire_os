@@ -26,6 +26,8 @@ from empire_os.a2a_target_owner_handoff_v1 import make_owner_research_handoffs, 
 from empire_os.a2a_owner_research_protocol_v1 import make_owner_pickup_packets
 from empire_os.a2a_owner_receipt_intake_v1 import inspect_owner_receipt_files
 from empire_os.a2a_owner_pickup_change_tracking_v1 import review_pickup_changes
+from empire_os.a2a_b2b_evidence_mining_v1 import mine_targeted_business_evidence, make_mining_source_hold
+from empire_os.a2a_b2b_mining_history_v1 import update_mining_history
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -66,7 +68,8 @@ def _write(name: str, content: dict) -> None:
             os.unlink(path)
 
 def run(*, previous: dict | None = None, history: dict | None = None,
-        previous_owner_pickup: dict | None = None) -> dict:
+        previous_owner_pickup: dict | None = None,
+        previous_mining_history: dict | None = None) -> dict:
     payload = {name: _read(path) for name, path in SOURCES.items()}
     current = mine_signals(
         community=payload["community"][0], revenue_gps=payload["gps"][0],
@@ -74,6 +77,7 @@ def run(*, previous: dict | None = None, history: dict | None = None,
     prompt_config = _read(Path(__file__).resolve().parents[1] /
                           "config/a2a_candidates/founder_targeting_prompts_v1.json")[0]
     targeting = build_prompted_research(prompt_config, payload["community"][0])
+    buyer_scout_snapshot = None
     try:
         buyer_scout_snapshot = _read(BASE / "buyer_acquisition/scout_latest.json")[0]
     except (OSError, ValueError, json.JSONDecodeError):
@@ -90,6 +94,22 @@ def run(*, previous: dict | None = None, history: dict | None = None,
                 profile_count=targeting["profile_count"],
             )
     owner_pickup = make_owner_pickup_packets(owner_handoffs)
+    # Mine existing real, owner-issued public research evidence without another
+    # crawler, new paid API calls or changing Buyer Scout's own candidate state.
+    if owner_handoffs.get("source_state") is not None or buyer_scout_snapshot is None:
+        mining = make_mining_source_hold(
+            targeting, reason="CANONICAL_MINING_INPUT_UNAVAILABLE")
+    else:
+        try:
+            public_research_seeds = _read(BASE / "buyer_acquisition/public_research_seeds.json")[0]
+            mining = mine_targeted_business_evidence(
+                targeting, owner_pickup, public_research_seeds,
+                buyer_scout_snapshot, payload["nyc"][0],
+            )
+        except (OSError, ValueError, json.JSONDecodeError):
+            mining = make_mining_source_hold(
+                targeting, reason="CANONICAL_MINING_INPUT_UNTRUSTED")
+    mining_history = update_mining_history(mining, previous_mining_history)
     receipt_review = inspect_owner_receipt_files(
         owner_pickup, LOCAL / "owner_signed_receipts",
     )
@@ -118,6 +138,8 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "owner_pickup": owner_pickup,
         "owner_receipt_review": receipt_review,
         "pickup_change_tracking": pickup_delta,
+        "data_mining": mining,
+        "mining_history": mining_history,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -137,8 +159,13 @@ def main() -> int:
     prior_pickup_path = LOCAL / "owner_research_pickup_v1.json"
     prior_pickup = (_read(prior_pickup_path)[0] if prior_pickup_path.is_file()
                     and not prior_pickup_path.is_symlink() else None)
+    mining_history_path = LOCAL / "targeted_business_mining_history_v1.json"
+    prior_mining_history = (_read(mining_history_path)[0]
+                            if mining_history_path.is_file()
+                            and not mining_history_path.is_symlink() else None)
     outcome = run(previous=previous, history=history,
-                  previous_owner_pickup=prior_pickup)
+                  previous_owner_pickup=prior_pickup,
+                  previous_mining_history=prior_mining_history)
     if args.write_local:
         for filename, key in (
             ("latest.json", "signal"),
@@ -150,6 +177,8 @@ def main() -> int:
             ("owner_research_pickup_v1.json", "owner_pickup"),
             ("owner_signed_receipts_review_v1.json", "owner_receipt_review"),
             ("owner_pickup_change_tracking_v1.json", "pickup_change_tracking"),
+            ("targeted_business_evidence_mining_v1.json", "data_mining"),
+            ("targeted_business_mining_history_v1.json", "mining_history"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -175,6 +204,11 @@ def main() -> int:
         "prepared_buyer_owner_research_tickets": outcome["buyer_owner_handoffs"]["prepared_handoff_ticket_count"],
         "actual_owner_tasks_dispatched": outcome["buyer_owner_handoffs"]["tasks_dispatched"],
         "owner_pickup_requests": outcome["owner_pickup"]["pickup_count"],
+        "mined_research_records": (outcome["data_mining"]["total_target_research_records_before_cross_target_dedupe"]
+                                   if outcome["data_mining"] is not None else None),
+        "fresh_web_searches_by_miner": 0,
+        "mining_source_history_snapshots": outcome["mining_history"]["snapshot_count"],
+        "new_mining_source_snapshot": outcome["mining_history"]["new_snapshot_appended"],
         "authenticated_owner_reply_count": outcome["owner_receipt_review"]["authenticated_owner_replies"],
         "owner_trust_state": outcome["owner_receipt_review"]["trust_store_state"],
         "new_owner_pickup_requests": outcome["pickup_change_tracking"]["new_request_count"],
