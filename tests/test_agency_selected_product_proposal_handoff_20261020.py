@@ -75,3 +75,20 @@ def test_no_contact_or_order_is_fabricated_in_deeplink():
     assert 'sessionStorage.setItem' not in text
     assert 'new URLSearchParams(window.location.search).get("email")' not in text
     assert 'new URLSearchParams(window.location.search).get("contact_consent")' not in text
+
+def test_enabled_checkout_also_offers_selected_product_proposal():
+    text = BUY.read_text()
+    assert "CREATE PAYMENT REQUEST" in text
+    assert "REQUEST A PROPOSAL INSTEAD" in text
+    assert "Prefer to discuss scope before ordering?" in text
+    assert text.count("/commercial?product=") == 2
+    assert text.index("REQUEST A PROPOSAL INSTEAD") < text.index("result ? (")
+
+
+def test_alternative_proposal_link_does_not_submit_checkout_form():
+    text = BUY.read_text()
+    start = text.index("REQUEST A PROPOSAL INSTEAD")
+    anchor = text.rfind("<a", 0, start)
+    assert anchor >= 0
+    assert "href={product ?" in text[anchor:start]
+    assert "type=\"submit\"" not in text[anchor:start]

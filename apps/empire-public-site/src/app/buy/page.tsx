@@ -495,6 +495,19 @@ export default function BuyPage() {
                     : "CREATE PAYMENT REQUEST"}
                 </button>
 
+                <div className="mt-4 rounded-xl border border-cyan-300/20 bg-cyan-300/[.035] px-4 py-4 text-center">
+                  <p className="text-xs leading-5 text-white/65">
+                    Prefer to discuss scope before ordering? You can request a
+                    founder proposal without a wallet or payment.
+                  </p>
+                  <a
+                    href={product ? `/commercial?product=${encodeURIComponent(product.product_code)}#commercial-enquiry` : "/commercial#commercial-enquiry"}
+                    className="mt-3 inline-flex min-h-11 items-center justify-center rounded-full border border-cyan-300/45 px-5 text-xs font-bold tracking-[.10em] text-cyan-200 transition hover:border-cyan-200 hover:text-white"
+                  >
+                    REQUEST A PROPOSAL INSTEAD
+                  </a>
+                </div>
+
                 {result ? (
                   <>
                     <ProductResult result={result} copyTreasury={copyTreasury} />
