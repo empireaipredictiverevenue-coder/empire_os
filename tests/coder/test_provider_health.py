@@ -69,3 +69,29 @@ def test_missing_routes_json_uses_empty_mapping_without_mutating_source(tmp_path
     health = ProviderHealth(source)
     assert health.snapshot()["routes"] == {}
     assert source.read_text(encoding="utf-8") == original
+
+
+
+def test_invalid_consecutive_failure_counter_cannot_break_model_health(tmp_path):
+    import json
+
+    now = datetime.now(timezone.utc)
+    for malformed in ("not-a-number", [], {}, float("inf"), -3):
+        path = tmp_path / "health.json"
+        path.write_text(json.dumps({
+            "schema_version": "empire.coder_model_health.v1",
+            "routes": {
+                "ollama:writer": {
+                    "provider": "ollama",
+                    "model": "writer",
+                    "consecutive_failures": malformed,
+                    "last_failure_at": now.isoformat(),
+                },
+            },
+        }), encoding="utf-8")
+        health = ProviderHealth(path, cooldown_seconds=30)
+        health.record_failure("ollama", "writer", "TimeoutError")
+        assert health.snapshot()["routes"]["ollama:writer"]["consecutive_failures"] == 1
+        assert ("ollama", "writer") in health.excluded_routes()
+        health.record_success("ollama", "writer")
+        assert health.excluded_routes() == ()

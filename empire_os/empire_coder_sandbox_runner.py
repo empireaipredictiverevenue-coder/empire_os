@@ -8,7 +8,7 @@ branch for independent verification.
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 import os
 from pathlib import Path
 import re
@@ -26,6 +26,7 @@ from empire_os.builder_capabilities import (
     builder_capability_snapshot,
 )
 from empire_os.coder import EmpireCoder
+from empire_os.coder.context import ContextDocument
 from empire_os.coder.models import VerificationVerdict
 from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
 
@@ -171,6 +172,47 @@ def _path_allowed(path: str, allowed: tuple[str, ...]) -> bool:
         if prefix and (clean == prefix or clean.startswith(prefix + "/")):
             return True
     return False
+
+
+def _scoped_source_context(coder, context, allowed_paths: tuple[str, ...]):
+    """Prioritise bounded, exact source files over unrelated search matches.
+
+    Only the existing repo.read path validator accesses files. Never walk a
+    broad symbol index or source tree just to infer which file to patch.
+    """
+    selected: list[ContextDocument] = []
+    for raw in allowed_paths:
+        path = _scoped_repo_path(raw)
+        if not path or not path.endswith(".py") or len(selected) >= 2:
+            continue
+        try:
+            snippet = coder.repo.read(path, max_chars=2400)
+        except (OSError, ValueError):
+            continue
+        if snippet:
+            selected.append(ContextDocument(
+                path=path,
+                reason="exact authorised source-file evidence",
+                excerpt=snippet,
+            ))
+    if not selected:
+        return context
+    # Preserve a brief architectural provenance excerpt, rather than losing
+    # the original Blueprint context entirely.
+    blueprint = [
+        ContextDocument(
+            path=doc.path,
+            reason=doc.reason,
+            excerpt=doc.excerpt[:800],
+        )
+        for doc in context.documents
+        if doc.path == "docs/BLUEPRINT_V6.md"
+    ][:1]
+    return replace(
+        context,
+        documents=tuple(selected + blueprint),
+        token_budget_chars=6000,
+    )
 
 
 def _changed_paths(clone: Path) -> list[str]:
@@ -377,8 +419,12 @@ def run_empire_coder_sandbox_job(
                         task = coder.create_task(job.objective)
                         context = coder.build_context(
                             task.id,
-                            terms=(job.department, job.capability),
-                            budget_chars=8000,
+                            terms=(),
+                            symbols=(),
+                            budget_chars=4000,
+                        )
+                        context = _scoped_source_context(
+                            coder, context, job.allowed_paths
                         )
                         candidate = coder.propose_structured_patch(
                             task.id,

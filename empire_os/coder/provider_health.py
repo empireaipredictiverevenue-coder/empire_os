@@ -59,7 +59,16 @@ class ProviderHealth:
                     recent = timedelta(0) <= now - instant <= timedelta(hours=1)
             except ValueError:
                 pass
-        failures = max(0, int(current.get("consecutive_failures") or 0)) + 1 if recent else 1
+        if recent:
+            try:
+                prior_failures = max(0, int(current.get("consecutive_failures") or 0))
+            except (TypeError, ValueError, OverflowError):
+                # A valid JSON object can still carry an invalid counter.
+                # Recover safely instead of crashing the local writer route.
+                prior_failures = 0
+            failures = prior_failures + 1
+        else:
+            failures = 1
         # Repeated *transport timeouts* need progressively longer, capped
         # cooling. Do not escalate for an invalid patch/schema or other
         # deterministic task error; those require their own repair path.
