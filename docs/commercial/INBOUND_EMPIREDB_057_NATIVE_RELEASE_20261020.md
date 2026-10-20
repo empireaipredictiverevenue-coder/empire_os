@@ -73,3 +73,38 @@ The disposable PostgreSQL 18 fixture additionally verifies:
 Production EmpireDB has NOT been modified or queried using a privileged
 database role. Separate DBA approval, audited backup/restore, actual
 RLS/role review and the production migration plan remain required.
+
+
+## 20 October — release-specific pgBackRest backup metadata gate
+
+Native EmpireDB 057 uses the existing pgBackRest readiness parser in a
+new, strictly read-only and redacted stdin-only checker:
+
+    cd /home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+    set -o pipefail
+    sudo -n -u postgres pgbackrest \
+      --config=/etc/pgbackrest/empiredb.conf \
+      --stanza=empiredb --output=json info 2>/dev/null \
+      | PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+          -m scripts.review_inbound_057_backup_readiness --stdin --read-only
+
+This runs pgBackRest INFO as the authorised Postgres account, with metadata
+piped directly into an Ubuntu-owned validator. There is no need to modify
+/home/ubuntu permissions or copy a credential. JSON is parsed in memory and
+not echoed. The status includes only backup age, type readiness and gates,
+not labels, paths, backup sets, endpoints, credentials or customer data.
+
+Release-specific conditions:
+- One healthy canonical EmpireDB stanza / repo metadata
+- At least one completed FULL backup from the last 168 hours
+- At least one completed FULL / DIFF / INCR backup within 48 hours
+- All age checks from original integer Unix timestamps, not rounded labels
+
+READY_FOR_INDEPENDENT_BACKUP_RESTORE_REVIEW does not prove the archive can
+restore or that PITR/rollback works. It is not migration approval. Actual
+recovery drill proof, approved rollback plan, founder/DBA authority,
+observability and application isolation must be separately verified.
+
+If sudo/pgBackRest exits with an error, the pipeline exits nonzero with
+pipefail and the validator reports held. Do not paste raw pgBackRest info
+containing repository labels or internal locations.
