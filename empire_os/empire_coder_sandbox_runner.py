@@ -64,13 +64,19 @@ def _structured_patch_runtime_env(
                 str(model or "qwen2.5-coder:1.5b").strip()
                 or "qwen2.5-coder:1.5b"
             )
-            os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] = "3"
+            # The proven llama.cpp structured-patch endpoint currently
+            # serves a 1.5B model. Successful small-format output is NOT
+            # evidence that it can safely implement architecture/security
+            # tasks (capability 3). Let the existing router choose an
+            # eligible higher-capability local Ollama writer, or fail closed.
+            os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] = "1"
             os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] = (
                 "planner,writer,verifier"
             )
-            # If llama.cpp unexpectedly becomes unavailable, keep the legacy
-            # Ollama fallback bounded instead of allowing a multi-minute hang.
-            os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] = "30"
+            # Allow the genuinely capable local Ollama writer bounded time
+            # to load/respond. Thirty seconds was too short for the larger
+            # architecture writer; ninety seconds remains a firm HTTP cap.
+            os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] = "90"
         yield
     finally:
         for key, value in previous.items():
