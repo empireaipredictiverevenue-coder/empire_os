@@ -10,6 +10,24 @@ Retain just THREE active high-level conversations, with one owner per change and
 
 The user alone closes/deletes ChatGPT conversations in the UI. This repository work neither deletes nor renames an existing ChatGPT conversation. An old conversation is eligible for archive/closure **once its unresolved issue has been transferred** to one of the three owner streams with exact original evidence and no unsaved instructions. Keeping a source handoff does not mean a workflow or deployment is completed.
 
+## New website source milestone — 20 October
+
+**Engineering source convergence CLOSED:** canonical EmpireOS now includes
+ASTRA's reviewed 3D/cinematic homepage source together with the current
+first-party buyer proposal/checkout source (production Git integration
+`2976df517`). Its isolated 19-page Next build, mobile/desktop WebGL
+review, 105 site/checkout/privacy tests and native proposal browser
+checks pass. This milestone does NOT mean the public static site is
+updated or the historical checkout manifest approved.
+
+**Website release still OPEN:** the combined staging receipt covers all
+135 generated static files, including Next routing data. At the last
+read-only comparison, 58 overlapping non-HTML public paths differed;
+the owner must coordinate a full versioned static export, unrelated-route
+preservation, backup/rollback and final public canary. Exact owner
+handoff: `docs/website/FLAGSHIP_CHECKOUT_SOURCE_CONVERGENCE_20261020.md`.
+Do not add a fourth control chat.
+
 ### CHAT 1 — EMPIRE AI | REVENUE & BUYERS (one active sales conversion owner)
 
 **Mission:** get the first authentic buyer enquiry, agreed scoped offer, order, verified USDT/BSC settlement, delivered product and realised gross profit. Prioritise warm existing buyers, accepted programmes, first-party organic traffic, minimal founder time. UK + USA, not only construction; email-first and suppression/privacy checks.

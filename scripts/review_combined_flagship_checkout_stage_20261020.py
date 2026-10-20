@@ -78,6 +78,19 @@ def manifest_for_stage(*, project: Path) -> dict:
         _read_under(project / "out", path) for path in sorted(assets.assets)
         if path.endswith(".js")
     )
+    # Static routing includes RSC .txt and shared Next assets. Three HTML
+    # hashes alone cannot authorize a selective public page replacement.
+    export_root = project / "out"
+    export_paths = sorted(p for p in export_root.rglob("*")
+                          if p.is_file() or p.is_symlink())
+    if not 1 <= len(export_paths) <= 500:
+        raise ValueError("unexpected_complete_static_export_size")
+    export_hashes = {
+        str(p.relative_to(export_root)): sha256(_read_under(
+            export_root, str(p.relative_to(export_root))
+        )).hexdigest()
+        for p in export_paths
+    }
     if not (
         "EmpireOS" in joined
         and "Intelligence Infrastructure" in joined
@@ -97,6 +110,8 @@ def manifest_for_stage(*, project: Path) -> dict:
         "source_sha256": source_hashes,
         "page_html_sha256": html_hashes,
         "page_asset_sha256": asset_hashes,
+        "complete_export_sha256": export_hashes,
+        "complete_export_file_count": len(export_hashes),
         "reviewed_page_count": len(html_hashes),
         "referenced_immutable_asset_count": len(asset_hashes),
         "html_preview_deployed": False,

@@ -114,3 +114,35 @@ Production site is unchanged at this stage. Source-only commit and exact
 path promotion can close the missing cinematic homepage *source code* gap,
 but the immutable static output still requires a coordinated versioned
 release and checksum/rollback validation before public launch.
+
+## Additional buyer-browser and full-export checks
+
+The combined-stage browser smoke `scripts/review_combined_buy_commercial_browser_20261020.cjs`
+ran in an ephemeral local static-server session with a synthetic allowlisted
+GET-only offer response. On both 1440px and 390px, **all 6 browser
+checks passed, with zero page errors or buyer form submissions**.
+Approved source-only product preselection worked; forged/unknown product
+codes were rejected, and consent and submit gating remained intact.
+
+A safe-read-only public-vs-stage inventory compared all **135** staged
+static-export files to the existing public static tree:
+
+- 29 staged paths are absent from current live static output;
+- 32 overlapping non-HTML assets match byte-for-byte;
+- **58 existing non-HTML paths differ**, including RSC `.txt` and other
+  Next.js routing payloads that cannot be ignored for navigation integrity.
+
+For that reason **no 3-page HTML-only promotion is authorised**. A future
+owner release must reconcile the complete static build, preserve unrelated
+live routes, capture a pre-promotion rollback snapshot and verify all
+effective generated Next routing assets before switching traffic.
+
+The new stage receipt pins **all 135 generated files**, including **69
+routing `.txt` payloads**, in addition to the focused three HTML,
+nine source and fourteen compiled-asset hashes. This fixes the original
+stage receipt's incomplete coverage. It does not re-approve the 13 October
+checkout manifest or change the live files.
+
+As-of production source commit `2976df517`, the cinematic homepage source
+gap is resolved in canonical Git; the public static-release gate remains
+separately HELD. Only Website & Growth owns that remaining release task.
