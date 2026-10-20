@@ -13,6 +13,9 @@ from typing import Any, Mapping
 
 from empire_os.meta_social_opportunity_research import SCHEMA as EVIDENCE_SCHEMA
 from empire_os.meta_social_opportunity_research import review_packet
+from empire_os.agents.meta_market_priority_intelligence_v1 import (
+    build_video_research_prompts, rank_exchange_research_gaps,
+)
 
 AGENT_SCHEMA = "empire.meta_market_validation_agent.v1"
 OWNER = "meta_market_validation_agent"
@@ -58,6 +61,7 @@ def _task(lane: str, order: int, action: str, acceptance: str,
 def run_agent(
     *,
     evidence_packet: Mapping[str, Any] | None = None,
+    exchange_snapshot: Mapping[str, Any] | None = None,
     lanes: tuple[dict[str, str], ...] = DEFAULT_LANES,
     now: datetime | None = None,
 ) -> dict[str, Any]:
@@ -81,6 +85,7 @@ def run_agent(
     review = review_packet(vetted, now=now)
     matches = {(p["niche"], p["us_zip"]): p for p in review["market_hypotheses"]}
     evidence = review["evidence"]
+    market_intelligence = rank_exchange_research_gaps(exchange_snapshot, now=now)
     lane_ids: set[str] = set()
     lane_reports = []
     tasks = []
@@ -142,6 +147,9 @@ def run_agent(
                           else "VERIFY_PROVIDER_WILLINGNESS_AND_PAYER_TERMS"),
             "evidence_ids": sorted(x["evidence_id"] for x in matching),
             "experiment_targets_not_results": dict(TARGETS),
+            "video_research_prompt_ids": [
+                p["id"] for p in build_video_research_prompts(niche=niche, market=city.lower())
+            ],
             "agent_tasks": lane_tasks,
         })
     return {
@@ -151,6 +159,10 @@ def run_agent(
             else "PENDING_REAL_AUTHORISED_EVIDENCE"),
         "mode": "OBSERVE", "implementation_stage": "isolated_research_candidate",
         "level_framework": list(LEVELS),
+        "video_source": "https://www.youtube.com/watch?v=tpZOU1ugODQ",
+        "video_prompt_pack_is_empire_authored_not_verbatim": True,
+        "market_intelligence": market_intelligence,
+        "priority_intelligence_auto_runs_external_research": False,
         "lanes": lane_reports, "research_task_count": len(tasks),
         "source_review": {
             "received": 0 if synthetic else review["observations_received"],
