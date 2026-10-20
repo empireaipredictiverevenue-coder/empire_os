@@ -37,3 +37,35 @@ def test_timeout_backoff_and_recovery(tmp_path, monkeypatch):
     health.record_success("ollama", "writer")
     health.record_failure("ollama", "writer", "TimeoutError")
     assert health.snapshot()["routes"]["ollama:writer"]["cooldown_seconds_applied"] == 300
+
+
+
+def test_malformed_routes_json_never_breaks_provider_recovery(tmp_path):
+    import json
+
+    for bad in (None, [], [{"provider": "ollama"}], 7, True, "invalid"):
+        source = tmp_path / "health.json"
+        source.write_text(json.dumps({
+            "schema_version": "empire.coder_model_health.v1",
+            "routes": bad,
+            "existing_metadata": "preserved",
+        }), encoding="utf-8")
+        health = ProviderHealth(source, cooldown_seconds=30)
+        assert health.excluded_routes() == ()
+        assert health.snapshot()["routes"] == {}
+        assert health.snapshot()["existing_metadata"] == "preserved"
+        health.record_failure("ollama", "writer", "TimeoutError")
+        assert ("ollama", "writer") in health.excluded_routes()
+        health.record_success("ollama", "writer")
+        assert health.excluded_routes() == ()
+
+
+def test_missing_routes_json_uses_empty_mapping_without_mutating_source(tmp_path):
+    import json
+
+    source = tmp_path / "health.json"
+    original = json.dumps({"schema_version": "empire.coder_model_health.v1"})
+    source.write_text(original, encoding="utf-8")
+    health = ProviderHealth(source)
+    assert health.snapshot()["routes"] == {}
+    assert source.read_text(encoding="utf-8") == original

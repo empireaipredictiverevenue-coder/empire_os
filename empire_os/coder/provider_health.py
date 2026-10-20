@@ -23,7 +23,12 @@ class ProviderHealth:
             return {"schema_version": "empire.coder_model_health.v1", "routes": {}}
         if not isinstance(value, dict):
             return {"schema_version": "empire.coder_model_health.v1", "routes": {}}
-        value.setdefault("routes", {})
+        # JSON can parse successfully while carrying a malformed route
+        # collection (null, list, etc.). Never let that corrupt a model
+        # cooldown update or break the read-only provider readiness probe.
+        # Preserve legitimate metadata, but recover to a safe empty map.
+        if not isinstance(value.get("routes"), dict):
+            value["routes"] = {}
         return value
 
     def _save(self, state: dict[str, Any]) -> None:
