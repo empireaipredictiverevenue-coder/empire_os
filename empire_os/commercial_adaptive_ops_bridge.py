@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.commercial_sales_director_adaptive_review import SOURCE_KINDS
+from empire_os.commercial_adaptive_checkpoint_guard import recover_safe_adaptive_checkpoints
 from empire_os.conversation_control_operational_truth import SOURCE_PATHS
 from scripts.review_commercial_adaptive_intelligence_20261020 import (
     build_adaptive_commercial_runtime,
@@ -148,6 +149,12 @@ def observe_ops_adaptive_commercial(
         }
     except Exception:
         # Never expose provider payloads, paths or raw exception values.
+        # Only a validated minimal prior decision may survive an unavailable
+        # source. Untrusted/unknown fields in a persisted Ops snapshot are
+        # NEVER copied into the new current Founder-visible snapshot.
+        retained_sales, retained_control = recover_safe_adaptive_checkpoints(
+            previous_sales, previous_control,
+        )
         return {
             "summary": {
                 "schema_version": SCHEMA,
@@ -165,7 +172,7 @@ def observe_ops_adaptive_commercial(
             },
             # Keep existing trusted-looking packet only as a previous checkpoint
             # for re-evaluation; do not announce it as current readiness.
-            "sales": previous_sales if isinstance(previous_sales, dict) else None,
-            "control": previous_control if isinstance(previous_control, dict) else None,
+            "sales": retained_sales,
+            "control": retained_control,
             "change_event": None,
         }

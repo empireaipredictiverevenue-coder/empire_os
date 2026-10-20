@@ -96,14 +96,21 @@ def test_prior_memory_survives_transient_source_unavailability(tmp_path):
     first = cycle(tmp_path)
     # Original offer-book input is mandatory. Its absence must not clear gates.
     book = tmp_path / "runtime/predictive_revenue/commercial_offer_book/latest.json"
+    original_book = book.read_bytes()
     book.unlink()
     fail = cycle(tmp_path, previous_from(first))
     assert fail["summary"]["available"] is False
-    assert fail["control"] == first["control"]
-    assert fail["sales"] == first["sales"]
+    assert fail["control"]["decision_signature"] == first["control"]["decision_signature"]
+    assert fail["sales"]["evidence_semantic_hash"] == first["sales"]["evidence_semantic_hash"]
+    assert "plain_language_reason" not in fail["sales"]
+    assert "active_dependency_gates" not in fail["control"]
     assert fail["change_event"] is None
     assert fail["summary"]["outbound_authorized"] is False
-    # Recovered owned producer data can be reevaluated with preserved checkpoint.
+    # The sanitized checkpoint still works as an existing-owner replay input.
+    book.write_bytes(original_book)
+    recovered = cycle(tmp_path, previous_from(fail))
+    assert recovered["summary"]["available"] is True
+    assert recovered["control"]["transition"] == "UNCHANGED_COMMERCIAL_HOLD"
     assert book in files
 
 
