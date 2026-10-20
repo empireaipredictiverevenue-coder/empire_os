@@ -135,6 +135,7 @@ def collect_approved_first_party_sites(
     dns_resolve: Callable = socket.getaddrinfo,
     now: datetime | None = None,
     max_sites: int = 9,
+    offline_html_parser: Callable[..., dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     time = now or datetime.now(timezone.utc)
     if time.tzinfo is None:
@@ -173,6 +174,7 @@ def collect_approved_first_party_sites(
             "site_fetch_status": "NOT_FETCHED",
             "robots_policy": "NOT_CHECKED",
             "source_body_sha256": None,
+            "offline_structured_extraction": None,
             "self_described_sector_matched": False,
             "self_described_city_or_region_matched": False,
             "independently_verified_company_identity": False,
@@ -195,6 +197,26 @@ def collect_approved_first_party_sites(
                     parser.feed(body.decode("utf-8", "replace"))
                     content = " ".join(parser.text).casefold()
                     entry["source_body_sha256"] = sha256(body).hexdigest()
+                    if offline_html_parser is not None:
+                        try:
+                            parsed = offline_html_parser(body, source_url=origin)
+                            if (not isinstance(parsed, dict)
+                                    or parsed.get("schema_version") !=
+                                    "empire.a2a.scrapling_approved_homepage_extraction.v1"
+                                    or parsed.get("network_access_performed_by_parser") is not False
+                                    or parsed.get("records_promoted_to_crm") != 0):
+                                raise ValueError("UNSAFE_OFFLINE_PARSE_RECEIPT")
+                            if (parsed.get("status") == "SCRAPLING_STRUCTURED_PAGE_PARSED"
+                                    and parsed.get("document_sha256") != entry["source_body_sha256"]):
+                                raise ValueError("UNBOUND_OFFLINE_PARSE_RECEIPT")
+                            entry["offline_structured_extraction"] = parsed
+                        except Exception:
+                            entry["offline_structured_extraction"] = {
+                                "schema_version": "empire.a2a.scrapling_approved_homepage_extraction.v1",
+                                "status": "OFFLINE_PARSER_UNTRUSTED_HOLD",
+                                "network_access_performed_by_parser": False,
+                                "records_promoted_to_crm": 0,
+                            }
                     entry["self_described_sector_matched"] = any(k in content for k in TRADE[niche])
                     entry["self_described_city_or_region_matched"] = any(k in content for k in SCOPE[metro])
         except Exception:
@@ -209,6 +231,11 @@ def collect_approved_first_party_sites(
         "source_type": "FOUNDER_APPROVED_FIRST_PARTY_COMPANY_WEBSITES",
         "websites_attempted": len(records),
         "websites_http_200": sum(r["site_fetch_status"] == "HTTP_200" for r in records),
+        "pages_structured_with_scrapling": sum(
+            isinstance(r["offline_structured_extraction"], dict) and
+            r["offline_structured_extraction"].get("status") == "SCRAPLING_STRUCTURED_PAGE_PARSED"
+            for r in records
+        ),
         "self_described_sector_and_region_matches": sum(
             r["self_described_sector_matched"] and r["self_described_city_or_region_matched"]
             for r in records

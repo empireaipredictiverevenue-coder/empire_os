@@ -53,6 +53,7 @@ def review_first_party_research(
                 "successful_site_reads": 0, "self_described_sector_and_region_matches": 0},
     }
     reviewed = []
+    structured_count = 0
     state = "SOURCE_CACHE_MISSING_NEEDS_OPERATOR_COLLECTION"
     captured = None
     if snapshot is not None:
@@ -106,6 +107,20 @@ def review_first_party_research(
                     or not isinstance(row.get("source_body_sha256"), str)
                     or not _DIGEST.fullmatch(row["source_body_sha256"]))):
                 raise ValueError("SITE_FETCH_LACKS_SOURCE_EVIDENCE")
+            parsed = row.get("offline_structured_extraction")
+            structured = False
+            if parsed is not None:
+                if (not isinstance(parsed, Mapping)
+                        or parsed.get("schema_version") != "empire.a2a.scrapling_approved_homepage_extraction.v1"
+                        or parsed.get("network_access_performed_by_parser") is not False
+                        or parsed.get("records_promoted_to_crm") != 0):
+                    raise ValueError("UNTRUSTED_STRUCTURED_PARSE")
+                structured = parsed.get("status") == "SCRAPLING_STRUCTURED_PAGE_PARSED"
+                if structured and (not good or parsed.get("document_sha256") != row.get("source_body_sha256")
+                                   or parsed.get("buyer_purchase_intent_verified") is not False
+                                   or parsed.get("raw_page_or_private_contacts_exported") is not False):
+                    raise ValueError("UNBOUND_SCRAPLING_PARSER_EVIDENCE")
+            structured_count += int(structured)
             match = (good and row.get("self_described_sector_matched") is True
                      and row.get("self_described_city_or_region_matched") is True)
             empty[market]["first_party_sites_attempted"] += 1
@@ -114,6 +129,10 @@ def review_first_party_research(
             reviewed.append({
                 "source_url": site, "market": market, "sector": niche,
                 "read_status": row.get("site_fetch_status"),
+                "scrapling_structured_page_parsed": structured,
+                "scrapling_document_matches_collector_sha": bool(structured),
+                "scrapling_page_title_present": bool(parsed.get("public_page_title_observed")) if structured else False,
+                "scrapling_h1_count_bounded": parsed.get("public_h1_count_bounded", 0) if structured else 0,
                 "self_description_matches_trade_and_region": bool(match),
                 "source_sha256_if_http_200": row.get("source_body_sha256") if good else None,
                 "buyer_or_lead_verified": False,
@@ -124,6 +143,7 @@ def review_first_party_research(
         "source_state": state, "captured_at_utc": captured,
         "approved_site_count": len(expected_map),
         "sites_read": len(reviewed),
+        "scrapling_structured_site_count": structured_count,
         "market_coverage": empty,
         "source_records": reviewed,
         "source_issuer_signature_verified": False,

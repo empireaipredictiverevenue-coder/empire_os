@@ -31,6 +31,7 @@ from empire_os.a2a_b2b_mining_history_v1 import update_mining_history
 from empire_os.a2a_first_party_recovery_readback_v1 import review_first_party_research
 from empire_os.a2a_openmanus_scoped_research_bridge_v1 import build_scoped_openmanus_plan
 from empire_os.a2a_first_party_buyer_scout_handoff_v1 import prepare_verified_scope_buyer_scout_handoff, make_first_party_owner_handoff_hold
+from empire_os.a2a_source_route_resilience_v1 import build_source_route_board
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -143,6 +144,18 @@ def run(*, previous: dict | None = None, history: dict | None = None,
             "next_gate": "CANONICAL_OWNER_PICKUP_SOURCE_UNAVAILABLE",
         }
     )
+    agent_reach_cached = LOCAL / "agent_reach_public_channel_health_v1.json"
+    try:
+        cached = (_read(agent_reach_cached)[0] if agent_reach_cached.is_file()
+                  and not agent_reach_cached.is_symlink() else None)
+        agent_reach_doctor = cached if (isinstance(cached, dict)
+                                       and cached.get("schema_version") ==
+                                       "empire.a2a.agent_reach_public_channel_health.v1") else None
+    except (OSError, ValueError, json.JSONDecodeError):
+        agent_reach_doctor = None
+    source_route_board = build_source_route_board(
+        first_party_research, mining, openmanus_owner_plan, agent_reach_doctor,
+    )
     receipt_review = inspect_owner_receipt_files(
         owner_pickup, LOCAL / "owner_signed_receipts",
     )
@@ -176,6 +189,7 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "first_party_research": first_party_research,
         "openmanus_owner_plan": openmanus_owner_plan,
         "first_party_buyer_owner_research": first_party_buyer_owner_research,
+        "source_route_board": source_route_board,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -218,6 +232,7 @@ def main() -> int:
             ("first_party_source_readback_v1.json", "first_party_research"),
             ("openmanus_research_jobs_v1.json", "openmanus_owner_plan"),
             ("first_party_buyer_scout_handoff_v1.json", "first_party_buyer_owner_research"),
+            ("source_route_resilience_v1.json", "source_route_board"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -249,6 +264,8 @@ def main() -> int:
         "mining_source_history_snapshots": outcome["mining_history"]["snapshot_count"],
         "new_mining_source_snapshot": outcome["mining_history"]["new_snapshot_appended"],
         "first_party_sites_read_from_cache": outcome["first_party_research"]["sites_read"],
+        "scrapling_parsed_existing_source_pages": outcome["first_party_research"]["scrapling_structured_site_count"],
+        "general_search_restored": outcome["source_route_board"]["keyless_search_restored"],
         "first_party_city_trade_self_claims": sum(
             x["self_described_sector_and_region_matches"]
             for x in outcome["first_party_research"]["market_coverage"].values()),

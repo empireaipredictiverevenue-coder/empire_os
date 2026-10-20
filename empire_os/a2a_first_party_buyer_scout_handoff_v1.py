@@ -131,6 +131,8 @@ def prepare_verified_scope_buyer_scout_handoff(
             "target_market":market, "target_sector":sector,
             "observed_source_sha256":digest,
             "source_read_status":site.get("read_status"),
+            "scrapling_structured_page_parsed": site.get("scrapling_structured_page_parsed") is True,
+            "scrapling_extraction_is_structural_not_buyer_proof": True,
             "self_published_trade_and_region_match":observed_match,
             "requires_independent_company_identity_verification":True,
             "requires_independent_service_territory_validation":True,
