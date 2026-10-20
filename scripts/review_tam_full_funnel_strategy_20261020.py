@@ -1364,6 +1364,91 @@ def review_conversion_owner_release_board(
     }
 
 
+def review_released_product_page_alignment(
+    root: Path, *, catalog_source: Mapping[str, Any] | None,
+    catalog_readiness: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Join EXISTING signed campaign objectives to exact catalog product codes.
+
+    This is an aggregate website-owner readiness check, not an inventory
+    projection or permission to market to research-form submitters.
+    """
+    from empire_os.owned_campaign_release import load_release
+    from empire_os.commercial_offer_book import product_ready
+
+    held = {
+        "schema_version": "empire.gtm.signed_research_product_alignment.v1",
+        "status": "HOLD_UNSIGNED_RELEASE_OR_UNTRUSTED_CATALOG",
+        "signed_research_pages": None,
+        "research_question_pages_not_commercial_offers": None,
+        "product_enquiry_pages": None,
+        "product_enquiry_pages_with_exact_catalog_terms": None,
+        "product_enquiry_pages_with_unverified_terms": None,
+        "buyer_fit_verified": False,
+        "offer_delivery_date_verified": False,
+        "production_publication_authorized": False,
+        "execution_authority": "NONE",
+    }
+    if (catalog_readiness.get("source_status")
+            != "CURRENT_CATALOG_PRODUCT_TERMS_REVIEWED"
+            or not isinstance(catalog_source, Mapping)):
+        return held
+    signed = load_release(root=root)
+    if not isinstance(signed, Mapping):
+        return held
+    pages = signed.get("campaigns")
+    products = catalog_source.get("products")
+    if (not isinstance(pages, list) or not isinstance(products, list)
+            or len(pages) > 100 or len(products) > 500
+            or catalog_source.get("product_count") != len(products)
+            or catalog_readiness.get("products_catalogued") != len(products)
+            or catalog_readiness.get("verified_commercial_terms_products") != sum(
+                product_ready(p) for p in products if isinstance(p, Mapping)
+            )):
+        return held
+    code_map: dict[str, list[Mapping[str, Any]]] = {}
+    for row in products:
+        if not isinstance(row, Mapping):
+            return held
+        code = row.get("product_code")
+        if isinstance(code, str) and code:
+            code_map.setdefault(code, []).append(row)
+    research_only = 0
+    product_enquiry = 0
+    linked_ready = 0
+    seen_campaigns = set()
+    for page in pages:
+        if not isinstance(page, Mapping):
+            return held
+        cid = page.get("campaign_id")
+        objective = page.get("campaign_objective")
+        if (not isinstance(cid, str) or cid in seen_campaigns
+                or page.get("conversion_plan", {}).get("landing_path")
+                != "/research/" + cid):
+            return held
+        seen_campaigns.add(cid)
+        if objective == "research_enquiry":
+            # Product references are unnecessary and not implied for research.
+            research_only += 1
+        elif objective == "product_enquiry":
+            product_enquiry += 1
+            matches = code_map.get(page.get("product_code"), [])
+            if len(matches) == 1 and product_ready(matches[0]):
+                linked_ready += 1
+        else:
+            return held
+    return {
+        **held,
+        "status": "EXACT_SIGNED_PAGE_CATALOG_CODE_ALIGNMENT_REVIEWED",
+        "signed_research_pages": len(pages),
+        "research_question_pages_not_commercial_offers": research_only,
+        "product_enquiry_pages": product_enquiry,
+        "product_enquiry_pages_with_exact_catalog_terms": linked_ready,
+        "product_enquiry_pages_with_unverified_terms":
+            product_enquiry - linked_ready,
+    }
+
+
 def export_conversion_owner_handoff(
     output: Mapping[str, Any], *, now: datetime,
 ) -> dict[str, Any]:
@@ -1380,6 +1465,16 @@ def export_conversion_owner_handoff(
         "feature_branch_review_only": True,
         "website": {
             "signed_research_route_count": release.get("verified_research_pages"),
+            "product_enquiry_pages_with_verified_catalog_terms": (
+                output["existing_research_product_alignment"].get(
+                    "product_enquiry_pages_with_exact_catalog_terms"
+                ) if "existing_research_product_alignment" in output else None
+            ),
+            "research_only_pages_not_product_offers": (
+                output["existing_research_product_alignment"].get(
+                    "research_question_pages_not_commercial_offers"
+                ) if "existing_research_product_alignment" in output else None
+            ),
             "private_proof_experience_publication_proven": False,
             "canonical_first_party_enquiry_route": (
                 release.get("existing_enquiry_route")
@@ -1456,6 +1551,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     # The SEO enquiry operator has a held privileged read. Its result
     # remains UNKNOWN until an independently authorised owner supplies it.
+    output["existing_research_product_alignment"] = (
+        review_released_product_page_alignment(
+            root,
+            catalog_source=read_existing_commercial_catalog_readonly(root),
+            catalog_readiness=output["existing_catalog_conversion_readiness"],
+        )
+    )
     output["research_enquiry_aggregate_conversion_readiness"] = (
         review_existing_enquiry_aggregate_for_conversion(
             None, owner_operator_attestation_verified=False,

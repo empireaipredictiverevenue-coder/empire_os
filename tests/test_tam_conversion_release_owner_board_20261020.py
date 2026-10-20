@@ -32,7 +32,9 @@ def product(ready=True):
 
 
 def catalog():
-    packet = summarize_catalog([product(True), product(False)])
+    other = product(False)
+    other["product_code"] = "offline_unverified_other"
+    packet = summarize_catalog([product(True), other])
     packet["generated_at"] = NOW.isoformat()
     return packet
 
@@ -308,3 +310,108 @@ def test_owner_handoff_updates_only_after_actual_owner_supplied_receipts():
     assert handoff["finance"]["realized_campaign_profit_cents"] == 500
     assert handoff["automatic_tasks_reassigned"] is False
     assert handoff["execution_authority"] == "NONE"
+
+
+def test_signed_research_pages_are_separated_from_verified_catalog_product_offers(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        review_released_product_page_alignment,
+    )
+    signed = {"campaigns": [
+        {
+            "campaign_id": "campaign_" + "a"*24,
+            "campaign_objective": "research_enquiry",
+            "product_code": None,
+            "conversion_plan": {"landing_path": "/research/campaign_"+"a"*24},
+        },
+        {
+            "campaign_id": "campaign_" + "b"*24,
+            "campaign_objective": "product_enquiry",
+            "product_code": "offline_fixture_only",
+            "conversion_plan": {"landing_path": "/research/campaign_"+"b"*24},
+        },
+    ]}
+    monkeypatch.setattr(
+        "empire_os.owned_campaign_release.load_release",
+        lambda *, root: signed,
+    )
+    report = review_released_product_page_alignment(
+        Path("/fixture"), catalog_source=catalog(),
+        catalog_readiness=review_commercial_catalog_for_conversion(catalog(), now=NOW),
+    )
+    assert report["status"] == "EXACT_SIGNED_PAGE_CATALOG_CODE_ALIGNMENT_REVIEWED"
+    assert report["signed_research_pages"] == 2
+    assert report["research_question_pages_not_commercial_offers"] == 1
+    assert report["product_enquiry_pages"] == 1
+    assert report["product_enquiry_pages_with_exact_catalog_terms"] == 1
+    assert report["product_enquiry_pages_with_unverified_terms"] == 0
+    assert report["buyer_fit_verified"] is False
+    assert report["offer_delivery_date_verified"] is False
+    assert report["production_publication_authorized"] is False
+    assert "offline_fixture_only" not in json.dumps(report)
+
+
+def test_unavailable_catalog_terms_do_not_mark_a_released_product_as_sellable(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        review_released_product_page_alignment,
+    )
+    signed = {"campaigns": [{
+        "campaign_id": "campaign_"+"b"*24,
+        "campaign_objective": "product_enquiry",
+        "product_code": "missing_catalog_product",
+        "conversion_plan": {"landing_path": "/research/campaign_"+"b"*24},
+    }]}
+    monkeypatch.setattr("empire_os.owned_campaign_release.load_release",
+                        lambda *, root: signed)
+    result = review_released_product_page_alignment(
+        Path("/fixture"), catalog_source=catalog(),
+        catalog_readiness=review_commercial_catalog_for_conversion(catalog(), now=NOW),
+    )
+    assert result["product_enquiry_pages"] == 1
+    assert result["product_enquiry_pages_with_exact_catalog_terms"] == 0
+    assert result["product_enquiry_pages_with_unverified_terms"] == 1
+
+
+def test_mismatched_publication_route_or_unknown_campaign_objective_holds(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        review_released_product_page_alignment,
+    )
+    for objective, path in (
+        ("product_enquiry", "/not-a-research-route"),
+        ("unreviewed_auto_checkout", "/research/campaign_"+"a"*24),
+    ):
+        monkeypatch.setattr(
+            "empire_os.owned_campaign_release.load_release",
+            lambda *, root, objective=objective, path=path: {
+                "campaigns": [{
+                    "campaign_id": "campaign_"+"a"*24,
+                    "campaign_objective": objective,
+                    "product_code": "offline_fixture_only",
+                    "conversion_plan": {"landing_path": path},
+                }],
+            },
+        )
+        result = review_released_product_page_alignment(
+            Path("/fixture"), catalog_source=catalog(),
+            catalog_readiness=review_commercial_catalog_for_conversion(catalog(), now=NOW),
+        )
+        assert result["status"] == "HOLD_UNSIGNED_RELEASE_OR_UNTRUSTED_CATALOG"
+        assert result["signed_research_pages"] is None
+        assert result["production_publication_authorized"] is False
+
+
+def test_catalog_owner_staleness_fails_closed_for_release_alignment(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        review_released_product_page_alignment,
+    )
+    monkeypatch.setattr(
+        "empire_os.owned_campaign_release.load_release",
+        lambda *, root: {"campaigns": []},
+    )
+    stale = catalog()
+    stale["generated_at"] = "2026-10-15T11:00:00+00:00"
+    result = review_released_product_page_alignment(
+        Path("/fixture"), catalog_source=stale,
+        catalog_readiness=review_commercial_catalog_for_conversion(stale, now=NOW),
+    )
+    assert result["status"] == "HOLD_UNSIGNED_RELEASE_OR_UNTRUSTED_CATALOG"
+    assert result["product_enquiry_pages_with_exact_catalog_terms"] is None

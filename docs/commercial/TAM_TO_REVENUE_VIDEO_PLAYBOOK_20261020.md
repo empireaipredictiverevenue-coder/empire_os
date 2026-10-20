@@ -1130,3 +1130,46 @@ published by the website owner, a genuine enquiry in canonical intake,
 an authenticated CRM join, and independently verified finance and
 fulfilment evidence. Current branch readiness is code-tested and
 source-audited, NOT a paid customer or a completed deployment.
+
+## 20 October — Production research-site QA and exact signed product mapping
+
+**Verified by read-only HTTP GET**, no forms submitted or tracking
+events deliberately posted. All five pages returned HTTP 200,
+each with precisely one form using POST /api/research/enquiry,
+the expected six field names, the owned /research-runtime.js script
+and the notice that a research enquiry is not a marketing subscription.
+
+The independently signed releases are:
+
+| Published research subject | Objective | Catalog mapping |
+|---|---|---|
+| Denver roofing coverage gap | Research enquiry | No product claim |
+| Atlanta class-action research | Product enquiry | managed_service — matching product terms currently verified |
+| NYC general-contractor evidence chain | Research enquiry | No product claim |
+| Dallas–Fort Worth HVAC opportunity pilot | Product enquiry | managed_service — matching product terms currently verified |
+| Denver HVAC acquired-records research | Research enquiry | No product claim |
+
+Only the *existing signed page metadata and catalog readiness* support
+the two exact product matches. This does not prove buyer need,
+source publication rights, fulfilment capacity, exact approved
+price disclosure, or conversion. The newly generated private
+proof experiences for GB solar are **not** published on those
+US research routes; no automatic product-to-offer substitution
+is allowed.
+
+The existing read-only owner-board CLI now includes
+website.product_enquiry_pages_with_verified_catalog_terms and
+website.research_only_pages_not_product_offers to catch future
+misalignment between the signed page objective and the verified
+commercial catalog. Duplicate product codes, incorrect paths,
+missing product terms and stale/untrusted source snapshots fail
+closed. The source-owned pages, deploys, CRM, Finance and buyer
+data are untouched.
+
+**Next owner action:** Existing flagship website owner should
+review the private proof-first experience and approve a distinct
+publication route (or deliberately revise an existing signed campaign)
+only after product/fulfilment/legal source approval. Existing
+CRM/Finance owners must independently verify real enquiry
+and payment receipts. No live POST, public deploy, payment, or
+customer contact occurred in this review.
