@@ -13,6 +13,9 @@ from pathlib import Path
 from empire_os.exchange_self_serve_fulfilment_review_v1 import (
     build_exchange_self_serve_fulfilment_review,
 )
+from empire_os.exchange_seat_renewal_lifecycle_v1 import (
+    review_exchange_seat_renewal_lifecycle,
+)
 
 DEFAULT = Path("/srv/empire_os/runtime/commercial_exchange/latest.json")
 
@@ -21,6 +24,7 @@ def main() -> int:
     parser.add_argument("--read-only",action="store_true",required=True)
     parser.add_argument("--snapshot",type=Path,default=DEFAULT)
     parser.add_argument("--a2a-owner-queue",type=Path,default=None)
+    parser.add_argument("--private-renewal-cycles-file",type=Path,default=None)
     args=parser.parse_args()
     p=args.snapshot
     try:
@@ -34,6 +38,22 @@ def main() -> int:
                 raise ValueError("untrusted_a2a_owner_queue")
             a2a=json.loads(q.read_text(encoding="utf-8"))
         value=build_exchange_self_serve_fulfilment_review(snapshot,a2a_owner_queue=a2a)
+        value["private_renewal_review"]={
+            "state":"NO_AUTHENTICATED_RENEWAL_OWNER_SOURCE_ATTACHED",
+            "actual_entitlements_verified":0,
+            "recognized_mrr_cents":0,
+        }
+        if args.private_renewal_cycles_file is not None:
+            f=args.private_renewal_cycles_file
+            if (not f.is_file() or f.is_symlink() or f.stat().st_size>1_000_000
+                    or f.stat().st_mode & 0o077):
+                raise ValueError("missing_or_unprotected_private_renewal_file")
+            ledger=json.loads(f.read_text(encoding="utf-8"))
+            if not isinstance(ledger,dict) or set(ledger)!={"membership","periods"}:
+                raise ValueError("untrusted_renewal_ledger_shape")
+            value["private_renewal_review"]=review_exchange_seat_renewal_lifecycle(
+                ledger["membership"],ledger["periods"],
+            )
     except (ValueError, OSError, UnicodeError, TypeError):
         value={
             "schema_version":"empire.exchange.self_serve_fulfilment_mrr_review.v1",
