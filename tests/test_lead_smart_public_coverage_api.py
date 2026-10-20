@@ -27,6 +27,7 @@ def _verified_preview():
 @pytest.fixture(autouse=True)
 def mock_data(monkeypatch):
     monkeypatch.setattr(api, "generate_from_files", lambda *args: _verified_preview())
+    monkeypatch.setattr(api, "call_available", lambda _zip: False)
     monkeypatch.setattr(
         api, "buyer_hours_preview",
         lambda: {"within_reported_window": True,
