@@ -9,7 +9,7 @@ from empire_os.exchange_a2a_research_signal_bridge_v1 import (
 from empire_os.exchange_self_serve_fulfilment_review_v1 import (
     build_exchange_self_serve_fulfilment_review,
 )
-from tests.test_lead_exchange_live_inventory_20261019 import fixture, NOW
+from tests.exchange_snapshot_fixture_20261020 import fixture, NOW
 
 
 def queue():

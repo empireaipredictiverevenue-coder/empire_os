@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from tests.test_lead_exchange_live_inventory_20261019 import fixture
+from tests.exchange_snapshot_fixture_20261020 import fixture
 from tests.test_exchange_seat_renewal_lifecycle_v1_20261020 import (
     membership, paid,
 )
