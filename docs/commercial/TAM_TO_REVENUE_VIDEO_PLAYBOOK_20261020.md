@@ -700,3 +700,48 @@ An exact consumer should check every field in `source_health` and
 `source_holds` before acting; this remains an **operator-review API**
 rather than a new sender or authorization source. Regression tests:
 `tests/test_tam_real_observer_connections_20261020.py`.
+
+
+## 20 October — Existing authenticated tenant Revenue CRM handoff
+
+The same campaign intelligence module now exposes
+`review_authenticated_crm_campaign_handoff` and the existing
+`review_authenticated_campaign_intelligence` accepts
+`authenticated_crm_owner_read`, `account_projection_owner` and
+`signal_owner`.
+
+This deliberately **reuses** the existing
+`revenue_crm_api.AuthenticatedRevenueCrmRead` and
+`revenue_crm_transport.PostgresRevenueCrmRepository`:
+the CRM owner must first authenticate the tenant through the existing
+HTTP/server resolver, which enforces a dedicated database login,
+read-only SQL, tenant-bound RLS and role checks. We never create or
+obtain a new database credential in this build.
+
+The new adapter calls only `repository.prospects(limit=...)` for at
+most 500 rows, verifies each tenant/prospect UUID, deduplicates
+prospects and passes each row to a **trusted owner-controlled canonical
+account join**. Missing source-attested joins are counted as held;
+no contact identity is guessed from a name, company, email, domain,
+AI content or website click.
+
+The owner must also provide actual verified signal receipts. The
+result runs through the existing adaptive journey, channel-consent
+and sales-review logic. Any changed CRM stage, altered UUID,
+cross-tenant record, bogus permission, duplicate prospect or
+unauthenticated repository is rejected before commercial learning.
+The adapter returns **only counts and internal next actions**.
+
+The existing standalone read-only CLI has no authenticated tenant
+principal, so its
+`decision_intelligence.authenticated_tenant_crm_handoff` remains
+`null`; this is not a connection failure or zero CRM buyers.
+The callable owner-integration path is implemented and tested, but
+actual production tenant reads must be invoked by the Revenue CRM
+owner's authenticated request/service workflow. No other agent's
+CRM API/router files have been modified or deployed.
+
+**Source tests:** `tests/test_authenticated_crm_campaign_handoff_20261020.py`.
+
+**No new database role, credentials, tenant bypass, unapproved send,
+nurture schedule, spend, automatic marketing subscription or payment.**

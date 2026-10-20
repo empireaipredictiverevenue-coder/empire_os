@@ -715,6 +715,9 @@ def review_authenticated_campaign_intelligence(
     learning_waves: Iterable[Any] | None = None,
     adaptive_journey_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
     observer_snapshots: Mapping[str, Any] | None = None,
+    authenticated_crm_owner_read: Any | None = None,
+    account_projection_owner: Callable | None = None,
+    signal_owner: Callable | None = None,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -728,7 +731,11 @@ def review_authenticated_campaign_intelligence(
         review_account_route_portfolio,
         review_multiwave_commercial_learning,
         review_adaptive_buyer_journey_portfolio,
+        review_authenticated_crm_campaign_handoff,
     )
+    if (authenticated_crm_owner_read is None
+            and (account_projection_owner is not None or signal_owner is not None)):
+        raise ValueError("cannot enable CRM callbacks without authenticated tenant owner")
     # A single authenticated generator must feed both experiment and journey
     # review without the latter silently receiving an exhausted iterator.
     verified_waves = tuple(learning_waves) if learning_waves is not None else None
@@ -768,6 +775,14 @@ def review_authenticated_campaign_intelligence(
         "real_existing_source_connections": (
             review_real_commercial_observers(observer_snapshots, now=now)
             if observer_snapshots is not None else None
+        ),
+        "authenticated_tenant_crm_handoff": (
+            review_authenticated_crm_campaign_handoff(
+                authenticated_crm_owner_read,
+                account_projection_owner=account_projection_owner,
+                signal_owner=signal_owner,
+                now=now,
+            ) if authenticated_crm_owner_read is not None else None
         ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,

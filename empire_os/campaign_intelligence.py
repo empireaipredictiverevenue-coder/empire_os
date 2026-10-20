@@ -1303,3 +1303,106 @@ def review_adaptive_buyer_journey_portfolio(
         "automatic_channel_activation": False,
         "execution_authority": "NONE",
     }
+
+
+def review_authenticated_crm_campaign_handoff(
+    authenticated_read: object, *,
+    account_projection_owner: object,
+    signal_owner: object,
+    now: datetime,
+    limit: int = 100,
+) -> dict:
+    """Use EXISTING tenant-authenticated, read-only Revenue CRM repository.
+
+    Caller must be the authenticated Revenue CRM route/service owner. It must
+    provide source-attested canonical account joins and event receipts.
+    Missing joins stay held, not coerced into contacts or subscribers. This
+    function does not call the unauthenticated public CRM API, load secrets,
+    instantiate a tenant repository, or add a new login/role/credential.
+    """
+    from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
+    from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
+    from empire_os.revenue_crm_channel_evidence import canonical_uuid
+
+    now = _aware(now)
+    if (type(authenticated_read) is not AuthenticatedRevenueCrmRead
+            or not isinstance(authenticated_read.repository, PostgresRevenueCrmRepository)
+            or not callable(account_projection_owner)
+            or not callable(signal_owner)
+            or type(limit) is not int or not 1 <= limit <= 500):
+        raise CampaignIntelligenceHeld("AUTHENTICATED_CRM_OWNER_BOUNDARY_REQUIRED")
+    repository = authenticated_read.repository
+    try:
+        tenant = canonical_uuid(authenticated_read.tenant_id)
+        if tenant != repository.tenant_id:
+            raise ValueError("authenticated tenant and dedicated repository differ")
+    except (ValueError, TypeError, AttributeError):
+        raise CampaignIntelligenceHeld("AUTHENTICATED_CRM_TENANT_MISMATCH") from None
+    try:
+        original = repository.prospects(limit=limit)
+    except Exception:
+        # Never leak a DSN, company, prospect ID or private database diagnostic.
+        raise CampaignIntelligenceHeld("AUTHENTICATED_CRM_READ_UNAVAILABLE") from None
+    if (not isinstance(original, (list, tuple))
+            or len(original) > limit):
+        raise CampaignIntelligenceHeld("BOUNDED_CRM_SOURCE_ROWS_REQUIRED")
+    seen_crm = set()
+    payloads = []
+    rows_with_no_proven_canonical_join = 0
+    for item in original:
+        if not isinstance(item, Mapping):
+            raise CampaignIntelligenceHeld("CANONICAL_CRM_ROW_SHAPE_INVALID")
+        try:
+            own_tenant = canonical_uuid(item.get("tenant_id"))
+            prospect = canonical_uuid(item.get("prospect_id"))
+        except (ValueError, TypeError, AttributeError):
+            raise CampaignIntelligenceHeld("CANONICAL_CRM_ROW_IDENTITY_INVALID") from None
+        if own_tenant != tenant or prospect in seen_crm:
+            raise CampaignIntelligenceHeld("DUPLICATE_OR_CROSS_TENANT_CRM_SOURCE")
+        seen_crm.add(prospect)
+        try:
+            joined = account_projection_owner(item)
+        except Exception:
+            raise CampaignIntelligenceHeld("ACCOUNT_TO_CRM_OWNER_JOIN_UNAVAILABLE") from None
+        if joined is None:
+            rows_with_no_proven_canonical_join += 1
+            continue
+        if (type(joined) is not TrustedJourneyProjection
+                or joined.canonical_account_to_crm_binding_verified is not True
+                or not isinstance(joined.crm_row, Mapping)
+                or any(
+                    joined.crm_row.get(name) != item.get(name)
+                    for name in _CRM_JOURNEY_FIELDS
+                    if name in item
+                )):
+            raise CampaignIntelligenceHeld("FORGED_OR_UNBOUND_CRM_JOURNEY_PROJECTION")
+        try:
+            joined_tenant = canonical_uuid(joined.crm_row.get("tenant_id"))
+            joined_prospect = canonical_uuid(joined.crm_row.get("prospect_id"))
+        except (ValueError, TypeError, AttributeError):
+            raise CampaignIntelligenceHeld("FORGED_OR_UNBOUND_CRM_JOURNEY_PROJECTION") from None
+        if joined_tenant != tenant or joined_prospect != prospect:
+            raise CampaignIntelligenceHeld("FORGED_OR_UNBOUND_CRM_JOURNEY_PROJECTION")
+        try:
+            trusted_signals = signal_owner(joined)
+            if type(trusted_signals) not in (list, tuple):
+                raise ValueError("typed source-bound signals required")
+        except Exception:
+            raise CampaignIntelligenceHeld("CANONICAL_ACCOUNT_SIGNAL_OWNER_UNAVAILABLE") from None
+        payloads.append((joined, trusted_signals))
+    reviewed = review_adaptive_buyer_journey_portfolio(payloads, now=now)
+    return {
+        "schema_version": "empire.gtm.tenant_crm_campaign_owner_handoff.v1",
+        "mode": "OBSERVE",
+        "authenticated_tenant_source_verified": True,
+        "canonical_crm_rows_read": len(original),
+        "canonical_account_join_unavailable": rows_with_no_proven_canonical_join,
+        "bound_account_journeys_reviewed": reviewed["accounts_reviewed"],
+        "human_next_play_counts": reviewed["recommended_human_play_counts"],
+        "read_result_may_be_partial": len(original) == limit,
+        "canonical_crm_contacts_returned": 0,
+        "marketing_subscription_inferred": False,
+        "crm_mutation": False,
+        "sender_enabled": False,
+        "execution_authority": "NONE",
+    }
