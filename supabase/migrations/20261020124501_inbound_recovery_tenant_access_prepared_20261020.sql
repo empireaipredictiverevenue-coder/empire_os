@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS public.inbound_recovery_management_access_audit (
         CHECK (actor_fingerprint ~ '^[a-f0-9]{64}$'),
     operation text NOT NULL CHECK (operation IN (
         'profile_read', 'scorecard_read', 'queue_read', 'patterns_read',
-        'knowledge_read', 'workflow_read'
+        'knowledge_read', 'workflow_read', 'calendar_read'
     )),
     previous_hash text NOT NULL,
     record_hash char(64) NOT NULL CHECK (record_hash ~ '^[a-f0-9]{64}$'),

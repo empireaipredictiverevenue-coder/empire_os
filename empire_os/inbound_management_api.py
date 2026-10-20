@@ -14,6 +14,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Response
 
 from empire_os.inbound_access_audit import RecoveryAccessAudit
 from empire_os.inbound_booking_store import OfflineBookingWorkflowStore
+from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
 from empire_os.inbound_booking_workflow import WorkflowPolicy
 from empire_os.inbound_knowledge_store import OfflineKnowledgeRepository
 from empire_os.inbound_management_auth import (
@@ -159,6 +160,25 @@ def create_inbound_management_router() -> APIRouter:
             raise
         except Exception as exc:
             raise HTTPException(status_code=503, detail="management_workflow_not_ready") from exc
+        result["management_mode"] = "local_read_only_nonproduction"
+        return result
+
+    @router.get("/calendar-summary")
+    def calendar_summary(
+        response: Response,
+        authorization: str | None = Header(default=None),
+    ):
+        if not _enabled():
+            raise HTTPException(status_code=404, detail="management_disabled")
+        response.headers["Cache-Control"] = "no-store"
+        actor, _tenant, _events = _read(authorization, "recovery:calendar", "calendar_read")
+        try:
+            with OfflineCalendarRegistry(
+                _fixed_path("EMPIRE_INBOUND_MANAGER_CALENDAR_DB"), read_only=True
+            ) as repository:
+                result = repository.tenant_summary(actor.tenant_id)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="management_calendar_not_ready") from exc
         result["management_mode"] = "local_read_only_nonproduction"
         return result
 

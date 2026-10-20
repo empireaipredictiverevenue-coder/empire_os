@@ -170,7 +170,6 @@ def summarise_inbound_workflow(
 
     appointment_status: dict[tuple[str, str], str] = {}
     appointment_owner: dict[tuple[str, str], str] = {}
-    booking_receipts_seen: set[tuple[str, str, str]] = set()
     booking_conflicts = 0
     for e in relevant:
         if e.kind not in BOOKING_KINDS:
@@ -181,10 +180,6 @@ def summarise_inbound_workflow(
             booking_conflicts += 1
             appointment_status[identifier] = "conflicted"
             continue
-        receipt_key = (e.calendar_ref, e.appointment_id, e.evidence_ref)
-        if receipt_key in booking_receipts_seen:
-            continue
-        booking_receipts_seen.add(receipt_key)
         appointment_owner[identifier] = e.call_id
         if appointment_status.get(identifier) == "conflicted":
             continue

@@ -371,3 +371,64 @@ def test_workflow_manager_disabled_mode_never_reads_or_logs(config, monkeypatch)
     result = get(client, "workflow", token(scopes=["recovery:workflow"]))
     assert result.status_code == 404
     assert not audit.exists()
+
+
+def test_calendar_summary_requires_distinct_scope_and_tenant_ownership(config, monkeypatch, tmp_path):
+    from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
+    from empire_os.inbound_google_calendar_adapter import (
+        ApprovedCalendarBinding, TrackedCalendarAppointment,
+    )
+    from empire_os.inbound_contact_identity import pseudonymise_inbound_contact
+
+    registry_file = tmp_path / "calendars.db"
+    hmac_key = "management-calendar-contact-key-minimum-32"
+    with OfflineCalendarRegistry(registry_file) as store:
+        for tenant, cal, event in [
+            ("alpha", "alpha-calendar@example.org", "appt-a"),
+            ("beta", "beta-calendar@example.org", "appt-b"),
+        ]:
+            assert store.register_binding_offline(
+                ApprovedCalendarBinding(
+                    tenant_id=tenant, calendar_id=cal,
+                    provider_account_ref=f"private-account-{tenant}",
+                    owner_approved=True, account_access_verified=True,
+                ),
+                approval_ref="customer-approval-20261020",
+            )
+            store.register_appointment_offline(TrackedCalendarAppointment(
+                tenant_id=tenant, calendar_id=cal, event_id=event,
+                call_id=f"call-{tenant}",
+                contact_key=pseudonymise_inbound_contact(
+                    "+442071234567", tenant_id=tenant, signing_key=hmac_key
+                ), tracked_ref=f"private-intent-{tenant}",
+            ))
+    monkeypatch.setenv("EMPIRE_INBOUND_MANAGER_CALENDAR_DB", str(registry_file))
+    client, audit, _ = config
+    assert get(client, "calendar-summary", token(tenant="alpha")).status_code == 401
+    allowed = get(
+        client, "calendar-summary",
+        token(tenant="alpha", scopes=["recovery:calendar"]),
+        tenant_id="beta",
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert allowed.json()["tenant_id"] == "alpha"
+    assert allowed.json()["tracked_appointments"] == 1
+    assert allowed.json()["not_verified"] == 1
+    assert allowed.json()["bookings_created"] is False
+    assert "beta-calendar" not in allowed.text
+    assert "alpha-calendar" not in allowed.text
+    assert allowed.headers["cache-control"] == "no-store"
+    with RecoveryAccessAudit(audit, audit_key=AUDIT_KEY) as log:
+        assert log.verify_chain()
+        assert log.row_count() == 1
+
+
+def test_calendar_summary_fails_closed_on_unprovisioned_storage(config):
+    client, audit, _ = config
+    denied = get(
+        client, "calendar-summary",
+        token(tenant="alpha", scopes=["recovery:calendar"]),
+    )
+    assert denied.status_code == 503
+    with RecoveryAccessAudit(audit, audit_key=AUDIT_KEY) as log:
+        assert log.verify_chain()

@@ -56,7 +56,7 @@ class RecoveryAccessAudit:
     def append(
         self, actor: RecoveryActor, operation: str, *, timestamp: datetime | None = None
     ) -> str:
-        if operation not in {"profile_read", "scorecard_read", "queue_read", "patterns_read", "knowledge_read", "workflow_read"}:
+        if operation not in {"profile_read", "scorecard_read", "queue_read", "patterns_read", "knowledge_read", "workflow_read", "calendar_read"}:
             raise ValueError("unsupported_audit_operation")
         when = timestamp or datetime.now(timezone.utc)
         if when.tzinfo is None or when.utcoffset() is None:

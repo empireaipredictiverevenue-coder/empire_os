@@ -228,3 +228,48 @@ No public endpoint ingests workflow claims. verified=True in offline fixtures is
 5. Verify provider/webhook authenticity, tenant boundaries, key rotation, deletion/retention, cost monitoring and UK GDPR/PECR obligations before an explicitly approved supervised pilot.
 
 No live calendar, messages, campaigns, customer-facing number routing or spending has been enabled.
+
+
+## 20 October — Google Calendar Authenticated Read-Back Adapter (Development)
+
+**Branch:** feature/inbound-revenue-recovery-20261020.
+**State:** provider-compatible read-only integration CODE, mock-transport tests, private offline registry, management reporting, and unapplied schema. No real customer OAuth credentials, tenant calendar permissions, external API calls, live bookings, or production launch.
+
+### Built
+
+- empire_os/inbound_google_calendar_adapter.py: Google Calendar v3 events.get and freeBusy query allowlisted HTTP transport. Only read-only event GET and POST freeBusy are supported; no event insert, update, delete or send. Requests target a fixed Google host, redirect handling is disabled, timeouts and response size are bounded. Token lifecycle is deliberately left to an authorised credentials adapter.
+- Backend-only ApprovedCalendarBinding and TrackedCalendarAppointment require exact tenant, calendar, event, call and approved source refs, with tenant-specific pseudonymous contact keys. These must originate in independent onboarding and verified calendar ownership; they are NOT publicly supplied.
+- Booking read-back confirms Google event status, ID, calendar-private tenant/call/source metadata, timed start/end, opaque busy event and an updated provider revision. No other Google event can be counted simply because it exists on a connected calendar.
+- Sparse cancelled event read-back is valid only when a previously verified identical appointment proof exists. Latest status, stale revision and cancellation/reconfirmation chronology guard against resurrecting an old booking.
+- Proofs project into both RecoveryEvent and InboundWorkflowEvent using one canonical calendar-scoped booking reference. The existing recovery ledger and workflow summary then process confirmed, cancelled and newly reconfirmed states consistently. No revenue is inferred and payment still requires separate verified financial evidence.
+- FreeBusy is independently verified for exact approved calendar, valid provider response, no calendar-level errors and bounded time interval. No calendar busy interval is not a bookable slot; available_slot_confirmed and booking_confirmed stay false.
+- empire_os/inbound_calendar_registry.py: private offline SQLite owner/tenant registry, appointment mapping and read-back history, idempotent same-provider-revision reconciliation and tenant-scoped aggregate summary. This stores NO Google OAuth credentials.
+- GET /v1/inbound-recovery/management/calendar-summary: default-off, recovery:calendar scope, approved tenant, mandatory audit and existing read-only local calendar database. Optional private env EMPIRE_INBOUND_MANAGER_CALENDAR_DB required for that endpoint.
+- scripts/review_inbound_calendar_20261020.py: tenant-scoped read-only summary from an existing offline calendar registry.
+- supabase/migrations/20261020124503_inbound_calendar_registry_prepared_20261020.sql: PREPARED, UNAPPLIED migration for owner-approved bindings, tracked appointment references and read-back records. FORCE RLS and direct client grants revoked.
+
+### Source contract
+
+Google Calendar Events.get:
+https://developers.google.com/workspace/calendar/api/v3/reference/events/get
+
+Google Calendar Freebusy.query:
+https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query
+
+Google Calendar Events resource status and extendedProperties.private:
+https://developers.google.com/workspace/calendar/api/v3/reference/events
+
+### Safe local review
+
+    cd /home/ubuntu/empire_worktrees/inbound_revenue_recovery_20261020
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_calendar_20261020 --calendar-db /path/to/existing_calendar_registry.db --tenant-id AUTHORIZED_TENANT --read-only
+
+### Production gates
+
+1. Operator-approved Google OAuth onboarding of an actual customer-owned calendar with appropriate read-only/freebusy scopes, revocation, explicit calendar ACL verification, secure token storage and refresh. Do not use unrelated personal calendars or account tokens.
+2. Trusted creation and immutable source linkage of Empire private event markers from a verified appointment-creation workflow. The current adapter will REFUSE unmarked events; this is deliberate.
+3. Legitimate, explicit customer authorization for new calendar event writes and confirmation messages requires a distinct separately gated module; do not silently grant these rights to the read-only adapter.
+4. Securely persist canonical proof events into the approved production evidence pipeline with transactional or idempotent cross-store reconciliation, provider retry tests and status-change monitoring.
+5. Apply only after isolated PostgreSQL migration/RLS checks and coordinated production identity, privacy, retention and audit signoff.
+
+The optional HTTP client has NOT been exercised against a live tenant calendar. Passing mocked provider tests is not a successful live calendar connection.
