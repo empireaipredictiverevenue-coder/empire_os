@@ -14,7 +14,9 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.predictive_bls_cost_index import review_bls_cost_index_owner
-from empire_os.predictive_bls_public_probe import probe_bls_public_v1
+from empire_os.predictive_bls_public_probe import (
+    probe_bls_public_v1, probe_bls_sector_public_v1,
+)
 from empire_os.predictive_multi_index_economics import review_multi_index_cost_pressure
 
 BUNDLE_FIELDS=frozenset((
@@ -40,19 +42,24 @@ def main()->int:
     parser.add_argument("--hypothesis-bundle",default=None)
     parser.add_argument("--probe-official-bls-v1",action="store_true",
                         help="One explicit official BLS public GET; does not approve source for profit scenarios")
+    parser.add_argument("--probe-sector-bls-v1",action="store_true",
+                        help="Four separate official BLS public research GETs; roofing/HVAC/electrical/concrete")
     args=parser.parse_args()
-    if args.probe_official_bls_v1 and args.bls_owner_review:
-        parser.error("Choose a reviewed owner packet OR the research-only public probe")
+    if (int(args.probe_official_bls_v1)+int(args.probe_sector_bls_v1)
+            +int(bool(args.bls_owner_review)))>1:
+        parser.error("Choose only one BLS owner packet, single-series probe, or sector basket")
     now=datetime.now(timezone.utc)
     bls=review_bls_cost_index_owner(
         _json(args.bls_owner_review) if args.bls_owner_review else None,as_of=now,
     )
     public_probe=probe_bls_public_v1(as_of=now) if args.probe_official_bls_v1 else None
+    sector_probe=probe_bls_sector_public_v1(as_of=now) if args.probe_sector_bls_v1 else None
     base={
         "schema_version":"empire.predictive_revenue.cost_pressure_operator.v1",
         "mode":"OBSERVE","status":"COST_PRESSURE_SOURCE_OR_ASSUMPTIONS_NOT_CONNECTED",
         "bls_source_status":bls["status"],
         "official_bls_public_research_probe":public_probe,
+        "official_bls_sector_research_probe":sector_probe,
         "public_research_source_is_finance_owner_approved":False,
         "bls_series_count":bls["series_observation_count"],
         "original_hypothesis_bundle_supplied":args.hypothesis_bundle is not None,
@@ -66,6 +73,10 @@ def main()->int:
     if (public_probe is not None and public_probe.get("status")
             == "BLS_PUBLIC_MONTHLY_INDEX_OBSERVED_RESEARCH_ONLY"):
         base["status"]="OFFICIAL_BLS_PUBLIC_RESEARCH_OBSERVED_OWNER_APPROVAL_REQUIRED"
+    if sector_probe is not None:
+        base["status"]=("OFFICIAL_BLS_SECTOR_RESEARCH_OBSERVED_OWNER_APPROVAL_REQUIRED"
+                        if sector_probe["status"]=="BLS_SECTOR_PUBLIC_RESEARCH_REVIEWED"
+                        else "OFFICIAL_BLS_SECTOR_RESEARCH_PARTIAL_SOURCE_HOLD")
     if args.hypothesis_bundle:
         bundle=_json(args.hypothesis_bundle)
         if not isinstance(bundle,dict) or set(bundle)!=BUNDLE_FIELDS:

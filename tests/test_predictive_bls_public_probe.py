@@ -171,3 +171,123 @@ def test_untrusted_m13_annual_classification_cannot_bypass_validation():
     })
     out=review_public_bls_v1_response(x,as_of=NOW)
     assert out["status"]=="BLS_PUBLIC_SOURCE_PROBE_HOLD"
+
+
+def sector_source_packets():
+    from empire_os.predictive_bls_public_probe import SERIES_CATALOG
+    packets=[]
+    for sid in SERIES_CATALOG:
+        packet=api_packet()
+        packet["Results"]["series"][0]["seriesID"]=sid
+        packets.append(review_public_bls_v1_response(packet,as_of=NOW,series_id=sid))
+    return packets
+
+
+def test_roofing_hvac_electrical_concrete_series_are_separate_and_not_solar_modules():
+    from empire_os.predictive_bls_public_probe import (
+        SERIES_CATALOG, review_bls_sector_reports,
+    )
+    report=review_bls_sector_reports(sector_source_packets(),as_of=NOW)
+    assert report["status"]=="BLS_SECTOR_PUBLIC_RESEARCH_REVIEWED"
+    assert report["source_series_count"]==4
+    assert report["source_series_observed_count"]==4
+    assert [r["official_public_series_id"] for r in report["source_research_cards"]]==list(SERIES_CATALOG)
+    assert {r["researched_sector"] for r in report["source_research_cards"]}=={
+        "construction_concrete","roofing_materials","hvac_equipment",
+        "electrical_grid_solar_adjacent_not_pv_module",
+    }
+    assert report["distinct_base_year_series_levels_must_not_be_aggregated"] is True
+    assert report["electrical_grid_index_is_solar_module_price"] is False
+    assert report["sector_cost_shocks_approved_by_finance"] is False
+    assert report["business_revenue_or_profit_verified"] is False
+    assert report["background_worker_scheduled"] is False
+    assert report["database_writes"] is False
+
+
+def test_partial_hold_remains_unknown_not_assumed_zero_index_or_success():
+    from empire_os.predictive_bls_public_probe import review_bls_sector_reports
+    cases=sector_source_packets()
+    cases[1]["status"]="BLS_PUBLIC_SOURCE_PROBE_HOLD"
+    cases[1]["published_index_yoy_percent"]=None
+    result=review_bls_sector_reports(cases,as_of=NOW)
+    assert result["status"]=="BLS_SECTOR_PUBLIC_RESEARCH_PARTIAL_HOLD"
+    assert result["source_series_holds_count"]==1
+    assert result["source_series_observed_count"]==3
+    assert result["source_research_cards"][1]["published_index_yoy_percent"] is None
+    assert result["sector_index_yoy_is_verified_supplier_cost_movement"] is False
+
+
+def test_public_bls_sector_id_substitution_rejected_even_if_other_data_valid():
+    from empire_os.predictive_bls_public_probe import review_bls_sector_reports
+    cases=sector_source_packets()
+    cases[1]["official_public_series_id"]="PCU999999999999"
+    with pytest.raises(ValueError):
+        review_bls_sector_reports(cases,as_of=NOW)
+
+
+def test_expected_public_id_must_match_original_api_series_id():
+    from empire_os.predictive_bls_public_probe import SERIES_CATALOG
+    sid=list(SERIES_CATALOG)[2]
+    x=api_packet()
+    result=review_public_bls_v1_response(x,as_of=NOW,series_id=sid)
+    assert result["status"]=="BLS_PUBLIC_SOURCE_PROBE_HOLD"
+    assert result["official_public_series_id"]==sid
+    assert result["source_last_month"] is None
+
+
+def test_unlisted_public_series_cannot_be_requested():
+    from empire_os.predictive_bls_public_probe import probe_bls_public_v1
+    with pytest.raises(ValueError):
+        probe_bls_public_v1(as_of=NOW,series_id="PCU000000000000")
+
+
+def test_explicit_sector_probe_limits_each_live_request_to_one_listed_series(monkeypatch):
+    import empire_os.predictive_bls_public_probe as mod
+    calls=[]
+    def fake_single(*,as_of,series_id):
+        calls.append(series_id)
+        x=api_packet()
+        x["Results"]["series"][0]["seriesID"]=series_id
+        return mod.review_public_bls_v1_response(x,as_of=as_of,series_id=series_id)
+    monkeypatch.setattr(mod,"probe_bls_public_v1",fake_single)
+    out=mod.probe_bls_sector_public_v1(as_of=NOW)
+    assert calls==list(mod.SERIES_CATALOG)
+    assert out["status"]=="BLS_SECTOR_PUBLIC_RESEARCH_REVIEWED"
+    assert out["official_public_gets_in_this_request_max"]==4
+
+
+def test_sector_operator_opt_in_does_not_activate_financial_scenarios(monkeypatch,capsys):
+    import scripts.review_predictive_multi_index_cost_pressure_20261020 as cli
+    import empire_os.predictive_bls_public_probe as mod
+    original=sector_source_packets()
+    monkeypatch.setattr(cli,"probe_bls_sector_public_v1",
+                        lambda *,as_of: mod.review_bls_sector_reports(original,as_of=as_of))
+    monkeypatch.setattr("sys.argv",["probe","--read-only","--probe-sector-bls-v1"])
+    cli.main()
+    result=json.loads(capsys.readouterr().out)
+    assert result["status"]=="OFFICIAL_BLS_SECTOR_RESEARCH_OBSERVED_OWNER_APPROVAL_REQUIRED"
+    assert result["official_bls_sector_research_probe"]["source_series_observed_count"]==4
+    assert result["bls_series_count"] is None
+    assert result["bls_source_status"]=="BLS_OWNER_SOURCE_NOT_CONNECTED"
+    assert result["hypothetical_scenario_review"] is None
+    assert result["simulation_applied_to_production"] is False
+    assert result["database_writes"] is False
+
+
+def test_sector_operator_does_not_fetch_without_explicit_flag(monkeypatch,capsys):
+    import scripts.review_predictive_multi_index_cost_pressure_20261020 as cli
+    def should_not_run(*,as_of):
+        raise AssertionError("never fetch without explicit opt-in")
+    monkeypatch.setattr(cli,"probe_bls_sector_public_v1",should_not_run)
+    monkeypatch.setattr("sys.argv",["probe","--read-only"])
+    cli.main()
+    result=json.loads(capsys.readouterr().out)
+    assert result["official_bls_sector_research_probe"] is None
+
+
+def test_conflicting_public_and_owner_flags_are_refused(monkeypatch):
+    import scripts.review_predictive_multi_index_cost_pressure_20261020 as cli
+    monkeypatch.setattr("sys.argv",["probe","--read-only",
+                                    "--probe-official-bls-v1","--probe-sector-bls-v1"])
+    with pytest.raises(SystemExit):
+        cli.main()

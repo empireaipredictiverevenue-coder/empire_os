@@ -122,3 +122,39 @@ References:
 - https://www.bls.gov/ppi/notices/2013/ppi-introduces-regional-detail-for-ready-mix-concrete-indexes.htm
 
 **Still not a full live connected cost-optimisation engine**. Ready-mix concrete is an initial verifiable proof-of-source series; before using roofing, HVAC, solar or other niche scenarios, source owners must select and verify relevant series, preserve geographic/period meaning, confirm source licences and obtain actual customer/product-level invoices, payments and forecasts. No producer feed was activated in production.
+
+
+## 20 October 2026 — verified four-sector public research expansion
+
+The initial single-series probe has now been expanded via an **explicit opt-in** to four original official BLS public API v1 series. Industry/title mappings are supported by the original BLS series as indexed by the Federal Reserve Bank of St. Louis/FRED. They are *research catalog identity*, not third-party commercial cost validation.
+
+| Series ID | Official industry output-price index | Research sector relevance | FRED catalog |
+|---|---|---|---|
+| `PCU327320327320` | Ready-mix concrete manufacturing | Construction concrete | https://fred.stlouisfed.org/series/PCU327320327320 |
+| `PCU324122324122` | Asphalt shingle and coating materials manufacturing | Roofing materials | https://fred.stlouisfed.org/series/PCU324122324122 |
+| `PCU333415333415` | Air-conditioning, refrigeration and forced-air heating equipment manufacturing | HVAC equipment | https://fred.stlouisfed.org/series/PCU333415333415 |
+| `PCU335313335313` | Switchgear and switchboard apparatus manufacturing | Electrical/grid infrastructure, **solar-adjacent, not solar PV modules** | https://fred.stlouisfed.org/series/PCU335313335313 |
+
+The code explicitly rejects arbitrary series IDs. It checks source identity, period, M13 annual rows, year-over-year same-month comparison, preliminary flags, freshness, HTTPS origin/final URL, response size, no warning status and broken sources; all source records remain separated. **Do not add index levels across different BLS base years.**
+
+New CLI flag:
+
+```bash
+PYTHONPATH=/home/ubuntu/empire_agents/predictive_decision_control_20261018 \
+  /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_predictive_multi_index_cost_pressure_20261020 \
+  --read-only --probe-sector-bls-v1
+```
+
+**Verified live results 20 October 2026 (official BLS public API, September 2026 vs September 2025, preliminary):**
+
+- ready-mix concrete index: **+2.3446%**;
+- asphalt shingle/coating manufacturing index: **+3.6518%**;
+- HVAC equipment manufacturing index: **+5.7387%**;
+- switchgear/switchboard equipment manufacturing index: **+12.3192%**.
+
+All four original source reads passed source validation; zero source holds. This command performs **up to four deliberate bounded official HTTPS GETs per invocation**, consuming anonymous public API allowance and never installing a monitor, storing source files or using a premium plan. The original one-series `--probe-official-bls-v1` remains supported and unchanged. Both switches are mutually exclusive with `--bls-owner-review`; source-owner approval is **not inferred from public data**.
+
+The four published output indexes **must not** be averaged together to claim a construction input inflation rate or assigned automatically to a local contractor's cost basket. The solar-adjacent electrical series is **not a verified solar-panel manufacturing price series**. Actual supplier quote, procurement terms, contractor labour rates, deliveries, refunds and unit-level accounting must be obtained through their existing Finance/Materials owners before model calibration and source-specific market profitability can be claimed.
+
+The original economic-source state remains `BLS_OWNER_SOURCE_NOT_CONNECTED`, `hypothetical_scenario_review=null`, `public_research_source_is_finance_owner_approved=false`, `database_writes=false`. No change to Finance, Marketing, source materializers, Quant, Economic Memory, production services or external messages.
