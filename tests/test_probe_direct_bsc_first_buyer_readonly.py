@@ -196,3 +196,107 @@ def test_module_has_no_live_order_write_or_mail():
                     "submit_payment_proposal(", "UPDATE public."):
         assert blocked not in source
     assert "POST" in source and "UNKNOWN" in source
+
+
+def independent_fixture(*, overrides=None, asset=None):
+    cases = fixtures()
+    cases.update(overrides or {})
+    traffic = []
+
+    def getter(url, *, page=False):
+        traffic.append(("GET", url))
+        if page:
+            return cases["buy"]
+        return cases["catalog"] if url == smoke.CATALOG else cases["health"]
+
+    def reserved_denial(url):
+        traffic.append(("POST_RESERVED_TOKEN_ONLY", url))
+        return True
+
+    def verifier():
+        traffic.append(("CHECK_PIN", "trusted_owner"))
+        if isinstance(asset, Exception):
+            raise asset
+        return asset is not False
+
+    def blockchain(*, config):
+        traffic.append(("READ_ONLY_RPC", "BSC"))
+        return cases["chain"]
+
+    result = smoke.inspect_independent_gates(
+        fetch=getter,
+        unknown_denied=reserved_denial,
+        chain=blockchain,
+        asset_verify=verifier,
+    )
+    return result, traffic
+
+
+def test_independent_canary_all_seven_checks_and_no_real_buyer():
+    result, traffic = independent_fixture()
+    assert result["status"] == "CHECKOUT_BUYER_READONLY_CANARY_VERIFIED"
+    assert result["verified_gate_count"] == result["all_gate_count"] == 7
+    assert all(result["checks"].values())
+    assert result["real_orders_submitted"] == 0
+    assert result["public_post_order_attempted"] is False
+    assert result["email_sent"] is False
+    assert result["revenue_recognition"] is False
+    assert result["legacy_asset_pin_reapproved"] is False
+    assert len([verb for verb, _ in traffic if verb == "POST_RESERVED_TOKEN_ONLY"]) == 2
+    assert len([verb for verb, _ in traffic if verb == "READ_ONLY_RPC"]) == 1
+    assert all(url != "http://127.0.0.1/v1/checkout/orders"
+               for verb, url in traffic)
+
+
+def test_asset_hold_does_not_prevent_independent_real_chain_and_routes():
+    result, traffic = independent_fixture(
+        asset=ValueError("untrusted checksum: private@example.invalid")
+    )
+    assert result["status"] == "CHECKOUT_BUYER_READONLY_CANARY_HELD"
+    assert result["held_stages"] == ["published_asset_integrity"]
+    assert result["checks"]["fresh_bsc_chain"] is True
+    assert result["checks"]["private_nonissued_bearer"] is True
+    assert result["checks"]["public_nonissued_bearer"] is True
+    assert result["verified_gate_count"] == 6
+    assert result["next_owner"] == "EXISTING_WEBSITE_RELEASE_OWNER"
+    assert result["payment_execution"] is False
+    assert "private@example" not in str(result)
+    assert ("READ_ONLY_RPC", "BSC") in traffic
+
+
+def test_bad_chain_is_held_even_if_all_site_checks_pass():
+    sample = fixtures()
+    sample["chain"] = {**sample["chain"], "chain_id": 97}
+    result, _ = independent_fixture(overrides={"chain": sample["chain"]})
+    assert result["held_stages"] == ["fresh_bsc_chain"]
+    assert result["status"] == "CHECKOUT_BUYER_READONLY_CANARY_HELD"
+    assert result["legacy_asset_pin_reapproved"] is False
+
+
+def test_multiple_independent_failures_do_not_mask_or_echo_source():
+    cases = fixtures()
+    cases["catalog"] = {**cases["catalog"], "products": [{}, {}]}
+    cases["health"] = {**cases["health"], "payment_execution": True}
+    result, traffic = independent_fixture(
+        overrides={"catalog": cases["catalog"], "health": cases["health"]},
+        asset=ValueError("operator secret customer@example.invalid")
+    )
+    assert set(result["held_stages"]) == {
+        "published_asset_integrity", "catalog", "checkout_health"
+    }
+    assert result["checks"]["fresh_bsc_chain"] is True
+    assert result["verified_gate_count"] == 4
+    assert "customer@" not in str(result)
+    assert result["real_orders_submitted"] == 0
+
+
+def test_cli_opt_in_requires_exact_flag(monkeypatch, capsys):
+    monkeypatch.setattr(smoke, "inspect_independent_gates", lambda: {
+        "status": "CHECKOUT_BUYER_READONLY_CANARY_HELD",
+        "held_stages": ["published_asset_integrity"],
+    })
+    assert smoke.main(["--independent-read-only"]) == 2
+    text = capsys.readouterr().out
+    assert "published_asset_integrity" in text
+    assert smoke.main(["--send-order"]) == 3
+    assert "EXACT_READ_ONLY_FLAG_REQUIRED" in capsys.readouterr().out

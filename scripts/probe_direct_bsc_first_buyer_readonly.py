@@ -143,10 +143,145 @@ def inspect(*, fetch=None, unknown_denied=None,
     return evidence
 
 
-def main()->int:
-    result=inspect()
-    print(json.dumps(result,sort_keys=True))
-    return 0 if result["status"]=="CHECKOUT_BUYER_READONLY_CANARY_VERIFIED" else 2
+
+def inspect_independent_gates(
+    *, fetch=None, unknown_denied=None, chain=None, asset_verify=None,
+) -> dict[str, Any]:
+    """Independent first-buyer PRE-ORDER evidence, not checkout release approval.
+
+    A historical HTML pin failure does not suppress independent status-route
+    or fresh BSC chain checks. Every gate is still required for an overall
+    green result. No real order, buyer identity, or payment is touched.
+    """
+    fetch = fetch or _get
+    unknown_denied = unknown_denied or _unknown_denied
+
+    def check_buy() -> bool:
+        body = fetch(BUY, page=True)
+        return (
+            type(body) is bytes and 0 < len(body) <= 800_000
+            and b"<html" in body.lower()
+        )
+
+    def check_assets() -> bool:
+        if asset_verify is None:
+            from scripts.deploy_direct_bsc_buyer_status_release import (
+                _published_checkout_verified,
+            )
+            _published_checkout_verified()
+            return True
+        return asset_verify() is True
+
+    def check_catalog() -> bool:
+        catalog = fetch(CATALOG)
+        return (
+            type(catalog) is dict
+            and catalog.get("binding_order_creation_authorized") is True
+            and catalog.get("payment_proposal_authorized") is True
+            and catalog.get("checkout_settlement_mode") == "direct"
+            and catalog.get("actual_revenue") is False
+            and type(catalog.get("products")) is list
+            and len(catalog["products"]) == 4
+        )
+
+    def check_checkout_health() -> bool:
+        health = fetch(HEALTH)
+        return (
+            type(health) is dict
+            and health.get("status") == "online"
+            and health.get("payment_execution") is False
+            and health.get("revenue_recognition") is False
+            and health.get("binding_order_creation_authorized") is True
+            and health.get("payment_proposal_authorized") is True
+        )
+
+    def check_chain() -> bool:
+        from empire_os.self_serve_payment_readiness import verify_checkout_bsc_chain
+        from empire_os.bsc_usdt_verifier import BscUsdtConfig, BSC_USDT_CONTRACT
+        config = BscUsdtConfig(
+            rpc_url="https://bsc-dataseed.bnbchain.org",
+            treasury_address="0x1339b487046B0ad924a10c20b1791608EA8595a8",
+            token_contract=BSC_USDT_CONTRACT,
+            min_confirmations=12,
+        )
+        proof = (chain or verify_checkout_bsc_chain)(config=config)
+        age = proof.get("block_age_seconds") if type(proof) is dict else None
+        return (
+            type(proof) is dict
+            and proof.get("chain_verified") is True
+            and proof.get("status") == "FRESH_BSC_MAINNET_USDT_ANCHOR"
+            and type(proof.get("chain_id")) is int
+            and proof.get("chain_id") == 56
+            and type(proof.get("token_decimals")) is int
+            and proof.get("token_decimals") == 18
+            and type(age) in (int, float)
+            and -30 <= age <= 300
+            and proof.get("payment_execution") is not True
+            and proof.get("actual_revenue") is not True
+        )
+
+    steps = (
+        ("buy_page", check_buy),
+        ("published_asset_integrity", check_assets),
+        ("catalog", check_catalog),
+        ("checkout_health", check_checkout_health),
+        ("private_nonissued_bearer", lambda: unknown_denied(PRIVATE) is True),
+        ("public_nonissued_bearer", lambda: unknown_denied(PUBLIC) is True),
+        ("fresh_bsc_chain", check_chain),
+    )
+    results: dict[str, bool] = {}
+    for stage, func in steps:
+        try:
+            results[stage] = func() is True
+        except Exception:
+            # No original HTTP response, traceback, token, wallet, or SQL
+            # error may enter the founder operator report.
+            results[stage] = False
+    held = [name for name, verified in results.items() if not verified]
+    return {
+        "schema_version": "empire.bsc_checkout.independent_preorder_gates.v1",
+        "status": (
+            "CHECKOUT_BUYER_READONLY_CANARY_VERIFIED"
+            if not held else "CHECKOUT_BUYER_READONLY_CANARY_HELD"
+        ),
+        "mode": "READ_ONLY",
+        "checks": results,
+        "held_stages": held,
+        "all_gate_count": len(steps),
+        "verified_gate_count": len(steps) - len(held),
+        "legacy_asset_pin_reapproved": False,
+        "fresh_chain_is_payment_or_settlement_proof": False,
+        "public_post_order_attempted": False,
+        "real_orders_submitted": 0,
+        "buyer_data_disclosed": False,
+        "status_tokens_issued": 0,
+        "email_sent": False,
+        "database_writes": False,
+        "payment_execution": False,
+        "revenue_recognition": False,
+        "execution_authority": "none",
+        "next_owner": (
+            "EXISTING_WEBSITE_RELEASE_OWNER"
+            if "published_asset_integrity" in held
+            else "EXISTING_BUYER_CHECKOUT_SOURCE_OWNER"
+            if held else "EXISTING_REAL_BUYER_TRANSACTION_OWNER"
+        ),
+        "next_original_proof": "GENUINE_FIRST_PARTY_ORDER_AND_SETTLEMENT",
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    import sys
+    argv = sys.argv[1:] if argv is None else argv
+    if argv == ["--independent-read-only"]:
+        result = inspect_independent_gates()
+    elif not argv:
+        result = inspect()
+    else:
+        print(json.dumps({"status": "EXACT_READ_ONLY_FLAG_REQUIRED"}))
+        return 3
+    print(json.dumps(result, sort_keys=True))
+    return 0 if result["status"] == "CHECKOUT_BUYER_READONLY_CANARY_VERIFIED" else 2
 
 
 if __name__=="__main__":
