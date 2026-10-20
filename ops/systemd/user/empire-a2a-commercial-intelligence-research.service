@@ -1,0 +1,21 @@
+[Unit]
+Description=Empire AI A2A Commercial Intelligence Research (observe-only)
+ConditionPathExists=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/scripts/run_a2a_commercial_intelligence_cycle_v2_20261020.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/
+Environment=PYTHONPATH=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020
+ExecStart=/srv/empire_os/.venv/bin/python -B -m scripts.run_a2a_commercial_intelligence_cycle_v2_20261020 --write-local
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/runtime/a2a_commercial_signal_mining
+RestrictAddressFamilies=AF_UNIX
+TimeoutStartSec=120
+MemoryMax=256M
+CPUQuota=25%
+StandardOutput=journal
+StandardError=journal

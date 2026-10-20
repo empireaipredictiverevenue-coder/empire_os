@@ -1,0 +1,12 @@
+[Unit]
+Description=Hourly Empire AI A2A Research Intelligence
+
+[Timer]
+OnCalendar=hourly
+RandomizedDelaySec=120s
+AccuracySec=1min
+Persistent=true
+Unit=empire-a2a-commercial-intelligence-research.service
+
+[Install]
+WantedBy=timers.target
