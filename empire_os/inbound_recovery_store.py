@@ -158,11 +158,11 @@ class OfflineRecoveryStore:
             )
         return True
 
-    def report(self, tenant_id: str) -> dict[str, Any]:
-        """Filters tenant in SQL before rebuilding aggregate; no raw caller PII."""
+    def events_for_tenant(self, tenant_id: str) -> tuple[RecoveryEvent, ...]:
+        """Tenant-scoped read of stored evidence; no cross-tenant joins."""
         if not tenant_id:
             raise ValueError("tenant_id_required")
-        ledger = RecoveryLedger()
+        events: list[RecoveryEvent] = []
         rows = self._conn.execute(
             "SELECT tenant_id,event_id,call_id,occurred_at,kind,origin,"
             "evidence_ref,amount_minor,currency,verified,synthetic "
@@ -170,15 +170,22 @@ class OfflineRecoveryStore:
             (tenant_id,),
         ).fetchall()
         for r in rows:
-            ledger.append(RecoveryEvent(
+            events.append(RecoveryEvent(
                 tenant_id=r[0], event_id=r[1], call_id=r[2], occurred_at=r[3],
                 kind=r[4], origin=r[5], evidence_ref=r[6],
                 amount_minor=r[7], currency=r[8], verified=bool(r[9]),
                 synthetic=bool(r[10]),
             ))
+        return tuple(events)
+
+    def report(self, tenant_id: str) -> dict[str, Any]:
+        """Aggregated read of tenant-scoped offline provider evidence."""
+        ledger = RecoveryLedger()
+        for event in self.events_for_tenant(tenant_id):
+            ledger.append(event)
         result = ledger.report(tenant_id)
         result["store"] = "offline_sqlite_persisted"
-        result["database_writes"] = False  # Report operation is read-only.
+        result["database_writes"] = False
         return result
 
 

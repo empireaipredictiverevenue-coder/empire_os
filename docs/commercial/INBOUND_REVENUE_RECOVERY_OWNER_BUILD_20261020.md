@@ -75,3 +75,42 @@ For commercial testing, hypothetical packages of £299, £499 and £999+ a month
 Do not change the existing live Lead Smart pilot, Voice Lab outbound authorization, buyer discovery, Predictive Revenue production sources, DemandCalls live route, public flagship site or payment authority through this branch.
 
 Before production activation: prove signed event authenticity, tenant identity/isolation, data minimization, consent/notice handling, callback suppression, human fallback, calendar and payment verification, retention deletion, cost monitoring and a separately approved supervised pilot.
+
+
+## 20 October — Opportunity Intelligence and Source Attribution extension
+
+**Milestone status:** Implemented as an **offline, read-only commercial intelligence layer**. No production customer contact, billing, campaigns or telecom routing has been enabled.
+
+### New code
+- empire_os/inbound_opportunity_intelligence.py: evidenced missed-call queue; configurable callback/booking/general response SLAs, deterministic urgency explanations, opt-out exclusion, protected tenant filtering, verified human intent signal handling, no customer outreach authority.
+- empire_os/inbound_source_attribution.py: canonical call-linked, verified first/last acquisition touch; source categories include organic, paid search, social, marketplaces and referrals. Actual payment receipts are included only after independently verified recovery; receipt deduplication is global within the tenant report. Unknown sources remain unattributed.
+- empire_os/inbound_recovery_patterns.py: verified provider call outcome distribution by weekday and local daypart. Configured minimum cohort and segment thresholds prevent unreliable alerts. Contradictory call dispositions are excluded; no money, ROI or causal prediction is fabricated.
+- empire_os/inbound_recovery_store.py: safe tenant-scoped event retrieval for existing SQLite review.
+- scripts/review_inbound_revenue_recovery_20261020.py: operator review modes for priorities, source attribution and pattern analysis, alongside earlier scorecard.
+
+### Operational interface
+
+All commands run from the isolated worktree using the project's Python environment, without provider/network writes.
+
+Read prioritised, unresolved work from an existing local evidence database:
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --sqlite-db /path/to/existing-evidence.db --tenant-id TENANT --read-only --opportunities --as-of 2026-10-20T13:00:00+01:00
+
+Inspect first-party source linkage; unknown is a valid result rather than an invented channel:
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --sqlite-db /path/to/existing-evidence.db --tenant-id TENANT --read-only --source-attribution --as-of 2026-10-20T13:00:00+01:00
+
+Review enough events for repeated missed demand patterns using a named business timezone:
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --sqlite-db /path/to/existing-evidence.db --tenant-id TENANT --read-only --patterns --timezone Europe/London --as-of 2026-10-20T13:00:00+01:00
+
+With --events-jsonl, local fixtures can be read without database access. --signals-jsonl is allowed only in opportunity mode and --source-touches-jsonl only in source-attribution mode. These are test/review assertions, not trusted live data capture or provider-authenticated source-linking.
+
+### Commercial intelligence safeguards
+
+- Never treat several provider call IDs as several unique people unless identity is independently verified.
+- Only real, verified provider-missed statuses create actionable internal tickets. Agent/model signals alone cannot escalate verified urgency. Human attestation is required and should eventually be tied to immutable reviewer audits.
+- Ticket prioritisation is rules-based, not a predictive buyer or expected-revenue score. All operator recommendations are review-only; explicit consent/suppression verification remains a prerequisite for any subsequent contact.
+- For source tracking, do not infer a paid click or organic source from message content. Provider/partner-backed call-tracking joins are required; revenue is limited to verified received-payment receipts after independently confirmed recovery.
+- Insufficient history yields no staffing patterns. The analysis highlights observed pressure on a business, not a statistically calibrated revenue estimate or causal proof.
+- Production integration still requires provider-signed intake, owner-authenticated tenants, durable provenance, customer-approved business-hours settings, consent and opt-out enforcement, true CRM/calendar/finance reconciliation and a supervised release.
