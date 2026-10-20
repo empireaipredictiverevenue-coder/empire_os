@@ -13,10 +13,14 @@ Sell verified business outcomes, not merely an AI receptionist. Businesses shoul
 - empire_os/inbound_revenue_recovery.py — deterministic receptionist response policy, tenant profiles, deduplicated recovery ledger, verified outcome and payment attribution.
 - empire_os/inbound_recovery_api.py — dedicated token-gated preview surface disabled unless an explicit environment flag is enabled.
 - empire_os/inbound_provider_contract.py — isolated number-to-tenant registry, explicit DID ownership and disabled/enabled routing contract, and status mapping requiring prior signed provider attestation.
+- empire_os/inbound_signature_verification.py — Vonage Voice JWT HS256 verification with issuer/API key/application checks, payload SHA-256, freshness and JWT ID (no publicly exposed intake endpoint).
+- empire_os/inbound_recovery_store.py — offline SQLite tenant-scoped persistence, signed callback JWT replay tracking, idempotent retry handling, and a genuinely read-only connection mode for reports.
+- empire_os/inbound_recovery_scorecard.py — no-estimates recovery funnel and operational review actions based on valid evidence only.
+- empire_os/inbound_business_hours.py — time-zone aware staffed windows, business-confirmed closures, after-hours fallback and DST-aware next opening.
 - empire_os/hub.py — registers only the preview router; leaves existing Vonage live call routes untouched.
-- scripts/review_inbound_revenue_recovery_20261020.py — offline JSONL replay, read-only aggregates and tenant filtering.
-- supabase/migrations/20261020124500_inbound_revenue_recovery_prepared.sql — prepared migration for default-deny tenant profiles and events (not applied).
-- tests/test_inbound_revenue_recovery.py and tests/test_inbound_provider_contract.py — offline evidence, tenant-number ownership, parity and preview safety tests.
+- scripts/review_inbound_revenue_recovery_20261020.py — offline JSONL or existing SQLite review, optional scorecard, tenant filtering and read-only enforcement.
+- supabase/migrations/20261020124500_inbound_revenue_recovery_prepared.sql — prepared, unapplied schema for tenant profiles, evidence events and signed callback replay receipts; all tables default-deny RLS.
+- tests/test_inbound_revenue_recovery.py, tests/test_inbound_provider_contract.py, tests/test_inbound_recovery_store.py, tests/test_inbound_recovery_scorecard.py and tests/test_inbound_business_hours.py — offline evidence, JWT auth/tamper/replay, durable attribution, opening-hours and preview safety tests.
 
 ## Existing integration points
 
@@ -28,29 +32,33 @@ Existing CRM, predictive revenue, buyer intelligence, demand-calls, website and 
 
 To run focused tests from this worktree:
 
-    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q tests/test_inbound_revenue_recovery.py tests/test_voice_gateway_api.py
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q tests/test_inbound_business_hours.py tests/test_inbound_recovery_scorecard.py tests/test_inbound_recovery_store.py tests/test_inbound_provider_contract.py tests/test_inbound_revenue_recovery.py tests/test_voice_gateway_api.py
 
 To run replay against an authorized local JSONL file:
 
-    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --events-jsonl /path/to/events.jsonl --tenant-id an-authorized-tenant --read-only
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --events-jsonl /path/to/events.jsonl --tenant-id an-authorized-tenant --scorecard --read-only
+
+To inspect an already-created offline SQLite file without writing or creating it:
+
+    PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_revenue_recovery_20261020 --sqlite-db /path/to/offline.db --tenant-id an-authorized-tenant --scorecard --read-only
 
 For a LOCAL test deployment only, enable EMPIRE_INBOUND_RECOVERY_PREVIEW_ENABLED and set a secret EMPIRE_INBOUND_RECOVERY_PREVIEW_TOKEN; send the header x-empire-preview-token to POST /v1/inbound-recovery/preview.
 
 In production, keep the preview flag unset. No inbound telephony, external callback, message, booking, database mutation, live billing or payment action is performed by this candidate.
 
-IMPORTANT: The verified flag in offline replay simulates receipts from an authorized adapter. It is not proof of signature verification. Real live adapters must validate the provider signature and ownership of the phone line, calendar item, invoice and tenant, then persist the evidence chain. Do not pass arbitrarily submitted JSON into commercial attribution.
+IMPORTANT: The offline JSONL verified flag simulates receipts from trusted adapters; it is not evidence of real calendar or payment-provider verification. The **standalone** Vonage verifier authenticates JWT HS256 + body hash, but there is no registered live webhook or real provider key. The SQLite signed-intake function is local/offline, not a deployed callback endpoint. Real live adapters must configure verified phone ownership and persist event proof under scoped DB authority, verify calendar and payment claims independently, and enforce legal/privacy safeguards before launch.
 
 ## Delivery phases
 
 **P0, implemented:** deterministic receptionist policy, AI disclosure, no invented appointment confirmation, emergency/human escalation, opt-out behaviour, scoped event ledger, strict receipt requirements, money deduplication, protected preview and read-only replay.
 
-**P1, partially prepared:** inbound DID/tenant mapping contract and canonical Vonage status normalization tested offline. Still pending: actual cryptographic webhook verification, real number registry provisioning and persistence, duplicate/retry reconciliation, durable event storage, business opening-hours logic, timezone and holiday handling, fallback to human transfers. Preserve the current Lead Smart production routing without change.
+**P1, partially implemented in offline form:** inbound DID/tenant mapping, canonical Vonage status normalization, signed JWT/payload verification, durable offline callback-replay storage, read-only reporting, verified-hours calculation, closure dates, and after-hours human-follow-up preview. Still pending: production signed webhook endpoint, real owner-verified number registry, Supabase persistence and authorization, customer-approved staffing schedules, operational SMS/callback transfer, authorized production deployment, supervised proof and monitoring. Preserve the current Lead Smart production routing without change.
 
 **P2, pending:** real customer callback consent workflow, verified calendar availability and booking adapter, human approval, permitted follow-up delivery and suppression propagation.
 
 **P3, pending:** CRM opportunity linkage, first-touch/last-touch campaign source, verified payment receipt reconciler, cost and gross margin dashboard, audit evidence chain and owner-approved finance integration.
 
-**P4, pending:** tenant provisioning and scripts, service-specific guardrails, FAQs and structured knowledge, security-scoped customer dashboard, accurate usage invoices, alerts and missed-opportunity SLA analytics.
+**P4, partially prepared:** read-only offline scorecard and hours-aware preview are implemented. Pending: actual tenant provisioning, client-specific scripts, FAQs and structured knowledge, secure authenticated customer dashboard, usage invoices, operational alerts and missed-opportunity SLA analytics.
 
 **P5, pending:** legal/privacy and UK PECR/GDPR review, recording notices, retention and erasure, signed webhook penetration tests, throughput/latency tests, genuine consented pilot, founder release approval and production monitoring.
 

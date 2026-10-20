@@ -58,13 +58,33 @@ CREATE TABLE IF NOT EXISTS public.inbound_recovery_events (
 CREATE INDEX IF NOT EXISTS inbound_recovery_events_tenant_call_time_idx
     ON public.inbound_recovery_events (tenant_id, call_id, occurred_at);
 
+-- Prepared signed-Voice callback replay/audit evidence.
+-- Do not ingest direct client payloads as verified callbacks.
+CREATE TABLE IF NOT EXISTS public.inbound_recovery_signed_callbacks (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    tenant_id text NOT NULL REFERENCES public.inbound_recovery_tenants(tenant_id),
+    event_id text NOT NULL,
+    provider text NOT NULL CHECK (provider = 'vonage'),
+    api_key text NOT NULL,
+    jwt_id text NOT NULL,
+    payload_sha256 char(64) NOT NULL CHECK (payload_sha256 ~ '^[a-f0-9]{64}$'),
+    verified_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE (api_key, jwt_id),
+    UNIQUE (tenant_id, event_id, jwt_id),
+    FOREIGN KEY (tenant_id, event_id)
+        REFERENCES public.inbound_recovery_events(tenant_id, event_id)
+);
+
 -- Default-deny. Future signed provider adapters use a dedicated internal role,
 -- with verified tenant mapping; nothing is granted to client/browser roles.
 ALTER TABLE public.inbound_recovery_tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.inbound_recovery_signed_callbacks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_tenants FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.inbound_recovery_events FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.inbound_recovery_signed_callbacks FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON public.inbound_recovery_tenants FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON public.inbound_recovery_events FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON public.inbound_recovery_signed_callbacks FROM PUBLIC, anon, authenticated;
 
 COMMIT;

@@ -204,3 +204,47 @@ def test_default_event_is_synthetic_until_explicitly_attested():
     ledger = RecoveryLedger()
     ledger.append(item)
     assert ledger.report("tenant-a")["calls_observed"] == 0
+
+
+def test_hours_preview_after_hours_does_not_offer_live_human_transfer(monkeypatch, client):
+    monkeypatch.setenv("EMPIRE_INBOUND_RECOVERY_PREVIEW_ENABLED", "true")
+    monkeypatch.setenv("EMPIRE_INBOUND_RECOVERY_PREVIEW_TOKEN", "only-inside-tests")
+    response = client.post("/v1/inbound-recovery/preview", json={
+        "tenant_id": "plumber-1",
+        "business_name": "Acme Plumbers",
+        "intent": "human",
+        "human_transfer_configured": True,
+        "staffed_hours": {
+            "timezone_name": "Europe/London",
+            "when_iso": "2026-10-20T20:00:00+00:00",
+            "simulated_verified": True,
+            "windows": [
+                {"weekday": d, "opens": "09:00", "closes": "17:30"}
+                for d in range(5)
+            ],
+        },
+    }, headers={"x-empire-preview-token": "only-inside-tests"})
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action"] == "request_human_followup"
+    assert body["staffed_hours"]["origin"] == "operator_supplied_simulation_only"
+    assert body["staffed_hours"]["open_now"] is False
+    assert body["booking_confirmed"] is False
+    assert body["provider_connected"] is False
+
+
+def test_hours_preview_rejects_invalid_or_naive_datetime(monkeypatch, client):
+    monkeypatch.setenv("EMPIRE_INBOUND_RECOVERY_PREVIEW_ENABLED", "true")
+    monkeypatch.setenv("EMPIRE_INBOUND_RECOVERY_PREVIEW_TOKEN", "only-inside-tests")
+    for when_iso in ("not-a-date", "2026-10-20T09:00:00"):
+        response = client.post("/v1/inbound-recovery/preview", json={
+            "tenant_id": "plumber-1",
+            "business_name": "Acme Plumbers",
+            "intent": "human",
+            "staffed_hours": {
+                "timezone_name": "Europe/London",
+                "when_iso": when_iso,
+                "simulated_verified": True,
+            },
+        }, headers={"x-empire-preview-token": "only-inside-tests"})
+        assert response.status_code == 422
