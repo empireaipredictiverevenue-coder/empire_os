@@ -353,3 +353,55 @@ def test_sandbox_runtime_deadline_already_expired_blocks_inference():
     with pytest.raises(EmpireCoderSandboxError, match="model_inference_deadline_exceeded"):
         with _bounded_inference_runtime(-1):
             raise AssertionError("expired inference must never run")
+
+
+def test_original_worker_and_isolated_sandbox_share_inference_lock(tmp_path):
+    import fcntl
+    from empire_os.empire_coder_sandbox_runner import (
+        _shared_coder_ollama_lock,
+        EmpireCoderSandboxError,
+    )
+    original_lock = tmp_path / "runtime/coder/ollama.lock"
+    original_lock.parent.mkdir(parents=True)
+    original_lock.touch()
+    with _shared_coder_ollama_lock(tmp_path):
+        # Independent open-file handles conflict, even in one process.
+        with original_lock.open("r+") as other:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(other.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(EmpireCoderSandboxError, match="inference_busy"):
+            with _shared_coder_ollama_lock(tmp_path):
+                raise AssertionError("should not enter nested inference")
+    # Lock release is guaranteed after both success and failure.
+    with _shared_coder_ollama_lock(tmp_path):
+        pass
+
+
+def test_original_coder_lock_absence_or_symlink_fails_closed(tmp_path):
+    from empire_os.empire_coder_sandbox_runner import (
+        _shared_coder_ollama_lock,
+        EmpireCoderSandboxError,
+    )
+    with pytest.raises(EmpireCoderSandboxError, match="lock_unavailable"):
+        with _shared_coder_ollama_lock(tmp_path):
+            pass
+    lock = tmp_path / "runtime/coder/ollama.lock"
+    lock.parent.mkdir(parents=True, exist_ok=True)
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.write_text("")
+    lock.symlink_to(elsewhere)
+    with pytest.raises(EmpireCoderSandboxError, match="lock_unavailable"):
+        with _shared_coder_ollama_lock(tmp_path):
+            pass
+
+
+def test_shared_inference_lock_released_after_exception(tmp_path):
+    from empire_os.empire_coder_sandbox_runner import _shared_coder_ollama_lock
+    lock = tmp_path / "runtime/coder/ollama.lock"
+    lock.parent.mkdir(parents=True)
+    lock.touch()
+    with pytest.raises(RuntimeError, match="synthetic code exception"):
+        with _shared_coder_ollama_lock(tmp_path):
+            raise RuntimeError("synthetic code exception")
+    with _shared_coder_ollama_lock(tmp_path):
+        pass
