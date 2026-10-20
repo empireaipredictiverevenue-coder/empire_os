@@ -13,6 +13,10 @@ import {
   reuseCheckoutOrderAttempt,
   type CheckoutOrderAttempt,
 } from "@/lib/checkout-order-attempt";
+import {
+  approvedProposalHref,
+  INTELLIGENCE_PROPOSAL_CODES,
+} from "@/lib/buyer-proposal-handoff";
 
 type Product = {
   product_code: string;
@@ -86,12 +90,7 @@ type ExchangeResult = {
   error?: string;
 };
 
-const DEFAULT_CODES = [
-  "competitor_search_gap",
-  "search_opportunity_map",
-  "technical_search_audit",
-  "solar_opportunity_map_us",
-];
+const DEFAULT_CODES: string[] = [...INTELLIGENCE_PROPOSAL_CODES];
 
 function human(value: string) {
   return value
@@ -177,6 +176,12 @@ export default function BuyPage() {
     () => exchange?.products.find((item) => item.product_code === tierCode) || null,
     [exchange, tierCode],
   );
+
+  // This is an independent, nonbinding buyer-initiated path. Only a product
+  // returned by the live approved checkout catalogue may become a proposal
+  // deep link. The commercial page will verify it again against its own
+  // first-party approved enquiry offers before selecting anything.
+  const proposalUrl = approvedProposalHref(product?.product_code || null);
 
   useEffect(() => {
     if (tier && !tier.exclusivity_eligible && exclusivity) {
@@ -425,7 +430,7 @@ export default function BuyPage() {
                     and on-chain payment requests remain independently gated.
                     You can still enquire today; no wallet or payment is required.
                   </p>
-                  <a href="/commercial" className="mt-7 inline-flex min-h-13 items-center rounded-xl bg-[#eaf2ff] px-6 text-xs font-bold tracking-[0.11em] text-[#07132c]">
+                  <a href={proposalUrl} className="mt-7 inline-flex min-h-13 items-center rounded-xl bg-[#eaf2ff] px-6 text-xs font-bold tracking-[0.11em] text-[#07132c]">
                     REQUEST A PROPOSAL
                   </a>
                 </div>
@@ -494,6 +499,13 @@ export default function BuyPage() {
                     ? "CREATING ORDER…"
                     : "CREATE PAYMENT REQUEST"}
                 </button>
+
+                <a
+                  href={proposalUrl}
+                  className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-cyan-300/50 px-4 py-3 text-center text-xs font-bold tracking-[.1em] text-cyan-200 hover:text-white"
+                >
+                  REQUEST A PROPOSAL INSTEAD
+                </a>
 
                 {result ? (
                   <>

@@ -9,6 +9,7 @@ import {
   type CommercialInterestAttempt,
   type CommercialInterestDetails,
 } from "@/lib/commercial-interest-attempt";
+import { selectApprovedProposalOffer } from "@/lib/buyer-proposal-handoff";
 
 type Offer = { product_code: string; name: string; offer_family: string; currency: string; approved_price_cents: number; price_interval: string; implementation_fee_cents?: number };
 type Catalog = { status: string; offers: Offer[] };
@@ -43,7 +44,15 @@ export default function CommercialPage() {
         if (!mounted) return;
         if (data.status !== "FOUNDER_LED_ENQUIRY_AVAILABLE" || !Array.isArray(data.offers)) throw Error("unverified");
         setOffers(data.offers);
-        setCode(data.offers[0]?.product_code || "");
+        // A /buy proposal link carries an UNTRUSTED suggested product.
+        // Never treat the query as an approved offer or consent. The
+        // first-party offers GET is the only selection allowlist.
+        const requested = new URLSearchParams(window.location.search).get("product");
+        const selection = selectApprovedProposalOffer(requested, data.offers);
+        setCode(selection.code);
+        if (selection.rejected) {
+          setError("The requested product is not available for a proposal. Please choose an approved offer below.");
+        }
       })
       .catch(() => { if (mounted) setError("Commercial enquiries are temporarily unavailable."); });
     return () => { mounted = false; };
@@ -136,7 +145,8 @@ export default function CommercialPage() {
           <p className="mt-2 text-sm leading-6 text-slate-400">Buyer-initiated enquiries go to our first-party commercial workflow for founder review. No automated follow-up, checkout or payment.</p>
           <form onSubmit={submit} className="mt-7 space-y-4">
             <label className="block text-xs text-slate-300">Solution
-              <select required value={code} onChange={e => setCode(e.target.value)} className={inputStyle}>
+              <select required value={code} onChange={e => { setCode(e.target.value); setError(""); }} className={inputStyle}>
+                <option value="" disabled>Choose an approved offer</option>
                 {offers.map(offer => <option value={offer.product_code} key={offer.product_code}>{offer.name}</option>)}
               </select>
             </label>
