@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -54,6 +54,7 @@ case "$command" in
   commercial-intake) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-crm) module=scripts.review_predictive_founder_crm_visibility_20261020 ;;
   catalog) module=scripts.review_predictive_catalog_readiness_20261020 ;;
+  science) module=scripts.review_predictive_product_science_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -97,6 +98,9 @@ EOF
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
     scripts/review_predictive_catalog_readiness_20261020.py \
+    empire_os/predictive_product_scientific_holdout.py \
+    empire_os/predictive_product_science_readiness.py \
+    scripts/review_predictive_product_science_20261020.py \
     scripts/review_predictive_founder_crm_visibility_20261020.py \
     scripts/review_predictive_commercial_requirements_20261020.py \
     scripts/print_predictive_commercial_intake_template_20261020.py \
@@ -157,6 +161,21 @@ assert x["enterprise_delivery_verified"] is False
 assert x["actual_revenue_verified"] is False
 assert x["database_writes"] is False
 assert x["execution_authority"]=="none"
+'
+# The science adapter MUST preserve unknown forecasts when original product
+# outcomes or forecast registry readback are absent.
+"$TMP/bin/empire-predictive-observe" science | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.product_science_readiness.v1"
+assert x["mode"]=="OBSERVE" and x["execution_authority"]=="none"
+assert x["catalogue_product_count"]>=5
+assert x["original_source_issuer_authenticated"] is False
+assert x["original_forecast_registry_readback_authenticated"] is False
+assert x["forecast_eligible_for_customer"] is False
+assert x["economic_memory_update_eligible"] is False
+assert x["database_writes"] is False
 '
 # The blank downloadable template must round-trip as a structured incomplete
 # customer intake, never an unhandled ValueError or an inferred buyer order.
