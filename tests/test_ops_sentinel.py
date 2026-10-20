@@ -179,3 +179,102 @@ def test_down_autonomous_revenue_owner_gets_safe_restart_plan():
         and row["target"] == "empire-autonomous-revenue-os.service"
         for row in plan
     )
+
+
+def recent_fallback_runtime():
+    current = datetime.now(timezone.utc).isoformat()
+    return {
+        "source_health": {
+            "source": "overpass",
+            "endpoint_healthy": False,
+            "blockers": ["source_probe_error"],
+            "errors": ["private upstream failure details"],
+        },
+        "acquisition": {
+            "schema_version": "acquisition_cycle.v2",
+            "observed_at": current,
+            "ok": True,
+            "fallback_used": True,
+            "source": "permits",
+            "attempted_sources": ["courtlistener", "permits"],
+            "canonical_acquisition_observed": True,
+            "real_data_only": True,
+            "prospect_canonical_write": False,
+            "outreach_enabled": False,
+            "payment_enabled": False,
+        },
+        "acquisition_last_success": {
+            "schema_version": "acquisition_success.v2",
+            "observed_at": current,
+            "source": "permits",
+            "real_data_only": True,
+            "canonical_writes": False,
+            "prospect_canonical_write": False,
+            "signal_inbox_write": True,
+            "write_store": "runtime_signal_inbox",
+        },
+    }
+
+
+def test_live_original_acquisition_fallback_changes_overpass_warning_to_info():
+    evidence = recent_fallback_runtime()
+    findings = analyze(unit_states=healthy_units(), runtime=evidence)
+    codes = {f.code for f in findings}
+    assert "source_pipeline_degraded" not in codes
+    row = next(f for f in findings
+               if f.code == "source_endpoint_degraded_fallback_active")
+    assert row.severity == "info"
+    assert row.repairable is False
+    assert row.evidence["fallback_source"] == "permits"
+    assert row.evidence["canonical_ingest_authorized"] is False
+    assert row.evidence["outreach_authorized"] is False
+    assert "private" not in str(row.evidence)
+    assert build_repair_plan(findings) == []
+
+
+import pytest
+
+
+@pytest.mark.parametrize("field,value", [
+    ("observed_at", "2026-09-01T00:00:00+00:00"),
+    ("ok", False),
+    ("source", "overpass"),
+    ("canonical_acquisition_observed", False),
+    ("real_data_only", False),
+    ("prospect_canonical_write", True),
+    ("outreach_enabled", True),
+    ("payment_enabled", True),
+    ("fallback_used", False),
+    ("attempted_sources", ["courtlistener"]),
+])
+def test_unverified_replay_or_authority_preserves_original_warning(field, value):
+    evidence = recent_fallback_runtime()
+    evidence["acquisition"][field] = value
+    findings = analyze(unit_states=healthy_units(), runtime=evidence)
+    assert any(f.code == "source_pipeline_degraded" and f.severity == "warning"
+               for f in findings)
+    assert not any(f.code == "source_endpoint_degraded_fallback_active"
+                   for f in findings)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("source", "unrelated"),
+    ("observed_at", "2026-09-01T00:00:00+00:00"),
+    ("real_data_only", False),
+    ("signal_inbox_write", False),
+    ("canonical_writes", True),
+    ("prospect_canonical_write", True),
+    ("write_store", "empiredb"),
+])
+def test_forged_last_success_keeps_source_warning(field, value):
+    evidence = recent_fallback_runtime()
+    evidence["acquisition_last_success"][field] = value
+    findings = analyze(unit_states=healthy_units(), runtime=evidence)
+    assert any(f.code == "source_pipeline_degraded" for f in findings)
+
+
+def test_last_success_receipt_absent_is_not_called_healthy():
+    evidence = recent_fallback_runtime()
+    del evidence["acquisition_last_success"]
+    findings = analyze(unit_states=healthy_units(), runtime=evidence)
+    assert any(f.code == "source_pipeline_degraded" for f in findings)

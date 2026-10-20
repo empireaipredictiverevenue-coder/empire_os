@@ -480,6 +480,8 @@ def main() -> int:
                 }
                 for row in blocking_findings
             )
+            else "FALLBACK_ACTIVE_OVERPASS_UNAVAILABLE"
+            if any(row.get("code") == "source_endpoint_degraded_fallback_active" for row in findings)
             else "HEALTHY"
         ),
         "model_providers": (

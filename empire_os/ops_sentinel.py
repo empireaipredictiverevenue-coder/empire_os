@@ -36,6 +36,7 @@ RUNTIME_INPUTS = {
     "commercial_loop": RUNTIME / "commercial_loop/latest.json",
     "model_health": RUNTIME / "llm/model_health.json",
     "acquisition": RUNTIME / "acquisition/latest.json",
+    "acquisition_last_success": RUNTIME / "acquisition/last_success.json",
     "buyer_review": RUNTIME / "buyer_review_materializer/latest.json",
     "coder_model_health": RUNTIME / "coder/model_health.json",
     "competitive_intelligence_refresh": (
@@ -84,6 +85,62 @@ def _commercial_blocker(loop: Mapping[str, Any]) -> str:
     return "unknown"
 
 
+def _fresh_verified_acquisition_fallback(
+    runtime: Mapping[str, Mapping[str, Any]],
+    *,
+    now: datetime,
+) -> bool:
+    """Read-only proof that a DIFFERENT original source succeeded recently.
+
+    Overpass may still be down; this only means the acquisition pipeline
+    has a real, observed fallback. It never grants canonical ingest or
+    converts source candidates into customers or buyer conversations.
+    """
+    latest = runtime.get("acquisition") or {}
+    receipt = runtime.get("acquisition_last_success") or {}
+    if not isinstance(latest, Mapping) or not isinstance(receipt, Mapping):
+        return False
+    source = latest.get("source")
+    if (
+        latest.get("schema_version") != "acquisition_cycle.v2"
+        or receipt.get("schema_version") != "acquisition_success.v2"
+        or latest.get("ok") is not True
+        or latest.get("fallback_used") is not True
+        or latest.get("canonical_acquisition_observed") is not True
+        or latest.get("real_data_only") is not True
+        or receipt.get("real_data_only") is not True
+        or receipt.get("signal_inbox_write") is not True
+        or receipt.get("canonical_writes") is not False
+        or receipt.get("prospect_canonical_write") is not False
+        or receipt.get("write_store") != "runtime_signal_inbox"
+        or latest.get("prospect_canonical_write") is not False
+        or latest.get("outreach_enabled") is not False
+        or latest.get("payment_enabled") is not False
+        or not isinstance(source, str)
+        or source not in {"permits", "courtlistener"}
+        or receipt.get("source") != source
+        or not isinstance(latest.get("attempted_sources"), list)
+        or source not in latest["attempted_sources"]
+    ):
+        return False
+    try:
+        times = []
+        for packet in (latest, receipt):
+            at = datetime.fromisoformat(
+                str(packet.get("observed_at")).replace("Z", "+00:00")
+            )
+            if at.utcoffset() is None:
+                return False
+            seconds = (now.astimezone(timezone.utc) -
+                       at.astimezone(timezone.utc)).total_seconds()
+            if seconds < -120 or seconds > 2700:
+                return False
+            times.append(at.timestamp())
+        return abs(times[0] - times[1]) <= 300
+    except (TypeError, ValueError, OverflowError):
+        return False
+
+
 def analyze(
     *,
     unit_states: Mapping[str, str],
@@ -112,15 +169,35 @@ def analyze(
     source = runtime.get("source_health") or {}
     if source:
         if source.get("endpoint_healthy") is False:
-            findings.append(Finding(
-                "source_pipeline_degraded", "warning", "source_health",
-                "Acquisition source endpoint is not healthy",
-                True, 90, {
-                    "endpoint_healthy": source.get("endpoint_healthy"),
-                    "blockers": source.get("blockers") or [],
-                    "errors": source.get("errors") or [],
-                },
-            ))
+            fallback = _fresh_verified_acquisition_fallback(
+                runtime, now=datetime.now(timezone.utc)
+            )
+            if fallback:
+                # This is NOT a successful Overpass probe: the source still
+                # failed. A separate original acquisition cycle and exact
+                # last-success receipt prove a different source is flowing.
+                findings.append(Finding(
+                    "source_endpoint_degraded_fallback_active", "info",
+                    "source_health",
+                    "Overpass unavailable; recent original acquisition fallback succeeded",
+                    False, 70, {
+                        "endpoint_healthy": False,
+                        "fallback_source": runtime["acquisition"]["source"],
+                        "canonical_ingest_authorized": False,
+                        "outreach_authorized": False,
+                        "source_probe_error": True,
+                    },
+                ))
+            else:
+                findings.append(Finding(
+                    "source_pipeline_degraded", "warning", "source_health",
+                    "Overpass unavailable; no fresh independent fallback proven",
+                    True, 90, {
+                        "endpoint_healthy": False,
+                        "blockers": source.get("blockers") or [],
+                        "errors": source.get("errors") or [],
+                    },
+                ))
         elif source.get("canonical_ingest_scheduled") is False:
             findings.append(Finding(
                 "source_pipeline_unscheduled", "warning", "source_health",
