@@ -13,7 +13,10 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
+import threading
+import time
 from typing import Any, Mapping
 
 from empire_os.aider_builder import (
@@ -144,6 +147,37 @@ def _run(
     )
 
 
+@contextmanager
+def _bounded_inference_runtime(seconds: float):
+    """Fail closed when model inference exhausts the job's remaining time.
+
+    Only operate on a dedicated main-thread sandbox execution. Do not
+    overwrite other components' SIGALRM deadline or signal handler.
+    The existing run_empire_coder_sandbox_job finally always releases its
+    execution lease and deletes the temporary clone after this exits.
+    """
+    if seconds <= 0:
+        raise EmpireCoderSandboxError("model_inference_deadline_exceeded")
+    if (not hasattr(signal, "setitimer")
+            or threading.current_thread() is not threading.main_thread()):
+        raise EmpireCoderSandboxError("model_deadline_requires_main_thread")
+    if signal.getitimer(signal.ITIMER_REAL)[0] > 0:
+        raise EmpireCoderSandboxError("existing_process_deadline_owned_elsewhere")
+
+    previous_handler = signal.getsignal(signal.SIGALRM)
+
+    def deadline_exceeded(_signum, _frame):
+        raise EmpireCoderSandboxError("model_inference_deadline_exceeded")
+
+    signal.signal(signal.SIGALRM, deadline_exceeded)
+    try:
+        signal.setitimer(signal.ITIMER_REAL, seconds)
+        yield
+    finally:
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        signal.signal(signal.SIGALRM, previous_handler)
+
+
 def _scoped_repo_path(value: str) -> str | None:
     """Accept only repo-relative paths without traversal or empty segments.
 
@@ -247,6 +281,7 @@ def run_empire_coder_sandbox_job(
     work_root: str | Path = DEFAULT_WORK_ROOT,
 ) -> dict[str, Any]:
     job.validate()
+    job_started = time.monotonic()
     root = Path(repo_root).resolve()
     work_base = Path(work_root)
     work_base.mkdir(parents=True, exist_ok=True)
@@ -426,19 +461,24 @@ def run_empire_coder_sandbox_job(
                         context = _scoped_source_context(
                             coder, context, job.allowed_paths
                         )
-                        candidate = coder.propose_structured_patch(
-                            task.id,
-                            (
-                                "Implement exactly one smallest safe DEVELOPMENT "
-                                "patch for the task objective. Return only the "
-                                "machine-checkable structured patch requested by "
-                                "Empire Coder. Do not touch deployment, services, "
-                                "production databases, outbound, credentials, "
-                                "payments, funds or revenue truth.\n\nTASK:\n"
-                                + job.objective
-                            ),
-                            context,
+                        remaining = (
+                            job.max_runtime_seconds
+                            - (time.monotonic() - job_started)
                         )
+                        with _bounded_inference_runtime(remaining):
+                            candidate = coder.propose_structured_patch(
+                                task.id,
+                                (
+                                    "Implement exactly one smallest safe DEVELOPMENT "
+                                    "patch for the task objective. Return only the "
+                                    "machine-checkable structured patch requested by "
+                                    "Empire Coder. Do not touch deployment, services, "
+                                    "production databases, outbound, credentials, "
+                                    "payments, funds or revenue truth.\n\nTASK:\n"
+                                    + job.objective
+                                ),
+                                context,
+                            )
                 except Exception as exc:
                     result["backend_attempts"].append({
                         "backend": "structured_patch",
@@ -447,6 +487,12 @@ def run_empire_coder_sandbox_job(
                             f"{type(exc).__name__}:{exc}"
                         )[:1000],
                     })
+                    if isinstance(exc, EmpireCoderSandboxError) and (
+                        "deadline" in str(exc)
+                    ):
+                        result["status"] = "TIME_BUDGET_EXCEEDED"
+                        result["reason"] = str(exc)
+                        return result
                     continue
 
                 proposal = candidate.proposal
@@ -514,6 +560,11 @@ def run_empire_coder_sandbox_job(
         ))
         checks: list[dict[str, Any]] = []
         if tests:
+            remaining = job.max_runtime_seconds - (time.monotonic() - job_started)
+            if remaining <= 0:
+                result["status"] = "TIME_BUDGET_EXCEEDED"
+                result["reason"] = "verification_time_budget_exceeded"
+                return result
             env = {
                 "PATH": "/usr/local/bin:/usr/bin:/bin",
                 "PYTHONPATH": str(clone),
@@ -526,7 +577,7 @@ def run_empire_coder_sandbox_job(
                 ],
                 cwd=clone,
                 env=env,
-                timeout=min(max(job.max_runtime_seconds, 120), 1200),
+                timeout=max(1, min(int(remaining), 1200)),
             )
             checks.append({
                 "kind": "pytest",
@@ -545,6 +596,10 @@ def run_empire_coder_sandbox_job(
             result["status"] = "VERIFICATION_FAILED"
             return result
 
+        if time.monotonic() - job_started >= job.max_runtime_seconds:
+            result["status"] = "TIME_BUDGET_EXCEEDED"
+            result["reason"] = "proposal_publication_time_budget_exceeded"
+            return result
         proposal_branch = f"empire-coder/job-{job.job_id}"
         switched = _run(
             ["git", "switch", "-C", proposal_branch],
@@ -581,10 +636,15 @@ def run_empire_coder_sandbox_job(
             result["reason"] = "origin_remote_unavailable"
             return result
         _run(["git", "remote", "set-url", "origin", remote], cwd=clone)
+        remaining = job.max_runtime_seconds - (time.monotonic() - job_started)
+        if remaining <= 0:
+            result["status"] = "TIME_BUDGET_EXCEEDED"
+            result["reason"] = "proposal_push_time_budget_exceeded"
+            return result
         pushed = _run(
             ["git", "push", "origin", f"HEAD:refs/heads/{proposal_branch}"],
             cwd=clone,
-            timeout=180,
+            timeout=max(1, min(int(remaining), 180)),
         )
         if pushed.returncode != 0:
             result["status"] = "PUSH_FAILED"

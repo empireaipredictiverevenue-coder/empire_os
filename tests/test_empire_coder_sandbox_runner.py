@@ -297,3 +297,59 @@ def test_sandbox_context_rejects_traversal_and_preserves_pack_on_no_sources():
     )
     assert result is original
     assert reads == ["empire_os/safe.py"]
+
+
+
+def test_sandbox_inference_deadline_interrupts_model_wait_and_restores_signal():
+    import signal
+    import time
+    from empire_os.empire_coder_sandbox_runner import _bounded_inference_runtime
+
+    if not hasattr(signal, "setitimer"):
+        pytest.skip("POSIX runtime deadline required")
+    assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+    handler = signal.getsignal(signal.SIGALRM)
+    with pytest.raises(EmpireCoderSandboxError, match="model_inference_deadline_exceeded"):
+        with _bounded_inference_runtime(0.03):
+            time.sleep(0.35)
+    assert signal.getsignal(signal.SIGALRM) is handler
+    assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+
+    with _bounded_inference_runtime(0.4):
+        assert 2 + 2 == 4
+    assert signal.getitimer(signal.ITIMER_REAL)[0] == 0
+
+
+def test_sandbox_runtime_deadline_fails_closed_if_other_timer_is_active(monkeypatch):
+    import signal
+    from empire_os.empire_coder_sandbox_runner import _bounded_inference_runtime
+
+    if not hasattr(signal, "getitimer"):
+        pytest.skip("POSIX runtime deadline required")
+    original_handler = signal.getsignal(signal.SIGALRM)
+    monkeypatch.setattr(signal, "getitimer", lambda _which: (15.0, 0.0))
+    with pytest.raises(EmpireCoderSandboxError, match="existing_process_deadline"):
+        with _bounded_inference_runtime(30):
+            raise AssertionError("deadline conflict must never execute model")
+    assert signal.getsignal(signal.SIGALRM) is original_handler
+
+
+def test_sandbox_runtime_deadline_rejects_non_main_thread():
+    from concurrent.futures import ThreadPoolExecutor
+    from empire_os.empire_coder_sandbox_runner import _bounded_inference_runtime
+
+    def outside_main_thread():
+        with _bounded_inference_runtime(1):
+            return "BAD_UNBOUNDED_INFERENCE"
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(outside_main_thread)
+        with pytest.raises(EmpireCoderSandboxError, match="model_deadline_requires_main_thread"):
+            future.result()
+
+
+def test_sandbox_runtime_deadline_already_expired_blocks_inference():
+    from empire_os.empire_coder_sandbox_runner import _bounded_inference_runtime
+
+    with pytest.raises(EmpireCoderSandboxError, match="model_inference_deadline_exceeded"):
+        with _bounded_inference_runtime(-1):
+            raise AssertionError("expired inference must never run")
