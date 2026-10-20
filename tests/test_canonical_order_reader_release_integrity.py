@@ -127,3 +127,56 @@ def test_forged_current_cannot_pass_transition(tmp_path):
     current["outbound_authorized"] = True
     with pytest.raises(ValueError):
         review_reader_release_transition(None, current)
+
+
+def test_transient_git_unavailable_does_not_trigger_false_owner_review(tmp_path):
+    root, source = repo(tmp_path, NO_METHOD)
+    confirmed = inspect_canonical_reader_release_integrity(root)
+    first = review_reader_release_transition(None, confirmed)
+    unavailable = dict(confirmed, status="ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN")
+    unknown = review_reader_release_transition(
+        confirmed, unavailable, previous_transition=first,
+    )
+    assert unknown["status"] == "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
+    assert unknown["last_confirmed_original_owner_state"] == "VERIFIED_ORDER_READER_NOT_COMMITTED"
+    assert unknown["existing_owner_review_eligible"] is False
+    restored = review_reader_release_transition(
+        unavailable, confirmed, previous_transition=unknown,
+    )
+    assert restored["status"] == "UNCHANGED_ORIGINAL_OWNER_RELEASE_HOLD"
+    assert restored["existing_owner_review_eligible"] is False
+
+
+def test_real_release_progress_after_source_unavailability_is_detected(tmp_path, monkeypatch):
+    root, source = repo(tmp_path, NO_METHOD)
+    before = inspect_canonical_reader_release_integrity(root)
+    first = review_reader_release_transition(None, before)
+    unavailable = dict(before, status="ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN")
+    missing = review_reader_release_transition(before, unavailable, first)
+    source.write_text(YES_METHOD)
+    git(root, "add", "empire_os/execution_bus_data_repository.py")
+    git(root, "-c", "user.name=Owner Tests",
+        "-c", "user.email=owner-tests@example.invalid",
+        "commit", "-qm", "committed owner method")
+    monkeypatch.setattr(ExecutionBusDataRepository, "verified_outcome_feedback",
+                        lambda *_a, **_kw: None, raising=False)
+    now = inspect_canonical_reader_release_integrity(root)
+    changed = review_reader_release_transition(unavailable, now, missing)
+    assert changed["status"] == "ORIGINAL_OWNER_RELEASE_INTEGRITY_CHANGED_REVIEW_REQUIRED"
+    assert changed["existing_owner_review_eligible"] is True
+    assert changed["outbound_authorized"] is False
+    assert changed["last_confirmed_original_owner_state"] == now["status"]
+    assert now["original_owner_release_attested"] is False
+
+
+def test_untrusted_previous_transition_does_not_restore_forged_authority(tmp_path):
+    root, _ = repo(tmp_path, NO_METHOD)
+    source = inspect_canonical_reader_release_integrity(root)
+    first = review_reader_release_transition(None, source)
+    modified = dict(first)
+    modified["last_confirmed_original_owner_state"] = "COMMITTED_READER_PRESENT_OWNER_APPROVAL_REQUIRED"
+    modified["new_agent_created"] = True
+    unavailable = dict(source, status="ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN")
+    out = review_reader_release_transition(source, unavailable, modified)
+    assert out["existing_owner_review_eligible"] is False
+    assert out["last_confirmed_original_owner_state"] == "VERIFIED_ORDER_READER_NOT_COMMITTED"

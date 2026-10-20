@@ -120,13 +120,13 @@ def test_existing_ops_observes_canonical_reader_integrity_without_clearing_order
     assert owner["verified_buyer_orders"] is None
     assert owner["original_owner_release_attested"] is False
     assert first["original_order_reader_release_transition"]["status"] == (
-        "FIRST_ORIGINAL_OWNER_RELEASE_INTEGRITY_CHECK"
+        "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
     )
     assert ops_mod.main() == 0
     capsys.readouterr()
     second = _summary(ops)
     assert second["original_order_reader_release_transition"]["status"] == (
-        "UNCHANGED_ORIGINAL_OWNER_RELEASE_HOLD"
+        "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
     )
     assert second["outbound_authorized"] is False
     assert second["original_order_reader_release_integrity"]["realized_revenue_cents"] is None

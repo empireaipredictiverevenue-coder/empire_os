@@ -110,49 +110,83 @@ def inspect_canonical_reader_release_integrity(repo_root: Path) -> dict:
     }
 
 
-def review_reader_release_transition(previous: dict | None, current: dict) -> dict:
-    """Only status transitions from allowlisted original-owner integrity proof."""
+def review_reader_release_transition(
+    previous: dict | None,
+    current: dict,
+    previous_transition: dict | None = None,
+) -> dict:
+    """Debounce transitory Git/source unavailability without upgrading proof.
+
+    Memory of the last confirmed allowlisted state survives an unavailable
+    observation. It is a comparison checkpoint only, never current authority.
+    """
+    unknown = "ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN"
     statuses = {
-        "ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN",
+        unknown,
         "ORIGINAL_OWNER_SOURCE_DIRTY_RELEASE_HOLD",
         "VERIFIED_ORDER_READER_NOT_COMMITTED",
         "COMMITTED_OWNER_READER_NOT_LOADED",
         "COMMITTED_READER_PRESENT_OWNER_APPROVAL_REQUIRED",
     }
-    if (
-        not isinstance(current, dict)
-        or current.get("schema_version") != SCHEMA
-        or current.get("status") not in statuses
-        or current.get("execution_authority") != "none"
-        or current.get("database_writes") is not False
-        or current.get("outbound_authorized") is not False
-        or current.get("payment_execution") is not False
-        or current.get("agent_tasks_created") is not False
-        or current.get("original_owner_release_attested") is not False
-    ):
+
+    def trusted(value):
+        return (
+            isinstance(value, dict)
+            and value.get("schema_version") == SCHEMA
+            and value.get("status") in statuses
+            and value.get("execution_authority") == "none"
+            and value.get("database_writes") is False
+            and value.get("outbound_authorized") is False
+            and value.get("payment_execution") is False
+            and value.get("agent_tasks_created") is False
+            and value.get("original_owner_release_attested") is False
+        )
+
+    if not trusted(current):
         raise ValueError("trusted canonical owner release-integrity proof required")
-    prior_valid = (
-        isinstance(previous, dict)
-        and previous.get("schema_version") == SCHEMA
-        and previous.get("status") in statuses
-        and previous.get("execution_authority") == "none"
-        and previous.get("original_owner_release_attested") is False
-        and previous.get("database_writes") is False
+    prior_status = previous["status"] if trusted(previous) else None
+    last_known = prior_status if prior_status != unknown else None
+    valid_prior_transition = (
+        isinstance(previous_transition, dict)
+        and previous_transition.get("schema_version") ==
+        "empire.commercial.canonical_reader_release_transition.v1"
+        and previous_transition.get("mode") == "OBSERVE"
+        and previous_transition.get("execution_authority") == "none"
+        and previous_transition.get("database_writes") is False
+        and previous_transition.get("outbound_authorized") is False
+        and previous_transition.get("new_agent_created") is False
+        and previous_transition.get("current_allowlisted_owner_state") == prior_status
+        and previous_transition.get("last_confirmed_original_owner_state") in (
+            statuses - {unknown}
+        ) | {None}
     )
-    before = previous["status"] if prior_valid else None
+    if valid_prior_transition:
+        last_known = previous_transition["last_confirmed_original_owner_state"]
     after = current["status"]
-    transition = (
-        "FIRST_ORIGINAL_OWNER_RELEASE_INTEGRITY_CHECK" if before is None
-        else "UNCHANGED_ORIGINAL_OWNER_RELEASE_HOLD" if before == after
-        else "ORIGINAL_OWNER_RELEASE_INTEGRITY_CHANGED_REVIEW_REQUIRED"
-    )
+    if after == unknown:
+        state = "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
+        review = False
+    elif last_known is None:
+        state = "FIRST_ORIGINAL_OWNER_RELEASE_INTEGRITY_CHECK"
+        review = False
+    elif last_known == after:
+        state = "UNCHANGED_ORIGINAL_OWNER_RELEASE_HOLD"
+        review = False
+    else:
+        state = "ORIGINAL_OWNER_RELEASE_INTEGRITY_CHANGED_REVIEW_REQUIRED"
+        review = True
+
     return {
         "schema_version": "empire.commercial.canonical_reader_release_transition.v1",
         "mode": "OBSERVE",
-        "status": transition,
-        "previous_allowlisted_owner_state": before,
+        "status": state,
+        "previous_allowlisted_owner_state": prior_status,
         "current_allowlisted_owner_state": after,
-        "existing_owner_review_eligible": before is not None and before != after,
+        "last_confirmed_original_owner_state": (
+            last_known if after == unknown else after
+        ),
+        "transient_source_error_does_not_create_owner_job": after == unknown,
+        "existing_owner_review_eligible": review,
         "new_agent_created": False,
         "outbound_authorized": False,
         "database_writes": False,

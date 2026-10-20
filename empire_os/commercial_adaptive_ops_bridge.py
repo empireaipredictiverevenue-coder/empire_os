@@ -91,6 +91,10 @@ def observe_ops_adaptive_commercial(
     )
     order_release_transition = review_reader_release_transition(
         prior_integrity, order_release_integrity,
+        previous_transition=(
+            prior_summary.get("original_order_reader_release_transition")
+            if isinstance(prior_summary, Mapping) else None
+        ),
     )
     old_buyer = (
         prior_summary.get("original_buyer_evidence_health")
