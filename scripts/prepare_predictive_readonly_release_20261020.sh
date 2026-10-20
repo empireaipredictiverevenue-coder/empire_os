@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -55,6 +55,7 @@ case "$command" in
   commercial-crm) module=scripts.review_predictive_founder_crm_visibility_20261020 ;;
   catalog) module=scripts.review_predictive_catalog_readiness_20261020 ;;
   science) module=scripts.review_predictive_product_science_20261020 ;;
+  science-agent) module=scripts.review_predictive_scientific_agent_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -102,6 +103,10 @@ EOF
     empire_os/predictive_product_prospective_baseline.py \
     empire_os/predictive_product_science_readiness.py \
     scripts/review_predictive_product_science_20261020.py \
+    empire_os/predictive_product_scientific_agent_review.py \
+    empire_os/agi_scientific_research_agent.py \
+    empire_os/experiment_registry.py \
+    scripts/review_predictive_scientific_agent_20261020.py \
     scripts/review_predictive_founder_crm_visibility_20261020.py \
     scripts/review_predictive_commercial_requirements_20261020.py \
     scripts/print_predictive_commercial_intake_template_20261020.py \
@@ -177,6 +182,25 @@ assert x["original_forecast_registry_readback_authenticated"] is False
 assert x["forecast_eligible_for_customer"] is False
 assert x["economic_memory_update_eligible"] is False
 assert x["database_writes"] is False
+'
+# Existing Scientific Research Agent skill custody and governance must remain
+# independent of revenue science; never convert synthetic world-model tests
+# into commercial forecast authority.
+"$TMP/bin/empire-predictive-observe" science-agent | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.scientific_agent_product_protocol.v1"
+assert x["status"].startswith("SCIENTIFIC_AGENT_PROTOCOL_READY_")
+assert x["existing_scientific_research_agent_skill_custody_verified"] is True
+assert x["existing_experiment_registry_contract_reused"] is True
+assert x["existing_scientific_agent_inference_invoked"] is False
+assert x["original_forecast_experiment_registered"] is False
+assert x["customer_model_validated"] is False
+assert x["scientific_model_promotion_approved"] is False
+assert x["economic_memory_update_eligible"] is False
+assert x["database_writes"] is False
+assert x["execution_authority"]=="none"
 '
 # The blank downloadable template must round-trip as a structured incomplete
 # customer intake, never an unhandled ValueError or an inferred buyer order.
