@@ -205,3 +205,14 @@ def test_existing_production_checkpoint_pre_upgrade_has_no_last_confirmed_field(
     assert after["status"] == "ORIGINAL_OWNER_SOURCE_TEMPORARILY_UNAVAILABLE_HOLD_NO_REVIEW"
     assert after["last_confirmed_original_owner_state"] == current["status"]
     assert after["outbound_authorized"] is False
+
+
+def test_exact_production_root_has_process_local_safe_directory_only():
+    from empire_os.canonical_order_reader_release_integrity import _git_read_command
+    production = _git_read_command(Path("/srv/empire_os"))
+    assert production == [
+        "git", "-c", "safe.directory=/srv/empire_os", "-C", "/srv/empire_os"
+    ]
+    other = _git_read_command(Path("/tmp/untrusted-repo"))
+    assert other == ["git", "-C", "/tmp/untrusted-repo"]
+    assert "*" not in str(production) + str(other)

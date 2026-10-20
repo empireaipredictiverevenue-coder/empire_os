@@ -35,6 +35,19 @@ def _owner_method_in_source(raw: bytes) -> bool:
     return expected.issubset(present)
 
 
+def _git_read_command(root: Path) -> list[str]:
+    """Trust only the fixed production root inside the service sandbox.
+
+    ProtectHome hides root's per-user Git safe.directory settings. Override
+    the single known EmpireOS root for this process only; never use '*' or
+    modify global Git config. Test/other worktrees use normal Git ownership.
+    """
+    base = ["git"]
+    if root == Path("/srv/empire_os"):
+        base.extend(["-c", "safe.directory=/srv/empire_os"])
+    return [*base, "-C", str(root)]
+
+
 def inspect_canonical_reader_release_integrity(repo_root: Path) -> dict:
     """Inspect exact allowlisted owner file at HEAD, not arbitrary owner paths."""
     status = "ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN"
@@ -59,14 +72,15 @@ def inspect_canonical_reader_release_integrity(repo_root: Path) -> dict:
         if len(raw) > MAX_FILE_BYTES:
             raise ValueError("canonical owner input too large")
         # Check that the declared root is genuinely its own Git worktree.
+        git_cmd = _git_read_command(root)
         info = subprocess.run(
-            ["git", "-C", str(root), "rev-parse", "--show-toplevel"],
+            [*git_cmd, "rev-parse", "--show-toplevel"],
             capture_output=True, check=True, timeout=GIT_TIMEOUT_SECONDS,
         )
         if Path(info.stdout.decode("utf-8").strip()).resolve() != root:
             raise ValueError("not exact canonical owner git worktree")
         committed = subprocess.run(
-            ["git", "-C", str(root), "show", "HEAD:" + SOURCE],
+            [*git_cmd, "show", "HEAD:" + SOURCE],
             capture_output=True, check=True, timeout=GIT_TIMEOUT_SECONDS,
         ).stdout
         if not 0 < len(committed) <= MAX_FILE_BYTES:
