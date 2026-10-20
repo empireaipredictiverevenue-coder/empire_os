@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import re
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from empire_os.experiment_engine import ExperimentDefinition, plan_assignment
 
@@ -146,7 +146,7 @@ def review_full_funnel_strategy(
     exp = ExperimentDefinition(
         experiment_id="tam-full-funnel-offer-angle-20261020",
         hypothesis="An outcome-first offer produces more verified customers per eligible delivery than feature-led copy.",
-        metric="verified_paying_customers_per_eligible_delivery",
+        metric="verified_paying_customers_per_randomly_assigned_account",
         control_variant="no_marketing_holdout",
         treatment_variants=(
             "buyer_inventory_fit_offer", "revenue_leak_signal_offer",
@@ -302,7 +302,7 @@ def plan_compliant_market_touch(
     definition = ExperimentDefinition(
         experiment_id="tam-full-funnel-offer-angle-20261020",
         hypothesis="Compare qualifying offers on real customer outcomes.",
-        metric="verified_paying_customers_per_eligible_delivery",
+        metric="verified_paying_customers_per_randomly_assigned_account",
         control_variant="no_marketing_holdout",
         treatment_variants=(
             "buyer_inventory_fit_offer", "revenue_leak_signal_offer",
@@ -434,7 +434,9 @@ def assemble_verified_cohort_wave(
     holds: dict[str, int] = {}
     seen = set()
     by_company: dict[str, str] = {}
-    for key in lookup_keys:
+    # Sort by opaque lookup key for repeatable one-contact-per-company choice.
+    # A future canonical buyer-role ranker must be applied by the CRM owner.
+    for key in sorted(lookup_keys):
         if type(key) is not str or not _LOOKUP_KEY.fullmatch(key) or key == "0" * 32:
             raise ValueError("nonidentifying lookup key required")
         if key in seen:
@@ -483,12 +485,16 @@ def assemble_verified_cohort_wave(
                 reason = planned["blockers"][0]
             else:
                 arm = planned["planned_arm"]
-                prior = by_company.setdefault(row.company_lookup_key, arm)
-                if arm != prior:
-                    # Should be impossible with deterministic assignment.
-                    raise ValueError("company experiment arm collision")
-                counts["eligible_for_review"] += 1
-                counts[arm] += 1
+                prior = by_company.get(row.company_lookup_key)
+                if prior is not None:
+                    if arm != prior:
+                        # Should be impossible with deterministic assignment.
+                        raise ValueError("company experiment arm collision")
+                    reason = "SECOND_CONTACT_SAME_COMPANY_WAVE"
+                else:
+                    by_company[row.company_lookup_key] = arm
+                    counts["eligible_for_review"] += 1
+                    counts[arm] += 1
         if reason:
             counts["held_for_review"] += 1
             holds[reason] = holds.get(reason, 0) + 1
@@ -686,6 +692,78 @@ def review_current_buyer_contactability(
     return result
 
 
+
+def review_authenticated_campaign_intelligence(
+    *, now: datetime,
+    account_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
+    experiment_arms: Iterable[Any] | None = None,
+    funnel_stage_receipts: Iterable[Any] | None = None,
+) -> dict[str, Any]:
+    """One entry point for the existing CRM, Analytics and Finance owners.
+
+    Sources are explicit. No optional real source silently becomes a zero
+    count or a fake example. Owner-provided evidence is never sent or stored.
+    """
+    from empire_os.campaign_intelligence import (
+        review_private_account_portfolio,
+        evaluate_real_customer_experiment,
+        diagnose_campaign_conversion_bottlenecks,
+    )
+    return {
+        "schema_version": "empire.gtm.full_funnel_decision_intelligence.v1",
+        "source_status": (
+            "EXISTING_OWNERS_MUST_SUPPLY_AUTHENTICATED_RECEIPT_ADAPTERS"
+            if account_packets is None or experiment_arms is None
+            or funnel_stage_receipts is None
+            else "REVIEWED_OWNER_SUPPLIED_OFFLINE_EVIDENCE"
+        ),
+        "account_intelligence": (
+            review_private_account_portfolio(account_packets, now=now)
+            if account_packets is not None else None
+        ),
+        "verified_customer_experiment": (
+            evaluate_real_customer_experiment(experiment_arms)
+            if experiment_arms is not None else None
+        ),
+        "conversion_bottleneck_review": (
+            diagnose_campaign_conversion_bottlenecks(funnel_stage_receipts)
+            if funnel_stage_receipts is not None else None
+        ),
+        "live_recipient_contact_or_messages": False,
+        "production_training_or_model_mutation": False,
+        "database_writes": False,
+        "execution_authority": "NONE",
+    }
+
+
+def recommend_next_real_execution_focus(review: Mapping[str, Any]) -> dict[str, Any]:
+    """Prioritise first real customer pipeline bottleneck, not new scaffolding."""
+    buyer = review.get("real_buyer_contactability") or {}
+    campaigns = review.get("campaign_assets") or {}
+    feedback = review.get("verified_commercial_feedback") or {}
+    if buyer.get("source_status") != "VERIFIED_READONLY_BUYER_SNAPSHOTS":
+        action = "RESTORE_PRIVATE_CANONICAL_BUYER_READ"
+    elif buyer.get("buyer_contact_verified_count") == 0:
+        action = "VERIFY_REAL_FIRST_WAVE_BUYER_CONTACTS_WITH_EXISTING_SALES_OWNER"
+    elif buyer.get("permitted_email_recipients") is None:
+        action = "PROVE_PERMISSIONED_SENDABLE_RECIPIENTS_WITH_EXISTING_SALES_OWNER"
+    elif campaigns.get("deployed_assets_correlated_to_runtime") is None:
+        action = "REPAIR_EXISTING_CAMPAIGN_OFFER_AND_LANDING_PROOF"
+    elif review.get("first_market_wave_delivered_verified") is not True:
+        action = "RUN_ONE_GOVERNED_MARKET_WAVE_USING_EXISTING_OUTREACH_OWNER"
+    elif feedback.get("outcome_linkage_verified") is not True:
+        action = "CONNECT_REAL_CAMPAIGN_AND_CUSTOMER_OUTCOME_RECEIPTS"
+    else:
+        action = "REVIEW_REAL_CUSTOMER_OFFER_EXPERIMENT_BEFORE_SCALING"
+    return {
+        "priority": action,
+        "inferred_buyer_intent": False,
+        "auto_send_authorized": False,
+        "source_owner_mutation_granted": False,
+        "execution_authority": "NONE",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
@@ -703,6 +781,10 @@ def main(argv: list[str] | None = None) -> int:
     output["first_pilot_offer_creatives"] = review_three_offer_creatives(
         market_scope="GB:solar:buyers",
     )
+    output["decision_intelligence"] = review_authenticated_campaign_intelligence(
+        now=current,
+    )
+    output["next_real_execution_focus"] = recommend_next_real_execution_focus(output)
     print(json.dumps(output, sort_keys=True))
     return 0
 

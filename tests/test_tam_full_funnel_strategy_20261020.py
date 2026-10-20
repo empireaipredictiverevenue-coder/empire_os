@@ -313,7 +313,9 @@ def test_two_contacts_same_company_get_identical_offer_arm():
         "no_marketing_holdout", "buyer_inventory_fit_offer",
         "revenue_leak_signal_offer", "verified_market_opportunity_brief",
     }}
-    assert sorted(arms.values()) == [0, 0, 0, 2]
+    assert sorted(arms.values()) == [0, 0, 0, 1]
+    assert report["counts"]["eligible_for_review"] == 1
+    assert report["hold_reasons"]["SECOND_CONTACT_SAME_COMPANY_WAVE"] == 1
 
 
 def test_unknown_permissions_and_suppression_always_hold():

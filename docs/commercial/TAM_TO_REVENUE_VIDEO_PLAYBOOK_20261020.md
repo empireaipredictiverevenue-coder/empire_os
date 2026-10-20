@@ -95,7 +95,7 @@ price, a perfect buyer match or a real prospect pain.
    and platform rules. Continue helpful owned organic content where valid.
 5. **Weeks 9–10: analyse per-market arm.** Baseline and holdout observed
    over comparable windows. Primary metric = verified paying customers
-   per eligible email delivery. Supporting metrics: verified website
+   per randomly assigned eligible account (including the unsent holdout). Supporting metrics: deliveries, verified website
    sessions, server-accepted enquiries, meetings, bounce/opt-out rate.
    Click-only/positive replies cannot be declared winners. No uplift
    claim without integrity and enough independently observed sample.
@@ -168,10 +168,12 @@ This wave **implements** more of the video method, not a second tracking app:
 
 - Reads only the existing private buyer qualification and commercial
   relationship snapshots; never logs/returns their personal/company rows.
-  The current read-only production evidence contains **23** shortlisted
+  The read-only production check at 10:37 UTC contains **22** shortlisted
   buyer targets, **261** researched/existing relationships and **0**
   contacts confirmed for outbound in the buyer qualification source.
-  Permitted-email recipient count is **unknown**, not 23 or 261.
+  These live counts can change when other owners refresh their snapshots.
+  Permitted-email recipient count is **unknown**, not the target or
+  relationship totals.
 - `assemble_verified_cohort_wave` accepts a bounded set of **opaque CRM
   contact keys** resolved by the existing owner's trusted private callback;
   validates tenant, vertical/country, company grouping, evidence freshness,
@@ -224,3 +226,141 @@ Field groups: `real_buyer_contactability`,
 `first_pilot_offer_creatives`, `launch_blockers`, plus the existing
 market, campaign, experiment and outcome review. The CLI does not send
 messages or write to EmpireDB.
+
+## 20 October — Advanced evidence intelligence expansion
+
+The continuing feature now has **three connected, pure owner APIs** in
+`empire_os/campaign_intelligence.py`, imported by the existing
+`scripts/review_tam_full_funnel_strategy_20261020.py` entry point.
+No separate autonomous agent, DB, paid provider, message sender or website
+tracking service has been created.
+
+### 1. Cross-channel account signal fusion
+
+`review_account_intelligence` and `review_private_account_portfolio`
+consume **only authenticated, typed, owner-supplied** signals for the
+existing market/tenant/account/campaign. Inputs distinguish:
+
+| Evidence kind | Commercial interpretation | Action |
+|---|---|---|
+| Email delivered | Delivery only, NOT intent | No sales signal |
+| Signed/verified link click | Weak interest; scanners excluded upstream | Internal review only |
+| Consented website/offer visit | On-site context, not identity | Internal review only |
+| Independently sourced company growth/procurement | Account research, NOT permission to contact anyone | Internal review only |
+| Verified enquiry, social inbound or buyer question | Explicit first-party intent | Same-day owner review **if inbound response basis exists** |
+| Pricing request / booked meeting | Explicit commercial engagement | Same-day owner review |
+| Accepted terms | Commercial-process evidence | Terms owner review |
+| Ledger-verified paying customer | Actual customer evidence | Existing-customer/finance owner review |
+| Unsubscribe / hard bounce / explicit rejection | Hard negative | Stop and suppress |
+
+Repeated same-day clicks/reloads are score-capped and cannot escalate
+passive browsing into sales authority. Stale positive observations expire
+while supported negative events block regardless of engagement. Wrong
+tenant, campaign, event source, owner-recipient binding, provenance,
+consent purpose, or altered replay **fails closed**. The numerical
+evidence breadth score is **not** buyer probability, LTV, or revenue.
+
+### 2. Real customer + gross profit offer learning
+
+`evaluate_real_customer_experiment` evaluates the same three-offer/
+10% no-marketing control design. It **correctly divides paying customers
+by randomly assigned *accounts*** rather than deliveries, because the
+holdout deliberately has no messages. It validates the four arms'
+assignment integrity, closed windows, source-bound buyer/commercial
+receipts, positive samples and per-arm denominators.
+
+When independently verified financial receipts exist, it may compare
+**realized gross profit per assigned account**, including negative
+profit, instead of only response or customer counts. High complaint or
+opt-out rates hold an arm even when conversion looks high. Missing
+settled receipts, poor assignment integrity or small samples mean
+**no commercial winner**. Differences are descriptive; significance,
+causal lift, incremental ROI and automatic scaling are **not claimed**.
+
+**Account-level randomisation improvement:** one eligible person per
+company per market wave is counted in the experiment; any additional
+same-company contacts are held. That keeps the *experimental unit* the
+same across the offer engine and the money calculation, avoids
+inconsistent offers being sent to coworkers and limits repeated
+company contact. The current deterministic fallback uses an opaque
+stable key; a verified role-ranked primary recipient must be chosen
+by the canonical CRM owner for a real launch.
+
+### 3. Funnel and next-best-experiment diagnosis
+
+`diagnose_campaign_conversion_bottlenecks` reuses the existing
+`empire_os.conversion_intelligence.ConversionStageEvidence` and
+`review_stage` rather than building a second analytics engine.
+Verified, campaign-attributed and window-closed source receipts can
+show whether the current bottleneck is:
+
+- offer/landing conversion,
+- delivered-email-to-reply audience, offer or copy relevance,
+- reply-to-qualified-conversation sales handling,
+- offer proof / terms conversion,
+- acceptance-to-payment checkout friction,
+- or payment-to-fulfilment delivery readiness.
+
+The output suggests a **controlled test for the existing owner**;
+conversion rates without trustworthy denominators/source provenance
+remain unknown. No automatic marketing, checkout, fulfilment,
+pricing or budget decisions.
+
+### 4. One connected API / no extra sidecar
+
+`review_authenticated_campaign_intelligence` (in the original TAM
+strategy script) allows CRM/Analytics/Finance to provide existing
+authoritative projections, and returns a compact combined read-only
+analysis. If an owner has not supplied a real receipt stream, the
+corresponding review stays `null`: there is no fixture, dummy person
+or invented positive conversion in the production CLI.
+
+`recommend_next_real_execution_focus` prioritises the **actual**
+current commercial blocker before choosing another development project.
+Today the verified buyer-source snapshot says **0 validated outbound
+contacts**, so the next real task for the existing Sales Director
+is to obtain a small legal/permissioned, product-fit first-wave buyer
+cohort, validate the primary buying roles and connect its governed
+sender. Not another broad social scraper or analytics installation.
+
+### More intelligence to develop *after* live source wiring
+
+1. **Company decision-maker / buying committee ranker:** use the existing
+   `outreach_account_strategy.build_buying_committee` for verified
+   primary role and source evidence, respecting company-level contact
+   limits. No inferred identities.
+2. **Market signal knowledge graph:** attach fresh permits, search
+   demand, published tenders, company expansion and public purchasing
+   requests through existing source owners, with timestamp/role/source
+   provenance and direct-buyer-intent separation.
+3. **Creative/offer optimisation:** learn by verified sector and buyer
+   pain, retain holdout, prefer recognized gross profit/LTV over clicks
+   when real financial feedback exists, and monitor opt-outs.
+4. **Cross-channel distribution:** organic search, videos, owned social,
+   email and partner channels each with consent/permission and
+   channel-specific measurement. Paid retargeting requires separate
+   user permission and founder budget; `£0` remains the default.
+5. **Actual revenue loop:** existing canonical buyer CRM, fulfilment and
+   EmpireDB commercial ledger must send reconciled payment/margin evidence
+   to the owner API before we can automatically recommend profitable
+   allocation. A payment request, click or offered deal is not profit.
+
+### Source and tests
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+ tests/test_campaign_intelligence_20261020.py \
+ tests/test_tam_full_funnel_strategy_20261020.py \
+ tests/analytics/test_campaign_click_evidence_20261020.py
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+ -m scripts.review_tam_full_funnel_strategy_20261020 --read-only
+```
+
+Current CLI keys to inspect: `decision_intelligence`,
+`next_real_execution_focus`, `real_buyer_contactability`,
+`experiment`, and `verified_commercial_feedback`.
+
+**Unchanged operational truth:** the source is an isolated build, not
+merged to production, and no mail, click collection, visitor tracking,
+ad audience export, payment, CRM or live campaign was executed.
