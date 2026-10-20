@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|source-gates|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -56,6 +56,7 @@ case "$command" in
   catalog) module=scripts.review_predictive_catalog_readiness_20261020 ;;
   science) module=scripts.review_predictive_product_science_20261020 ;;
   science-agent) module=scripts.review_predictive_scientific_agent_20261020 ;;
+  source-gates) module=scripts.review_predictive_source_owner_deployment_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -99,6 +100,8 @@ EOF
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_intelligence.py \
+    empire_os/predictive_source_owner_deployment_preflight.py \
+    scripts/review_predictive_source_owner_deployment_20261020.py \
     empire_os/outcome_feedback.py \
     scripts/review_predictive_catalog_readiness_20261020.py \
     empire_os/predictive_product_scientific_holdout.py \
@@ -212,6 +215,20 @@ assert x["scientific_model_promotion_approved"] is False
 assert x["economic_memory_update_eligible"] is False
 assert x["database_writes"] is False
 assert x["execution_authority"]=="none"
+'
+# Original production writer drift is inventoried, never silently repaired.
+"$TMP/bin/empire-predictive-observe" source-gates | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.original_source_owner_deployment.v1"
+assert x["mode"]=="OBSERVE" and x["execution_authority"]=="none"
+assert x["original_tenant_reader_role_verified"] is False
+assert x["commercial_outcomes_rls_force_verified"] is False
+assert x["customer_forecast_eligible"] is False
+assert x["source_file_mutated"] is False
+assert x["unit_modified"] is False
+assert x["database_writes"] is False
 '
 # The blank downloadable template must round-trip as a structured incomplete
 # customer intake, never an unhandled ValueError or an inferred buyer order.

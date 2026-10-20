@@ -13,6 +13,12 @@ Source DDL: `migrations/empiredb/036_runtime_causal_lineage_continuity.sql` defi
 3. `predictive_product_science_readiness.py` requires counts, source status, tenant nullity, no estimates, and explicit non-authenticated flags to agree before reporting the quarantine; `predictive_product_scientific_agent_review.py` recognizes this quarantine as a scientific source blocker, not eligible research.
 4. Tests cover 50 spoofed global wins, no private-field persistence, cached unsafe forecast bypass attempts, empty source, contradictory custody claims, and scientific source handoff. **The tests are local fixtures, not original customer outcomes.**
 
+## Exact original production writer drift (read-only verified)
+
+`empire-predictive-observe source-gates` now compares the active source path declared by the original systemd service against the immutable release candidate. The checked original `/srv/empire_os/empire_os/predictive_intelligence.py` is a group-writable shared source file (mode `664` at this review) and its bytes differ from the isolated, tested quarantine implementation. This explains `source_scope_admission_status=null` from the old running snapshot. The diagnostic does not infer live systemd drop-ins are resolved nor that source-code equality would grant forecast or database authority.
+
+`source-gates` supplies original/candidate SHA-256 digests and group-writable custody status, returns `ORIGINAL_SOURCE_OWNER_DEPLOYMENT_STILL_REQUIRED`, and never reads customer rows, mutates the production unit or edits source code. Production source-owner review should choose the exact commit `104338e68867` or its tested successor and install under an owner-controlled immutable service artifact; do not copy directly into a concurrent dirty shared checkout.
+
 ## Important deployment distinction
 
 The patch is currently committed **only on the isolated Predictive feature branch** and included in its immutable OBSERVE review/release. The production timer is still pointed at the existing shared `/srv/empire_os` source; this patch does not modify that dirty checkout, systemd services or the canonical database. Accordingly this does NOT claim production refresh service is protected until the original owner separately reviews and integrates the patch or safely updates the service to exact tested bytes.
