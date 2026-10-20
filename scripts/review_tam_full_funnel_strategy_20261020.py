@@ -712,6 +712,7 @@ def review_authenticated_campaign_intelligence(
     experiment_arms: Iterable[Any] | None = None,
     funnel_stage_receipts: Iterable[Any] | None = None,
     account_route_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
+    learning_waves: Iterable[Any] | None = None,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -723,6 +724,7 @@ def review_authenticated_campaign_intelligence(
         evaluate_real_customer_experiment,
         diagnose_campaign_conversion_bottlenecks,
         review_account_route_portfolio,
+        review_multiwave_commercial_learning,
     )
     return {
         "schema_version": "empire.gtm.full_funnel_decision_intelligence.v1",
@@ -747,6 +749,10 @@ def review_authenticated_campaign_intelligence(
         "account_buying_committee_routes": (
             review_account_route_portfolio(account_route_packets, now=now)
             if account_route_packets is not None else None
+        ),
+        "multiwave_campaign_learning": (
+            review_multiwave_commercial_learning(learning_waves, now=now)
+            if learning_waves is not None else None
         ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,

@@ -786,3 +786,269 @@ def review_account_route_portfolio(
         "autonomous_sender_enabled": False,
         "execution_authority": "NONE",
     }
+
+# Multi-wave learning stays within the original experiment decision owner.
+# A wave is an owner-attested, canonical ledger/CRM projection, never user
+# browser input. It can recommend testing, not change the actual assignment,
+# tracking, offer, email channel or spend.
+EXPERIMENT_ID = "tam-full-funnel-offer-angle-20261020"
+
+
+@dataclass(frozen=True)
+class TrustedCampaignLearningWave:
+    wave_key: str
+    tenant_ref: str
+    market_scope: str
+    experiment_id: str
+    started_at: datetime
+    outcome_window_closed_at: datetime
+    evidence_issued_at: datetime
+    arm_outcomes: tuple[TrustedArmOutcome, ...]
+    source_receipts_verified: bool
+    assignment_replay_verified: bool
+    cross_wave_identity_dedup_verified: bool
+    comparable_cohort_verified: bool
+
+
+def _wilson_interval(positives: int, sample: int, z: float = 2.64) -> tuple[float, float]:
+    """Conservative binomial interval, not a campaign-level causal estimate."""
+    if type(positives) is not int or type(sample) is not int or not 0 <= positives <= sample:
+        raise CampaignIntelligenceHeld("INVALID_CONFIDENCE_INTERVAL_COUNTS")
+    if sample == 0:
+        raise CampaignIntelligenceHeld("EMPTY_CONFIDENCE_INTERVAL_DENOMINATOR")
+    # Reuse Empire's canonical Predictive Intelligence statistics helper.
+    # 2.64 is deliberately more conservative than its default 95% interval.
+    from empire_os.predictive_intelligence import _wilson_interval as existing_wilson
+    low, high = existing_wilson(positives, sample, z=z)
+    return (round(low, 7), round(high, 7))
+
+
+def review_multiwave_commercial_learning(
+    waves: Iterable[TrustedCampaignLearningWave], *, now: datetime,
+    minimum_assigned_per_arm: int = 50,
+    max_evidence_age_days: int = 14,
+) -> dict:
+    """Compare verified, non-overlapping, comparable campaign cohorts.
+
+    Missing or incompatible receipts hold the *entire* pooled winner claim.
+    Negative performance and unsubscribes are never washed out by averaging.
+    Assignment integrity is source-owner-attested; this function cannot audit
+    raw email or payment identities and never represents itself as doing so.
+    """
+    now = _aware(now)
+    if type(max_evidence_age_days) is not int or not 1 <= max_evidence_age_days <= 90:
+        raise CampaignIntelligenceHeld("INVALID_LEARNING_FRESHNESS_POLICY")
+    if type(minimum_assigned_per_arm) is not int or not 20 <= minimum_assigned_per_arm <= 10000:
+        raise CampaignIntelligenceHeld("INVALID_LEARNING_SAMPLE_POLICY")
+    rows = list(waves)
+    if len(rows) > 12:
+        raise CampaignIntelligenceHeld("TOO_MANY_LEARNING_WAVES")
+    if not rows:
+        return {
+            "schema_version": "empire.gtm.multiwave_learning.v1",
+            "status": "NO_AUTHENTICATED_LEARNING_WAVES",
+            "waves_reviewed": 0, "comparable_pool_ready": False,
+            "proposed_offer": None, "next_learning_action": "AWAIT_VERIFIED_CAMPAIGN_OUTCOMES",
+            "cohort_trend": None, "arm_statistics": None,
+            "auto_reallocation": False, "execution_authority": "NONE",
+        }
+    first = rows[0]
+    if type(first) is not TrustedCampaignLearningWave:
+        raise CampaignIntelligenceHeld("INVALID_LEARNING_WAVE_SHAPE")
+    market = first.market_scope
+    tenant = first.tenant_ref
+    if market not in _SCOPES or type(tenant) is not str or not _TENANT.fullmatch(tenant):
+        raise CampaignIntelligenceHeld("LEARNING_MARKET_OR_TENANT_NOT_VERIFIED")
+    seen_keys: set[str] = set()
+    seen_time_spans: set[tuple[datetime, datetime]] = set()
+    validated: list[tuple[datetime, datetime, TrustedCampaignLearningWave, dict]] = []
+    holds: set[str] = set()
+    for row in rows:
+        if type(row) is not TrustedCampaignLearningWave or not _opaque(row.wave_key):
+            raise CampaignIntelligenceHeld("INVALID_LEARNING_WAVE_ID")
+        if row.wave_key in seen_keys:
+            raise CampaignIntelligenceHeld("DUPLICATE_LEARNING_WAVE")
+        seen_keys.add(row.wave_key)
+        if (row.tenant_ref != tenant or row.market_scope != market
+                or row.experiment_id != EXPERIMENT_ID):
+            raise CampaignIntelligenceHeld("INCOMPARABLE_TENANT_MARKET_OR_EXPERIMENT")
+        start = _aware(row.started_at)
+        closed = _aware(row.outcome_window_closed_at)
+        issued = _aware(row.evidence_issued_at)
+        if start > closed or closed > issued or issued > now + timedelta(minutes=1):
+            raise CampaignIntelligenceHeld("LEARNING_WAVE_CAUSAL_CLOCK_INVALID")
+        if closed - start < timedelta(days=14):
+            holds.add("OUTCOME_MATURATION_WINDOW_TOO_SHORT")
+        if now - issued > timedelta(days=max_evidence_age_days):
+            holds.add("OUTCOME_SOURCE_SNAPSHOT_STALE")
+        if (start, closed) in seen_time_spans:
+            raise CampaignIntelligenceHeld("REPEATED_WAVE_TIME_WINDOW")
+        seen_time_spans.add((start, closed))
+        for flag in (
+            "source_receipts_verified", "assignment_replay_verified",
+            "cross_wave_identity_dedup_verified", "comparable_cohort_verified",
+        ):
+            if type(getattr(row, flag)) is not bool:
+                raise CampaignIntelligenceHeld("UNKNOWN_LEARNING_TRUST_GATE")
+            if getattr(row, flag) is not True:
+                holds.add(flag.upper() + "_MISSING")
+        if type(row.arm_outcomes) is not tuple:
+            raise CampaignIntelligenceHeld("LEARNING_ARM_ROWS_INVALID")
+        evidence = evaluate_real_customer_experiment(
+            row.arm_outcomes, minimum_assigned_per_arm=minimum_assigned_per_arm,
+        )
+        # The existing experiment definition fixes a 10% account holdout.
+        # Comparing campaigns with different assignment regimes is unsafe.
+        assigned = {arm.arm: arm.assigned_accounts for arm in row.arm_outcomes}
+        total_assigned = sum(assigned.values())
+        control_share = assigned["no_marketing_holdout"] / total_assigned
+        if not 0.07 <= control_share <= 0.13:
+            holds.add("HOLDOUT_RANDOMIZATION_SHARE_MISMATCH")
+        if any(
+            not 0.25 <= assigned[name] / total_assigned <= 0.35
+            for name in EXPERIMENT_ARMS if name != "no_marketing_holdout"
+        ):
+            holds.add("TREATMENT_ARM_ALLOCATION_IMBALANCE")
+        if evidence["data_quality_holds"]:
+            holds.add("ARM_RECEIPT_OR_SAFETY_HOLD")
+        if any(x["receipts_for_this_arm_accepted"] is not True
+               for x in evidence["arm_reviews"]):
+            holds.add("CLOSED_CANONICAL_OUTCOMES_NOT_VERIFIED")
+        validated.append((start, closed, row, evidence))
+    validated.sort(key=lambda record: record[0])
+    if any(previous[1] >= following[0] for previous, following in
+           zip(validated, validated[1:])):
+        holds.add("OVERLAPPING_OR_CONTAMINATED_WAVE_WINDOWS")
+    if len(validated) > 1:
+        baseline_bounds = []
+        for _, _, item, _ in validated:
+            control = next(arm for arm in item.arm_outcomes
+                           if arm.arm == "no_marketing_holdout")
+            baseline_bounds.append(_wilson_interval(
+                control.paying_customers, control.assigned_accounts
+            ))
+        if max(pair[0] for pair in baseline_bounds) > min(
+            pair[1] for pair in baseline_bounds
+        ):
+            holds.add("CONTROL_BASELINE_SHIFT_REQUIRES_SOURCE_REVIEW")
+    # Owner receipt verification is only sufficient for a valid *review*.
+    # It does not establish full-period randomized causal comparability.
+    if holds:
+        return {
+            "schema_version": "empire.gtm.multiwave_learning.v1",
+            "status": "HOLD_MISSING_OR_INCOMPARABLE_CAMPAIGN_EVIDENCE",
+            "waves_reviewed": len(validated), "comparable_pool_ready": False,
+            "source_holds": sorted(holds), "proposed_offer": None,
+            "next_learning_action": "REPAIR_EXISTING_EXPERIMENT_AND_COMMERCIAL_SOURCE_PROOF",
+            "cohort_trend": None, "arm_statistics": None,
+            "auto_reallocation": False, "execution_authority": "NONE",
+        }
+
+    totals = {
+        arm: {"assigned": 0, "delivered": 0, "customers": 0,
+              "complaints": 0, "optouts": 0, "gp": 0, "revenue": 0}
+        for arm in EXPERIMENT_ARMS
+    }
+    all_finance = True
+    single_wave_rates = []
+    for _, _, row, _ in validated:
+        by_arm = {arm.arm: arm for arm in row.arm_outcomes}
+        by_control = by_arm["no_marketing_holdout"]
+        single_wave_rates.append(
+            round(by_control.paying_customers / by_control.assigned_accounts, 6)
+        )
+        for arm in row.arm_outcomes:
+            t = totals[arm.arm]
+            t["assigned"] += arm.assigned_accounts
+            t["delivered"] += arm.delivered_accounts
+            t["customers"] += arm.paying_customers
+            t["complaints"] += arm.complaint_accounts
+            t["optouts"] += arm.unsubscribe_accounts
+            all_finance &= arm.financial_receipts_verified is True
+            if arm.financial_receipts_verified:
+                t["gp"] += arm.realized_gp_cents
+                t["revenue"] += arm.recognized_revenue_cents
+
+    control_count = totals["no_marketing_holdout"]
+    control_interval = _wilson_interval(control_count["customers"], control_count["assigned"])
+    reviewed = []
+    for name in EXPERIMENT_ARMS:
+        counts = totals[name]
+        lb, ub = _wilson_interval(counts["customers"], counts["assigned"])
+        delivered = counts["delivered"]
+        complaint_rate = counts["complaints"] / delivered if delivered else 0.0
+        optout_rate = counts["optouts"] / delivered if delivered else 0.0
+        risk_hold = (name != "no_marketing_holdout"
+                     and (complaint_rate > 0.01 or optout_rate > 0.05))
+        reviewed.append({
+            "arm": name,
+            "assigned_accounts": counts["assigned"],
+            "paying_customers": counts["customers"],
+            "observed_customer_rate": round(counts["customers"] / counts["assigned"], 6),
+            "conservative_rate_bounds": [lb, ub],
+            "observed_gp_per_account_cents": (
+                round(counts["gp"] / counts["assigned"], 2) if all_finance else None
+            ),
+            "safety_hold": risk_hold,
+            # Interval non-overlap is a conservative screening heuristic
+            # and does NOT prove causal lift or multiple-test significance.
+            "customer_rate_bounds_above_holdout": (
+                lb > control_interval[1] if name != "no_marketing_holdout" else False
+            ),
+        })
+    safe = [row for row in reviewed
+            if row["arm"] != "no_marketing_holdout" and not row["safety_hold"]]
+    candidate = None
+    action = "CONTINUE_CONTROLLED_EXPLORATION_AND_MEASURE_CUSTOMERS"
+    if not safe:
+        action = "REVIEW_OUTREACH_COMPLAINTS_AND_UNSUBSCRIBES"
+    elif len(validated) < 2:
+        action = "COLLECT_SECOND_COMPARABLE_MARKET_WAVE"
+    else:
+        # Require independent waves to show each arm above the contemporaneous
+        # holdout; a pooled rate alone can hide market and time confounding.
+        eligible = []
+        for result in safe:
+            arm = result["arm"]
+            across_waves = all(
+                {r.arm: r for r in wave.arm_outcomes}[arm].paying_customers
+                / {r.arm: r for r in wave.arm_outcomes}[arm].assigned_accounts
+                > {r.arm: r for r in wave.arm_outcomes}["no_marketing_holdout"].paying_customers
+                / {r.arm: r for r in wave.arm_outcomes}["no_marketing_holdout"].assigned_accounts
+                for _, _, wave, _ in validated
+            )
+            if (across_waves
+                and result["customer_rate_bounds_above_holdout"]
+                and result["paying_customers"] > 0
+                and (not all_finance
+                     or result["observed_gp_per_account_cents"] is not None
+                     and result["observed_gp_per_account_cents"] > 0)):
+                eligible.append(result)
+        if eligible:
+            metric = ("observed_gp_per_account_cents"
+                      if all_finance else "observed_customer_rate")
+            selected = max(eligible, key=lambda x: (x[metric], x["arm"]))
+            candidate = selected["arm"]
+            action = "HUMAN_REVIEW_REPLICATED_OFFER_RESULT_WITH_EXISTING_CAUSAL_SPECIALIST"
+        elif all_finance and all(
+            row["observed_gp_per_account_cents"] is not None
+            and row["observed_gp_per_account_cents"] <= 0
+            for row in safe
+        ):
+            action = "REVIEW_REALIZED_MARGIN_BEFORE_ANY_CAMPAIGN_EXPANSION"
+    return {
+        "schema_version": "empire.gtm.multiwave_learning.v1",
+        "status": "REPLICATED_CANDIDATE_FOR_HUMAN_CAUSAL_REVIEW" if candidate else
+                  "CONTINUE_LEARNING_NO_COMMERCIAL_WINNER",
+        "waves_reviewed": len(validated), "comparable_pool_ready": True,
+        "source_holds": [], "proposed_offer": candidate,
+        "next_learning_action": action,
+        "cohort_trend": {
+            "observed_holdout_customer_rates_by_wave": single_wave_rates,
+            "marketing_outcome_receipts_all_financially_verified": all_finance,
+        },
+        "arm_statistics": reviewed,
+        "causal_lift_or_significance_claimed": False,
+        "auto_reallocation": False, "budget_mutation": False, "campaign_activated": False,
+        "execution_authority": "NONE",
+    }

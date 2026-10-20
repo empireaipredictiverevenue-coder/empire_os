@@ -168,12 +168,12 @@ This wave **implements** more of the video method, not a second tracking app:
 
 - Reads only the existing private buyer qualification and commercial
   relationship snapshots; never logs/returns their personal/company rows.
-  The read-only production check at 10:37 UTC contains **22** shortlisted
-  buyer targets, **261** researched/existing relationships and **0**
-  contacts confirmed for outbound in the buyer qualification source.
-  These live counts can change when other owners refresh their snapshots.
-  Permitted-email recipient count is **unknown**, not the target or
-  relationship totals.
+  Same-day buyer-source reads have shown **22–23** shortlisted targets
+  during concurrent owner refreshes, alongside **261** relationship
+  records and **0** contacts confirmed outbound-ready. The live
+  review command must be used for the current count; observed target
+  totals are not permissioned email recipients. Permitted recipient
+  count remains **unknown**, not an inferred count from either source.
 - `assemble_verified_cohort_wave` accepts a bounded set of **opaque CRM
   contact keys** resolved by the existing owner's trusted private callback;
   validates tenant, vertical/country, company grouping, evidence freshness,
@@ -457,3 +457,79 @@ coverage and permissioned buying contacts need genuine source
 verification by the existing buyer scout and Sales Director owners.
 The account route API is ready to evaluate the resulting authenticated
 records; it does not authorise outreach on its own.
+
+## 20 October — Intelligent learning across successive market waves
+
+**This is an upgrade to the same TAM-to-paying-customer strategy**, not a
+second predictive agent, CRM, database or email sender.
+
+### What has been implemented
+
+`empire_os/campaign_intelligence.py` now includes
+`TrustedCampaignLearningWave` and
+`review_multiwave_commercial_learning`. The full-funnel entry point
+`review_authenticated_campaign_intelligence(..., learning_waves=...)`
+accepts an authenticated in-memory owner projection when it becomes
+available. With no real source connected, the output is **null**, not
+an empty synthetic customer history.
+
+It compares up to 12 independently evidenced waves of the *same*
+tenant, region/sector, four-arm experiment and closeout policy.
+Inputs must carry canonical, attested campaign receipts and support:
+
+- a **10% no-marketing holdout** with approximately balanced offer arms;
+  no email is delivered to the holdout
+- paying customers **per randomly assigned company**, never
+  per-click or per-delivery for the unsent holdout
+- closed and sufficiently mature outcome windows, source freshness and
+  verified experiment assignment/replay integrity
+- verified cross-wave company-identity deduplication and market-cohort
+  comparability, to prevent inflated experimental denominators
+- per-wave customer-rate baselines; a materially different control
+  rate holds pooled results for possible seasonal, market or source drift
+- safety holds for opt-outs, complaints, overlapping waves, duplicate
+  evidence keys, mismatched markets and contaminated experiment groups
+- **realised gross profit** per assigned account, *only* when owner
+  financial evidence is verified. Loss-making offers cannot be promoted
+  as profit winners, even when click/reply/customer counts look positive.
+
+Where all comparison evidence is valid, it reuses
+`empire_os.predictive_intelligence._wilson_interval` with a more
+conservative confidence setting to screen differences from the
+contemporaneous holdout. It then **requires replication across at
+least two comparable market waves** before proposing an offer to the
+**existing causal experiment specialist** for human review. The
+interval screen is *not* a significance or causal-lift claim.
+
+### Learning states
+
+| Evidence | Recommended next action |
+|---|---|
+| No authenticated receipts | Await genuine campaign/customer data |
+| Only one clean market wave | Repeat a comparable, approved wave |
+| Stale, duplicate, mismatched or contaminated evidence | Repair source/assignment before making claims |
+| Control group changes materially | Review market and instrumentation shift |
+| Consent complaints or opt-outs deteriorate | Hold campaign expansion and review safety |
+| Repeated offer advantage and finance evidence | Human causal and profitability review |
+| Verified realised losses | Review margin before recommending any expansion |
+
+### Integration + scope
+
+The existing read-only CLI stays:
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_tam_full_funnel_strategy_20261020 --read-only
+```
+
+The returned `decision_intelligence.multiwave_campaign_learning`
+remains `null` until the existing CRM, send and finance owners supply
+**actual authenticated account-level event/outcome projections**.
+Synthetic fixtures live only in
+`tests/test_campaign_multiwave_learning_20261020.py` and do not imply
+live conversions, simulated production success, or revenue.
+
+**No external messages, retargeting, public tracking, new cron jobs,
+model retraining, audience export, budget movement or production deploy.**
+Output is recommendation-only and evidence-provenance bounded.
