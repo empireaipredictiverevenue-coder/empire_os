@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
+import fcntl
 import os
 from pathlib import Path
 import re
@@ -176,6 +177,34 @@ def _bounded_inference_runtime(seconds: float):
     finally:
         signal.setitimer(signal.ITIMER_REAL, 0)
         signal.signal(signal.SIGALRM, previous_handler)
+
+
+@contextmanager
+def _shared_coder_ollama_lock(root: Path):
+    """Serialize sandbox model calls with the original Empire Coder worker.
+
+    Each disposable clone has a different runtime/ollama.lock. Use the
+    original worker's existing real-root lock instead, so multiple Coder
+    tasks cannot silently compete for CPU inference. Never wait behind
+    another owner: return a distinct busy result before contacting Ollama.
+    The caller retains its separate execution lease and source allowlist.
+    """
+    target = root / "runtime/coder/ollama.lock"
+    try:
+        fd = os.open(target, os.O_RDWR | os.O_NOFOLLOW)
+    except OSError as exc:
+        raise EmpireCoderSandboxError(
+            "original_coder_inference_lock_unavailable"
+        ) from exc
+    with os.fdopen(fd, "r+") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise EmpireCoderSandboxError("original_coder_inference_busy") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
 def _scoped_repo_path(value: str) -> str | None:
@@ -465,20 +494,21 @@ def run_empire_coder_sandbox_job(
                             job.max_runtime_seconds
                             - (time.monotonic() - job_started)
                         )
-                        with _bounded_inference_runtime(remaining):
-                            candidate = coder.propose_structured_patch(
-                                task.id,
-                                (
-                                    "Implement exactly one smallest safe DEVELOPMENT "
-                                    "patch for the task objective. Return only the "
-                                    "machine-checkable structured patch requested by "
-                                    "Empire Coder. Do not touch deployment, services, "
-                                    "production databases, outbound, credentials, "
-                                    "payments, funds or revenue truth.\n\nTASK:\n"
-                                    + job.objective
-                                ),
-                                context,
-                            )
+                        with _shared_coder_ollama_lock(root):
+                            with _bounded_inference_runtime(remaining):
+                                candidate = coder.propose_structured_patch(
+                                    task.id,
+                                    (
+                                        "Implement exactly one smallest safe DEVELOPMENT "
+                                        "patch for the task objective. Return only the "
+                                        "machine-checkable structured patch requested by "
+                                        "Empire Coder. Do not touch deployment, services, "
+                                        "production databases, outbound, credentials, "
+                                        "payments, funds or revenue truth.\n\nTASK:\n"
+                                        + job.objective
+                                    ),
+                                    context,
+                                )
                 except Exception as exc:
                     result["backend_attempts"].append({
                         "backend": "structured_patch",
@@ -487,6 +517,14 @@ def run_empire_coder_sandbox_job(
                             f"{type(exc).__name__}:{exc}"
                         )[:1000],
                     })
+                    if (isinstance(exc, EmpireCoderSandboxError)
+                            and str(exc) in {
+                                "original_coder_inference_busy",
+                                "original_coder_inference_lock_unavailable",
+                            }):
+                        result["status"] = "MODEL_INFERENCE_BUSY"
+                        result["reason"] = str(exc)
+                        return result
                     if isinstance(exc, EmpireCoderSandboxError) and (
                         "deadline" in str(exc)
                     ):
