@@ -13,6 +13,7 @@ from typing import Iterable
 
 from .context import ContextPack
 from .graphify_context import GraphifyContextSource
+from .graphify_change_review import GraphifyChangeReviewer
 
 
 _CAMEL_SYMBOL = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b")
@@ -83,6 +84,45 @@ class GraphifyContextOverlay:
 
     def set_active_knowledge_paths(self, paths: Iterable[str]) -> None:
         self.delegate.set_active_knowledge_paths(paths)
+
+    def review_change_impact(
+        self, changed_paths: Iterable[str], *, max_affected: int = 20,
+    ) -> dict:
+        """Opt-in pre-edit briefing, filtered through existing Coder policy.
+
+        No Coder owner source changes and no automated patch authority.
+        """
+        paths = tuple(changed_paths)
+        if not paths or len(paths) > 15:
+            raise ValueError("explicit changed files required")
+        if any(
+            not isinstance(path, str) or
+            not self.delegate._knowledge_allowed(path)
+            for path in paths
+        ):
+            raise ValueError("changed file not permitted by Coder knowledge policy")
+        reviewer = GraphifyChangeReviewer(
+            workspace=self.source.workspace,
+            graph_path=self.source.graph_path,
+            snapshot_path=self.source.snapshot_path,
+        )
+        review = reviewer.review(paths, max_affected=max_affected)
+        original = review["affected_source_files"]
+        visible = [
+            row for row in original
+            if self.delegate._knowledge_allowed(row["source_file"])
+        ]
+        review["affected_source_files"] = visible
+        review["affected_source_count"] = len(visible)
+        review["known_test_file_candidates"] = sorted(
+            row["source_file"] for row in visible
+            if row["source_file"].startswith("tests/")
+        )
+        review["results_truncated"] = (
+            review["results_truncated"] or len(visible) != len(original)
+        )
+        review["filtered_by_existing_coder_policy"] = True
+        return review
 
     def build(
         self, task, *, terms: Iterable[str] = (),
