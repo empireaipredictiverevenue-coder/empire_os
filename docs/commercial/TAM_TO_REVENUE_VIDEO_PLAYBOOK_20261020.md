@@ -1173,3 +1173,108 @@ only after product/fulfilment/legal source approval. Existing
 CRM/Finance owners must independently verify real enquiry
 and payment receipts. No live POST, public deploy, payment, or
 customer contact occurred in this review.
+
+
+## 20 October — Cross-market prepublication risk interception
+
+**Founder requirement:** Flag wrong-market, wrong-industry, wrong-product,
+misleading or unapproved proof placements *before* any publication,
+rather than finding them only in post-release review.
+
+This increment implements the pure, read-only review API
+`review_proposed_proof_placement` inside the existing GTM campaign
+owner script. It **does not modify or bypass** the separately assigned
+`owned_campaign_release` writer, public website, CMS, outbound provider,
+CRM, Finance or database. The website owner must invoke this API before
+a changed page can be published; merely implementing it here **does not
+mean it is already enforced in production**. This distinction is
+explicitly exposed by `--read-only --owner-board`.
+
+### Risks now flagged
+
+- **Wrong country and sector:** compare the intended offer market
+  country and niche against the exact destination campaign's signed
+  `geography` and `niche` fields. Only known market labels are mapped;
+  unknown geography or sector **holds**, not guessed. This catches
+  putting a UK solar proof experience on a US roofing/HVAC/legal page.
+- **Wrong conversion objective:** an existing research-only route
+  cannot silently become a managed-service CTA or product checkout;
+  objectives are checked against the immutable release.
+- **Wrong or unapproved product:** an exact signed product code must
+  match one and only one current catalog product whose binding terms
+  satisfy `commercial_offer_book.product_ready`. Missing, stale,
+  ambiguous or substituted product codes hold.
+- **Unsupported or modified content:** the preview must regenerate
+  identically from an authenticated, typed canonical buyer value case
+  bound to the exact campaign, account, market and verified signal
+  receipts. Unknown source, unavailable inventory, altered HTML,
+  unsupported claims or old proof **hold**.
+- **Missing or outdated approvals:** separate Claims, Website, Privacy
+  and Fulfilment owner-review flags must all be present and bound to
+  the exact SHA-256 digest of the reviewed HTML. A later copy edit
+  invalidates the old digests. The website publisher **must still
+  independently authenticate the approving owners and the source
+  receipts**; caller-supplied flags/digests alone are not signatures.
+- **Unauthorised distribution:** proposed automatic follow-up,
+  marketing contact or paid media produces a critical block. First-party
+  enquiry permission is not general marketing permission.
+
+The output is a bounded, PII-free risk list, with severity and the
+existing owning team for each block. It is either
+`CRITICAL_PREPUBLICATION_HOLD` or
+`READY_FOR_INDEPENDENT_WEBSITE_OWNER_PREFLIGHT`, never a license
+to deploy. **Even zero findings returns**
+`publication_authorized=false`, `outbound_authorized=false`,
+`paid_media_authorized=false`, `execution_authority=NONE`.
+
+### Verified demonstration (not a discovered live queued mistake)
+
+Use this **explicitly hypothetical** comparison to inspect how the
+policy would handle a proposed UK solar offer placed on the five
+already-signed US research pages:
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_tam_full_funnel_strategy_20261020 \
+  --read-only --hypothetical-placement-market GB:solar:buyers
+```
+
+The 20 October output shows **five country mismatches and five sector
+mismatches** across five signed routes. It also clearly returns
+`actual_proposed_placements_checked=0` and
+`actual_queued_publications_detected=false`, because no real
+publication queue was authenticated in this review.
+
+### Website owner integration contract
+
+Before the existing website publication step for any future source-
+backed private offer preview, the authorised website owner should:
+
+1. Load the current immutable signed release and canonical catalog
+   through its approved source readers.
+2. Obtain the exact authenticated `TrustedBuyerValueCase` and
+   original `TrustedCampaignSignal` receipts from the existing
+   Sales Director/CRM owner, **not the public form body**.
+3. Generate the private proof experience with the existing
+   `build_private_buyer_offer_experience` function and bind all
+   independently authenticated Claims/Website/Privacy/Fulfilment
+   approvals to that exact HTML digest.
+4. Call `review_proposed_proof_placement` using the release root,
+   intended market/product/objective, verified source case/signals,
+   fresh catalog and same-page approval digests.
+5. Hard-stop on any critical risk, record the blocker with the
+   existing owner, and **re-run** the check immediately before any
+   publication. Even a clean preflight must pass the website owner's
+   original `owned_campaign_preflight`, publication/legal/security
+   approval and real deployment verification.
+
+No new queue or worker is required. The active website owner retains
+release control, source permissions and the right to decline a draft.
+Tests: `tests/test_proof_placement_prepublication_risks_20261020.py`.
+
+**Current limitation:** the pure gate is implemented and tested in the
+campaign feature branch; it has **not** been wired into the production
+release writer, so we cannot claim automatic production interception
+until the existing website owner accepts the integration and verifies
+it at the publishing boundary.

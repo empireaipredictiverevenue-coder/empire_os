@@ -1449,6 +1449,344 @@ def review_released_product_page_alignment(
     }
 
 
+# These country/niche labels are drawn from the fixed signed website release
+# contract. Unknown strings are NOT guessed from titles or marketing copy.
+_RELEASE_MARKET_GEO = {
+    "denver, co": "US",
+    "atlanta": "US",
+    "nyc": "US",
+    "dallas-fort worth": "US",
+}
+_RELEASE_NICHE = frozenset({
+    "roofing", "hvac", "general_contractor", "class_action_lawyer",
+})
+_RELEASE_NICHE_ALIASES = {
+    "general contractor": "general_contractor",
+    "class action lawyer": "class_action_lawyer",
+}
+_PROOF_OFFER_ARMS = frozenset({
+    "buyer_inventory_fit_offer",
+    "revenue_leak_signal_offer",
+    "verified_market_opportunity_brief",
+})
+_PROOF_PLACEMENT_RISKS = {
+    "NO_SIGNED_DESTINATION_RELEASE": ("critical", "existing_flagship_website_owner"),
+    "CAMPAIGN_NOT_IN_SIGNED_RELEASE": ("critical", "existing_flagship_website_owner"),
+    "UNKNOWN_SOURCE_MARKET": ("critical", "existing_flagship_website_owner"),
+    "COUNTRY_SCOPE_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "SECTOR_SCOPE_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "CONVERSION_OBJECTIVE_MISMATCH": ("critical", "existing_flagship_website_owner"),
+    "RESEARCH_FORM_IS_NOT_PRODUCT_CHECKOUT": ("critical", "existing_flagship_website_owner"),
+    "PRODUCT_CODE_MISMATCH": ("critical", "existing_commercial_catalog_and_fulfilment_owner"),
+    "CATALOG_TERMS_NOT_CURRENT": ("critical", "existing_commercial_catalog_and_fulfilment_owner"),
+    "PRODUCT_TERMS_UNVERIFIED": ("critical", "existing_commercial_catalog_and_fulfilment_owner"),
+    "PROOF_CONTENT_NOT_SOURCE_BOUND": ("critical", "existing_flagship_website_owner"),
+    "STALE_OR_MISSING_EXACT_CONTENT_SIGNOFF": ("critical", "existing_flagship_website_owner"),
+    "UNVERIFIED_PROOF_CLAIMS_APPROVAL": ("critical", "existing_flagship_website_owner"),
+    "UNVERIFIED_WEBSITE_APPROVAL": ("critical", "existing_flagship_website_owner"),
+    "UNVERIFIED_PRIVACY_REVIEW": ("critical", "existing_flagship_website_owner"),
+    "UNVERIFIED_FULFILMENT_APPROVAL": ("critical", "existing_commercial_catalog_and_fulfilment_owner"),
+    "UNVERIFIED_SALES_CHANNEL_BASIS": ("critical", "existing_tenant_crm_and_sales_owner"),
+    "PAID_MEDIA_OR_AUTOMATED_OUTBOUND_NOT_AUTHORIZED": ("critical", "existing_flagship_website_owner"),
+}
+_PROOF_PLACEMENT_OWNER_FIELDS = {
+    "source_proof_claims_approval": "UNVERIFIED_PROOF_CLAIMS_APPROVAL",
+    "website_publication_approval": "UNVERIFIED_WEBSITE_APPROVAL",
+    "privacy_form_approval": "UNVERIFIED_PRIVACY_REVIEW",
+    "fulfilment_and_delivery_approval": "UNVERIFIED_FULFILMENT_APPROVAL",
+}
+
+
+def review_proposed_proof_placement(
+    *,
+    root: Path,
+    requested_campaign_id: str,
+    proposed_market_scope: str,
+    proposed_offer_arm: str,
+    intended_conversion_objective: str,
+    catalog_source: Mapping[str, Any] | None,
+    catalog_readiness: Mapping[str, Any],
+    proof_preview: Mapping[str, Any] | None = None,
+    source_value_case: Any | None = None,
+    source_signals: tuple[Any, ...] | None = None,
+    now: datetime | None = None,
+    proposed_product_code: str | None = None,
+    approvals: Mapping[str, bool] | None = None,
+    approval_content_sha256_by_owner: Mapping[str, str] | None = None,
+    marketing_or_auto_followup_requested: bool = False,
+    paid_media_requested: bool = False,
+) -> dict[str, Any]:
+    """Fail-closed review before proposing a proof experience for a released page.
+
+    This gate is an existing campaign-owner API for website-owner integration,
+    NOT installed into the existing website release writer. The caller must
+    authenticate source/approval attestations in the owner's trust boundary.
+    The result never authorizes publication, outreach, spending or billing.
+    """
+    from empire_os.owned_campaign_release import load_release
+    from empire_os.commercial_offer_book import product_ready
+    from empire_os.campaign_intelligence import _SCOPES, _CAMPAIGN
+    if (not isinstance(root, Path)
+            or type(requested_campaign_id) is not str
+            or not _CAMPAIGN.fullmatch(requested_campaign_id)
+            or type(proposed_market_scope) is not str
+            or proposed_market_scope not in _SCOPES
+            or type(proposed_offer_arm) is not str
+            or proposed_offer_arm not in _PROOF_OFFER_ARMS
+            or type(intended_conversion_objective) is not str
+            or intended_conversion_objective not in (
+                "research_enquiry", "product_enquiry"
+            )
+            or (proposed_product_code is not None
+                and (type(proposed_product_code) is not str
+                     or len(proposed_product_code) > 90))
+            or type(marketing_or_auto_followup_requested) is not bool
+            or type(paid_media_requested) is not bool):
+        raise ValueError("UNTRUSTED_OR_UNSUPPORTED_PROOF_PLACEMENT_INTENT")
+    if (approvals is not None
+            and (not isinstance(approvals, Mapping)
+                 or set(approvals) != set(_PROOF_PLACEMENT_OWNER_FIELDS)
+                 or any(type(val) is not bool for val in approvals.values()))):
+        raise ValueError("EXACT_TYPED_OWNER_APPROVAL_PROJECTION_REQUIRED")
+    if (approval_content_sha256_by_owner is not None
+            and (not isinstance(approval_content_sha256_by_owner, Mapping)
+                 or set(approval_content_sha256_by_owner)
+                 != set(_PROOF_PLACEMENT_OWNER_FIELDS)
+                 or any(type(value) is not str or len(value) != 64
+                        or any(char not in "0123456789abcdef" for char in value)
+                        for value in approval_content_sha256_by_owner.values()))):
+        raise ValueError("EXACT_SHA256_OWNER_APPROVAL_PROJECTION_REQUIRED")
+
+    problems: set[str] = set()
+    signed = load_release(root=root)
+    campaign = None
+    if signed is None:
+        problems.add("NO_SIGNED_DESTINATION_RELEASE")
+    else:
+        matches = [
+            row for row in signed["campaigns"]
+            if row.get("campaign_id") == requested_campaign_id
+        ]
+        if len(matches) != 1:
+            problems.add("CAMPAIGN_NOT_IN_SIGNED_RELEASE")
+        else:
+            campaign = matches[0]
+    if campaign is not None:
+        source_country = _RELEASE_MARKET_GEO.get(
+            str(campaign.get("geography", "")).lower().strip()
+        )
+        source_niche = _RELEASE_NICHE_ALIASES.get(
+            str(campaign.get("niche", "")).lower().strip(),
+            str(campaign.get("niche", "")).lower().strip(),
+        )
+        if source_country is None or source_niche not in _RELEASE_NICHE:
+            problems.add("UNKNOWN_SOURCE_MARKET")
+        else:
+            country, niche, _ = proposed_market_scope.split(":")
+            if source_country != country:
+                problems.add("COUNTRY_SCOPE_MISMATCH")
+            if source_niche != niche:
+                problems.add("SECTOR_SCOPE_MISMATCH")
+        if (campaign.get("campaign_objective") != intended_conversion_objective
+                or (campaign.get("conversion_plan") or {}).get("landing_path")
+                   != "/research/" + requested_campaign_id):
+            problems.add("CONVERSION_OBJECTIVE_MISMATCH")
+        if (intended_conversion_objective == "research_enquiry"
+                and proposed_product_code is not None):
+            problems.add("RESEARCH_FORM_IS_NOT_PRODUCT_CHECKOUT")
+        elif (intended_conversion_objective == "product_enquiry"
+              and (proposed_product_code is None
+                   or proposed_product_code != campaign.get("product_code"))):
+            problems.add("PRODUCT_CODE_MISMATCH")
+    if marketing_or_auto_followup_requested or paid_media_requested:
+        problems.add("PAID_MEDIA_OR_AUTOMATED_OUTBOUND_NOT_AUTHORIZED")
+
+    verified_catalog_review = (
+        review_commercial_catalog_for_conversion(catalog_source, now=now)
+        if type(now) is datetime and now.tzinfo is not None else None
+    )
+    if (catalog_readiness.get("source_status")
+            != "CURRENT_CATALOG_PRODUCT_TERMS_REVIEWED"
+            or not isinstance(catalog_source, Mapping)
+            or not isinstance(catalog_source.get("products"), list)
+            or catalog_source.get("product_count") != len(catalog_source["products"])
+            or catalog_readiness.get("products_catalogued") != len(catalog_source["products"])
+            or verified_catalog_review is None
+            or verified_catalog_review.get("source_status")
+            != "CURRENT_CATALOG_PRODUCT_TERMS_REVIEWED"
+            or catalog_readiness.get("verified_commercial_terms_products")
+            != verified_catalog_review.get("verified_commercial_terms_products")):
+        problems.add("CATALOG_TERMS_NOT_CURRENT")
+    elif proposed_product_code is not None:
+        exact_matches = [
+            p for p in catalog_source["products"]
+            if isinstance(p, Mapping)
+            and p.get("product_code") == proposed_product_code
+        ]
+        if len(exact_matches) != 1 or not product_ready(exact_matches[0]):
+            problems.add("PRODUCT_TERMS_UNVERIFIED")
+
+    # A caller-supplied HTML packet or self-asserted hash is not source
+    # evidence. Regenerate from a typed, account-bound case and source-owned
+    # verified signals. No case means critical HOLD, not trusted marketing.
+    canonical_preview = None
+    if source_value_case is not None or source_signals is not None:
+        from empire_os.campaign_intelligence import (
+            TrustedBuyerValueCase, TrustedCampaignSignal,
+            build_private_buyer_offer_experience,
+        )
+        if (type(source_value_case) is TrustedBuyerValueCase
+                and source_value_case.context.campaign_id == requested_campaign_id
+                and source_value_case.context.market_scope == proposed_market_scope
+                and type(source_signals) is tuple
+                and len(source_signals) <= 250
+                and all(type(x) is TrustedCampaignSignal for x in source_signals)
+                and type(now) is datetime and now.tzinfo is not None):
+            try:
+                canonical_preview = build_private_buyer_offer_experience(
+                    source_value_case, verified_signals=source_signals,
+                    now=now,
+                )
+            except ValueError:
+                canonical_preview = None
+    if (canonical_preview is None
+            or not isinstance(proof_preview, Mapping)
+            or canonical_preview.get("private_html") != proof_preview.get("private_html")
+            or canonical_preview.get("offer_arm") != proposed_offer_arm
+            or proof_preview.get("status") != "PRIVATE_OPERATOR_PREVIEW_READY"
+            or proof_preview.get("market_scope") != proposed_market_scope
+            or proof_preview.get("offer_arm") != proposed_offer_arm
+            or proof_preview.get("publication_authorized") is not False
+            or proof_preview.get("working_first_party_cta_present") is not False
+            or proof_preview.get("customer_or_account_identity_exposed") is not False
+            or proof_preview.get("financial_results_or_inventory_quantity_claimed") is not False
+            or not isinstance(proof_preview.get("private_html"), str)
+            or not proof_preview.get("private_html")):
+        problems.add("PROOF_CONTENT_NOT_SOURCE_BOUND")
+    else:
+        questions = proof_preview.get("prospect_question_coverage")
+        if (not isinstance(questions, Mapping)
+                or questions.get("questions_reviewed") != 8
+                or questions.get("conversion_ready_for_live_site") is not False):
+            problems.add("PROOF_CONTENT_NOT_SOURCE_BOUND")
+
+    for key, risk in _PROOF_PLACEMENT_OWNER_FIELDS.items():
+        if approvals is None or approvals.get(key) is not True:
+            problems.add(risk)
+    # Approval is version-specific: the slightest changed page copy must
+    # invalidate EVERY old Claims/Website/Privacy/Fulfilment signature.
+    from hashlib import sha256
+    canonical_html = (
+        canonical_preview.get("private_html")
+        if isinstance(canonical_preview, Mapping) else None
+    )
+    expected_digest = (
+        sha256(canonical_html.encode("utf-8")).hexdigest()
+        if isinstance(canonical_html, str) and canonical_html else None
+    )
+    if (expected_digest is None or approval_content_sha256_by_owner is None
+            or any(
+                approval_content_sha256_by_owner.get(k) != expected_digest
+                for k in _PROOF_PLACEMENT_OWNER_FIELDS
+            )):
+        problems.add("STALE_OR_MISSING_EXACT_CONTENT_SIGNOFF")
+    # A positive owner approval flag alone is never authority for dispatch
+    # or web publishing; the website owner's release writer must verify
+    # actual approvals, exact content digests and privacy at its own boundary.
+    if marketing_or_auto_followup_requested or paid_media_requested:
+        problems.add("UNVERIFIED_SALES_CHANNEL_BASIS")
+
+    risks = [
+        {"risk_code": key, "severity": _PROOF_PLACEMENT_RISKS[key][0],
+         "existing_owner": _PROOF_PLACEMENT_RISKS[key][1]}
+        for key in sorted(problems)
+    ]
+    return {
+        "schema_version": "empire.gtm.proof_placement_prepublication_risk.v1",
+        "status": (
+            "CRITICAL_PREPUBLICATION_HOLD" if problems
+            else "READY_FOR_INDEPENDENT_WEBSITE_OWNER_PREFLIGHT"
+        ),
+        "blocking_issue_count": len(problems),
+        "risk_codes": [r["risk_code"] for r in risks],
+        "risks": risks,
+        "requested_market_scope": proposed_market_scope,
+        "destination_country_and_sector_match_verified":
+            not any(x in problems for x in (
+                "NO_SIGNED_DESTINATION_RELEASE", "CAMPAIGN_NOT_IN_SIGNED_RELEASE",
+                "UNKNOWN_SOURCE_MARKET", "COUNTRY_SCOPE_MISMATCH",
+                "SECTOR_SCOPE_MISMATCH")),
+        "actual_queued_publication_detected": False,
+        "proposed_preview_already_published": False,
+        "website_release_writer_enforcement_installed": False,
+        "existing_owner_independent_evidence_recheck_required": True,
+        "public_contact_or_raw_content_exported": False,
+        "publication_authorized": False,
+        "outbound_authorized": False,
+        "paid_media_authorized": False,
+        "execution_authority": "NONE",
+    }
+
+
+def review_hypothetical_market_placement_risks(
+    root: Path, *, market_scope: str,
+    catalog_source: Mapping[str, Any] | None,
+    catalog_readiness: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Demonstrate scope conflicts against signed routes only; not a queue."""
+    from empire_os.owned_campaign_release import load_release
+    from empire_os.campaign_intelligence import _SCOPES
+
+    if market_scope not in _SCOPES:
+        raise ValueError("UNSUPPORTED_HYPOTHETICAL_MARKET_SCOPE")
+    signed = load_release(root=root)
+    if signed is None:
+        return {
+            "schema_version": "empire.gtm.hypothetical_proof_market_audit.v1",
+            "status": "HOLD_NO_SIGNED_CAMPAIGNS",
+            "routes_compared": None,
+            "geography_mismatch_routes": None,
+            "sector_mismatch_routes": None,
+            "actual_proposed_placements_checked": 0,
+            "publication_authorized": False,
+            "execution_authority": "NONE",
+        }
+    destination = []
+    for c in signed["campaigns"]:
+        route = review_proposed_proof_placement(
+            root=root,
+            requested_campaign_id=c["campaign_id"],
+            proposed_market_scope=market_scope,
+            proposed_offer_arm="buyer_inventory_fit_offer",
+            intended_conversion_objective=c["campaign_objective"],
+            catalog_source=catalog_source,
+            catalog_readiness=catalog_readiness,
+            proposed_product_code=c.get("product_code"),
+            # No actual user/owner proposal, preview, permissions, or approvals
+            # exist for this hypothetical simulation.
+        )
+        destination.append(route)
+    counts = {
+        key: sum(key in row["risk_codes"] for row in destination)
+        for key in ("COUNTRY_SCOPE_MISMATCH", "SECTOR_SCOPE_MISMATCH",
+                    "UNKNOWN_SOURCE_MARKET")
+    }
+    return {
+        "schema_version": "empire.gtm.hypothetical_proof_market_audit.v1",
+        "status": "HYPOTHETICAL_MARKET_SCOPE_CONFLICTS_REVIEWED",
+        "compared_market_scope": market_scope,
+        "routes_compared": len(destination),
+        "geography_mismatch_routes": counts["COUNTRY_SCOPE_MISMATCH"],
+        "sector_mismatch_routes": counts["SECTOR_SCOPE_MISMATCH"],
+        "unknown_source_market_routes": counts["UNKNOWN_SOURCE_MARKET"],
+        "actual_proposed_placements_checked": 0,
+        "actual_queued_publications_detected": False,
+        "website_release_writer_enforcement_installed": False,
+        "publication_authorized": False,
+        "execution_authority": "NONE",
+    }
+
+
 def export_conversion_owner_handoff(
     output: Mapping[str, Any], *, now: datetime,
 ) -> dict[str, Any]:
@@ -1476,6 +1814,9 @@ def export_conversion_owner_handoff(
                 ) if "existing_research_product_alignment" in output else None
             ),
             "private_proof_experience_publication_proven": False,
+            "prepublication_proof_risk_api_implemented_in_feature_branch": True,
+            "prepublication_proof_risk_enforced_in_live_release_writer": False,
+            "actual_new_publication_queue_authenticated_here": False,
             "canonical_first_party_enquiry_route": (
                 release.get("existing_enquiry_route")
             ),
@@ -1522,6 +1863,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--owner-board", action="store_true",
         help="print only the privacy-safe implementation-owner conversion handoff",
+    )
+    parser.add_argument(
+        "--hypothetical-placement-market",
+        choices=("GB:solar:buyers", "US:roofing:buyers"),
+        help="compare a hypothetical offer market to existing signed routes; "
+             "not an actual publication queue",
     )
     options = parser.parse_args(argv)
     if not options.read_only:
@@ -1570,7 +1917,13 @@ def main(argv: list[str] | None = None) -> int:
         customer_money_join=output["decision_intelligence"]["real_first_party_conversion_journey"],
     )
     output["next_real_execution_focus"] = recommend_next_real_execution_focus(output)
-    if options.owner_board:
+    if options.hypothetical_placement_market:
+        print(json.dumps(review_hypothetical_market_placement_risks(
+            root, market_scope=options.hypothetical_placement_market,
+            catalog_source=read_existing_commercial_catalog_readonly(root),
+            catalog_readiness=output["existing_catalog_conversion_readiness"],
+        ), sort_keys=True))
+    elif options.owner_board:
         print(json.dumps(export_conversion_owner_handoff(output, now=current), sort_keys=True))
     else:
         print(json.dumps(output, sort_keys=True))
