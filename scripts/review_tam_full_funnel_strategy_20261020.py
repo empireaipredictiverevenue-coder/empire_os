@@ -8,11 +8,12 @@ enrols contacts, exports audiences, or changes any production source.
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from empire_os.experiment_engine import ExperimentDefinition, plan_assignment
 
@@ -171,7 +172,10 @@ def review_full_funnel_strategy(
     }
     blockers = []
     if not tam_complete:
-        blockers.append("COMPLETE_VERIFIED_QUALIFIED_TAM_NOT_AVAILABLE")
+        # A verified, lawful *cohort* can be tested before an exhaustive TAM
+        # census; the absence of a full census blocks market-wide claims,
+        # not a narrowly scoped first wave.
+        blockers.append("MARKET_WIDE_COVERAGE_UNVERIFIED_SCOPED_PILOT_ONLY")
     if not asset_evidence:
         blockers.append("CAMPAIGN_ASSET_AND_RUNTIME_COUPLING_UNVERIFIED")
     if not safe_optimizer["fresh_learning_source"]:
@@ -375,15 +379,329 @@ def review_paid_customer_winners(
             "causal_lift_claimed": False, "automatic_scaling": False}
 
 
+
+
+@dataclass(frozen=True)
+class RecipientWaveEvidence:
+    """Private, canonical CRM projection: no emails, names, URLs or free text."""
+
+    contact_lookup_key: str
+    company_lookup_key: str
+    tenant_ref: str
+    market_scope: str
+    last_verified_at: datetime
+    last_marketing_touch_at: datetime | None
+    source_authority_verified: bool
+    channel_lawfulness_verified: bool
+    suppression_clear: bool
+    contact_history_verified: bool
+    sending_domain_approved: bool
+    offer_evidence_verified: bool
+
+
+_MARKET_SCOPES = frozenset({"GB:solar:buyers", "US:roofing:buyers"})
+_LOOKUP_KEY = re.compile(r"^[0-9a-f]{32}$")
+_TENANT_REF = re.compile(r"^tenant_[a-z0-9]{8,40}$")
+_WAVE_LIMIT = 500
+
+
+def assemble_verified_cohort_wave(
+    lookup_keys: list[str] | tuple[str, ...], *,
+    trusted_resolver: Callable[[str], RecipientWaveEvidence],
+    tenant_ref: str, market_scope: str, now: datetime,
+) -> dict[str, Any]:
+    """Plan offer/holdout assignments over a TRUSTED owner-resolved cohort.
+
+    Critically, a verified *subset* may be reviewed without falsely claiming
+    the entire TAM is complete. This does not publish a send list, email, or
+    contact identifier and does not grant delivery authority.
+    """
+    if (type(lookup_keys) not in (list, tuple)
+            or not 1 <= len(lookup_keys) <= _WAVE_LIMIT
+            or not callable(trusted_resolver)
+            or type(tenant_ref) is not str or not _TENANT_REF.fullmatch(tenant_ref)
+            or market_scope not in _MARKET_SCOPES
+            or not isinstance(now, datetime) or now.tzinfo is None):
+        raise ValueError("trusted bounded cohort required")
+    counts = {
+        "source_contacts_checked": 0, "eligible_for_review": 0,
+        "held_for_review": 0, "duplicate_lookup_keys_skipped": 0,
+        "no_marketing_holdout": 0,
+        "buyer_inventory_fit_offer": 0,
+        "revenue_leak_signal_offer": 0,
+        "verified_market_opportunity_brief": 0,
+    }
+    holds: dict[str, int] = {}
+    seen = set()
+    by_company: dict[str, str] = {}
+    for key in lookup_keys:
+        if type(key) is not str or not _LOOKUP_KEY.fullmatch(key) or key == "0" * 32:
+            raise ValueError("nonidentifying lookup key required")
+        if key in seen:
+            counts["duplicate_lookup_keys_skipped"] += 1
+            continue
+        seen.add(key)
+        counts["source_contacts_checked"] += 1
+        try:
+            row = trusted_resolver(key)
+        except Exception:
+            # Never leak a private CRM error, address or internal DSN.
+            row = None
+        reason = None
+        if type(row) is not RecipientWaveEvidence:
+            reason = "CANONICAL_CRM_RECORD_UNAVAILABLE"
+        elif (row.contact_lookup_key != key
+              or type(row.company_lookup_key) is not str
+              or not _LOOKUP_KEY.fullmatch(row.company_lookup_key)
+              or row.company_lookup_key == "0" * 32
+              or row.tenant_ref != tenant_ref or row.market_scope != market_scope):
+            reason = "TENANT_MARKET_OR_IDENTITY_MISMATCH"
+        elif row.source_authority_verified is not True:
+            reason = "CANONICAL_SOURCE_AUTHORITY_UNVERIFIED"
+        elif (not isinstance(row.last_verified_at, datetime)
+              or row.last_verified_at.tzinfo is None
+              or now < row.last_verified_at
+              or now - row.last_verified_at > timedelta(days=2)):
+            reason = "CONTACT_VERIFICATION_STALE"
+        elif row.offer_evidence_verified is not True:
+            reason = "OFFER_OUTCOME_PROOF_MISSING"
+        else:
+            try:
+                planned = plan_compliant_market_touch(
+                    contact_lookup_key=row.company_lookup_key,
+                    market_scope_verified=True,
+                    lawful_outreach_verified=row.channel_lawfulness_verified,
+                    suppressed=(row.suppression_clear is not True),
+                    sending_domain_approved=row.sending_domain_approved,
+                    last_touch_verified=row.contact_history_verified,
+                    last_touch_at=row.last_marketing_touch_at,
+                    now=now,
+                )
+            except ValueError:
+                planned = {"status": "HOLD", "blockers": ["CONTACT_HISTORY_INVALID"]}
+            if planned["status"] == "HOLD":
+                reason = planned["blockers"][0]
+            else:
+                arm = planned["planned_arm"]
+                prior = by_company.setdefault(row.company_lookup_key, arm)
+                if arm != prior:
+                    # Should be impossible with deterministic assignment.
+                    raise ValueError("company experiment arm collision")
+                counts["eligible_for_review"] += 1
+                counts[arm] += 1
+        if reason:
+            counts["held_for_review"] += 1
+            holds[reason] = holds.get(reason, 0) + 1
+
+    return {
+        "schema_version": "empire.gtm.canonical_cohort_wave_review.v1",
+        "status": "OFFLINE_SEGMENTED_WAVE_PLAN_NOT_SENT",
+        "market_scope": market_scope,
+        "counts": counts,
+        "hold_reasons": dict(sorted(holds.items())),
+        "verified_entire_tam": False,
+        "contact_identities_or_emails_exposed": 0,
+        "recipient_list_exported": False,
+        "auto_email_sending_enabled": False,
+        "retargeting_audience_exported": False,
+        "source_owner_execution_approval_granted": False,
+        "execution_authority": "NONE",
+    }
+
+
+
+_OFFER_DRAFTS = {
+    "buyer_inventory_fit_offer": (
+        "A quick buyer-fit check",
+        "Would it help to check whether the lead types and territories you buy fit what "
+        "Empire AI can verify as available? We would review supply evidence, buyer "
+        "criteria and acceptance rules before suggesting anything, and say clearly "
+        "if there isn't a match. Would a short buyer-fit check be useful?",
+        "Would a short buyer-fit check be useful?",
+    ),
+    "revenue_leak_signal_offer": (
+        "Local demand evidence",
+        "When enquiries are lost between demand and response, it can be hard to "
+        "tell which gaps matter. A territory-level evidence check could help "
+        "separate measured opportunity from assumptions, including where our "
+        "information is incomplete. We can outline the verified sources and "
+        "open questions. Would a short evidence snapshot help?",
+        "Would a short evidence snapshot help?",
+    ),
+    "verified_market_opportunity_brief": (
+        "Choosing your next market",
+        "If you're deciding which territories to pursue, comparing independently "
+        "sourced market signals could help before committing budget. We can "
+        "prepare a short brief showing observations, limits and the questions "
+        "still unresolved. The result would be a starting point, not a promise "
+        "of leads or returns. Would a one-page outline be useful?",
+        "Would a one-page outline be useful?",
+    ),
+}
+
+
+def review_three_offer_creatives(
+    *, market_scope: str, verified_offer_evidence_refs: tuple[str, ...] = (),
+    live_offer_and_landing_verified: bool = False,
+) -> dict[str, Any]:
+    """Draft real three-angle campaign copy using the EXISTING copy reviewer.
+
+    Evidence-ref strings are *references*, not independent attestation, and
+    therefore do not make campaigns send-ready.
+    """
+    if market_scope not in _MARKET_SCOPES:
+        raise ValueError("approved video-pilot market required")
+    if type(verified_offer_evidence_refs) is not tuple or len(verified_offer_evidence_refs) > 10:
+        raise ValueError("bounded proof reference list required")
+    if any(type(ref) is not str or len(ref) > 100 or not re.fullmatch(
+        r"[a-zA-Z0-9_./:-]{8,100}", ref
+    ) for ref in verified_offer_evidence_refs):
+        raise ValueError("invalid proof reference")
+    from empire_os.outreach_message_optimizer import review_message
+    drafts = []
+    for arm, (subject, body, cta) in _OFFER_DRAFTS.items():
+        quality = review_message(subject=subject, body=body, cta=cta)
+        if quality["human_copy_gate"]["eligible"] is not True:
+            raise ValueError("offer copy failed existing human copy gate")
+        drafts.append({
+            "arm": arm, "subject": subject, "body": body, "cta": cta,
+            "existing_copy_quality_score": quality["structural_score"],
+            "existing_copy_hard_gate_passed": True,
+            "experiment_eligible": False,
+            "send_authorized": False,
+        })
+    return {
+        "schema_version": "empire.gtm.three_outcome_offer_drafts.v1",
+        "market_scope": market_scope,
+        "drafts": drafts,
+        "offer_evidence_references_supplied": len(verified_offer_evidence_refs),
+        "offer_and_landing_owner_attested": live_offer_and_landing_verified is True,
+        "offer_truth_independently_verified": False,
+        "production_sender_and_recipients_verified": False,
+        "copy_sent": False,
+        "authority": "DRAFT_ONLY",
+    }
+
+
+BUYER_SOURCE_PATHS = {
+    "buyer_qualification": (
+        "runtime/buyer_network_intelligence/founder_qualification_actions_latest.json",
+        "empire.buyer_qualification_actions.v1",
+    ),
+    "relationships": (
+        "runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json",
+        "empire.commercial_relationship_registry.v1",
+    ),
+}
+
+
+def read_existing_buyer_sources(root: Path) -> dict[str, dict[str, Any]]:
+    """Existing root-private buyer data. Never echo or export any contact row."""
+    found: dict[str, dict[str, Any]] = {}
+    for key, (rel, _) in BUYER_SOURCE_PATHS.items():
+        path = root / rel
+        try:
+            mode = path.stat().st_mode
+            if (path.is_symlink() or not path.is_file()
+                    or mode & 0o077 or path.stat().st_size > 2_500_000):
+                raise ValueError("unapproved private source")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            found[key] = data if isinstance(data, dict) else {}
+        except (OSError, ValueError):
+            found[key] = {}
+    return found
+
+
+def review_current_buyer_contactability(
+    snapshots: Mapping[str, Any] | None, *, now: datetime,
+) -> dict[str, Any]:
+    """Source-bound real eligibility census; does not make contacts sendable.
+
+    Buyer evidence is an *independent* owner surface from the old TAM
+    research snapshot. A research target or prior Gmail thread never
+    supplies consent, deliverability, current suppression or send authority.
+    """
+    now = now.astimezone(timezone.utc)
+    data = snapshots or {}
+    qualification = data.get("buyer_qualification", {})
+    relationships = data.get("relationships", {})
+    q_valid = (
+        isinstance(qualification, Mapping)
+        and qualification.get("schema_version") == BUYER_SOURCE_PATHS["buyer_qualification"][1]
+        and qualification.get("mode") == "OBSERVE"
+        and qualification.get("execution_authority") in ("none", "NONE")
+        and qualification.get("outbound_enabled") is False
+        and qualification.get("outbound_sent") is False
+        and _fresh(qualification.get("generated_at"), now)
+        and isinstance(qualification.get("targets"), list)
+        and len(qualification["targets"]) <= 500
+    )
+    r_valid = (
+        isinstance(relationships, Mapping)
+        and relationships.get("schema_version") == BUYER_SOURCE_PATHS["relationships"][1]
+        and relationships.get("mode") == "OBSERVE"
+        and relationships.get("execution_authority") in ("none", "NONE")
+        and relationships.get("outbound_authorized") is False
+        and relationships.get("outbound_sent") is False
+        and _fresh(relationships.get("generated_at"), now)
+        and isinstance(relationships.get("relationships"), list)
+        and len(relationships["relationships"]) <= 10_000
+    )
+    result = {
+        "source_status": "VERIFIED_READONLY_BUYER_SNAPSHOTS" if q_valid and r_valid
+                         else "HOLD_BUYER_SOURCE_MISSING_STALE_OR_INCOMPATIBLE",
+        "shortlisted_buyer_targets": None,
+        "reviewed_relationships": None,
+        "buyer_contact_verified_count": None,
+        "qualifying_contacts_for_wave": None,
+        "permitted_email_recipients": None,
+        "existing_auto_send_authority": False,
+        "private_contacts_exposed": 0,
+        "outbound_enabled_by_review": False,
+    }
+    if not q_valid or not r_valid:
+        return result
+    targets = qualification["targets"]
+    rows = relationships["relationships"]
+    if (not all(isinstance(row, Mapping) for row in targets)
+            or not all(isinstance(row, Mapping) for row in rows)
+            or _count(qualification.get("contact_verified_for_outbound_count")) is None):
+        result["source_status"] = "HOLD_BUYER_RECORD_COUNTS_INVALID"
+        return result
+    # Numbers describe exactly what these sources know, not the market's
+    # total addressable population or an independently authenticated send list.
+    result["shortlisted_buyer_targets"] = len(targets)
+    result["reviewed_relationships"] = len(rows)
+    result["buyer_contact_verified_count"] = qualification[
+        "contact_verified_for_outbound_count"
+    ]
+    # Two independent snapshots are not joined by email/company strings.
+    # A recipient-level authoritative CRM join is required for send readiness.
+    result["qualifying_contacts_for_wave"] = None
+    result["permitted_email_recipients"] = None
+    result["existing_auto_send_authority"] = (
+        False if all(row.get("auto_send_authorized") is not True for row in rows)
+        else None
+    )
+    return result
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
     options = parser.parse_args(argv)
     if not options.read_only:
         raise ValueError("read-only required")
+    root = Path("/srv/empire_os")
+    current = datetime.now(timezone.utc)
     output = review_full_funnel_strategy(
-        read_existing_snapshots(Path("/srv/empire_os")),
-        now=datetime.now(timezone.utc),
+        read_existing_snapshots(root), now=current,
+    )
+    output["real_buyer_contactability"] = review_current_buyer_contactability(
+        read_existing_buyer_sources(root), now=current,
+    )
+    output["first_pilot_offer_creatives"] = review_three_offer_creatives(
+        market_scope="GB:solar:buyers",
     )
     print(json.dumps(output, sort_keys=True))
     return 0

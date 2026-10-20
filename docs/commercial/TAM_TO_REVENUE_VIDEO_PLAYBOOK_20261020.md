@@ -160,3 +160,67 @@ The next *real* activation belongs to existing market, sender, website
 and Sales Director owners, using current reviewed evidence and explicit
 authority at the actual operational boundary. Incomplete source proofs
 remain BLOCKERS, not silently waived.
+
+
+## 20 October continuation — real eligible-cohort builder and offer creatives
+
+This wave **implements** more of the video method, not a second tracking app:
+
+- Reads only the existing private buyer qualification and commercial
+  relationship snapshots; never logs/returns their personal/company rows.
+  The current read-only production evidence contains **23** shortlisted
+  buyer targets, **261** researched/existing relationships and **0**
+  contacts confirmed for outbound in the buyer qualification source.
+  Permitted-email recipient count is **unknown**, not 23 or 261.
+- `assemble_verified_cohort_wave` accepts a bounded set of **opaque CRM
+  contact keys** resolved by the existing owner's trusted private callback;
+  validates tenant, vertical/country, company grouping, evidence freshness,
+  offer proof, recipient-level lawful marketing eligibility, suppression,
+  sender readiness and last-contact history. Does **not** accept browser
+  self-asserted consent or raw personal email lists.
+- Explicitly separates a lawful **scoped pilot cohort** from the claim
+  that the **entire TAM** is covered. A complete TAM census is a scale
+  objective, not a reason to prevent pilot tests of evidenced eligible
+  contacts. The current observed TAM still has **8** stale sample
+  entities and does not verify a sendable GB solar cohort.
+- Reuses Empire's existing deterministic experiment engine to put
+  **all people at the same company in one offer/holdout arm**, rather
+  than sending mixed messages to coworkers. Repeat key inputs are
+  deduplicated; suppression and 30-day last-contact policy hold sending.
+- `review_three_offer_creatives` prepares the three actual plain-text
+  campaign drafts: **A quick buyer-fit check**, **Local demand evidence**
+  and **Choosing your next market**. Each is run through the existing
+  `outreach_message_optimizer.review_message` hard copy-quality check.
+  Current structural scores are 90/100/100. They are **drafts**, not
+  personalised or proof-backed send assets; they make no inventory or
+  paying-customer claims.
+- The current real source read confirms **zero outbound-verified buyer
+  contacts** and **zero exact campaign outcome matches**. Until a
+  source-owned CRM recipient join and lawful approved campaign route
+  exist, every contact and send action remains held. No paid-media
+  audiences or browser analytics were activated.
+
+### What the existing Sales Director and sender owner must connect
+
+Supply its canonical signed/trusted recipient projection to
+`assemble_verified_cohort_wave`, with current suppression, last-contact
+and sender/offer evidence. Review and approve a truthful offer/landing
+page and then use the existing governed sender with a separately
+authorised first wave. Feed actual delivery, qualifying responses,
+click/site receipts, meetings and *verified paying customers* to the
+existing campaign outcome resolver. Continue same-business-day review
+of confirmed enquiries. Do not activate a new marketing automation
+from this source-only build.
+
+### Inspect current real pilot truth
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_tam_full_funnel_strategy_20261020 --read-only
+```
+
+Field groups: `real_buyer_contactability`,
+`first_pilot_offer_creatives`, `launch_blockers`, plus the existing
+market, campaign, experiment and outcome review. The CLI does not send
+messages or write to EmpireDB.

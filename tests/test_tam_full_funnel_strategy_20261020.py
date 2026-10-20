@@ -70,7 +70,7 @@ def test_stale_tam_cannot_be_taken_as_verified_full_market():
     result = review_full_funnel_strategy(data, now=NOW)
     assert result["qualified_market"]["complete_addressable_market_verified"] is False
     assert result["qualified_market"]["complete_market_size"] is None
-    assert "COMPLETE_VERIFIED_QUALIFIED_TAM_NOT_AVAILABLE" in result["launch_blockers"]
+    assert "MARKET_WIDE_COVERAGE_UNVERIFIED_SCOPED_PILOT_ONLY" in result["launch_blockers"]
 
 
 def test_wrong_schema_cannot_count_as_campaign_proof():
@@ -246,3 +246,222 @@ def test_winner_rejects_unsafe_low_sample_or_impossible_claims():
     bad["variant_a"] = {"eligible_delivered": 100, "paid_customers": 101}
     with pytest.raises(ValueError):
         review_paid_customer_winners(bad, outcome_receipts_verified=True)
+
+from dataclasses import replace
+from scripts.review_tam_full_funnel_strategy_20261020 import (
+    RecipientWaveEvidence, assemble_verified_cohort_wave,
+    read_existing_buyer_sources, review_current_buyer_contactability,
+    BUYER_SOURCE_PATHS,
+)
+
+
+def _canonical_recipient(**changes):
+    record = RecipientWaveEvidence(
+        contact_lookup_key="a" * 32, company_lookup_key="b" * 32,
+        tenant_ref="tenant_empireai", market_scope="GB:solar:buyers",
+        last_verified_at=NOW, last_marketing_touch_at=None,
+        source_authority_verified=True,
+        channel_lawfulness_verified=True, suppression_clear=True,
+        contact_history_verified=True,
+        sending_domain_approved=True, offer_evidence_verified=True,
+    )
+    return replace(record, **changes)
+
+
+def _cohort(keys=None, resolver=None, **kw):
+    value = _canonical_recipient()
+    return assemble_verified_cohort_wave(
+        ["a" * 32] if keys is None else keys,
+        trusted_resolver=(lambda _: value) if resolver is None else resolver,
+        tenant_ref=kw.get("tenant_ref", "tenant_empireai"),
+        market_scope=kw.get("market_scope", "GB:solar:buyers"),
+        now=NOW,
+    )
+
+
+def test_one_valid_segment_can_be_planned_without_claiming_tam_complete():
+    report = _cohort()
+    assert report["status"] == "OFFLINE_SEGMENTED_WAVE_PLAN_NOT_SENT"
+    assert report["counts"]["eligible_for_review"] == 1
+    assert report["counts"]["held_for_review"] == 0
+    assert report["verified_entire_tam"] is False
+    assert sum(report["counts"][name] for name in (
+        "no_marketing_holdout", "buyer_inventory_fit_offer",
+        "revenue_leak_signal_offer", "verified_market_opportunity_brief")) == 1
+    for key in ("recipient_list_exported", "auto_email_sending_enabled",
+                "retargeting_audience_exported", "source_owner_execution_approval_granted"):
+        assert report[key] is False
+    dumped = json.dumps(report)
+    for secret in ("a" * 32, "b" * 32, "tenant_empireai", "person@example.com"):
+        assert secret not in dumped
+
+
+def test_duplicate_contact_is_idempotently_discarded_before_assignment():
+    report = _cohort(keys=["a" * 32] * 3)
+    assert report["counts"]["source_contacts_checked"] == 1
+    assert report["counts"]["duplicate_lookup_keys_skipped"] == 2
+    assert report["counts"]["eligible_for_review"] == 1
+
+
+def test_two_contacts_same_company_get_identical_offer_arm():
+    one = _canonical_recipient()
+    two = replace(one, contact_lookup_key="c" * 32)
+    report = _cohort(keys=[one.contact_lookup_key, two.contact_lookup_key],
+                     resolver=lambda key: {one.contact_lookup_key: one,
+                                           two.contact_lookup_key: two}[key])
+    arms = {k: v for k, v in report["counts"].items() if k in {
+        "no_marketing_holdout", "buyer_inventory_fit_offer",
+        "revenue_leak_signal_offer", "verified_market_opportunity_brief",
+    }}
+    assert sorted(arms.values()) == [0, 0, 0, 2]
+
+
+def test_unknown_permissions_and_suppression_always_hold():
+    for prop, val in (
+        ("channel_lawfulness_verified", False),
+        ("suppression_clear", False),
+        ("contact_history_verified", False),
+        ("sending_domain_approved", False),
+        ("offer_evidence_verified", False),
+        ("source_authority_verified", False),
+    ):
+        row = _canonical_recipient(**{prop: val})
+        result = _cohort(resolver=lambda _: row)
+        assert result["counts"]["eligible_for_review"] == 0, prop
+        assert result["counts"]["held_for_review"] == 1, prop
+
+
+def test_tenant_market_and_lookup_mismatch_hold():
+    for change in (
+        {"tenant_ref": "tenant_otherx"},
+        {"market_scope": "US:roofing:buyers"},
+        {"contact_lookup_key": "f" * 32},
+        {"company_lookup_key": "zero"},
+    ):
+        row = _canonical_recipient(**change)
+        report = _cohort(resolver=lambda _: row)
+        assert report["counts"]["held_for_review"] == 1
+        assert "TENANT_MARKET_OR_IDENTITY_MISMATCH" in report["hold_reasons"]
+
+
+def test_stale_future_dates_and_30_day_cooldown_rejected():
+    for updates in (
+        {"last_verified_at": NOW - timedelta(days=4)},
+        {"last_verified_at": NOW + timedelta(hours=1)},
+        {"last_marketing_touch_at": NOW - timedelta(days=12)},
+    ):
+        report = _cohort(resolver=lambda _: _canonical_recipient(**updates))
+        assert report["counts"]["held_for_review"] == 1
+        assert report["counts"]["eligible_for_review"] == 0
+
+
+def test_unreadable_resolver_errors_never_leak_crm_secret():
+    def resolver(_):
+        raise ValueError("secret person@example.com")
+    report = _cohort(resolver=resolver)
+    assert report["hold_reasons"] == {"CANONICAL_CRM_RECORD_UNAVAILABLE": 1}
+    assert "person@example.com" not in json.dumps(report)
+
+
+def test_unsafe_contact_lookup_and_empty_cohort_rejected():
+    import pytest
+    for keys in (["person@example.com"], [], ["0" * 32], ["A" * 32],
+                 ["a" * 32] * 501):
+        with pytest.raises(ValueError):
+            _cohort(keys=keys)
+
+
+def _buyer_sources():
+    return {
+        "buyer_qualification": {
+            "schema_version": BUYER_SOURCE_PATHS["buyer_qualification"][1],
+            "generated_at": NOW.isoformat(), "mode": "OBSERVE",
+            "execution_authority": "none", "outbound_enabled": False,
+            "outbound_sent": False, "contact_verified_for_outbound_count": 0,
+            "targets": [{"outbound_authorized": False} for _ in range(23)],
+        },
+        "relationships": {
+            "schema_version": BUYER_SOURCE_PATHS["relationships"][1],
+            "generated_at": NOW.isoformat(), "mode": "OBSERVE",
+            "execution_authority": "NONE", "outbound_authorized": False,
+            "outbound_sent": False,
+            "relationships": [{"auto_send_authorized": False} for _ in range(261)],
+        },
+    }
+
+
+def test_buyer_evidence_maps_real_qualified_targets_not_send_list():
+    result = review_current_buyer_contactability(_buyer_sources(), now=NOW)
+    assert result["source_status"] == "VERIFIED_READONLY_BUYER_SNAPSHOTS"
+    assert result["shortlisted_buyer_targets"] == 23
+    assert result["reviewed_relationships"] == 261
+    assert result["buyer_contact_verified_count"] == 0
+    assert result["permitted_email_recipients"] is None
+    assert result["qualifying_contacts_for_wave"] is None
+    assert result["existing_auto_send_authority"] is False
+    assert "person@example.com" not in json.dumps(result)
+
+
+def test_missing_stale_or_untrusted_buyer_source_denied():
+    for mutated in (
+        lambda d: d["relationships"].__setitem__("generated_at", "2020-01-01T00:00:00Z"),
+        lambda d: d["relationships"].__setitem__("outbound_authorized", True),
+        lambda d: d["buyer_qualification"].__setitem__("mode", "LIVE"),
+    ):
+        data = _buyer_sources()
+        mutated(data)
+        assert review_current_buyer_contactability(data, now=NOW)["shortlisted_buyer_targets"] is None
+
+
+def test_owner_private_file_reader_rejects_symlinks_and_nonprivate_files(tmp_path):
+    data = _buyer_sources()
+    for key, (path, _) in BUYER_SOURCE_PATHS.items():
+        file = tmp_path / path
+        file.parent.mkdir(parents=True, exist_ok=True)
+        file.write_text(json.dumps(data[key]))
+        file.chmod(0o600)
+    assert set(read_existing_buyer_sources(tmp_path)) == set(BUYER_SOURCE_PATHS)
+    assert review_current_buyer_contactability(
+        read_existing_buyer_sources(tmp_path), now=NOW,
+    )["buyer_contact_verified_count"] == 0
+    qualification_path = tmp_path / BUYER_SOURCE_PATHS["buyer_qualification"][0]
+    qualification_path.chmod(0o644)
+    assert read_existing_buyer_sources(tmp_path)["buyer_qualification"] == {}
+    qualification_path.unlink()
+    qualification_path.symlink_to(tmp_path / BUYER_SOURCE_PATHS["relationships"][0])
+    assert read_existing_buyer_sources(tmp_path)["buyer_qualification"] == {}
+
+from scripts.review_tam_full_funnel_strategy_20261020 import review_three_offer_creatives
+
+
+def test_actual_three_offer_copy_uses_existing_quality_gate_and_is_not_sent():
+    result = review_three_offer_creatives(market_scope="GB:solar:buyers")
+    assert len(result["drafts"]) == 3
+    assert {draft["arm"] for draft in result["drafts"]} == {
+        "buyer_inventory_fit_offer", "revenue_leak_signal_offer",
+        "verified_market_opportunity_brief",
+    }
+    assert result["copy_sent"] is False
+    assert result["offer_truth_independently_verified"] is False
+    assert all(d["existing_copy_hard_gate_passed"] is True for d in result["drafts"])
+    assert all(d["send_authorized"] is False and d["experiment_eligible"] is False
+               for d in result["drafts"])
+    assert all(d["existing_copy_quality_score"] >= 70 for d in result["drafts"])
+
+
+def test_offer_reference_and_market_scope_validation_cannot_bypass_send_authority():
+    import pytest
+    with pytest.raises(ValueError):
+        review_three_offer_creatives(market_scope="random")
+    with pytest.raises(ValueError):
+        review_three_offer_creatives(market_scope="GB:solar:buyers",
+                                     verified_offer_evidence_refs=("person@example.com",))
+    result = review_three_offer_creatives(
+        market_scope="US:roofing:buyers",
+        verified_offer_evidence_refs=("canonical:offers:evidence_001",),
+        live_offer_and_landing_verified=True,
+    )
+    assert result["offer_evidence_references_supplied"] == 1
+    assert result["offer_truth_independently_verified"] is False
+    assert result["copy_sent"] is False
+    assert all(x["send_authorized"] is False for x in result["drafts"])
