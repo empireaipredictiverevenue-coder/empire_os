@@ -1,0 +1,15 @@
+# PREPARED ONLY / NOT INSTALLED. DBA-owned recurring differential jobs
+# Mon-Sat; the Sunday slot is reserved for full backups (separate unit).
+[Unit]
+Description=EmpireDB approved Data Cloud differential backup five days per week
+After=postgresql@18-main.service
+
+[Timer]
+OnCalendar=Mon,Tue,Thu..Sat *-*-* 03:00:00 UTC
+AccuracySec=5min
+RandomizedDelaySec=10min
+Persistent=false
+Unit=empire-data-cloud-physical-backup@diff.service
+
+[Install]
+WantedBy=timers.target

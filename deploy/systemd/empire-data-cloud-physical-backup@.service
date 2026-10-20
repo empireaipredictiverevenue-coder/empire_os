@@ -1,0 +1,29 @@
+# PREPARED ONLY / NOT INSTALLED. Existing Data Cloud DBA-owned physical
+# backup producer, NOT Revenue Recovery automation. Requires independent
+# privileged cron collision audit, retention/PITR review and founder approval.
+[Unit]
+Description=EmpireDB authorised Data Cloud online %i physical backup
+Documentation=https://pgbackrest.org/user-guide.html
+After=postgresql@18-main.service
+Requires=postgresql@18-main.service
+ConditionPathExists=/etc/pgbackrest/empiredb.conf
+
+[Service]
+Type=oneshot
+User=postgres
+Group=postgres
+UMask=0077
+TimeoutStartSec=6h
+ExecStart=/usr/bin/pgbackrest --config=/etc/pgbackrest/empiredb.conf --stanza=empiredb --type=%i --no-expire-auto --log-level-console=warn backup
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+# Retention is intentionally DISABLED for this candidate. An independently
+# reviewed, bounded repository-retention policy MUST be authorised before
+# continuing unattended long-term. Never delete validated recovery sets
+# automatically during the first supervised deployment.

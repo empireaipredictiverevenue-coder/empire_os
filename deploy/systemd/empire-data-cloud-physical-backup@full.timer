@@ -1,0 +1,14 @@
+# PREPARED ONLY / NOT INSTALLED. DBA-owned twice-weekly full base, preserving 168-hour freshness.
+[Unit]
+Description=EmpireDB approved Data Cloud full backup Wednesday and Sunday
+After=postgresql@18-main.service
+
+[Timer]
+OnCalendar=Wed,Sun *-*-* 03:00:00 UTC
+AccuracySec=5min
+RandomizedDelaySec=10min
+Persistent=false
+Unit=empire-data-cloud-physical-backup@full.service
+
+[Install]
+WantedBy=timers.target
