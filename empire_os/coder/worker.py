@@ -175,6 +175,51 @@ class CoderTaskWorker:
         return terminal
 
     def _process(self, job: CoderJob) -> dict[str, Any]:
+        # Fail closed BEFORE repository-context extraction or local model
+        # inference. A legacy Founder Directive internal_plan is advisory,
+        # not an authorised implementation execution-plane request.
+        if job.kind is JobKind.IMPLEMENT:
+            payload = job.payload if isinstance(job.payload, dict) else {}
+            request_id = str(payload.get("execution_plane_request_id") or "").strip()
+            allowed = tuple(str(p).strip() for p in
+                            (payload.get("allowed_paths") or ()) if str(p).strip())
+            leases = tuple(str(p).strip() for p in
+                           (payload.get("lease_resources") or ()) if str(p).strip())
+            tests = tuple(str(p).strip() for p in
+                          (payload.get("required_tests") or ()) if str(p).strip())
+            missing = []
+            if not request_id:
+                missing.append("execution_plane_request_id_required")
+            if not allowed:
+                missing.append("allowed_paths_required")
+            if not leases:
+                missing.append("lease_resources_required")
+            if not tests:
+                missing.append("required_tests_required")
+            if any(
+                not t.startswith("tests/") or not t.endswith(".py")
+                or ".." in t.replace("\\", "/").split("/")
+                or t.startswith("/")
+                for t in tests
+            ):
+                missing.append("required_tests_must_be_safe_repository_paths")
+            if any(
+                p.startswith("/") or ".." in p.replace("\\", "/").split("/")
+                or not p or p.startswith("\\")
+                for p in allowed
+            ):
+                missing.append("allowed_paths_must_be_safe_repository_paths")
+            if missing:
+                return {
+                    "kind": job.kind.value,
+                    "eligible": False,
+                    "applied": False,
+                    "validation_reasons": sorted(set(missing)),
+                    "execution_authority": "none",
+                    "production_mutation": False,
+                    "model_inference": False,
+                }
+
         task = self.coder.load_task(job.task_id)
 
         if job.kind is JobKind.VERIFY:
@@ -274,14 +319,9 @@ class CoderTaskWorker:
                 for value in (job.payload.get("required_tests") or ())
                 if str(value).strip()
             )
-            if execution_request_id and (
-                not allowed_paths or not lease_resources
-            ):
-                raise ValueError(
-                    "execution-plane IMPLEMENT requires allowed_paths "
-                    "and lease_resources"
-                )
-
+            # Scope completeness was checked before context/model work.
+            # Existing independent path policy and execution leases below
+            # remain the authority for an admissible candidate.
             candidate = self.coder.propose_structured_patch(
                 task.id,
                 (

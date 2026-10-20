@@ -212,6 +212,10 @@ def test_worker_implement_applies_one_validated_patch_and_verifies(tmp_path):
         payload={
             "terms": ["buyer_allocation"],
             "budget_chars": 12000,
+            "execution_plane_request_id": "existing_scoped_software_test_request",
+            "allowed_paths": ["empire_os/example.py"],
+            "lease_resources": ["domain:test"],
+            "required_tests": ["tests/test_example.py"],
         },
     )
 
@@ -479,3 +483,74 @@ def test_hermes_fallback_plan_requests_degraded_local_planner(tmp_path):
     assert result.result["production_mutation"] is False
     plan_call = next(call for call in coder.calls if call[0] == "plan")
     assert plan_call[3]["degraded_local"] is True
+
+
+
+def test_legacy_implementation_without_execution_scope_is_denied_before_inference(tmp_path):
+    """An advisory Founder Directive never authorizes model or repository writes."""
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    queue.enqueue(
+        task_id="existing_advisory_software_test",
+        kind=JobKind.IMPLEMENT,
+        payload={"authority": "internal_plan", "terms": ["directive"]},
+    )
+
+    outcome = worker.run_once()
+    assert outcome.status is JobStatus.COMPLETED
+    assert outcome.result["eligible"] is False
+    assert outcome.result["applied"] is False
+    assert outcome.result["model_inference"] is False
+    assert outcome.result["execution_authority"] == "none"
+    assert set(outcome.result["validation_reasons"]) == {
+        "execution_plane_request_id_required",
+        "allowed_paths_required",
+        "lease_resources_required",
+        "required_tests_required",
+    }
+    assert coder.calls == []
+
+
+def test_partial_implementation_scope_denied_before_model_or_context(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    queue.enqueue(
+        task_id="partial_scope_software_test",
+        kind=JobKind.IMPLEMENT,
+        payload={
+            "execution_plane_request_id": "existing_software_test_scope",
+            "allowed_paths": ["empire_os/example.py"],
+            "lease_resources": ["domain:test"],
+        },
+    )
+
+    outcome = worker.run_once()
+    assert outcome.result["applied"] is False
+    assert "required_tests_required" in outcome.result["validation_reasons"]
+    assert coder.calls == []
+
+
+def test_path_traversal_in_scope_or_tests_never_reaches_model(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    coder = FakeCoder()
+    worker = CoderTaskWorker(coder, queue)
+    queue.enqueue(
+        task_id="unsafe_scope_software_test",
+        kind=JobKind.IMPLEMENT,
+        payload={
+            "execution_plane_request_id": "existing_software_test_scope",
+            "allowed_paths": ["../outside"],
+            "lease_resources": ["domain:test"],
+            "required_tests": ["tests/../../outside.py"],
+        },
+    )
+    outcome = worker.run_once()
+    assert outcome.result["applied"] is False
+    assert "allowed_paths_must_be_safe_repository_paths" in outcome.result["validation_reasons"]
+    assert "required_tests_must_be_safe_repository_paths" in outcome.result["validation_reasons"]
+    assert coder.calls == []
