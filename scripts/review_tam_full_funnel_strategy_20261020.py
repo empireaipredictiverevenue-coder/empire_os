@@ -720,6 +720,12 @@ def review_authenticated_campaign_intelligence(
     signal_owner: Callable | None = None,
     value_case_owner: Callable | None = None,
     value_case_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
+    released_research_route: Mapping[str, Any] | None = None,
+    released_research_repository_root: Path | None = None,
+    source_enquiry_receipts: Iterable[Any] | None = None,
+    source_crm_enquiry_links: Iterable[Any] | None = None,
+    source_finance_outcome_receipts: Iterable[Any] | None = None,
+    finance_outcome_window_complete: bool = False,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -735,6 +741,7 @@ def review_authenticated_campaign_intelligence(
         review_adaptive_buyer_journey_portfolio,
         review_authenticated_crm_campaign_handoff,
         review_buyer_value_first_portfolio,
+        reconcile_first_party_conversion_journey,
     )
     if (authenticated_crm_owner_read is None
             and (account_projection_owner is not None or signal_owner is not None
@@ -792,6 +799,17 @@ def review_authenticated_campaign_intelligence(
         "buyer_value_first_offer_review": (
             review_buyer_value_first_portfolio(value_case_packets, now=now)
             if value_case_packets is not None else None
+        ),
+        "real_first_party_conversion_journey": (
+            reconcile_first_party_conversion_journey(
+                root=released_research_repository_root,
+                released_route=released_research_route,
+                enquiries=source_enquiry_receipts,
+                crm_links=source_crm_enquiry_links,
+                commercial_outcomes=source_finance_outcome_receipts,
+                finance_window_complete=finance_outcome_window_complete,
+                now=now,
+            ) if released_research_route is not None else None
         ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,
@@ -1087,6 +1105,55 @@ def review_real_commercial_observers(
     }
 
 
+def review_existing_research_release_entrypoints(root: Path) -> dict[str, Any]:
+    """Existing, independently owned first-party site release: READ ONLY.
+
+    This verifies immutable release metadata only. It does not check HTTP,
+    inspect submitted contacts, claim that new value previews are published,
+    or grant permission to post enquiries.
+    """
+    from empire_os.owned_campaign_release import load_release
+    from empire_os.campaign_intelligence import review_released_research_route
+
+    released = load_release(root=root)
+    if released is None:
+        return {
+            "schema_version": "empire.gtm.existing_research_release_inventory.v1",
+            "release_status": "HOLD_NO_VERIFIED_SIGNED_RELEASE",
+            "verified_research_pages": None,
+            "published_private_value_experiences": None,
+            "real_enquiries_observed": None,
+            "real_payments_observed": None,
+            "source_owner": "existing_owned_campaign_website",
+            "execution_authority": "NONE",
+        }
+    campaigns = released.get("campaigns", ())
+    paths = [
+        review_released_research_route(
+            root=root, campaign_id=item["campaign_id"],
+            now=datetime.now(timezone.utc),
+        )
+        for item in campaigns
+    ]
+    if not paths or any(
+        value["status"] != "EXISTING_RELEASE_VERIFIED_RESEARCH_ROUTE"
+        for value in paths
+    ):
+        raise ValueError("signed first-party release inconsistent with research router")
+    return {
+        "schema_version": "empire.gtm.existing_research_release_inventory.v1",
+        "release_status": "EXISTING_RELEASED_RESEARCH_PATHS_VERIFIED",
+        "verified_research_pages": len(paths),
+        "existing_enquiry_route": "/api/research/enquiry",
+        "published_private_value_experiences": 0,
+        "real_enquiries_observed": None,
+        "real_payments_observed": None,
+        "actual_http_verified_in_this_report": False,
+        "source_owner": "existing_owned_campaign_website",
+        "execution_authority": "NONE",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
@@ -1107,6 +1174,9 @@ def main(argv: list[str] | None = None) -> int:
     output["decision_intelligence"] = review_authenticated_campaign_intelligence(
         now=current,
         observer_snapshots=read_real_commercial_observers(root),
+    )
+    output["existing_first_party_research_release"] = (
+        review_existing_research_release_entrypoints(root)
     )
     output["next_real_execution_focus"] = recommend_next_real_execution_focus(output)
     print(json.dumps(output, sort_keys=True))

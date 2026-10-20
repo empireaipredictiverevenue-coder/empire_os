@@ -918,3 +918,145 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
 The real CLI continues to print `null` for buyer-value and CRM
 per-contact owner projections until authenticated receipts exist.
 This is truthful proof of **readiness without manufacturing conversions**.
+
+
+## 20 October — Prospect questions and actual first-party conversion journey
+
+**Founder insight:** Before asking a prospect to buy, check whether the
+offer answers the questions already in the buyer's mind: relevance,
+deliverable, proof/trust, business value, price and risk, delivery
+timing, differentiation, and next step.
+
+### What the source-grounded page currently answers
+
+`review_prospect_question_coverage` runs on the **existing**
+`review_buyer_value_first_offer` proof and is included in
+`build_private_buyer_offer_experience`, not a second offer generator.
+
+| Prospect question | Readiness of a currently verified private proof preview |
+|---|---|
+| Is this for my business? | Answered at **review** level only; individual buy box still needs confirmation |
+| What will I initially get? | Answered at review level by the sourced proof-first brief |
+| Can I trust these claims? | Partial: capability source date and limitations are available; no independently substantiated customer case study |
+| Will it improve business outcomes? | Partial: practical decision usefulness explained, no measured ROI or lift |
+| How much will it cost and what is the risk? | **Open:** commercial catalog/terms owner must verify price, exclusions, acceptance and cancellation terms |
+| How soon will it be delivered? | **Open:** fulfilment owner must verify capacity and timeframe |
+| Why Empire AI? | Partial: explain evidence-first method without invented competitor advantage |
+| What exactly is the next step? | **Open for these new proof assets:** website owner must publish an approved form/CTA and confirm it works |
+
+This is **2 review answers, 3 partial and 3 outstanding owner questions**.
+The eight actual questions and honest answers now appear in every
+generated private proof page. No claim that the page is publication-
+or conversion-ready is made.
+
+### Genuine first-party site path — verified
+
+Existing website owner code is **already deployed**, with routes:
+
+- `GET /research/{campaign_id}` — released, immutable campaign page
+- `GET /research-runtime.js` — owned first-party runtime script
+- `POST /api/research/enquiry` — exact campaign/asset-bound enquiry;
+  same-origin, size/rate-limit and canonical EmpireDB intake protections
+- `POST /api/research/event` — separately bounded organic campaign events
+
+The currently signed site release validates **five** research paths
+through `owned_campaign_release.load_release`. A read-only HTTP
+GET to `https://empire-ai.co.uk/research/campaign_3438b6c3b110f941407ce1dd`
+on 20 October returned **200 HTML**, a form action at
+`/api/research/enquiry`, the existing expected fields and the
+explicit **not a marketing subscription** privacy notice.
+A HEAD request on the POST-only enquiry route returned **405**, as
+expected for an unsupported method; **no enquiry POST** was made.
+
+This live finding is independent of the new offer preview. The new
+private value-first pages are **not published on any of those five
+routes**, and no new production conversion claims were inferred.
+
+The read-only full-funnel CLI now includes
+`existing_first_party_research_release` with these verified
+release counts (HTTP is intentionally a separate observation).
+
+### Exact source-bound enquiry → CRM → order → money
+
+The **existing campaign intelligence owner** now exposes:
+
+- `review_released_research_route`: independently validates the
+  signed, immutable website release, exact campaign and landing
+  asset ID, existing privacy text and zero automatic outbound
+- `reconcile_first_party_conversion_journey`: re-reads that
+  unchanged release and joins **canonical reader-owned receipts**
+  through first-party enquiry acceptance, an authenticated tenant
+  CRM/prospect binding, a verified settled payment and fulfilment,
+  a separate revenue-recognition event, and verified actual costs
+
+Typed input contracts: `TrustedResearchEnquiry`,
+`TrustedResearchCrmAttribution`,
+`TrustedResearchCommercialOutcome`.
+
+An enquiry is **not** a buyer. A CRM prospect is **not** a sale.
+A paid order is **not** recognized revenue. Recognized revenue is
+**not** verified gross profit when independently evidenced costs
+are absent. Attribution needs exact campaign/asset/receipt/tenant/
+prospect/order linkage with chronological source records. Duplicate
+enquiries, duplicate orders, mismatched tenant IDs and spoofed
+paid/delivery values are rejected. Results disclose **only aggregate
+counts and cents**, not contact or payment receipt IDs; no causal
+advertising lift is asserted.
+
+This bridge is available from the same
+`review_authenticated_campaign_intelligence` API using the optional
+website release root, source enquiry receipts, authenticated CRM
+links and Finance-owner outcome receipts. These are *owner-attested*
+typed data projections, **not arbitrary browser JSON** and not a
+new route for accepting payments or declaring source authenticity.
+The source-owning teams must verify their own ledger, principal,
+settlement, fulfilment and accounting custody before passing
+any "verified" flags. A closed Finance receipt window is also
+owner-supplied; this function cannot independently assert it.
+When receipts are not connected, the current live CLI returns
+`null` for those figures, not fake customers or zero profit.
+
+### Owner pickup / same-system integration
+
+**Existing flagship/website owner:** Review the new private
+source-backed offer experience and eight buyer questions. Resolve
+specific missing approved terms/fulfilment facts, integrate only
+approved HTML/copy into their own existing public site release, and
+test the existing same-origin enquiry route, privacy text and
+submission receipt. Do not overwrite existing home page or
+campaign release, and do not publish unverified claims.
+
+**Existing Revenue CRM owner:** Read a real `owned_campaign_enquiries`
+receipt using its approved reader, authenticate the tenant CRM
+prospect, and pass only an independently proven exact linkage.
+A submitted email/domain is insufficient to manufacture an
+account join or opt-in.
+
+**Existing Revenue Pulse / Finance owner:** Supply actual canonical
+settlement, delivery and recognized-revenue events plus actual
+cost receipts and a closed outcome window. The campaign intelligence
+owner does **not** query Finance under a privileged identity,
+recognize revenue, initiate a refund or move funds.
+
+**Campaign intelligence owner (this branch):** Consume those
+independent receipts, compute privacy-safe funnel and realized
+margin diagnostics, adapt the proof-first experience where actual
+buyers demonstrate friction, and maintain attribution unknown
+until a verifiable causal lineage exists.
+
+### Runtime and tests
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+ -m scripts.review_tam_full_funnel_strategy_20261020 --read-only
+
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+ tests/test_campaign_real_conversion_journey_20261020.py \
+ tests/test_campaign_buyer_value_first_20261020.py \
+ tests/test_owned_campaign_runtime.py
+```
+
+Live posting, website deployment and payments were **not** exercised.
+All fabricated fixture email/UUID/payment rows are isolated to
+tests, never written into production CRM, buyer or finance.

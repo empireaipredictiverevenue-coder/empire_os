@@ -1831,6 +1831,115 @@ _OFFER_EXPERIENCE_EDITORIAL = {
         ),
     },
 }
+# A private offer preview must answer the questions the prospect is already
+# carrying, and must state the unknowns rather than hide them behind a form.
+# These labels are editorial disclosures, not scores or source attestations.
+_PROSPECT_DECISION_QUESTIONS = (
+    ("buyer_fit", "Is this relevant to my business?"),
+    ("deliverable", "What exactly will I get?"),
+    ("evidence_trust", "Why should I believe the evidence?"),
+    ("business_value", "What business value might this create?"),
+    ("price_and_risk", "What will I pay and what is the risk?"),
+    ("delivery_timing", "How quickly can we start and deliver?"),
+    ("differentiation", "Why choose Empire AI?"),
+    ("working_next_step", "What happens if I want to proceed?"),
+)
+
+
+def review_prospect_question_coverage(
+    verified_value_report: Mapping[str, object], *,
+    market_label: str,
+    source_review_day: str,
+) -> dict:
+    """Self-critical prospect FAQ coverage from an already verified value case.
+
+    Does not conjure approved pricing, delivery capacity, case-study results
+    or a published CTA; those belong to independent catalog, fulfilment,
+    finance and website owners. Reports open questions rather than claiming
+    that the preview solves an entire commercial purchase decision.
+    """
+    if (not isinstance(verified_value_report, Mapping)
+            or verified_value_report.get("offer_candidate") not in _OFFER_EXPERIENCE_EDITORIAL
+            or verified_value_report.get("buyer_problem_proven_by_first_party") is not True
+            or type(market_label) is not str
+            or market_label not in ("UK solar buyers", "US roofing buyers")
+            or type(source_review_day) is not str
+            or len(source_review_day) != 10):
+        raise CampaignIntelligenceHeld("PROSPECT_QUESTION_SOURCE_PROOF_REQUIRED")
+    arm = verified_value_report["offer_candidate"]
+    key_to_answer = {
+        "buyer_fit": (
+            "REVIEW_ANSWERED",
+            f"This evidence-led first review is scoped to {market_label} and "
+            "an independently stated buying question. Specific acceptance "
+            "criteria still need review.",
+        ),
+        "deliverable": (
+            "REVIEW_ANSWERED",
+            str(verified_value_report["value_first_deliverable"]),
+        ),
+        "evidence_trust": (
+            "PARTIALLY_ANSWERED",
+            f"Source capability last reviewed {source_review_day}; "
+            "request the underlying source, coverage and limitations. "
+            "This is not an independently verified customer case study.",
+        ),
+        "business_value": (
+            "PARTIALLY_ANSWERED",
+            "The first deliverable can inform a business decision. "
+            "No financial impact or incremental lift is proven yet.",
+        ),
+        "price_and_risk": (
+            "UNANSWERED_REQUIRES_OWNER",
+            "A price, contract, acceptance rules and cancellation/risk terms "
+            "must come from an approved commercial offer, not this preview.",
+        ),
+        "delivery_timing": (
+            "UNANSWERED_REQUIRES_OWNER",
+            "Start date, turnaround and delivery capacity are not independently "
+            "confirmed here. Do not invent a timeline.",
+        ),
+        "differentiation": (
+            "PARTIALLY_ANSWERED",
+            "Empire AI proposes checking source provenance and buyer-fit "
+            "criteria before making an offer. No competitor comparison or "
+            "unique performance advantage has been independently proven.",
+        ),
+        "working_next_step": (
+            "UNANSWERED_REQUIRES_OWNER",
+            "This is a private review, not an active offer page. The existing "
+            "website owner must connect a tested, approved first-party enquiry "
+            "route before a visitor can act.",
+        ),
+    }
+    rows = [
+        {"question_key": key, "question": question,
+         "coverage": key_to_answer[key][0], "answer": key_to_answer[key][1]}
+        for key, question in _PROSPECT_DECISION_QUESTIONS
+    ]
+    return {
+        "schema_version": "empire.gtm.prospect_decision_question_coverage.v1",
+        "questions_reviewed": len(rows),
+        "answered_at_review_level": sum(
+            x["coverage"] == "REVIEW_ANSWERED" for x in rows
+        ),
+        "partially_answered": sum(
+            x["coverage"] == "PARTIALLY_ANSWERED" for x in rows
+        ),
+        "owner_evidence_needed": sum(
+            x["coverage"] == "UNANSWERED_REQUIRES_OWNER" for x in rows
+        ),
+        "open_question_keys": [
+            x["question_key"] for x in rows
+            if x["coverage"] == "UNANSWERED_REQUIRES_OWNER"
+        ],
+        "questions": rows,
+        "all_commercial_questions_answered": False,
+        "conversion_ready_for_live_site": False,
+        "execution_authority": "NONE",
+    }
+
+
 _PROOF_SURFACE_EDITORIAL = {
     "source_signal": "Source observations",
     "qualification": "Acceptance and qualification",
@@ -1889,6 +1998,14 @@ def build_private_buyer_offer_experience(
         raise CampaignIntelligenceHeld("OFFER_EXPERIENCE_PROOF_NOT_READY")
     cap = next(c for c in case.capabilities if c.offer_arm == arm)
     verified_day = _aware(cap.verified_at).date().isoformat()
+    questions_review = review_prospect_question_coverage(
+        report, market_label=market_label, source_review_day=verified_day,
+    )
+    storefront_questions = "".join(
+        f'<details><summary>{escape(item["question"])}</summary>'
+        f'<p>{escape(item["answer"])}</p></details>'
+        for item in questions_review["questions"]
+    )
     storyboard = [
         {
             "step": idx + 1,
@@ -1979,7 +2096,7 @@ footer{{color:#849bb3;font-size:13px;border-top:1px solid var(--line);margin-top
 <div class="meta"><div class="pill">{escape(market_label)}</div><div class="pill">Source reviewed: {escape(verified_day)}</div><div class="pill">Availability must be rechecked</div></div>
 <section><p class="kicker">How the review works</p><h2>Three evidence-led steps.</h2><p class="sub">A useful starting point—not a claim of inventory, cost savings or a buying commitment.</p><div class="steps">{steps}</div></section>
 <section><p class="kicker">What must be verified</p><div class="proof"><div><h2>Show the source. Explain the limits.</h2><p class="sub">These are proof surfaces for an owner-reviewed walkthrough, not verified customer outcomes.</p></div><div><ul>{proof_list}</ul></div></div></section>
-<section><p class="kicker">Common questions</p><h2>Useful answers, not sales pressure.</h2>{faq_cards}{friction_block}</section>
+<section><p class="kicker">Questions a buyer will ask</p><h2>Real answers. Clear unknowns.</h2><p class="sub">Two questions are answered at review level; others are partial or need independent commercial verification. Missing details are not hidden behind a sales call.</p>{storefront_questions}{faq_cards}{friction_block}</section>
 <section><div class="next"><p class="kicker">Next step — human review only</p><h2>Start with a source-backed brief.</h2><p class="sub">{escape(note)} No form, external link or automatic contact has been activated.</p></div></section>
 <footer>Empire AI · Internal proof-first offer preview · No implied customer endorsement, lead guarantee, financial result or marketing permission.</footer>
 </main></body></html>"""
@@ -1994,10 +2111,317 @@ footer{{color:#849bb3;font-size:13px;border-top:1px solid var(--line);margin-top
         "demo_target_seconds": sum(x["segment_seconds"] for x in storyboard),
         "source_proof_day": verified_day,
         "proof_surface_review_names": proof_labels,
+        "prospect_question_coverage": questions_review,
         "publication_authorized": False,
         "working_first_party_cta_present": False,
         "financial_results_or_inventory_quantity_claimed": False,
         "customer_or_account_identity_exposed": False,
         "legal_privacy_consent_and_landing_owner_signoff_required": True,
+        "execution_authority": "NONE",
+    }
+
+# Commercial proof experience -> existing published research route -> canonical
+# first-party enquiry -> authenticated CRM -> independently verified economics.
+# The campaign owner reads receipts; it never becomes the website intake or
+# Revenue Pulse writer. No browser-provided identity or UTM gets trusted.
+@dataclass(frozen=True)
+class TrustedResearchEnquiry:
+    campaign_id: str
+    asset_id: str
+    receipt_id: str  # actual UUID from owned_campaign_enquiries.read-only owner
+    received_at: datetime
+    release_website_binding_verified: bool
+    canonical_intake_readback_verified: bool
+    original_same_origin_admission_verified: bool
+
+
+@dataclass(frozen=True)
+class TrustedResearchCrmAttribution:
+    campaign_id: str
+    enquiry_receipt_id: str
+    tenant_id: str  # independently authenticated canonical CRM UUID
+    prospect_id: str
+    recorded_at: datetime
+    exact_intake_to_prospect_link_verified: bool
+    authenticated_tenant_reader_verified: bool
+
+
+@dataclass(frozen=True)
+class TrustedResearchCommercialOutcome:
+    campaign_id: str
+    tenant_id: str
+    prospect_id: str
+    order_id: str
+    finance_event_key: str
+    paid_at: datetime
+    delivered_at: datetime | None
+    recognized_at: datetime | None
+    actual_cost_verified: bool
+    payment_settlement_verified: bool
+    fulfilment_verified: bool
+    recognized_revenue_event_verified: bool
+    canonical_order_prospect_join_verified: bool
+    recognized_revenue_cents: int | None
+    actual_cost_cents: int | None
+    realized_gp_cents: int | None
+
+
+def review_released_research_route(
+    *, root: object, campaign_id: str, now: datetime,
+) -> dict:
+    """Read the existing signed release, not the mutable campaign planner.
+
+    A released research form is an operational endpoint; it does not imply
+    the *new* value-first proof HTML is approved or published there.
+    """
+    from pathlib import Path
+    from empire_os.owned_campaign_release import load_release
+    from empire_os.owned_campaign_preflight import _landing
+    from empire_os.owned_campaign_content import PRIVACY
+    now = _aware(now)
+    if not _CAMPAIGN.fullmatch(campaign_id):
+        raise CampaignIntelligenceHeld("INVALID_RESEARCH_CAMPAIGN_ID")
+    if not isinstance(root, Path):
+        raise CampaignIntelligenceHeld("EXPLICIT_CANONICAL_REPOSITORY_ROOT_REQUIRED")
+    snapshot = load_release(root=root)
+    if snapshot is None:
+        return {
+            "schema_version": "empire.gtm.released_research_conversion_route.v1",
+            "status": "HOLD_UNVERIFIED_WEBSITE_RELEASE",
+            "current_research_path": None,
+            "canonical_enquiry_post_path": None,
+            "active_proof_experience_published": False,
+            "live_http_verified_here": False,
+            "execution_authority": "NONE",
+        }
+    matches = [x for x in snapshot["campaigns"] if x.get("campaign_id") == campaign_id]
+    if len(matches) != 1:
+        return {
+            "schema_version": "empire.gtm.released_research_conversion_route.v1",
+            "status": "HOLD_NO_MATCHING_RELEASED_CAMPAIGN",
+            "current_research_path": None,
+            "canonical_enquiry_post_path": None,
+            "active_proof_experience_published": False,
+            "live_http_verified_here": False,
+            "execution_authority": "NONE",
+        }
+    c = matches[0]
+    landing = _landing(c)
+    path = "/research/" + campaign_id
+    if (c.get("conversion_plan", {}).get("landing_path") != path
+            or landing.get("asset_id") != campaign_id + ":landing"
+            or landing.get("privacy_notice") != PRIVACY
+            or c.get("outbound_authorized", False) is not False
+            or c.get("automatic_followup", False) is not False):
+        raise CampaignIntelligenceHeld("RELEASED_RESEARCH_JOURNEY_CONTRACT_CHANGED")
+    return {
+        "schema_version": "empire.gtm.released_research_conversion_route.v1",
+        "status": "EXISTING_RELEASE_VERIFIED_RESEARCH_ROUTE",
+        "current_research_path": path,
+        "canonical_enquiry_post_path": "/api/research/enquiry",
+        "canonical_event_post_path": "/api/research/event",
+        "source_research_campaign_id": campaign_id,
+        "source_asset_id": landing["asset_id"],
+        "first_party_form_fields": (
+            "campaign_id", "asset_id", "reply_email", "research_question"
+        ),
+        "optional_form_fields": ("company", "role"),
+        "form_reply_not_marketing_subscription": True,
+        "origin_policy_enforced_by_existing_gateway": True,
+        "released_campaign_is_first_party_owner_only": True,
+        "active_proof_experience_published": False,
+        "live_http_verified_here": False,
+        "execution_authority": "NONE",
+    }
+
+
+def reconcile_first_party_conversion_journey(
+    *,
+    root: object,
+    released_route: Mapping[str, object],
+    enquiries: Iterable[TrustedResearchEnquiry] | None,
+    crm_links: Iterable[TrustedResearchCrmAttribution] | None,
+    commercial_outcomes: Iterable[TrustedResearchCommercialOutcome] | None,
+    now: datetime,
+    finance_window_complete: bool = False,
+) -> dict:
+    """End-to-end source-receipt join, not automatic attribution or payment.
+
+    Browser form submission is never identity, permission, order or sales
+    proof. The website owner supplies persisted enquiry readback; CRM owner
+    supplies exact tenant/prospect linkage; Finance supplies settled payment,
+    fulfilment, recognized revenue and independently evidenced costs.
+    """
+    from uuid import UUID
+    from empire_os.revenue_crm_channel_evidence import canonical_uuid
+    now = _aware(now)
+    if (not isinstance(released_route, Mapping)
+            or released_route.get("status") != "EXISTING_RELEASE_VERIFIED_RESEARCH_ROUTE"
+            or released_route.get("canonical_enquiry_post_path") != "/api/research/enquiry"
+            or released_route.get("execution_authority") != "NONE"
+            or type(finance_window_complete) is not bool):
+        raise CampaignIntelligenceHeld("EXISTING_CANONICAL_RELEASE_REQUIRED")
+    campaign = released_route.get("source_research_campaign_id")
+    asset = released_route.get("source_asset_id")
+    if (type(campaign) is not str or not _CAMPAIGN.fullmatch(campaign)
+            or asset != campaign + ":landing"
+            or released_route.get("current_research_path") != "/research/" + campaign):
+        raise CampaignIntelligenceHeld("ENQUIRY_CAMPAIGN_ASSET_BOUNDARY_INVALID")
+    # Release attestations cannot arrive from a browser/body or arbitrary
+    # mapping. Recompute from the existing immutable website release on each
+    # review; stale/revoked releases fail closed even with old intake receipts.
+    canonical_route = review_released_research_route(
+        root=root, campaign_id=campaign, now=now,
+    )
+    if (canonical_route.get("status") != "EXISTING_RELEASE_VERIFIED_RESEARCH_ROUTE"
+            or dict(released_route) != canonical_route):
+        raise CampaignIntelligenceHeld("RESEARCH_RELEASE_READBACK_MISMATCH")
+    if (crm_links is not None and enquiries is None
+            or commercial_outcomes is not None and crm_links is None
+            or finance_window_complete and commercial_outcomes is None):
+        raise CampaignIntelligenceHeld("UNSUPPORTED_DOWNSTREAM_WITHOUT_UPSTREAM_PROOF")
+    def check_uuid(value):
+        try:
+            raw = canonical_uuid(value)
+            if raw == "00000000-0000-0000-0000-000000000000":
+                raise ValueError("zero id")
+            return raw
+        except (ValueError, TypeError, AttributeError):
+            raise CampaignIntelligenceHeld("CANONICAL_JOURNEY_RECEIPT_UUID_REQUIRED") from None
+
+    def bounded(rows, cls, ceiling):
+        if rows is None:
+            return None
+        if type(rows) not in (tuple, list):
+            raise CampaignIntelligenceHeld("TRUSTED_CANONICAL_READER_BATCH_REQUIRED")
+        if len(rows) > ceiling or any(type(x) is not cls for x in rows):
+            raise CampaignIntelligenceHeld("TRUSTED_CANONICAL_READER_BATCH_REQUIRED")
+        return rows
+
+    incoming = bounded(enquiries, TrustedResearchEnquiry, 500)
+    linked = bounded(crm_links, TrustedResearchCrmAttribution, 500)
+    outcomes = bounded(commercial_outcomes, TrustedResearchCommercialOutcome, 1000)
+    enq: dict[str, TrustedResearchEnquiry] = {}
+    for x in incoming or ():
+        ref = check_uuid(x.receipt_id)
+        ts = _aware(x.received_at)
+        if (x.campaign_id != campaign or x.asset_id != asset
+                or any(type(flag) is not bool or flag is not True for flag in (
+                    x.release_website_binding_verified,
+                    x.canonical_intake_readback_verified,
+                    x.original_same_origin_admission_verified,
+                ))
+                or not ts <= now or now - ts > timedelta(days=180)):
+            raise CampaignIntelligenceHeld("FIRST_PARTY_ENQUIRY_SOURCE_CONFLICT")
+        if ref in enq:
+            raise CampaignIntelligenceHeld("DUPLICATE_ENQUIRY_RECEIPT_REPLAY")
+        enq[ref] = x
+    prospects: dict[tuple[str, str], TrustedResearchCrmAttribution] = {}
+    matched_receipts: set[str] = set()
+    tenant_set: set[str] = set()
+    for x in linked or ():
+        ref = check_uuid(x.enquiry_receipt_id)
+        tenant = check_uuid(x.tenant_id)
+        pid = check_uuid(x.prospect_id)
+        key = (tenant, pid)
+        ts = _aware(x.recorded_at)
+        if (x.campaign_id != campaign or ref not in enq
+                or ts < enq[ref].received_at or ts > now
+                or x.exact_intake_to_prospect_link_verified is not True
+                or x.authenticated_tenant_reader_verified is not True):
+            raise CampaignIntelligenceHeld("CANONICAL_CRM_ENQUIRY_BINDING_INVALID")
+        if key in prospects or ref in matched_receipts:
+            raise CampaignIntelligenceHeld("DUPLICATE_OR_AMBIGUOUS_CRM_ENQUIRY_BINDING")
+        prospects[key] = x
+        matched_receipts.add(ref)
+        tenant_set.add(tenant)
+    if len(tenant_set) > 1:
+        raise CampaignIntelligenceHeld("CROSS_TENANT_CAMPAIGN_JOURNEY_JOIN")
+    seen_orders: set[str] = set()
+    seen_finance_events: set[str] = set()
+    paid_people: set[tuple[str, str]] = set()
+    recognized_orders = 0
+    recognized_total = 0
+    gp_total = 0
+    gp_complete = True
+    for x in outcomes or ():
+        tenant, pid = check_uuid(x.tenant_id), check_uuid(x.prospect_id)
+        order = check_uuid(x.order_id)
+        key = (tenant, pid)
+        if (x.campaign_id != campaign or key not in prospects
+                or not _opaque(x.finance_event_key)
+                or x.canonical_order_prospect_join_verified is not True
+                or x.payment_settlement_verified is not True
+                or type(x.fulfilment_verified) is not bool
+                or type(x.recognized_revenue_event_verified) is not bool
+                or type(x.actual_cost_verified) is not bool
+                or order in seen_orders or x.finance_event_key in seen_finance_events):
+            raise CampaignIntelligenceHeld("UNVERIFIED_DUPLICATE_OR_CROSS_ACCOUNT_FINANCE")
+        seen_orders.add(order)
+        seen_finance_events.add(x.finance_event_key)
+        paid_at = _aware(x.paid_at)
+        if paid_at < prospects[key].recorded_at or paid_at > now:
+            raise CampaignIntelligenceHeld("FINANCE_SOURCE_CAUSAL_CLOCK_INVALID")
+        paid_people.add(key)
+        if x.fulfilment_verified:
+            if x.delivered_at is None:
+                raise CampaignIntelligenceHeld("UNVERIFIED_DELIVERY_TIMESTAMP")
+            delivery = _aware(x.delivered_at)
+            if delivery < paid_at or delivery > now:
+                raise CampaignIntelligenceHeld("FINANCE_SOURCE_CAUSAL_CLOCK_INVALID")
+        elif x.delivered_at is not None:
+            raise CampaignIntelligenceHeld("UNVERIFIED_DELIVERY_PROVENANCE")
+        if x.recognized_revenue_event_verified:
+            if (not x.fulfilment_verified or x.recognized_at is None
+                    or type(x.recognized_revenue_cents) is not int
+                    or x.recognized_revenue_cents < 0):
+                raise CampaignIntelligenceHeld("UNVERIFIED_REVENUE_RECOGNITION")
+            recognized_at = _aware(x.recognized_at)
+            if recognized_at < _aware(x.delivered_at) or recognized_at > now:
+                raise CampaignIntelligenceHeld("FINANCE_SOURCE_CAUSAL_CLOCK_INVALID")
+            recognized_orders += 1
+            recognized_total += x.recognized_revenue_cents
+            if x.actual_cost_verified:
+                if (type(x.actual_cost_cents) is not int or x.actual_cost_cents < 0
+                        or type(x.realized_gp_cents) is not int
+                        or x.realized_gp_cents !=
+                        x.recognized_revenue_cents - x.actual_cost_cents):
+                    raise CampaignIntelligenceHeld("UNVERIFIED_ACTUAL_COST_OR_MARGIN")
+                gp_total += x.realized_gp_cents
+            else:
+                if x.actual_cost_cents is not None or x.realized_gp_cents is not None:
+                    raise CampaignIntelligenceHeld("UNVERIFIED_ACTUAL_COST_OR_MARGIN")
+                gp_complete = False
+        elif (x.recognized_at is not None or x.recognized_revenue_cents is not None
+              or x.actual_cost_cents is not None or x.realized_gp_cents is not None
+              or x.actual_cost_verified):
+            raise CampaignIntelligenceHeld("UNVERIFIED_PREMATURE_REVENUE_CLAIM")
+    ready_finance = outcomes is not None and finance_window_complete
+    return {
+        "schema_version": "empire.gtm.first_party_to_realized_profit.v1",
+        "campaign_released_source_bound": True,
+        "accepted_first_party_enquiry_receipts": len(enq) if incoming is not None else None,
+        "authenticated_crm_enquiries_linked": len(prospects) if linked is not None else None,
+        "finance_receipt_window_closed": ready_finance,
+        "observed_paid_buyers": len(paid_people) if outcomes is not None else None,
+        "recognized_order_count": recognized_orders if ready_finance else None,
+        "recognized_campaign_revenue_cents": recognized_total if ready_finance else None,
+        "realized_campaign_gp_cents": (
+            gp_total if ready_finance and gp_complete and recognized_orders > 0
+            else None
+        ),
+        "revenue_attribution_basis": (
+            "EXACT_INTAKE_CRM_ORDER_JOIN_WITH_CLOSED_FINANCE_WINDOW"
+            if ready_finance else "NO_COMPLETE_CANONICAL_FINANCE_WINDOW"
+        ),
+        "channel_or_roi_causal_lift_proven": False,
+        "unlinked_enquiries_observed": (
+            len(enq) - len(matched_receipts) if incoming is not None and linked is not None
+            else None
+        ),
+        "identifying_or_payment_receipt_ids_exposed": 0,
+        "first_party_form_created": False,
+        "new_crm_or_payment_writer_created": False,
+        "outreach_or_money_moved": False,
         "execution_authority": "NONE",
     }

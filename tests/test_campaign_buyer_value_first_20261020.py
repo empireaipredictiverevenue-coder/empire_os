@@ -416,3 +416,57 @@ def test_full_funnel_shared_interface_exposes_preview_readiness_count_only():
     ] == 1
     assert "private_html" not in json.dumps(result)
     assert result["live_recipient_contact_or_messages"] is False
+
+
+def test_prospect_mind_eight_questions_are_explicitly_answered_or_open():
+    from empire_os.campaign_intelligence import (
+        build_private_buyer_offer_experience,
+    )
+    experience = build_private_buyer_offer_experience(
+        case(), verified_signals=(), now=NOW,
+    )
+    audit = experience["prospect_question_coverage"]
+    assert audit["questions_reviewed"] == 8
+    assert audit["answered_at_review_level"] == 2
+    assert audit["partially_answered"] == 3
+    assert audit["owner_evidence_needed"] == 3
+    assert audit["open_question_keys"] == [
+        "price_and_risk", "delivery_timing", "working_next_step",
+    ]
+    assert audit["all_commercial_questions_answered"] is False
+    assert audit["conversion_ready_for_live_site"] is False
+    assert "What will I pay and what is the risk?" in experience["private_html"]
+    assert "How quickly can we start and deliver?" in experience["private_html"]
+    assert "Why choose Empire AI?" in experience["private_html"]
+    assert "No competitor comparison or" in experience["private_html"]
+    assert "A price, contract, acceptance rules" in experience["private_html"]
+    assert "Start date, turnaround" in experience["private_html"]
+
+
+@pytest.mark.parametrize("problem_code", list(ARMS))
+def test_each_offer_experience_has_eight_answers_without_fake_roi_or_price(problem_code):
+    from empire_os.campaign_intelligence import (
+        build_private_buyer_offer_experience,
+    )
+    result = build_private_buyer_offer_experience(
+        case(problem_code), verified_signals=(), now=NOW,
+    )
+    audit = result["prospect_question_coverage"]
+    assert len({entry["question_key"] for entry in audit["questions"]}) == 8
+    assert audit["questions_reviewed"] == 8
+    assert audit["execution_authority"] == "NONE"
+    assert audit["owner_evidence_needed"] >= 3
+    assert audit["all_commercial_questions_answered"] is False
+    assert result["publication_authorized"] is False
+
+
+def test_coverage_never_accepts_unverified_or_bogus_value_report():
+    from empire_os.campaign_intelligence import (
+        review_prospect_question_coverage,
+    )
+    with pytest.raises(CampaignIntelligenceHeld, match="PROSPECT_QUESTION_SOURCE_PROOF_REQUIRED"):
+        review_prospect_question_coverage(
+            {"offer_candidate": "buyer_inventory_fit_offer",
+             "buyer_problem_proven_by_first_party": False},
+            market_label="UK solar buyers", source_review_day="2026-10-20",
+        )
