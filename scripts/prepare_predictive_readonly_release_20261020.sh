@@ -84,6 +84,7 @@ EOF
     empire_os/predictive_commercial_supply_readiness.py \
     empire_os/predictive_commercial_lead_eligibility.py \
     empire_os/predictive_commercial_fulfilment.py \
+    empire_os/predictive_existing_owner_pickup.py \
     empire_os/predictive_four_stage_economic_custody.py \
     empire_os/predictive_structural_revenue_gaps.py \
     scripts/review_empire_cross_agent_release_board_20261020.py \
