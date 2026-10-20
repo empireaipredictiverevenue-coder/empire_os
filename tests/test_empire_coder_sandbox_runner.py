@@ -103,9 +103,9 @@ def test_structured_patch_runtime_env_pins_proven_llama_cpp(monkeypatch):
     ):
         assert os.environ["EMPIRE_CODER_LLAMA_CPP_ENABLED"] == "true"
         assert os.environ["EMPIRE_CODER_LLAMA_CPP_MODEL"] == "qwen2.5-coder:1.5b"
-        assert os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "3"
+        assert os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "1"
         assert os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] == "planner,writer,verifier"
-        assert os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] == "30"
+        assert os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] == "90"
 
     for key in keys:
         assert key not in os.environ
@@ -131,3 +131,46 @@ def test_structured_patch_runtime_env_restores_existing_values(monkeypatch):
     assert os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"] == "1"
     assert os.environ["EMPIRE_CODER_LLAMA_CPP_ROLES"] == "planner"
     assert os.environ["EMPIRE_CODER_OLLAMA_TIMEOUT_SECONDS"] == "120"
+
+
+def test_sandbox_proven_small_llama_cannot_masquerade_as_architecture_writer(
+    monkeypatch,
+):
+    """Use real configured model names, without invoking inference or writing data."""
+    import os
+    from empire_os.coder.router import ModelProfile, ModelRouter
+    from empire_os.coder.orchestrator import local_ollama_profiles
+    from empire_os.empire_coder_sandbox_runner import (
+        _structured_patch_runtime_env,
+    )
+
+    monkeypatch.delenv("EMPIRE_CODER_LLAMA_CPP_CAPABILITY", raising=False)
+    with _structured_patch_runtime_env(
+        True, model="qwen2.5-coder:1.5b",
+    ):
+        small_capacity = int(os.environ["EMPIRE_CODER_LLAMA_CPP_CAPABILITY"])
+        assert small_capacity == 1
+        writer_profiles = (
+            ModelProfile(
+                provider="llama_cpp",
+                model="qwen2.5-coder:1.5b",
+                capability=small_capacity,
+                local=True,
+                roles=("planner", "writer", "verifier"),
+            ),
+            *local_ollama_profiles(("qwen3-coder:30b",)),
+        )
+        route = ModelRouter(writer_profiles).route(
+            "Security architecture refactor for an existing production module",
+            role="writer",
+        )
+        assert route.provider == "ollama"
+        assert route.model == "qwen3-coder:30b"
+
+    # If the capable writer is absent, never pretend the small backend
+    # is eligible for an architecture patch.
+    weak_only = ModelRouter(writer_profiles[:1]).route(
+        "Security architecture refactor for an existing production module",
+        role="writer",
+    )
+    assert weak_only.provider == "unconfigured"
