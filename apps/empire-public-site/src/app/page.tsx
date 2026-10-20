@@ -245,6 +245,9 @@ export default function Home() {
                   <a href="/industries" className="inline-flex min-h-12 items-center rounded-full border border-white/10 bg-[#08152f]/65 px-5 text-[9px] font-semibold tracking-[0.13em] text-white/60 backdrop-blur-2xl transition hover:border-[#60a5fa]/30 hover:text-white">
                     EXPLORE INDUSTRIES
                   </a>
+                  <a href="/roofing" className="inline-flex min-h-12 items-center rounded-full border border-cyan-300/25 bg-cyan-300/[0.065] px-5 text-[9px] font-semibold tracking-[0.11em] text-cyan-100/90 backdrop-blur-2xl transition hover:border-cyan-200/55 hover:text-white" aria-label="US homeowner roofing ZIP coverage check">
+                    US HOMEOWNERS · ROOFING ZIP CHECK
+                  </a>
                 </div>
               </div>
             )}
