@@ -115,3 +115,68 @@ def test_verification_helpers_require_pass():
     assert _tests_from_implementation_result(passed) == [
         "tests/test_example.py"
     ]
+
+
+
+def test_clean_checkout_does_not_turn_advisory_directives_into_implement_jobs(
+    tmp_path, monkeypatch,
+):
+    """No model calls, tasks or queue jobs may come from internal_plan alone."""
+    from pathlib import Path
+    import empire_os.coder_supervisor as module
+
+    class ExistingDirectiveStore:
+        def __init__(self, root):
+            self.root = root
+
+        def list(self, *, statuses):
+            if statuses == {"implementation_ready"}:
+                return (
+                    SimpleNamespace(authority="internal_plan"),
+                    SimpleNamespace(authority="internal_plan"),
+                )
+            return ()
+
+        def summary(self):
+            return {"status_counts": {"implementation_ready": 2},
+                    "founder_gate_count": 0}
+
+        def update(self, *args, **kwargs):
+            raise AssertionError("advisory state must not mutate")
+
+    class ExistingCoder:
+        def __init__(self, root, **kwargs):
+            self.root = root
+
+        def create_task(self, *args, **kwargs):
+            raise AssertionError("unapproved task creation")
+
+    class ExistingQueue:
+        def __init__(self, root, **kwargs):
+            self.pending = Path(root) / "pending"
+            self.running = Path(root) / "running"
+            self.pending.mkdir(exist_ok=True)
+            self.running.mkdir(exist_ok=True)
+
+        def enqueue(self, *args, **kwargs):
+            raise AssertionError("unapproved IMPLEMENT enqueue")
+
+    monkeypatch.setattr(module, "FounderDirectiveStore", ExistingDirectiveStore)
+    monkeypatch.setattr(module, "plan_captured_directives",
+                        lambda *args, **kwargs: {"planned": 0})
+
+    for dirty in ("", " M empire_os/unrelated_owner.py\n"):
+        observed = module.run_coder_supervisor(
+            tmp_path, coder_factory=ExistingCoder,
+            queue_factory=ExistingQueue,
+            runner=lambda *args, content=dirty, **kwargs: SimpleNamespace(
+                returncode=0, stdout=content, stderr="",
+            ),
+        )
+        assert observed["queued_implementation"] == 0
+        assert observed["implementation_authority_held"] == 2
+        assert observed["advisory_directive_promoted_to_execution"] is False
+        assert observed["implementation_next_action"] == (
+            "EXISTING_EXECUTION_PLANE_OWNER_VERIFY_SCOPED_REQUEST"
+        )
+        assert bool(observed["repo_blocked_by_nonprotected_dirty"]) == bool(dirty)
