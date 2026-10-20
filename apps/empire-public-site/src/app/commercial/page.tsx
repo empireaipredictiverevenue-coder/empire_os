@@ -43,7 +43,12 @@ export default function CommercialPage() {
         if (!mounted) return;
         if (data.status !== "FOUNDER_LED_ENQUIRY_AVAILABLE" || !Array.isArray(data.offers)) throw Error("unverified");
         setOffers(data.offers);
-        setCode(data.offers[0]?.product_code || "");
+        // Preserve the product the buyer selected on /buy. Accept only codes
+        // currently returned by the governed commercial offers endpoint;
+        // never treat a query parameter as a binding price or order.
+        const requested = new URLSearchParams(window.location.search).get("product");
+        const approved = data.offers.find((offer) => offer.product_code === requested);
+        setCode(approved?.product_code || data.offers[0]?.product_code || "");
       })
       .catch(() => { if (mounted) setError("Commercial enquiries are temporarily unavailable."); });
     return () => { mounted = false; };

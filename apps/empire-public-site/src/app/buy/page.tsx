@@ -425,7 +425,7 @@ export default function BuyPage() {
                     and on-chain payment requests remain independently gated.
                     You can still enquire today; no wallet or payment is required.
                   </p>
-                  <a href="/commercial" className="mt-7 inline-flex min-h-13 items-center rounded-xl bg-[#eaf2ff] px-6 text-xs font-bold tracking-[0.11em] text-[#07132c]">
+                  <a href={product ? `/commercial?product=${encodeURIComponent(product.product_code)}#commercial-enquiry` : "/commercial#commercial-enquiry"} className="mt-7 inline-flex min-h-13 items-center rounded-xl bg-[#eaf2ff] px-6 text-xs font-bold tracking-[0.11em] text-[#07132c]">
                     REQUEST A PROPOSAL
                   </a>
                 </div>
