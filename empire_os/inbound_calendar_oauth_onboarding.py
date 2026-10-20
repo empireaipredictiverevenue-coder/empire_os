@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 import base64
 from hashlib import sha256
+import hmac
 import secrets
 import sqlite3
 from pathlib import Path
@@ -83,6 +84,7 @@ class OfflineGoogleConsentStateStore:
                 client_id TEXT NOT NULL,
                 redirect_uri TEXT NOT NULL,
                 encrypted_verifier BLOB NOT NULL,
+                browser_nonce_sha256 TEXT NOT NULL DEFAULT '',
                 created_at TEXT NOT NULL,
                 expires_at TEXT NOT NULL,
                 consumed INTEGER NOT NULL DEFAULT 0
@@ -98,7 +100,7 @@ class OfflineGoogleConsentStateStore:
     def begin(
         self, *, tenant_id: str, admin_subject: str,
         client_id: str, redirect_uri: str,
-        now: datetime,
+        now: datetime, browser_nonce: str | None = None,
     ) -> GoogleConsentRequest:
         _as_of(now)
         for field_name, value in (
@@ -108,6 +110,11 @@ class OfflineGoogleConsentStateStore:
             if not isinstance(value, str) or not value.strip() or len(value) > 200:
                 raise OAuthOnboardingDenied(f"oauth_{field_name}_required")
         _https_redirect(redirect_uri)
+        if browser_nonce is not None and (
+            not isinstance(browser_nonce, str) or
+            not 32 <= len(browser_nonce) <= 256
+        ):
+            raise OAuthOnboardingDenied("invalid_browser_nonce")
         state = secrets.token_urlsafe(32)
         verifier = secrets.token_urlsafe(64)
         challenge = base64.urlsafe_b64encode(
@@ -118,10 +125,12 @@ class OfflineGoogleConsentStateStore:
             self.db.execute(
                 "INSERT INTO oauth_pending "
                 "(state_sha256,tenant_id,admin_subject,client_id,redirect_uri,"
-                "encrypted_verifier,created_at,expires_at) VALUES(?,?,?,?,?,?,?,?)",
+                "encrypted_verifier,created_at,expires_at,browser_nonce_sha256) "
+                "VALUES(?,?,?,?,?,?,?,?,?)",
                 (sha256(state.encode()).hexdigest(), tenant_id, admin_subject,
                  client_id, redirect_uri, self.fernet.encrypt(verifier.encode()),
-                 now.isoformat(), expire.isoformat()),
+                 now.isoformat(), expire.isoformat(),
+                 sha256(browser_nonce.encode()).hexdigest() if browser_nonce else ""),
             )
         params = urlencode({
             "client_id": client_id,
@@ -144,6 +153,7 @@ class OfflineGoogleConsentStateStore:
     def consume(
         self, *, tenant_id: str, admin_subject: str,
         state: str, authorization_code: str, now: datetime,
+        browser_nonce: str | None = None,
     ) -> OneTimeGoogleCodeTicket:
         """One-time callback state validation; NO token exchange or persistence."""
         _as_of(now)
@@ -155,13 +165,19 @@ class OfflineGoogleConsentStateStore:
         try:
             row = self.db.execute(
                 "SELECT tenant_id,admin_subject,client_id,redirect_uri,"
-                "encrypted_verifier,created_at,expires_at,consumed "
+                "encrypted_verifier,created_at,expires_at,consumed,browser_nonce_sha256 "
                 "FROM oauth_pending WHERE state_sha256=?",
                 (sha256(state.encode()).hexdigest(),),
             ).fetchone()
             if (row is None or row[0] != tenant_id or row[1] != admin_subject
                 or row[7] != 0):
                 raise OAuthOnboardingDenied("oauth_state_missing_replayed_or_mismatched")
+            expected_nonce = row[8]
+            actual_nonce = sha256(browser_nonce.encode()).hexdigest() if (
+                isinstance(browser_nonce, str) and browser_nonce
+            ) else ""
+            if not hmac.compare_digest(expected_nonce, actual_nonce):
+                raise OAuthOnboardingDenied("oauth_browser_session_mismatch")
             created = datetime.fromisoformat(row[5])
             expires = datetime.fromisoformat(row[6])
             if not created <= now < expires:

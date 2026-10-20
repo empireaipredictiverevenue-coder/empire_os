@@ -142,3 +142,38 @@ def test_consumption_removes_encrypted_verifier_from_db(tmp_path):
         assert store.db.execute(
             "SELECT length(encrypted_verifier) FROM oauth_pending"
         ).fetchone()[0] == 0
+
+
+def test_optional_browser_session_binding_requires_same_nonce(tmp_path):
+    with OfflineGoogleConsentStateStore(
+        tmp_path / "browser-bound.db", encryption_key=Fernet.generate_key(),
+    ) as store:
+        nonce = "http-only-browser-session-nonce-" + ("a" * 48)
+        _, params = begin(store, browser_nonce=nonce)
+        with pytest.raises(OAuthOnboardingDenied, match="browser_session_mismatch"):
+            claim(store, params)
+        with pytest.raises(OAuthOnboardingDenied, match="browser_session_mismatch"):
+            claim(store, params, browser_nonce="different-browser-session-" + ("b" * 48))
+        assert claim(store, params, browser_nonce=nonce).tenant_id == "business-a"
+        with pytest.raises(OAuthOnboardingDenied, match="replayed"):
+            claim(store, params, browser_nonce=nonce)
+
+
+def test_browser_nonce_not_persisted_in_plaintext(tmp_path):
+    path = tmp_path / "browser-bound.db"
+    with OfflineGoogleConsentStateStore(
+        path, encryption_key=Fernet.generate_key(),
+    ) as store:
+        secret_nonce = "private-browser-opaque-nonce-" + ("z" * 48)
+        _, params = begin(store, browser_nonce=secret_nonce)
+        assert secret_nonce.encode() not in path.read_bytes()
+        assert claim(store, params, browser_nonce=secret_nonce)
+        assert secret_nonce.encode() not in path.read_bytes()
+
+
+def test_rejects_weak_cookie_nonce(tmp_path):
+    with OfflineGoogleConsentStateStore(
+        tmp_path / "browser-bound.db", encryption_key=Fernet.generate_key(),
+    ) as store:
+        with pytest.raises(OAuthOnboardingDenied, match="invalid_browser_nonce"):
+            begin(store, browser_nonce="short")
