@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|source-gates|tenant-evidence|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -58,6 +58,7 @@ case "$command" in
   science-agent) module=scripts.review_predictive_scientific_agent_20261020 ;;
   source-gates) module=scripts.review_predictive_source_owner_deployment_20261020 ;;
   tenant-evidence) module=scripts.review_predictive_tenant_outcome_reader_preflight_20261020 ;;
+  tenant-cohort) module=scripts.review_predictive_tenant_terminal_cohort_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -105,6 +106,8 @@ EOF
     scripts/review_predictive_source_owner_deployment_20261020.py \
     empire_os/predictive_tenant_outcome_reader_preflight.py \
     scripts/review_predictive_tenant_outcome_reader_preflight_20261020.py \
+    empire_os/predictive_tenant_terminal_cohort_reader.py \
+    scripts/review_predictive_tenant_terminal_cohort_20261020.py \
     empire_os/outcome_feedback.py \
     scripts/review_predictive_catalog_readiness_20261020.py \
     empire_os/predictive_product_scientific_holdout.py \
@@ -245,6 +248,18 @@ assert x["tenant_safe_data_reader_activated"] is False
 assert x["customer_forecast_eligible"] is False
 assert x["database_writes"] is False
 assert x["execution_authority"]=="none"
+'
+# Canonical tenant cohort reader must hold with no dedicated login; no writes.
+env -u EMPIREDB_TENANT_OUTCOME_READER_DSN \
+  "$TMP/bin/empire-predictive-observe" tenant-cohort | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.tenant_terminal_cohort_candidates.v1"
+assert x["status"]=="HELD_DEDICATED_TENANT_OUTCOME_READER_CREDENTIAL_MISSING"
+assert x["source_rows_exported_to_scientific_training"] is False
+assert x["customer_forecast_eligible"] is False
+assert x["database_writes"] is False and x["execution_authority"]=="none"
 '
 # The blank downloadable template must round-trip as a structured incomplete
 # customer intake, never an unhandled ValueError or an inferred buyer order.

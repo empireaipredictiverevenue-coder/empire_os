@@ -15,7 +15,7 @@ TABLE_POLICY = {
     "buyers": "buyers_tenant_reader_select",
     "fulfilment_orders": "fulfilment_orders_tenant_reader_select",
     "commercial_events": "commercial_events_tenant_reader_select",
-    "commercial_outcomes": "commercial_outcomes_tenant_reader_select",
+    "commercial_outcomes": "order056_outcomes_tenant_select",
 }
 ROLE_SQL = (
     "SELECT rolcanlogin,rolsuper,rolbypassrls,rolinherit "
@@ -78,6 +78,7 @@ def _catalogue(
             "expected_scoped_policy_found": False,
         }
     seen = set()
+    untrusted_extra_policy_tables = set()
     for item in policies:
         if type(item) not in (tuple, list) or len(item) != 5:
             raise TenantEvidencePolicyHold("policy record invalid")
@@ -91,6 +92,15 @@ def _catalogue(
         if (name, policy) in seen:
             raise TenantEvidencePolicyHold("duplicate policy metadata")
         seen.add((name, policy))
+        if policy != TABLE_POLICY[name] and (
+            cmd in ("SELECT", "ALL")
+            and any(role.lower() in ("public", READER_ROLE) for role in roles)
+        ):
+            # An additional permissive policy could union its visibility
+            # with the expected tenant policy; hold until DBA review.
+            if name in inventory:
+                inventory[name]["expected_scoped_policy_found"] = False
+            untrusted_extra_policy_tables.add(name)
         if policy == TABLE_POLICY[name]:
             scoped = (
                 cmd == "SELECT"
@@ -102,6 +112,9 @@ def _catalogue(
             )
             if name in inventory:
                 inventory[name]["expected_scoped_policy_found"] = scoped
+    for name in untrusted_extra_policy_tables:
+        if name in inventory:
+            inventory[name]["expected_scoped_policy_found"] = False
     result = {}
     for name in TABLE_POLICY:
         flags = inventory.get(name) or {
