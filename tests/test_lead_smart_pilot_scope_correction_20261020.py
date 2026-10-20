@@ -55,3 +55,14 @@ def test_new_pilot_drops_seven_day_authority():
 def test_pilot_duration_is_10_to_20_minutes(minutes):
     with pytest.raises(ValueError):
         window("2026-10-21T10:00",minutes)
+
+
+def test_legacy_full_scope_cannot_reactivate_if_correction_missing(tmp_path):
+    import shutil
+    root=tmp_path
+    src=ROOT/"docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    dest=root/"docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    dest.parent.mkdir(parents=True)
+    shutil.copy2(src,dest)
+    assert not (root/"docs/evidence/lead_smart_full_campaign_scope_correction_20261020.json").exists()
+    assert founder_full_campaign_approved(root=root) is False

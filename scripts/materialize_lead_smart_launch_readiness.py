@@ -179,6 +179,10 @@ def founder_full_campaign_approved(root: Path | None = None) -> bool:
             and record.get("founder_request") == "why cant we jusut run a ful campaign s"
             and record.get("founder_continuation") == "go on bro we not far away"
             and record.get("mode") == "FULL_CAMPAIGN"
+            # This separate, explicit authority was never in the historical
+            # record, which only concerned a small supervised pilot. A removed
+            # correction file cannot reactivate that superseded authority.
+            and record.get("scope") == "SEPARATELY_APPROVED_FULL_CAMPAIGN_WITH_BUYER_TERMS"
             and record.get("buyer") == "Lead Smart"
             and record.get("campaign_id") == "CA8278ed3f26e9495b881fe3833174d007"
             and record.get("tracking_number") == "+18883579305"
