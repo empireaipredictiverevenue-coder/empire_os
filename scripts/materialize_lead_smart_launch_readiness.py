@@ -165,6 +165,11 @@ def founder_full_campaign_approved(root: Path | None = None) -> bool:
     """Read the founder's actual full-campaign directive, never activate on its own."""
     root = root or Path(__file__).resolve().parents[1]
     path = root / "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    # The founder later clarified that Seth's reply covered only the requested
+    # 10–20-minute supervised test. This newer correction always supersedes
+    # the earlier broad interpretation. Never remove it to "make tests green".
+    if (root / "docs/evidence/lead_smart_full_campaign_scope_correction_20261020.json").exists():
+        return False
     try:
         record = load(path)
         return (

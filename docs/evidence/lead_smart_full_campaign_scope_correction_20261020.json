@@ -1,0 +1,19 @@
+{
+  "schema_version": "empire.lead_smart.founder_scope_correction.v1",
+  "recorded_on": "2026-10-20",
+  "founder_clarification": "we only had small pilot window bro for lead smart totest",
+  "founder_scope": "SUPERVISED_PILOT_ONLY",
+  "pilot_duration_minutes_min": 10,
+  "pilot_duration_minutes_max": 20,
+  "buyer_context": "19 October 2026 Empire AI request for another 10–20-minute supervised pilot; Seth replied Yes. You can get started",
+  "buyer_email_thread_id": "1a0d9ce883c87d4a",
+  "superseded_authority_ref": "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json",
+  "superseded_scope": "FULL_CAMPAIGN",
+  "seven_day_live_campaign_authorized": false,
+  "future_pilot_automatically_authorized": false,
+  "new_window_must_be_explicitly_confirmed": true,
+  "call_admission_switch_disabled_at_correction": true,
+  "site_remains_public": true,
+  "preserve_prior_records": true,
+  "customer_revenue_verified": false
+}

@@ -62,6 +62,11 @@ def revised_control(control: dict, start: datetime, end: datetime,
     new["ends_at"] = end.isoformat()
     new["max_site_handoffs"] = max_handoffs
     new["enabled"] = False
+    # Always switch away from any superseded week-long campaign state.
+    # Do not inherit full-campaign approval in a 10–20-minute retry.
+    new["mode"] = "SUPERVISED_PILOT"
+    new["founder_authority_ref"] = "docs/evidence/lead_smart_founder_launch_intent_20261011.json"
+    new.pop("max_daily_site_handoffs", None)
     return new
 
 
