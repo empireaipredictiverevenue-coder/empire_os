@@ -9,7 +9,8 @@ from empire_os import lead_smart_pilot_call_api as handoff
 CLIENT = TestClient(public_gateway.app)
 
 
-def test_handoff_denied_by_default_and_no_phone_disclosed():
+def test_handoff_denied_by_default_and_no_phone_disclosed(monkeypatch):
+    monkeypatch.setattr(handoff, "call_available", lambda _zip: False)
     response = CLIENT.post(
         "/roofing/pilot-handoff", data={"zip": "10001"},
         headers={"origin": "https://empire-ai.co.uk"},
