@@ -77,6 +77,44 @@ def _counts(book: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def reconstruct_in_memory_offer_book(
+    *,
+    catalog: Mapping[str, Any],
+    distribution: Mapping[str, Any],
+    review_sources: Mapping[str, Any],
+    now: datetime,
+) -> dict[str, Any]:
+    """Reuse canonical owner builder without its disk-writing producer."""
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("trusted timezone-aware review clock required")
+    if (
+        catalog.get("schema_version") != CATALOG_SCHEMA
+        or distribution.get("schema_version") != DISTRIBUTION_SCHEMA
+        or catalog.get("execution_authority") != "none"
+        or distribution.get("execution_authority") != "none"
+    ):
+        raise ValueError("exact non-executing canonical catalog and distribution required")
+    if set(review_sources) != set(REVIEW_SOURCES):
+        raise ValueError("exact existing owner source contract required")
+    opportunities = distribution.get("opportunities")
+    if not isinstance(opportunities, list) or len(opportunities) > MAX_TARGETS:
+        raise ValueError("bounded source opportunity list required")
+    if any(value is not None and not isinstance(value, (Mapping, list))
+           for value in review_sources.values()):
+        raise ValueError("invalid owner source packet")
+    generated = build_human_review_queue(
+        {"catalog": catalog}, review_sources, opportunities, limit=None,
+    )
+    rows = generated.get("human_review_queue")
+    if not isinstance(rows, list) or len(rows) > MAX_TARGETS:
+        raise ValueError("bounded owner human review queue required")
+    return build_commercial_offer_book(
+        catalog=catalog,
+        revenue_distribution={**distribution, "human_review_queue": rows},
+        generated_at=now.astimezone(timezone.utc).isoformat(),
+    )
+
+
 def review_shadow_offer_reconstruction(
     *,
     catalog: Mapping[str, Any],
@@ -127,22 +165,11 @@ def review_shadow_offer_reconstruction(
             stamp = None
         source_clocks["owner_review_" + label] = _clock(stamp, now)
 
-    # The existing owner specifies how missing sources influence review holds.
-    generated = build_human_review_queue(
-        {"catalog": catalog},
-        review_inputs,
-        opportunities,
-        limit=None,
-    )
-    rows = generated.get("human_review_queue")
-    if not isinstance(rows, list) or len(rows) > MAX_TARGETS:
-        raise ValueError("bounded owner human review queue required")
-    # No freshness laundering: the generated_at below is a shadow calculation
-    # clock, not evidence that any upstream source was freshly observed.
-    projected = build_commercial_offer_book(
+    projected = reconstruct_in_memory_offer_book(
         catalog=catalog,
-        revenue_distribution={**distribution, "human_review_queue": rows},
-        generated_at=now.isoformat(),
+        distribution=distribution,
+        review_sources=review_inputs,
+        now=now,
     )
     projected_counts = _counts(projected)
     previous_counts = _counts(previous_offer_book)
