@@ -87,3 +87,26 @@ The original unit tests now provide a controlled historic test clock or a
 fresh synthetic timestamp. New tests ensure stale/forged/future samples
 cannot appear as current buyer activity. The fresh first-sale aggregate in
 Ops remains the preferred trustworthy count-only first-party signal.
+
+
+## Exact existing buyer checkout asset integrity hold
+
+The existing read-only direct BSC buyer canary failed at
+`published_asset_integrity`. Further bounded original checks showed:
+
+- The public `/buy` HTML is byte-identical to the locally published
+  `apps/empire-public-site/out/buy.html`, both GET 200.
+- The reviewed checkout source `apps/empire-public-site/src/app/buy/page.tsx`
+  still matches its recorded source SHA256.
+- All **36** pinned immutable JS/CSS assets match their manifest.
+- The rendered `buy.html` **does not match** the 13 October pinned HTML
+  SHA256 (nor the prior-live SHA). Do not silently repin this HTML without
+  the existing website release owner's independently reviewed build.
+
+The existing five-minute Ops observer now calls the original release
+owner's `_published_checkout_verified()` read-only check; it reports
+`LEGACY_BUY_UI_HTML_OR_ASSET_INTEGRITY_RELEASE_HOLD` and hands the owner
+`EXISTING_CHECKOUT_WEBSITE_RELEASE_OWNER_RECONCILE_HTML_PIN`.
+It does not modify the manifest, rehash production HTML, issue status
+tokens, send a contact, place an order, move funds or claim settlement.
+A GET-only checkout route check remains separate from asset attestation.

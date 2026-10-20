@@ -254,3 +254,47 @@ def test_site_conversion_routing_drift_requests_existing_owner_not_fake_sales(tm
     assert restored["public_conversion_route_status"] == "PUBLIC_CONVERSION_GET_ROUTES_PRESENT_POST_UNTESTED"
     assert restored["transition"] == "FIRST_SALE_SOURCE_CHANGE_OWNER_REVIEW_REQUIRED"
     assert restored["verified_first_sale"] is None
+
+
+def test_legacy_buy_asset_mismatch_is_held_not_silently_rehashed(tmp_path):
+    preview = observe_first_sale_readiness(
+        root=tmp_path, now=NOW, previous=None,
+        sales_probe=owner_counts, health_probe=checkout,
+        public_probe=lambda: True,
+        asset_probe=lambda: False,
+    )
+    assert preview["status"] == "NO_CANONICAL_FIRST_PARTY_SALES_ENQUIRIES"
+    assert preview["public_conversion_route_status"] == (
+        "PUBLIC_CONVERSION_GET_ROUTES_PRESENT_POST_UNTESTED"
+    )
+    assert preview["legacy_buy_ui_manifest_integrity_status"] == (
+        "LEGACY_BUY_UI_HTML_OR_ASSET_INTEGRITY_RELEASE_HOLD"
+    )
+    assert preview["legacy_buy_ui_manifest_rewrite_authorized"] is False
+    assert preview["next_existing_owner_action"] == (
+        "EXISTING_CHECKOUT_WEBSITE_RELEASE_OWNER_RECONCILE_HTML_PIN"
+    )
+    repeated = observe_first_sale_readiness(
+        root=tmp_path, now=NOW, previous=preview,
+        sales_probe=owner_counts, health_probe=checkout,
+        public_probe=lambda: True, asset_probe=lambda: False,
+    )
+    assert repeated["transition"] == "UNCHANGED_FIRST_SALE_EVIDENCE_HOLD"
+    assert repeated["repeated_owner_attention_suppressed"] is True
+
+
+def test_original_legacy_asset_verifier_failure_is_private_and_nonexecuting(tmp_path):
+    def broken():
+        raise ValueError("hash drift at hidden/private@example.invalid")
+    preview = observe_first_sale_readiness(
+        root=tmp_path, now=NOW, previous=None,
+        sales_probe=owner_counts, health_probe=checkout,
+        public_probe=lambda: True, asset_probe=broken,
+    )
+    assert preview["legacy_buy_ui_manifest_integrity_status"] == (
+        "LEGACY_BUY_UI_HTML_OR_ASSET_INTEGRITY_RELEASE_HOLD"
+    )
+    assert preview["legacy_buy_ui_manifest_rewrite_authorized"] is False
+    assert preview["recognized_revenue_cents"] is None
+    assert preview["outbound_sent"] is False
+    assert "private@" not in str(preview)

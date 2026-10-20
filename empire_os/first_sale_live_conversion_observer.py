@@ -103,6 +103,18 @@ def _public_conversion_gets() -> bool:
     return True
 
 
+def _legacy_buy_ui_manifest_verified() -> bool:
+    """Use existing buyer-status release owner's *read-only* asset verifier.
+
+    Never regenerate, rewrite, approve or repin checkout evidence here.
+    """
+    from scripts.deploy_direct_bsc_buyer_status_release import (
+        _published_checkout_verified,
+    )
+    _published_checkout_verified()
+    return True
+
+
 def _canonical_sales_counts():
     # The pre-existing original owner operates a bounded privileged READ ONLY
     # SQL aggregation under the founder tenant. It returns counts, not records.
@@ -209,9 +221,17 @@ def evaluate_first_sale_readiness(
     funnel_freshness: str,
     previous: Mapping[str, Any] | None = None,
     public_routes: bool | None = None,
+    legacy_asset_integrity: bool | None = None,
 ) -> dict[str, Any]:
     count = _counts(sales)
     checkout_status = _checkout_status(checkout)
+    asset_status = (
+        "LEGACY_BUY_UI_PINNED_ASSETS_AND_HTML_VERIFIED"
+        if legacy_asset_integrity is True
+        else "LEGACY_BUY_UI_HTML_OR_ASSET_INTEGRITY_RELEASE_HOLD"
+        if legacy_asset_integrity is False
+        else "LEGACY_BUY_UI_MANIFEST_NOT_CHECKED"
+    )
     public_status = (
         "PUBLIC_CONVERSION_GET_ROUTES_PRESENT_POST_UNTESTED" if public_routes is True
         else "PUBLIC_CONVERSION_ROUTE_REVIEW_REQUIRED" if public_routes is False
@@ -232,6 +252,8 @@ def evaluate_first_sale_readiness(
         "canonical_sales_acquisition_counts": count,
         "checkout_status": checkout_status,
         "public_conversion_route_status": public_status,
+        "legacy_buy_ui_manifest_integrity_status": asset_status,
+        "legacy_buy_ui_manifest_rewrite_authorized": False,
         "public_post_or_customer_submission_attempted": False,
         "legacy_founder_funnel_snapshot_freshness": (
             funnel_freshness if funnel_freshness in (
@@ -257,6 +279,7 @@ def evaluate_first_sale_readiness(
     stable_fields = (
         "status", "canonical_sales_acquisition_counts",
         "checkout_status", "public_conversion_route_status",
+        "legacy_buy_ui_manifest_integrity_status",
         "legacy_founder_funnel_snapshot_freshness",
     )
     if prev is None:
@@ -271,6 +294,8 @@ def evaluate_first_sale_readiness(
     )
     current["next_existing_owner_action"] = (
         "WEBSITE_CONVERSION_ROUTE_OWNER_REPAIR" if public_routes is False
+        else "EXISTING_CHECKOUT_WEBSITE_RELEASE_OWNER_RECONCILE_HTML_PIN"
+        if legacy_asset_integrity is False
         else "CHECK_ORIGINAL_FIRST_PARTY_INTAKE_AND_WEB_CONVERSION"
         if count is not None and count["sales_acquisition_rows"] == 0
         else "VERIFY_FIRST_PARTY_CANONICAL_SOURCE"
@@ -286,6 +311,7 @@ def observe_first_sale_readiness(
     sales_probe=None,
     health_probe=None,
     public_probe=None,
+    asset_probe=None,
 ) -> dict:
     if not isinstance(now, datetime) or now.utcoffset() is None:
         raise ValueError("offset-aware observation required")
@@ -314,8 +340,16 @@ def observe_first_sale_readiness(
             public = check if type(check) is bool else False
         except (OSError, ValueError, RuntimeError, TypeError, TimeoutError):
             public = False
+    asset = None
+    if canonical or asset_probe is not None:
+        try:
+            check = (asset_probe or _legacy_buy_ui_manifest_verified)()
+            asset = check if type(check) is bool else False
+        except (OSError, ValueError, RuntimeError, TypeError, TimeoutError):
+            asset = False
     return evaluate_first_sale_readiness(
         sales=source, checkout=health,
         funnel_freshness=_freshness(root,now.astimezone(timezone.utc)),
         previous=previous, public_routes=public,
+        legacy_asset_integrity=asset,
     )
