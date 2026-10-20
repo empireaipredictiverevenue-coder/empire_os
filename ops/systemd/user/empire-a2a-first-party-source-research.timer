@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily bounded Empire AI first-party company research refresh
+
+[Timer]
+OnCalendar=*-*-* 06:30:00 UTC
+RandomizedDelaySec=10min
+AccuracySec=1min
+Persistent=true
+Unit=empire-a2a-first-party-source-research.service
+
+[Install]
+WantedBy=timers.target

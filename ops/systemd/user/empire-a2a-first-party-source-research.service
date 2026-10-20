@@ -1,0 +1,21 @@
+[Unit]
+Description=Empire AI approved first-party B2B source refresh (observe only)
+ConditionPathExists=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/scripts/run_a2a_first_party_source_recovery_20261020.py
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/
+Environment=PYTHONPATH=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020
+ExecStart=/srv/empire_os/.venv/bin/python -B -m scripts.run_a2a_first_party_source_recovery_20261020 --live-readonly --approval FOUNDER_APPROVED_PUBLIC_BUSINESS_SOURCE_READ_20261020 --max-sites 9
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/empire_worktrees/a2a_commercial_signal_mining_20261020/runtime/a2a_commercial_signal_mining
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+TimeoutStartSec=160
+MemoryMax=256M
+CPUQuota=25%
+StandardOutput=journal
+StandardError=journal

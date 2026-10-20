@@ -28,6 +28,8 @@ from empire_os.a2a_owner_receipt_intake_v1 import inspect_owner_receipt_files
 from empire_os.a2a_owner_pickup_change_tracking_v1 import review_pickup_changes
 from empire_os.a2a_b2b_evidence_mining_v1 import mine_targeted_business_evidence, make_mining_source_hold
 from empire_os.a2a_b2b_mining_history_v1 import update_mining_history
+from empire_os.a2a_first_party_recovery_readback_v1 import review_first_party_research
+from empire_os.a2a_openmanus_scoped_research_bridge_v1 import build_scoped_openmanus_plan
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -110,6 +112,29 @@ def run(*, previous: dict | None = None, history: dict | None = None,
             mining = make_mining_source_hold(
                 targeting, reason="CANONICAL_MINING_INPUT_UNTRUSTED")
     mining_history = update_mining_history(mining, previous_mining_history)
+    site_manifest = _read(Path(__file__).resolve().parents[1] /
+                          "config/a2a_candidates/approved_first_party_business_sites_v1.json")[0]
+    public_site_snapshot = LOCAL / "first_party_source_recovery_v1.json"
+    try:
+        site_source = (_read(public_site_snapshot)[0] if public_site_snapshot.is_file()
+                       and not public_site_snapshot.is_symlink() else None)
+        first_party_research = review_first_party_research(site_manifest, site_source)
+    except (OSError, ValueError, json.JSONDecodeError):
+        first_party_research = review_first_party_research(site_manifest, None)
+        first_party_research["source_state"] = "SOURCE_CACHE_REJECTED_UNTRUSTED"
+    # Cached source reports are supplementary research observations, not the
+    # canonical Buyer's Scout source or anything permitting external execution.
+    openmanus_owner_plan = (
+        build_scoped_openmanus_plan(owner_pickup, first_party_research)
+        if owner_pickup.get("pickup_count") else {
+            "schema_version": "empire.a2a.openmanus_scoped_owner_research_plan.v1",
+            "mode": "OBSERVE", "execution_authority": "NONE",
+            "jobs_prepared": 0, "jobs_executed": 0, "jobs": [],
+            "production_openmanus_executor_verified": False,
+            "production_jobs_dispatched": 0,
+            "next_gate": "CANONICAL_OWNER_PICKUP_SOURCE_UNAVAILABLE",
+        }
+    )
     receipt_review = inspect_owner_receipt_files(
         owner_pickup, LOCAL / "owner_signed_receipts",
     )
@@ -140,6 +165,8 @@ def run(*, previous: dict | None = None, history: dict | None = None,
         "pickup_change_tracking": pickup_delta,
         "data_mining": mining,
         "mining_history": mining_history,
+        "first_party_research": first_party_research,
+        "openmanus_owner_plan": openmanus_owner_plan,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -179,6 +206,8 @@ def main() -> int:
             ("owner_pickup_change_tracking_v1.json", "pickup_change_tracking"),
             ("targeted_business_evidence_mining_v1.json", "data_mining"),
             ("targeted_business_mining_history_v1.json", "mining_history"),
+            ("first_party_source_readback_v1.json", "first_party_research"),
+            ("openmanus_research_jobs_v1.json", "openmanus_owner_plan"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -209,6 +238,13 @@ def main() -> int:
         "fresh_web_searches_by_miner": 0,
         "mining_source_history_snapshots": outcome["mining_history"]["snapshot_count"],
         "new_mining_source_snapshot": outcome["mining_history"]["new_snapshot_appended"],
+        "first_party_sites_read_from_cache": outcome["first_party_research"]["sites_read"],
+        "first_party_city_trade_self_claims": sum(
+            x["self_described_sector_and_region_matches"]
+            for x in outcome["first_party_research"]["market_coverage"].values()),
+        "first_party_source_state": outcome["first_party_research"]["source_state"],
+        "openmanus_scoped_jobs_prepared": outcome["openmanus_owner_plan"]["jobs_prepared"],
+        "openmanus_scoped_jobs_executed": outcome["openmanus_owner_plan"]["jobs_executed"],
         "authenticated_owner_reply_count": outcome["owner_receipt_review"]["authenticated_owner_replies"],
         "owner_trust_state": outcome["owner_receipt_review"]["trust_store_state"],
         "new_owner_pickup_requests": outcome["pickup_change_tracking"]["new_request_count"],

@@ -1,0 +1,67 @@
+{
+  "schema_version": "empire.a2a.approved_first_party_business_sites.v1",
+  "mode": "OBSERVE",
+  "owner": "commercial_signal_miner_source_research",
+  "activation": "LIVE_READONLY_BY_EXPLICIT_OPERATOR_ACTION",
+  "source_selection": "public first-party company websites discovered in manual research on 2026-10-20, self-descriptions only",
+  "sites": [
+    {
+      "market": "tampa, fl",
+      "niche": "roofing",
+      "url": "https://roofstampa.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "tampa, fl",
+      "niche": "roofing",
+      "url": "https://tamparoofing.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "tampa, fl",
+      "niche": "roofing",
+      "url": "https://elementroofingsolutions.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "little rock, ar",
+      "niche": "hvac",
+      "url": "https://northsidecomfort.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "little rock, ar",
+      "niche": "hvac",
+      "url": "https://whittikerac.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "little rock, ar",
+      "niche": "hvac",
+      "url": "https://1callheatandair.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "nyc",
+      "niche": "general_contractor",
+      "url": "https://www.danconservices.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "nyc",
+      "niche": "general_contractor",
+      "url": "https://evergreenconstructioncorp.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    },
+    {
+      "market": "nyc",
+      "niche": "general_contractor",
+      "url": "https://www.llnygroup.com/",
+      "source_type": "FIRST_PARTY_PUBLIC_SITE"
+    }
+  ],
+  "no_private_contacts": true,
+  "assume_buyer_intent": false,
+  "send_messages": false,
+  "budget_usd": 0
+}
