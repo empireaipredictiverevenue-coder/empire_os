@@ -42,6 +42,7 @@ from empire_os.a2a_identity_api import create_a2a_identity_router
 from empire_os.a2a_commerce_api import create_a2a_commerce_router
 from empire_os.agent_web_runtime import execute_public_capability
 from empire_os.owned_campaign_http import LIMITER as FIRST_PARTY_INTAKE_LIMITER
+from empire_os.roofing_guide_optin_api import create_roofing_optin_router
 from empire_os.empire_ai_public_legal_release import checked_legal_path as checked_empire_ai_legal_path
 from empire_os.public_flagship_asset_policy import reviewed_flagship_asset_path
 from empire_os.flagship_static_release_routes import (
@@ -87,6 +88,10 @@ CHECKOUT_INTERNAL_URL = os.getenv(
 app = FastAPI(title="Empire AI Public Gateway", docs_url=None, redoc_url=None, openapi_url=None)
 app.include_router(roofing_coverage_router)
 app.include_router(roofing_pilot_handoff_router)
+# Intentionally disabled: no independent subscriber backend or public writes.
+app.include_router(create_roofing_optin_router(
+    limiter=lambda peer: FIRST_PARTY_INTAKE_LIMITER.allow(peer, "enquiry"),
+))
 app.include_router(create_affiliate_ingress_router())
 app.mount("/_next", StaticFiles(directory=str(SITE_OUT / "_next"), check_dir=False), name="next-static")
 # First-party, byte-pinned flagship release routes precede legacy asset handlers.

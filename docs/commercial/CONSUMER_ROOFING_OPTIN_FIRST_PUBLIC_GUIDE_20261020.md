@@ -50,3 +50,33 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
 ```
 
 **Commercial truth:** we have a complete informational lead magnet and an optional opt-in *interface*, but **no live email capture, subscribers, independent consent approval, buyer contact transfer, qualified lead or customer revenue**.
+
+
+## 20 October continuation — staged subscriber DB + closed API
+
+A **second additive implementation commit** adds original-purpose subscriber infrastructure without touching production:
+
+- `migrations/empiredb/057_consumer_roofing_optin_staged_20261020.sql`: staged-only EmpireDB migration. It creates a dedicated single-purpose encrypted subscriber record, append-only consent history and keyed-HMAC suppression tombstones. It rejects unsafe database names, requires the existing restricted migrator role, enables and **forces RLS**, has **no policies and no runtime grants**, and cannot be automatically called by boot/deploy. Emails are represented as encrypted bytea with a private key reference; keyed lookup digests are never a substitute for legal consent. The migration was **not run**, even inside a rolled-back transaction, against production.
+- `empire_os/roofing_guide_optin_api.py`: first-party GET readiness, POST optional own-brand opt-in, and POST opaque-token unsubscribe. It is mounted in the *isolated* `public_gateway.py` branch with **no private backend**, so live or test GET/POSTs return controlled 503 until a real privately configured service is approved. The POST requires same-origin, strict JSON, size caps, bounded syntax, the right original version and true brand opt-in. It rejects referral consent claims, honeypot fields, unrecognised payload keys and bot/rate abuse. It never sends email or returns the submitted address in responses.
+- `tests/test_roofing_optin_api_and_storage_20261020.py`: real gateway fail-closed tests plus simulated private-backend signup, withdrawal and denial tests. These use only `.example.test` synthetic addresses in memory, without real email or DB calls. Any real withdrawal service must recognise purpose-scoped unpredictable unsubscribe tokens, record suppressions before future mail, and never expose person existence.
+
+**Whole public-gateway regression passed: 66 tests** (one third-party Starlette deprecation warning). The protected guide release and other existing gateway flows remain intact.
+
+### Production check, no writes
+
+Original privileged read-only EmpireDB object inventory confirmed:
+- `public.empire_consumer_subscriptions`: ABSENT
+- `public.empire_consumer_consent_events`: ABSENT
+- `public.empire_consumer_email_suppressions`: ABSENT
+
+The live `https://empire-ai.co.uk/v1/consumer-optin/roofing/status` currently returns 404, because the new disabled routes were **not deployed to production**. The guide URL also remains 404, pending its independent exact-content and privacy release. Neither a live mailing list nor an unsubscribe endpoint has been claimed.
+
+### Activation order (independent owners)
+
+1. **Privacy/Legal + Founder:** review own-brand marketing purpose, named sender, exact unbundled checkbox, privacy notice and retention; independently approve a subscriber withdrawal/deletion route, including treatment of suppression tombstones. A guide download must stay free without an email.
+2. **DBA:** review new SQL against present production migrations, verify a backup and ownership, then obtain **separate explicit privileged migration approval** before applying. After secure cipher/HMAC custody is designed, create minimal dedicated private-service roles and narrow RLS functions. Do not grant all access to `empiredb_app`, the public gateway, or B2B CRM.
+3. **Subscriber service + Email owner:** build isolated authenticated private adapter, real double-opt-in or appropriate verification, actual provider receipts, consent/suppression/erasure and anti-abuse rate limiting. Configure sender domain, bounce handling, audits and unsubscribe. Implement purpose-scoped no-existence-leak token withdrawal. Synthetic approval flags cannot substitute for real transport readback.
+4. **Website owner:** merge the guide against the **current** flagship assets, capture a byte-pinned reviewed-content release that includes independent homeowner/editorial/legal approvals, and smoke the public page while the opt-in status remains held. Do not overwrite active premium brokerage, existing roofing campaign or public product conversion fixes.
+5. **Activation and measurement:** once first-party storage, privacy and sender verification are independently proven, connect the private backend and enable readiness. Verify the first genuine opt-in, receipt, cancellation and suppression safely; report **subscribers and confirmed enquiries separately**, and never count a newsletter subscriber as an Exchange buyer-referral lead.
+
+**Current authority:** private build/test only. No production DB mutation, buyer contact disclosure, live email subscription, outbound mail or payment.
