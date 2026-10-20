@@ -55,11 +55,11 @@ case "$command" in
 esac
 cd "$release"
 if [[ "$command" == "commercial-example" ]]; then
-  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \\
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --example-tampa-roofing
 fi
 if [[ "$command" == "commercial-intake" ]]; then
-  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \\
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --requirement-intake "$2"
 fi
 if [[ "$command" == "cost-sector" ]]; then
@@ -89,6 +89,10 @@ EOF
     scripts/review_empire_cross_agent_release_board_20261020.py \
     > metadata/critical_source_checksums.sha256
 )
+# Block publication if the newly generated allowlisted launcher is invalid.
+for profile in commercial commercial-example finance owners; do
+  "$TMP/bin/empire-predictive-observe" "$profile" > /dev/null
+done
 mv -T -- "$TMP" "$RELEASE"
 trap - EXIT
 echo "RELEASE_PATH=$RELEASE"
