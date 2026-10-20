@@ -59,6 +59,15 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
         </a>
       </nav>
 
+      {page.slug === "roofing" && (
+        <aside aria-label="US homeowner roofing guidance" className="relative z-20 mx-auto mt-4 flex w-[min(1480px,calc(100%-32px))] flex-col gap-3 rounded-2xl border border-[#00E5FF]/20 bg-[#00E5FF]/[0.055] px-5 py-4 text-sm text-white/75 sm:flex-row sm:items-center sm:justify-between">
+          <p>Looking for roof installation or replacement guidance for a US property? Service availability varies by ZIP.</p>
+          <a href="/roofing" className="inline-flex shrink-0 items-center gap-2 font-bold text-[#B8F8FF] underline-offset-4 hover:underline">
+            Check roofing coverage by ZIP <ArrowRight className="size-4" aria-hidden="true" />
+          </a>
+        </aside>
+      )}
+
       <section className="relative z-10 mx-auto grid min-h-[760px] w-[min(1480px,calc(100%-32px))] items-center gap-16 py-20 lg:grid-cols-[1.05fr_0.95fr]">
         <div>
           <Label>{page.eyebrow}</Label>
