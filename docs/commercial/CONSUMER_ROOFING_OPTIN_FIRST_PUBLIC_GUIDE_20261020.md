@@ -99,3 +99,46 @@ A real headless Chromium test of **the isolated static export** verified that an
 Original production readback still: `/roofing/cost-guide` HTTP 404; `/roofing/email-preferences` HTTP 404; `/v1/consumer-optin/roofing/status` HTTP 404; existing `/roofing` HTTP 200. The original live roofing campaign, gateway and database were **not** modified.
 
 **Remaining practical implementation to activate, in existing owner order:** approved legal privacy/recipient purpose and content; approved DBA migration to a separate private consumer store; transactional encrypted email/token/suppression backend; verified private email delivery and unsubscribe service including real provider receipts; exact-content reviewed public guide and preferences release; then a strictly scoped live opt-in pilot with one consenting real person and independently checked withdrawal. Do not claim a customer subscriber, CRM lead, shared consumer contact or realised revenue before those receipts exist. The website's readiness GET must stay held until all relevant controls are complete.
+
+
+## 20 October — private subscriber runtime and real-Postgres fixture
+
+**Fourth isolated branch release.** The missing private subscriber implementation is now coded, not just an interface. It has not been wired into the live system.
+
+- `empire_os/consumer_optin_private_service.py`: genuine AES-256-GCM authenticated encryption for private email bytes, independently keyed lookup and token HMACs, source+notice-scoped per-request evidence digests, cryptographic 256-bit confirmation and unsubscribe tokens, guarded verification-email initiation, explicit provider-acceptance receipt custody and confirmation/withdrawal operations. It has **no default network/database/provider connector**, no environment-variable activation or public buyer-sharing authority. The private sender is an injected protocol, not a production mail transport.
+- `empire_os/consumer_optin_postgres_repository.py`: real parameterised PostgreSQL transaction adapter, with per-contact advisory locks, suppression checks, restricted pending subscriptions, immutable consent events, one-time token issue and expiry, pre-email suppression recheck and send claim, provider receipt attestation, original confirmation evidence, atomic unsubscribe and full token invalidation. Its `approved_custody` defaults to false; it still requires a separately reviewed narrow production role and row-level security policy before any deployment.
+- `empire_os/consumer_optin_confirmation_email.py`: no-tracking first-party confirmation email and unsubscribe wording, with strict first-party confirmation/withdrawal URLs and **send_authorized=false**; formatting a message cannot trigger an email.
+- Migration 057 staged schema now also includes a forced-RLS provider-delivery receipt and per-token `send_claimed_at`. No public or application grants are issued. The original-consent digest is distinct for each browser request rather than a repeat of identical static checkbox text.
+
+### Stronger evidence: actual disposable PostgreSQL lifecycle
+
+A reproducible, **fully isolated** PostgreSQL 18 cluster smoke is provided by `scripts/run_consumer_optin_ephemeral_db_probe_20261020.sh` and `scripts/probe_consumer_optin_ephemeral_db_20261020.py`. It creates `empire_consumer_optin_fixture` inside `pg_virtualenv`, adds test-only narrow RLS policies, executes the staging migration, and tears the cluster down automatically. It **does not connect to production EmpireDB**. The test uses a synthetic `.example.test` address, fixture-only encryption keys and a fake provider acceptance receipt. The exact executed scenario passes:
+
+- 5 consumer tables, all FORCE RLS; no access for PUBLIC, zero default policies, one append-only trigger
+- encrypted pending subscription with two one-use bearer-token HMACs
+- a fresh suppression-safe confirmation send claim and a **synthetic provider acceptance**
+- verified state only after the token and provider receipt match
+- token replay blocked
+- unsubscribe, real DB suppression tombstone and original consent event appended
+- all outstanding tokens invalidated; repeating signup for suppressed person refused
+- exactly three append-only consent events; attempts to UPDATE a consent event rejected by PostgreSQL
+- no original personal email in storage, zero real messages sent and no production database mutation
+
+The full selected unit, browser reviewed-content and public-gateway regression suite passed **112 tests** (one benign upstream Starlette deprecation warning). The SQL transaction tests are supported by the real throwaway Postgres fixture, not just mocked queries.
+
+### Production boundary remaining
+
+No production migration has been applied. The public guide, preference and opt-in routes are still unreleased. Nothing in this private code supplies real operator-approved encryption/HMAC key custody, narrow production writer privileges or source-rights/privacy review. It also has no actual sender provider (the synthetic sender is fixture-only) or provider delivery logs. Independent safeguards still need working real delivery, unsubscribe/bounce processing and observed receipts before connecting it to the public gateway.
+
+To verify fully without affecting production:
+
+```bash
+cd /home/ubuntu/empire_worktrees/consumer_optin_roofing_20261020
+./scripts/run_consumer_optin_ephemeral_db_probe_20261020.sh
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+ tests/test_consumer_optin_postgres_repository_20261020.py \
+ tests/test_consumer_optin_private_backend_20261020.py \
+ tests/test_consumer_optin_confirmation_email_20261020.py
+```
+
+This backend intentionally does not treat list subscriptions as buyer-referral consent or generate Lead Exchange inventory. The Exchange still requires an independently consented named-buyer request before any person can be transferred.

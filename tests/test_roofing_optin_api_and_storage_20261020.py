@@ -283,3 +283,10 @@ def test_staged_schema_has_one_use_purpose_separated_tokens_and_erasure():
     assert "REVOKE ALL ON TABLE public.empire_consumer_one_time_tokens FROM PUBLIC" in text
     assert "GRANT INSERT" not in text
     assert "GRANT EXECUTE" not in text
+
+def test_staged_token_claim_must_precede_verification_send_receipt():
+    text=SQL.read_text()
+    assert "send_claimed_at timestamptz" in text
+    assert "consumed_at timestamptz" in text
+    assert "public.empire_consumer_delivery_receipts" in text
+    assert "email_lookup_hmac" in text

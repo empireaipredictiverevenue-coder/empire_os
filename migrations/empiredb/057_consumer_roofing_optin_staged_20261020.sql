@@ -22,6 +22,7 @@ BEGIN
      OR pg_catalog.to_regclass('public.empire_consumer_consent_events') IS NOT NULL
      OR pg_catalog.to_regclass('public.empire_consumer_email_suppressions') IS NOT NULL
      OR pg_catalog.to_regclass('public.empire_consumer_one_time_tokens') IS NOT NULL
+     OR pg_catalog.to_regclass('public.empire_consumer_delivery_receipts') IS NOT NULL
      OR pg_catalog.to_regprocedure('public.empire_consumer_consent_event_immutable()') IS NOT NULL
   THEN
     RAISE EXCEPTION 'CONSUMER057_OBJECT_ALREADY_EXISTS_REVIEW_FIRST';
@@ -70,7 +71,7 @@ CREATE TABLE public.empire_consumer_subscriptions (
       AND email_ciphertext IS NULL AND email_key_reference IS NULL)
     OR
     (permission_state<>'erased' AND email_ciphertext IS NOT NULL
-      AND octet_length(email_ciphertext) BETWEEN 40 AND 2048
+      AND octet_length(email_ciphertext) BETWEEN 34 AND 2048
       AND email_key_reference IS NOT NULL)
   )
 );
@@ -118,8 +119,10 @@ CREATE TABLE public.empire_consumer_one_time_tokens (
   token_purpose text NOT NULL CHECK (token_purpose IN ('confirm','unsubscribe')),
   issued_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   expires_at timestamptz NOT NULL,
+  send_claimed_at timestamptz,
   consumed_at timestamptz,
   CHECK (expires_at > issued_at),
+  CHECK (send_claimed_at IS NULL OR send_claimed_at >= issued_at),
   CHECK (expires_at <= issued_at + interval '30 days'),
   CHECK (consumed_at IS NULL OR consumed_at >= issued_at)
 );
@@ -128,6 +131,18 @@ COMMENT ON TABLE public.empire_consumer_one_time_tokens IS
 
 CREATE INDEX empire_consumer_tokens_by_subscription
   ON public.empire_consumer_one_time_tokens(subscription_id,token_purpose,expires_at);
+
+-- Genuine provider send acceptance is recorded separately from a pending
+-- opt-in. Only provider-accepted confirmation tokens may become verified.
+-- The stored receipt is keyed HMAC, not a raw email/provider event payload.
+CREATE TABLE public.empire_consumer_delivery_receipts (
+  token_hmac text PRIMARY KEY REFERENCES public.empire_consumer_one_time_tokens(token_hmac),
+  subscription_id uuid NOT NULL
+    REFERENCES public.empire_consumer_subscriptions(subscription_id),
+  provider_receipt_hmac text NOT NULL
+    CHECK (provider_receipt_hmac ~ '^[a-f0-9]{64}$'),
+  provider_accepted_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
 
 CREATE INDEX empire_consumer_subs_by_state
   ON public.empire_consumer_subscriptions(permission_state, created_at);
@@ -155,6 +170,8 @@ ALTER TABLE public.empire_consumer_email_suppressions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_email_suppressions FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_one_time_tokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_one_time_tokens FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.empire_consumer_delivery_receipts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.empire_consumer_delivery_receipts FORCE ROW LEVEL SECURITY;
 
 -- No policies and NO runtime grants. Dedicated operator-reviewed writer /
 -- verification / withdrawal capabilities must be established separately.
@@ -162,6 +179,7 @@ REVOKE ALL ON TABLE public.empire_consumer_subscriptions FROM PUBLIC;
 REVOKE ALL ON TABLE public.empire_consumer_consent_events FROM PUBLIC;
 REVOKE ALL ON TABLE public.empire_consumer_email_suppressions FROM PUBLIC;
 REVOKE ALL ON TABLE public.empire_consumer_one_time_tokens FROM PUBLIC;
+REVOKE ALL ON TABLE public.empire_consumer_delivery_receipts FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.empire_consumer_consent_event_immutable() FROM PUBLIC;
 
 COMMENT ON TABLE public.empire_consumer_email_suppressions IS
