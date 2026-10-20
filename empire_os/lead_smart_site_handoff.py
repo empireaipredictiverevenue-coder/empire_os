@@ -91,6 +91,11 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
     local_start = start.astimezone(chicago)
     local_end = end.astimezone(chicago)
     if mode == "FULL_CAMPAIGN":
+        # The founder corrected the permitted scope to a short test only.
+        # Runtime revocation remains fail-closed even with a stale readiness
+        # snapshot or a manually re-enabled old configuration.
+        if control.get("full_campaign_scope_revoked") is True:
+            raise HandoffHeld()
         # An explicit, time-bounded campaign is distinct from the old pilot.
         # Buyer source is the actual 19 Oct reply: "Yes. You can get started".
         # Site traffic is controlled here, not by an invented buyer daily cap.

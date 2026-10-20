@@ -165,6 +165,11 @@ def founder_full_campaign_approved(root: Path | None = None) -> bool:
     """Read the founder's actual full-campaign directive, never activate on its own."""
     root = root or Path(__file__).resolve().parents[1]
     path = root / "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    # The founder later clarified that Seth's reply covered only the requested
+    # 10–20-minute supervised test. This newer correction always supersedes
+    # the earlier broad interpretation. Never remove it to "make tests green".
+    if (root / "docs/evidence/lead_smart_full_campaign_scope_correction_20261020.json").exists():
+        return False
     try:
         record = load(path)
         return (
@@ -174,6 +179,10 @@ def founder_full_campaign_approved(root: Path | None = None) -> bool:
             and record.get("founder_request") == "why cant we jusut run a ful campaign s"
             and record.get("founder_continuation") == "go on bro we not far away"
             and record.get("mode") == "FULL_CAMPAIGN"
+            # This separate, explicit authority was never in the historical
+            # record, which only concerned a small supervised pilot. A removed
+            # correction file cannot reactivate that superseded authority.
+            and record.get("scope") == "SEPARATELY_APPROVED_FULL_CAMPAIGN_WITH_BUYER_TERMS"
             and record.get("buyer") == "Lead Smart"
             and record.get("campaign_id") == "CA8278ed3f26e9495b881fe3833174d007"
             and record.get("tracking_number") == "+18883579305"
