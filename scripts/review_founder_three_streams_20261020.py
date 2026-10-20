@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.flagship_v2_live_attestation import attest_public_flagship_v2
+
 SCHEMA = "empire.founder.three_stream_checkpoint.v1"
 OPS_SCHEMA = "empire.ops_control_cycle.v1"
 FIRST_SALE_SCHEMA = "empire.commercial.first_sale_live_conversion_observer.v1"
@@ -140,6 +142,8 @@ def build_checkpoint(*, root: Path, now: datetime) -> dict[str, Any]:
         "PUBLIC_CONVERSION_ROUTE_REVIEW_REQUIRED"
     )
     healthy = ops.get("healthy") if ops is not None else None
+    v2 = attest_public_flagship_v2(root)
+    v2_live = v2.get("exact_published_bytes_verified") is True
     topics = [
         {
             "chat": "Revenue & Buyers",
@@ -165,20 +169,27 @@ def build_checkpoint(*, root: Path, now: datetime) -> dict[str, Any]:
             "chat": "Website & Growth",
             "lane": "website_growth",
             "current_state": (
-                "PUBLIC_CONVERSION_ROUTE_HOLD" if route_held
+                "FLAGSHIP_V2_PUBLISHED_VERIFIED_HISTORICAL_CHECKOUT_PIN_PENDING"
+                if v2_live
+                else "PUBLIC_CONVERSION_ROUTE_HOLD" if route_held
                 else "CHECKOUT_RELEASE_HTML_PROVENANCE_HOLD" if asset_held
                 else "WEBSITE_CONVERSION_SOURCE_REVIEW_REQUIRED" if not counts_known
                 else "NO_RECORDED_WEBSITE_ROUTE_OR_HTML_HOLD_IN_OPS"
             ),
+            "v2_public_static_source": v2,
             "public_get_routes_status": sale["site_route_status"] if counts_known else None,
             "legacy_buy_html_release_status": sale["buy_ui_release_status"] if counts_known else None,
             "next_action": (
-                "EXISTING_WEBSITE_OWNER_REPAIR_PUBLIC_CONVERSION_ROUTE" if route_held
+                "ITERATE_PUBLISHED_FLAGSHIP_V2_AND_REVIEW_NEW_BUY_MANIFEST"
+                if v2_live
+                else "EXISTING_WEBSITE_OWNER_REPAIR_PUBLIC_CONVERSION_ROUTE" if route_held
                 else "EXISTING_WEBSITE_OWNER_REVIEW_CURRENT_BUILD_AND_VERSIONED_HTML_RECEIPT" if asset_held
                 else "CHECK_ORIGINAL_WEBSITE_RELEASE_RECEIPTS"
             ),
             "completion_proof": "INDEPENDENT_CURRENT_SITE_BUILD_RECEIPT_AND_BUY_CHECKOUT_CANARY",
-            "original_handoffs": list(OWNER_REFERENCES["website_growth"]),
+            "original_handoffs": list(OWNER_REFERENCES["website_growth"]) + [
+                "docs/website/FLAGSHIP_V2_APPROVED_ATOMIC_PUBLICATION_20261020.md",
+            ],
         },
         {
             "chat": "EmpireOS Core & Operations",

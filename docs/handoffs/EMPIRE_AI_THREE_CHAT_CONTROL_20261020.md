@@ -107,3 +107,53 @@ For actual live checkout technical gates, use the existing owner command:
 **First:** one website release owner independently attests the intended current `/buy` build and preserves existing flagship content, then reruns the exact strict checkout canary. **Second:** one revenue owner obtains an authentic opt-in enquiry (not a synthetic row), follows up where the original consent/suppression permits and aims for a real paid order. **Third:** Core continues current Ops monitoring and only handles active evidenced blockers; no fourth general chat.
 
 Keep this file as the stable index. Update from actual shipping evidence, not conversational promises.
+
+
+## 20 October 2026 — Flagship V2 actually launched (replaces old prelaunch status)
+
+The founder **explicitly approved** publishing exact 632-file V2 inventory
+SHA-256 `650318b7e8db14213cb115eb5adc90be846f1d6681142d04e9c293bd135bcfe3`.
+The guarded one-shot atomic release ran successfully via
+`scripts/publish_approved_flagship_v2_20261020.py`. Code release HEAD at
+launch: `3a3755d88`. Original backend gateway and checkout services
+remained active, with no payments, outbound, orders or new public content
+activation.
+
+**Primary production evidence:**
+
+- Root-owned exact publication receipt:
+  `/var/backups/empire-website/FLAGSHIP_V2_PUBLICATION_RECEIPT_20261020.json`
+- Current exact published static tree: **632 files** at
+  `/srv/empire_os/apps/empire-public-site/out`
+- Previous public tree preserved: **603 files** at
+  `/home/ubuntu/empire_releases/flagship_checkout_union_20261020/out.pre-v2-public`
+- Immutable protected original tar and SHA:
+  `/var/backups/empire-website/flagship_current_live_20261020_before_union.tar*`
+- Public Cloudflare HTTPS GETs for `/`, `/buy`, `/commercial`, `/about`
+  all HTTP **200**. The three key external HTTPS page byte-digests exactly
+  matched the deployed source files. Existing original public insight and
+  self-serve catalogue/tier/brokerage GETs also worked. Unapproved
+  homeowner guide and treasury content remained intentional **404**.
+- Payment execution, revenue recognition and outbound remained disabled;
+  no buyer form, order or payment was submitted.
+
+**Corrected control semantics:** original 13 October checkout HTML
+signature remains a *historical* manifest mismatch and must not be
+silently repinned. The new V2 release is separately founder-approved and
+file-hash verified. The three-stream read-only command now distinguishes
+`FLAGSHIP_V2_PUBLISHED_VERIFIED_HISTORICAL_CHECKOUT_PIN_PENDING` from a
+prelaunch hold. It does not claim a paid order or financial activation.
+
+**Website & Growth:** public launch engineering COMPLETE. Next: improve
+the live premium site in versioned releases; independently review a new
+V2 checkout-security manifest and original real-form/CRM delivery before
+claiming customer conversion. Preserve founder-approved design. Do not
+revert to the old site because the historical hash is stale.
+
+**Revenue & Buyers:** unchanged blocker: first genuine opted-in buyer,
+accepted order/terms, settlement/fulfilment and verified realised revenue.
+Focus on actual buyer outreach only where originally approved and legally
+permitted. No paid traffic or synthetic production orders.
+
+**EmpireOS Core:** existing healthy Ops timer, minimal owner isolation and
+backup custody; do not create a new control agent. Keep the 3-chat index.
