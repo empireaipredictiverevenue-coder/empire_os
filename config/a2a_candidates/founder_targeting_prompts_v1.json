@@ -1,0 +1,22 @@
+{
+  "schema_version": "empire.a2a.founder_prompt_target_profiles.v1",
+  "owner": "empire.a2a.commercial_signal_miner.v1",
+  "authorised_sources": "existing_owner_permitted_public_research_only",
+  "profiles": [
+    {
+      "label": "US roofing call buyers - Tampa",
+      "prompt": "Find roofing companies and lead buyers interested in buying exclusive inbound calls and appointments in Tampa, Florida. Exclude agencies and unverified resellers. Verify business owners, budget, service area and consent."
+    },
+    {
+      "label": "US HVAC appointment buyers - Little Rock",
+      "prompt": "Find HVAC companies and owners buying qualified appointments and leads in Little Rock, Arkansas. Exclude brokers and unverified resellers. Check actual buying capacity and service-area fit."
+    },
+    {
+      "label": "NYC construction data buyers",
+      "prompt": "Find commercial construction companies, general contractors and procurement directors evaluating permit data and project intelligence in New York City. Verify company identity, intended dataset fields, buying budget and source licences."
+    }
+  ],
+  "execution_authority": "NONE",
+  "contact_authorized": false,
+  "campaign_launch_authorized": false
+}

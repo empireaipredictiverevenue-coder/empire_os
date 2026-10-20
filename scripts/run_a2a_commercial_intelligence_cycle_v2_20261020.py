@@ -21,6 +21,7 @@ from empire_os.a2a_nyc_commercial_evidence_gate import inspect_nyc_pilot
 from empire_os.a2a_signal_decision_intelligence_v2 import make_decision_intelligence
 from empire_os.a2a_opportunity_graph_v2 import make_opportunity_graph
 from empire_os.a2a_evidence_history_v2 import merge_evidence_history
+from empire_os.a2a_founder_targeting_cycle_v1 import build_prompted_research
 
 BASE = Path("/srv/empire_os/runtime")
 LOCAL = Path(__file__).resolve().parents[1] / "runtime" / "a2a_commercial_signal_mining"
@@ -65,6 +66,9 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
     current = mine_signals(
         community=payload["community"][0], revenue_gps=payload["gps"][0],
     )
+    prompt_config = _read(Path(__file__).resolve().parents[1] /
+                          "config/a2a_candidates/founder_targeting_prompts_v1.json")[0]
+    targeting = build_prompted_research(prompt_config, payload["community"][0])
     campaigns = build_data_campaign_experiments(current)
     nyc = inspect_nyc_pilot(
         report=payload["nyc"][0],
@@ -84,6 +88,7 @@ def run(*, previous: dict | None = None, history: dict | None = None) -> dict:
     return {
         "intel": intelligence, "graph": make_opportunity_graph(intelligence, releases),
         "history": evidence_history,
+        "targeting": targeting,
         "signal": current, "campaign": campaigns,
         "nyc": nyc, "release": releases, "handoff": plan_handoffs(campaigns),
         "card": agent_card(),
@@ -107,6 +112,7 @@ def main() -> int:
             ("decision_intelligence_v2.json", "intel"),
             ("opportunity_evidence_graph_v2.json", "graph"),
             ("evidence_history_v2.json", "history"),
+            ("founder_prompted_targeting_v1.json", "targeting"),
             ("data_campaign_experiments.json", "campaign"),
             ("nyc_commercial_preflight.json", "nyc"),
             ("data_campaign_release_review.json", "release"),
@@ -127,6 +133,8 @@ def main() -> int:
         "knowledge_graph_nodes": outcome["graph"]["node_count"],
         "knowledge_graph_edges": outcome["graph"]["edge_count"],
         "history_source_snapshots": outcome["history"]["source_snapshots_recorded"],
+        "founder_target_profiles": outcome["targeting"]["profile_count"],
+        "target_profiles_with_public_research_venues": outcome["targeting"]["targets_with_public_sources"],
         "new_source_snapshots_this_run": outcome["history"]["new_source_snapshot_recorded_this_run"],
         "source_health": x["source_health"],
         "catalogue_stale": x["catalogue_stale"],
