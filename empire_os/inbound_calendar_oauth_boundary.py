@@ -20,12 +20,14 @@ from empire_os.inbound_google_calendar_adapter import (
 )
 
 EVENTS_READ = "https://www.googleapis.com/auth/calendar.events.readonly"
+CALENDAR_LIST_READ = "https://www.googleapis.com/auth/calendar.calendarlist.readonly"
 OWNED_EVENTS_READ = "https://www.googleapis.com/auth/calendar.events.owned.readonly"
 CALENDAR_READ = "https://www.googleapis.com/auth/calendar.readonly"
 CALENDAR_FREEBUSY = "https://www.googleapis.com/auth/calendar.freebusy"
 EVENTS_FREEBUSY = "https://www.googleapis.com/auth/calendar.events.freebusy"
 ALLOWED_GOOGLE_READ_SCOPES = frozenset({
     EVENTS_READ, OWNED_EVENTS_READ, CALENDAR_READ, CALENDAR_FREEBUSY, EVENTS_FREEBUSY,
+    CALENDAR_LIST_READ,
 })
 EVENT_SCOPES = frozenset({EVENTS_READ, OWNED_EVENTS_READ, CALENDAR_READ, EVENTS_FREEBUSY})
 AVAILABILITY_SCOPES = frozenset({CALENDAR_READ, CALENDAR_FREEBUSY, EVENTS_FREEBUSY})

@@ -18,7 +18,7 @@ from urllib.parse import urlencode, urlsplit
 from cryptography.fernet import Fernet, InvalidToken
 
 from empire_os.inbound_calendar_oauth_boundary import (
-    EVENTS_READ, CALENDAR_FREEBUSY,
+    EVENTS_READ, CALENDAR_FREEBUSY, CALENDAR_LIST_READ,
 )
 
 
@@ -26,7 +26,7 @@ class OAuthOnboardingDenied(ValueError):
     pass
 
 
-READ_SCOPES = (EVENTS_READ, CALENDAR_FREEBUSY)
+READ_SCOPES = (EVENTS_READ, CALENDAR_FREEBUSY, CALENDAR_LIST_READ)
 
 
 @dataclass(frozen=True)

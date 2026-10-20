@@ -310,3 +310,31 @@ https://developers.google.com/workspace/calendar/api/auth
 https://developers.google.com/identity/protocols/oauth2/web-server
 https://developers.google.com/workspace/calendar/api/v3/reference/events/get
 https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query
+
+## 20 October — Encrypted Calendar Token Vault, OAuth Exchange & Calendar Enrollment
+
+STATUS: implemented only on isolated feature branch. Built and tested offline with mocked provider responses; no customer Google account was connected, no real OAuth codes/tokens exchanged, no production vault configured, no live read or write made.
+
+### New implementation
+
+- empire_os/inbound_calendar_token_vault.py: tenant/calendar/account-scoped local encrypted staging vault. Encrypts OAuth access and refresh tokens with Fernet/MultiFernet, blocks calendar reassignment, supports encrypted key rewrap, provides local revocation that purges encrypted credential material, rejects unapproved/non-read-only grants. On-disk SQLite must be an existing 0600 owner-only file or is created with 0600 mode. No token is displayed in repr or status. Encryption keys must be supplied from a separate authorised KMS/secret manager; DO NOT reuse these local staging secrets as a production KMS. Local revocation does not revoke Google's server-side grant.
+- empire_os/inbound_google_oauth_exchange.py: explicit Google HTTPS token POST exchange using a one-time PKCE ticket, strict Bearer response validation, scoped grant parsing, bounded access lifetime, initial refresh-token requirement and refresh flow that refuses scope expansion. Fixed host, no redirects or caller-provided URL. No automatic provider calls on import.
+- empire_os/inbound_google_calendar_credentials.py: vault-backed token resolver, limited refresh near expiry, independently tenant-bound and client-ID-bound credentials, and read-only calendarList.get verification requiring exact selected calendar ID and Google owner/writer access role. The customer's actual EmpireOS identity and tenant owner approval must be authenticated in an existing secure application session; a claimed owner bool or arbitrary local approval string is not proof.
+- empire_os/inbound_google_calendar_enrollment.py: privileged manual onboarding orchestrator. Validates tenant, consumed OAuth ticket, exact client ID, Google-granted scopes, calendarList permission and customer-approved binding before storing an encrypted scoped credential and registering the calendar. If registry binding fails, locally revokes the newly written credential. No user-facing HTTP route is created and no Google API credentials are supplied by this branch.
+- empire_os/inbound_google_calendar_adapter.py: additional GET-only calendarList.get support, with no calendar list mutation/booking creation.
+- empire_os/inbound_calendar_oauth_onboarding.py: consent scopes expanded to include calendar.calendarlist.readonly, allowing Google selected-calendar verification and preventing a guessed calendar address from becoming an approved binding. Read-only event and free/busy scopes retained.
+- tests/test_inbound_calendar_token_vault.py, tests/test_inbound_google_calendar_enrollment.py and tests/test_inbound_google_calendar_credential_flow.py: encrypted persistence, file permissions, revoked access, key rotation, scope escalation denial, owner binding, token refresh, and a single complete fake-provider consent-to-booking-evidence integration test. Fixture objects are NOT commercial events.
+
+### Release and identity gates
+
+These new modules are not a production OAuth integration. The connection operation requires explicit invocation by a trusted backend after customer consent and tenant admin authentication; the existing Google Cloud OAuth consent screen and registered callback must be configured. A long-lived refresh token must be encrypted in an externally managed production credential system (KMS-backed store), with real Google revocation and alerting. Google scope strings in the token endpoint response must be independently checked with actual provider responses; a mocked response or manually constructed local flag cannot establish live access.
+
+Do not use any existing personal Google Calendar/Gmail account credentials, connected ChatGPT calendar, or other departments' integrations as a stand-in for a customer-owned approved calendar.
+
+Next engineering gates: integrate existing EmpireOS login and tenant-member authorisation into an HTTPS OAuth start/callback with CSRF/session binding and strict redirect allowlist; build KMS-backed token storage and server-side refresh/revocation; run a supervised Google Calendar test using an actual consenting customer-owned calendar; validate actual PostgreSQL migrations and RLS in an isolated environment; implement production transactional delivery with monitoring. Do not enable telephony, bookings, customer follow-up or payments without separate approval.
+
+Official Google references:
+https://developers.google.com/identity/protocols/oauth2/web-server
+https://developers.google.com/workspace/calendar/api/auth
+https://developers.google.com/workspace/calendar/api/v3/reference/calendarList/get
+https://developers.google.com/workspace/calendar/api/v3/reference/events/get

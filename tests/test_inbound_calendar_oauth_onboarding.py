@@ -10,7 +10,7 @@ import pytest
 from empire_os.inbound_calendar_oauth_onboarding import (
     OAuthOnboardingDenied, OfflineGoogleConsentStateStore,
 )
-from empire_os.inbound_calendar_oauth_boundary import EVENTS_READ, CALENDAR_FREEBUSY
+from empire_os.inbound_calendar_oauth_boundary import EVENTS_READ, CALENDAR_FREEBUSY, CALENDAR_LIST_READ
 
 NOW = datetime(2026, 10, 20, 12, tzinfo=timezone.utc)
 REDIRECT = "https://empire.example.org/oauth/google/calendar/callback"
@@ -46,7 +46,7 @@ def test_one_time_consent_has_exact_readonly_scopes_pkce_and_state(tmp_path):
         start, params = begin(store)
         assert start.live_provider_access_granted is False
         assert urlsplit(start.authorization_url).hostname == "accounts.google.com"
-        assert set(params["scope"][0].split()) == {EVENTS_READ, CALENDAR_FREEBUSY}
+        assert set(params["scope"][0].split()) == {EVENTS_READ, CALENDAR_FREEBUSY, CALENDAR_LIST_READ}
         assert params["response_type"] == ["code"]
         assert params["code_challenge_method"] == ["S256"]
         assert params["include_granted_scopes"] == ["false"]

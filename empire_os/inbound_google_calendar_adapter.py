@@ -105,6 +105,9 @@ class GoogleCalendarReadOnlyHTTP:
             method == "GET" and path.startswith("/calendar/v3/calendars/")
             and "/events/" in path and body is None
         ) or (
+            method == "GET" and path.startswith("/calendar/v3/users/me/calendarList/")
+            and body is None
+        ) or (
             method == "POST" and path == "/calendar/v3/freeBusy" and isinstance(body, dict)
         )
         if not allowed or "?" in path or "#" in path or "\\" in path or "//" in path:
