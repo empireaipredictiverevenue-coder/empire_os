@@ -28,20 +28,28 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-example|commercial-intake FILE|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command="${1}"
 if [[ "$command" == "commercial-intake" ]]; then
   if [[ "$#" -ne 2 ]]; then
-    echo "COMMERCIAL_INTAKE_REQUIRES_ORIGINAL_SOURCE_FILE" >&2; exit 2
+    echo "COMMERCIAL_INTAKE_REQUIRES_ORIGINAL_SOURCE_FILE" >&2
+    echo "Use: empire-predictive-observe commercial-template > /home/ubuntu/commercial_requirement.json" >&2
+    exit 2
+  fi
+  if [[ ! -f "$2" || ! -r "$2" || -L "$2" ]]; then
+    echo "COMMERCIAL_INTAKE_FILE_NOT_FOUND_OR_NOT_READABLE: Supply a real readable JSON file; /path/to/request.json is just an example, not a file." >&2
+    echo "Create a blank draft: empire-predictive-observe commercial-template > /home/ubuntu/commercial_requirement.json" >&2
+    exit 2
   fi
 elif [[ "$#" -ne 1 ]]; then
   echo "UNEXPECTED_EXTRA_ARGS_HOLD" >&2; exit 2
 fi
 case "$command" in
   commercial) module=scripts.review_predictive_commercial_requirements_20261020 ;;
+  commercial-template) module=scripts.print_predictive_commercial_intake_template_20261020 ;;
   commercial-example) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-intake) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
@@ -81,6 +89,7 @@ EOF
   cd "$TMP"
   sha256sum bin/empire-predictive-observe \
     empire_os/predictive_commercial_requirements.py \
+    scripts/print_predictive_commercial_intake_template_20261020.py \
     empire_os/predictive_commercial_supply_readiness.py \
     empire_os/predictive_commercial_lead_eligibility.py \
     empire_os/predictive_commercial_fulfilment.py \
@@ -91,9 +100,21 @@ EOF
     > metadata/critical_source_checksums.sha256
 )
 # Block publication if the newly generated allowlisted launcher is invalid.
-for profile in commercial commercial-example finance owners; do
+for profile in commercial commercial-template commercial-example finance owners; do
   "$TMP/bin/empire-predictive-observe" "$profile" > /dev/null
 done
+if "$TMP/bin/empire-predictive-observe" commercial-intake /path/to/request.json \
+    > /dev/null 2> "$TMP/metadata/missing_intake_error.txt"; then
+  echo "RELEASE_VALIDATION_FAILED_ACCEPTED_NONEXISTENT_INTAKE" >&2
+  exit 6
+fi
+grep -q "COMMERCIAL_INTAKE_FILE_NOT_FOUND_OR_NOT_READABLE" \
+    "$TMP/metadata/missing_intake_error.txt"
+if grep -q "Traceback" "$TMP/metadata/missing_intake_error.txt"; then
+  echo "RELEASE_VALIDATION_FAILED_INTAKE_TRACEBACK" >&2
+  exit 6
+fi
+rm -f "$TMP/metadata/missing_intake_error.txt"
 mv -T -- "$TMP" "$RELEASE"
 trap - EXIT
 echo "RELEASE_PATH=$RELEASE"
