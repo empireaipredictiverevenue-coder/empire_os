@@ -1087,6 +1087,7 @@ def review_adaptive_buyer_journey(
     verified_signals: Iterable[TrustedCampaignSignal],
     now: datetime,
     learning_waves: Iterable[TrustedCampaignLearningWave] | None = None,
+    buyer_value_case: TrustedBuyerValueCase | None = None,
 ) -> dict:
     """Reconcile real CRM stage, channel proof, account route and offer learning.
 
@@ -1143,8 +1144,11 @@ def review_adaptive_buyer_journey(
     crm["tenant_id"] = tenant
     crm["prospect_id"] = prospect
     preview = preview_crm_journey(crm, now=now)
+    # Preserve the same source-attested receipts for both the journey
+    # and value-first stages, even if the caller passes a generator.
+    source_signals = tuple(verified_signals)
     route_review = review_account_buying_route(
-        route, verified_signals=verified_signals, now=now,
+        route, verified_signals=source_signals, now=now,
     )
     channel_reviews = {}
     seen_channels = set()
@@ -1225,6 +1229,35 @@ def review_adaptive_buyer_journey(
     )
     if play != "OFFER_EXPERIMENT_OWNER_REVIEW":
         candidate = None
+    value_preview = None
+    if buyer_value_case is not None:
+        if (type(buyer_value_case) is not TrustedBuyerValueCase
+                or buyer_value_case.context != route.context):
+            raise CampaignIntelligenceHeld("CROSS_ACCOUNT_ADAPTIVE_VALUE_CASE")
+        reviewed_value = review_buyer_value_first_offer(
+            buyer_value_case, verified_signals=source_signals, now=now,
+        )
+        # No prospecting propositions appear beside stop/payment/fulfilment
+        # reviews. Existing buyer conversations may use a proof-backed brief;
+        # only a buyer's genuine direct request earns a sales CTA review.
+        show_value = play in (
+            "OFFER_EXPERIMENT_OWNER_REVIEW",
+            "SAME_DAY_BUYER_CONVERSATION_REVIEW",
+        )
+        value_preview = {
+            "value_first_review_play": reviewed_value["review_play"],
+            "value_deliverable_for_owner": (
+                reviewed_value["value_first_deliverable"] if show_value else None
+            ),
+            "buyer_friction_resolution_for_owner": (
+                reviewed_value["buyer_risk_resolution"] if show_value else None
+            ),
+            "commercial_cta_review_eligible": (
+                play == "SAME_DAY_BUYER_CONVERSATION_REVIEW"
+                and reviewed_value["commercial_cta_review_eligible"]
+            ),
+            "send_or_upsell_authorized": False,
+        }
     return {
         "schema_version": "empire.gtm.adaptive_buyer_journey_review.v1",
         "recommended_play": play,
@@ -1238,6 +1271,7 @@ def review_adaptive_buyer_journey(
         "editorial_interest_hypothesis_not_subscription":
             preview["editorial_interest_hypothesis_not_subscription"],
         "offer_learning_candidate_for_review": candidate,
+        "buyer_value_first_review": value_preview,
         "offer_auto_promotion": False,
         "timing": timing,
         "personal_identifiers_disclosed": False,
@@ -1311,6 +1345,7 @@ def review_authenticated_crm_campaign_handoff(
     signal_owner: object,
     now: datetime,
     limit: int = 100,
+    value_case_owner: object | None = None,
 ) -> dict:
     """Use EXISTING tenant-authenticated, read-only Revenue CRM repository.
 
@@ -1329,6 +1364,7 @@ def review_authenticated_crm_campaign_handoff(
             or not isinstance(authenticated_read.repository, PostgresRevenueCrmRepository)
             or not callable(account_projection_owner)
             or not callable(signal_owner)
+            or (value_case_owner is not None and not callable(value_case_owner))
             or type(limit) is not int or not 1 <= limit <= 500):
         raise CampaignIntelligenceHeld("AUTHENTICATED_CRM_OWNER_BOUNDARY_REQUIRED")
     repository = authenticated_read.repository
@@ -1348,6 +1384,8 @@ def review_authenticated_crm_campaign_handoff(
         raise CampaignIntelligenceHeld("BOUNDED_CRM_SOURCE_ROWS_REQUIRED")
     seen_crm = set()
     payloads = []
+    value_review_counts: Counter[str] = Counter()
+    value_proof_held = 0
     rows_with_no_proven_canonical_join = 0
     for item in original:
         if not isinstance(item, Mapping):
@@ -1390,6 +1428,21 @@ def review_authenticated_crm_campaign_handoff(
         except Exception:
             raise CampaignIntelligenceHeld("CANONICAL_ACCOUNT_SIGNAL_OWNER_UNAVAILABLE") from None
         payloads.append((joined, trusted_signals))
+        if value_case_owner is not None:
+            try:
+                value_case = value_case_owner(joined)
+            except Exception:
+                raise CampaignIntelligenceHeld("CANONICAL_VALUE_CASE_OWNER_UNAVAILABLE") from None
+            if value_case is None:
+                value_proof_held += 1
+            else:
+                if (type(value_case) is not TrustedBuyerValueCase
+                        or value_case.context != joined.account_route.context):
+                    raise CampaignIntelligenceHeld("CROSS_ACCOUNT_CRM_VALUE_CASE")
+                result = review_buyer_value_first_offer(
+                    value_case, verified_signals=trusted_signals, now=now,
+                )
+                value_review_counts[result["review_play"]] += 1
     reviewed = review_adaptive_buyer_journey_portfolio(payloads, now=now)
     return {
         "schema_version": "empire.gtm.tenant_crm_campaign_owner_handoff.v1",
@@ -1399,10 +1452,316 @@ def review_authenticated_crm_campaign_handoff(
         "canonical_account_join_unavailable": rows_with_no_proven_canonical_join,
         "bound_account_journeys_reviewed": reviewed["accounts_reviewed"],
         "human_next_play_counts": reviewed["recommended_human_play_counts"],
+        "buyer_value_first_review_counts": (
+            dict(sorted(value_review_counts.items()))
+            if value_case_owner is not None else None
+        ),
+        "buyer_value_case_unverified_count": (
+            value_proof_held if value_case_owner is not None else None
+        ),
         "read_result_may_be_partial": len(original) == limit,
         "canonical_crm_contacts_returned": 0,
         "marketing_subscription_inferred": False,
         "crm_mutation": False,
         "sender_enabled": False,
+        "execution_authority": "NONE",
+    }
+
+# Value-first commercial offer selection extends this existing campaign
+# intelligence owner, not the central product catalog or Sales Director.
+_VALUE_PROBLEMS = {
+    "supply_territory_fit": (
+        "buyer_inventory_fit_offer", "canonical_inventory",
+        "verified_supply_acceptance_fit",
+        "Prepare a bounded inventory/territory fit-check with the buyer's acceptance criteria.",
+        "Check buyer territory and lead acceptance criteria",
+        "Show a verified match or say explicitly there is no matching inventory.",
+    ),
+    "missed_demand_followup": (
+        "revenue_leak_signal_offer", "canonical_first_party_analytics",
+        "verified_conversion_bottleneck",
+        "Prepare a measured demand-to-response gap brief with limitations.",
+        "Review which measured response handoff fails",
+        "Propose one controlled response-process improvement for review.",
+    ),
+    "market_expansion_decision": (
+        "verified_market_opportunity_brief", "verified_public_market_source",
+        "verified_territory_market_signal",
+        "Prepare a one-page market evidence brief, distinguishing research from demand.",
+        "Review which territories match the buyer's supplied criteria",
+        "Compare verified observations and unknowns without guaranteeing returns.",
+    ),
+}
+_FRICTION_RESOLUTION = {
+    "quality_uncertainty": "Present observed acceptance rules and rejection handling; no guaranteed lead quality.",
+    "proof_uncertainty": "Show source dates, evidence gaps and an independently checkable sample.",
+    "terms_uncertainty": "Explain scope and acceptance conditions; use only approved written commercial terms.",
+    "delivery_uncertainty": "Show verified fulfilment capacity before suggesting commitments.",
+    "integration_effort": "Provide a bounded implementation outline; do not assume integration access.",
+    "budget_uncertainty": "Show product scope before discussing prices; never invent ROI, savings or guarantees.",
+}
+_DIRECT_BUYER_REQUEST = frozenset({
+    "optin_enquiry", "verified_social_inbound_enquiry", "demo_request",
+    "direct_buyer_question", "pricing_request", "meeting_booked",
+})
+
+
+@dataclass(frozen=True)
+class TrustedBuyerValueProblem:
+    tenant_ref: str
+    account_key: str
+    market_scope: str
+    problem_code: str
+    observed_at: datetime
+    buyer_directly_stated_problem: bool
+    canonical_crm_evidence_verified: bool
+    friction_code: str | None = None
+    friction_receipt_verified: bool = False
+
+
+@dataclass(frozen=True)
+class TrustedOfferCapability:
+    tenant_ref: str
+    market_scope: str
+    offer_arm: str
+    capability_source: str
+    proof_kind: str
+    proof_key: str
+    verified_at: datetime
+    source_receipt_verified: bool
+    currently_deliverable: bool
+    verified_sufficient_market_fit: bool
+    paid_catalog_product: Mapping | None = None
+
+
+@dataclass(frozen=True)
+class TrustedBuyerValueCase:
+    context: AccountIntelligenceContext
+    problem: TrustedBuyerValueProblem | None
+    capabilities: tuple[TrustedOfferCapability, ...]
+
+
+def review_buyer_value_first_offer(
+    case: TrustedBuyerValueCase, *,
+    verified_signals: Iterable[TrustedCampaignSignal],
+    now: datetime,
+) -> dict:
+    """Choose source-grounded buyer value before any commercial CTA.
+
+    Genuine CRM-stated need is not created from public-company research.
+    This API returns only a safe internal brief and experiment-selection
+    hypothesis. It cannot send messages, quote costs or sign binding terms.
+    """
+    from empire_os.commercial_offer_book import product_ready
+    if type(case) is not TrustedBuyerValueCase:
+        raise CampaignIntelligenceHeld("TRUSTED_VALUE_CASE_REQUIRED")
+    _context(case.context)
+    now = _aware(now)
+    ctx = case.context
+    signals = tuple(verified_signals)
+    intent = review_account_intelligence(ctx, signals, now=now)
+    if type(case.capabilities) is not tuple or len(case.capabilities) > 12:
+        raise CampaignIntelligenceHeld("BOUNDED_VALUE_CAPABILITIES_REQUIRED")
+    problem = case.problem
+    active_problem = False
+    problem_code = None
+    friction = None
+    if problem is not None:
+        if type(problem) is not TrustedBuyerValueProblem:
+            raise CampaignIntelligenceHeld("TRUSTED_BUYER_PROBLEM_REQUIRED")
+        if (problem.tenant_ref != ctx.tenant_ref
+                or problem.account_key != ctx.account_key
+                or problem.market_scope != ctx.market_scope
+                or problem.problem_code not in _VALUE_PROBLEMS
+                or problem.friction_code not in (None, *_FRICTION_RESOLUTION)):
+            raise CampaignIntelligenceHeld("CROSS_ACCOUNT_OR_UNSUPPORTED_BUYER_PROBLEM")
+        observed = _aware(problem.observed_at)
+        if observed > now + timedelta(minutes=1):
+            raise CampaignIntelligenceHeld("FUTURE_BUYER_PROBLEM_EVIDENCE")
+        if (type(problem.buyer_directly_stated_problem) is not bool
+                or type(problem.canonical_crm_evidence_verified) is not bool
+                or type(problem.friction_receipt_verified) is not bool):
+            raise CampaignIntelligenceHeld("UNVERIFIED_BUYER_PROBLEM_SOURCE")
+        active_problem = (
+            problem.buyer_directly_stated_problem
+            and problem.canonical_crm_evidence_verified
+            and now - observed <= timedelta(days=45)
+        )
+        if active_problem:
+            problem_code = problem.problem_code
+            if problem.friction_code is not None and problem.friction_receipt_verified:
+                friction = problem.friction_code
+    statuses: dict[str, str] = {}
+    seen: set[str] = set()
+    for capability in case.capabilities:
+        if type(capability) is not TrustedOfferCapability:
+            raise CampaignIntelligenceHeld("TRUSTED_OFFER_CAPABILITY_REQUIRED")
+        if capability.offer_arm in seen:
+            raise CampaignIntelligenceHeld("DUPLICATE_CANONICAL_OFFER_CAPABILITY")
+        seen.add(capability.offer_arm)
+        if capability.offer_arm not in {
+            value[0] for value in _VALUE_PROBLEMS.values()
+        }:
+            raise CampaignIntelligenceHeld("UNKNOWN_OFFER_ARM")
+        if (capability.tenant_ref != ctx.tenant_ref
+                or capability.market_scope != ctx.market_scope):
+            raise CampaignIntelligenceHeld("CROSS_TENANT_OFFER_PROOF")
+        expected = next(
+            value for value in _VALUE_PROBLEMS.values()
+            if value[0] == capability.offer_arm
+        )
+        if (capability.capability_source != expected[1]
+                or capability.proof_kind != expected[2]
+                or not _opaque(capability.proof_key)):
+            raise CampaignIntelligenceHeld("OFFER_PROOF_OR_PROVENANCE_INVALID")
+        when = _aware(capability.verified_at)
+        if when > now + timedelta(minutes=1):
+            raise CampaignIntelligenceHeld("OFFER_PROOF_FROM_FUTURE")
+        for flag in ("source_receipt_verified", "currently_deliverable",
+                     "verified_sufficient_market_fit"):
+            if type(getattr(capability, flag)) is not bool:
+                raise CampaignIntelligenceHeld("OFFER_PROOF_TRUST_GATE_UNKNOWN")
+        if capability.paid_catalog_product is not None and not isinstance(
+            capability.paid_catalog_product, Mapping
+        ):
+            raise CampaignIntelligenceHeld("OFFER_CATALOG_PRODUCT_INVALID")
+        max_age_days = 7 if capability.offer_arm == "buyer_inventory_fit_offer" else 30
+        if now - when > timedelta(days=max_age_days):
+            status = "HOLD_STALE_PROOF"
+        elif not capability.source_receipt_verified:
+            status = "HOLD_SOURCE_UNVERIFIED"
+        elif not capability.currently_deliverable:
+            status = "HOLD_UNAVAILABLE_DELIVERY"
+        elif not capability.verified_sufficient_market_fit:
+            status = "HOLD_UNVERIFIED_MARKET_FIT"
+        elif (capability.paid_catalog_product is not None
+              and not product_ready(capability.paid_catalog_product)):
+            status = "HOLD_UNVERIFIED_PAID_PRODUCT"
+        else:
+            status = "VERIFIED_VALUE_PREVIEW_AVAILABLE"
+        statuses[capability.offer_arm] = status
+    selected = None
+    if active_problem and ctx.canonical_account_verified and ctx.suppression_clear:
+        matching = _VALUE_PROBLEMS[problem_code][0]
+        if statuses.get(matching) == "VERIFIED_VALUE_PREVIEW_AVAILABLE":
+            selected = matching
+    else:
+        matching = None
+    stop = intent["action"] == "STOP_AND_SUPPRESS"
+    direct_kinds = {
+        signal.kind for signal in signals
+        if signal.kind in _DIRECT_BUYER_REQUEST
+        and now - _aware(signal.observed_at) <= timedelta(days=45)
+    }
+    qualified_cta = (
+        bool(direct_kinds)
+        and intent["action"] == "SAME_BUSINESS_DAY_SALES_REVIEW"
+        and active_problem and selected is not None
+    )
+    if stop:
+        play = "STOP_CONTACT_AND_SUPPRESS"
+    elif not ctx.canonical_account_verified:
+        play = "HOLD_ACCOUNT_IDENTITY"
+    elif not active_problem:
+        play = "RESEARCH_BUYER_NEED_BEFORE_PERSONALIZATION"
+    elif selected is None:
+        play = "VERIFY_DELIVERABLE_BUYER_VALUE_BEFORE_OFFER"
+    elif qualified_cta:
+        play = "SAME_DAY_RESPOND_WITH_VALUE_THEN_REVIEW_CTA"
+    else:
+        play = "PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA"
+    supported = _VALUE_PROBLEMS[problem_code] if selected is not None else None
+    # Reuse the existing GTM demo specialist rather than creating a second
+    # video/content system. A demo plan is NOT a rendered video or an
+    # offer commitment, even when proof source receipts are current.
+    demo_outline = None
+    if selected is not None and supported is not None and not stop:
+        from empire_os.gtm_offer_strategy import (
+            NicheOfferContext, build_demo_asset_plan,
+        )
+        capability = next(x for x in case.capabilities if x.offer_arm == selected)
+        niche = ctx.market_scope.split(":")[1]
+        demo = build_demo_asset_plan(
+            context=NicheOfferContext(
+                niche=niche, metro=None, pe_backed=None,
+                high_cash_flow_evidence=None, founder_network_fit=None,
+                opportunity_evidence_refs=(),
+            ),
+            capability_evidence_refs=(capability.proof_key,),
+        )
+        demo_outline = {
+            "format": demo["format"],
+            "lead_magnet": demo["lead_magnet"],
+            "proof_surfaces_for_owner_to_verify": demo["proof_surfaces"],
+            "target_duration_seconds": demo["target_duration_seconds"],
+            "asset_created_or_published": False,
+            "public_case_study_or_roi_claim": False,
+        }
+    return {
+        "schema_version": "empire.gtm.buyer_value_first_offer.v1",
+        "review_play": play,
+        "buyer_problem_proven_by_first_party": active_problem,
+        "buyer_problem_type": problem_code,
+        "offer_candidate": selected if not stop else None,
+        "offer_proof_statuses": dict(sorted(statuses.items())),
+        "value_first_deliverable": (
+            supported[3] if supported and not stop else None
+        ),
+        "proof_based_demo_outline": demo_outline,
+        "buyer_risk_resolution": (
+            _FRICTION_RESOLUTION[friction] if friction and not stop else None
+        ),
+        "buyer_friction_confirmed": friction,
+        "recommended_next_experiment": (
+            supported[4] if supported and not stop else None
+        ),
+        "owner_reviewed_next_step": (
+            supported[5] if supported and not stop else None
+        ),
+        "commercial_cta_review_eligible": qualified_cta and not stop,
+        "cta_requires_explicit_buyer_request": True,
+        "paid_price_quoted_cents": None,
+        "roi_or_results_guaranteed": False,
+        "customer_identity_or_proof_keys_exposed": False,
+        "auto_send": False, "auto_follow_up": False,
+        "campaign_auto_enrolled": False,
+        "execution_authority": "NONE",
+    }
+
+
+def review_buyer_value_first_portfolio(
+    cases: Iterable[
+        tuple[TrustedBuyerValueCase, Iterable[TrustedCampaignSignal]]
+    ], *, now: datetime,
+) -> dict:
+    """Review canonical accounts once, emit only action/proof readiness totals."""
+    values = list(cases)
+    if len(values) > 500:
+        raise CampaignIntelligenceHeld("VALUE_PORTFOLIO_LIMIT_EXCEEDED")
+    seen = set()
+    statuses: Counter[str] = Counter()
+    chosen: Counter[str] = Counter()
+    for case, signals in values:
+        if type(case) is not TrustedBuyerValueCase:
+            raise CampaignIntelligenceHeld("TRUSTED_VALUE_CASE_REQUIRED")
+        _context(case.context)
+        identity = (case.context.tenant_ref, case.context.account_key,
+                    case.context.campaign_id)
+        if identity in seen:
+            raise CampaignIntelligenceHeld("DUPLICATE_VALUE_PORTFOLIO_ACCOUNT")
+        seen.add(identity)
+        outcome = review_buyer_value_first_offer(
+            case, verified_signals=signals, now=now,
+        )
+        statuses[outcome["review_play"]] += 1
+        if outcome["offer_candidate"] is not None:
+            chosen[outcome["offer_candidate"]] += 1
+    return {
+        "schema_version": "empire.gtm.buyer_value_first_portfolio.v1",
+        "accounts_reviewed": len(seen),
+        "buyer_value_next_play_counts": dict(sorted(statuses.items())),
+        "evidence_backed_offer_candidate_counts": dict(sorted(chosen.items())),
+        "public_buyer_list_exposed": False,
+        "messages_or_quotes_sent": 0,
         "execution_authority": "NONE",
     }

@@ -745,3 +745,89 @@ CRM API/router files have been modified or deployed.
 
 **No new database role, credentials, tenant bypass, unapproved send,
 nurture schedule, spend, automatic marketing subscription or payment.**
+
+
+## 20 October — Buyer-value-first conversion intelligence
+
+**Commercial objective:** become easier to say yes to by demonstrating real
+relevance, verifiable capability and low-friction next steps. Do not pressure
+people with false urgency, invented savings, made-up ROI or unsupported
+personalized "pain." The user-approved commercial rule is
+**rapport and useful value first; introduce a sales CTA only after
+a genuine verified buyer request or other independently authenticated
+commercial intent**.
+
+This release extends the existing `empire_os/campaign_intelligence.py`
+owner with `review_buyer_value_first_offer` and an aggregate
+`review_buyer_value_first_portfolio`. The first-party source adapters
+are built into the **same** `review_authenticated_campaign_intelligence`
+entry point through optional `value_case_packets` and
+`value_case_owner` (from the existing tenant-authenticated Revenue CRM
+handoff). There is no new CRM, outbound worker, sender, scheduler or agent.
+
+### Offer fit, proof and actual delivery
+
+| Buyer-stated problem | Three-arm campaign value offer | Required matching current source |
+|---|---|---|
+| Buyer needs supply and territory/acceptance fit | A buyer inventory-fit check | Canonical inventory acceptance and available supply proof, no older than 7 days |
+| First-party evidence of demand-to-response leakage | Measured response/coverage opportunity check | Verified analytics or conversion bottleneck evidence, no older than 30 days |
+| Buyer asks which market or territory to prioritise | Bounded territory evidence brief | Verified public market source and limitations, no older than 30 days |
+
+A matching account/tenant/market source receipt is required. The
+**buyer must have actually stated the problem** in a fresh canonical
+CRM record; a site visit, company growth observation, search result
+or AI-inferred need does not pass. Proof must confirm current
+deliverability and market fit. All source timestamps, source types and
+evidence identifiers are validated before an offer can be suggested.
+A product requiring paid commercial terms additionally uses the existing
+`commercial_offer_book.product_ready` readiness check.
+**No price, guaranteed outcomes or revenue claims** are inserted by
+the suggestion engine, regardless of whether a catalog item is ready.
+
+### Value/rapport before CTA
+
+The selector produces a private owner-review brief containing:
+the buyer problem category, supported offer arm, scoped sample/value
+deliverable, independently checked source status, one verified
+buying objection/risk resolution (if stated) and the next controlled
+experiment. It reuses `gtm_offer_strategy.build_demo_asset_plan`
+for a bounded evidence-led screen-demo outline. **The video is
+planned, not rendered or published.**
+
+The decision states are:
+
+- **Research buyer need** when no first-party buyer problem exists.
+- **Verify proof or fulfilment** if supply/capacity, market match,
+  approved paid product or evidence recency is missing.
+- **Prepare proof-first brief, no sales CTA** for a real buyer need
+  and real source-backed deliverability but no buyer request.
+- **Same-day response with value, then review a CTA** only after a
+  verified buyer question, pricing request, appointment or similar
+  authenticated direct inbound evidence and lawful response basis.
+- **Stop and suppress** immediately on account suppression, opt-out
+  or a verified do-not-contact signal.
+
+The value brief is also composed into
+`review_adaptive_buyer_journey(..., buyer_value_case=...)`,
+so it cannot appear as an aggressive acquisition recommendation
+beside an existing customer's fulfilment, payment, contact hold
+or CRM stop state. The authenticated CRM adapter enforces that the
+value case and account share an exact canonical identity.
+
+### What this does and does not do
+
+This is real, test-backed business decision software. It prepares
+a stronger, evidence-led commercial conversation and a useful sample
+to show the buyer. It **does not** create the inventory, run the
+advert, fabricate a verified buyer conversation, send the
+email, launch a site, manufacture ROI or move a prospect through
+a payment stage. It operates only where existing sources provide
+authenticated, tenant-bound first-party evidence. The current
+production read-only CLI has no tenant CRM principal; therefore
+`decision_intelligence.buyer_value_first_offer_review` remains
+`null` until the source owner supplies that evidence.
+
+Tests are in
+`tests/test_campaign_buyer_value_first_20261020.py`,
+`tests/test_adaptive_campaign_journey_20261020.py` and
+`tests/test_authenticated_crm_campaign_handoff_20261020.py`.

@@ -363,3 +363,81 @@ def test_no_source_from_owner_does_not_imply_zero_adaptive_buyers():
     out = review_authenticated_campaign_intelligence(now=NOW)
     assert out["adaptive_buyer_journeys"] is None
     assert out["database_writes"] is False
+
+def value_case_for(route_value):
+    from empire_os.campaign_intelligence import (
+        TrustedBuyerValueCase, TrustedBuyerValueProblem,
+        TrustedOfferCapability,
+    )
+    context_value = route_value.context
+    return TrustedBuyerValueCase(
+        context=context_value,
+        problem=TrustedBuyerValueProblem(
+            tenant_ref=TENANT, account_key=ACCOUNT,
+            market_scope="GB:solar:buyers",
+            problem_code="supply_territory_fit", observed_at=NOW,
+            buyer_directly_stated_problem=True,
+            canonical_crm_evidence_verified=True,
+        ),
+        capabilities=(TrustedOfferCapability(
+            tenant_ref=TENANT, market_scope="GB:solar:buyers",
+            offer_arm="buyer_inventory_fit_offer",
+            capability_source="canonical_inventory",
+            proof_kind="verified_supply_acceptance_fit",
+            proof_key="e"*32, verified_at=NOW,
+            source_receipt_verified=True,
+            currently_deliverable=True,
+            verified_sufficient_market_fit=True,
+        ),),
+    )
+
+
+def test_adaptive_journey_value_first_preview_is_given_before_proactive_cta():
+    current_route = route()
+    report = review_adaptive_buyer_journey(
+        projection(buyer_route=current_route, receipts=(receipt(),)),
+        verified_signals=(), now=NOW,
+        buyer_value_case=value_case_for(current_route),
+    )
+    assert report["recommended_play"] == "OFFER_EXPERIMENT_OWNER_REVIEW"
+    value = report["buyer_value_first_review"]
+    assert value["value_deliverable_for_owner"]
+    assert value["commercial_cta_review_eligible"] is False
+    assert value["send_or_upsell_authorized"] is False
+
+
+def test_adaptive_journey_verified_inbound_can_request_value_first_cta_review():
+    current_route = route(ctx=context(marketing_contact_basis_verified=False))
+    report = review_adaptive_buyer_journey(
+        projection(buyer_route=current_route),
+        verified_signals=(row for row in (signal("pricing_request"),)),
+        now=NOW,
+        buyer_value_case=value_case_for(current_route),
+    )
+    assert report["recommended_play"] == "SAME_DAY_BUYER_CONVERSATION_REVIEW"
+    assert report["buyer_value_first_review"]["commercial_cta_review_eligible"] is True
+    assert report["send_authorized"] is False
+
+
+def test_adaptive_journey_suppressed_account_never_presents_buyer_offer():
+    current_route = route(ctx=context(suppression_clear=False))
+    report = review_adaptive_buyer_journey(
+        projection(buyer_route=current_route), verified_signals=(),
+        now=NOW, buyer_value_case=value_case_for(current_route),
+    )
+    assert report["recommended_play"] == "STOP_CONTACT"
+    assert report["buyer_value_first_review"]["value_deliverable_for_owner"] is None
+    assert report["buyer_value_first_review"]["commercial_cta_review_eligible"] is False
+
+
+def test_adaptive_journey_value_case_cannot_be_swapped_between_accounts():
+    current_route = route()
+    misbound = replace(
+        value_case_for(current_route),
+        context=context(account_key="f"*32),
+    )
+    with pytest.raises(CampaignIntelligenceHeld, match="CROSS_ACCOUNT_ADAPTIVE_VALUE_CASE"):
+        review_adaptive_buyer_journey(
+            projection(buyer_route=current_route), verified_signals=(),
+            now=NOW, buyer_value_case=misbound,
+        )

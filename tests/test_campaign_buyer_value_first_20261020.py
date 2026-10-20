@@ -1,0 +1,301 @@
+"""Value-first offers are generated from authentic, separately bound sources.
+
+All data here are offline fixtures; no buyer, supplier, lead or money is real.
+"""
+from dataclasses import replace
+from datetime import datetime, timedelta, timezone
+import json
+
+import pytest
+
+from empire_os.campaign_intelligence import (
+    AccountIntelligenceContext, TrustedBuyerValueProblem,
+    TrustedOfferCapability, TrustedBuyerValueCase, TrustedCampaignSignal,
+    CampaignIntelligenceHeld, review_buyer_value_first_offer,
+    review_buyer_value_first_portfolio,
+)
+from scripts.review_tam_full_funnel_strategy_20261020 import (
+    review_authenticated_campaign_intelligence,
+)
+
+NOW = datetime(2026, 10, 20, 11, tzinfo=timezone.utc)
+ACC = "a"*32
+TENANT = "tenant_empireai"
+CAMPAIGN = "campaign_" + "f"*24
+ARMS = {
+    "supply_territory_fit": (
+        "buyer_inventory_fit_offer", "canonical_inventory",
+        "verified_supply_acceptance_fit",
+    ),
+    "missed_demand_followup": (
+        "revenue_leak_signal_offer", "canonical_first_party_analytics",
+        "verified_conversion_bottleneck",
+    ),
+    "market_expansion_decision": (
+        "verified_market_opportunity_brief", "verified_public_market_source",
+        "verified_territory_market_signal",
+    ),
+}
+
+
+def ctx(**kw):
+    return replace(AccountIntelligenceContext(
+        tenant_ref=TENANT, account_key=ACC,
+        market_scope="GB:solar:buyers", campaign_id=CAMPAIGN,
+        canonical_account_verified=True, suppression_clear=True,
+        inbound_response_basis_verified=True,
+        marketing_contact_basis_verified=False,
+        offer_evidence_current=True,
+    ), **kw)
+
+
+def problem(code="supply_territory_fit", **kw):
+    return replace(TrustedBuyerValueProblem(
+        tenant_ref=TENANT, account_key=ACC,
+        market_scope="GB:solar:buyers",
+        problem_code=code, observed_at=NOW,
+        buyer_directly_stated_problem=True,
+        canonical_crm_evidence_verified=True,
+        friction_code="quality_uncertainty",
+        friction_receipt_verified=True,
+    ), **kw)
+
+
+def capability(code="supply_territory_fit", **kw):
+    arm, source, kind = ARMS[code]
+    return replace(TrustedOfferCapability(
+        tenant_ref=TENANT, market_scope="GB:solar:buyers",
+        offer_arm=arm, capability_source=source, proof_kind=kind,
+        proof_key="e"*32, verified_at=NOW,
+        source_receipt_verified=True,
+        currently_deliverable=True,
+        verified_sufficient_market_fit=True,
+        paid_catalog_product=None,
+    ), **kw)
+
+
+def signals(kind="pricing_request", **kw):
+    source = {
+        "pricing_request": "canonical_crm",
+        "optin_enquiry": "canonical_crm",
+        "meeting_booked": "canonical_crm",
+        "email_link_clicked": "first_party_click_gateway",
+        "verified_public_procurement": "verified_public_intent_source",
+        "unsubscribe": "canonical_crm",
+        "verified_paying_customer": "canonical_commercial_ledger",
+    }[kind]
+    return (replace(TrustedCampaignSignal(
+        event_id="b"*32, tenant_ref=TENANT, account_key=ACC,
+        market_scope="GB:solar:buyers", campaign_id=CAMPAIGN,
+        kind=kind, source=source, observed_at=NOW,
+        source_receipt_verified=True, canonical_account_link_verified=True,
+        purpose_lawfulness_verified=True,
+    ), **kw),)
+
+
+def case(code="supply_territory_fit", **kw):
+    return replace(TrustedBuyerValueCase(
+        context=ctx(), problem=problem(code),
+        capabilities=(capability(code),),
+    ), **kw)
+
+
+def review(value=None, *, signal_rows=()):
+    return review_buyer_value_first_offer(
+        value or case(), verified_signals=signal_rows, now=NOW,
+    )
+
+
+@pytest.mark.parametrize("code,arm", [
+    ("supply_territory_fit", "buyer_inventory_fit_offer"),
+    ("missed_demand_followup", "revenue_leak_signal_offer"),
+    ("market_expansion_decision", "verified_market_opportunity_brief"),
+])
+def test_buyer_proven_need_and_verified_deliverability_select_correct_offer(code, arm):
+    result = review(case(code))
+    assert result["review_play"] == "PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA"
+    assert result["offer_candidate"] == arm
+    assert result["value_first_deliverable"]
+    assert result["proof_based_demo_outline"]["format"] == "screen_demo"
+    assert result["proof_based_demo_outline"]["asset_created_or_published"] is False
+    assert result["buyer_risk_resolution"]
+    assert result["commercial_cta_review_eligible"] is False
+    assert result["paid_price_quoted_cents"] is None
+    assert result["roi_or_results_guaranteed"] is False
+    assert result["auto_send"] is False
+    dumped = json.dumps(result)
+    assert ACC not in dumped and TENANT not in dumped and "e"*32 not in dumped
+
+
+def test_explicit_recent_buyer_request_opens_human_cta_review_not_automatic_outreach():
+    packet = review(signal_rows=signals())
+    assert packet["commercial_cta_review_eligible"] is True
+    assert packet["review_play"] == "SAME_DAY_RESPOND_WITH_VALUE_THEN_REVIEW_CTA"
+    assert packet["auto_follow_up"] is False
+    assert packet["campaign_auto_enrolled"] is False
+    assert packet["execution_authority"] == "NONE"
+
+
+def test_click_or_public_market_research_never_turns_into_buyer_cta():
+    for kind in ("email_link_clicked", "verified_public_procurement"):
+        packet = review(signal_rows=signals(kind))
+        assert packet["review_play"] == "PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA"
+        assert packet["commercial_cta_review_eligible"] is False
+
+
+def test_inbound_without_permission_to_reply_still_has_no_commercial_cta():
+    packet = review(case(context=ctx(inbound_response_basis_verified=False)),
+                    signal_rows=signals("pricing_request"))
+    assert packet["commercial_cta_review_eligible"] is False
+    assert packet["auto_send"] is False
+
+
+def test_explicit_suppression_dominates_verified_offer_proof():
+    packet = review(case(context=ctx(suppression_clear=False)),
+                    signal_rows=signals("pricing_request"))
+    assert packet["review_play"] == "STOP_CONTACT_AND_SUPPRESS"
+    assert packet["offer_candidate"] is None
+    assert packet["commercial_cta_review_eligible"] is False
+    packet = review(signal_rows=signals("unsubscribe"))
+    assert packet["review_play"] == "STOP_CONTACT_AND_SUPPRESS"
+    assert packet["value_first_deliverable"] is None
+
+
+def test_unknown_account_identity_blocks_selected_commercial_offer():
+    packet = review(case(context=ctx(canonical_account_verified=False)))
+    assert packet["review_play"] == "HOLD_ACCOUNT_IDENTITY"
+    assert packet["offer_candidate"] is None
+
+
+def test_unproven_or_stale_buyer_need_cannot_fake_personalized_pain():
+    for buyer_problem in (
+        problem(buyer_directly_stated_problem=False),
+        problem(canonical_crm_evidence_verified=False),
+        problem(observed_at=NOW-timedelta(days=46)),
+    ):
+        packet = review(case(problem=buyer_problem), signal_rows=signals())
+        assert packet["buyer_problem_proven_by_first_party"] is False
+        assert packet["offer_candidate"] is None
+        assert packet["review_play"] == "RESEARCH_BUYER_NEED_BEFORE_PERSONALIZATION"
+        assert packet["commercial_cta_review_eligible"] is False
+
+
+def test_no_buyer_problem_does_not_create_one_from_site_or_supply():
+    packet = review(case(problem=None), signal_rows=signals("email_link_clicked"))
+    assert packet["buyer_problem_type"] is None
+    assert packet["offer_candidate"] is None
+
+
+def test_current_inventory_proof_only_seven_days_old():
+    packet = review(case(capabilities=(capability(
+        verified_at=NOW-timedelta(days=8),
+    ),)))
+    assert packet["offer_candidate"] is None
+    assert packet["offer_proof_statuses"]["buyer_inventory_fit_offer"] == "HOLD_STALE_PROOF"
+
+
+def test_offer_not_ready_or_incompatible_tenant_cannot_be_sold():
+    for change, hold in (
+        ({"source_receipt_verified": False}, "HOLD_SOURCE_UNVERIFIED"),
+        ({"currently_deliverable": False}, "HOLD_UNAVAILABLE_DELIVERY"),
+        ({"verified_sufficient_market_fit": False}, "HOLD_UNVERIFIED_MARKET_FIT"),
+    ):
+        packet = review(case(capabilities=(capability(**change),)))
+        assert packet["offer_candidate"] is None
+        assert packet["offer_proof_statuses"]["buyer_inventory_fit_offer"] == hold
+
+
+def test_public_market_signal_cannot_be_falsely_labelled_supplier_inventory():
+    with pytest.raises(CampaignIntelligenceHeld, match="OFFER_PROOF_OR_PROVENANCE"):
+        review(case(capabilities=(capability(capability_source="verified_public_market_source"),)))
+
+
+def test_paid_product_quote_requires_canonical_product_readiness():
+    unready = {
+        "active": True, "binding_terms_ready": False,
+        "catalog_state": "VERIFIED", "version_state": "VERIFIED",
+        "price_basis": {"amount_cents": 5000, "currency": "USD", "unit": "one_off"},
+    }
+    packet = review(case(capabilities=(capability(
+        paid_catalog_product=unready,
+    ),)))
+    assert packet["offer_candidate"] is None
+    assert packet["offer_proof_statuses"]["buyer_inventory_fit_offer"] == "HOLD_UNVERIFIED_PAID_PRODUCT"
+    paid = {**unready, "binding_terms_ready": True, "readiness_blockers": []}
+    packet = review(case(capabilities=(capability(
+        paid_catalog_product=paid,
+    ),)))
+    assert packet["offer_candidate"] == "buyer_inventory_fit_offer"
+    assert packet["paid_price_quoted_cents"] is None
+
+
+def test_unconfirmed_buyer_objection_is_not_fabricated():
+    packet = review(case(problem=problem(friction_receipt_verified=False)))
+    assert packet["buyer_risk_resolution"] is None
+    assert packet["buyer_friction_confirmed"] is None
+
+
+def test_cross_tenant_proof_and_buyer_need_are_rejected():
+    with pytest.raises(CampaignIntelligenceHeld, match="CROSS_TENANT_OFFER_PROOF"):
+        review(case(capabilities=(capability(tenant_ref="tenant_different01"),)))
+    with pytest.raises(CampaignIntelligenceHeld, match="CROSS_ACCOUNT_OR_UNSUPPORTED_BUYER_PROBLEM"):
+        review(case(problem=problem(account_key="f"*32)))
+
+
+def test_only_matching_offer_type_may_solve_the_buyers_need():
+    packet = review(case(
+        problem=problem("market_expansion_decision"),
+        capabilities=(capability("supply_territory_fit"),),
+    ))
+    assert packet["offer_candidate"] is None
+    assert packet["review_play"] == "VERIFY_DELIVERABLE_BUYER_VALUE_BEFORE_OFFER"
+
+
+def test_duplicate_offer_capabilities_fail_closed():
+    with pytest.raises(CampaignIntelligenceHeld, match="DUPLICATE"):
+        review(case(capabilities=(capability(),capability())))
+
+
+def test_future_source_and_unknown_enum_or_trust_flag_fail_closed():
+    for item in (
+        case(problem=problem(observed_at=NOW+timedelta(hours=1))),
+        case(capabilities=(capability(verified_at=NOW+timedelta(days=1)),)),
+        case(problem=problem(problem_code="imaginary_problem")),
+        case(capabilities=(capability(currently_deliverable="true"),)),
+    ):
+        with pytest.raises(CampaignIntelligenceHeld):
+            review(item)
+
+
+def test_portfolio_never_exports_private_people_or_claimed_commercial_conversions():
+    packet = review_buyer_value_first_portfolio([
+        (case(), signals("pricing_request")),
+    ], now=NOW)
+    assert packet["accounts_reviewed"] == 1
+    assert packet["buyer_value_next_play_counts"] == {
+        "SAME_DAY_RESPOND_WITH_VALUE_THEN_REVIEW_CTA": 1,
+    }
+    assert packet["evidence_backed_offer_candidate_counts"]["buyer_inventory_fit_offer"] == 1
+    assert packet["messages_or_quotes_sent"] == 0
+    assert "a"*32 not in json.dumps(packet)
+
+
+def test_portfolio_rejects_same_account_twice():
+    with pytest.raises(CampaignIntelligenceHeld, match="DUPLICATE_VALUE_PORTFOLIO"):
+        review_buyer_value_first_portfolio([
+            (case(), ()), (case(), ()),
+        ], now=NOW)
+
+
+def test_integration_full_funnel_accepts_value_case_owner_packets():
+    output = review_authenticated_campaign_intelligence(
+        now=NOW, value_case_packets=[(case(), signals("pricing_request"))],
+    )
+    assert output["buyer_value_first_offer_review"]["accounts_reviewed"] == 1
+    assert output["authenticated_tenant_crm_handoff"] is None
+    assert output["live_recipient_contact_or_messages"] is False
+
+
+def test_live_entry_without_value_case_source_remains_unknown_not_zero():
+    output = review_authenticated_campaign_intelligence(now=NOW)
+    assert output["buyer_value_first_offer_review"] is None

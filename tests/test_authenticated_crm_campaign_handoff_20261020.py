@@ -218,3 +218,97 @@ def test_no_live_send_authority_from_tenant_crm_reader(monkeypatch):
     assert result["crm_mutation"] is False
     assert result["sender_enabled"] is False
     assert result["execution_authority"] == "NONE"
+
+def owner_value_case(joined):
+    from empire_os.campaign_intelligence import (
+        TrustedBuyerValueCase, TrustedBuyerValueProblem,
+        TrustedOfferCapability,
+    )
+    return TrustedBuyerValueCase(
+        context=joined.account_route.context,
+        problem=TrustedBuyerValueProblem(
+            tenant_ref=EMP_TENANT, account_key=ACCOUNT,
+            market_scope="GB:solar:buyers",
+            problem_code="supply_territory_fit", observed_at=NOW,
+            buyer_directly_stated_problem=True,
+            canonical_crm_evidence_verified=True,
+        ),
+        capabilities=(TrustedOfferCapability(
+            tenant_ref=EMP_TENANT, market_scope="GB:solar:buyers",
+            offer_arm="buyer_inventory_fit_offer",
+            capability_source="canonical_inventory",
+            proof_kind="verified_supply_acceptance_fit",
+            proof_key="d"*32, verified_at=NOW,
+            source_receipt_verified=True, currently_deliverable=True,
+            verified_sufficient_market_fit=True,
+        ),),
+    )
+
+
+def test_authenticated_crm_owner_can_attach_a_verified_value_first_offer(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    output = review_authenticated_crm_campaign_handoff(
+        handoff, account_projection_owner=owner_projection,
+        signal_owner=empty_verified_signals,
+        value_case_owner=owner_value_case, now=NOW,
+    )
+    assert output["buyer_value_first_review_counts"] == {
+        "PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA": 1,
+    }
+    assert output["buyer_value_case_unverified_count"] == 0
+    assert output["sender_enabled"] is False
+    assert output["canonical_crm_contacts_returned"] == 0
+
+
+def test_auth_crm_missing_value_evidence_held_without_fake_upsell(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    output = review_authenticated_crm_campaign_handoff(
+        handoff, account_projection_owner=owner_projection,
+        signal_owner=empty_verified_signals,
+        value_case_owner=lambda _: None, now=NOW,
+    )
+    assert output["buyer_value_first_review_counts"] == {}
+    assert output["buyer_value_case_unverified_count"] == 1
+
+
+def test_cross_account_value_case_from_crm_owner_fails_closed(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    def wrong_case(joined):
+        val = owner_value_case(joined)
+        return replace(
+            val,
+            context=replace(val.context, account_key="f"*32),
+        )
+    with pytest.raises(CampaignIntelligenceHeld, match="CROSS_ACCOUNT_CRM_VALUE_CASE"):
+        review_authenticated_crm_campaign_handoff(
+            handoff, account_projection_owner=owner_projection,
+            signal_owner=empty_verified_signals,
+            value_case_owner=wrong_case, now=NOW,
+        )
+
+
+def test_owner_callback_failure_masks_internal_crm_error(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    def fail(_):
+        raise ValueError("INTERNAL_SOURCE_CREDENTIAL_ERROR")
+    with pytest.raises(CampaignIntelligenceHeld, match="CANONICAL_VALUE_CASE_OWNER_UNAVAILABLE") as exc:
+        review_authenticated_crm_campaign_handoff(
+            handoff, account_projection_owner=owner_projection,
+            signal_owner=empty_verified_signals,
+            value_case_owner=fail, now=NOW,
+        )
+    assert "INTERNAL_SOURCE_CREDENTIAL_ERROR" not in str(exc.value)
+
+
+def test_existing_full_funnel_handoff_reports_verified_value_case_counts(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    result = review_authenticated_campaign_intelligence(
+        now=NOW, authenticated_crm_owner_read=handoff,
+        account_projection_owner=owner_projection,
+        signal_owner=empty_verified_signals,
+        value_case_owner=owner_value_case,
+    )
+    review_result = result["authenticated_tenant_crm_handoff"]
+    assert review_result["buyer_value_first_review_counts"]["PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA"] == 1
+    assert result["buyer_value_first_offer_review"] is None
+    assert result["live_recipient_contact_or_messages"] is False
