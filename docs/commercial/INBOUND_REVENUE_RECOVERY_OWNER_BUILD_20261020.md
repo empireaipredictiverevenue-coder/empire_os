@@ -404,3 +404,65 @@ Deployment requires the independently approved private CRM account + membership 
 - tests/test_inbound_calendar_oauth_onboarding.py adds private file permission and safe legacy migration checks.
 
 **No real provider token exchange, customer consent or Google Calendar was attempted.** This adapter is deliberately NOT wired into the running systemd dark staging app. The SQLite Fernet vault is staging-only; a production KMS-backed backend with an audited revocation lifecycle remains a release blocker. No private signing keys or Google client secrets were generated, extracted or copied into this repo.
+
+
+## 20 October — Scaleway external Secret Manager calendar vault (unprovisioned)
+
+Scope: opt-in production credential backend code, with all tests using in-memory
+fake Scaleway Secret Manager transport. No cloud API calls, costs or secret
+provisioning performed in this change.
+
+- empire_os/inbound_scaleway_calendar_vault.py adds fixed-region Scaleway Secret
+  Manager API access, no proxy/redirect allowed, exact secret UUIDs, a bounded
+  response, and pre-provisioned one-to-one bindings from
+  (tenant_id, calendar_id, provider_account_ref) to secret UUID. A secret
+  cannot be reused across different customer/calendar tuples.
+- API contract follows the Scaleway Secret Manager v1beta1 documentation:
+  GET /regions/{region}/secrets/{secret_id}/versions/latest_enabled/access and
+  POST /regions/{region}/secrets/{secret_id}/versions, with base64 secret
+  content and disable_previous=true on every new version. Older revision
+  protection requires correct provider IAM/operations policies.
+  API reference: https://www.scaleway.com/en/developers/api/secret-manager/secret-versions
+- ScalewaySecretManagerCalendarVault stores full credential JSON in the
+  provider-managed encrypted secret versions rather than on disk. Every
+  read checks the embedded tenant/calendar/provider identity, granted
+  read-only scopes, and verified consent flags. Rotations write a new version
+  and disable the previous. Local revoke_local compatibility method writes
+  a new secret-manager revocation tombstone; it does NOT revoke Google's
+  grant (that must be a separate verified provider operation).
+- A write or revoke is NOT considered verified solely from an API success
+  status: the adapter re-reads the latest enabled version to confirm the
+  intended credential or tombstone is durable.
+- empire_os/inbound_calendar_scaleway_iam.py requires the future approved
+  OAuth service's private systemd CREDENTIALS_DIRECTORY, not an ambient
+  SCW_SECRET_KEY. The current dark staging unit has no such credential.
+  The service identity, IAM scope, approved Secret Manager secrets, region,
+  signing keys and pre-approved mapping must be provisioned by the
+  authorised operator outside source control.
+- empire_os/inbound_google_calendar_completion.py accepts the production-
+  capable external secret backend through the same restricted callback
+  seam; the local encrypted SQLite vault remains staging-only.
+- All test credential data is fake; no actual Scaleway or Google customer
+  account, payment resource, or real appointment was accessed.
+
+**Required for live release (all are unverified until read-back):**
+
+1. Operator privately provisions a **dedicated, restricted** Scaleway IAM
+   identity and a pre-created secret UUID per tenant/calendar/provider tuple.
+   IAM must limit the service to only the exact secret resources.
+2. Operator approves a region (fr-par/nl-ams/pl-waw) and secret protection
+   policy, then delivers its IAM token through the new OAuth systemd unit's
+   LoadCredential (never the existing dark staging unit).
+3. Private 0600 tenant-to-secret mapping, real Google Cloud OAuth client and
+   callback, production customer owner account, and audit/revocation are
+   reviewed. Do not put credentials in Git, in command-line arguments or
+   in pasted chat logs.
+4. Prove actual Scaleway IAM read/write/version-disable semantics, account
+   segregation and an authorised Google calendarList read-back from a
+   consented tenant before customer activation.
+5. Existing prepared tenant/RLS migrations are NOT yet approved/applied.
+   Their write identity and live RLS permissions need independent review.
+
+Source documentation:
+https://www.scaleway.com/en/developers/api/secret-manager
+https://www.scaleway.com/en/docs/iam/policies-permissions/supported-products-resource-level/

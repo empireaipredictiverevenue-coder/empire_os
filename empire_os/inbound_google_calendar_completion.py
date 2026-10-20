@@ -16,6 +16,7 @@ from empire_os.inbound_calendar_connection_identity import CalendarConnectionPri
 from empire_os.inbound_calendar_oauth_onboarding import OneTimeGoogleCodeTicket
 from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
 from empire_os.inbound_calendar_token_vault import OfflineCalendarCredentialVault
+from empire_os.inbound_scaleway_calendar_vault import ScalewaySecretManagerCalendarVault
 from empire_os.inbound_google_calendar_adapter import (
     ApprovedCalendarBinding, CalendarReadTransport, CalendarVerificationError,
 )
@@ -41,7 +42,7 @@ class ApprovedGoogleCalendarCompletion:
         account_binding: Callable[[str, str, str], str | None],
         token_endpoint: OAuthTokenEndpoint,
         calendar_transport: CalendarReadTransport,
-        open_vault: Callable[[], OfflineCalendarCredentialVault],
+        open_vault: Callable[[], OfflineCalendarCredentialVault | ScalewaySecretManagerCalendarVault],
         open_registry: Callable[[], OfflineCalendarRegistry],
         owner_membership_check: Callable[[str, str], bool],
         evidence_key: bytes,
@@ -127,7 +128,7 @@ class ApprovedGoogleCalendarCompletion:
         # Fresh connections are mandatory: FastAPI sync callbacks run in
         # worker threads; a pooled SQLite connection is unsafe across threads.
         with self.open_vault() as vault, self.open_registry() as registry:
-            if (not isinstance(vault, OfflineCalendarCredentialVault)
+            if (not isinstance(vault, (OfflineCalendarCredentialVault, ScalewaySecretManagerCalendarVault))
                 or not isinstance(registry, OfflineCalendarRegistry)
                 or registry.read_only):
                 raise CalendarVerificationError("trusted_calendar_storage_factories_required")

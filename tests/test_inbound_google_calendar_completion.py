@@ -242,3 +242,69 @@ def test_full_guarded_http_flow_uses_actual_enrollment_and_registry_readback(tmp
     finally:
         vault.db.close()
         registry.db.close()
+
+
+def test_completed_google_enrollment_uses_external_iam_vault_with_no_local_token_file(tmp_path):
+    from empire_os.inbound_scaleway_calendar_vault import ScalewaySecretManagerCalendarVault
+    from empire_os.inbound_calendar_registry import OfflineCalendarRegistry
+    from empire_os.inbound_calendar_oauth_onboarding import OneTimeGoogleCodeTicket
+    from empire_os.inbound_google_calendar_completion import ApprovedGoogleCalendarCompletion
+    from empire_os.inbound_calendar_connection_identity import CalendarConnectionPrincipal
+
+    class Gateway:
+        def __init__(self):
+            self.versions = {}
+            self.created = []
+        def access_latest(self, secret_id):
+            return self.versions.get(secret_id)
+        def add_version(self, secret_id, data):
+            self.created.append(secret_id)
+            self.versions[secret_id] = data
+            return len(self.created)
+
+    gateway = Gateway()
+    secret_id = "00000000-0000-0000-0000-000000000099"
+    registry_path = tmp_path / "customer-registry.db"
+
+    def open_vault():
+        return ScalewaySecretManagerCalendarVault(
+            gateway, approved_secret_ids={
+                (TENANT, CAL, "authorized-calendar-account"): secret_id,
+            }
+        )
+
+    def open_registry():
+        return OfflineCalendarRegistry(registry_path)
+
+    completion = ApprovedGoogleCalendarCompletion(
+        expected_client_id=CLIENT, expected_redirect_uri=CALLBACK,
+        client_secret_provider=lambda: "fixture-google-secret",
+        account_binding=lambda tenant, subject, calendar:
+            "authorized-calendar-account" if (
+                tenant == TENANT and subject == SUBJECT and calendar == CAL
+            ) else None,
+        token_endpoint=MockTokenEndpoint(),
+        calendar_transport=MockReadOnlyGoogle(),
+        open_vault=open_vault, open_registry=open_registry,
+        owner_membership_check=lambda subject, tenant:
+            subject == SUBJECT and tenant == TENANT,
+        evidence_key=b"server-held-approval-key-32bytes-for-test",
+        now=lambda: NOW,
+    )
+    result = completion(ticket(), principal())
+    assert result.credential_vault_write
+    assert result.calendar_binding_created
+    assert gateway.created == [secret_id]
+    assert b"fixture-google-refresh-secret" in gateway.versions[secret_id]  # isolated fake
+    assert not (tmp_path / "vault.db").exists()
+    with open_registry() as registry:
+        binding = registry.get_binding(CAL)
+        assert binding is not None
+        assert binding.provider_account_ref == "authorized-calendar-account"
+        assert b"fixture-google-refresh-secret" not in registry_path.read_bytes()
+    with open_vault() as vaulted:
+        saved = vaulted.get_active(
+            tenant_id=TENANT, calendar_id=CAL,
+            provider_account_ref="authorized-calendar-account",
+        )
+        assert saved.customer_approved
