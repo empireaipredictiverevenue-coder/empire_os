@@ -169,7 +169,37 @@ def _offer_row(row: Mapping[str, Any], signals: list[dict[str, Any]]) -> dict[st
         2 if ready else
         3 if state == "CONTACT_EVIDENCE_REQUIRED" else 4
     )
+    person_verified = row.get("person_verified") is True
+    email_verified = row.get("email_verified") is True
+    gap_codes = []
+    if not _identity(row):
+        gap_codes.append("CANONICAL_ID_MISSING")
+    if state == "PRODUCT_READINESS_REQUIRED":
+        gap_codes.append("PRODUCT_TERMS_OR_CATALOG_UNREADY")
+    elif state not in ("OFFER_READY", "CONTACT_EVIDENCE_REQUIRED"):
+        gap_codes.append("UNRECOGNIZED_OFFER_READINESS_STATE")
+    if not person_verified or not email_verified or state == "CONTACT_EVIDENCE_REQUIRED":
+        gap_codes.append("PERSON_CONTACT_EVIDENCE_UNVERIFIED")
+    if not demand:
+        gap_codes.append("BUYER_DEMAND_NOT_VERIFIED")
+    if existing:
+        gap_codes.append("EXISTING_CONVERSATION_REQUIRES_LIVE_THREAD_RECHECK")
+    # These are cross-cutting review needs, not task assignments or
+    # permission to change canonical prospect, contact or CRM records.
+    workstream_map = {
+        "CANONICAL_ID_MISSING": "decision_maker_resolver",
+        "PRODUCT_TERMS_OR_CATALOG_UNREADY": "commercial_catalog_owner",
+        "UNRECOGNIZED_OFFER_READINESS_STATE": "commercial_catalog_owner",
+        "PERSON_CONTACT_EVIDENCE_UNVERIFIED": "contact_verifier",
+        "BUYER_DEMAND_NOT_VERIFIED": "buyer_qualifier",
+        "EXISTING_CONVERSATION_REQUIRES_LIVE_THREAD_RECHECK": "sales_director_operator",
+    }
     return {
+        "readiness_gap_codes": gap_codes,
+        "review_owner_lanes": list(dict.fromkeys(workstream_map[c] for c in gap_codes)),
+        "person_verified_in_source": person_verified,
+        "email_verified_in_source": email_verified,
+        "canonical_id_is_historical_source_claim": bool(_identity(row)),
         "canonical_prospect_id": _identity(row),
         "company": _text(row.get("company"), 120) or None,
         "domain": _text(row.get("domain"), 140) or None,
@@ -285,6 +315,21 @@ def build_commercial_growth_review(
         r["canonical_prospect_id"] or "",
         r["domain"] or "",
     ))
+    gap_counts = {
+        code: sum(code in row["readiness_gap_codes"] for row in reviews)
+        for code in (
+            "CANONICAL_ID_MISSING",
+            "PRODUCT_TERMS_OR_CATALOG_UNREADY",
+            "UNRECOGNIZED_OFFER_READINESS_STATE",
+            "PERSON_CONTACT_EVIDENCE_UNVERIFIED",
+            "BUYER_DEMAND_NOT_VERIFIED",
+            "EXISTING_CONVERSATION_REQUIRES_LIVE_THREAD_RECHECK",
+        )
+    }
+    owner_counts = {
+        lane: sum(lane in row["review_owner_lanes"] for row in reviews)
+        for lane in sorted({lane for row in reviews for lane in row["review_owner_lanes"]})
+    }
 
     # Aggregate economic truth must not be attributed to these candidates.
     actual = funnel.get("actual_revenue") is True
@@ -316,6 +361,10 @@ def build_commercial_growth_review(
             "funnel": "empire.founder_commercial_funnel.v1",
             "observations": "research_only_no_contact_authority",
         },
+        "readiness_gap_counts_nonexclusive": gap_counts,
+        "owner_review_lane_counts_nonexclusive": owner_counts,
+        "readiness_counts_are_overlapping": True,
+        "historical_source_claims_not_live_customer_proof": True,
         "source_counts": {
             "canonical_offer_targets": len(reviews),
             "linked_research_observations": sum(len(r["linked_research_signal_ids"]) for r in reviews),
@@ -324,6 +373,8 @@ def build_commercial_growth_review(
         },
         "review_queue": reviews,
         "unlinked_signal_review": unlinked,
+        "review_only": True,
+        "refresh_is_required_before_approaching_or_reporting_on_these_targets": requires_refresh,
         "aggregate_revenue_context": revenue_context,
         "principles": [
             "identify_evidence_backed_expensive_problems",
