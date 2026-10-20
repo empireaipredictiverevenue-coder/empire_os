@@ -50,12 +50,17 @@ def build_adaptive_commercial_runtime(
     now: datetime,
     previous_sales: dict | None,
     previous_control: dict | None,
+    conversation_proof: dict | None = None,
+    owner_source_receipts: dict | None = None,
+    include_sales_review: bool = False,
 ):
     """Pure read-only owner composition, no database, mailbox API or writes."""
-    original_sales = build_original_proof_runtime(root, now=now)
+    original_sales = build_original_proof_runtime(
+        root, now=now, conversation_proof=conversation_proof,
+    )
     sales = adaptive_original_proof_review(
         current=original_sales, previous=previous_sales,
-        source_receipts=None, now=now,
+        source_receipts=owner_source_receipts, now=now,
     )
     catalog = _bounded_json(root / "runtime/commercial_catalog/latest.json")
     distribution_file = _bounded_json(root / "runtime/revenue_distribution/latest.json")
@@ -83,10 +88,11 @@ def build_adaptive_commercial_runtime(
         source_snapshots=original_distribution_sources,
         previous_distribution=distribution_file, now=now,
     )
-    return review_adaptive_commercial_intelligence(
+    report = review_adaptive_commercial_intelligence(
         sales=sales, offers=offers, distribution=distribution,
         previous=previous_control, now=now,
     )
+    return {"control": report, "sales": sales} if include_sales_review else report
 
 
 def main() -> int:

@@ -20,6 +20,7 @@ from empire_os.ops_sentinel import observe
 from empire_os.runtime_self_heal import run_runtime_self_heal
 from empire_os.sovereign_infrastructure_observer import collect_sovereign_infrastructure_health
 from empire_os.conversation_control_operational_truth import inspect_conversation_evidence
+from empire_os.commercial_adaptive_ops_bridge import observe_ops_adaptive_commercial
 from empire_os.supabase_egress_guard import (
     MANAGED_TIMERS,
     supabase_egress_contained,
@@ -496,6 +497,14 @@ def main() -> int:
         previous = json.loads(OUTPUT.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         previous = {}
+    adaptive = observe_ops_adaptive_commercial(
+        root=Path("/srv/empire_os"),
+        previous_ops_snapshot=previous,
+        conversation_proof=conversation_evidence_review,
+        now=datetime.now(timezone.utc),
+    )
+    health_domains["adaptive_commercial_intelligence"] = adaptive["summary"]["status"]
+    # Leadgen historical baseline is separate from adaptive evidence memory.
     # Seed exactly one baseline event when change-only history is first installed.
     if not (OUTPUT.parent / "leadgen_truth_transitions.jsonl").exists():
         previous = {}
@@ -513,6 +522,9 @@ def main() -> int:
         "user_worker_health": user_worker_health,
         "sovereign_infrastructure": sovereign_infrastructure,
         "conversation_evidence_review": conversation_evidence_review,
+        "adaptive_commercial_summary": adaptive["summary"],
+        "adaptive_sales_review": adaptive["sales"],
+        "adaptive_commercial_review": adaptive["control"],
         "leadgen_truth_transition": transition,
         "leadgen_preflight_checks_clear": leadgen_truth["preflight_checks_clear"],
         "blocking_finding_count": len(blocking_findings),
@@ -552,6 +564,11 @@ def main() -> int:
         event = {"observed_at": payload["observed_at"], **transition}
         with changes.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event, sort_keys=True) + "\n")
+    # Same owner cycle, change-only privacy-safe history, no second timer.
+    if adaptive["change_event"] is not None:
+        changes = OUTPUT.parent / "adaptive_commercial_transitions.jsonl"
+        with changes.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(adaptive["change_event"], sort_keys=True) + "\n")
     print(json.dumps(payload, indent=2, sort_keys=True))
 
     failed_repairs = [row for row in repairs if row.get("ok") is not True]
