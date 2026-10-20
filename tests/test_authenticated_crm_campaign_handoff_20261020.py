@@ -312,3 +312,15 @@ def test_existing_full_funnel_handoff_reports_verified_value_case_counts(monkeyp
     assert review_result["buyer_value_first_review_counts"]["PREPARE_PROOF_FIRST_VALUE_BRIEF_NO_SALES_CTA"] == 1
     assert result["buyer_value_first_offer_review"] is None
     assert result["live_recipient_contact_or_messages"] is False
+
+
+def test_authenticated_crm_handoff_reports_private_preview_readiness_without_pii(monkeypatch):
+    handoff = mock_handoff(monkeypatch)
+    report = review_authenticated_crm_campaign_handoff(
+        handoff, account_projection_owner=owner_projection,
+        signal_owner=empty_verified_signals,
+        value_case_owner=owner_value_case, now=NOW,
+    )
+    assert report["proof_first_private_page_candidate_count"] == 1
+    assert "private_html" not in json.dumps(report)
+    assert report["sender_enabled"] is False

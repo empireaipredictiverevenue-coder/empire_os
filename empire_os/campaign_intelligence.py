@@ -1385,6 +1385,7 @@ def review_authenticated_crm_campaign_handoff(
     seen_crm = set()
     payloads = []
     value_review_counts: Counter[str] = Counter()
+    private_experience_candidates = 0
     value_proof_held = 0
     rows_with_no_proven_canonical_join = 0
     for item in original:
@@ -1443,6 +1444,8 @@ def review_authenticated_crm_campaign_handoff(
                     value_case, verified_signals=trusted_signals, now=now,
                 )
                 value_review_counts[result["review_play"]] += 1
+                if result["offer_candidate"] is not None:
+                    private_experience_candidates += 1
     reviewed = review_adaptive_buyer_journey_portfolio(payloads, now=now)
     return {
         "schema_version": "empire.gtm.tenant_crm_campaign_owner_handoff.v1",
@@ -1458,6 +1461,10 @@ def review_authenticated_crm_campaign_handoff(
         ),
         "buyer_value_case_unverified_count": (
             value_proof_held if value_case_owner is not None else None
+        ),
+        "proof_first_private_page_candidate_count": (
+            private_experience_candidates
+            if value_case_owner is not None else None
         ),
         "read_result_may_be_partial": len(original) == limit,
         "canonical_crm_contacts_returned": 0,
@@ -1741,6 +1748,7 @@ def review_buyer_value_first_portfolio(
     seen = set()
     statuses: Counter[str] = Counter()
     chosen: Counter[str] = Counter()
+    experience_candidates = 0
     for case, signals in values:
         if type(case) is not TrustedBuyerValueCase:
             raise CampaignIntelligenceHeld("TRUSTED_VALUE_CASE_REQUIRED")
@@ -1756,12 +1764,240 @@ def review_buyer_value_first_portfolio(
         statuses[outcome["review_play"]] += 1
         if outcome["offer_candidate"] is not None:
             chosen[outcome["offer_candidate"]] += 1
+            experience_candidates += 1
     return {
         "schema_version": "empire.gtm.buyer_value_first_portfolio.v1",
         "accounts_reviewed": len(seen),
         "buyer_value_next_play_counts": dict(sorted(statuses.items())),
         "evidence_backed_offer_candidate_counts": dict(sorted(chosen.items())),
+        "proof_first_private_page_candidate_count": experience_candidates,
         "public_buyer_list_exposed": False,
         "messages_or_quotes_sent": 0,
+        "execution_authority": "NONE",
+    }
+
+# Proof-backed offer experiences are PRIVATE previews. Website, consent,
+# tracking and public deployment remain with their existing owners.
+_OFFER_EXPERIENCE_EDITORIAL = {
+    "buyer_inventory_fit_offer": {
+        "eyebrow": "Buyer inventory fit",
+        "headline": "Better-fit opportunities start with better evidence.",
+        "intro": (
+            "See how territory, category and acceptance criteria can be checked "
+            "against separately verified availability before a buying decision."
+        ),
+        "sections": (
+            ("Define the buy box", "Agree the exact categories, territories and rejection criteria."),
+            ("Verify actual availability", "Review current source records, their scope and any gaps."),
+            ("Make a measured decision", "Review what fits and what cannot yet be supported."),
+        ),
+        "questions": (
+            ("Is inventory guaranteed?", "No. Availability and buyer acceptance must be verified for the relevant corridor."),
+            ("Will every enquiry qualify?", "No. An acceptance check should make rejection rules explicit."),
+        ),
+    },
+    "revenue_leak_signal_offer": {
+        "eyebrow": "Demand-to-response intelligence",
+        "headline": "Find the gaps between an enquiry and a useful response.",
+        "intro": (
+            "Review measured handoff evidence and identify which conversion "
+            "or response stage deserves a controlled improvement."
+        ),
+        "sections": (
+            ("Trace the handoff", "Confirm the observed stages and the sources behind them."),
+            ("Locate a measurable gap", "Separate supported conversion gaps from assumptions."),
+            ("Test one practical fix", "Choose a small, governed workflow experiment and measure its outcome."),
+        ),
+        "questions": (
+            ("Are projected savings guaranteed?", "No. Cost and profit claims require verified actual financial receipts."),
+            ("Will the system contact leads automatically?", "No. Contact channels and permissions remain separately governed."),
+        ),
+    },
+    "verified_market_opportunity_brief": {
+        "eyebrow": "Evidence-based market choices",
+        "headline": "Choose your next territory with evidence, not guesswork.",
+        "intro": (
+            "Compare independently sourced observations with your buying criteria "
+            "and identify what remains unproven before committing resources."
+        ),
+        "sections": (
+            ("Set the market criteria", "Define geography, category and minimum source quality."),
+            ("Review the observations", "Inspect verifiable public-market evidence and its dates."),
+            ("Define the next test", "Narrow the field and check unknowns before any spend."),
+        ),
+        "questions": (
+            ("Does market activity prove buyer demand?", "No. Research signals are not confirmed purchasing intent."),
+            ("Are financial returns projected?", "No. Revenue and return claims require independently verified outcomes."),
+        ),
+    },
+}
+_PROOF_SURFACE_EDITORIAL = {
+    "source_signal": "Source observations",
+    "qualification": "Acceptance and qualification",
+    "buyer_routing": "Buyer routing boundaries",
+    "crm_followup": "CRM follow-up process",
+    "pipeline_signal": "Observed pipeline evidence",
+    "conversion": "Conversion evidence",
+    "followup": "Follow-up process",
+    "current_process": "Current process",
+    "automation": "Automation controls",
+    "economic_evidence": "Verifiable financial evidence",
+}
+
+
+def build_private_buyer_offer_experience(
+    case: TrustedBuyerValueCase, *,
+    verified_signals: Iterable[TrustedCampaignSignal],
+    now: datetime,
+) -> dict:
+    """Create a self-contained, review-only page and demo storyboard.
+
+    Never renders customer PII, source tokens, account keys, monetary amounts,
+    URLs, cookies, scripts or actionable forms. Unverified buyer needs,
+    suppressed accounts and undeliverable offers cannot produce a page.
+    """
+    from html import escape
+    report = review_buyer_value_first_offer(
+        case, verified_signals=verified_signals, now=now,
+    )
+    if report["offer_candidate"] is None:
+        return {
+            "schema_version": "empire.gtm.private_buyer_offer_experience.v1",
+            "status": "HOLD_NO_SUPPORTED_PUBLIC_FACING_VALUE",
+            "review_play": report["review_play"],
+            "offer_arm": None,
+            "private_html": None,
+            "demo_storyboard": None,
+            "publication_authorized": False,
+            "working_first_party_cta_present": False,
+            "execution_authority": "NONE",
+        }
+    arm = report["offer_candidate"]
+    editorial = _OFFER_EXPERIENCE_EDITORIAL[arm]
+    demo = report["proof_based_demo_outline"]
+    if not isinstance(demo, Mapping):
+        raise CampaignIntelligenceHeld("VERIFIED_DEMO_PLAN_MISSING")
+    scope = case.context.market_scope
+    market_label = {
+        "GB:solar:buyers": "UK solar buyers",
+        "US:roofing:buyers": "US roofing buyers",
+    }.get(scope)
+    if not market_label:
+        raise CampaignIntelligenceHeld("OFFER_EXPERIENCE_MARKET_INVALID")
+    proof_statuses = report["offer_proof_statuses"]
+    if proof_statuses.get(arm) != "VERIFIED_VALUE_PREVIEW_AVAILABLE":
+        raise CampaignIntelligenceHeld("OFFER_EXPERIENCE_PROOF_NOT_READY")
+    cap = next(c for c in case.capabilities if c.offer_arm == arm)
+    verified_day = _aware(cap.verified_at).date().isoformat()
+    storyboard = [
+        {
+            "step": idx + 1,
+            "segment_seconds": 60,
+            "title": headline,
+            "what_to_show": detail,
+            "live_customer_example_included": False,
+        }
+        for idx, (headline, detail) in enumerate(editorial["sections"])
+    ]
+    faq_cards = "".join(
+        f"<details><summary>{escape(q)}</summary><p>{escape(a)}</p></details>"
+        for q, a in editorial["questions"]
+    )
+    steps = "".join(
+        (
+            '<article class="step"><span class="number">'
+            f'{idx:02d}</span><h3>{escape(title)}</h3>'
+            f'<p>{escape(description)}</p></article>'
+        )
+        for idx, (title, description) in enumerate(editorial["sections"], 1)
+    )
+    proof_labels = [
+        _PROOF_SURFACE_EDITORIAL[code]
+        for code in demo["proof_surfaces_for_owner_to_verify"]
+        if code in _PROOF_SURFACE_EDITORIAL
+    ]
+    proof_list = "".join(f"<li>{escape(item)}</li>" for item in proof_labels)
+    friction = report["buyer_risk_resolution"]
+    friction_block = (
+        f'<div class="notice"><strong>Your documented concern</strong>'
+        f'<p>{escape(friction)}</p></div>'
+        if friction else ""
+    )
+    note = (
+        "A verified direct enquiry is available for a human-reviewed next step."
+        if report["commercial_cta_review_eligible"]
+        else "First review the evidence; a sales conversation is not presumed."
+    )
+    # The preview has no web form, CTA link, contact identifier or external
+    # dependency. The publishing owner must supply verified legal/brand/CTA
+    # approval, security headers, a real landing route and consent text.
+    html = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; object-src 'none'; frame-ancestors 'none'">
+<title>Evidence-first buyer brief | Empire AI</title>
+<style>
+:root{{--ink:#edf3fc;--muted:#b5c4d9;--line:#32445b;--accent:#8be3f5}}
+*{{box-sizing:border-box}}body{{margin:0;background:#08121e;color:var(--ink);font-family:system-ui,-apple-system,Segoe UI,sans-serif;line-height:1.6}}
+main{{max-width:1100px;margin:auto;padding:30px clamp(20px,5vw,64px) 88px}}
+a{{color:inherit}}.strip{{border:1px solid #4d7090;color:#bdd7e8;padding:9px 14px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.12em;display:inline-block}}
+header{{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:85px}}
+.brand{{font-size:18px;font-weight:780;letter-spacing:-.02em}}
+.kicker{{color:var(--accent);font-weight:700;letter-spacing:.12em;text-transform:uppercase;font-size:12px}}
+h1{{font-size:clamp(42px,6.5vw,80px);line-height:1.08;letter-spacing:-.052em;max-width:920px;margin:18px 0 24px}}
+.lead{{font-size:clamp(18px,2vw,22px);color:var(--muted);max-width:750px}}
+.meta{{display:flex;flex-wrap:wrap;gap:14px;margin-top:35px}}
+.pill{{border:1px solid var(--line);border-radius:99px;padding:10px 16px;color:#cfdeef;font-size:13px}}
+section{{margin-top:100px}}
+h2{{font-size:clamp(29px,4vw,45px);line-height:1.12;letter-spacing:-.04em;margin-bottom:15px}}
+.sub{{color:var(--muted);max-width:740px}}
+.steps{{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:32px}}
+.step{{border:1px solid var(--line);border-radius:18px;padding:25px;background:#101f30}}
+.number{{color:var(--accent);font-weight:700;letter-spacing:.1em}}
+h3{{font-size:20px;line-height:1.25;margin:45px 0 8px}}
+.step p,details p{{color:var(--muted);font-size:15px}}
+.proof{{display:grid;grid-template-columns:1fr 1fr;gap:30px;background:#14283a;border:1px solid #34627d;padding:32px;border-radius:22px}}
+.proof ul{{padding-left:20px;color:#d2e3f1}}
+details{{border-bottom:1px solid var(--line);padding:20px 0}}
+summary{{font-weight:650;cursor:pointer}}
+.notice{{border-left:3px solid var(--accent);padding:17px 23px;background:#102739;margin-top:25px}}
+.notice p{{margin-bottom:0;color:var(--muted)}}
+.next{{border-radius:24px;border:1px solid #426f81;padding:32px 36px;background:linear-gradient(120deg,#123247,#0e1e2f)}}
+footer{{color:#849bb3;font-size:13px;border-top:1px solid var(--line);margin-top:95px;padding-top:24px}}
+@media(max-width:720px){{header{{margin-bottom:60px}}.steps,.proof{{grid-template-columns:1fr}}section{{margin-top:65px}}h3{{margin-top:26px}}}}
+</style>
+</head>
+<body>
+<main>
+<header><div class="brand">Empire AI<span style="color:#8be3f5"> / Intelligence</span></div><span class="strip">PRIVATE PREVIEW — NOT LIVE</span></header>
+<div class="kicker">{escape(editorial["eyebrow"])}</div>
+<h1>{escape(editorial["headline"])}</h1>
+<p class="lead">{escape(editorial["intro"])}</p>
+<div class="meta"><div class="pill">{escape(market_label)}</div><div class="pill">Source reviewed: {escape(verified_day)}</div><div class="pill">Availability must be rechecked</div></div>
+<section><p class="kicker">How the review works</p><h2>Three evidence-led steps.</h2><p class="sub">A useful starting point—not a claim of inventory, cost savings or a buying commitment.</p><div class="steps">{steps}</div></section>
+<section><p class="kicker">What must be verified</p><div class="proof"><div><h2>Show the source. Explain the limits.</h2><p class="sub">These are proof surfaces for an owner-reviewed walkthrough, not verified customer outcomes.</p></div><div><ul>{proof_list}</ul></div></div></section>
+<section><p class="kicker">Common questions</p><h2>Useful answers, not sales pressure.</h2>{faq_cards}{friction_block}</section>
+<section><div class="next"><p class="kicker">Next step — human review only</p><h2>Start with a source-backed brief.</h2><p class="sub">{escape(note)} No form, external link or automatic contact has been activated.</p></div></section>
+<footer>Empire AI · Internal proof-first offer preview · No implied customer endorsement, lead guarantee, financial result or marketing permission.</footer>
+</main></body></html>"""
+    return {
+        "schema_version": "empire.gtm.private_buyer_offer_experience.v1",
+        "status": "PRIVATE_OPERATOR_PREVIEW_READY",
+        "review_play": report["review_play"],
+        "offer_arm": arm,
+        "market_scope": scope,
+        "private_html": html,
+        "demo_storyboard": storyboard,
+        "demo_target_seconds": sum(x["segment_seconds"] for x in storyboard),
+        "source_proof_day": verified_day,
+        "proof_surface_review_names": proof_labels,
+        "publication_authorized": False,
+        "working_first_party_cta_present": False,
+        "financial_results_or_inventory_quantity_claimed": False,
+        "customer_or_account_identity_exposed": False,
+        "legal_privacy_consent_and_landing_owner_signoff_required": True,
         "execution_authority": "NONE",
     }

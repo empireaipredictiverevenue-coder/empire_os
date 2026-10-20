@@ -831,3 +831,90 @@ Tests are in
 `tests/test_campaign_buyer_value_first_20261020.py`,
 `tests/test_adaptive_campaign_journey_20261020.py` and
 `tests/test_authenticated_crm_campaign_handoff_20261020.py`.
+
+
+## 20 October — Private proof-backed offer experience renderer
+
+**Scope:** The campaign-intelligence owner now builds actual **offline,
+review-only HTML offer experiences** from trusted, source-attested
+`TrustedBuyerValueCase` evidence. Website publishing, design, domain
+routing, legal copy, tracking, analytics, lead forms and brand deployment
+remain with the existing flagship website and consent owners. Nothing
+has been installed into their worktrees or into the live website.
+
+### Implemented source
+
+`empire_os/campaign_intelligence.build_private_buyer_offer_experience`
+reuses `review_buyer_value_first_offer` and the existing
+`gtm_offer_strategy.build_demo_asset_plan`.
+
+For a genuine canonical buyer problem and a matching current
+verified/deliverable capability, it returns:
+
+- a complete, **self-contained responsive HTML5 preview** with
+  editorial design, no external scripts, tracker or network dependency
+- a relevant offer story and buyer-language headline
+- a three-step evidence-review journey, anchored in exactly the
+  market and commercial problem proven by the source
+- clear FAQ and buyer friction/objection text, but only for a
+  *documented* buyer concern
+- a 3-minute storyboard split into three 60-second segments,
+  each with a concrete proof surface that the owner can demonstrate
+- a **proof review date**; inventory evidence older than 7 days
+  and other offer evidence older than 30 days are held
+- a next-step recommendation that explicitly does not send,
+  quote, enrol, publish or bind the buyer
+
+The preview has `noindex,nofollow,noarchive`, a restrictive
+local-only CSP and **no form, CTA URL, marketing pixel,
+cookie, outbound email, auto-follow-up or interactive purchasing
+button**. Its content never includes company/contact identity,
+private CRM case data, opaque proof IDs, source URLs, invented
+inventory quantities, financial claims or customer testimonials.
+
+### Acceptance / abstention
+
+`HOLD_NO_SUPPORTED_PUBLIC_FACING_VALUE` is returned, with
+`private_html=null`, when the canonical buyer problem is absent
+or not genuinely buyer-stated, when the matching value has no
+current verified delivery proof, or when the account is suppressed,
+unverified or cross-tenant. In particular, a public permit/hiring
+signal, a click or a sales score is **not** a verified buyer problem.
+
+Only source-grounded proposals can generate an operator preview.
+The selected offer has to match the stated need exactly; the
+existing commercial product-book check rejects unapproved paid
+catalog promises.
+
+### Owner handoff
+
+The original `review_buyer_value_first_portfolio` and
+`review_authenticated_crm_campaign_handoff` now include
+`proof_first_private_page_candidate_count`: a privacy-safe **count
+of source-backed candidates**, not a published page count.
+When the existing CRM owner supplies an authenticated tenant
+read, a canonical account join and authenticated value evidence,
+that owner can call the renderer directly for an individual
+review case, inspect the produced HTML and hand it to the
+flagship website team.
+
+**Publication prerequisites remain separate:** actual approved
+first-party landing route, current source-publication rights,
+privacy and consent wording, approved site design, security
+headers, tested functional CTA, founder/business sign-off and
+campaign evidence attribution. This code does **not** turn
+private previews into active websites or take over those owners.
+
+### Verification
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+ tests/test_campaign_buyer_value_first_20261020.py \
+ tests/test_authenticated_crm_campaign_handoff_20261020.py \
+ tests/test_adaptive_campaign_journey_20261020.py
+```
+
+The real CLI continues to print `null` for buyer-value and CRM
+per-contact owner projections until authenticated receipts exist.
+This is truthful proof of **readiness without manufacturing conversions**.

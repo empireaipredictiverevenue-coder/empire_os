@@ -299,3 +299,120 @@ def test_integration_full_funnel_accepts_value_case_owner_packets():
 def test_live_entry_without_value_case_source_remains_unknown_not_zero():
     output = review_authenticated_campaign_intelligence(now=NOW)
     assert output["buyer_value_first_offer_review"] is None
+
+
+def test_private_experience_renders_three_minute_proof_first_buyer_page():
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    preview = build_private_buyer_offer_experience(
+        case(), verified_signals=(), now=NOW,
+    )
+    assert preview["status"] == "PRIVATE_OPERATOR_PREVIEW_READY"
+    assert preview["offer_arm"] == "buyer_inventory_fit_offer"
+    assert preview["demo_target_seconds"] == 180
+    assert len(preview["demo_storyboard"]) == 3
+    assert "<!doctype html>" in preview["private_html"]
+    assert "Empire AI" in preview["private_html"]
+    assert "Better-fit opportunities start with better evidence." in preview["private_html"]
+    assert "PRIVATE PREVIEW" in preview["private_html"]
+    assert preview["publication_authorized"] is False
+    assert preview["working_first_party_cta_present"] is False
+    assert preview["customer_or_account_identity_exposed"] is False
+    assert preview["financial_results_or_inventory_quantity_claimed"] is False
+    assert preview["legal_privacy_consent_and_landing_owner_signoff_required"] is True
+    assert "a"*32 not in preview["private_html"]
+    assert "e"*32 not in preview["private_html"]
+    assert "tenant_empireai" not in preview["private_html"]
+
+
+@pytest.mark.parametrize("code,unique", [
+    ("supply_territory_fit", "Define the buy box"),
+    ("missed_demand_followup", "Trace the handoff"),
+    ("market_expansion_decision", "Set the market criteria"),
+])
+def test_private_offer_page_content_and_storyboard_match_buyer_need(code, unique):
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    output = build_private_buyer_offer_experience(case(code), verified_signals=(), now=NOW)
+    assert unique in output["private_html"]
+    assert output["demo_storyboard"][0]["title"] == unique
+    assert "No. " in output["private_html"]
+    assert output["market_scope"] == "GB:solar:buyers"
+    assert output["source_proof_day"] == "2026-10-20"
+    assert all(not step["live_customer_example_included"] for step in output["demo_storyboard"])
+
+
+def test_private_offer_preview_is_inert_without_sender_or_tracking_controls():
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    import re
+    markup = build_private_buyer_offer_experience(
+        case(), verified_signals=signals("pricing_request"), now=NOW,
+    )["private_html"].lower()
+    for forbidden in (
+        "<script", "<iframe", "<form", "<input", "<button",
+        "href=", "fetch(", "navigator.", "mailto:", "tel:",
+        "http://", "https://", "onclick=", "onload=",
+    ):
+        assert forbidden not in markup
+    assert 'name="robots" content="noindex,nofollow,noarchive"' in markup
+    assert 'default-src &#39;none&#39;' not in markup  # literal CSP attribute
+    assert 'default-src \'none\'' in markup
+
+
+def test_private_offer_hold_produces_no_buyer_facing_page():
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    for value in (
+        case(problem=None),
+        case(context=ctx(suppression_clear=False)),
+        case(capabilities=(capability(currently_deliverable=False),)),
+        case(capabilities=(capability(source_receipt_verified=False),)),
+        case(problem=problem(buyer_directly_stated_problem=False)),
+    ):
+        result = build_private_buyer_offer_experience(
+            value, verified_signals=(), now=NOW,
+        )
+        assert result["status"] == "HOLD_NO_SUPPORTED_PUBLIC_FACING_VALUE"
+        assert result["private_html"] is None
+        assert result["demo_storyboard"] is None
+        assert result["publication_authorized"] is False
+
+
+def test_verified_explicit_inbound_does_not_activate_real_cta():
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    output = build_private_buyer_offer_experience(
+        case(), verified_signals=signals("pricing_request"), now=NOW,
+    )
+    assert output["status"] == "PRIVATE_OPERATOR_PREVIEW_READY"
+    assert output["working_first_party_cta_present"] is False
+    assert output["execution_authority"] == "NONE"
+    assert "No form, external link or automatic contact has been activated." in output["private_html"]
+
+
+def test_private_preview_escaping_never_leaks_raw_proof_keys_or_account_fields():
+    from empire_os.campaign_intelligence import build_private_buyer_offer_experience
+    value = case(context=ctx(
+        tenant_ref="tenant_canonical0123",
+        campaign_id="campaign_"+"f"*24,
+    ))
+    # Wrong market/tenant context is rejected rather than using dynamic
+    # untrusted strings in static HTML.
+    with pytest.raises(CampaignIntelligenceHeld):
+        build_private_buyer_offer_experience(value, verified_signals=(), now=NOW)
+
+
+def test_value_portfolio_reports_preview_eligibility_without_exporting_html():
+    result = review_buyer_value_first_portfolio(
+        [(case(), ()),], now=NOW,
+    )
+    assert result["proof_first_private_page_candidate_count"] == 1
+    assert "private_html" not in result
+    assert result["public_buyer_list_exposed"] is False
+
+
+def test_full_funnel_shared_interface_exposes_preview_readiness_count_only():
+    result = review_authenticated_campaign_intelligence(
+        now=NOW, value_case_packets=[(case(), ())],
+    )
+    assert result["buyer_value_first_offer_review"][
+        "proof_first_private_page_candidate_count"
+    ] == 1
+    assert "private_html" not in json.dumps(result)
+    assert result["live_recipient_contact_or_messages"] is False
