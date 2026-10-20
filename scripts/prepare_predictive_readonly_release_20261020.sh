@@ -99,6 +99,7 @@ EOF
     empire_os/predictive_catalog_readiness_bridge.py \
     scripts/review_predictive_catalog_readiness_20261020.py \
     empire_os/predictive_product_scientific_holdout.py \
+    empire_os/predictive_product_prospective_baseline.py \
     empire_os/predictive_product_science_readiness.py \
     scripts/review_predictive_product_science_20261020.py \
     scripts/review_predictive_founder_crm_visibility_20261020.py \
