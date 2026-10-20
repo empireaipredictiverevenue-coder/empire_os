@@ -18,6 +18,7 @@ from empire_os.predictive_market_restricted_provenance import (
 from empire_os.predictive_customer_value_outcome_readiness import SCHEMA as OUTCOME_SCHEMA
 from empire_os.predictive_profitability_governed_decision import TRUTH_SCHEMA
 from empire_os.predictive_storm_measurement import SCHEMA as STORM_SCHEMA
+from empire_os.predictive_bls_cost_index import SCHEMA as BLS_SCHEMA
 
 SCHEMA = "empire.predictive_revenue.measurement_instruments.v1"
 
@@ -64,6 +65,7 @@ def build_predictive_measurement_instruments(
     producer: Mapping[str, Any],
     storm: Mapping[str, Any],
     *, as_of: datetime,
+    bls: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Score measurement coverage, not commercial success or model accuracy."""
     if not isinstance(as_of, datetime) or as_of.utcoffset() is None:
@@ -119,7 +121,23 @@ def build_predictive_measurement_instruments(
         and storm.get("storm_opportunity_revenue_verified") is False
         and storm.get("forecast_outcome_calibration_allowed") is False
     )
+    b = (
+        isinstance(bls,Mapping)
+        and bls.get("schema_version")==BLS_SCHEMA
+        and bls.get("status")=="BLS_OFFICIAL_INDEX_RESEARCH_REVIEWED"
+        and bls.get("execution_authority")=="none"
+        and bls.get("realized_profit_verified") is False
+        and bls.get("actual_material_or_labor_cost_authenticated") is False
+        and bls.get("external_fetch_or_paid_query_performed") is False
+        and isinstance(bls.get("series_research_cards"),list)
+        and type(bls.get("series_observation_count")) is int
+        and bls["series_observation_count"]==len(bls["series_research_cards"])
+        and 1<=bls["series_observation_count"]<=12
+        and isinstance(bls.get("source_revision_sha256"),str)
+        and len(bls["source_revision_sha256"])==64
+    )
     checks = {
+        "bls_cost_index_research": b,
         "storm_source": s,
         "territory_research": t,
         "restricted_reply_lineage": l,
@@ -274,11 +292,19 @@ def build_predictive_measurement_instruments(
             scope="prospective_original_tenant_product_territory_cohort",
             window_days=None,source_ref=None,limitation=reason,
         ))
+    count("bls_original_index_series_count",bls if b else {},
+          "series_observation_count",b,"bls_economic_source_owner",
+          "national_or_source_series_geography",None,
+          "Source series coverage only; not verified supplier prices, invoices or margin")
     observed=sum(x["value"] is not None for x in metrics)
     return {
         "schema_version":SCHEMA,"status":"MEASUREMENT_INSTRUMENT_EVIDENCE_READINESS_REVIEWED",
         "mode":"OBSERVE","reviewed_at":as_of.isoformat(),
         "source_check_status":checks,
+        "bls_cost_index_source_status":bls.get("status") if isinstance(bls,Mapping) else "BLS_OWNER_SOURCE_NOT_CONNECTED",
+        "bls_year_over_year_research_cards":list(bls["series_research_cards"]) if b else [],
+        "bls_series_are_verified_local_supplier_costs":False,
+        "bls_series_joined_to_original_market_twin":False,
         "storm_source_status":storm.get("status"),
         "storm_source_age_hours":storm.get("source_age_hours"),
         "storm_source_last_observed_at":storm.get("source_snapshot_generated_at"),

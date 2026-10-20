@@ -123,3 +123,46 @@ def test_missing_quant_outcomes_never_result_in_accuracy_or_profit():
     assert metrics["profit_prediction_error_minor"]["value"] is None
     assert metrics["verified_customer_value_saved"]["value"] is None
     assert report["model_training_allowed"] is False
+
+
+def test_optional_bls_index_source_attaches_to_existing_scorecard_without_cost_fiction():
+    from test_predictive_bls_cost_index import owner as sample_bls
+    from empire_os.predictive_bls_cost_index import review_bls_cost_index_owner
+    packet=sample_bls()
+    packet["generated_at"]=NOW.isoformat()
+    bls=review_bls_cost_index_owner(packet,as_of=NOW)
+    report=build_predictive_measurement_instruments(
+        *inputs(),as_of=NOW,bls=bls,
+    )
+    assert report["source_check_status"]["bls_cost_index_research"] is True
+    assert report["bls_cost_index_source_status"]=="BLS_OFFICIAL_INDEX_RESEARCH_REVIEWED"
+    assert by_name(report)["bls_original_index_series_count"]["value"]==1
+    assert report["bls_year_over_year_research_cards"][0][
+        "year_over_year_index_change_pct_research_only"]==10
+    assert report["bls_series_are_verified_local_supplier_costs"] is False
+    assert report["bls_series_joined_to_original_market_twin"] is False
+    assert report["model_training_allowed"] is False
+    assert report["verified_customer_profit_by_market_computed"] is False
+
+
+def test_bls_source_unknown_does_not_change_existing_real_market_and_storm_evidence():
+    report=review()
+    metrics=by_name(report)
+    assert report["source_check_status"]["bls_cost_index_research"] is False
+    assert report["bls_cost_index_source_status"]=="BLS_OWNER_SOURCE_NOT_CONNECTED"
+    assert metrics["bls_original_index_series_count"]["value"] is None
+    assert metrics["territory_market_research_count"]["value"]==3
+    assert metrics["storm_events_observed"]["value"]==1
+    assert report["bls_year_over_year_research_cards"]==[]
+
+
+def test_forged_bls_local_spend_or_profit_authentication_blocks_metric_promotion():
+    from test_predictive_bls_cost_index import owner as sample_bls
+    from empire_os.predictive_bls_cost_index import review_bls_cost_index_owner
+    packet=sample_bls();packet["generated_at"]=NOW.isoformat()
+    bls=review_bls_cost_index_owner(packet,as_of=NOW)
+    bls["actual_material_or_labor_cost_authenticated"]=True
+    report=build_predictive_measurement_instruments(*inputs(),as_of=NOW,bls=bls)
+    assert report["source_check_status"]["bls_cost_index_research"] is False
+    assert by_name(report)["bls_original_index_series_count"]["value"] is None
+    assert report["bls_year_over_year_research_cards"]==[]
