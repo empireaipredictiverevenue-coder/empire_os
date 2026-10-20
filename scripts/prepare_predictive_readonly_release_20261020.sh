@@ -104,7 +104,12 @@ EOF
     empire_os/predictive_product_science_readiness.py \
     scripts/review_predictive_product_science_20261020.py \
     empire_os/predictive_product_scientific_agent_review.py \
-    empire_os/agi_scientific_research_agent.py \
+    empire_os/predictive_existing_scientific_agent_skill_lock.py \
+    empire_os/skills_library/skills/empire-evidence-verification/SKILL.md \
+    empire_os/skills_library/skills/empire-engineering-verification/SKILL.md \
+    empire_os/data/prompts/agent_world_model_architect.txt \
+    empire_os/data/prompts/scientific_paper_replication_harness_architect.txt \
+    empire_os/data/prompts/autonomous_ml_research_agent.txt \
     empire_os/experiment_registry.py \
     scripts/review_predictive_scientific_agent_20261020.py \
     scripts/review_predictive_founder_crm_visibility_20261020.py \

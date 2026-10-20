@@ -13,8 +13,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from empire_os.agi_scientific_research_agent import (
-    ROOT, verify_scientific_skill_custody,
+from empire_os.predictive_existing_scientific_agent_skill_lock import (
+    ROOT, verify_existing_scientific_agent_skill_lock,
 )
 from empire_os.experiment_registry import ExperimentRegistryRecord
 from empire_os.predictive_product_science_readiness import SCHEMA as SCIENCE_SCHEMA
@@ -168,7 +168,7 @@ def review_product_scientific_agent_protocol(
     """Reuse existing agent skill custody and experiment governance, not AGI metrics."""
     product_count, outcomes, probability_count = _science_summary(science_source)
     try:
-        custody = verify_scientific_skill_custody(root=root)
+        custody = verify_existing_scientific_agent_skill_lock(root=root)
     except (ValueError, OSError, TypeError):
         raise ScientificProtocolHold("scientific agent skills changed or unavailable") from None
     if (custody.get("status") != "PINNED_EXISTING_SKILLS_VERIFIED"
