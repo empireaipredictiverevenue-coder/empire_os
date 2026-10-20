@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -53,6 +53,7 @@ case "$command" in
   commercial-example) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-intake) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-crm) module=scripts.review_predictive_founder_crm_visibility_20261020 ;;
+  catalog) module=scripts.review_predictive_catalog_readiness_20261020 ;;
   finance) module=scripts.review_predictive_four_stage_economics_20261020 ;;
   gaps) module=scripts.review_predictive_gap_intelligence_20261020 ;;
   cost) module=scripts.review_predictive_multi_index_cost_pressure_20261020 ;;
@@ -93,6 +94,9 @@ EOF
     empire_os/predictive_commercial_intake_readiness.py \
     empire_os/predictive_commercial_evidence_chain.py \
     empire_os/predictive_existing_founder_crm_bridge.py \
+    empire_os/predictive_catalog_intelligence_contracts.py \
+    empire_os/predictive_catalog_readiness_bridge.py \
+    scripts/review_predictive_catalog_readiness_20261020.py \
     scripts/review_predictive_founder_crm_visibility_20261020.py \
     scripts/review_predictive_commercial_requirements_20261020.py \
     scripts/print_predictive_commercial_intake_template_20261020.py \
@@ -134,6 +138,25 @@ assert value["canonical_original_acquisition_probe_checked"] is False
 assert value["original_customer_order_authenticated"] is False
 assert value["crm_write_performed"] is False
 assert value["outbound_sent"] is False
+'
+# The pinned product catalogue bridge must reconcile real owner snapshot policy,
+# but never mistake root-file custody for original DB/customer authentication.
+"$TMP/bin/empire-predictive-observe" catalog | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.catalog_original_readiness.v1"
+assert x["status"]=="CANONICAL_CATALOGUE_POLICY_RECONCILED_SOURCE_DB_UNVERIFIED"
+assert x["source_root_custody_verified"] is True
+assert x["source_original_db_receipt_authenticated"] is False
+assert x["catalogue_product_count"]>=5
+assert len(x["flagship_deployments"])==5
+assert x["catalogue_terms_ready_count"]<=x["catalogue_product_count"]
+assert x["tenant_customer_forecast_verified"] is False
+assert x["enterprise_delivery_verified"] is False
+assert x["actual_revenue_verified"] is False
+assert x["database_writes"] is False
+assert x["execution_authority"]=="none"
 '
 # The blank downloadable template must round-trip as a structured incomplete
 # customer intake, never an unhandled ValueError or an inferred buyer order.
