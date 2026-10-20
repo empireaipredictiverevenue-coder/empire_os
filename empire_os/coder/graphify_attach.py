@@ -8,10 +8,35 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import re
 from typing import Iterable
 
 from .context import ContextPack
 from .graphify_context import GraphifyContextSource
+
+
+_CAMEL_SYMBOL = re.compile(r"\b[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]+)+\b")
+_SNAKE_SYMBOL = re.compile(r"\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b")
+_PYTHON_MODULE = re.compile(
+    r"(?<![A-Za-z0-9/])(?:[A-Za-z_][A-Za-z0-9_]*/){0,5}"
+    r"[A-Za-z_][A-Za-z0-9_]*\.py\b"
+)
+
+
+def explicit_code_hints(objective: str) -> tuple[str, ...]:
+    """Recognise only overt CODE identifiers, never invent semantic terms."""
+    if not isinstance(objective, str):
+        return ()
+    text = objective[:2048]
+    found: list[str] = []
+    for expression in (_PYTHON_MODULE, _CAMEL_SYMBOL, _SNAKE_SYMBOL):
+        for match in expression.finditer(text):
+            value = match.group(0)
+            if 3 <= len(value) <= 128 and value not in found:
+                found.append(value)
+            if len(found) >= 8:
+                return tuple(found)
+    return tuple(found)
 
 
 class GraphifyContextOverlay:
@@ -39,6 +64,7 @@ class GraphifyContextOverlay:
         self.last_graph_status = "NOT_QUERIED"
         self._usage = {
             "query_attempts": 0,
+            "objective_code_hint_queries": 0,
             "attested_queries": 0,
             "stale_or_invalid_queries": 0,
             "graph_candidate_files": 0,
@@ -71,7 +97,13 @@ class GraphifyContextOverlay:
             budget_chars=budget_chars,
         )
         if not terms and not symbol_terms:
-            return result
+            # Only explicit Python identifiers in an existing task objective;
+            # do not mine free-form business language or create fake signals.
+            discovered = explicit_code_hints(getattr(task, "objective", ""))
+            if not discovered:
+                return result
+            terms = discovered
+            self._usage["objective_code_hint_queries"] += 1
         self._usage["query_attempts"] += 1
         # The underlying graph fails closed if its source has changed.
         try:

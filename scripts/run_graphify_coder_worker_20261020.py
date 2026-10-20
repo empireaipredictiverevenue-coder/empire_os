@@ -53,13 +53,18 @@ def attach_approved_graph_context(coder: EmpireCoder, *, workspace: Path) -> str
         return "REJECTED_GRAPH_ONLY_BASE_CODER_INTACT"
 
 
-def _print_context_usage(coder: EmpireCoder) -> None:
+def _print_context_usage(coder: EmpireCoder, job=None) -> None:
     """Emit count-only telemetry on stderr, never prompt or source metadata."""
     context = getattr(coder, "context", None)
     report = getattr(context, "metrics_snapshot", None)
-    if callable(report):
+    if callable(report) and job is not None:
+        counts = report()
+        # Generic enum values only; NEVER emit job IDs, task text,
+        # customer data, file paths, private terms or URLs.
+        counts["job_kind"] = job.kind.value
+        counts["job_status"] = job.status.value
         print(
-            "GRAPHIFY_CONTEXT_USAGE " + json.dumps(report(), sort_keys=True),
+            "GRAPHIFY_CONTEXT_USAGE " + json.dumps(counts, sort_keys=True),
             file=sys.stderr,
         )
 
@@ -79,7 +84,7 @@ def main(argv: list[str] | None = None) -> int:
         heartbeat_seconds=args.heartbeat_seconds,
         max_attempts=args.max_attempts,
     ).run_once()
-    _print_context_usage(coder)
+    _print_context_usage(coder, job)
     # Maintain original machine-readable stdout shape and exit codes.
     if job is None:
         print(json.dumps({
