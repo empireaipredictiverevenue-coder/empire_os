@@ -15,6 +15,9 @@ from typing import Any
 
 from empire_os.commercial_sales_director_adaptive_review import SOURCE_KINDS
 from empire_os.commercial_adaptive_checkpoint_guard import recover_safe_adaptive_checkpoints
+from empire_os.commercial_buyer_source_health import (
+    inspect_original_buyer_health, review_buyer_evidence_transition,
+)
 from empire_os.conversation_control_operational_truth import SOURCE_PATHS
 from scripts.review_commercial_adaptive_intelligence_20261020 import (
     build_adaptive_commercial_runtime,
@@ -75,6 +78,12 @@ def observe_ops_adaptive_commercial(
     previous_sales = prior.get("adaptive_sales_review")
     previous_control = prior.get("adaptive_commercial_review")
     prior_summary = prior.get("adaptive_commercial_summary")
+    buyer_evidence = inspect_original_buyer_health(root, now=now)
+    old_buyer = (
+        prior_summary.get("original_buyer_evidence_health")
+        if isinstance(prior_summary, Mapping) else None
+    )
+    buyer_transition = review_buyer_evidence_transition(old_buyer, buyer_evidence)
     try:
         result = build_adaptive_commercial_runtime(
             root, now=now.astimezone(timezone.utc),
@@ -95,6 +104,8 @@ def observe_ops_adaptive_commercial(
             "plain_language_reason": control["plain_language_reason"],
             "reviewed_at": now.astimezone(timezone.utc).isoformat(),
             "active_dependency_gates": len(control["active_dependency_gates"]),
+            "original_buyer_evidence_health": buyer_evidence,
+            "original_buyer_evidence_transition": buyer_transition,
             "parallel_owner_reviews_possible_not_dispatched": len(
                 control["recommended_parallel_reviews_not_dispatched"]
             ),
@@ -160,6 +171,8 @@ def observe_ops_adaptive_commercial(
                 "schema_version": SCHEMA,
                 "status": "ADAPTIVE_COMMERCIAL_EVIDENCE_UNAVAILABLE",
                 "available": False,
+                "original_buyer_evidence_health": buyer_evidence,
+                "original_buyer_evidence_transition": buyer_transition,
                 "plain_language_reason": (
                     "Existing commercial source contracts or prior decision memory "
                     "could not be verified. Keep all actions held and review with source owners."
