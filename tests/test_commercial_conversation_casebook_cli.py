@@ -119,3 +119,40 @@ def test_cli_requires_explicit_read_only_flag(tmp_path):
     )
     assert r.returncode != 0
     assert "required" in r.stderr
+
+
+PROOF_MODULE = "scripts.review_sales_director_original_proof_20261020"
+
+
+def test_original_proof_handoff_missing_owner_receipts_stays_held_without_writes(tmp_path):
+    paths = _prepare(tmp_path)
+    before = {_hash(p): str(p) for p in paths}
+    r = subprocess.run(
+        [sys.executable, "-B", "-m", PROOF_MODULE,
+         "--read-only", "--repo-root", str(tmp_path)],
+        text=True, capture_output=True, timeout=25, cwd=ROOT,
+    )
+    assert r.returncode == 0, r.stderr
+    report = json.loads(r.stdout)
+    assert report["case_count"] == 1
+    assert report["status"] == "ORIGINAL_AUTHENTICATED_REPLY_EVIDENCE_HOLD"
+    assert report["source_blockers_allowlisted"]
+    assert report["original_inbox_accessed"] is False
+    assert report["outbound_authorized"] is False
+    assert report["database_writes"] is False
+    assert "private@" not in r.stdout
+    assert "Synthetic Partner" not in r.stdout
+    assert "synthetic-thread-1" not in r.stdout
+    assert {_hash(p): str(p) for p in paths} == before
+    assert sorted(tmp_path.rglob("*.json")) == sorted(paths)
+
+
+def test_original_proof_cli_requires_readonly_flag(tmp_path):
+    _prepare(tmp_path)
+    r = subprocess.run(
+        [sys.executable, "-B", "-m", PROOF_MODULE,
+         "--repo-root", str(tmp_path)],
+        text=True, capture_output=True, timeout=15, cwd=ROOT,
+    )
+    assert r.returncode != 0
+    assert "required" in r.stderr

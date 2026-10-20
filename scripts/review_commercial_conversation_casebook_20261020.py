@@ -24,14 +24,8 @@ def _read(path: Path):
     return json.loads(p.read_text(encoding="utf-8"))
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Read-only existing Sales Director conversation conversion review"
-    )
-    parser.add_argument("--read-only", required=True, action="store_true")
-    parser.add_argument("--repo-root", default="/srv/empire_os")
-    args = parser.parse_args()
-    root = Path(args.repo_root).resolve(strict=True)
+def build_casebook_runtime(root: Path, *, now: datetime):
+    """Compose owner packet readers in memory, without new jobs or file writes."""
     catalog = _read(root / "runtime/commercial_catalog/latest.json")
     distribution = _read(root / "runtime/revenue_distribution/latest.json")
     previous = _read(root / "runtime/predictive_revenue/commercial_offer_book/latest.json")
@@ -42,7 +36,6 @@ def main() -> int:
             sources[label] = _read(root / rel)
         except (OSError, ValueError, json.JSONDecodeError):
             sources[label] = None
-    now = datetime.now(timezone.utc)
     health = review_shadow_offer_reconstruction(
         catalog=catalog, distribution=distribution, review_sources=sources,
         previous_offer_book=previous, now=now,
@@ -51,10 +44,21 @@ def main() -> int:
         catalog=catalog, distribution=distribution,
         review_sources=sources, now=now,
     )
-    report = review_conversion_casebook(
+    return review_conversion_casebook(
         offer_book=book, conversation_recovery=recovery,
         source_health=health, now=now,
     )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        description="Read-only existing Sales Director conversation conversion review"
+    )
+    parser.add_argument("--read-only", required=True, action="store_true")
+    parser.add_argument("--repo-root", default="/srv/empire_os")
+    args = parser.parse_args()
+    root = Path(args.repo_root).resolve(strict=True)
+    report = build_casebook_runtime(root, now=datetime.now(timezone.utc))
     print(json.dumps(report, sort_keys=True, indent=2))
     return 0
 
