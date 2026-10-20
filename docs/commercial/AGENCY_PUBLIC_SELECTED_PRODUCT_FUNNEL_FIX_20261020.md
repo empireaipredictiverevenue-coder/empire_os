@@ -56,3 +56,27 @@ Fresh isolated Next.js 16.3.5 static build: TypeScript passed, 19 static pages g
 The browser-smoke script is `scripts/smoke_agency_selected_product_browser_20261020.cjs`; it serves only the **isolated staged static export** on loopback and requires the existing approved browser installation on EmpireOS. It is for website-owner review, not a production service.
 
 **Release owner:** only the two public-site source modules need merging into the actual latest website-owner branch. This refinement intentionally provides a genuine first-party **non-wallet** conversion alternative while preserving any currently authorised checkout, instead of disabling commerce. Actual consented enquiry receipt → correct CRM tenant remains unverified until a real buyer completes the form.
+
+## 20 October — LIVE surgical release and public Chromium verification
+
+**This supersedes the staged-only release status above.** The founder explicitly requested deployment. The live /buy page uses an older Turbopack bundle, while the live /commercial page contains a newer premium-brokerage section with different Webpack assets. Replacing both with the standalone static preview would discard current production content.
+
+Instead, we deployed a surgical self-origin JavaScript bridge against the exact existing live pages. Each published HTML file differs from its prior bytes only by one new script tag immediately before the closing body element. All earlier checkout, premium-brokerage, CSS and Next.js bundles were left untouched. No website or backend service was restarted.
+
+Live HTML: /srv/empire_os/apps/empire-public-site/out/buy.html and commercial.html
+Additive JS: /srv/empire_os/apps/empire-public-site/out/_next/static/agency/selected-product-bridge-20261020.js
+Original exact-page backups and manifest: /home/ubuntu/empire_releases/agency_selected_product_public_20261020
+Source: scripts/live_selected_product_bridge_20261020.js
+Guarded apply/verify/rollback: scripts/promote_surgical_selected_product_20261020.py
+Exact-live-snapshot Chromium smoke: scripts/smoke_surgical_live_selected_product_20261020.cjs
+
+**Live public HTTPS browser smoke passed:** /buy shows REQUEST A PROPOSAL INSTEAD alongside the existing CREATE PAYMENT REQUEST button. Switching from Search Opportunity Map back to Competitor Search Gap updates the new link. /commercial?product=competitor_search_gap#commercial-enquiry preselects the correct live approved offer; invalid codes fall back. The pre-existing premium-brokerage section and enabled checkout remain present. The additive script returned HTTP 200. No browser POSTs, contacts, orders, CRM rows or payments were created.
+
+Pre-release exact SHA256: buy.html 0e649ec52f02bf56cae7e0f63b045faac7239eac29bca896cbffc691ffb1176e; commercial.html 4bbcea52f174c18850ebaa6799d7d7605219fa304b2e10ab6edc00f2df19188c. The private release manifest retains original bytes and final expected SHA256 digests.
+
+To verify without writes: python3 scripts/promote_surgical_selected_product_20261020.py --verify
+To conditionally restore the original pages (only while neither has been modified by another owner): python3 scripts/promote_surgical_selected_product_20261020.py --rollback
+
+**Important future cleanup:** GitHub issue #69 remains open for the original Website/SEO owner to integrate the preferred native Next.js source fix. The surgical compatibility script should then be removed in the same reviewed public release (both HTML script tags and the bridge file) to prevent duplicate proposal links. Do not run the surgical rollback blindly after a new source-owned release; it must refuse conflicting changes.
+
+This live UI fix does not independently verify consented enquiry receipts in the CRM, visitor analytics permission, a purchase, customer payment or permission to publish research evidence.
