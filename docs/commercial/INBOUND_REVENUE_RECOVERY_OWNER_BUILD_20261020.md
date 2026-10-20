@@ -392,3 +392,15 @@ Built on EmpireOS existing customer identity; NOT a customer-visible endpoint.
 - Tests cover login and provider-flow fixtures separately. No real Google customer account or actual booking was connected.
 
 Deployment requires the independently approved private CRM account + membership reader, pinned signing keys, exact Google Cloud registered HTTPS callback, production KMS-backed vault, persisted auditable tenant registry, consent, authorized private/public ingress boundaries, revocation and PostgreSQL/RLS checks. Do not mount this opt-in router into the existing dark staging or CRM pilot without explicit release review. The existing deployed service remains dark by design.
+
+
+## 20 October — Trusted Google OAuth completion adapter and state-store hardening
+
+- empire_os/inbound_google_calendar_completion.py: opt-in ApprovedGoogleCalendarCompletion bridges the short-lived, browser-bound one-time Google PKCE ticket with the existing Google OAuth token exchange, exact calendarList.get readback, encrypted local vault and approved calendar registry. It verifies principal tenant/subject/role, client ID, pinned callback URL, fresh owner membership, and a server-controlled tenant+calendar+owner account binding BEFORE calling Google. Operator tracking account reference is not independently verified Google user identity. A 32-byte server-held HMAC key produces non-plaintext consent-evidence references.
+- Per-call vault/registry factories are mandatory. FastAPI runs synchronous callbacks in worker threads; reusing SQLite connections across threads failed an integration test and was removed. No check_same_thread=False workaround.
+- Existing inbound_calendar_connection_api callback independently reads the persisted tenant/calendar/provider binding before ever returning connected=true.
+- OfflineGoogleConsentStateStore now creates staging SQLite OAuth state files mode 0600 and rejects world-accessible, symlink or unowned state files. Existing pre-browser-binding schemas receive missing nonce and selected-calendar columns. Legacy rows are not eligible for a browser-bound callback because their nonce hashes are blank.
+- tests/test_inbound_google_calendar_completion.py exercises complete HTTP start/Google OAuth callback/verified vault persistence/registry readback using ONLY fake token endpoints, plus operator approval, tenant revocation, wrong client/redirect/calendar, insufficient read scopes and provider role denial.
+- tests/test_inbound_calendar_oauth_onboarding.py adds private file permission and safe legacy migration checks.
+
+**No real provider token exchange, customer consent or Google Calendar was attempted.** This adapter is deliberately NOT wired into the running systemd dark staging app. The SQLite Fernet vault is staging-only; a production KMS-backed backend with an audited revocation lifecycle remains a release blocker. No private signing keys or Google client secrets were generated, extracted or copied into this repo.

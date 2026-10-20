@@ -177,3 +177,85 @@ def test_rejects_weak_cookie_nonce(tmp_path):
     ) as store:
         with pytest.raises(OAuthOnboardingDenied, match="invalid_browser_nonce"):
             begin(store, browser_nonce="short")
+
+
+
+def test_oauth_state_file_newly_created_as_owner_only(tmp_path):
+    import stat
+    path = tmp_path / "private-state.db"
+    with OfflineGoogleConsentStateStore(path, encryption_key=Fernet.generate_key()) as store:
+        assert store.db.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+        assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_world_readable_or_symlinked_oauth_state_denied(tmp_path):
+    import os
+    path = tmp_path / "insecure.db"
+    path.write_text("not-a-real-db")
+    path.chmod(0o644)
+    with pytest.raises(OAuthOnboardingDenied, match="owner_only"):
+        OfflineGoogleConsentStateStore(path, encryption_key=Fernet.generate_key())
+    path.chmod(0o600)
+    linked = tmp_path / "link.db"
+    linked.symlink_to(path)
+    with pytest.raises(OAuthOnboardingDenied, match="private_oauth_state_store_required"):
+        OfflineGoogleConsentStateStore(linked, encryption_key=Fernet.generate_key())
+
+
+def test_existing_legacy_sqlite_state_migrates_without_granting_old_sessions(tmp_path):
+    import sqlite3
+    key = Fernet.generate_key()
+    db = tmp_path / "pre-browser-nonce.db"
+    # Reconstruct only the OLD columns to prove an installed staging file
+    # can upgrade without silently accepting an unbound OAuth consent.
+    with sqlite3.connect(db) as conn:
+        conn.execute("""
+            CREATE TABLE oauth_pending (
+                state_sha256 TEXT PRIMARY KEY, tenant_id TEXT NOT NULL,
+                admin_subject TEXT NOT NULL, client_id TEXT NOT NULL,
+                redirect_uri TEXT NOT NULL, encrypted_verifier BLOB NOT NULL,
+                created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+                consumed INTEGER NOT NULL DEFAULT 0
+            )
+        """)
+        legacy_state = "legacy-staging-state-" + ("z" * 32)
+        conn.execute(
+            "INSERT INTO oauth_pending VALUES(?,?,?,?,?,?,?,?,?)",
+            (sha256(legacy_state.encode()).hexdigest(),
+             "business-a", "approved-owner-1", "google-client",
+             REDIRECT, Fernet(key).encrypt(b"legacy-test-verifier"),
+             NOW.isoformat(), (NOW + timedelta(minutes=8)).isoformat(), 0),
+        )
+    db.chmod(0o600)
+    with OfflineGoogleConsentStateStore(db, encryption_key=key) as state_store:
+        columns = {row[1] for row in state_store.db.execute(
+            "PRAGMA table_info(oauth_pending)"
+        ).fetchall()}
+        assert "browser_nonce_sha256" in columns
+        assert "selected_calendar_id" in columns
+        with pytest.raises(OAuthOnboardingDenied, match="browser_session_mismatch"):
+            state_store.consume(
+                tenant_id="business-a", admin_subject="approved-owner-1",
+                state=legacy_state, authorization_code="test-provider-code",
+                now=NOW + timedelta(minutes=1),
+                browser_nonce="new-browser-bound-nonce-" + ("b" * 40),
+            )
+        _, params = begin(
+            state_store, selected_calendar_id="selected@example.org",
+            browser_nonce="new-browser-bound-nonce-" + ("b" * 40),
+        )
+        confirmed = claim(
+            state_store, params,
+            browser_nonce="new-browser-bound-nonce-" + ("b" * 40),
+        )
+        assert confirmed.selected_calendar_id == "selected@example.org"
+
+
+def test_wrong_existing_schema_is_never_rewritten_as_valid_oauth_state(tmp_path):
+    import sqlite3
+    path = tmp_path / "unexpected.db"
+    with sqlite3.connect(path) as conn:
+        conn.execute("CREATE TABLE oauth_pending (state_sha256 TEXT PRIMARY KEY)")
+    path.chmod(0o600)
+    with pytest.raises(OAuthOnboardingDenied, match="unsupported_oauth_state_schema"):
+        OfflineGoogleConsentStateStore(path, encryption_key=Fernet.generate_key())

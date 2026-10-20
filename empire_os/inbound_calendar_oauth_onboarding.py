@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import base64
 from hashlib import sha256
 import hmac
+import os
+import stat
 import secrets
 import sqlite3
 from pathlib import Path
@@ -67,31 +69,66 @@ def _https_redirect(value: str) -> None:
 class OfflineGoogleConsentStateStore:
     def __init__(self, path: str | Path, *, encryption_key: bytes):
         self.path = Path(path)
-        if (self.path != Path(":memory:") and (
-            not self.path.parent.is_dir() or self.path.is_symlink()
-        )):
-            raise OAuthOnboardingDenied("private_oauth_state_store_required")
         try:
             self.fernet = Fernet(encryption_key)
         except (ValueError, TypeError) as exc:
             raise OAuthOnboardingDenied("valid_server_side_fernet_key_required") from exc
+        if self.path != Path(":memory:"):
+            if (not self.path.is_absolute() or self.path.is_symlink()
+                or not self.path.parent.is_dir() or self.path.parent.is_symlink()):
+                raise OAuthOnboardingDenied("private_oauth_state_store_required")
+            if not self.path.exists():
+                try:
+                    fd = os.open(self.path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+                    os.close(fd)
+                except FileExistsError:
+                    pass
+            metadata = self.path.stat()
+            if (not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) & 0o077
+                or metadata.st_uid != os.geteuid()):
+                raise OAuthOnboardingDenied("oauth_state_file_must_be_owner_only")
         self.db = sqlite3.connect(str(self.path), timeout=3)
-        self.db.execute("PRAGMA busy_timeout=3000")
-        self.db.executescript("""
-            CREATE TABLE IF NOT EXISTS oauth_pending (
-                state_sha256 TEXT PRIMARY KEY,
-                tenant_id TEXT NOT NULL,
-                admin_subject TEXT NOT NULL,
-                client_id TEXT NOT NULL,
-                redirect_uri TEXT NOT NULL,
-                encrypted_verifier BLOB NOT NULL,
-                browser_nonce_sha256 TEXT NOT NULL DEFAULT '',
-                selected_calendar_id TEXT NOT NULL DEFAULT '',
-                created_at TEXT NOT NULL,
-                expires_at TEXT NOT NULL,
-                consumed INTEGER NOT NULL DEFAULT 0
-            );
-        """)
+        try:
+            self.db.execute("PRAGMA busy_timeout=3000")
+            self.db.execute("""
+                CREATE TABLE IF NOT EXISTS oauth_pending (
+                    state_sha256 TEXT PRIMARY KEY,
+                    tenant_id TEXT NOT NULL,
+                    admin_subject TEXT NOT NULL,
+                    client_id TEXT NOT NULL,
+                    redirect_uri TEXT NOT NULL,
+                    encrypted_verifier BLOB NOT NULL,
+                    browser_nonce_sha256 TEXT NOT NULL DEFAULT '',
+                    selected_calendar_id TEXT NOT NULL DEFAULT '',
+                    created_at TEXT NOT NULL,
+                    expires_at TEXT NOT NULL,
+                    consumed INTEGER NOT NULL DEFAULT 0
+                )
+            """)
+            names = {row[1] for row in self.db.execute(
+                "PRAGMA table_info(oauth_pending)"
+            ).fetchall()}
+            baseline = {
+                "state_sha256", "tenant_id", "admin_subject", "client_id",
+                "redirect_uri", "encrypted_verifier", "created_at",
+                "expires_at", "consumed",
+            }
+            if not baseline.issubset(names):
+                raise OAuthOnboardingDenied("unsupported_oauth_state_schema")
+            # Upgrade only optional columns, retaining existing rows. Old
+            # rows have blank browser hashes/calendar IDs and therefore
+            # cannot be consumed by the browser-bound calendar API.
+            for name in ("browser_nonce_sha256", "selected_calendar_id"):
+                if name not in names:
+                    self.db.execute(
+                        "ALTER TABLE oauth_pending ADD COLUMN " + name +
+                        " TEXT NOT NULL DEFAULT ''"
+                    )
+            self.db.commit()
+        except Exception:
+            self.db.close()
+            raise
 
     def __enter__(self) -> "OfflineGoogleConsentStateStore":
         return self
