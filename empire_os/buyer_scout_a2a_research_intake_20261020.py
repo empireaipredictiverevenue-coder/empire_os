@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from urllib.parse import urlparse
 import json
 import re
+from empire_os.buyer_scout_first_party_evidence_binding_20261020 import verify_site_source_binding
 
 SCHEMA="empire.buyer_scout.a2a_owner_evidence_intake.v1"
 WEB_SCHEMA="empire.a2a.first_party_buyer_scout_evidence_handoff.v1"
@@ -115,6 +116,7 @@ def stage_a2a_owner_research(
         if candidate:
             try:known.add(_normal_domain(candidate))
             except ValueError:pass  # pre-existing source URLs may contain paths
+    binding=verify_site_source_binding(raw_sites, source_readback)
     seen=set()
     site_review=[]
     for row in raw_sites:
@@ -142,9 +144,10 @@ def stage_a2a_owner_research(
             "market":row["target_market"],"vertical":row["target_sector"],
             "existing_search_or_scout_domain_overlap":domain in known,
             "public_page_content_sha256":receipt if good else None,
+            "source_receipt_bound_to_independent_collector_readback":binding[row["public_company_website"]],
             "a2a_ticket_id":row.get("buyer_scout_ticket_id"),
             "research_status":("PENDING_OWNER_COMPANY_AND_COMMERCIAL_NEED_VERIFICATION"
-                               if good and source_recent
+                               if good and source_recent and binding[row["public_company_website"]]
                                and row.get("ready_for_buyer_scout_owner_research_review") is True
                                else "SOURCE_STALE_OR_HELD_NOT_CURRENT"),
             "buyer_identity_verified":False,"live_buying_need_verified":False,
@@ -183,6 +186,7 @@ def stage_a2a_owner_research(
         "source_schema_validated":True,
         "website_research_records":site_review,
         "website_research_record_count":len(site_review),
+        "website_receipts_individually_bound_to_source":sum(binding.values()),
         "website_source_recency_independently_crosschecked":source_readback is not None,
         "website_source_within_seven_days":source_recent,
         "website_source_records_eligible_for_further_owner_review":sum(

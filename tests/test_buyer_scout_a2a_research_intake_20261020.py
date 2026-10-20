@@ -110,7 +110,7 @@ def test_duplicate_website_cannot_become_two_new_discoveries():
         stage_a2a_owner_research(*args)
 
 
-def test_only_recent_authorized_first_party_receipt_can_enter_active_owner_review():
+def test_recent_label_without_individual_site_receipts_is_not_authoritative():
     w,p,c,q=sources()
     evidence={
         "schema_version":"empire.a2a.first_party_source_recovery_review.v1",
@@ -118,12 +118,10 @@ def test_only_recent_authorized_first_party_receipt_can_enter_active_owner_revie
         "outbound_sent":0,
         "source_state":"CACHED_FIRST_PARTY_PUBLIC_RESEARCH_WITHIN_7_DAYS",
     }
-    x=stage_a2a_owner_research(w,p,c,q,evidence)
-    assert x["website_source_records_eligible_for_further_owner_review"]==1
-    assert x["website_source_within_seven_days"]
-    evidence["source_state"]="STALE_FIRST_PARTY_PUBLIC_RESEARCH_OVER_7_DAYS"
-    old=stage_a2a_owner_research(w,p,c,q,evidence)
-    assert old["website_source_records_eligible_for_further_owner_review"]==0
+    # A recency label alone is insufficient: the original collector must
+    # supply every site's matching URL, SHA, source and parser attestation.
+    with pytest.raises(ValueError, match="SOURCE_BINDING_RECORD_SET_INCOMPLETE"):
+        stage_a2a_owner_research(w,p,c,q,evidence)
     evidence["new_verified_sales_leads"]=1
     with pytest.raises(ValueError,match="UNTRUSTED_SOURCE_FRESHNESS"):
         stage_a2a_owner_research(w,p,c,q,evidence)
