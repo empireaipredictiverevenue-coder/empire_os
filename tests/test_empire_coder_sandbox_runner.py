@@ -234,3 +234,66 @@ def test_sandbox_valid_relative_scopes_still_work_and_tests_must_be_safe():
             lease_resources=("domain:software_test",),
             pytest_targets=("tests/../../unsafe.py",),
         ).validate()
+
+
+
+def test_sandbox_prefers_exact_authorised_source_code_without_symbol_scan():
+    from types import SimpleNamespace
+    from empire_os.coder.context import ContextDocument, ContextPack
+    from empire_os.empire_coder_sandbox_runner import _scoped_source_context
+
+    reads = []
+
+    def read(path, *, max_chars):
+        reads.append((path, max_chars))
+        return "class ProviderHealth:\n    def _load(self):\n        return {}"
+
+    coder = SimpleNamespace(repo=SimpleNamespace(read=read))
+    original = ContextPack(
+        objective="Repair the existing software loader",
+        task_state={},
+        documents=(
+            ContextDocument("docs/BLUEPRINT_V6.md", "original blueprint", "B" * 2000),
+            ContextDocument("empire_os/unrelated.py", "broad search match", "X" * 1800),
+        ),
+        symbols=(),
+        token_budget_chars=8000,
+    )
+    scoped = _scoped_source_context(
+        coder, original,
+        ("empire_os/coder/provider_health.py", "tests/coder/test_provider_health.py"),
+    )
+    assert reads == [
+        ("empire_os/coder/provider_health.py", 2400),
+        ("tests/coder/test_provider_health.py", 2400),
+    ]
+    assert [doc.path for doc in scoped.documents] == [
+        "empire_os/coder/provider_health.py",
+        "tests/coder/test_provider_health.py",
+        "docs/BLUEPRINT_V6.md",
+    ]
+    assert "ProviderHealth" in scoped.documents[0].excerpt
+    assert scoped.documents[-1].excerpt == "B" * 800
+    assert scoped.token_budget_chars == 6000
+    assert original.documents[1].path == "empire_os/unrelated.py"
+
+
+def test_sandbox_context_rejects_traversal_and_preserves_pack_on_no_sources():
+    from types import SimpleNamespace
+    from empire_os.coder.context import ContextPack
+    from empire_os.empire_coder_sandbox_runner import _scoped_source_context
+
+    reads = []
+
+    def read(path, *, max_chars):
+        reads.append(path)
+        raise OSError("source missing")
+
+    coder = SimpleNamespace(repo=SimpleNamespace(read=read))
+    original = ContextPack("software task", {}, (), (), 4000)
+    result = _scoped_source_context(
+        coder, original,
+        ("../outside.py", "/etc/passwd", "empire_os/safe.py"),
+    )
+    assert result is original
+    assert reads == ["empire_os/safe.py"]
