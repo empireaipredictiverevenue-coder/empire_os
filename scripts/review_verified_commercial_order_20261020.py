@@ -18,6 +18,9 @@ from empire_os.authenticated_commercial_outcome_intelligence import (
     _uuid, MAX_ORDERS, inspect_canonical_order_outcomes,
 )
 from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
+from empire_os.canonical_order_reader_release_integrity import (
+    inspect_canonical_reader_release_integrity,
+)
 
 SCHEMA = "empire.commercial.verified_order_operator.v1"
 
@@ -94,10 +97,16 @@ def main() -> int:
                           "status": "INVALID_OR_UNAUTHORIZED_REQUEST_SCOPE",
                           "execution_authority": "none"}))
         return 2
-    if not callable(getattr(ExecutionBusDataRepository, "verified_outcome_feedback", None)):
+    release = inspect_canonical_reader_release_integrity(root)
+    if release["status"] != "COMMITTED_READER_PRESENT_OWNER_APPROVAL_REQUIRED":
         print(json.dumps({
             "schema_version": SCHEMA,
-            "status": "CANONICAL_OWNER_READER_NOT_DEPLOYED",
+            "status": (
+                "CANONICAL_OWNER_READER_NOT_DEPLOYED"
+                if release["status"] == "VERIFIED_ORDER_READER_NOT_COMMITTED"
+                else "ORIGINAL_OWNER_READER_COMMIT_INTEGRITY_HOLD"
+            ),
+            "original_owner_release_integrity": release["status"],
             "next_existing_owner": "execution_bus_data_repository",
             "verified_financial_results": None,
             "outbound_authorized": False,

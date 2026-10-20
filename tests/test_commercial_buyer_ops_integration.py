@@ -103,3 +103,30 @@ def test_original_ops_reports_order_reader_deployment_only_not_sales(
     assert capability["verified_order_count"] is None
     assert capability["execution_authority"] == "none"
     assert after["outbound_authorized"] is False
+
+
+def test_existing_ops_observes_canonical_reader_integrity_without_clearing_order_hold(
+    tmp_path, monkeypatch, capsys,
+):
+    ops_mod = _load_ops()
+    ops = _configure_sandbox(monkeypatch, ops_mod, tmp_path)
+    _buyer_sources(tmp_path)
+    assert ops_mod.main() == 0
+    capsys.readouterr()
+    first = _summary(ops)
+    owner = first["original_order_reader_release_integrity"]
+    assert owner["status"] == "ORIGINAL_OWNER_SOURCE_INTEGRITY_NOT_PROVEN"
+    assert owner["actual_canonical_order_read_performed"] is False
+    assert owner["verified_buyer_orders"] is None
+    assert owner["original_owner_release_attested"] is False
+    assert first["original_order_reader_release_transition"]["status"] == (
+        "FIRST_ORIGINAL_OWNER_RELEASE_INTEGRITY_CHECK"
+    )
+    assert ops_mod.main() == 0
+    capsys.readouterr()
+    second = _summary(ops)
+    assert second["original_order_reader_release_transition"]["status"] == (
+        "UNCHANGED_ORIGINAL_OWNER_RELEASE_HOLD"
+    )
+    assert second["outbound_authorized"] is False
+    assert second["original_order_reader_release_integrity"]["realized_revenue_cents"] is None

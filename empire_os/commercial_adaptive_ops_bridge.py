@@ -19,6 +19,9 @@ from empire_os.commercial_buyer_source_health import (
     inspect_original_buyer_health, review_buyer_evidence_transition,
 )
 from empire_os.commercial_verified_learning_review import original_order_reader_capability
+from empire_os.canonical_order_reader_release_integrity import (
+    inspect_canonical_reader_release_integrity, review_reader_release_transition,
+)
 from empire_os.conversation_control_operational_truth import SOURCE_PATHS
 from scripts.review_commercial_adaptive_intelligence_20261020 import (
     build_adaptive_commercial_runtime,
@@ -81,6 +84,14 @@ def observe_ops_adaptive_commercial(
     prior_summary = prior.get("adaptive_commercial_summary")
     buyer_evidence = inspect_original_buyer_health(root, now=now)
     order_reader = original_order_reader_capability()
+    order_release_integrity = inspect_canonical_reader_release_integrity(root)
+    prior_integrity = (
+        prior_summary.get("original_order_reader_release_integrity")
+        if isinstance(prior_summary, Mapping) else None
+    )
+    order_release_transition = review_reader_release_transition(
+        prior_integrity, order_release_integrity,
+    )
     old_buyer = (
         prior_summary.get("original_buyer_evidence_health")
         if isinstance(prior_summary, Mapping) else None
@@ -109,6 +120,8 @@ def observe_ops_adaptive_commercial(
             "original_buyer_evidence_health": buyer_evidence,
             "original_buyer_evidence_transition": buyer_transition,
             "original_order_outcome_reader_capability": order_reader,
+            "original_order_reader_release_integrity": order_release_integrity,
+            "original_order_reader_release_transition": order_release_transition,
             "parallel_owner_reviews_possible_not_dispatched": len(
                 control["recommended_parallel_reviews_not_dispatched"]
             ),
@@ -177,6 +190,8 @@ def observe_ops_adaptive_commercial(
                 "original_buyer_evidence_health": buyer_evidence,
                 "original_buyer_evidence_transition": buyer_transition,
                 "original_order_outcome_reader_capability": order_reader,
+                "original_order_reader_release_integrity": order_release_integrity,
+                "original_order_reader_release_transition": order_release_transition,
                 "plain_language_reason": (
                     "Existing commercial source contracts or prior decision memory "
                     "could not be verified. Keep all actions held and review with source owners."

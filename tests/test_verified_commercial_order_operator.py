@@ -24,7 +24,7 @@ def _cli(*flags, dsn=None):
     if dsn is not None:
         env["EMPIREDB_DSN"] = dsn
     return subprocess.run(
-        [sys.executable, "-B", "-m", MODULE, *flags],
+        [sys.executable, "-B", "-m", MODULE, "--repo-root", str(ROOT), *flags],
         cwd=ROOT, env=env, text=True, capture_output=True, timeout=15,
     )
 
