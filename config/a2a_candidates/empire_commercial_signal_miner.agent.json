@@ -1,0 +1,79 @@
+{
+  "agent_id": "empire.a2a.commercial_signal_miner.v1",
+  "capabilities": [
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Evaluate existing licensed or permitted source summaries",
+      "name": "intelligence.source.review"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Rank B2B buyer research priorities, not verified buyers",
+      "name": "intelligence.buyer_signal.rank"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Cross-reference market research and buyer evidence",
+      "name": "intelligence.market_gap.match"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Form unpriced opportunity hypotheses, no revenue claims",
+      "name": "intelligence.money_opportunity.review"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Draft tightly scoped internal campaign experiments",
+      "name": "campaign.microsegment.draft"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Prepare a request for existing finance owner, never issue a payment link",
+      "name": "finance.payment_request.plan"
+    },
+    {
+      "approval_required_for_external_effects": true,
+      "authenticated_a2a_required": true,
+      "callable_endpoint_deployed": false,
+      "description": "Propose governed specialist handoff without dispatch",
+      "name": "a2a.commerce.intent.handoff"
+    }
+  ],
+  "compatible_owner_boundaries": [
+    "community_intent",
+    "buyer_scout",
+    "data_brokerage",
+    "owned_campaigns",
+    "predictive_revenue",
+    "finance_os"
+  ],
+  "display_name": "Empire AI Commercial Signal Miner",
+  "organisation": "Empire AI",
+  "registration": {
+    "cryptographic_identity": "not_provisioned",
+    "external_agent_network": "not_registered",
+    "internal_catalogue": "candidate_defined",
+    "trusted_by_other_agents": false
+  },
+  "schema_version": "empire.a2a.agent_capability_card.v1",
+  "security": {
+    "authority": "OBSERVE_ONLY",
+    "data_resale": false,
+    "financial_execution": false,
+    "outbound": false,
+    "production_dispatch": false,
+    "signature_and_replay_verification_required": true
+  }
+}
