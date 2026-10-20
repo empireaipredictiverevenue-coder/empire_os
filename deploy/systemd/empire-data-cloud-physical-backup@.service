@@ -14,6 +14,9 @@ User=postgres
 Group=postgres
 UMask=0077
 TimeoutStartSec=6h
+# Fail the unit before any backup if repo headroom, backup count or trusted
+# installed guard custody is missing. Requires separate root-owned release.
+ExecStartPre=/usr/bin/python3 -I -B /opt/empire-ai/backup-operators/releases/20261020-empiredb-physical-guard-v1/inspect_empiredb_backup_job_preflight_20261020.py --preflight %i
 ExecStart=/usr/bin/pgbackrest --config=/etc/pgbackrest/empiredb.conf --stanza=empiredb --type=%i --no-expire-auto --log-level-console=warn backup
 NoNewPrivileges=true
 PrivateTmp=true
