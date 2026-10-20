@@ -316,3 +316,45 @@ def test_external_vault_revocation_blocks_lease_before_google_refresh():
     with pytest.raises(CalendarVerificationError, match="missing_or_revoked"):
         resolver.acquire(binding=approved)
     assert exchanges == []
+
+
+
+def test_scaleway_checksum_added_on_write_and_verified_on_read():
+    import binascii
+    from io import BytesIO
+    service = ScalewaySecretManagerHTTP(
+        region="fr-par", api_token=lambda: "test-only-token-" + ("s" * 40),
+    )
+    payload = b'{"test-only":"safe"}'
+    result = {
+        "secret_id": SECRET_ID, "type": "opaque",
+        "data": base64.b64encode(payload).decode("ascii"),
+        "data_crc32": binascii.crc32(payload) & 0xffffffff,
+    }
+    seen = []
+    class Response:
+        status = 200
+        def __init__(self, obj):
+            self.stream = BytesIO(json.dumps(obj).encode("utf-8"))
+        def __enter__(self): return self
+        def __exit__(self, *_): return None
+        def read(self, limit): return self.stream.read(limit)
+    class Gateway:
+        def open(self, request, timeout):
+            if request.get_method() == "POST":
+                seen.append(json.loads(request.data))
+                return Response({
+                    "secret_id": SECRET_ID,
+                    "revision": 7, "status": "enabled",
+                })
+            return Response(result)
+    service.opener = Gateway()
+    assert service.add_version(SECRET_ID, payload) == 7
+    assert seen[0]["data_crc32"] == result["data_crc32"]
+    assert service.access_latest(SECRET_ID) == payload
+    result["data_crc32"] += 1
+    with pytest.raises(CalendarVerificationError, match="checksum"):
+        service.access_latest(SECRET_ID)
+    result["data_crc32"] = True
+    with pytest.raises(CalendarVerificationError, match="checksum"):
+        service.access_latest(SECRET_ID)

@@ -490,3 +490,53 @@ https://www.scaleway.com/en/docs/iam/policies-permissions/supported-products-res
   OAuth systemd unit and /run/credentials/empire-inbound-recovery-calendar-oauth.service
   credential directory are not installed. Do not claim Scaleway IAM
   provisioning or customer OAuth is active.
+
+
+## 20 October — Cloud activation redacted operator preflight
+
+The next release-stage script is:
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m scripts.review_inbound_calendar_cloud_activation_20261020 --read-only
+
+The script deliberately NEVER calls Scaleway or Google and NEVER reads secret
+payloads. It only inspects pre-approved PRIVATE metadata and the existence and
+permissions of service-specific systemd credential files. Its output does NOT
+include tenant identifiers, Google client identifiers, provider account refs,
+secret UUIDs, private signing keys or credentials.
+
+Expected optional root-owned config file:
+  /etc/empire/inbound-calendar-cloud-pilot.json
+Schema: empire.inbound.calendar.cloud_pilot.v1
+Exact keys: schema_version, founder_approval_ref, google_client_id,
+  application_origin, google_redirect_uri, scaleway_region, calendar_secrets
+Each calendar_secrets item has exact keys:
+  tenant_id, calendar_id, provider_account_ref, secret_id
+Tenant IDs and secret IDs must be canonical UUIDs. Each secret ID belongs to
+exactly one approved tenant/calendar/provider mapping. The Google client
+ID and HTTPS callback must match the approved application origin, with the
+callback exactly /v1/inbound-recovery/calendar-connect/callback.
+The configuration must be an owner-restricted regular file, mode 0600 or 0400.
+No IAM token, client secret or token key belongs in this JSON file.
+
+Dedicated, separately authorised future systemd unit:
+  empire-inbound-recovery-calendar-oauth.service
+Credential mount:
+  /run/credentials/empire-inbound-recovery-calendar-oauth.service
+Five service-specific LoadCredential names:
+  scaleway-secret-iam-token
+  google-calendar-oauth-client-secret
+  calendar-owner-ed25519-private-key
+  calendar-oauth-state-encryption-key
+  calendar-consent-evidence-hmac-key
+
+The existing DARK staging unit MUST stay separately mounted, with no OAuth
+secrets or customer data. The preflight cannot prove a secret-manager IAM
+policy, Google Cloud callback registration, real tenant consent, or database
+RLS without separately authorised tests. It intentionally NEVER returns
+live_customer_oauth_authorized=true; the owner/release reviewer has to
+approve those external gates after independent evidence.
+
+New adapter integrity hardening: Scaleway Secret Manager version creation
+now sends data_crc32. Provider responses with a CRC32 are independently
+checked against the decoded raw payload; a mismatch blocks use of tokens.
+Official schema source:
+https://www.scaleway.com/en/developers/api/secret-manager/secret-versions

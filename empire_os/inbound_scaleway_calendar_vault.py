@@ -127,6 +127,12 @@ class ScalewaySecretManagerHTTP:
             raise CalendarVerificationError("scaleway_secret_base64_invalid") from None
         if not 1 <= len(raw) <= 32000:
             raise CalendarVerificationError("scaleway_secret_payload_invalid")
+        checksum = doc.get("data_crc32")
+        if checksum is not None and (
+            type(checksum) is not int or not 0 <= checksum <= 0xffffffff
+            or checksum != binascii.crc32(raw) & 0xffffffff
+        ):
+            raise CalendarVerificationError("scaleway_secret_checksum_mismatch")
         return raw
 
     def add_version(self, secret_id: str, payload: bytes) -> int:
@@ -135,6 +141,7 @@ class ScalewaySecretManagerHTTP:
         body = json.dumps({
             "data": base64.b64encode(payload).decode("ascii"),
             "disable_previous": True,
+            "data_crc32": binascii.crc32(payload) & 0xffffffff,
         }, separators=(",", ":")).encode("utf-8")
         doc = self._send(secret_id, path="/versions", method="POST", body=body)
         revision = doc.get("revision") if doc else None
