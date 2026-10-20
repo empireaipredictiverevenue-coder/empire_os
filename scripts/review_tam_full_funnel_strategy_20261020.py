@@ -1773,6 +1773,111 @@ def review_proposed_proof_placement(
     }
 
 
+class ProofPrepublicationHeld(ValueError):
+    """Explicit stop signal for the existing website owner's release writer."""
+
+    def __init__(self, reason_codes: Iterable[str]) -> None:
+        codes = tuple(sorted(set(reason_codes)))
+        self.reason_codes = codes
+        super().__init__(
+            "PROOF_PREPUBLICATION_HELD:"
+            + ",".join(codes or ("NO_VERIFIED_GATE_RESULT",))
+        )
+
+
+def require_proof_placement_at_owner_release_boundary(
+    *,
+    candidate_html_bytes: bytes,
+    placement_arguments: Mapping[str, Any],
+    final_artifact_signoff_sha256_by_owner: Mapping[str, str] | None = None,
+) -> dict[str, Any]:
+    """Owner-controlled release *precondition*, not a publication command.
+
+    The site owner calls this immediately before its own atomic publisher
+    write, after authenticating owner signoffs, proof sources and artifacts.
+    It raises on all unsafe conditions and checks owner-approved SHA-256
+    values against the exact bytes proposed for publication. The private
+    source preview and the public rendered page may (and generally must)
+    differ: publishing owners must separately approve the final real form,
+    privacy disclosures, CTA, routes and claims. This function does not
+    authenticate owner signatures and cannot authorize a publication.
+    It never writes files, signals services, or issues deployment tokens.
+
+    This is supplied as an integration hook, not installed in production.
+    """
+    from hashlib import sha256
+
+    if type(candidate_html_bytes) is not bytes:
+        raise ProofPrepublicationHeld(("FINAL_RENDERED_ASSET_NOT_BYTES",))
+    if not 100 <= len(candidate_html_bytes) <= 1_000_000:
+        raise ProofPrepublicationHeld(("FINAL_RENDERED_ASSET_SIZE_INVALID",))
+    if not isinstance(placement_arguments, Mapping):
+        raise ProofPrepublicationHeld(("SOURCE_PLACEMENT_CONTRACT_REQUIRED",))
+    allowed = {
+        "root", "requested_campaign_id", "proposed_market_scope",
+        "proposed_offer_arm", "intended_conversion_objective",
+        "catalog_source", "catalog_readiness", "proof_preview",
+        "source_value_case", "source_signals", "now",
+        "proposed_product_code", "proposed_target_geography",
+        "target_geography_source_verified", "approvals",
+        "approval_content_sha256_by_owner",
+        "marketing_or_auto_followup_requested", "paid_media_requested",
+    }
+    required = {
+        "root", "requested_campaign_id", "proposed_market_scope",
+        "proposed_offer_arm", "intended_conversion_objective",
+        "catalog_source", "catalog_readiness", "proof_preview",
+        "source_value_case", "source_signals", "now",
+        "proposed_target_geography", "target_geography_source_verified",
+        "approvals", "approval_content_sha256_by_owner",
+    }
+    if (set(placement_arguments) - allowed
+            or required - set(placement_arguments)):
+        raise ProofPrepublicationHeld(("EXACT_RELEASE_PLACEMENT_ARGUMENTS_REQUIRED",))
+    try:
+        result = review_proposed_proof_placement(**dict(placement_arguments))
+    except (ValueError, TypeError, AttributeError, KeyError, OSError):
+        raise ProofPrepublicationHeld(("UNTRUSTED_OR_UNAVAILABLE_RELEASE_EVIDENCE",)) from None
+    if (result.get("status") != "READY_FOR_INDEPENDENT_WEBSITE_OWNER_PREFLIGHT"
+            or result.get("blocking_issue_count") != 0
+            or result.get("risk_codes")):
+        raise ProofPrepublicationHeld(
+            tuple(result.get("risk_codes") or ("GATE_NOT_READY",))
+        )
+    # The public artifact is not the PRIVATE preview; it may include the
+    # publisher's separately approved first-party enquiry form and site
+    # accessibility features. Require all source-owner and final-artifact
+    # approvals for the exact candidate bytes, independently.
+    if (not isinstance(final_artifact_signoff_sha256_by_owner, Mapping)
+            or set(final_artifact_signoff_sha256_by_owner)
+            != set(_PROOF_PLACEMENT_OWNER_FIELDS)
+            or any(type(v) is not str or len(v) != 64
+                   or any(ch not in "0123456789abcdef" for ch in v)
+                   for v in final_artifact_signoff_sha256_by_owner.values())):
+        raise ProofPrepublicationHeld(("FINAL_ARTIFACT_OWNER_SIGNOFFS_REQUIRED",))
+    expected = sha256(candidate_html_bytes).hexdigest()
+    if any(final_artifact_signoff_sha256_by_owner[k] != expected
+           for k in _PROOF_PLACEMENT_OWNER_FIELDS):
+        raise ProofPrepublicationHeld(("FINAL_ASSET_CHANGED_AFTER_OWNER_SIGNOFF",))
+    # Matching owner-provided digests is NOT signature authentication.
+    # The real publisher must verify approvals were issued by the
+    # authorized owners for THIS release and remain in force.
+    return {
+        "schema_version": "empire.gtm.owner_final_artifact_proof_preflight.v1",
+        "status": "READY_FOR_INDEPENDENT_WEBSITE_OWNER_RELEASE_CHECKS",
+        "candidate_html_sha256": expected,
+        "final_artifact_digest_matches_all_owner_claims": True,
+        "exact_publication_route_authenticated_here": False,
+        "first_party_form_or_privacy_deployment_verified_here": False,
+        "risk_issue_count": 0,
+        "source_owner_attestations_independently_authenticated_here": False,
+        "publication_authorized": False,
+        "published": False,
+        "release_writer_hook_installed": False,
+        "execution_authority": "NONE",
+    }
+
+
 def review_hypothetical_market_placement_risks(
     root: Path, *, market_scope: str,
     catalog_source: Mapping[str, Any] | None,

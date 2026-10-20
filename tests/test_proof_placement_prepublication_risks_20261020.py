@@ -513,3 +513,253 @@ def test_untrusted_territory_provenance_input_is_not_accepted(field, value):
     args[field] = value
     with pytest.raises(ValueError, match="UNTRUSTED_OR_UNSUPPORTED"):
         review_proposed_proof_placement(**args)
+
+
+def _final_signoff(html):
+    return {name: sha256(html).hexdigest() for name in APPROVALS}
+
+
+def _final_owner_release_packet(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        require_proof_placement_at_owner_release_boundary,
+    )
+    monkeypatch.setattr(
+        "empire_os.owned_campaign_release.load_release",
+        lambda *, root: release(),
+    )
+    c = value_case()
+    page = build_private_buyer_offer_experience(c, verified_signals=(), now=NOW)
+    catalog = source()
+    exact_digest = sha256(page["private_html"].encode("utf-8")).hexdigest()
+    placement = {
+        "root": Path("/offline-fixture"),
+        "requested_campaign_id": CAMPAIGN,
+        "proposed_market_scope": US,
+        "proposed_offer_arm": "buyer_inventory_fit_offer",
+        "intended_conversion_objective": "research_enquiry",
+        "catalog_source": catalog,
+        "catalog_readiness": review_commercial_catalog_for_conversion(
+            catalog, now=NOW,
+        ),
+        "proof_preview": page,
+        "source_value_case": c,
+        "source_signals": (),
+        "now": NOW,
+        "proposed_target_geography": "denver, co",
+        "target_geography_source_verified": True,
+        "approvals": APPROVALS,
+        "approval_content_sha256_by_owner": {
+            name: exact_digest for name in APPROVALS
+        },
+    }
+    return (
+        page["private_html"].encode("utf-8"), placement,
+        require_proof_placement_at_owner_release_boundary,
+    )
+
+
+def test_owner_release_boundary_check_passes_exact_bytes_to_separate_site_review(monkeypatch):
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    result = check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert result["status"] == "READY_FOR_INDEPENDENT_WEBSITE_OWNER_RELEASE_CHECKS"
+    assert result["candidate_html_sha256"] == sha256(html).hexdigest()
+    assert result["risk_issue_count"] == 0
+    assert result["source_owner_attestations_independently_authenticated_here"] is False
+    assert result["publication_authorized"] is False
+    assert result["published"] is False
+    assert result["release_writer_hook_installed"] is False
+
+
+@pytest.mark.parametrize("variation", [
+    lambda b: b + b" Extra unsupported guarantee.",
+    lambda b: b.replace(b"PRIVATE PREVIEW", b"PUBLIC RELEASE"),
+    lambda b: b"not the expected page",
+    lambda b: b"",
+])
+def test_owner_release_boundary_blocks_asset_mutation_after_signoff(
+    monkeypatch, variation,
+):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=variation(html),
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert caught.value.reason_codes
+    assert any(x in caught.value.reason_codes for x in (
+        "FINAL_ASSET_CHANGED_AFTER_OWNER_SIGNOFF",
+        "FINAL_RENDERED_ASSET_SIZE_INVALID",
+    ))
+
+
+def test_owner_release_boundary_blocks_wrong_city_even_if_final_bytes_valid(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    placement["proposed_target_geography"] = "atlanta"
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "TERRITORY_SCOPE_MISMATCH" in caught.value.reason_codes
+
+
+def test_owner_release_boundary_blocks_privacy_change_without_inventing_permission(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    campaign = release()["campaigns"][0]
+    campaign["assets"][0]["privacy_notice"] = "marketing subscription"
+    monkeypatch.setattr(
+        "empire_os.owned_campaign_release.load_release",
+        lambda *, root: {"campaigns": [campaign]},
+    )
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "RESEARCH_LANDING_ASSET_OR_PRIVACY_MISMATCH" in caught.value.reason_codes
+
+
+@pytest.mark.parametrize("bad", [
+    None, "HTML string not bytes", 1, [], {"raw": "html"},
+])
+def test_owner_release_boundary_refuses_untyped_written_artifact(monkeypatch, bad):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html_fixture, placement, check = _final_owner_release_packet(monkeypatch)
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=bad,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html_fixture),
+        )
+    assert "FINAL_RENDERED_ASSET_NOT_BYTES" in caught.value.reason_codes
+
+
+def test_owner_release_boundary_missing_approval_digest_or_source_holds(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    placement["approval_content_sha256_by_owner"] = None
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "STALE_OR_MISSING_EXACT_CONTENT_SIGNOFF" in caught.value.reason_codes
+    _, placement, check = _final_owner_release_packet(monkeypatch)
+    placement["source_value_case"] = None
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "PROOF_CONTENT_NOT_SOURCE_BOUND" in caught.value.reason_codes
+
+
+def test_owner_release_boundary_rejects_unexpected_argument_or_missing_contract(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    placement["allow_unverified_publish"] = True
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "EXACT_RELEASE_PLACEMENT_ARGUMENTS_REQUIRED" in caught.value.reason_codes
+    placement.pop("allow_unverified_publish")
+    placement.pop("now")
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=_final_signoff(html),
+        )
+    assert "EXACT_RELEASE_PLACEMENT_ARGUMENTS_REQUIRED" in caught.value.reason_codes
+
+
+def test_public_page_with_separately_approved_form_can_pass_final_byte_review(monkeypatch):
+    # The approved PRIVATE proof is input evidence, NOT the final public HTML.
+    # A site owner may add a compliant rendered first-party form/CTA under
+    # independent claims, privacy, website and fulfilment approvals.
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    public_html = html.replace(
+        b"PRIVATE PREVIEW",
+        b"WEBSITE OWNER APPROVED PUBLIC BRIEF",
+    ).replace(
+        b"</main></body>",
+        b'<form method="post" action="/api/research/enquiry">'
+        b'<input name="campaign_id" value="fixture" />'
+        b'<button>Request research</button></form></main></body>',
+    )
+    assert public_html != html
+    result = check(
+        candidate_html_bytes=public_html,
+        placement_arguments=placement,
+        final_artifact_signoff_sha256_by_owner=_final_signoff(public_html),
+    )
+    assert result["candidate_html_sha256"] == sha256(public_html).hexdigest()
+    assert result["final_artifact_digest_matches_all_owner_claims"] is True
+    assert result["exact_publication_route_authenticated_here"] is False
+    assert result["first_party_form_or_privacy_deployment_verified_here"] is False
+    assert result["publication_authorized"] is False
+
+
+def test_public_page_even_one_byte_modified_after_final_owner_signoff_is_blocked(monkeypatch):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    public_html = html.replace(b"PRIVATE PREVIEW", b"PUBLIC REVIEWED BRIEF")
+    owners = _final_signoff(public_html)
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=public_html+b" ",
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=owners,
+        )
+    assert "FINAL_ASSET_CHANGED_AFTER_OWNER_SIGNOFF" in caught.value.reason_codes
+
+
+@pytest.mark.parametrize("bad_signoffs", [
+    None,
+    {},
+    {"website_publication_approval": "f"*64},
+    {name: "NOT_A_REAL_DIGEST" for name in APPROVALS},
+])
+def test_no_final_public_artifact_can_pass_without_all_owner_digest_claims(
+    monkeypatch, bad_signoffs,
+):
+    from scripts.review_tam_full_funnel_strategy_20261020 import (
+        ProofPrepublicationHeld,
+    )
+    html, placement, check = _final_owner_release_packet(monkeypatch)
+    with pytest.raises(ProofPrepublicationHeld) as caught:
+        check(
+            candidate_html_bytes=html,
+            placement_arguments=placement,
+            final_artifact_signoff_sha256_by_owner=bad_signoffs,
+        )
+    assert "FINAL_ARTIFACT_OWNER_SIGNOFFS_REQUIRED" in caught.value.reason_codes

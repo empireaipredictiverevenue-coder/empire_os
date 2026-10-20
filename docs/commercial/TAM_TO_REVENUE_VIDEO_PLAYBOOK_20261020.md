@@ -1325,3 +1325,114 @@ No real forms were submitted and no production release was changed.
 **Status:** implemented and tested in the isolated GTM branch;
 production website enforcement continues to depend on the existing
 flagship owner accepting GitHub issue #68.
+
+
+## 20 October — Release-byte enforcement adapter for ASTRA owner (issue #68)
+
+A pure final-artifact blocking adapter has been added to the existing
+campaign-intelligence script:
+`require_proof_placement_at_owner_release_boundary(
+candidate_html_bytes=..., placement_arguments=...)`.
+
+Unlike a passive risk report, it **raises `ProofPrepublicationHeld`**
+on any critical upstream placement risk, missing exact owner approvals,
+missing independently verified geography, changed research privacy,
+unexpected outbound permission, or bytes that differ from the
+source-backed, exactly approved private HTML. The result on success is
+`READY_FOR_INDEPENDENT_WEBSITE_OWNER_RELEASE_CHECKS`; the returned
+SHA-256 is a comparison digest **not** a signature, permission or
+publishing token. The adapter cannot mutate a site or publish assets.
+
+### Exact owner writer boundaries (read-only discovery)
+
+The existing *research-campaign* manifest writer is
+`scripts/release_owned_campaigns.py`:
+its separate `--apply` branch writes
+`runtime/astra/owned_campaign_deployed_release.json`, after
+`empire_os.owned_campaign_release.build_release_manifest` validates
+five zero-paid research campaigns. This code is only for its original
+five signed research pages; do **not** graft a sixth UK solar page
+or replace those pages' original HTML, which would invalidate their
+immutable signed asset digests.
+
+The existing *flagship Next.js/static-site* publication owner has a
+separate controlled candidate and atomic release path, including
+`scripts/prepare_flagship_release.py` and
+`scripts/release_flagship_static_export_20261017.py` in the
+owner's active review worktree. Its release preflight verifies clean
+Git provenance, static export files, protected pages and before/after
+asset hashes; the owner must retain these checks.
+
+**There is no safe inference that either existing writer already
+publishes new proof-offer experiences.** The website owner must choose
+a separate properly approved public landing route and its actual
+writer, or explicitly introduce a reviewed campaign addition through
+its own versioned release mechanism. Implement the guard where the
+chosen route's bytes become public, and test an unchanged approved
+asset and mutated asset against a throwaway destination **before**
+allowing any existing production --apply path. No production files,
+public URLs or services were changed in this GTM branch.
+
+### Site-owner acceptance gate
+
+1. Obtain authenticated source-owner buyer/problem and approved offer
+   receipts, independently verified source geography, exact signed
+   destination and catalog snapshot, and real owner approvals.
+2. Generate the private proof page; let Claims, Privacy, Website and
+   Fulfilment owners approve an exact immutable HTML SHA-256.
+3. Right before any final atomic publication write, pass the exact
+   rendered HTML **bytes** and same-version source/approvals through
+   `require_proof_placement_at_owner_release_boundary`.
+4. Any `ProofPrepublicationHeld` or missing source stops the release
+   transaction. Even a clean check must also satisfy the site's
+   original preflight, authentication, lawful consent, HTTPS and
+   owner-controlled deployment permissions.
+5. Add owner's writer-level tests: block same-country/wrong-metro
+   proof, changed HTML after approval, privacy asset replacement,
+   forged approvals and out-of-scope product checkout. Test no live
+   deployment or contact occurs from these failures.
+
+This integration adapter remains in the **campaign branch only**
+until the existing website owner installs it at the actual chosen
+publisher. Running it does not authorize an independent owner to
+deploy; in particular, caller-provided flags and SHA-256 digests
+must be independently authenticated by the publisher. The sole
+GTM owner output is a review result/stop reason, not a public page.
+
+
+### Correction — public rendered asset vs private proof bytes
+
+The earlier local final-byte helper was overly restrictive: it required
+the COMPLETE PUBLIC page to be identical to the PRIVATE no-form proof
+preview. A real website needs a separately reviewed first-party form,
+CTA, consent/legal text and owner-controlled rendering. Publishing an
+unusable private preview would not satisfy the commercial task.
+
+The corrected, isolated helper now has two independent integrity gates:
+
+1. Reconstruct and independently validate the original source-backed
+   PRIVATE proof bound to the exact account, market and campaign, with
+   exact authenticated claims/owner review of that private source.
+2. Require a separate digest signoff for the actual FINAL PUBLIC HTML
+   from all four Claims, Website, Privacy and Fulfilment owners.
+   The caller passes final_artifact_signoff_sha256_by_owner.
+   A missing role or a one-byte difference from the final approved
+   HTML raises ProofPrepublicationHeld.
+
+A public page with independently approved form and copy MAY differ
+from the private review. A byte changed AFTER final signoff MUST fail.
+
+This adapter only checks the source and consistency of owner-provided
+claims. The website publisher must separately authenticate each
+approver's identity, approval scope, expiry/revocation, exact release
+route and consent/form behavior. Identical caller-supplied SHA-256
+strings are not authenticated signatures.
+
+The helper remains in the campaign worktree and has NOT been installed
+into the live website publisher or authorised production deployment.
+Successful output retains publication_authorized=false.
+
+This correction supersedes any earlier direction to compare public
+HTML byte-for-byte against private preview HTML. Tests in
+test_proof_placement_prepublication_risks_20261020.py cover both a
+separately approved public candidate and byte-for-byte tampering.
