@@ -27,6 +27,9 @@ GRAPH = "runtime/graphify/attested_coder_20261020/graphify-out/graph.json"
 MANIFEST = "runtime/graphify/attested_coder_manifest_20261020.json"
 RELEASE = "runtime/graphify/curated_expansion_release_impact_20261020.json"
 BACKUP = "runtime/graphify/curated_expansion_backup_impact_20261020"
+# Explicit additive receipt: do not overwrite historical private evidence.
+NEXT_RELEASE = "runtime/graphify/curated_expansion_release_implguard_20261020.json"
+NEXT_BACKUP = "runtime/graphify/curated_expansion_backup_implguard_20261020"
 REQUIRED_FLAGS = (
     "EMPIRE_CODER_GRAPHIFY_ENABLED=1",
     "EMPIRE_CODER_GRAPHIFY_PREPATCH_OBSERVE=1",
@@ -55,12 +58,17 @@ def _read_receipt(path: Path) -> dict[str, Any]:
 
 
 def verify_release_custody(root: Path) -> dict[str, Any]:
-    """Check the existing, separate versioned rollback is still trustworthy."""
+    """Check BOTH immutable Graphify release generations and rollback hashes.
+
+    The initial public code-adapter release is unchanged. A subsequent
+    indexed-source refresh is valid only when its private backup exactly
+    matches the preceding release's current file digests.
+    """
     root = Path(root)
     try:
-        packet = _read_receipt(root / RELEASE)
-        if packet.get("status") != "LIVE_CURATED_REAL_SOURCE_EXPANSION_VERIFIED":
-            raise ValueError("unexpected release status")
+        prior = _read_receipt(root / RELEASE)
+        if prior.get("status") != "LIVE_CURATED_REAL_SOURCE_EXPANSION_VERIFIED":
+            raise ValueError("unexpected original release status")
         for filename in (GRAPH, MANIFEST):
             path = root / filename
             if path.is_symlink() or not path.is_file() or path.stat().st_size > 50_000_000:
@@ -69,27 +77,51 @@ def verify_release_custody(root: Path) -> dict[str, Any]:
             "graph": sha256((root / GRAPH).read_bytes()).hexdigest(),
             "manifest": sha256((root / MANIFEST).read_bytes()).hexdigest(),
         }
-        if (current["graph"] != packet.get("current_graph_sha256")
-                or current["manifest"] != packet.get("current_manifest_sha256")):
+
+        def verify_private_backup(backup_relative: str, packet: Mapping[str, Any]) -> None:
+            backup = root / backup_relative
+            if backup.is_symlink() or not backup.is_dir():
+                raise ValueError("private rollback backup absent")
+            for filename, expected in (
+                ("graph.json", "prior_graph_file_sha256"),
+                ("manifest.json", "prior_snapshot_file_sha256"),
+            ):
+                path = backup / filename
+                if (path.is_symlink() or not path.is_file()
+                        or path.stat().st_mode & 0o077
+                        or sha256(path.read_bytes()).hexdigest() != packet.get(expected)):
+                    raise ValueError("private rollback digest mismatch")
+
+        verify_private_backup(BACKUP, prior)
+        latest = prior
+        release_generation = "ORIGINAL_ATTESTED_CODE"
+        follow_up = root / NEXT_RELEASE
+        if follow_up.exists() or follow_up.is_symlink():
+            newer = _read_receipt(follow_up)
+            if newer.get("status") != "LIVE_CURATED_REAL_SOURCE_EXPANSION_VERIFIED":
+                raise ValueError("invalid next code-only release")
+            if (newer.get("prior_graph_file_sha256") != prior.get("current_graph_sha256")
+                    or newer.get("prior_snapshot_file_sha256") != prior.get("current_manifest_sha256")):
+                raise ValueError("Graphify release provenance chain broken")
+            verify_private_backup(NEXT_BACKUP, newer)
+            latest = newer
+            release_generation = "IMPLEMENT_ADMISSION_REFRESH"
+        if (current["graph"] != latest.get("current_graph_sha256")
+                or current["manifest"] != latest.get("current_manifest_sha256")):
             raise ValueError("current Graphify release drifted")
-        backup = root / BACKUP
-        if backup.is_symlink() or not backup.is_dir():
-            raise ValueError("rollback backup absent")
-        for filename, expected in (
-            ("graph.json", "prior_graph_file_sha256"),
-            ("manifest.json", "prior_snapshot_file_sha256"),
-        ):
-            path = backup / filename
-            if (path.is_symlink() or not path.is_file()
-                    or path.stat().st_mode & 0o077
-                    or sha256(path.read_bytes()).hexdigest() != packet.get(expected)):
-                raise ValueError("private rollback digest mismatch")
-        return {"status": "PRIVATE_ROLLBACK_AND_RELEASE_ATTESTED",
-                "rollback_available": True, "reason_code": None}
+        return {
+            "status": "PRIVATE_ROLLBACK_AND_RELEASE_ATTESTED",
+            "rollback_available": True,
+            "release_generation": release_generation,
+            "reason_code": None,
+        }
     except (OSError, ValueError, TypeError, KeyError):
-        return {"status": "DEPLOYMENT_HOLD",
-                "rollback_available": False,
-                "reason_code": "PRIVATE_RELEASE_CUSTODY_UNVERIFIED"}
+        return {
+            "status": "DEPLOYMENT_HOLD",
+            "rollback_available": False,
+            "release_generation": "UNVERIFIED",
+            "reason_code": "PRIVATE_RELEASE_CUSTODY_UNVERIFIED",
+        }
 
 
 def _show(unit: str, *properties: str) -> dict[str, str]:
