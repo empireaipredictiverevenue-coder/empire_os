@@ -16,6 +16,7 @@ from empire_os.inbound_calendar_oauth_boundary import (
 from empire_os.inbound_calendar_token_vault import (
     CalendarCredential, OfflineCalendarCredentialVault,
 )
+from empire_os.inbound_scaleway_calendar_vault import ScalewaySecretManagerCalendarVault
 from empire_os.inbound_google_oauth_exchange import (
     OAuthTokenEndpoint, refresh_google_calendar_access,
 )
@@ -71,11 +72,15 @@ class VaultBackedGoogleCalendarResolver:
     """Refresh a customer-approved lease, never expose secrets to public API."""
 
     def __init__(
-        self, *, vault: OfflineCalendarCredentialVault,
+        self, *, vault: OfflineCalendarCredentialVault | ScalewaySecretManagerCalendarVault,
         token_endpoint: OAuthTokenEndpoint,
         client_secret_provider: Callable[[str], str],
         now_provider: Callable[[], datetime] | None = None,
     ):
+        if not isinstance(vault, (OfflineCalendarCredentialVault, ScalewaySecretManagerCalendarVault)):
+            raise ValueError("verified_calendar_vault_backend_required")
+        if not callable(getattr(token_endpoint, "post_form", None)) or not callable(client_secret_provider):
+            raise ValueError("trusted_google_token_exchange_required")
         self.vault = vault
         self.endpoint = token_endpoint
         self.client_secret_provider = client_secret_provider

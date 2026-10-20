@@ -466,3 +466,27 @@ provisioning performed in this change.
 Source documentation:
 https://www.scaleway.com/en/developers/api/secret-manager
 https://www.scaleway.com/en/docs/iam/policies-permissions/supported-products-resource-level/
+
+
+## 20 October — External-vault Google refresh lease verification
+
+- The existing VaultBackedGoogleCalendarResolver now explicitly accepts
+  either the isolated encrypted SQLite staging vault or the tenant-scoped
+  Scaleway Secret Manager backend. There is no separate refresh engine.
+- For expiring Google read-only access, the existing strict OAuth refresh
+  exchange retains only the originally granted read scopes, writes a new
+  externally managed secret version (disabling the prior enabled version),
+  verifies the persisted version by readback, and issues the existing
+  tenant/calendar-specific CalendarReadLease.
+- A revoked secret must fail closed before any Google refresh call or
+  appointment read. Tests use an in-memory fake Scaleway gateway and fake
+  Google token exchange; no cloud secret, API credential or customer
+  calendar has been used.
+- The official Scaleway Secret Manager v1beta1 schema confirms
+  latest_enabled version-access and the disable_previous API parameter:
+  https://www.scaleway.com/en/developers/api/secret-manager/secret-versions
+- Live read-only inspection on 20 October confirmed the existing dark
+  staging unit is active and enabled, while the separate intended calendar
+  OAuth systemd unit and /run/credentials/empire-inbound-recovery-calendar-oauth.service
+  credential directory are not installed. Do not claim Scaleway IAM
+  provisioning or customer OAuth is active.

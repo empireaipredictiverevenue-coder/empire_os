@@ -244,3 +244,75 @@ def test_provider_ack_without_revocation_tombstone_does_not_claim_revoke():
         tenant_id=TENANT, calendar_id=CAL,
         provider_account_ref=ACCOUNT,
     ).refresh_token == "fixture-refresh-secret"
+
+
+
+def test_external_vault_refreshes_google_readonly_lease_without_local_secret_file(tmp_path):
+    from empire_os.inbound_google_calendar_credentials import VaultBackedGoogleCalendarResolver
+    from empire_os.inbound_google_calendar_adapter import ApprovedCalendarBinding
+
+    manager, gateway = vault()
+    manager.put_verified_offline(credential(), at=NOW)
+    refresh_calls = []
+    class ReadOnlyTokenExchange:
+        def post_form(self, fields):
+            refresh_calls.append(dict(fields))
+            return {
+                "token_type": "Bearer", "expires_in": 1800,
+                "access_token": "fixture-google-rotated-access",
+            }
+    binding = ApprovedCalendarBinding(
+        tenant_id=TENANT, calendar_id=CAL,
+        provider_account_ref=ACCOUNT,
+        owner_approved=True, account_access_verified=True,
+    )
+    with manager:
+        resolver = VaultBackedGoogleCalendarResolver(
+            vault=manager, token_endpoint=ReadOnlyTokenExchange(),
+            client_secret_provider=lambda client_id: "fixture-google-client-secret",
+            now_provider=lambda: NOW + timedelta(minutes=19),
+        )
+        lease, access_token = resolver.acquire(binding=binding)
+        assert access_token == "fixture-google-rotated-access"
+        assert lease.granted_scopes == SCOPES
+        assert lease.calendar_id == CAL
+        assert len(refresh_calls) == 1
+        assert refresh_calls[0]["grant_type"] == "refresh_token"
+        assert refresh_calls[0]["refresh_token"] == "fixture-refresh-secret"
+        assert refresh_calls[0]["client_id"] == "fixture-google-client"
+        assert manager.get_active(
+            tenant_id=TENANT, calendar_id=CAL,
+            provider_account_ref=ACCOUNT,
+        ).access_token == "fixture-google-rotated-access"
+    assert len([call for call in gateway.calls if call[0] == "POST"]) == 2
+    assert not list(tmp_path.iterdir())
+
+
+def test_external_vault_revocation_blocks_lease_before_google_refresh():
+    from empire_os.inbound_google_calendar_credentials import VaultBackedGoogleCalendarResolver
+    from empire_os.inbound_google_calendar_adapter import ApprovedCalendarBinding
+
+    manager, gateway = vault()
+    manager.put_verified_offline(credential(), at=NOW)
+    manager.revoke_local(
+        tenant_id=TENANT, calendar_id=CAL,
+        provider_account_ref=ACCOUNT, at=NOW,
+    )
+    exchanges = []
+    class NeverExchange:
+        def post_form(self, data):
+            exchanges.append(data)
+            raise AssertionError("no refresh permitted for revoked calendar")
+    resolver = VaultBackedGoogleCalendarResolver(
+        vault=manager, token_endpoint=NeverExchange(),
+        client_secret_provider=lambda _: "fixture-secret",
+        now_provider=lambda: NOW + timedelta(minutes=19),
+    )
+    approved = ApprovedCalendarBinding(
+        tenant_id=TENANT, calendar_id=CAL,
+        provider_account_ref=ACCOUNT,
+        owner_approved=True, account_access_verified=True,
+    )
+    with pytest.raises(CalendarVerificationError, match="missing_or_revoked"):
+        resolver.acquire(binding=approved)
+    assert exchanges == []
