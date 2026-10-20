@@ -714,6 +714,7 @@ def review_authenticated_campaign_intelligence(
     account_route_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
     learning_waves: Iterable[Any] | None = None,
     adaptive_journey_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
+    observer_snapshots: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -764,6 +765,10 @@ def review_authenticated_campaign_intelligence(
                 adaptive_journey_packets, now=now, learning_waves=verified_waves,
             ) if adaptive_journey_packets is not None else None
         ),
+        "real_existing_source_connections": (
+            review_real_commercial_observers(observer_snapshots, now=now)
+            if observer_snapshots is not None else None
+        ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,
         "database_writes": False,
@@ -799,6 +804,265 @@ def recommend_next_real_execution_focus(review: Mapping[str, Any]) -> dict[str, 
     }
 
 
+
+# Cross-owner, read-only evidence joins. Every input is an existing EmpireOS
+# observer snapshot, not a direct CRM/ledger query or a new runtime producer.
+# Do NOT join customers by name, domain, mailbox or public prospect strings.
+REAL_OBSERVER_SOURCES = {
+    "next_best": (
+        "runtime/next_best_action/next_best_action_latest.json",
+        "empire.next_best_action_snapshot.v1",
+    ),
+    "account_twin": (
+        "runtime/account_twin/account_twin_latest.json",
+        "empire.account_buyer_digital_twin_snapshot.v1",
+    ),
+    "consent_outcome": (
+        "runtime/consent_suppression/outcome_linkage_latest.json",
+        "empire-consent-outcome-linkage-v1",
+    ),
+    "campaign_output": (
+        "runtime/campaigns_control/campaign_output_outcome_latest.json",
+        "empire-campaign-output-outcome-v1",
+    ),
+    "campaign_measured": SOURCES["outcomes"],
+    "order_payment": (
+        "runtime/orders_payments_revenue_control/"
+        "orders_payments_revenue_runtime_latest.json",
+        "empire-orders-payments-revenue-runtime-control-v1",
+    ),
+}
+REAL_OBSERVER_MAX_BYTES = 512 * 1024
+NEXT_BEST_OPERATOR_PLAYS = (
+    "verify_decision_maker", "research_more", "prepare_buyer_review",
+    "conversation_follow_up", "terms_candidate", "payment_review",
+    "fulfilment_review", "hold",
+)
+
+
+def read_real_commercial_observers(root: Path) -> dict[str, Mapping[str, Any]]:
+    """Read ONLY fixed first-party observer snapshots, no PII returned by review.
+
+    Neither this reader nor its reviewer connects directly to the tenant CRM,
+    financial ledger or delivery endpoints. A file may be a valid observer
+    while stale, and that will be disclosed rather than silently repaired.
+    """
+    root = Path(root).resolve()
+    out: dict[str, Mapping[str, Any]] = {}
+    for name, (relative_path, _) in REAL_OBSERVER_SOURCES.items():
+        path = root / relative_path
+        try:
+            stat = path.lstat()
+            if (not path.is_file() or path.is_symlink()
+                    or stat.st_size > REAL_OBSERVER_MAX_BYTES
+                    or stat.st_size <= 0 or (stat.st_mode & 0o002)):
+                raise ValueError("untrusted or oversized observer file")
+            raw = json.loads(path.read_text(encoding="utf-8"))
+            out[name] = raw if isinstance(raw, dict) else {}
+        except (OSError, ValueError, UnicodeError):
+            out[name] = {}
+    return out
+
+
+def _valid_observer_source(
+    payload: Mapping[str, Any], name: str, now: datetime,
+) -> bool:
+    return (
+        isinstance(payload, Mapping)
+        and payload.get("schema_version") == REAL_OBSERVER_SOURCES[name][1]
+        and payload.get("mode") == "OBSERVE"
+        and _fresh(payload.get("generated_at"), now)
+    )
+
+
+def review_real_commercial_observers(
+    snapshots: Mapping[str, Any], *, now: datetime,
+) -> dict[str, Any]:
+    """Reconcile live, independent OBSERVE signals without fabricating buyers.
+
+    8 global linked outbound-intent records are NOT 8 converted customers.
+    5 campaign output-quality proofs are NOT 5 profitable campaigns.
+    Unknown per-contact permissions, settlement and seller acceptance remain
+    unknown until independently authenticated owners supply source receipts.
+    """
+    if not isinstance(snapshots, Mapping) or now.tzinfo is None:
+        raise ValueError("current source map and aware clock required")
+    now = now.astimezone(timezone.utc)
+    raw = {
+        name: snapshots.get(name, {}) for name in REAL_OBSERVER_SOURCES
+    }
+    state = {
+        name: (
+            "VERIFIED_CURRENT_OBSERVER" if _valid_observer_source(raw[name], name, now)
+            else "HOLD_STALE_MISSING_OR_INCOMPATIBLE_SOURCE"
+        )
+        for name in REAL_OBSERVER_SOURCES
+    }
+    data = {
+        name: raw[name] if state[name] == "VERIFIED_CURRENT_OBSERVER" else {}
+        for name in REAL_OBSERVER_SOURCES
+    }
+    holds: set[str] = set()
+    eligible_operator_plays: dict[str, int] | None = None
+    reviewed_accounts: int | None = None
+    nba = data["next_best"]
+    if nba:
+        actions = nba.get("actions")
+        if (nba.get("execution_authority") == "none"
+                and nba.get("outreach_authorized") is False
+                and nba.get("payment_authorized") is False
+                and nba.get("buyer_intent_inferred") is False
+                and nba.get("commercial_intent_inferred") is False
+                and isinstance(actions, list)
+                and 0 <= len(actions) <= 500
+                and nba.get("action_count") == len(actions)
+                and all(
+                    isinstance(item, Mapping)
+                    and item.get("recommendation_only") is True
+                    and item.get("execution_authority") == "none"
+                    and item.get("mutation_authorized") is False
+                    and item.get("external_execution_authorized") is False
+                    and item.get("outreach_authorized") is False
+                    and item.get("payment_authorized") is False
+                    and item.get("buyer_intent_inferred") is False
+                    and item.get("commercial_intent_inferred") is False
+                    for item in actions
+                )):
+            from collections import Counter
+            counted = Counter(
+                item.get("recommended_action")
+                if item.get("recommended_action") in NEXT_BEST_OPERATOR_PLAYS
+                else "other_existing_action"
+                for item in actions
+            )
+            eligible_operator_plays = dict(sorted(counted.items()))
+            reviewed_accounts = len(actions)
+        else:
+            state["next_best"] = "HOLD_RECOMMENDATION_SOURCE_GOVERNANCE"
+            holds.add("NEXT_BEST_PROVENANCE_INVALID")
+    # The Digital Twin is NOT an independent revenue source. Its projection
+    # can be used for freshness/coverage diagnostics but not for recognizing
+    # payments, authorizing a marketing touch or creating a buyer.
+    twin = data["account_twin"]
+    twin_count: int | None = None
+    if twin:
+        twins = twin.get("twins")
+        if (twin.get("execution_authority") == "none"
+                and twin.get("buyer_intent_inferred") is False
+                and twin.get("commercial_intent_inferred") is False
+                and twin.get("outreach_authorized") is False
+                and twin.get("payment_authorized") is False
+                and isinstance(twins, list)
+                and twin.get("twin_count") == len(twins)
+                and len(twins) <= 500):
+            twin_count = len(twins)
+        else:
+            state["account_twin"] = "HOLD_DIGITAL_TWIN_GOVERNANCE"
+            holds.add("DIGITAL_TWIN_GOVERNANCE_INVALID")
+    global_links = data["consent_outcome"]
+    linked_events = None
+    if global_links:
+        governance = global_links.get("governance")
+        linked = global_links.get("linked_outcomes")
+        if (isinstance(governance, Mapping)
+                and governance.get("db_write") is False
+                and governance.get("outbound") is False
+                and governance.get("funds") is False
+                and isinstance(linked, list)
+                and len(linked) <= 10000
+                and global_links.get("linked_outcome_count") == len(linked)
+                and all(isinstance(row, Mapping) for row in linked)):
+            linked_events = len(linked)
+        else:
+            holds.add("GLOBAL_OUTCOME_LINKAGE_UNVERIFIED")
+            state["consent_outcome"] = "HOLD_CONSENT_OUTCOME_GOVERNANCE"
+    campaign_output = data["campaign_output"]
+    campaign_measured = data["campaign_measured"]
+    output_quality_campaign_count = None
+    exact_campaign_matches = None
+    output_linkages = None
+    if campaign_output:
+        if (campaign_output.get("db_write") is False
+                and campaign_output.get("outbound") is False
+                and campaign_output.get("campaign_state_mutated") is False
+                and campaign_output.get("action_authority_granted") is False
+                and _count(campaign_output.get("output_quality_campaign_count")) is not None
+                and _count(campaign_output.get("outcome_linkage_campaign_count")) is not None
+                and type(campaign_output.get("outcome_linkage_proved")) is bool):
+            output_quality_campaign_count = campaign_output["output_quality_campaign_count"]
+            output_linkages = campaign_output["outcome_linkage_campaign_count"]
+        else:
+            state["campaign_output"] = "HOLD_CAMPAIGN_OUTPUT_GOVERNANCE"
+            holds.add("CAMPAIGN_OUTPUT_GOVERNANCE_INVALID")
+    if campaign_measured:
+        governance = campaign_measured.get("governance")
+        if (isinstance(governance, Mapping)
+                and governance.get("db_write") is False
+                and governance.get("outbound") is False
+                and _count(campaign_measured.get("exact_outcome_match_count")) is not None
+                and type(campaign_measured.get("outcome_linkage_proved")) is bool):
+            exact_campaign_matches = campaign_measured["exact_outcome_match_count"]
+        else:
+            state["campaign_measured"] = "HOLD_CAMPAIGN_OUTCOME_GOVERNANCE"
+            holds.add("CAMPAIGN_OUTCOME_GOVERNANCE_INVALID")
+    if exact_campaign_matches is not None and output_linkages is not None:
+        if exact_campaign_matches != output_linkages:
+            holds.add("INDEPENDENT_CAMPAIGN_OUTCOME_COUNTERS_DISAGREE")
+            exact_campaign_matches = None
+        elif (bool(exact_campaign_matches)
+              != (campaign_output.get("outcome_linkage_proved") is True)
+              or bool(exact_campaign_matches)
+              != (campaign_measured.get("outcome_linkage_proved") is True)):
+            holds.add("INDEPENDENT_CAMPAIGN_LINKAGE_PROOF_MISMATCH")
+            exact_campaign_matches = None
+    payments = data["order_payment"]
+    payment_population_count = None
+    observed_payment = None
+    if payments:
+        governance = payments.get("governance")
+        semantics = payments.get("semantic_truth")
+        if (isinstance(governance, Mapping)
+                and governance.get("db_write") is False
+                and governance.get("funds_movement") is False
+                and governance.get("payment_write") is False
+                and isinstance(semantics, Mapping)
+                and type(semantics.get("real_payment_observed")) is bool
+                and _count(payments.get("current_transaction_row_count")) is not None):
+            payment_population_count = payments["current_transaction_row_count"]
+            observed_payment = semantics["real_payment_observed"]
+        else:
+            state["order_payment"] = "HOLD_ORDER_PAYMENT_GOVERNANCE"
+            holds.add("PAYMENT_CONTROL_SOURCE_INVALID")
+    for name, status in state.items():
+        if status != "VERIFIED_CURRENT_OBSERVER":
+            holds.add("SOURCE_NOT_READY:" + name)
+    return {
+        "schema_version": "empire.gtm.live_commercial_observer_join.v1",
+        "source_health": state,
+        "integrated_current_observer_sources": sum(
+            v == "VERIFIED_CURRENT_OBSERVER" for v in state.values()
+        ),
+        "total_observer_sources": len(REAL_OBSERVER_SOURCES),
+        "existing_next_best_actions_reviewed": reviewed_accounts,
+        "next_best_internal_play_counts": eligible_operator_plays,
+        "fresh_account_twin_count": twin_count,
+        "global_linked_event_records_not_sales": linked_events,
+        "verified_campaign_output_quality_count": output_quality_campaign_count,
+        "exact_campaign_outcome_linkage_count": exact_campaign_matches,
+        "controlled_payment_source_row_count": payment_population_count,
+        "payment_observed_within_checked_population": observed_payment,
+        "campaign_verified_paying_customers": None,
+        "recognized_campaign_revenue_cents": None,
+        "margin_realized_cents": None,
+        "source_holds": sorted(holds),
+        "canonical_crm_contact_join_established": False,
+        "outbound_execution_eligible_from_observers": False,
+        "production_actions_executed": False,
+        "database_writes": False,
+        "execution_authority": "NONE",
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
@@ -818,6 +1082,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     output["decision_intelligence"] = review_authenticated_campaign_intelligence(
         now=current,
+        observer_snapshots=read_real_commercial_observers(root),
     )
     output["next_real_execution_focus"] = recommend_next_real_execution_focus(output)
     print(json.dumps(output, sort_keys=True))

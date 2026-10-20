@@ -614,3 +614,89 @@ acquisition by this owner, paid traffic, publishing, public tracking, lead
 admission, customer billing, automatic subscriber enrollment and changes to
 another agent's CRM/Finance source files. Live buyer verification remains
 assigned elsewhere, as directed by the founder.
+
+
+## 20 October — REAL EmpireOS observer connections (no mock production outcomes)
+
+This is the first **live source-level integration** into the existing
+full-funnel command, not an additional analytics application. The
+`review_authenticated_campaign_intelligence` entry point now accepts
+`observer_snapshots`; the original read-only CLI automatically loads
+six **existing production-owned observer snapshots** from hardcoded
+EmpireOS runtime paths using `read_real_commercial_observers` and
+reconciles them with `review_real_commercial_observers`.
+
+| Existing observer | Live integration | Interpretation |
+|---|---|---|
+| Next-Best Action | Connected, freshness checked | Existing human/operator actions, NOT contact permission |
+| Account/Buyer Digital Twin | Connected with stale-data hold | Historic identity/history preview; NOT independently recognized money |
+| Consent/Outcome Linkage | Connected, source-governance checked | Globally linked event records; NOT equivalent to campaign customers |
+| Campaign Output/Outcome | Connected, independent linkage check | Verified output-quality counts, separate from payments and revenue |
+| Campaign Measured Outcomes | Connected, independent linkage check | Exact campaign outcome links, must agree with output observer |
+| Orders/Payments/Revenue control | Connected, source-governance checked | **Payment evidence only for the observed control population**, not an Empire-wide sales census |
+
+The existing TAM, message optimiser, owned asset/campaign runtime
+and buyer qualification/relationship snapshots remain in their
+original read-only adapters. This additional reconciliation avoids
+duplicate readers and does not change another department's source
+files, database schema or service endpoint.
+
+### What was actually observed on 20 October
+
+The connected runtime observations contained **two** existing
+Next-Best Action recommendations: one internal decision-maker
+verification and one internal research review. **Five** campaigns
+had output-quality evidence; the independently observed
+**exact campaign outcome match count was zero**. The global
+consent/outcome observer recorded **eight linked event records**
+from `public.outbound_intents`; these are **not recognized
+revenue, fulfilled buyers or paid customers**. The checked
+order/payment control population contained zero current transaction
+rows and no observed real payment in *that population*. The older
+Account Digital Twin snapshot, from **1 October 2026**, was
+held as stale instead of being used for current buyer decisions.
+
+These are snapshot observations, not guarantees that no other
+sales or payments exist elsewhere in the company.
+
+### Hard boundaries of this connection
+
+- Reader only accepts six fixed allowlisted paths, bounded JSON
+  size, known schemas, OBSERVE mode, freshness and non-world-writable,
+  non-symlink files. Other files and source content are never searched
+  to fill gaps.
+- A malicious or incompatible source, count mismatch, stale clock,
+  unauthorized execution flag or disagreement between campaign
+  observers returns a **hold** and unknown outcome, never a positive
+  customer claim.
+- No company, contact, prospect, thread, event identifier, source
+  raw row or private CRM name is exported. Only coarse counts and
+  approved internal action classifications are returned.
+- The actual per-tenant Revenue CRM HTTP API requires its
+  authenticated dedicated tenant repository. This independent
+  command is **not** granted that authentication. Consequently
+  `decision_intelligence.adaptive_buyer_journeys` and
+  `decision_intelligence.multiwave_campaign_learning` remain null
+  until their existing data owners provide authenticated
+  `adaptive_journey_packets` and closed-window `learning_waves`.
+- The typed journey/channel adapter is built and tested. Claiming
+  arbitrary JSON, website clicks or snapshots as a CRM identity join
+  is specifically prohibited. The other Sales Director/buyer agent
+  retains responsibility for authenticating the account routes.
+- No live marketing dispatch, sender reconfiguration, user-tracking
+  endpoint, audience export, publisher enrolment, finance mutation
+  or database write was performed.
+
+### Read the live evidence
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+ -m scripts.review_tam_full_funnel_strategy_20261020 --read-only
+```
+
+The evidence is inside `decision_intelligence.real_existing_source_connections`.
+An exact consumer should check every field in `source_health` and
+`source_holds` before acting; this remains an **operator-review API**
+rather than a new sender or authorization source. Regression tests:
+`tests/test_tam_real_observer_connections_20261020.py`.
