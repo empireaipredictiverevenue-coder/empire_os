@@ -28,6 +28,9 @@ class PrivateSubscriptionBackend(Protocol):
     def independently_ready(self) -> bool: ...
     def request_verification(self, *, email: str, notice_version: str,
                              consent_receipt: dict[str, str]) -> bool: ...
+    def can_service_withdrawals(self) -> bool: ...
+    def can_service_confirmations(self) -> bool: ...
+    def confirm_with_token(self, *, token: str) -> None: ...
     def withdraw_with_token(self, *, token: str) -> None: ...
 
 
@@ -50,6 +53,16 @@ def create_roofing_optin_router(
             return False
         try:
             return backend.independently_ready() is True
+        except Exception:
+            return False
+
+    def service_available(method: str) -> bool:
+        # Withdrawal MUST remain possible if new signups are paused.
+        if backend is None:
+            return False
+        try:
+            check = getattr(backend, method, None)
+            return callable(check) and check() is True
         except Exception:
             return False
 
@@ -133,11 +146,32 @@ def create_roofing_optin_router(
             return _response({"error": "signup_temporarily_unavailable"}, 503)
         return _response({"status": "OPTIN_RECORDED_PENDING_VERIFICATION"}, 202)
 
+    @router.post("/v1/consumer-optin/roofing/confirm")
+    async def roofing_optin_confirm(request: Request):
+        # Email token verification is an explicit user action. Never verify
+        # with an auto-loading GET that mail scanners can trigger.
+        if not service_available("can_service_confirmations"):
+            return _response({"status": "OPTIN_CONFIRMATION_SERVICE_HELD"}, 503)
+        if not same_origin(request):
+            return _response({"error": "same_origin_required"}, 403)
+        payload = await read_json(request, limit=1024)
+        if (payload is None or set(payload) != {"confirmation_token"}
+            or not isinstance(payload["confirmation_token"], str)
+            or TOKEN.fullmatch(payload["confirmation_token"]) is None):
+            return _response({"error": "invalid_confirmation_request"}, 422)
+        if limiter is None or limiter(request.client.host if request.client else "unknown") is not True:
+            return _response({"error": "rate_limited_or_unavailable"}, 429)
+        try:
+            backend.confirm_with_token(token=payload["confirmation_token"])
+        except Exception:
+            return _response({"status": "OPTIN_CONFIRMATION_SERVICE_UNAVAILABLE"}, 503)
+        return _response({"status": "REQUEST_RECEIVED_IF_TOKEN_VALID"}, 202)
+
     @router.post("/v1/consumer-optin/roofing/unsubscribe")
     async def roofing_optin_unsubscribe(request: Request):
         # A confirmed owner must implement a purpose-scoped opaque verifier.
         # Do not ever accept an email or arbitrary subscriber ID here.
-        if not ready():
+        if not service_available("can_service_withdrawals"):
             return _response({"status": "OPTIN_WITHDRAWAL_SERVICE_HELD"}, 503)
         if not same_origin(request):
             return _response({"error": "same_origin_required"}, 403)

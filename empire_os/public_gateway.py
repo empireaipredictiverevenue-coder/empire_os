@@ -276,6 +276,7 @@ _STATIC_REVIEWED_ROUTES = {
     "roofing/replacement-vs-repair": "roofing/replacement-vs-repair.html",
     "roofing/installation-checklist": "roofing/installation-checklist.html",
     "roofing/cost-guide": "roofing/cost-guide.html",
+    "roofing/email-preferences": "roofing/email-preferences.html",
 }
 # This existing gateway is the only publishing surface. Absent an explicitly
 # approved, exact-content release record, staged assets must return 404.
@@ -1213,7 +1214,7 @@ def public_website_terms():
 @app.get("/roofing/{guide_slug}")
 def public_roofing_guide(guide_slug: str):
     # Explicit finite allowlist; no user-controlled filesystem path.
-    if guide_slug not in {"replacement-vs-repair", "installation-checklist", "cost-guide"}:
+    if guide_slug not in {"replacement-vs-repair", "installation-checklist", "cost-guide", "email-preferences"}:
         return JSONResponse(
             {"error": "roofing_guide_not_released"}, status_code=404,
             headers={"Cache-Control": "no-store", "X-Robots-Tag": "noindex, nofollow"},

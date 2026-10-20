@@ -31,8 +31,17 @@ class SyntheticTestBackend:
         self.enabled=True
         self.received=[]
         self.withdrawal=[]
+        self.confirmed=[]
+        self.withdrawals_enabled=True
+        self.confirmations_enabled=True
     def independently_ready(self):
         return self.enabled
+    def can_service_withdrawals(self):
+        return self.withdrawals_enabled
+    def can_service_confirmations(self):
+        return self.confirmations_enabled
+    def confirm_with_token(self, **kwargs):
+        self.confirmed.append(kwargs)
     def request_verification(self, **kwargs):
         self.received.append(kwargs)
         return True
@@ -59,6 +68,9 @@ def test_real_gateway_closes_all_routes_without_subscriber_backend():
         assert r.status_code==503
         r=app.post("/v1/consumer-optin/roofing/unsubscribe",
                    json={"unsubscribe_token":"a"*40})
+        assert r.status_code==503
+        r=app.post("/v1/consumer-optin/roofing/confirm",
+                   json={"confirmation_token":"a"*40})
         assert r.status_code==503
 
 
@@ -187,3 +199,87 @@ def test_page_never_reuses_business_crm_or_buyer_optin_implicitly():
     assert "unsubscribe" in text.lower()
     for forbidden in ("/v1/checkout/commercial/interests","/v1/leads/direct-intake"):
         assert forbidden not in text
+
+def test_verification_is_post_only_explicit_with_opaque_token():
+    backend=SyntheticTestBackend()
+    with client(backend) as app:
+        assert app.get("/v1/consumer-optin/roofing/confirm").status_code==405
+        r=app.post("/v1/consumer-optin/roofing/confirm",
+            headers=ORIGIN,json={"confirmation_token":"T"*43})
+        assert r.status_code==202
+        assert r.json()=={"status":"REQUEST_RECEIVED_IF_TOKEN_VALID"}
+        invalid=app.post("/v1/consumer-optin/roofing/confirm",
+            headers=ORIGIN,json={"email":"synthetic@example.test"})
+        assert invalid.status_code==422
+        cross_site=app.post("/v1/consumer-optin/roofing/confirm",
+            headers={**ORIGIN,"origin":"https://evil.example"},
+            json={"confirmation_token":"T"*43})
+        assert cross_site.status_code==403
+    assert backend.confirmed==[{"token":"T"*43}]
+
+
+def test_signup_pause_does_not_disable_existing_withdrawals():
+    backend=SyntheticTestBackend()
+    backend.enabled=False
+    with client(backend) as app:
+        assert app.get("/v1/consumer-optin/roofing/status").status_code==503
+        assert app.post("/v1/consumer-optin/roofing",
+                        json=payload(),headers=ORIGIN).status_code==503
+        r=app.post("/v1/consumer-optin/roofing/unsubscribe",
+            headers=ORIGIN,json={"unsubscribe_token":"U"*43})
+        assert r.status_code==202
+        r=app.post("/v1/consumer-optin/roofing/confirm",
+            headers=ORIGIN,json={"confirmation_token":"C"*43})
+        assert r.status_code==202
+    assert backend.withdrawal==[{"token":"U"*43}]
+    assert backend.confirmed==[{"token":"C"*43}]
+
+
+def test_withdrawal_service_unavailable_does_not_pretend_success():
+    backend=SyntheticTestBackend()
+    backend.withdrawals_enabled=False
+    with client(backend) as app:
+        r=app.post("/v1/consumer-optin/roofing/unsubscribe",
+            headers=ORIGIN,json={"unsubscribe_token":"U"*43})
+        assert r.status_code==503
+    assert backend.withdrawal==[]
+
+
+def test_preference_landing_page_is_reviewed_nonindexed_and_never_auto_posts():
+    root=ROOT/"apps/empire-public-site/src/app/roofing/email-preferences"
+    page=(root/"page.tsx").read_text()
+    layout=(root/"layout.tsx").read_text()
+    assert 'robots: { index: false, follow: false }' in layout
+    assert 'window.location.hash.slice(1)' in page
+    assert 'window.history.replaceState(null, "", window.location.pathname)' in page
+    assert 'new URLSearchParams(hash)' in page
+    assert 'window.addEventListener("hashchange", readOriginalLink)' in page
+    assert 'type="submit"' in page
+    assert 'async function submit(event:' in page
+    assert 'method: "POST"' in page
+    assert 'confirm' in page and 'unsubscribe' in page
+    assert "fetch(PATH + \"/\" + selected.kind" in page
+    assert "localStorage" not in page and "sessionStorage" not in page
+
+
+def test_preference_page_stays_held_without_original_website_review_receipt():
+    from empire_os import public_gateway
+    assert public_gateway._STATIC_REVIEWED_ROUTES["roofing/email-preferences"] == "roofing/email-preferences.html"
+    with TestClient(public_gateway.app) as app:
+        response=app.get("/roofing/email-preferences")
+    assert response.status_code==404
+    assert response.headers.get("x-robots-tag")=="noindex, nofollow"
+
+
+def test_staged_schema_has_one_use_purpose_separated_tokens_and_erasure():
+    text=SQL.read_text()
+    assert "public.empire_consumer_one_time_tokens" in text
+    assert "token_hmac text PRIMARY KEY" in text
+    assert "token_purpose IN ('confirm','unsubscribe')" in text
+    assert "consumed_at timestamptz" in text
+    assert "expires_at > issued_at" in text
+    assert "email_ciphertext IS NULL AND email_key_reference IS NULL" in text
+    assert "ALTER TABLE public.empire_consumer_one_time_tokens FORCE ROW LEVEL SECURITY" in text
+    assert "REVOKE ALL ON TABLE public.empire_consumer_one_time_tokens FROM PUBLIC" in text
+    assert "GRANT INSERT" not in text
+    assert "GRANT EXECUTE" not in text

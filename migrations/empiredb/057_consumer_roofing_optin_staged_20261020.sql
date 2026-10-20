@@ -21,6 +21,7 @@ BEGIN
   IF pg_catalog.to_regclass('public.empire_consumer_subscriptions') IS NOT NULL
      OR pg_catalog.to_regclass('public.empire_consumer_consent_events') IS NOT NULL
      OR pg_catalog.to_regclass('public.empire_consumer_email_suppressions') IS NOT NULL
+     OR pg_catalog.to_regclass('public.empire_consumer_one_time_tokens') IS NOT NULL
      OR pg_catalog.to_regprocedure('public.empire_consumer_consent_event_immutable()') IS NOT NULL
   THEN
     RAISE EXCEPTION 'CONSUMER057_OBJECT_ALREADY_EXISTS_REVIEW_FIRST';
@@ -40,8 +41,8 @@ CREATE TABLE public.empire_consumer_subscriptions (
     CHECK (tenant_scope='empire-ai.co.uk'),
   email_lookup_hmac text NOT NULL
     CHECK (email_lookup_hmac ~ '^[a-f0-9]{64}$'),
-  email_ciphertext bytea NOT NULL CHECK (octet_length(email_ciphertext) BETWEEN 40 AND 2048),
-  email_key_reference text NOT NULL
+  email_ciphertext bytea,
+  email_key_reference text
     CHECK (email_key_reference ~ '^[a-z][a-z0-9_:-]{5,63}$'),
   purpose text NOT NULL DEFAULT 'empire_own_brand_homeowner_updates'
     CHECK (purpose='empire_own_brand_homeowner_updates'),
@@ -63,7 +64,15 @@ CREATE TABLE public.empire_consumer_subscriptions (
     UNIQUE (tenant_scope, purpose, email_lookup_hmac),
   CHECK ((permission_state <> 'verified') OR verified_at IS NOT NULL),
   CHECK ((permission_state NOT IN ('unsubscribed','erased')) OR revoked_at IS NOT NULL),
-  CHECK ((permission_state <> 'erased') OR erased_at IS NOT NULL)
+  CHECK ((permission_state <> 'erased') OR erased_at IS NOT NULL),
+  CHECK (
+    (permission_state='erased'
+      AND email_ciphertext IS NULL AND email_key_reference IS NULL)
+    OR
+    (permission_state<>'erased' AND email_ciphertext IS NOT NULL
+      AND octet_length(email_ciphertext) BETWEEN 40 AND 2048
+      AND email_key_reference IS NOT NULL)
+  )
 );
 COMMENT ON TABLE public.empire_consumer_subscriptions IS
   'STAGED: encrypted individually permissioned OWN BRAND email subscriptions, no contractor/referral rights, no active app role.';
@@ -98,6 +107,28 @@ CREATE TABLE public.empire_consumer_email_suppressions (
   suppressed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 
+-- Tokens are 256-bit random bearer secrets; ONLY the purpose-separated,
+-- keyed HMAC fingerprint is stored. Verification/unsubscribe consumption MUST
+-- atomically lock the subscription + token and check current suppression.
+-- No automatic email scanner GET may consume a confirmation token.
+CREATE TABLE public.empire_consumer_one_time_tokens (
+  token_hmac text PRIMARY KEY CHECK (token_hmac ~ '^[a-f0-9]{64}$'),
+  subscription_id uuid NOT NULL
+    REFERENCES public.empire_consumer_subscriptions(subscription_id),
+  token_purpose text NOT NULL CHECK (token_purpose IN ('confirm','unsubscribe')),
+  issued_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  expires_at timestamptz NOT NULL,
+  consumed_at timestamptz,
+  CHECK (expires_at > issued_at),
+  CHECK (expires_at <= issued_at + interval '30 days'),
+  CHECK (consumed_at IS NULL OR consumed_at >= issued_at)
+);
+COMMENT ON TABLE public.empire_consumer_one_time_tokens IS
+  'STAGED: one-use purpose-separated keyed digests, no cleartext tokens or live authority.';
+
+CREATE INDEX empire_consumer_tokens_by_subscription
+  ON public.empire_consumer_one_time_tokens(subscription_id,token_purpose,expires_at);
+
 CREATE INDEX empire_consumer_subs_by_state
   ON public.empire_consumer_subscriptions(permission_state, created_at);
 CREATE INDEX empire_consumer_events_by_sub
@@ -122,12 +153,15 @@ ALTER TABLE public.empire_consumer_consent_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_consent_events FORCE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_email_suppressions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.empire_consumer_email_suppressions FORCE ROW LEVEL SECURITY;
+ALTER TABLE public.empire_consumer_one_time_tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.empire_consumer_one_time_tokens FORCE ROW LEVEL SECURITY;
 
 -- No policies and NO runtime grants. Dedicated operator-reviewed writer /
 -- verification / withdrawal capabilities must be established separately.
 REVOKE ALL ON TABLE public.empire_consumer_subscriptions FROM PUBLIC;
 REVOKE ALL ON TABLE public.empire_consumer_consent_events FROM PUBLIC;
 REVOKE ALL ON TABLE public.empire_consumer_email_suppressions FROM PUBLIC;
+REVOKE ALL ON TABLE public.empire_consumer_one_time_tokens FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.empire_consumer_consent_event_immutable() FROM PUBLIC;
 
 COMMENT ON TABLE public.empire_consumer_email_suppressions IS
