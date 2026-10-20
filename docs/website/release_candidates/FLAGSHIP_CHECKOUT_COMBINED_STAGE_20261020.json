@@ -1,0 +1,49 @@
+{
+  "customer_enquiry_or_order_submitted": false,
+  "existing_oct13_manifest_reapproved": false,
+  "external_actions": false,
+  "html_preview_deployed": false,
+  "page_asset_sha256": {
+    "_next/static/chunks/00740d7edgihf.js": "24fa9c7b7e4db0fd0c850d89d3c963cf9a860336d24ce9fed8f8b08623a772fa",
+    "_next/static/chunks/00csqdmn1ppym.js": "34834901ed172c3915e539a3df745fe9c894deaa00030028360ff084513d32bf",
+    "_next/static/chunks/05x4ucd2koj0v.css": "ce0e7a62753fcaa910e288f5155bb97952e225c63839200b0685f9576de9d0fc",
+    "_next/static/chunks/0bnac-qv4-kj1.js": "642e715bd8159ad27328cd330988b02f59d2c3bea3e0d96297e9ec437524a450",
+    "_next/static/chunks/0cz1d0mv5g_q7.js": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+    "_next/static/chunks/0jiyunp5x7m90.js": "9614ebba610e546e11b9c2a51abb43add848bbcfd2b22d2d977f65e8a2013770",
+    "_next/static/chunks/1f59dvr04lp2q.css": "11e78696cc2854bf028ad4ede0048313ecd1d9f68cd1936735a5bdb559da0910",
+    "_next/static/chunks/1imwq8qchx0y9.js": "84091742ec54cdf3ec79d7f70da52671f0553618162f6c913a3378a34a179e5f",
+    "_next/static/chunks/1z3h-wpd7w46_.css": "a3efa1c9944f97a7c9edea7d4b25d5d984b871daefa3f1a74fb59aaf48b864e8",
+    "_next/static/chunks/2_mjsxmatigr9.js": "e6a6c54d6329d1f0ddc87e8bc2ca6b8713c138099de3dfcc2305315ecf68b0d5",
+    "_next/static/chunks/2wtk630vp69qr.js": "c11b47105612f575a3735b4e9f04cb526b2607545d482030c334849a51a6e2aa",
+    "_next/static/chunks/348erbu-h8d8b.js": "6c0c61ae0e1e66e3409283d6dab944ddbf1c0f772010c96dbd25d0afdec8c2a2",
+    "_next/static/chunks/3kdi8z7f__py4.js": "c20a76719936ef0b49f3a07fea967d30537610acb14e9295bbd76c16b2b45c5d",
+    "_next/static/chunks/turbopack-40jik6rsqbixm.js": "bedafcae164115301771184a4450765283ba328907044f4fa4aaaffcc9490a72"
+  },
+  "page_html_sha256": {
+    "buy.html": "435cd7b1fed3490998ec2ca74cd0fc68f1a6ff0a324a10adba6428def4e92552",
+    "commercial.html": "c0f8518d0113ea30faf38cd4f2f769e80fd2ff46d715e4d86100cde6f4659b7f",
+    "index.html": "061b03b39a22575a4ed79626e1ef44637a012345bcc9a855610b07e45871e209"
+  },
+  "payment_activation": false,
+  "referenced_immutable_asset_count": 14,
+  "revenue_verified": false,
+  "reviewed_page_count": 3,
+  "schema_version": "empire.website.flagship_checkout_source_convergence.v1",
+  "source_origin": {
+    "buyer_proposal_source_commit": "56817a08",
+    "cinematic_ast_source_commit": "084f4e80"
+  },
+  "source_sha256": {
+    "src/app/buy/page.tsx": "be01cec0fea6a9aabbcdfbe7815266760ef604686b192b31a0496b8083f42e73",
+    "src/app/commercial/page.tsx": "dd3108dd26a2b9cc398405f7ff460e90b8236190c5c9bde01dc665f502e27905",
+    "src/app/globals.css": "ae71955a3a75dff1647b8ca08ed1f46c1985e15b4a936bd4adf5b9ad3c3ed1c5",
+    "src/app/layout.tsx": "e988c3a33343ac43b6789c95caa85ad2d56e6aaadfb2d8e3e69071c594c2d378",
+    "src/app/page.tsx": "4eb7db2e3d56070baf5cf65303e62501bb82afd58fec40d11ec7d64663fb124c",
+    "src/components/CinematicExperience.tsx": "2fbf8cede0f89d6faa17ae63731ffee398254924386dd84a674c39270ec04650",
+    "src/components/EarthJourneyScene.tsx": "8d751b2235ea16d44130e43d1538995e059deeca5155d97d29933460b97a5ca8",
+    "src/components/scroll-world-director.ts": "a50c6effa82073f63c8a196379c3a45cb2be564b9d2046ee75d16d484d7b066c",
+    "src/lib/buyer-proposal-handoff.ts": "a70421892a18556b1b92de58772ef5e20a7ed9b227374690edc521bb871e9a4d"
+  },
+  "stage_status": "COMBINED_SOURCE_BUILD_VERIFIED_AWAITING_VISUAL_RELEASE",
+  "website_visual_approval": false
+}

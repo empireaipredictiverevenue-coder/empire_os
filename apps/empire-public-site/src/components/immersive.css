@@ -1,0 +1,170 @@
+/* Scoped cinematic upgrade. Original brand and all owner routes remain intact. */
+.earth-experience{overflow:clip}
+.earth-hero{min-height:max(780px,100svh);padding:135px 5vw 130px;grid-template-columns:48% 52%;gap:0}
+.earth-copy{padding-right:25px}
+.earth-copy h1{font-size:clamp(44px,4.5vw,78px);line-height:1.035;letter-spacing:-.045em;text-wrap:balance}
+.earth-copy .eyebrow{max-width:510px}
+.earth-shade{background:linear-gradient(90deg,#020913ec 0%,#02091388 42%,transparent 76%),linear-gradient(0deg,#020913,transparent 40%)}
+.console-stage{width:108%;transform:translateX(-1%);position:relative}
+.console-stage:before{content:"";position:absolute;inset:-26% -10%;pointer-events:none;background:radial-gradient(ellipse at 90% 15%,#ffba6335,transparent 28%),radial-gradient(ellipse at 25% 80%,#048cff25,transparent 50%);filter:blur(20px)}
+.intelligence-console{padding:25px 20px 19px;transform-origin:50% 65%;border-radius:23px;box-shadow:0 0 0 6px #05101ce8,0 0 0 7px #264561,0 38px 90px #000b,inset 0 2px 20px #70b6ff22,15px -4px 40px #ffc78015}
+.intelligence-console:before{content:"";position:absolute;inset:1px;pointer-events:none;border-radius:22px;background:linear-gradient(135deg,#a1dfff12,transparent 28%,transparent 70%,#ffda9c12)}
+.intelligence-console:after{content:"";position:absolute;bottom:-8px;left:12%;right:8%;height:2px;background:linear-gradient(90deg,transparent,#37aeff,#c9ecff,#efc999,transparent);box-shadow:0 0 18px #008cff}
+.console-body{grid-template-columns:34% 66%;min-height:380px}
+.console-heading{font-size:16px;letter-spacing:.16em}
+.console-modules{justify-content:center}
+.console-modules button{min-height:61px;background:#031321da;transition:border-color .2s,background .2s,transform .2s}
+.console-modules button:hover{transform:translateX(3px);border-color:#8ad9ff}
+.console-modules button:active{transform:translateX(1px)}
+.console-modules small{font-size:8px}
+.console-earth{margin-left:-10px;overflow:visible;background:transparent;min-height:380px}
+.console-callout{z-index:2;left:25%;right:0;bottom:4%;backdrop-filter:blur(12px);background:linear-gradient(135deg,#092039ed,#020b16ed);border:1px solid #5cb6ec70;box-shadow:0 14px 35px #0009}
+.console-callout strong{font-size:15px}
+.hero-webgl.earth-webgl{inset:-15px -20px 0 -25px;z-index:0}
+.earth-webgl canvas{opacity:1;transition:opacity .6s}
+.globe-static{position:absolute;width:70%;aspect-ratio:1;left:15%;top:8%;border-radius:50%;background:radial-gradient(circle at 34% 30%,transparent 10%,#00102455 60%,#00101c 85%),url('/art/earth/day.jpg') 50%/cover;box-shadow:inset -20px -12px 40px #000b,inset 2px 0 14px #74ccff,0 0 25px #168cff70;opacity:.8}
+.earth-webgl[data-ready=true] .globe-static{opacity:0}
+.intelligence-world{height:360svh;padding:0;position:relative;background:linear-gradient(#020913,#061222)}
+.world-sticky{position:sticky;top:0;min-height:760px;height:100svh;max-height:1200px;padding:105px 5vw 20px;display:grid;grid-template-rows:auto minmax(220px,1fr) auto auto;overflow:hidden}
+.world-heading h2{font-size:clamp(30px,3.2vw,49px);letter-spacing:-.04em}
+.world-heading .eyebrow{margin-bottom:12px}
+.world-heading>p{font-size:13px}
+.world-landscape{height:auto;min-height:220px;margin:0;overflow:visible}
+.world-landscape>img{height:135%;opacity:.36;filter:saturate(.8);object-position:center;mask-image:linear-gradient(transparent,#000 45%,transparent)}
+.world-landscape:after{background:radial-gradient(ellipse at 70% 75%,#f3b35c0c,transparent 50%)}
+.world-landscape .earth-webgl{inset:-24px 0 20px}
+.world-stations{padding:0 0 4px;align-items:end;gap:10px}
+.world-stations button{min-height:68px;gap:5px;max-width:200px;font-size:10px}
+.world-stations .station-beacon{height:37px;width:37px}
+.world-stations .station-number{display:none}
+.world-stations .is-selected .station-beacon{border-color:#ffda9a;box-shadow:0 0 30px #ffb84e40;background:#2d2319}
+.world-stations .is-selected svg{color:#ffe0a1}
+.world-detail{padding-top:22px;min-height:245px;grid-template-columns:1.6fr 1fr;gap:55px;border-top:1px solid #83b5e029}
+.world-detail h3{font-size:clamp(25px,2.5vw,37px);max-width:620px}
+.world-detail .eyebrow{margin-bottom:12px;font-size:10px}
+.world-detail p:not(.eyebrow){font-size:14px;line-height:1.65;margin:12px 0;max-width:630px}
+.world-detail .secondary-action{min-height:42px;padding:10px 16px}
+.world-controls{padding:15px 20px;background:#041224b0;backdrop-filter:blur(15px)}
+.world-controls input{margin:12px 0 0}
+.motion-control{font-size:11px}
+.scene-caption{font-size:10px;color:#8ca6bc;margin:10px 0 0}
+.scene-caption a{text-decoration:underline;text-underline-offset:3px;margin-left:8px}
+.earth-experience .earth-offers .solution-grid{position:relative;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:thin;scrollbar-color:#3872a6 #06112c;gap:24px;padding:20px 3px 30px;perspective:1000px;overscroll-behavior-x:contain;cursor:grab;touch-action:pan-x pan-y;scroll-padding-inline:3px}
+.earth-offers .solution-grid:active{cursor:grabbing}
+.earth-experience .solution-card{position:relative;flex:0 0 68%;min-width:0;min-height:390px;padding:38px;scroll-snap-align:start;background:linear-gradient(125deg,#091e32,#020b16);border-color:#49729370;overflow:hidden;transform:scale(.97);transition:transform .35s,border-color .35s,box-shadow .35s;isolation:isolate}
+.earth-experience .solution-card.is-current{transform:scale(1);border-color:#6cb9ef;box-shadow:0 15px 45px #0004,inset 0 1px #b2e1ff33}
+.earth-experience .solution-card h3{font-size:clamp(28px,3vw,44px);max-width:70%;font-weight:700}
+.earth-experience .solution-card>p{max-width:65%;font-size:15px}
+.earth-experience .solution-card .card-top{margin-bottom:45px}
+.product-slider-controls{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:10px;font-size:12px;font-variant-numeric:tabular-nums}
+.product-slider-controls button{width:48px;height:48px;border:1px solid #5b9bce88;border-radius:50%;cursor:pointer;font-size:20px;transition:background .2s}
+.product-slider-controls button:hover:enabled{background:#126fc055}
+.product-slider-controls button:disabled{opacity:.3;cursor:default}
+.product-art{position:absolute;right:-8%;top:20%;width:45%;height:65%;z-index:-1;opacity:.7;transform:rotate(-25deg)}
+.product-art span{position:absolute;inset:10%;border:1px solid #56b5ff88;border-radius:50%;box-shadow:0 0 24px #148cff24}
+.product-art span:nth-child(2){inset:20%}.product-art span:nth-child(3){inset:30%;background:#168cff11}.product-art span:nth-child(4){inset:40%;background:#238ddd;box-shadow:0 0 35px #42beff}.product-art span:nth-child(5){inset:2%;transform:rotateY(65deg)}
+.product-art-1{transform:rotate(-18deg) skewY(12deg)}.product-art-1 span{border-radius:12px;transform:translateY(-15px);background:#0f3a5b22}.product-art-1 span:nth-child(2){transform:translateY(15px)}.product-art-1 span:nth-child(3){transform:translateY(45px)}.product-art-1 span:nth-child(4){background:#ffce80;box-shadow:0 0 30px #ffce8077}
+.product-art-2{transform:rotate(30deg)}.product-art-2 span{border-radius:20%;border-color:#d6b17855;transform:rotate(45deg)}.product-art-2 span:nth-child(4){background:#ffce80;box-shadow:0 0 30px #ffce8077}
+.earth-experience[data-motion=paused] .intelligence-world{height:auto}
+.earth-experience[data-motion=paused] .world-sticky{position:relative;height:auto;min-height:0;grid-template-rows:auto 360px auto auto}
+@media(min-width:1700px){.console-body,.console-earth{min-height:450px}.console-modules button{min-height:75px}.console-modules small{font-size:10px}}
+@media(max-width:1050px){.earth-hero{grid-template-columns:1fr;padding-top:140px;gap:48px}.earth-copy{max-width:750px;padding:0}.console-stage{width:95%;max-width:780px;transform:none}.earth-copy h1{font-size:clamp(46px,7vw,72px)}.world-sticky{padding-top:105px}.world-heading>p{max-width:250px}.world-detail{gap:25px}.world-detail h3{font-size:29px}.world-controls{padding:15px}.earth-experience .solution-card{flex-basis:82%}}
+@media(max-width:600px){
+ .earth-hero{padding:126px 22px 140px;gap:36px}.earth-copy h1{font-size:clamp(37px,10.4vw,55px)}.earth-copy .eyebrow{font-size:9px}.earth-intro{font-size:16px;line-height:1.65}.console-stage{width:100%}.intelligence-console{padding:16px 12px 12px;border-radius:17px}.console-heading{font-size:12px;margin-bottom:14px}.console-heading small{font-size:6px}.console-body{grid-template-columns:42% 58%;min-height:290px}.console-earth{min-height:290px;margin:0}.console-modules button{font-size:9px;gap:6px;min-height:49px;padding:8px 6px}.console-modules small{font-size:7px}.console-callout{left:2%;bottom:2%;padding:10px}.console-callout strong{font-size:12px}.hero-webgl.earth-webgl{inset:-5px -30px 35px -30px}
+ .intelligence-world{height:300svh}.world-sticky{padding:100px 22px 16px;min-height:820px;height:100svh;grid-template-rows:auto minmax(210px,1fr) auto auto}.world-heading h2{font-size:31px}.world-heading>p{display:none}.world-heading .eyebrow{font-size:9px;margin-bottom:10px}.world-landscape .earth-webgl{inset:-20px -35px 65px}.world-stations{display:flex;flex-wrap:nowrap;align-items:end;padding:0;gap:5px;height:100%}.world-stations button{font-size:8px;min-width:0;min-height:70px;justify-content:flex-start;flex:1;line-height:1.4}.world-stations .station-beacon{width:30px;height:30px}.world-stations .station-beacon svg{width:16px}.world-detail{grid-template-columns:1fr;padding-top:14px;min-height:0;gap:13px}.world-detail h3{font-size:26px;line-height:1.1}.world-detail p:not(.eyebrow){font-size:13px;line-height:1.55;margin:10px 0}.world-detail .eyebrow{font-size:8px;margin-bottom:10px}.world-detail .secondary-action{font-size:11px}.world-controls{padding:8px 12px;display:grid;grid-template-columns:1fr auto;gap:0 12px}.world-control-row{gap:10px}.world-control-row label{font-size:10px}.world-control-row label span{display:inline;margin-left:7px}.world-control-row button{width:40px;height:40px}.world-controls input{grid-column:1;grid-row:2;margin:0;height:25px}.motion-control{grid-column:2;grid-row:1/3;max-width:65px;font-size:9px;text-align:center}.scene-caption{font-size:8px;line-height:1.5}.scene-caption a{margin-left:0}
+ .earth-experience .solution-card{flex-basis:91%;padding:26px;min-height:400px}.earth-experience .solution-card h3{max-width:90%;font-size:29px}.earth-experience .solution-card>p{max-width:90%;font-size:14px}.product-art{opacity:.3;right:-20%;width:75%}.earth-experience .solution-card .card-top{margin-bottom:75px}.earth-experience .earth-offers .solution-grid{gap:16px}.earth-experience[data-motion=paused] .world-sticky{grid-template-rows:auto 260px auto auto}
+}
+@media(max-height:820px) and (min-width:601px){.world-sticky{min-height:690px;padding-top:95px}.world-heading h2{font-size:32px}.world-detail{min-height:220px}.world-detail h3{font-size:28px}.world-detail p:not(.eyebrow){font-size:13px}.world-controls{padding:12px}}
+@media(prefers-reduced-motion:reduce){.intelligence-world{height:auto}.world-sticky{position:relative;height:auto;min-height:0;grid-template-rows:auto 320px auto auto}.earth-experience .solution-card{transform:none!important}.globe-static{transition:none}.earth-webgl canvas{transition:none}}
+
+.earth-offers .solution-grid::after{content:"";flex:0 0 calc(32% - 24px)}
+@media(max-width:1050px){.earth-offers .solution-grid::after{flex-basis:calc(18% - 24px)}}
+@media(max-width:600px){.earth-offers .solution-grid::after{flex-basis:calc(9% - 16px)}.earth-shade{background:linear-gradient(90deg,#020913ed,#02091388),linear-gradient(0deg,#020913,transparent 60%)}}
+
+/* Keep the degraded scene inside its allocated viewport. */
+.globe-static{width:auto;height:82%;max-width:90%;left:50%;top:5%;transform:translateX(-50%);background:radial-gradient(circle at 35% 30%,#12315e22 10%,#00102477 60%,#00101cee 90%),url('/art/earth/night.jpg') 52%/cover;box-shadow:inset -20px -12px 40px #000b,inset 2px 0 14px #74ccff,0 0 25px #168cff70}
+.world-heading,.world-detail,.scene-caption{position:relative;z-index:2}
+.world-detail{background:linear-gradient(#04101ceb,#04101c)}
+.world-landscape{overflow:hidden}
+.world-landscape .earth-webgl{inset:0 0 45px}
+@media(max-width:600px){.world-landscape .earth-webgl{inset:0 -25px 65px}}
+@media(max-height:760px){.intelligence-world{height:auto}.world-sticky{position:relative;height:auto;min-height:0;grid-template-rows:auto 310px auto auto}}
+@media(max-width:600px) and (max-height:820px){.intelligence-world{height:auto}.world-sticky{position:relative;height:auto;min-height:0;grid-template-rows:auto 240px auto auto}}
+
+.scene-preferences{display:flex;align-items:center;gap:16px;margin-top:6px}
+.scene-preferences select{color:#c4e3fb;background:#061525;border:1px solid #47749c;border-radius:6px;font:inherit;font-size:11px;min-height:34px;padding:5px 9px}
+@media(max-width:600px){.scene-preferences{grid-column:2;grid-row:1/3;display:flex;flex-direction:column;gap:0;margin:0;width:90px}.scene-preferences select{font-size:9px;min-height:28px;width:90px;padding:4px}.scene-preferences .motion-control{min-height:30px;font-size:8px;max-width:90px}}
+
+/* A persistent viewport crosses between the two semantic HTML scenes. */
+.earth-experience{isolation:isolate}
+.earth-experience .earth-hero{isolation:auto}
+.shared-journey{position:fixed;left:0;top:0;width:1px;height:1px;visibility:hidden;pointer-events:none;z-index:2}
+.shared-journey .earth-webgl,.shared-journey .hero-webgl.earth-webgl{inset:0}
+.earth-experience .console-stage{z-index:3}
+.earth-experience .intelligence-console{background:linear-gradient(135deg,#0a1c2caa,#020a1488)}
+.hero-scene-anchor,.world-scene-anchor,.scene-anchor-static{position:absolute;pointer-events:none}
+.hero-scene-anchor{inset:-15px -20px 0 -25px}
+.world-scene-anchor{inset:0 0 45px}
+.scene-anchor-static{inset:0}
+/* Only replace the accessible still when a real 3D scene is ready.
+   No-GPU, loading and failed WebGL states must retain the source image. */
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .scene-anchor-static{visibility:hidden}
+/* User-requested static modes must not show a second fixed fallback on top. */
+.earth-experience[data-motion=paused] .shared-journey,
+.earth-experience[data-scene-detail=simple] .shared-journey{display:none}
+.earth-experience[data-motion=paused] .scene-anchor-static,
+.earth-experience[data-scene-detail=simple] .scene-anchor-static{visibility:visible!important}
+@media(max-width:600px){.hero-scene-anchor{inset:-5px -30px 35px -30px}.world-scene-anchor{inset:0 -25px 65px}}
+@media(prefers-reduced-motion:reduce){.shared-journey{display:none}.scene-anchor-static{visibility:visible!important}}
+.world-sticky{z-index:3}
+.earth-experience[data-shared-scene=true] .world-landscape>img{opacity:.15}
+
+/* Composition recovery: the globe is the subject; the space image supplies atmosphere. */
+.earth-backdrop{opacity:.24;filter:saturate(.82)}
+.earth-shade{background:linear-gradient(90deg,#020913f2 0%,#020913a0 42%,#02091318 76%),linear-gradient(0deg,#020913 0%,transparent 55%)}
+.earth-experience .intelligence-console{background:linear-gradient(90deg,#04101de8 0%,#06182da6 28%,#04101c18 48%,#03101c12 100%)}
+.intelligence-console:before{background:linear-gradient(145deg,#bdeaff0d,transparent 30%,transparent 78%,#e8bd8014)}
+.console-stage:before{background:radial-gradient(ellipse at 88% 0%,#ffba6350,transparent 28%),radial-gradient(ellipse at 45% 85%,#048cff40,transparent 50%)}
+.console-callout{background:linear-gradient(135deg,#092039f2,#020b16ed)}
+@media(min-width:1051px){.console-body,.console-earth{min-height:440px}.hero-scene-anchor{inset:-25px -30px -45px -45px}.earth-hero{padding-top:110px;padding-bottom:130px}.console-stage{transform:translateX(-2%) scale(.94)}.earth-copy h1{font-size:clamp(44px,4.5vw,78px)}}
+@media(max-width:600px){.earth-backdrop{opacity:.34}.earth-experience .intelligence-console{background:linear-gradient(90deg,#04101de8,#06182d60 44%,#04101c16 65%)}.earth-shade{background:linear-gradient(90deg,#020913c9,#02091350),linear-gradient(0deg,#020913,transparent 65%)}}
+
+@media(min-width:1051px){.earth-hero{min-height:760px;padding-top:70px;padding-bottom:100px}.earth-baseline{bottom:30px}.console-body,.console-earth{min-height:400px}.hero-scene-anchor{inset:-20px -25px -30px -35px}}
+
+/* Founder city direction: restore image clarity; shade text locally. */
+.earth-backdrop{opacity:.82;filter:saturate(1.14) contrast(1.08);}
+.earth-shade{background:linear-gradient(90deg,#020913e8 0%,#020913b0 35%,#02091315 70%),linear-gradient(0deg,#020913,transparent 38%)}
+.console-stage:before{background:radial-gradient(ellipse at 90% 8%,#ffb85b66,transparent 25%),radial-gradient(ellipse at 40% 80%,#00aaff50,transparent 55%)}
+.world-landscape>img{filter:saturate(1.2) contrast(1.08)}
+.earth-experience[data-shared-scene=true] .world-landscape>img{opacity:.32}
+@media(max-width:600px){.earth-backdrop{opacity:.65}.earth-shade{background:linear-gradient(90deg,#020913d9,#02091355),linear-gradient(0deg,#020913,transparent 55%)}}
+
+.city-still{position:absolute;inset:0;width:100%;height:90%;filter:drop-shadow(0 0 10px #008cff30)}
+.earth-webgl[data-ready=true] .city-still{display:none}
+.earth-webgl:has(.city-still) .globe-static{height:28%;top:0}
+
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .world-landscape>img{opacity:0}
+
+/* Ultra-wide canvases keep the opening as a complete scene. */
+@media(min-width:1920px){
+ .earth-experience .earth-hero{min-height:100svh;gap:2vw;padding-top:120px;padding-bottom:150px}
+ .earth-copy{max-width:none}.earth-copy h1{font-size:clamp(82px,4.5vw,172px)}
+ .earth-intro{font-size:clamp(19px,1vw,34px);max-width:1000px}
+ .earth-copy .eyebrow{font-size:clamp(11px,.5vw,18px)}
+ .console-body,.console-earth{min-height:clamp(550px,29vw,1100px)}
+ .console-modules button{flex:1;font-size:clamp(12px,.7vw,25px)}
+ .console-modules small{font-size:clamp(9px,.45vw,17px)}
+ .console-callout strong{font-size:clamp(16px,.9vw,32px)}
+ .console-callout{padding:clamp(16px,1vw,36px)}
+}
+
+/* The reduced-motion alternative keeps the same architectural art direction. */
+.infrastructure-poster{height:100%;overflow:hidden;border-radius:12px;filter:none}
+.infrastructure-poster img{width:100%;height:100%;object-fit:cover;object-position:50% 52%;opacity:.9}
+.infrastructure-poster:after{content:"";position:absolute;inset:0;background:linear-gradient(transparent 65%,#020b18)}
+.poster-stage{position:absolute;bottom:12%;width:8px;height:8px;border-radius:50%;background:#ffe0a3;box-shadow:0 0 18px #ffd18e;z-index:1}
+.earth-webgl:has(.infrastructure-poster) .globe-static{display:none}
+
+/* R3F sets pointer-events on its canvas wrapper. The shared scene is decorative;
+   keep it from intercepting accessible HTML controls, even at zero opacity. */
+.shared-journey *{pointer-events:none!important}

@@ -1,0 +1,340 @@
+/* Flagship founder-reviewed visual direction. All content is grounded.
+   No hero analytics or fabricated commercial statistics. */
+.orbital-home-hero {
+  position:relative; isolation:isolate; overflow:hidden;
+  min-height:min(920px,110svh);
+  padding:140px clamp(24px,5.4vw,100px) 0;
+  color:#f6faff; background:#020a18;
+  font-family:"Empire Satoshi",Inter,Arial,sans-serif;
+}
+.orbital-home-atmosphere,.orbital-home-earth,.orbital-home-tint {
+  position:absolute;pointer-events:none;inset:0;z-index:-1;
+}
+.orbital-home-earth {
+  background: url("/art/earth-detail-v2.webp") 75% 57%/cover no-repeat;
+  opacity:.9;
+  transform:scale(1.015);
+}
+.orbital-home-atmosphere {
+  background:radial-gradient(ellipse at 66% 49%,#1162aa65,transparent 60%),
+             radial-gradient(ellipse at 90% 90%,#9c601e4a,transparent 48%);
+}
+.orbital-home-tint {
+  background:linear-gradient(90deg,#020917 0%,#020917f7 17%,#020917df 35%,#02091755 70%,#02091777 100%),
+             linear-gradient(180deg,#010b18b8 0%,transparent 22%,transparent 62%,#020817 99%);
+}
+.orbital-home-inner {
+  position:relative;display:grid;grid-template-columns:minmax(0,51%) minmax(0,49%);
+  min-height:610px;align-items:center;max-width:1680px;margin:auto;gap:12px;
+}
+.orbital-home-copy {z-index:3;max-width:780px;padding-bottom:80px;}
+.orbital-home-eyebrow {
+  display:flex;align-items:center;gap:16px;font-size:11px;font-weight:700;
+  line-height:1.55;letter-spacing:.22em;text-transform:uppercase;color:#e2eaf8;
+  margin:0 0 25px;
+}
+.orbital-home-eyebrow::before {
+  content:"";display:block;width:35px;height:2px;background:#f0bf65;
+  box-shadow:0 0 15px #e1a24c55;
+}
+.orbital-home-copy h1 {
+  max-width:790px;margin:0;font-size:clamp(48px,5.25vw,88px);
+  line-height:1.02;letter-spacing:-.055em;font-weight:700;
+  font-family:"Empire Satoshi",Arial,sans-serif;
+  color:#fafcff;text-wrap:balance;text-shadow:0 3px 38px #0007;
+}
+.orbital-home-copy h1 span {
+  display:inline;color:#f6ce83;
+  background:linear-gradient(125deg,#ffebb7 0%,#f3c978 43%,#ca8837 95%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+.orbital-home-lede {max-width:650px;margin:26px 0 31px;font-size:clamp(16px,1.4vw,19px);line-height:1.65;color:#d6e4f7;}
+.orbital-home-actions {display:flex;align-items:center;flex-wrap:wrap;gap:16px;}
+.orbital-home-cta,.orbital-home-cta-alt {
+  display:inline-flex;align-items:center;justify-content:center;gap:13px;
+  min-height:54px;padding:13px 22px;border-radius:9px;font-size:14px;font-weight:700;
+  text-decoration:none;transition:background .2s,border-color .2s,transform .2s;
+}
+.orbital-home-cta {
+  background:linear-gradient(130deg,#fff0b9,#f1bd66 55%,#e8a848);
+  box-shadow:0 10px 32px #d49a4d42,0 1px 0 #fff8e5 inset;color:#07142d;
+  border:1px solid #ffdc94;
+}
+.orbital-home-cta-alt {
+  background:#07152bc9;color:#eaf8ff;border:1px solid #79c8ff8f;
+  box-shadow:0 1px 15px #178de518 inset;
+}
+.orbital-home-cta:hover {background:#fff5cf;transform:translateY(-1px);}
+.orbital-home-cta-alt:hover {border-color:#fff;transform:translateY(-1px);}
+.orbital-home-cta:focus-visible,.orbital-home-cta-alt:focus-visible,.orbital-home-proof-more:focus-visible {
+  outline:3px solid #f6ce83;outline-offset:4px;
+}
+.orbital-home-qualifier{font-size:12px;color:#acc0d6;margin-top:22px;line-height:1.6;}
+.orbital-home-art {
+  position:relative;align-self:stretch;min-height:510px;isolation:isolate;
+}
+.orbital-home-art::before {
+  content:"";position:absolute;inset:0 0 15% -10%;
+  border-radius:50%;pointer-events:none;z-index:-1;
+  background:radial-gradient(ellipse at 52% 50%,#227cbe42,transparent 48%);
+}
+.orbital-home-emblem {
+  position:absolute;top:6%;right:11%;width:min(80%,460px);min-height:290px;
+  display:flex;align-items:center;justify-content:center;flex-direction:column;
+  filter:drop-shadow(0 16px 32px #00152599);
+}
+.orbital-home-emblem .approved-brand {
+  transform:scale(1.95);transform-origin:center;filter:brightness(1.12);
+  mix-blend-mode:screen;pointer-events:none;
+}
+.orbital-home-emblem-caption {
+  margin-top:48px;color:#bfdaf9;font-size:10px;text-transform:uppercase;
+  letter-spacing:.25em;text-shadow:0 2px 5px #000b;
+}
+.orbital-home-glass {
+  position:absolute;padding:15px 18px;border:1px solid #8acaef66;border-radius:12px;
+  background:linear-gradient(145deg,#081a32cf,#020a1fdc);
+  box-shadow:0 18px 30px #0008,inset 0 1px 0 #f0f8ff1c;
+  color:#eff8ff;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  max-width:260px;
+}
+.orbital-home-glass-kicker {
+  display:flex;align-items:center;gap:8px;text-transform:uppercase;
+  color:#91d5ff;font-size:10px;font-weight:700;letter-spacing:.1em;
+}
+.orbital-home-glass strong {display:block;font-size:16px;font-weight:700;line-height:1.3;margin:11px 0 4px;}
+.orbital-home-glass p {font-size:11px;margin:0;color:#b4c9de;line-height:1.5;}
+.orbital-home-glass-top{left:0;top:11%;width:224px;}
+.orbital-home-glass-right{right:0;top:39%;width:210px;}
+.orbital-home-glass-bottom{left:11%;bottom:12%;width:230px;border-color:#e5b76c77;}
+.orbital-home-signal{display:flex;gap:6px;align-items:end;height:24px;margin-top:12px;}
+.orbital-home-signal i{flex:1;border-radius:1px 1px 0 0;background:linear-gradient(#83d5ff,#1d64c1);opacity:.78}
+.orbital-home-signal i:nth-child(1){height:25%}.orbital-home-signal i:nth-child(2){height:42%}.orbital-home-signal i:nth-child(3){height:39%}
+.orbital-home-signal i:nth-child(4){height:61%}.orbital-home-signal i:nth-child(5){height:55%}.orbital-home-signal i:nth-child(6){height:76%}
+.orbital-home-signal i:nth-child(7){height:71%}.orbital-home-signal i:nth-child(8){height:83%}.orbital-home-signal i:nth-child(9){height:100%}
+.orbital-home-stages{display:flex;gap:8px;margin-top:15px}
+.orbital-home-stages span{width:32px;height:3px;border-radius:5px;background:#53adff}
+.orbital-home-stages span:last-child{background:#dbb26c}
+.orbital-home-art-note{position:absolute;bottom:5%;right:0;font-size:10px;color:#96b2cb;text-shadow:0 3px 10px #000;}
+.orbital-home-proof {
+  position:relative;z-index:2;display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;
+  gap:0;align-items:stretch;max-width:1710px;margin:auto;padding:19px 13px;
+  border:1px solid #79b2dc65;border-radius:19px 19px 0 0;
+  background:linear-gradient(130deg,#04101fdf,#061327ed);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  box-shadow:0 -6px 30px #091a3055,inset 0 1px 0 #e0f2ff22;
+}
+.orbital-home-proof-item{display:flex;gap:14px;align-items:center;min-width:0;padding:13px 22px;border-right:1px solid #80accc35}
+.orbital-home-proof-icon {flex-shrink:0;display:grid;place-items:center;width:46px;height:46px;border:1px solid #9ac9f46c;border-radius:50%;color:#f2c577;background:#091a2dd4;}
+.orbital-home-proof-item strong{display:block;font-size:12px;line-height:1.45;color:#eff9ff}
+.orbital-home-proof-item p{font-size:11px;line-height:1.5;color:#b0c4d8;margin:6px 0 0}
+.orbital-home-proof-more{min-width:125px;display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;color:#f8d39a;font-size:11px;font-weight:700;text-decoration:none}
+body:has(.orbital-home-hero) .immersive-header {
+  border-bottom-color:#b4ddf537;
+  background:linear-gradient(105deg,#041127f0,#07182bd1 65%,#051226ec);
+  backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  box-shadow:inset 0 1px 0 #c1d8f71e;
+}
+body:has(.orbital-home-hero) .site-brand .approved-brand {
+  mix-blend-mode:screen;
+}
+
+@media(max-width:1200px) {
+ .orbital-home-inner{grid-template-columns:minmax(0,53%) minmax(0,47%);}
+ .orbital-home-copy h1{font-size:clamp(42px,5.3vw,72px);}
+ .orbital-home-emblem{right:4%;}
+ .orbital-home-glass-right{right:-10px;}
+ .orbital-home-glass-top{left:0;}
+ .orbital-home-proof{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .orbital-home-proof-more{grid-column:1/-1;border-top:1px solid #80accc35;}
+}
+@media(max-width:950px) {
+ .orbital-home-hero{padding:135px 28px 0;min-height:auto}
+ .orbital-home-inner{grid-template-columns:1fr;min-height:0}
+ .orbital-home-copy{max-width:800px;padding-bottom:12px}
+ .orbital-home-copy h1{max-width:790px;font-size:clamp(44px,7vw,69px)}
+ .orbital-home-art{min-height:380px;margin:18px 0 0;max-width:730px;width:100%;justify-self:center}
+ .orbital-home-emblem{right:15%;top:1%;width:65%;min-height:300px}
+ .orbital-home-glass-top{left:1%;top:6%}
+ .orbital-home-glass-right{right:0;top:40%}
+ .orbital-home-glass-bottom{left:10%;bottom:11%}
+ .orbital-home-proof{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .orbital-home-proof-item{border-bottom:1px solid #80accc35}
+ .orbital-home-proof-item:nth-child(2){border-right:none}
+ .orbital-home-proof-item:nth-child(3){border-bottom:none}
+}
+@media(max-width:600px) {
+ .orbital-home-hero{padding:108px 18px 0}
+ .orbital-home-tint{
+  background:linear-gradient(90deg,#020917ef,#020917cc),linear-gradient(180deg,#020917a0,transparent 45%,#020917);
+ }
+ .orbital-home-copy{padding-bottom:10px}
+ .orbital-home-copy h1{font-size:clamp(37px,9.5vw,53px);line-height:1.09;letter-spacing:-.05em}
+ .orbital-home-eyebrow{font-size:10px;letter-spacing:.12em;gap:11px;margin-bottom:20px}
+ .orbital-home-eyebrow::before{width:18px}
+ .orbital-home-lede{font-size:15.5px;line-height:1.68;margin:22px 0 25px}
+ .orbital-home-actions{flex-direction:column;align-items:stretch;gap:12px}
+ .orbital-home-cta,.orbital-home-cta-alt{justify-content:space-between;min-height:52px;width:100%}
+ .orbital-home-qualifier{font-size:11px;margin-top:18px}
+ .orbital-home-art{height:365px;min-height:365px;margin-top:20px}
+ .orbital-home-emblem{top:0;right:5%;width:90%;min-height:175px}
+ .orbital-home-emblem .approved-brand{transform:scale(1.1)}
+ .orbital-home-emblem-caption{margin-top:8px;font-size:8px;letter-spacing:.14em}
+ .orbital-home-glass{padding:12px;max-width:54%}
+ .orbital-home-glass-top{left:0;top:5%;width:45%}
+ .orbital-home-glass-right{right:0;top:47%;width:49%}
+ .orbital-home-glass-bottom{left:0;bottom:12%;width:54%}
+ .orbital-home-glass-kicker{font-size:8px;gap:5px}
+ .orbital-home-glass-kicker svg{width:12px}
+ .orbital-home-glass strong{font-size:12px;margin:8px 0 4px}
+ .orbital-home-glass p{font-size:9px}
+ .orbital-home-signal{height:18px}
+ .orbital-home-art-note{bottom:1%;left:0;right:auto;font-size:9px}
+ .orbital-home-proof{grid-template-columns:1fr;padding:7px 14px 4px;border-radius:14px 14px 0 0}
+ .orbital-home-proof-item{padding:15px 4px;border-right:none;border-bottom:1px solid #80accc35!important}
+ .orbital-home-proof-icon{width:40px;height:40px}
+ .orbital-home-proof-item strong{font-size:12px}
+ .orbital-home-proof-item p{font-size:11px}
+}
+@media(max-width:340px){
+ .orbital-home-hero{padding-inline:13px}
+ .orbital-home-copy h1{font-size:34px}
+ .orbital-home-art{min-height:375px}
+ .orbital-home-glass{padding:10px}
+ .orbital-home-glass-kicker{font-size:7px}
+}
+@media(prefers-reduced-motion:reduce) {
+ .orbital-home-hero *,body:has(.orbital-home-hero) .site-header{animation:none!important;transition:none!important;transform:none!important}
+ .orbital-home-emblem .approved-brand{transform:scale(1.6)!important}
+}
+
+/* Stable shared-journey geometry for the previously installed single 3D renderer. */
+.orbital-home-art .hero-scene-anchor {
+ position:absolute;inset:16% 7% 6% 0;z-index:-1;pointer-events:none;
+}
+@media(max-width:600px) {
+ .orbital-home-art .hero-scene-anchor{inset:0 0 3% 0}
+}
+
+/* Keep the existing real 3D scene behind meaningful text and controls.
+   Narrow the shared renderer's anchor so it does not swallow the identity. */
+.orbital-home-inner {z-index:3}
+.orbital-home-art {z-index:3}
+.orbital-home-art .hero-scene-anchor {inset:23% 24% 29% 20%}
+.orbital-home-emblem {z-index:5}
+.orbital-home-glass {z-index:6}
+.orbital-home-art-note {z-index:7}
+body:has(.orbital-home-hero) .site-header.site-header {
+ padding-block:18px;
+ border-bottom:1px solid #8dbeee59;
+ box-shadow:0 9px 34px #0007,inset 0 1px 0 #b4d5ff29;
+}
+/* The shared electric-blue header CTA remains consistent on the homepage;
+   warm gold is reserved for hero highlights and in-page accents. */
+@media(max-width:950px) {
+ .orbital-home-art .hero-scene-anchor{inset:26% 24% 34% 24%}
+}
+@media(max-width:600px){
+ .orbital-home-art .hero-scene-anchor{inset:33% 18% 27% 20%}
+}
+
+/* V2 review refinement: one approved orbital-A in the glass header,
+   no duplicate image pasted into the cinematic art. */
+.orbital-home-art-kicker {
+ position:absolute;top:3%;right:6%;z-index:5;
+ color:#d9e9ff;font-size:10px;letter-spacing:.17em;
+ font-weight:700;text-shadow:0 2px 11px #030b17;
+}
+body:has(.orbital-home-hero) .site-brand .approved-brand {
+ mix-blend-mode:screen;
+ filter:drop-shadow(0 1px 10px #3772ab44);
+}
+@media(max-width:600px) {
+ .orbital-home-art {
+  display:grid;grid-template-columns:1fr;
+  gap:10px;align-content:start;
+  height:auto;min-height:730px;
+  margin-top:20px;padding-top:304px;
+ }
+ .orbital-home-art-kicker {
+  top:0;left:0;right:auto;
+  font-size:9px;letter-spacing:.1em;
+ }
+ .orbital-home-art .hero-scene-anchor {
+  inset:36px 13% auto 13%;
+  height:254px;
+ }
+ .orbital-home-art .orbital-home-glass {
+  position:relative;inset:auto;
+  grid-column:1;
+  width:100%;max-width:none;
+  padding:14px 16px;
+ }
+ .orbital-home-glass-kicker{font-size:10px;letter-spacing:.09em}
+ .orbital-home-glass strong{font-size:15px}
+ .orbital-home-glass p{font-size:11px}
+ .orbital-home-signal{height:25px}
+ .orbital-home-art-note {
+  position:relative;grid-column:1;
+  inset:auto;margin:4px 0 14px;font-size:10px;
+ }
+ .orbital-home-proof{position:relative;z-index:5}
+}
+
+/* The opening console is the visible entrance, not a collection of floating cards.
+   Its viewport remains the anchor for the existing single scroll renderer. */
+.orbital-home-art {display:flex;align-items:center;min-height:560px;height:auto;padding:0;margin:0;perspective:1500px}
+.arrival-console {position:relative;width:100%;border:1px solid #51a9ed91;border-radius:24px;padding:13px;background:linear-gradient(135deg,#143452dd,#020a16f5 42%,#07182aee);box-shadow:0 30px 65px #000b,-8px 4px 0 #07172d,0 0 44px #0985ff30,inset 0 1px 0 #c6eaff99;transform:rotateY(-8deg) rotateZ(3deg);transform-origin:center;}
+.arrival-console::after {content:"";position:absolute;inset:auto 10% -3px;height:2px;pointer-events:none;background:linear-gradient(90deg,transparent,#62c6ff,#e6f8ff,#e5b56b,transparent);box-shadow:0 0 19px #168cff}
+.arrival-console-heading {display:flex;justify-content:space-between;gap:12px;padding:9px 8px 17px;color:#b5ddff;font-size:9px;letter-spacing:.14em;text-transform:uppercase}
+.arrival-console-heading span:last-child{color:#efc06a;letter-spacing:.03em}
+.arrival-console-screen {position:relative;isolation:isolate;min-height:310px;overflow:hidden;border:1px solid #26629477;border-radius:13px;background:#020817 url('/art/earth-detail-v2.webp') 62% 50%/cover no-repeat;}
+.arrival-console-screen::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#020b19e8,transparent 85%),linear-gradient(0deg,#020b19bb,transparent 60%)}
+.orbital-home-art .hero-scene-anchor {position:absolute;inset:0;z-index:-1;height:auto;pointer-events:none}
+.arrival-console-modules{position:relative;display:grid;gap:7px;padding:14px;width:54%;z-index:2}
+.arrival-console-modules button{display:flex;align-items:center;text-align:left;gap:9px;min-height:48px;border:1px solid #4480b955;background:#031224d9;border-radius:7px;padding:8px;color:#d1e5f6;font:inherit;font-size:11px;cursor:pointer;transition:border-color .18s,background .18s,transform .18s}
+.arrival-console-modules button>span:first-child{font-size:9px;color:#70bfff}
+.arrival-console-modules small{display:block;margin-top:3px;font-size:9px;line-height:1.4;color:#a6bed5}
+.arrival-console-modules button[aria-pressed="true"]{border-color:#80cbff;background:#0b3157ef;box-shadow:inset 3px 0 #48b2ff,0 0 17px #168cff22;color:white}
+.arrival-console-modules button:hover{border-color:#efc06a;background:#13344e}
+.arrival-console-modules button:active{transform:translateY(1px)}
+.arrival-console a:focus-visible,.arrival-console button:focus-visible{outline:3px solid #efc06a;outline-offset:3px}
+.arrival-console-focus{position:absolute;right:12px;bottom:23px;width:43%;padding:12px;border:1px solid #4cb5ff85;border-radius:9px;background:#041327e8;box-shadow:0 10px 22px #0009}
+.arrival-console-focus span{display:block;font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#70c7ff}
+.arrival-console-focus strong{display:block;margin-top:8px;font-size:14px;line-height:1.35;color:#f5f9ff}
+.arrival-console-orbit{position:absolute;inset:20% -16% 14% 36%;border:1px solid #299aff77;border-radius:50%;transform:rotate(-32deg);box-shadow:0 0 12px #168cff44}
+.arrival-console-orbit span{position:absolute;left:17%;top:12%;width:5px;height:5px;border-radius:50%;background:#c5eeff;box-shadow:0 0 12px 3px #168cff}
+.arrival-console-orbit span:last-child{left:83%;top:81%;background:#efc06a;box-shadow:0 0 12px 3px #af7120}
+.arrival-console-detail{padding:16px 9px 13px;min-height:164px}
+.arrival-console-detail>span{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#efc06a}
+.arrival-console-detail p{font-size:12px;line-height:1.6;color:#c4d6e7;margin:7px 0}
+.arrival-console-detail a{display:inline-flex;align-items:center;gap:7px;min-height:36px;color:#b9e2ff;font-size:12px;text-decoration:none}
+.arrival-console-enter{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 17px;min-height:50px;border:1px solid #62bdff;border-radius:9px;background:linear-gradient(110deg,#09569a,#103451);color:white;font-size:13px;font-weight:700;text-decoration:none;transition:background .18s}
+.arrival-console-enter:hover{background:#1266a5}
+.arrival-console-caption{text-align:center;font-size:9px;color:#acc2d6;margin:10px 0 2px}
+@media(min-width:951px){.orbital-home-inner{gap:30px;grid-template-columns:minmax(0,49%) minmax(0,51%);padding-bottom:55px}.orbital-home-art{margin-right:-12px}.orbital-home-copy{padding-bottom:0}}
+@media(max-width:950px){.orbital-home-art{min-height:0;margin:24px auto 40px;max-width:640px}.arrival-console{transform:rotateZ(1deg)}}
+@media(max-width:600px){.orbital-home-art{display:block;min-height:0;height:auto;padding:0;margin:20px 0 30px}.arrival-console{padding:9px;border-radius:17px;transform:none}.arrival-console-screen{min-height:320px}.arrival-console-modules{padding:9px;width:62%;gap:8px}.arrival-console-modules button{min-height:50px;font-size:11px}.arrival-console-modules small{font-size:9px}.arrival-console-focus{right:7px;bottom:15px;width:34%;padding:9px}.arrival-console-focus strong{font-size:12px}.arrival-console-focus span{font-size:8px}.arrival-console-heading{font-size:8px;letter-spacing:.07em}.arrival-console-detail{min-height:0;padding:14px 6px}.arrival-console-detail p{font-size:12px}.orbital-home-art .hero-scene-anchor{inset:0;height:auto}}
+
+/* One persistent Three.js surface sits between the atmosphere and HTML controls.
+   Transparency is enabled only after the scene reports ready. */
+.orbital-home-hero{isolation:auto}
+.orbital-home-atmosphere,.orbital-home-earth,.orbital-home-tint{z-index:0}
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console{transform:none;background:none;box-shadow:0 30px 65px #0008,inset 0 1px 0 #c6eaff55}
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-screen{background:transparent}
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-screen::before,
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-orbit{visibility:hidden}
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-heading,
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-detail,
+.earth-experience:has(.shared-journey .earth-webgl[data-ready=true]) .arrival-console-caption{background:#041020ed}
+@media(max-width:600px){
+ .arrival-console-screen{min-height:0;padding-top:250px;background-position:50% 0;background-size:auto 250px;background-color:#020817}
+ .orbital-home-art .hero-scene-anchor{inset:0 0 auto;height:250px}
+ .arrival-console-modules{width:100%;grid-template-columns:1fr 1fr;padding:10px;gap:8px;background:#041020ed}
+ .arrival-console-modules button{min-height:64px;font-size:12px}
+ .arrival-console-modules small{font-size:10px}
+ .arrival-console-modules button:last-child{grid-column:1/-1}
+ .arrival-console-focus{top:183px;bottom:auto;right:10px;width:58%;padding:8px}
+ .arrival-console-focus strong{font-size:12px;margin-top:4px}
+ .arrival-console-detail p{font-size:14px}
+}

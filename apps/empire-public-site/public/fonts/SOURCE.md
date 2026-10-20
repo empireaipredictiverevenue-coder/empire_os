@@ -1,0 +1,1 @@
+Satoshi by Deni Anggara / Indian Type Foundry. Source: https://www.fontshare.com/fonts/satoshi ; official API https://api.fontshare.com/v2/fonts identifies license_type itf_ffl. License: https://www.fontshare.com/licenses/itf-ffl . Original WOFF2 files, no font modifications. No Vercel font assets.
