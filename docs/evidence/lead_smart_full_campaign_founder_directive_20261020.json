@@ -1,0 +1,17 @@
+{
+  "schema_version": "empire.lead_smart.founder_full_campaign_directive.v1",
+  "evidence_source": "founder-direct-chat-20261020",
+  "founder_request": "why cant we jusut run a ful campaign s",
+  "founder_continuation": "go on bro we not far away",
+  "mode": "FULL_CAMPAIGN",
+  "buyer": "Lead Smart",
+  "campaign_id": "CA8278ed3f26e9495b881fe3833174d007",
+  "tracking_number": "+18883579305",
+  "buyer_live_authorization_ref": "gmail:1a1551ac7204ff8a",
+  "acquisition_scope": "EMPIRE_FIRST_PARTY_ORGANIC",
+  "operator_limits": "configurable daily and total site handoffs, max 14-day release, automatic expiry, emergency disable",
+  "recording_consent_still_required": true,
+  "buyer_hours_gate_required": true,
+  "ringba_realised_payment_evidence_required_for_revenue": true,
+  "traffic_activated_by_this_document": false
+}

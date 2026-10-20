@@ -161,6 +161,32 @@ def founder_launch_approved(root: Path | None = None) -> bool:
         return False
 
 
+def founder_full_campaign_approved(root: Path | None = None) -> bool:
+    """Read the founder's actual full-campaign directive, never activate on its own."""
+    root = root or Path(__file__).resolve().parents[1]
+    path = root / "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    try:
+        record = load(path)
+        return (
+            record.get("schema_version")
+            == "empire.lead_smart.founder_full_campaign_directive.v1"
+            and record.get("evidence_source") == "founder-direct-chat-20261020"
+            and record.get("founder_request") == "why cant we jusut run a ful campaign s"
+            and record.get("founder_continuation") == "go on bro we not far away"
+            and record.get("mode") == "FULL_CAMPAIGN"
+            and record.get("buyer") == "Lead Smart"
+            and record.get("campaign_id") == "CA8278ed3f26e9495b881fe3833174d007"
+            and record.get("tracking_number") == "+18883579305"
+            and record.get("buyer_live_authorization_ref") == "gmail:1a1551ac7204ff8a"
+            and record.get("acquisition_scope") == "EMPIRE_FIRST_PARTY_ORGANIC"
+            and record.get("recording_consent_still_required") is True
+            and record.get("buyer_hours_gate_required") is True
+            and record.get("traffic_activated_by_this_document") is False
+        )
+    except (OSError, RuntimeError, ValueError, TypeError, AttributeError):
+        return False
+
+
 def compute_live_launch_readiness(
     *, evidence_root: Path | None = None,
     repo_root: Path | None = None,
@@ -200,6 +226,8 @@ def compute_live_launch_readiness(
                 or witness.get('payable_call_verified') is not False):
             raise ValueError('untrusted_witness_record')
         supervised_confirmation = {
+            'mode': control.get('mode', 'SUPERVISED_PILOT'),
+            'buyer_live_authorization_ref': control.get('buyer_live_authorization_ref'),
             'buyer': witness.get('buyer'),
             'campaign_id': witness.get('campaign_id'),
             'tracking_number': witness.get('tracking_number'),
@@ -275,14 +303,23 @@ def compute_live_launch_readiness(
         # is independently checked against the frozen exported HTML digest.
         # It does NOT grant calls while legal/provider/stop gates are held.
         landing_publication_authorized=(
-            founder_launch_approved(root=repo_root)
+            (
+                founder_full_campaign_approved(root=repo_root)
+                if supervised_confirmation is not None
+                   and supervised_confirmation.get("mode") == "FULL_CAMPAIGN"
+                else founder_launch_approved(root=repo_root)
+            )
             and approved_live_publication(
                 policy["routing"]["landing_review_report"], repo_root=repo_root,
             )
         ),
 
-        founder_live_traffic_authorized=
-            founder_launch_approved(root=repo_root),
+        founder_live_traffic_authorized=(
+            founder_full_campaign_approved(root=repo_root)
+            if supervised_confirmation is not None
+               and supervised_confirmation.get("mode") == "FULL_CAMPAIGN"
+            else founder_launch_approved(root=repo_root)
+        ),
 
         # Actual wired, atomic site-handoff control; absent receipt holds.
         pilot_stop_verified=
