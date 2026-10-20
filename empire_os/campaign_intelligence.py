@@ -512,3 +512,277 @@ def diagnose_campaign_conversion_bottlenecks(
         "campaign_mutated": False,
         "execution_authority": "NONE",
     }
+
+# Account route planning reuses the existing outreach_account_strategy helpers.
+# Only typed, trusted CRM/relationship projections are accepted. This function
+# does not create a prospect or claim a real company/contact exists.
+
+@dataclass(frozen=True)
+class TrustedBuyingMember:
+    person_key: str
+    account_key: str
+    tenant_ref: str
+    decision_role: str
+    observed_at: datetime
+    canonical_person_link_verified: bool
+    contact_route_verified: bool
+    source_provenance_verified: bool
+
+
+@dataclass(frozen=True)
+class TrustedWarmIntroduction:
+    referrer_key: str
+    account_key: str
+    tenant_ref: str
+    kind: str
+    observed_at: datetime
+    relationship_verified: bool
+    introduction_permission_verified: bool
+    strength: str
+
+
+@dataclass(frozen=True)
+class TrustedAccountTouch:
+    touch_key: str
+    account_key: str
+    tenant_ref: str
+    observed_at: datetime
+    canonical_delivery_receipt_verified: bool
+
+
+@dataclass(frozen=True)
+class TrustedAccountRoute:
+    context: AccountIntelligenceContext
+    buying_members: tuple[TrustedBuyingMember, ...]
+    warm_introductions: tuple[TrustedWarmIntroduction, ...]
+    contact_history: tuple[TrustedAccountTouch, ...]
+    contact_history_complete: bool
+    market_and_buyer_fit_verified: bool
+    offer_fulfilment_verified: bool
+    marketing_channel_lawfulness_verified: bool
+
+
+def review_account_buying_route(
+    route: TrustedAccountRoute, *,
+    verified_signals: Iterable[TrustedCampaignSignal],
+    now: datetime,
+) -> dict:
+    """Choose the NEXT human-review commercial play for a canonical account.
+
+    The existing committee, verified-introduction and fatigue planners supply
+    prioritisation. No PII or account identifiers leave the result. A public
+    hiring observation or page click alone is never a reply/consent.
+    """
+    from empire_os.outreach_account_strategy import (
+        INTRO_KINDS, ROLE_PRIORITY, build_buying_committee,
+        choose_introduction_path, evaluate_contact_fatigue,
+    )
+    if type(route) is not TrustedAccountRoute:
+        raise CampaignIntelligenceHeld("TRUSTED_ACCOUNT_ROUTE_REQUIRED")
+    _context(route.context)
+    now = _aware(now)
+    for flag in (
+        "contact_history_complete", "market_and_buyer_fit_verified",
+        "offer_fulfilment_verified", "marketing_channel_lawfulness_verified",
+    ):
+        if type(getattr(route, flag)) is not bool:
+            raise CampaignIntelligenceHeld("ACCOUNT_ROUTE_AUTHORITY_GATE_INVALID")
+    members, introductions, touches = (
+        route.buying_members, route.warm_introductions, route.contact_history
+    )
+    if (type(members) is not tuple or len(members) > 30
+            or type(introductions) is not tuple or len(introductions) > 30
+            or type(touches) is not tuple or len(touches) > 500):
+        raise CampaignIntelligenceHeld("BOUNDED_ACCOUNT_ROUTE_REQUIRED")
+    ctx = route.context
+    people_for_existing_planner = []
+    role_rows: dict[str, bool] = {}
+    seen_members: set[str] = set()
+    for person in members:
+        if type(person) is not TrustedBuyingMember or not _opaque(person.person_key):
+            raise CampaignIntelligenceHeld("CANONICAL_BUYING_PERSON_INVALID")
+        if person.person_key in seen_members:
+            raise CampaignIntelligenceHeld("DUPLICATE_CANONICAL_BUYING_PERSON")
+        seen_members.add(person.person_key)
+        if (person.account_key != ctx.account_key
+                or person.tenant_ref != ctx.tenant_ref
+                or person.decision_role not in ROLE_PRIORITY):
+            raise CampaignIntelligenceHeld("CROSS_ACCOUNT_OR_UNKNOWN_BUYING_ROLE")
+        observed = _aware(person.observed_at)
+        if observed > now or now - observed > timedelta(days=90):
+            raise CampaignIntelligenceHeld("BUYING_PERSON_EVIDENCE_STALE")
+        if (person.canonical_person_link_verified is not True
+                or person.source_provenance_verified is not True
+                or type(person.contact_route_verified) is not bool):
+            raise CampaignIntelligenceHeld("CANONICAL_PERSON_LINK_UNVERIFIED")
+        # Internal opaque placeholders are never disclosed. No actual names,
+        # generated contacts or job titles are invented.
+        people_for_existing_planner.append({
+            "person_id": person.person_key, "name": person.person_key,
+            "title": "", "decision_role": person.decision_role,
+            "contact_verified": person.contact_route_verified,
+            "evidence_ref": f"canonical_person:{person.person_key}",
+        })
+        role_rows[person.person_key] = person.contact_route_verified
+    committee = build_buying_committee(people_for_existing_planner)
+    primary = next(
+        (person for person in committee["members"] if
+         role_rows.get(person["person_id"]) is True),
+        None,
+    )
+
+    paths_for_existing_planner = []
+    seen_paths: set[tuple[str, str]] = set()
+    for path in introductions:
+        if (type(path) is not TrustedWarmIntroduction
+                or not _opaque(path.referrer_key)
+                or path.account_key != ctx.account_key
+                or path.tenant_ref != ctx.tenant_ref
+                or path.kind not in INTRO_KINDS
+                or path.strength not in {"strong", "medium", "weak"}):
+            raise CampaignIntelligenceHeld("TRUSTED_INTRODUCTION_LINK_INVALID")
+        key = (path.referrer_key, path.kind)
+        if key in seen_paths:
+            raise CampaignIntelligenceHeld("DUPLICATE_INTRODUCTION_EVIDENCE")
+        seen_paths.add(key)
+        when = _aware(path.observed_at)
+        if when > now or now - when > timedelta(days=90):
+            raise CampaignIntelligenceHeld("INTRODUCTION_EVIDENCE_STALE")
+        if (path.relationship_verified is not True
+                or type(path.introduction_permission_verified) is not bool):
+            raise CampaignIntelligenceHeld("INTRODUCTION_PROVENANCE_UNVERIFIED")
+        if path.introduction_permission_verified:
+            paths_for_existing_planner.append({
+                "kind": path.kind, "referrer": path.referrer_key,
+                "verified": True, "relationship_strength": path.strength,
+                "evidence_ref": f"canonical_relationship:{path.referrer_key}",
+            })
+    chosen_intro = choose_introduction_path(paths_for_existing_planner)
+
+    seen_touches: set[str] = set()
+    touches_for_existing_planner = []
+    for touch in touches:
+        if type(touch) is not TrustedAccountTouch or not _opaque(touch.touch_key):
+            raise CampaignIntelligenceHeld("CANONICAL_CONTACT_TOUCH_INVALID")
+        if touch.touch_key in seen_touches:
+            raise CampaignIntelligenceHeld("DUPLICATE_CONTACT_HISTORY_EVENT")
+        seen_touches.add(touch.touch_key)
+        if (touch.account_key != ctx.account_key
+                or touch.tenant_ref != ctx.tenant_ref
+                or touch.canonical_delivery_receipt_verified is not True):
+            raise CampaignIntelligenceHeld("CONTACT_HISTORY_SOURCE_UNVERIFIED")
+        when = _aware(touch.observed_at)
+        if when > now:
+            raise CampaignIntelligenceHeld("CONTACT_HISTORY_FUTURE_EVENT")
+        touches_for_existing_planner.append({"occurred_at": when.isoformat()})
+    fatigue = evaluate_contact_fatigue(
+        touches_for_existing_planner, now=now,
+        max_touches_30d=1, min_cooldown_hours=720,
+    )
+    observed = review_account_intelligence(ctx, verified_signals, now=now)
+    signal_action = observed["action"]
+    blockers = []
+    if not ctx.suppression_clear or signal_action == "STOP_AND_SUPPRESS":
+        play = "STOP_AND_SUPPRESS"
+    elif not ctx.canonical_account_verified:
+        play = "HOLD_CANONICAL_ACCOUNT_IDENTITY"
+    elif signal_action == "REVIEW_EXISTING_CUSTOMER":
+        play = "EXISTING_CUSTOMER_HUMAN_REVIEW"
+    elif signal_action == "REVIEW_ACCEPTED_TERMS":
+        play = "COMMERCIAL_TERMS_HUMAN_REVIEW"
+    elif signal_action == "SAME_BUSINESS_DAY_SALES_REVIEW":
+        play = "SAME_BUSINESS_DAY_EXISTING_INBOUND_REVIEW"
+    elif signal_action == "HOLD_INBOUND_BASIS":
+        play = "HOLD_INBOUND_REPLY_BASIS"
+    elif not route.contact_history_complete:
+        play = "HOLD_INCOMPLETE_GLOBAL_CONTACT_HISTORY"
+    elif fatigue["blocked"]:
+        play = "HOLD_30_DAY_COMPANY_COOLDOWN"
+    elif not route.market_and_buyer_fit_verified:
+        play = "RESEARCH_ACCOUNT_MARKET_FIT"
+    elif not route.offer_fulfilment_verified or not ctx.offer_evidence_current:
+        play = "VERIFY_COMMERCIAL_OFFER_PROOF"
+    elif (not route.marketing_channel_lawfulness_verified
+          or not ctx.marketing_contact_basis_verified):
+        play = "HOLD_MARKETING_CHANNEL_PERMISSION"
+    elif chosen_intro is not None:
+        play = "PREPARE_VERIFIED_WARM_INTRO_FOR_OWNER_REVIEW"
+    elif primary is not None:
+        play = "PREPARE_ONE_CONTACT_OFFER_FOR_OWNER_REVIEW"
+    else:
+        play = "RESEARCH_VERIFIED_BUYING_COMMITTEE"
+    if not route.contact_history_complete:
+        blockers.append("GLOBAL_CONTACT_HISTORY_NOT_VERIFIED")
+    if fatigue["blocked"]:
+        blockers.append("30_DAY_COMPANY_COOLDOWN_OR_CONTACT_HISTORY")
+    if (not route.marketing_channel_lawfulness_verified
+            or not ctx.marketing_contact_basis_verified):
+        blockers.append("CHANNEL_LAWFULNESS_NOT_VERIFIED")
+    if not route.offer_fulfilment_verified:
+        blockers.append("OFFER_FULFILMENT_NOT_VERIFIED")
+    return {
+        "schema_version": "empire.gtm.buying_committee_route_review.v1",
+        "recommended_play": play,
+        "account_signal_action": signal_action,
+        "observed_verified_buying_members": committee["observed_member_count"],
+        "verified_contact_route_count": sum(role_rows.values()),
+        "selected_contact_role": primary["decision_role"] if primary else None,
+        "selected_contact_personally_identifiable": False,
+        "verified_warm_introduction_available": chosen_intro is not None,
+        "preferred_introduction_type": chosen_intro["kind"] if chosen_intro else None,
+        "global_contact_history_checked": route.contact_history_complete,
+        "company_cooldown_held": fatigue["blocked"],
+        "missing_requirements": blockers,
+        "inferred_buyer_identity_or_demand": False,
+        "outbound_sent": False, "campaign_enrolled": False,
+        "personal_data_exposed": False, "database_writes": False,
+        "execution_authority": "NONE",
+    }
+
+
+def review_account_route_portfolio(
+    packets: Iterable[
+        tuple[TrustedAccountRoute, Iterable[TrustedCampaignSignal]]
+    ], *, now: datetime,
+) -> dict:
+    """Privacy-minimising aggregate Sales Director play queue.
+
+    Deliberately exposes no contact IDs, company names or recipient lists.
+    The existing owner must retain account-level access controls and source
+    receipt verification; this is not a replacement CRM or buyer graph.
+    """
+    packets = list(packets)
+    if len(packets) > 500:
+        raise CampaignIntelligenceHeld("ROUTE_PORTFOLIO_LIMIT_EXCEEDED")
+    seen: set[tuple[str, str, str]] = set()
+    plays: Counter[str] = Counter()
+    intro_count = 0
+    verified_routes = 0
+    for route, signals in packets:
+        if type(route) is not TrustedAccountRoute:
+            raise CampaignIntelligenceHeld("TRUSTED_ROUTE_PROJECTION_REQUIRED")
+        _context(route.context)
+        identity = (
+            route.context.tenant_ref,
+            route.context.account_key,
+            route.context.campaign_id,
+        )
+        if identity in seen:
+            raise CampaignIntelligenceHeld("DUPLICATE_ACCOUNT_ROUTE_PORTFOLIO")
+        seen.add(identity)
+        result = review_account_buying_route(route, verified_signals=signals, now=now)
+        plays[result["recommended_play"]] += 1
+        if result["verified_warm_introduction_available"]:
+            intro_count += 1
+        verified_routes += result["verified_contact_route_count"]
+    return {
+        "schema_version": "empire.gtm.sales_director_route_portfolio.v1",
+        "accounts_reviewed": len(seen),
+        "commercial_plays": dict(sorted(plays.items())),
+        "verified_contact_routes_reviewed": verified_routes,
+        "verified_warm_introductions_reviewed": intro_count,
+        "sent_messages": 0,
+        "contact_information_exposed": False,
+        "autonomous_sender_enabled": False,
+        "execution_authority": "NONE",
+    }

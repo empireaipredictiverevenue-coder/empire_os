@@ -657,6 +657,8 @@ def review_current_buyer_contactability(
         "source_status": "VERIFIED_READONLY_BUYER_SNAPSHOTS" if q_valid and r_valid
                          else "HOLD_BUYER_SOURCE_MISSING_STALE_OR_INCOMPATIBLE",
         "shortlisted_buyer_targets": None,
+        "research_target_sectors": None,
+        "research_geography_and_live_buying_role_verified": False,
         "reviewed_relationships": None,
         "buyer_contact_verified_count": None,
         "qualifying_contacts_for_wave": None,
@@ -677,6 +679,17 @@ def review_current_buyer_contactability(
     # Numbers describe exactly what these sources know, not the market's
     # total addressable population or an independently authenticated send list.
     result["shortlisted_buyer_targets"] = len(targets)
+    # Research classification only: this never establishes contactability,
+    # geography, an accepting buyer or market size. The same target can
+    # appear in multiple sectors, so totals intentionally may overlap.
+    result["research_target_sectors"] = {
+        sector: sum(
+            isinstance(row.get("verticals"), list)
+            and sector in row["verticals"]
+            for row in targets
+        )
+        for sector in ("roofing", "solar", "hvac")
+    }
     result["reviewed_relationships"] = len(rows)
     result["buyer_contact_verified_count"] = qualification[
         "contact_verified_for_outbound_count"
@@ -698,6 +711,7 @@ def review_authenticated_campaign_intelligence(
     account_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
     experiment_arms: Iterable[Any] | None = None,
     funnel_stage_receipts: Iterable[Any] | None = None,
+    account_route_packets: Iterable[tuple[Any, Iterable[Any]]] | None = None,
 ) -> dict[str, Any]:
     """One entry point for the existing CRM, Analytics and Finance owners.
 
@@ -708,6 +722,7 @@ def review_authenticated_campaign_intelligence(
         review_private_account_portfolio,
         evaluate_real_customer_experiment,
         diagnose_campaign_conversion_bottlenecks,
+        review_account_route_portfolio,
     )
     return {
         "schema_version": "empire.gtm.full_funnel_decision_intelligence.v1",
@@ -728,6 +743,10 @@ def review_authenticated_campaign_intelligence(
         "conversion_bottleneck_review": (
             diagnose_campaign_conversion_bottlenecks(funnel_stage_receipts)
             if funnel_stage_receipts is not None else None
+        ),
+        "account_buying_committee_routes": (
+            review_account_route_portfolio(account_route_packets, now=now)
+            if account_route_packets is not None else None
         ),
         "live_recipient_contact_or_messages": False,
         "production_training_or_model_mutation": False,

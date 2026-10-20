@@ -364,3 +364,96 @@ Current CLI keys to inspect: `decision_intelligence`,
 **Unchanged operational truth:** the source is an isolated build, not
 merged to production, and no mail, click collection, visitor tracking,
 ad audience export, payment, CRM or live campaign was executed.
+
+
+## 20 October — Account buying-committee and safe next-commercial-play integration
+
+This continuation extends **the existing** full-funnel intelligence contract,
+rather than creating a new account graph or another sales agent. Source:
+`empire_os/campaign_intelligence.py`; integration:
+`scripts/review_tam_full_funnel_strategy_20261020.py`.
+
+### Implemented
+
+`review_account_buying_route` consumes a bounded, tenant-scoped,
+**owner-authenticated** canonical account projection and its verified
+cross-channel commercial signals. It reuses the established
+`empire_os.outreach_account_strategy` functions for:
+
+- `build_buying_committee` — prioritises evidence-backed buyer roles,
+  with **verified contact route** taking precedence over a higher-ranking
+  person whose contactability is unverified
+- `choose_introduction_path` — chooses a genuinely verified,
+  permitted warm partner/customer introduction over unsolicited cold outreach
+- `evaluate_contact_fatigue` — enforces an account-wide single-contact
+  30-day wave cooldown, including across email campaign variants
+
+Personal names, company identities, contact records, source URLs and
+event tokens are **not returned**. Input people and relationships are
+bound to the exact account/tenant; timestamps, provenance, permission,
+duplicate receipts and identity mismatches are validated strictly.
+Opaque test references do **not** create live prospects or verified
+buyers.
+
+### Human-review play classes (no auto-send)
+
+| Verified situation | Play |
+|---|---|
+| Genuine inbound pricing question or opt-in | Same-business-day existing-thread sales review |
+| Existing, verified paying customer | Customer/relationship-owner review |
+| Commercial terms already accepted | Existing commercial terms review |
+| Opt-out, hard bounce or suppression | Stop and suppress |
+| Contacted within last 30 days | Hold company-wide wave cooldown |
+| Missing account, marketing permission or product proof | Hold and verify the missing evidence |
+| Verified warm introduction available | Prepare an intro draft for existing owner |
+| Verified contact in buying committee | Prepare one-contact/one-company offer draft |
+| No verified buyer contact | Research; do not send |
+
+`review_account_route_portfolio` aggregates these plays into an
+identity-free Sales Director queue and rejects duplicate accounts.
+`review_authenticated_campaign_intelligence` accepts an optional
+`account_route_packets` owner interface. **No packets are fabricated or
+loaded from a public spreadsheet.** If the CRM owner has not supplied
+authenticated account projections, `account_buying_committee_routes`
+stays `null` in the production read-only review.
+
+### Engineering and business boundaries
+
+- This is tested **source**, not production release. Do not represent
+  a mock buying committee as a live Empire customer.
+- Existing Sales Director and CRM remain the contact/identity and
+  outreach owners. No duplicate contact creation, campaign enrollment,
+  email sending, public website change, ad budget or CRM mutation.
+- The buyer qualification snapshot currently reports **zero verified
+  outbound-ready contacts**, so the immediately useful next step remains
+  producing one genuine, lawfully contactable, offer-fit buyer cohort.
+  A verified warm introduction or real inbound message may deserve
+  human review but does not automatically grant sender authority.
+
+Regression:
+
+```bash
+cd /home/ubuntu/empire_worktrees/campaign_click_intent_bridge_20261020
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B -m pytest -q \
+  tests/test_campaign_account_route_20261020.py \
+  tests/test_campaign_intelligence_20261020.py \
+  tests/test_outreach_intelligence.py
+```
+
+
+**Scoped research counts from the latest read-only buyer snapshot:** 23
+shortlisted target records, including 7 tagged roofing, 1 solar and
+1 HVAC; classification tags can overlap, are **not** independent TAM
+market totals, and have no verified geography, permissioned
+recipient, active buyer demand or send authority. The
+`research_target_sectors` field exposes only aggregate sector coverage
+from the current source. Source refreshes may change these figures.
+None of the 23 target records is promoted to a live campaign list by
+this build.
+
+The immediate blocker is therefore especially concrete for the
+founder-prioritised **UK solar buyer** segment: current research
+coverage and permissioned buying contacts need genuine source
+verification by the existing buyer scout and Sales Director owners.
+The account route API is ready to evaluate the resulting authenticated
+records; it does not authorise outreach on its own.

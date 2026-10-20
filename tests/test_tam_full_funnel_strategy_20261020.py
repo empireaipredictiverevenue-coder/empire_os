@@ -396,6 +396,8 @@ def test_buyer_evidence_maps_real_qualified_targets_not_send_list():
     result = review_current_buyer_contactability(_buyer_sources(), now=NOW)
     assert result["source_status"] == "VERIFIED_READONLY_BUYER_SNAPSHOTS"
     assert result["shortlisted_buyer_targets"] == 23
+    assert result["research_target_sectors"] == {"roofing": 0, "solar": 0, "hvac": 0}
+    assert result["research_geography_and_live_buying_role_verified"] is False
     assert result["reviewed_relationships"] == 261
     assert result["buyer_contact_verified_count"] == 0
     assert result["permitted_email_recipients"] is None
@@ -467,3 +469,19 @@ def test_offer_reference_and_market_scope_validation_cannot_bypass_send_authorit
     assert result["offer_truth_independently_verified"] is False
     assert result["copy_sent"] is False
     assert all(x["send_authorized"] is False for x in result["drafts"])
+
+def test_buyer_sector_research_counts_do_not_misstate_research_as_tam_or_sendability():
+    sample = _buyer_sources()
+    sample["buyer_qualification"]["targets"] = [
+        {"verticals": ["roofing", "solar"], "outbound_authorized": False},
+        {"verticals": ["solar"], "outbound_authorized": False},
+        {"verticals": ["roofing", "roofing"], "outbound_authorized": False},
+    ]
+    report = review_current_buyer_contactability(sample, now=NOW)
+    assert report["shortlisted_buyer_targets"] == 3
+    assert report["research_target_sectors"] == {
+        "roofing": 2, "solar": 2, "hvac": 0
+    }
+    assert report["buyer_contact_verified_count"] == 0
+    assert report["permitted_email_recipients"] is None
+    assert report["research_geography_and_live_buying_role_verified"] is False
