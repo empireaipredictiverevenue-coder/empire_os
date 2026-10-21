@@ -1,0 +1,9 @@
+item_id,question_theme,topic,seo_page,seo_page_public_verified,actual_quora_question_url,quora_account_verified,answer_status,owner_review,link_approved,geography_caveat
+QROOF001,How can a homeowner tell when roof replacement might be appropriate,repair-versus-replacement,/roofing/replacement-vs-repair,false,,false,RESEARCH_ONLY,REQUIRED,false,No remote diagnosis or claim of covered ZIP
+QROOF002,What details should I compare in roofing replacement estimates,quotes-and-contracts,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Discuss itemised scope insurance exclusions and warranties
+QROOF003,Is a roof age enough reason to get a replacement,roof-age-condition,/roofing/replacement-vs-repair,false,,false,RESEARCH_ONLY,REQUIRED,false,No substitute for qualified local inspection
+QROOF004,What safety steps should a homeowner take after hail damage,storm-damage-safety,/roofing,false,,false,RESEARCH_ONLY,REQUIRED,false,Avoid climbing roof and do not promise insurer coverage
+QROOF005,How do permits and warranties affect a new roof project,roof-installation-process,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Jurisdiction-specific rules must be sourced
+QROOF006,How do I check a roofing contractor's insurance and qualifications,contractor-due-diligence,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Do not endorse an unverified roofing contractor
+QROOF007,What is the difference between roofing underlayment and ventilation,roofing-system-scope,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,No unverified product or building code claims
+QROOF008,Which questions help compare tear-off versus overlay proposals,roof-replacement-options,/roofing/replacement-vs-repair,false,,false,RESEARCH_ONLY,REQUIRED,false,No unsafe structural advice or unverified local regulation
