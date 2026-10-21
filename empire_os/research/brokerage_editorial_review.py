@@ -17,6 +17,7 @@ from urllib.request import Request, build_opener, HTTPRedirectHandler
 from urllib.parse import urlsplit
 
 from .research_profiles import ResearchProfile, research_with_profile
+from .original_source_passages import extract_source_passage_anchors
 
 US_SOURCES = (
     ("Park Dental Specialists", "https://parkdentalspecialists.com/our-services/dental-implants"),
@@ -108,12 +109,18 @@ def inspect_known_source(url: str) -> dict:
         "private dental services", "market study", "price transparency",
     )
     source_signals = [term for term in scoped_terms if term in visible_text]
+    passage_anchors = extract_source_passage_anchors(body)
+    passage_terms = {row["term"] for row in passage_anchors}
+    unanchored_terms = [term for term in source_signals if term not in passage_terms]
     return {
         "status": "ORIGINAL_HTML_HEADINGS_INSPECTED",
         "content_sha256": sha256(body).hexdigest(),
         "document_headings": parsed.headings[:4],
         "visible_excerpt": " ".join(parsed.visible)[:850],
         "literal_source_terms_observed": source_signals,
+        "source_passage_anchors": passage_anchors,
+        "unanchored_page_terms_require_manual_review": unanchored_terms,
+        "passage_extractor": "beautifulsoup4_existing_mit_local",
         "term_presence_is_not_clinical_or_ranking_proof": True,
     }
 

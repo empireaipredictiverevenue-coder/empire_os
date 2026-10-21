@@ -147,6 +147,14 @@ def render_markdown(report: dict) -> str:
                 + "; source: " + row["original_url"]
                 + "; observed headings: " + (title or "unavailable")
             )
+        lines += [
+            "", "**Private original-page context for editorial review:**", ""
+        ]
+        for entry in item["evidence_ledger"]:
+            anchors = entry["original_passage_anchors_for_editorial_only"]
+            lines.append("- " + entry["publisher_host"] + ": "
+                         + (anchors[0]["original_page_excerpt"]
+                            if anchors else "no bounded source passage extracted"))
         lines += ["", "**Literal terminology observed on source pages (not clinical proof):**", ""]
         for matrix in item["source_term_comparison"]:
             lines.append("- " + matrix["publisher_host"] + ": "

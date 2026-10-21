@@ -156,6 +156,28 @@ def build_brokerage_decision_brief(
                      and bool(re.fullmatch("[0-9a-f]{64}",
                                            str(record.get("content_sha256") or ""))))
         headings = record.get("document_headings") if inspected else []
+        anchors = []
+        if inspected and isinstance(record.get("source_passage_anchors"), list):
+            for item in record["source_passage_anchors"][:8]:
+                if not isinstance(item, Mapping):
+                    continue
+                term, excerpt, digest = (
+                    item.get("term"), item.get("original_page_excerpt"),
+                    item.get("excerpt_sha256")
+                )
+                if (not isinstance(term, str) or not isinstance(excerpt, str)
+                    or len(term) > 50 or len(excerpt) > 165
+                    or len(excerpt.split()) > 25
+                    or term.casefold() not in excerpt.casefold()
+                    or sha256(excerpt.encode("utf-8")).hexdigest() != digest):
+                    raise ValueError("UNVERIFIED_OR_TAMPERED_SOURCE_PASSAGE")
+                anchors.append({
+                    "term": term,
+                    "original_page_excerpt": excerpt,
+                    "excerpt_sha256": digest,
+                    "publisher_assertion_not_independently_verified": True,
+                    "republication_rights_not_cleared": True,
+                })
         ledger.append({
             "source_id": record.get("source_id"),
             "publisher_host": urlsplit(url).hostname,
@@ -165,6 +187,13 @@ def build_brokerage_decision_brief(
             "inspected": inspected,
             "content_sha256": record.get("content_sha256") if inspected else None,
             "page_headings_as_observed": headings[:4] if isinstance(headings, list) else [],
+            "original_passage_anchors_for_editorial_only": anchors,
+            "unanchored_page_terms_require_manual_review": (
+                (record.get("unanchored_page_terms_require_manual_review") or [])[:12]
+                if inspected and isinstance(
+                    record.get("unanchored_page_terms_require_manual_review"), list
+                ) else []
+            ),
             "literal_terms_seen_on_page_not_clinically_validated": (
                 (record.get("literal_source_terms_observed") or [])[:12]
                 if inspected and isinstance(record.get("literal_source_terms_observed"), list)

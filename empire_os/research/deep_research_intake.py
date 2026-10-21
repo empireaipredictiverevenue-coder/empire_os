@@ -190,6 +190,33 @@ def run_research(
                             (literal_terms if isinstance(literal_terms, list) else [])[:12]
                             if isinstance(term, str)
                         ]
+                        passage_anchors = inspected.get("source_passage_anchors")
+                        unanchored_terms = inspected.get(
+                            "unanchored_page_terms_require_manual_review"
+                        )
+                        entry["unanchored_page_terms_require_manual_review"] = [
+                            _text(term, 50) for term in (
+                                unanchored_terms if isinstance(unanchored_terms, list)
+                                else []
+                            )[:12] if isinstance(term, str)
+                        ]
+                        entry["source_passage_anchors"] = [
+                            {
+                                "term": _text(anchor.get("term"), 50),
+                                "original_page_excerpt": _text(
+                                    anchor.get("original_page_excerpt"), 165
+                                ),
+                                "excerpt_sha256": _text(anchor.get("excerpt_sha256"), 64),
+                                "support_level": "VERBATIM_PUBLISHER_WORDS_ONLY",
+                                "publisher_claim_truth_verified": False,
+                                "client_republication_rights_verified": False,
+                            }
+                            for anchor in (
+                                passage_anchors if isinstance(passage_anchors, list)
+                                else []
+                            )[:8]
+                            if isinstance(anchor, Mapping)
+                        ]
                 else:
                     entry["inspection_status"] = "INVALID_INSPECTOR_RESULT"
             except Exception as exc:
