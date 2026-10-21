@@ -2,6 +2,15 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Restored cinematic globe, distinct Storm Hub branding (private candidate)
+
+- The **original cinematic Earth composition** is back, now using locally hosted NASA Blue Marble western-hemisphere imagery, with original deep atmospheric lighting. It is a historical source mosaic, not a live storm, warning boundary or weather product. Original reference: https://science.nasa.gov/resource/blue-marble-2002/
+- The product is **deliberately not an Empire AI flagship copy**: the corporate neon-blue/gold/glass-console treatment is replaced on the Storm Hub homepage by charcoal/white editorial typography, safety-yellow ZIP actions and reserved red for alert navigation. Blue is retained in Earth and its atmosphere, not as the universal UI identity.
+- Removed the synthetic orbit lines, fake hazard/location pins, telemetry labels, weather side card, numbered benefits ribbon, mock Atlas radar and fake contractor-console checkboxes.
+- The Atlas now displays actual source-dated NWS results, with unavailable and zero-result states clearly distinguished.
+- Kept user features (ZIP, Predictor, Alerts, Passport, research/recovery) and existing source policy unchanged. No founder-only finance link appears in the public homepage footer.
+- Current read-only private comparison: `http://127.0.0.1:3159/`. Browser screenshots checked 1440×950 desktop and 390×844 mobile, without horizontal overflow or client exceptions. 23 Node tests and production build passed. Public deployment is **not** authorized by this private redesign branch.
+
 ## Impeccable-informed UI polish (private candidate, 2026-10-21)
 
 - Reuses the existing Hermes Impeccable catalogue **reference** and records actual audience, brand, evidence boundaries and design direction in first-party `PRODUCT.md` and `DESIGN.md`.

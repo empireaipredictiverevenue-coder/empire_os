@@ -36,13 +36,17 @@ function SiteMark() {
   return <span className="site-mark" aria-hidden="true"><CloudLightning size={24} strokeWidth={1.8}/></span>;
 }
 function GlobeVisual() {
-  return <div className="globe-scene" aria-label="Decorative spherical weather illustration. Not a live geographic warning map." role="img">
-    <div className="globe-orbit orbit-one"/><div className="globe-orbit orbit-two"/>
-    <div className="globe-sphere"><div className="sphere-graticule"/><div className="sphere-highlights"/></div>
-    <div className="globe-pulse pulse-a"/><div className="globe-pulse pulse-b"/>
-    <span className="globe-pin pin-one"/><span className="globe-pin pin-two"/><span className="globe-pin pin-three"/>
-    <div className="globe-readout readout-top"><span className="status-line"/> OBSERVATION NETWORK <span>01 / 03</span></div>
-    <div className="globe-readout readout-bottom">SOURCE-FIRST INTELLIGENCE <span>USA</span></div>
+  // Decorative, cinematic globe—not a weather map. No invented hazard pins,
+  // orbital tracking lines, fake counters, or floating telemetry labels.
+  return <div className="globe-scene globe-scene-clean"
+      aria-label="Cinematic illustration using NASA Blue Marble 2002 Earth imagery. Historical mosaic, not live weather data or a storm map."
+      role="img">
+    <div className="globe-atmosphere"/>
+    <div className="globe-sphere">
+      <div className="sphere-graticule"/>
+      <div className="sphere-highlights"/>
+      <div className="globe-terminator"/>
+    </div>
   </div>;
 }
 function Status({state}) {
@@ -156,8 +160,8 @@ export default function HomePage(){
   const sourceView=summarizeHomeSource(weather);
   const done=CHECKLIST.filter(([id])=>passport.tasks[id]).length;
   const passportState=passport.savedState?STATE_NAMES[passport.savedState]:null;
-  return <div className="nsh">
-    <div className="top-alert" role="note"><span className="top-alert-dot"/> INDEPENDENT WEATHER INFORMATION PLATFORM <span className="top-alert-sep">/</span> For emergency warnings, follow <a href="https://www.weather.gov/" target="_blank" rel="noreferrer">weather.gov <ArrowUpRight size={12}/></a></div>
+  return <div className="nsh home-clean">
+    <div className="top-alert" role="note">Independent site · Emergency warnings: <a href="https://www.weather.gov/" target="_blank" rel="noreferrer">weather.gov <ArrowUpRight size={12}/></a></div>
     <header className="site-header">
       <a className="brand" href="#home" aria-label="National Storm Hub home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a>
       <nav id="site-main-navigation" className={menuOpen?"nav-links open":"nav-links"} aria-label="Main navigation">
@@ -175,9 +179,9 @@ export default function HomePage(){
     <main id="home">
       <section className="hero wrap" aria-labelledby="hero-title">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-line"/> WEATHER INTELLIGENCE, REIMAGINED <span className="eyebrow-index">/ 01</span></div>
+          <div className="eyebrow hero-eyebrow">LOCAL WEATHER. CLEAR ANSWERS.</div>
           <h1 id="hero-title">When the weather changes, <em>know what matters.</em></h1>
-          <p className="hero-lead">One place to explore official storm information, prepare your home and keep the history that matters to you. Built for the moments before, during and after a storm.</p>
+          <p className="hero-lead">Check official weather warnings, understand your local forecast and get ready for severe weather. All in one place.</p>
           <form className="zip-search" onSubmit={browseZip} aria-label="Explore storm information by ZIP code">
             <MapPin size={20} className="zip-pin" aria-hidden="true"/>
             <label htmlFor="zip-entry" className="sr-only">Five-digit US ZIP code</label>
@@ -185,16 +189,17 @@ export default function HomePage(){
             <button type="submit">Explore my area <ArrowRight size={17}/></button>
           </form>
           {errorInput?<p className="form-error" id="zip-error" role="alert">{errorInput}</p>:<p className="microcopy" id="zip-help"><LockKeyhole size={13}/> No account needed. ZIP lookup uses an external public location service.</p>}
-          <div className="hero-trust"><span><ShieldCheck size={16}/> Official sources</span><span><Clock3 size={16}/> Dated evidence</span><span><LockKeyhole size={16}/> Privacy by design</span></div>
-          <a href="/alerts" className="hero-alerts-cta"><Bell size={17}/> Check current storm alerts <ArrowRight size={16}/></a>
-          <a href="/predictor" className="hero-predictor-cta"><Sparkles size={17}/> Explore Storm Predictor <ArrowRight size={16}/></a>
+          <div className="hero-actions">
+            <a href="/alerts" className="hero-alerts-cta"><Bell size={16}/> View current alerts <ArrowRight size={16}/></a>
+            <a href="/predictor" className="hero-predictor-cta">Storm Predictor <ArrowRight size={16}/></a>
+          </div>
         </div>
-        <div className="hero-art"><GlobeVisual/><div className="floating-weather"><div className="float-icon"><Radar size={21}/></div><div><span>STORM ATLAS</span><strong>Explore the evidence</strong><small>Forecasts ≠ confirmed damage</small></div><ArrowUpRight size={18}/></div><div className="art-note">CONCEPTUAL EARTH VISUAL • NOT AN ALERT BOUNDARY MAP</div></div>
+        <div className="hero-art"><GlobeVisual/></div>
       </section>
 
       <section className="source-snapshot wrap" aria-labelledby="source-snapshot-title">
         <div className="snapshot-context">
-          <span className="snapshot-overline"><span className={"snapshot-indicator "+sourceView.phase}/> LIVE DATA / NWS SOURCE STATUS</span>
+          <span className="snapshot-overline"><span className={"snapshot-indicator "+sourceView.phase}/> National Weather Service</span>
           <h2 id="source-snapshot-title">{sourceView.title}</h2>
           <p>{sourceView.detail}</p>
         </div>
@@ -205,19 +210,34 @@ export default function HomePage(){
         <a className="snapshot-action" href="/alerts">View official alerts <ArrowUpRight size={17}/></a>
       </section>
 
-      <section className="trust-ribbon" aria-label="Platform information"><div className="wrap trust-inner"><div>01 <span>SOURCE-GROUNDED WEATHER</span></div><div>02 <span>HOMEOWNER CONTROL</span></div><div>03 <span>REGIONAL KNOWLEDGE</span></div><div>04 <span>NO FALSE DAMAGE CLAIMS</span></div></div></section>
 
-      <section className="state-hubs wrap" aria-label="Explore our founding state hubs"><div><span className="state-hub-eyebrow">FOUNDING REGIONAL EXPERIENCES</span><h2>One network. <em>Locally useful.</em></h2></div><div className="state-hub-cards"><a href="/states/texas"><span>TEXAS / HAIL &amp; WIND</span><strong>Texas Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a><a href="/states/florida"><span>FLORIDA / HURRICANES</span><strong>Florida Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a></div></section>
+      <section className="state-hubs wrap" aria-label="State weather and preparedness guides"><div><span className="state-hub-eyebrow">STATE GUIDES</span><h2>Storm guidance, <em>close to home.</em></h2></div><div className="state-hub-cards"><a href="/states/texas"><span>TEXAS / HAIL &amp; WIND</span><strong>Texas Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a><a href="/states/florida"><span>FLORIDA / HURRICANES</span><strong>Florida Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a></div></section>
 
-      <section className="predictor-feature wrap" aria-label="Introducing Storm Predictor"><div><span className="eyebrow"><span className="eyebrow-line"/> NEW / STORM INTELLIGENCE</span><h2>Meet the Storm <em>Predictor.</em></h2><p>From our existing EmpireOS storm intelligence work: a public, read-only weather research tool combining official NWS forecasts, active alerts and SPC severe-weather outlooks. No invented storm tracks. No unsupported property-damage claims.</p><a href="/predictor">Explore a ZIP forecast <ArrowRight size={17}/></a></div><div className="predictor-feature-right"><div><Radar size={26}/><span>National Weather Service</span><strong>Local forecasts &amp; alerts</strong></div><div><Layers size={26}/><span>Storm Prediction Center</span><strong>Day 1 categorical outlook</strong></div><div><ShieldCheck size={26}/><span>EmpireOS source review</span><strong>Evidence-only interpretation</strong></div></div></section>
+      <section className="predictor-feature wrap" aria-label="Storm Predictor">
+        <div>
+          <span className="eyebrow">LOCAL FORECASTS</span>
+          <h2>See what's ahead <em>for your area.</em></h2>
+          <p>Look up the National Weather Service forecast, active warnings and the Storm Prediction Center outlook for a US ZIP code. Each result links to its source.</p>
+          <a href="/predictor">Try Storm Predictor <ArrowRight size={17}/></a>
+        </div>
+      </section>
 
       <section id="atlas" className="section atlas-section wrap" aria-labelledby="atlas-title">
-        <div className="section-intro"><div><div className="eyebrow"><span className="eyebrow-line"/> EXPLORE THE CONDITIONS <span className="eyebrow-index">/ 02</span></div><h2 id="atlas-title">Storm Atlas<span className="punctuation">.</span></h2><p>Real NWS alerts, without the guesswork. Search a US ZIP code or browse by state.</p></div><a className="text-link" href="https://www.weather.gov/" target="_blank" rel="noreferrer">Official NWS website <ExternalLink size={15}/></a></div>
+        <div className="section-intro"><div><div className="eyebrow">CHECK YOUR AREA</div><h2 id="atlas-title">Storm Atlas<span className="punctuation">.</span></h2><p>Read current National Weather Service alerts by state or ZIP code.</p></div><a className="text-link" href="https://www.weather.gov/" target="_blank" rel="noreferrer">Official NWS website <ExternalLink size={15}/></a></div>
         <div className="atlas-grid">
           <div className="atlas-visual">
-            <div className="atlas-upper"><IconLabel icon={Radio}>SOURCE MONITOR</IconLabel><span>UNITED STATES / PUBLIC PREVIEW</span></div>
-            <div className="atlas-map"><div className="atlas-grid-lines"/><div className="atlas-radar-ring ring-a"/><div className="atlas-radar-ring ring-b"/><div className="atlas-radar-ring ring-c"/><div className="atlas-radar-core"/><div className="atlas-grid-cross"/> <span className="map-label map-label-one">STORM EVIDENCE</span><span className="map-label map-label-two">REGION FILTER: {region}</span><span className="map-coordinate">US / NWS</span></div>
-            <div className="atlas-foot"><span><Info size={15}/> Map graphic is illustrative, not official alert geometry.</span><span>DATA: WEATHER.GOV</span></div>
+            <div className="atlas-overview">
+              <span className="atlas-overview-eyebrow">NATIONAL WEATHER SERVICE</span>
+              <div className="atlas-overview-count">{weather.kind==="ready"?weather.data.alert_count:"—"}</div>
+              <h3>{weather.kind==="ready"?
+                (weather.data.alert_count===1?"Active alert returned":"Active alerts returned"):
+                (weather.kind==="error"?"Feed unavailable":"Checking current alerts")}</h3>
+              <p>{weather.kind==="ready"?
+                (weather.data.alert_count===0?"No records returned at the last check. This is not an all-clear.":"Check the affected areas, warning times and source details on the right."):
+                (weather.kind==="error"?"We couldn't verify the weather feed. Use weather.gov for current warnings.":"Retrieving the latest official records.")}</p>
+              <div className="atlas-overview-source"><ShieldCheck size={17}/> Official NWS data · {weather.kind==="ready"?formatted(weather.data.checked_at):"Awaiting source"}</div>
+              <a href="https://www.weather.gov/" target="_blank" rel="noreferrer">Go to weather.gov <ExternalLink size={15}/></a>
+            </div>
           </div>
           <div className="atlas-panel">
             <div className="panel-heading"><span>OFFICIAL ALERTS</span><Status state={weather}/></div>
@@ -247,7 +267,7 @@ export default function HomePage(){
       </section>
 
       <section id="passport" className="section passport-section" aria-labelledby="passport-title">
-        <div className="wrap passport-grid"><div className="passport-info"><div className="eyebrow"><span className="eyebrow-line"/> YOUR HOME, YOUR RECORD <span className="eyebrow-index">/ 03</span></div><h2 id="passport-title">Meet your <em>Storm Passport.</em></h2><p>Your own home-preparedness space. Start with an area, follow official weather information, save useful records and build better habits between storms.</p><div className="passport-benefits"><div><ShieldCheck size={20}/><span>Choose which areas you follow</span></div><div><FileCheck2 size={20}/><span>Track your preparedness checklist</span></div><div><Bookmark size={20}/><span>Bookmark source-linked weather events</span></div><div><LockKeyhole size={20}/><span>Control what stays in your browser</span></div></div><p className="privacy-note"><Info size={16}/> This first release is a browser-only Passport preview, not a registered account or encrypted cloud document vault. Do not store sensitive information here.</p></div>
+        <div className="wrap passport-grid"><div className="passport-info"><div className="eyebrow">STORM PASSPORT</div><h2 id="passport-title">Stay ready <em>between storms.</em></h2><p>Save a location, build your preparedness checklist and bookmark official weather alerts. Your information stays in this browser.</p><div className="passport-benefits"><div><ShieldCheck size={20}/><span>Choose which areas you follow</span></div><div><FileCheck2 size={20}/><span>Track your preparedness checklist</span></div><div><Bookmark size={20}/><span>Bookmark source-linked weather events</span></div><div><LockKeyhole size={20}/><span>Control what stays in your browser</span></div></div><p className="privacy-note"><Info size={16}/> This first release is a browser-only Passport preview, not a registered account or encrypted cloud document vault. Do not store sensitive information here.</p></div>
           <div className="passport-card">
             <div className="passport-card-top"><span><SiteMark/> STORM PASSPORT</span><span className="preview-tag">LOCAL PREVIEW</span></div>
             <div className="passport-area"><span className="fine-label">MY SAVED AREA</span><h3>{passportState||"No saved area"}</h3><p>{passport.savedZip?"ZIP "+passport.savedZip:"Use Storm Atlas to save an area"} {passportState&&<MapPin size={14}/>}</p></div>
@@ -260,10 +280,10 @@ export default function HomePage(){
         </div>
       </section>
 
-      <section className="research-invite wrap"><div><span className="eyebrow"><span className="eyebrow-line"/> FROM DATA TO UNDERSTANDING</span><h2>Research behind <em>every layer.</em></h2><p>Explore our original-source register, data limitations, official severe-weather sources, historical-storm gaps and product research programme.</p></div><a href="/research">Read the research library <ArrowRight size={16}/></a></section>
+      <section className="research-invite wrap"><div><span className="eyebrow">OUR SOURCES</span><h2>Know where the <em>information comes from.</em></h2><p>See the official sources we use, what they cover and where their limits matter.</p></div><a href="/research">Read the research library <ArrowRight size={16}/></a></section>
 
       <section id="prepare" className="section recovery-section wrap" aria-labelledby="recovery-title">
-        <div className="section-intro"><div><div className="eyebrow"><span className="eyebrow-line"/> BEFORE · DURING · AFTER <span className="eyebrow-index">/ 04</span></div><h2 id="recovery-title">A clearer path <em>through the storm.</em></h2><p>Information that helps you decide what to do next, without pressure or invented urgency.</p></div></div>
+        <div className="section-intro"><div><div className="eyebrow">PREPARE · STAY SAFE · RECOVER</div><h2 id="recovery-title">A clearer path <em>through the storm.</em></h2><p>Information that helps you decide what to do next, without pressure or invented urgency.</p></div></div>
         <div className="recovery-cards">
           <ShellCard className="recovery-card"><span className="card-index">01 / PREPARE</span><div className="recovery-icon"><Home size={26}/></div><h3>Before it arrives.</h3><p>Review household plans, safe property maintenance, important documents and official warning channels.</p><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Preparedness guidance <ArrowUpRight size={16}/></a></ShellCard>
           <ShellCard className="recovery-card"><span className="card-index">02 / UNDERSTAND</span><div className="recovery-icon"><Radio size={26}/></div><h3>When conditions change.</h3><p>Follow National Weather Service warnings, source timestamps and local authorities. Always prioritise safety.</p><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">Official weather alerts <ArrowUpRight size={16}/></a></ShellCard>
@@ -271,10 +291,21 @@ export default function HomePage(){
         </div>
       </section>
 
-      <section id="pro" className="pro-section"><div className="wrap pro-grid"><div><div className="eyebrow"><span className="eyebrow-line"/> INTELLIGENCE FOR LOCAL OPERATORS <span className="eyebrow-index">/ 05</span></div><h2>Built for homeowners. <em>Useful for professionals.</em></h2><p>Storm Hub Pro is our planned contractor intelligence workspace: documented weather signals, territory research, verified coverage and governed customer enquiries.</p><div className="pro-flag"><Info size={17}/> Pro subscriptions and contractor enrolment are not open in this preview.</div></div><div className="pro-module"><div className="module-header"><Building2 size={19}/> STORM HUB PRO <span>CONCEPT</span></div><div className="module-line"><Radar size={18}/><span>Regional weather & market intelligence</span><CheckCircle2 size={16}/></div><div className="module-line"><Compass size={18}/><span>Service territory and capacity controls</span><CheckCircle2 size={16}/></div><div className="module-line"><ShieldCheck size={18}/><span>Credential and compliance review</span><CheckCircle2 size={16}/></div><div className="module-line"><ChartNoAxesCombined size={18}/><span>Verified outcome reporting</span><CheckCircle2 size={16}/></div><p className="module-disclaimer">Planned modules. No active marketplace or paid referrals.</p></div></div></section>
+      <section id="pro" className="pro-section"><div className="wrap pro-grid">
+          <div>
+            <div className="eyebrow">FOR CONTRACTORS</div>
+            <h2>Weather context <em>for local teams.</em></h2>
+            <p>We're exploring tools to help contractors review documented weather conditions and plan service coverage.</p>
+            <p className="pro-availability">Storm Hub Pro isn't accepting subscriptions or enquiries yet.</p>
+          </div>
+          <div className="pro-context"><Building2 size={30}/>
+            <strong>Storm Hub Pro</strong>
+            <p>In development. We'll publish actual features and availability once they're verified.</p>
+          </div>
+        </div></section>
 
-      <section className="final-cta wrap"><span className="eyebrow">STAY PREPARED. STAY INFORMED.</span><h2>Weather will change. <em>How you prepare can too.</em></h2><a href="#atlas">Explore Storm Atlas <ArrowRight size={17}/></a></section>
+      <section className="final-cta wrap"><span className="eyebrow">BE READY FOR WHAT'S NEXT</span><h2>Weather will change. <em>How you prepare can too.</em></h2><a href="#atlas">Explore Storm Atlas <ArrowRight size={17}/></a></section>
     </main>
-    <footer className="site-footer"><div className="wrap footer-inner"><div><a className="brand footer-brand" href="#home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/alerts">Live Storm Alerts</a><a href="/founder/revenue-pulse">Founder Revenue Pulse</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
+    <footer className="site-footer"><div className="wrap footer-inner"><div><a className="brand footer-brand" href="#home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/alerts">Live Storm Alerts</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a><a href="https://science.nasa.gov/resource/blue-marble-2002/" target="_blank" rel="noreferrer">Hero Earth imagery: NASA Blue Marble <ExternalLink size={13}/></a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
   </div>;
 }
