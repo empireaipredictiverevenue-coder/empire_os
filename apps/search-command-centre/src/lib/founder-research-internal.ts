@@ -2,7 +2,12 @@ import "server-only";
 
 // This is a server-to-loopback bridge, not an identity authority. The API
 // independently verifies the signed Cloudflare Access JWT and Founder subject.
-const RESEARCH_API = "http://127.0.0.1:8766/v1/founder-research-products";
+// The only override is a fixed loopback port for ephemeral integration tests.
+// Live configuration always uses the existing Founder API on port 8766.
+const RESEARCH_API =
+  process.env.EMPIRE_RESEARCH_ISOLATED_STAGE === "1"
+    ? "http://127.0.0.1:3097/v1/founder-research-products"
+    : "http://127.0.0.1:8766/v1/founder-research-products";
 
 export function forwardedAccessAssertion(value: string | null): string | null {
   if (!value || value.length > 8192 || value.split(".").length !== 3) return null;
