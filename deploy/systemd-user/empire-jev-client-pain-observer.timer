@@ -1,0 +1,12 @@
+[Unit]
+Description=Review existing UK and US public client pain evidence every 15 minutes
+
+[Timer]
+OnBootSec=6min
+OnUnitActiveSec=15min
+AccuracySec=60s
+Persistent=true
+Unit=empire-jev-client-pain-observer.service
+
+[Install]
+WantedBy=timers.target

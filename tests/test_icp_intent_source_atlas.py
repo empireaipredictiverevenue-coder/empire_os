@@ -27,6 +27,10 @@ def test_icp_atlas_adds_verified_communities_to_current_reddit_rotation():
     assert ("RoofingSales", "marketing leads", "roofing", "US") in REDDIT_ROTATION
     assert ("LeadGenMarketplace", "roofing leads", "roofing", "US") in REDDIT_ROTATION
     assert set(REDDIT_ROTATION) <= set(cycle.REDDIT_ROTATION)
+    assert ("Dentistry", "new patients marketing", "dental", "US") in REDDIT_ROTATION
+    assert ("SaaS", "struggling get customers", "saas", "online") in REDDIT_ROTATION
+    assert sum(x[0] == "Dentistry" for x in REDDIT_ROTATION) == 1
+    assert sum(x[0] == "SaaS" for x in REDDIT_ROTATION) == 1
     for source in SOURCES:
         assert source.url.startswith("https://")
         if source.venue != "Reddit":

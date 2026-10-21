@@ -1,0 +1,15 @@
+[Unit]
+Description=EmpireOS Jev client pain research (read-only, existing source evidence)
+After=empire-community-intent.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/empire_os
+Environment=PYTHONPATH=/srv/empire_os
+ExecStart=/srv/empire_os/.venv/bin/python -B /srv/empire_os/scripts/run_jev_client_pain_observer_20261022.py --read-only --write-private
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/srv/empire_os/runtime/jev_client_pain_discovery
+TimeoutStartSec=90

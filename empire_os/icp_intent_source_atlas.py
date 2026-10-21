@@ -114,6 +114,20 @@ SOURCES: tuple[IcpSource, ...] = (
         "localseo", "client leads", "agency", "online",
     ),
     IcpSource(
+        "reddit_dentistry", "dental_practice_owners", "Reddit",
+        "https://www.reddit.com/r/Dentistry/",
+        "public_reddit_rss", "OBSERVE", "patient_acquisition_and_marketing_roi",
+        "predictive_revenue_demand_engine", 92,
+        "Dentistry", "new patients marketing", "dental", "US",
+    ),
+    IcpSource(
+        "reddit_saas", "saas_founders", "Reddit",
+        "https://www.reddit.com/r/SaaS/",
+        "public_reddit_rss", "OBSERVE", "first_customers_and_retention",
+        "predictive_revenue", 89,
+        "SaaS", "struggling get customers", "saas", "online",
+    ),
+    IcpSource(
         "alignable_marketing", "us_ca_smb_owners", "Alignable",
         "https://www.alignable.com/groups/marketing-for-the-small-business",
         "public_view_only", "MANUAL_REVIEW_ONLY", "marketing_growth",
