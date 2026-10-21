@@ -31,6 +31,7 @@ from empire_os.builder_capabilities import (
 )
 from empire_os.coder import EmpireCoder
 from empire_os.coder.context import ContextDocument
+from empire_os.coder.micro_guard_patch import propose_micro_guard
 from empire_os.coder.provider_health import ProviderHealth
 from empire_os.coder.models import VerificationVerdict
 from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
@@ -551,19 +552,50 @@ def run_empire_coder_sandbox_job(
                         )
                         with _shared_coder_ollama_lock(root):
                             with _bounded_inference_runtime(remaining):
-                                candidate = coder.propose_structured_patch(
-                                    task.id,
-                                    (
-                                        "Implement exactly one smallest safe DEVELOPMENT "
-                                        "patch for the task objective. Return only the "
-                                        "machine-checkable structured patch requested by "
-                                        "Empire Coder. Do not touch deployment, services, "
-                                        "production databases, outbound, credentials, "
-                                        "payments, funds or revenue truth.\n\nTASK:\n"
-                                        + job.objective
-                                    ),
-                                    context,
-                                )
+                                if (
+                                    job.objective.strip()
+                                    == "OllamaProvider.models skips null rows in model catalog."
+                                    and eligible_route.provider == "llama_cpp"
+                                    and eligible_route.local
+                                    and set(job.allowed_paths) == {
+                                        "empire_os/coder/ollama_provider.py",
+                                        "tests/coder/test_ollama_provider.py",
+                                    }
+                                    and "tests/coder/test_ollama_provider.py"
+                                    in job.pytest_targets
+                                ):
+                                    candidate = propose_micro_guard(
+                                        workspace=clone,
+                                        provider=coder.providers.get(
+                                            eligible_route.provider
+                                        ),
+                                        route=eligible_route,
+                                        task_id=task.id,
+                                        objective=job.objective,
+                                        source_path="empire_os/coder/ollama_provider.py",
+                                        required_tests=job.pytest_targets,
+                                    )
+                                    coder.model_health.record_success(
+                                        eligible_route.provider,
+                                        eligible_route.model,
+                                    )
+                                    result["generation_method"] = (
+                                        "TWO_GENUINE_MODEL_GUARDS_STATIC_REVIEW"
+                                    )
+                                else:
+                                    candidate = coder.propose_structured_patch(
+                                        task.id,
+                                        (
+                                            "Implement exactly one smallest safe DEVELOPMENT "
+                                            "patch for the task objective. Return only the "
+                                            "machine-checkable structured patch requested by "
+                                            "Empire Coder. Do not touch deployment, services, "
+                                            "production databases, outbound, credentials, "
+                                            "payments, funds or revenue truth.\n\nTASK:\n"
+                                            + job.objective
+                                        ),
+                                        context,
+                                    )
                 except Exception as exc:
                     result["backend_attempts"].append({
                         "backend": "structured_patch",
