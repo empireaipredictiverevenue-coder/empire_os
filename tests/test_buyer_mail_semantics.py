@@ -180,3 +180,41 @@ def test_html_only_publisher_response_reports_paid_placements_without_quoted_his
     encoded=base64.urlsafe_b64encode(body.encode()).decode().rstrip('=')
     events=recognize_message_payload({"mimeType":"text/html","body":{"data":encoded}})
     assert events==["PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED"]
+
+
+def test_lead_smart_new_team_decision_reply_is_pending_not_approval():
+    # Original latest buyer reply, 21 October 2026 10:41 UTC (no quoted history).
+    body = ("Hi Phil,\\n\\nGot your message. This needs a decision from our "
+            "team. We will get back to you.\\n\\nThanks, Lead Smart Support Agent")
+    expected = ["BUYER_INTERNAL_DECISION_PENDING_REPORTED"]
+    assert classify_visible_claims(body.replace("\\n", "\n")) == expected
+    assert classify_visible_claims(body.replace("\\n", "\n"), outbound=True) == []
+    for not_decision in (
+        "We already tested your numbers and everything looks good. You can go live.",
+        "Your payment terms are now approved and finalized.",
+        "Please wait for the final landing screenshots approval.",
+        "No need to make an internal decision from our team.",
+    ):
+        assert "BUYER_INTERNAL_DECISION_PENDING_REPORTED" not in classify_visible_claims(not_decision)
+    quoted = "Thanks, got it.\nOn Wednesday, Buyer wrote:\nThis needs a decision from our team."
+    assert "BUYER_INTERNAL_DECISION_PENDING_REPORTED" not in classify_visible_claims(quoted)
+
+
+def test_pending_decision_event_flows_into_registry_without_launch_authority():
+    from tests.test_connected_gmail_buyer_metadata import inputs
+    old, index = inputs()
+    inbound = index["threads"][0]["messages"][1]
+    inbound["recognized_codes"] = ["BUYER_INTERNAL_DECISION_PENDING_REPORTED"]
+    now = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+    updated, _ = refreshed_summary(old, index, now=now)
+    lead = next(x for x in updated["threads"] if x["entity_key"] == "lead-smart")
+    assert lead["buyer_signal_events"][-1]["event_code"] == "BUYER_INTERNAL_DECISION_PENDING_REPORTED"
+    report = reconcile(updated, {"candidate_count":0, "candidates":[]},
+                       {"shortlisted_count":0, "targets":[]}, now=now,
+                       do_not_pursue_domains=frozenset())
+    row = next(x for x in report["relationships"] if x["entity_key"] == "lead-smart")
+    assert any(e["event_code"] == "BUYER_INTERNAL_DECISION_PENDING_REPORTED"
+               for e in row["automatically_recognized_buyer_events"])
+    assert row["recognized_buyer_events_are_verified"] is False
+    assert row["outbound_authorized"] is False
+    assert report["execution_authority"] == "NONE"

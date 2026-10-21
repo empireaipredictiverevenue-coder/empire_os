@@ -23,6 +23,7 @@ EVENT_CODES = frozenset({
     "PILOT_TECHNICAL_REQUIREMENTS_SENT",
     "COMPLETE_BUYER_REQUIREMENTS_SENT",
     "PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED",
+    "BUYER_INTERNAL_DECISION_PENDING_REPORTED",
 })
 
 def _decode(data: Any) -> str:
@@ -117,6 +118,17 @@ def classify_visible_claims(visible: str, *, outbound: bool = False) -> list[str
         if not line:
             continue
         if not outbound:
+            # A promised internal team decision is NOT approval of traffic,
+            # terms, payment, or any independent Ringba evidence. Keep this
+            # observation advisory and anchored to the buyer's own reply.
+            if (re.search(
+                r"\b(?:this|that|it) (?:needs|requires) (?:a|an) "
+                r"(?:internal )?decision from (?:our|the) team\b", line,
+            ) and re.search(
+                r"\bwe (?:will|shall) get back to you\b|\bwe.ll get back to you\b",
+                text,
+            )):
+                events.add("BUYER_INTERNAL_DECISION_PENDING_REPORTED")
             # An actual affirmative decision must be explicit. Phrases such
             # as "awaiting sign-off", "when you send screenshots" or
             # "will reply with approval" are NOT approval.
