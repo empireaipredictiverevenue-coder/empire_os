@@ -278,3 +278,47 @@ def test_reviewer_accepts_published_consent_protocol_not_unsigned_claims(tmp_pat
     ]:
         assert not site_handoff_available("60601",config_path=conf,ledger_path=ledger,
                     readiness=tampered,eligible_zip=True,now=checked)
+
+def test_lock_wait_past_supervised_window_never_reserves_a_handoff(tmp_path, monkeypatch):
+    """Closing time is checked again AFTER obtaining the permit lock."""
+    from datetime import timedelta
+    import empire_os.lead_smart_site_handoff as handoff
+
+    start = local(21, 9)
+    end = local(21, 9, 15)
+    before = end - timedelta(seconds=1)
+    conf = tmp_path / "approved_control.json"
+    ledger = tmp_path / "site_handoffs.json"
+    control = spec(start, end)
+    control["full_campaign_scope_revoked"] = True
+    conf.write_text(json.dumps(control))
+    ready = {
+        "schema_version": "empire.lead_smart.launch_readiness.v1",
+        "mode": "READY", "launch_ready": True, "call_cta_enabled": True,
+        "execution_authority": "LIVE_TRAFFIC", "buyer_window_open_now": True,
+        "gates": {"preflight_passed": True},
+        "operating_hours": {"evaluated_at": before.isoformat()},
+    }
+
+    class ControlledDatetime(datetime):
+        current = before
+
+        @classmethod
+        def now(cls, tz=None):
+            return cls.current if tz is not None else cls.current.replace(tzinfo=None)
+
+    real_lock = handoff.fcntl.flock
+
+    def advance_while_waiting(fd, operation):
+        if operation == handoff.fcntl.LOCK_EX:
+            ControlledDatetime.current = end + timedelta(seconds=1)
+        return real_lock(fd, operation)
+
+    monkeypatch.setattr(handoff, "datetime", ControlledDatetime)
+    monkeypatch.setattr(handoff.fcntl, "flock", advance_while_waiting)
+    with pytest.raises(HandoffHeld):
+        handoff.reserve_site_handoff(
+            "60601", config_path=conf, ledger_path=ledger,
+            readiness=ready, eligible_zip=True,
+        )
+    assert not ledger.exists()

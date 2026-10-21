@@ -252,7 +252,10 @@ def reserve_site_handoff(
     ledger_path: Path = LEDGER, readiness: Mapping[str, Any],
     eligible_zip: bool, now: datetime | None = None,
 ) -> str:
-    now = (now or datetime.now(timezone.utc))
+    # Explicit timestamps are allowed only for deterministic isolated tests.
+    # Real requests must refresh time AFTER waiting for the permit lock.
+    clock_supplied = now is not None
+    now = now if clock_supplied else datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise HandoffHeld()
     now = now.astimezone(timezone.utc)
@@ -265,25 +268,28 @@ def reserve_site_handoff(
     lock = ledger_path.with_suffix(".lock")
     with lock.open("a+b") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        # Revalidate under the exclusive lock; no permit over configured cap.
+        # A queue for this lock can outlast the founder-approved launch window.
+        # Recheck the REAL clock under lock, not the time captured before
+        # waiting. Preserve an explicit fixed clock for isolated tests only.
+        locked_now = now if clock_supplied else datetime.now(timezone.utc)
         if not site_handoff_available(
             zip_code, config_path=config_path, ledger_path=ledger_path,
-            readiness=readiness, eligible_zip=eligible_zip, now=now,
+            readiness=readiness, eligible_zip=eligible_zip, now=locked_now,
         ):
             raise HandoffHeld()
         # The emergency STOP uses this same lock. Re-read the exact current
         # control in the lock to keep limits and window changes atomic.
         control = _json(config_path)
-        window, _ = _control(control, now)
+        window, _ = _control(control, locked_now)
         prior = _json(ledger_path) if ledger_path.exists() else None
         if not _ledger_available(prior, control, window,
-                                 _handoff_limit(control), now):
+                                 _handoff_limit(control), locked_now):
             raise HandoffHeld()
         existing = prior if prior is not None else {
             "schema_version": LEDGER_SCHEMA, "window": window, "site_handoffs": 0,
         }
         if control.get("mode") == "FULL_CAMPAIGN":
-            day = now.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
+            day = locked_now.astimezone(ZoneInfo("America/Chicago")).date().isoformat()
             if "local_day" not in existing:
                 existing["local_day"] = day
                 existing["daily_site_handoffs"] = 0
