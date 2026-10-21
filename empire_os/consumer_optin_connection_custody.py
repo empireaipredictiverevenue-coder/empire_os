@@ -121,13 +121,29 @@ class PrivateConsumerConnectionFactory:
             raise RuntimeError("CONSUMER_SCHEMA_AUTHORITY_INVALID")
         for table in TABLES:
             name="public."+table
+            # The restricted service login must not ask PostgreSQL to check
+            # the *effective privileges* of unrelated B2B/CRM accounts:
+            # production may forbid that introspection with SQLSTATE 42501.
+            # The separately privileged release gate audits those effective
+            # permissions for all five exact relations.
+            #
+            # Here verify only own effective SELECT and the *explicit* ACL
+            # metadata: owner plus this one NOLOGIN writer role only. This
+            # fails closed on any unfamiliar directly granted principal.
             grants=conn.execute(
-                "SELECT has_table_privilege(%s,%s,'SELECT'),"
-                "has_table_privilege('empiredb_app',%s,'SELECT'),"
-                "has_table_privilege('empiredb_readonly',%s,'SELECT')",
-                (WRITER,name,name,name),
+                "SELECT has_table_privilege(current_user,%s,'SELECT'),"
+                "NOT EXISTS ("
+                " SELECT 1 FROM pg_catalog.pg_class c"
+                " CROSS JOIN LATERAL pg_catalog.aclexplode("
+                "   COALESCE(c.relacl,pg_catalog.acldefault('r',c.relowner))"
+                " ) acl"
+                " WHERE c.oid=%s::pg_catalog.regclass"
+                " AND acl.grantee<>c.relowner"
+                " AND acl.grantee<>'empire_consumer_optin_writer'::regrole"
+                ")",
+                (name,name),
             ).fetchone()
-            if not grants or tuple(grants)!=(True,False,False):
+            if not grants or tuple(grants)!=(True,True):
                 raise RuntimeError("CONSUMER_SCHEMA_TABLE_ACCESS_INVALID")
 
     def __call__(self) -> Any:

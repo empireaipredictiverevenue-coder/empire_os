@@ -50,8 +50,8 @@ class FakeConnection:
             return Cursor((self.schema_count,))
         if "FROM pg_policies" in sql:
             return Cursor((5,))
-        if "has_table_privilege(%s,%s,'SELECT')" in sql:
-            return Cursor((True,self.broad_reader,False))
+        if "has_table_privilege(current_user,%s,'SELECT')" in sql:
+            return Cursor((True,not self.broad_reader))
         if sql.startswith("SELECT EXISTS("):
             return Cursor((not self.broad_reader,))
         return Cursor()
@@ -104,7 +104,9 @@ def test_private_login_enters_scoped_role_and_verifies_original_schema():
     assert seen and seen[0][1]["connect_timeout"]==5
     assert any(sql=="SET LOCAL ROLE "+WRITER for sql,_ in fake.commands)
     assert any("FORCE" not in sql and "pg_policies" in sql for sql,_ in fake.commands)
-    assert len([1 for sql,_ in fake.commands if "has_table_privilege(%s,%s,'SELECT')" in sql])==5
+    assert len([1 for sql,_ in fake.commands if "has_table_privilege(current_user,%s,'SELECT')" in sql])==5
+    assert all("has_table_privilege('empiredb_app'" not in sql for sql,_ in fake.commands)
+    assert all("pg_catalog.aclexplode" in sql for sql,_ in fake.commands if "has_table_privilege(current_user" in sql)
     assert all("INSERT INTO" not in sql for sql,_ in fake.commands)
     assert all("ALTER ROLE" not in sql for sql,_ in fake.commands)
 

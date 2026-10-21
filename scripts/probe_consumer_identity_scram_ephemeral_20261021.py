@@ -17,6 +17,7 @@ from scripts.review_consumer_private_identity_session_20261021 import (
 )
 from scripts import diagnose_consumer_private_identity_hold_20261021 as segmented
 from scripts import review_consumer_table_acl_detail_20261021 as acl_detail
+from scripts import review_consumer_root_authoritative_20261021 as final_guard
 from unittest.mock import patch
 import scripts.review_consumer_private_identity_session_20261021 as original
 
@@ -77,6 +78,26 @@ def main():
     assert acl_readback["status"]=="CONSUMER_ACL_READONLY_PASS"
     assert len(acl_readback["table_checks"])==5
 
+    # Authority-separated final readback. Admin inspects B2B/PUBLIC ACL;
+    # dedicated consumer login only tests itself + zero row RLS.
+    def fixture_admin():
+        result=subprocess.run(
+            ["/usr/bin/psql","-X","-q","-w","-A","-t",
+             "-v","ON_ERROR_STOP=1","-d","empiredb"],
+            input=final_guard.ADMIN_SQL,text=True,capture_output=True,timeout=15,
+        )
+        assert result.returncode==0, "fixture admin catalog query held"
+        return json.loads(result.stdout.strip())
+
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(final_guard.os,"geteuid",return_value=0):
+            final_readback=final_guard.check(
+                original=original,admin=fixture_admin,connect=authenticated
+            )
+    assert final_readback["status"]=="CONSUMER_ROOT_AND_LOGIN_READONLY_VERIFIED"
+    assert final_readback["original_root_key_custody"] is True
+    assert len(final_readback["catalogue"]["tables"])==5
+
     # An unexpected B2B grant on ONE fixture table must be identified
     # precisely and held. This is a disposable PG18 fixture, NEVER live.
     with psycopg.connect(
@@ -91,6 +112,13 @@ def main():
     assert drift["status"]=="CONSUMER_ACL_READONLY_HOLD"
     assert drift["first_failed_table"]=="empire_consumer_subscriptions"
     assert drift["first_failed_checks"]==["crm_app_select_denied"]
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(final_guard.os,"geteuid",return_value=0):
+            combined_drift=final_guard.check(
+                original=original,admin=fixture_admin,connect=authenticated
+            )
+    assert combined_drift["status"]=="CONSUMER_ROOT_ACL_HOLD"
+    assert combined_drift["catalogue"]["tables"]["empire_consumer_subscriptions"]["crm_denied"] is False
     with psycopg.connect(
         dbname="empiredb",host="localhost",port=port
     ) as admin:
