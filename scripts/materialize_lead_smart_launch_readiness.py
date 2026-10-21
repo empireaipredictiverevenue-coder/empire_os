@@ -128,8 +128,22 @@ def approved_live_publication(
             ROOFING_HERO_CTA_SOURCE_SHA256: ROOFING_HERO_CTA_HTML_SHA256,
             ROOFING_INDEXABLE_SOURCE_SHA256: ROOFING_INDEXABLE_HTML_SHA256,
         }.get(source_variant, APPROVED_ROOFING_HTML_SHA256)
-        return hashlib.sha256(published.read_bytes()).hexdigest() == expected_html
-    except OSError:
+        published_sha = hashlib.sha256(published.read_bytes()).hexdigest()
+        if published_sha == expected_html:
+            return True
+        # An independently founder-approved V2 static release may have a
+        # different Next.js shell yet retain *exactly* the buyer-reviewed
+        # homeowner copy, ZIP and consent semantics. Require a root-owned,
+        # narrow compatibility attestation as well as both pinned page bytes.
+        # This is LANDING evidence ONLY; legal, routing, ANI, stop, recording
+        # and time/window gates remain independent and fail-closed.
+        if source_variant != ROOFING_INDEXABLE_SOURCE_SHA256:
+            return False
+        from empire_os.lead_smart_v2_landing_compatibility import (
+            V2_HTML_SHA, accept_installed_attestation,
+        )
+        return published_sha == V2_HTML_SHA and accept_installed_attestation()
+    except (OSError, ValueError, TypeError, ImportError):
         return False
 
 def effective_legal_release_verified() -> bool:

@@ -111,14 +111,24 @@ def test_activation_installs_stop_timer_before_enabling_calls(tmp_path,monkeypat
     assert json.loads(config.read_text())["enabled"] is True
 
 def test_activation_fails_closed_without_fresh_source(tmp_path,monkeypatch):
+    # Freeze within the historic synthetic window. Without this the test's
+    # stale 20 Oct campaign now correctly fails earlier on elapsed time.
+    # No production authority is created or extended by the fixture.
+    from datetime import datetime as RealDateTime
+    class Frozen(datetime):
+        @classmethod
+        def now(cls,tz=None):
+            now=RealDateTime(2026,10,20,13,5,tzinfo=timezone.utc)
+            return now if tz is None else now.astimezone(tz)
+    monkeypatch.setattr(op,"datetime",Frozen)
     c=op.proposed(old_control(),"2026-10-20T08:00",7,20,140)
     cfg=tmp_path/"control"
     cfg.write_text(json.dumps(c))
     monkeypatch.setattr(op,"CONFIG",cfg)
     monkeypatch.setattr(op,"founder_full_campaign_approved",lambda root:True)
     monkeypatch.setattr(op,"refresh",lambda:{"source_refresh_completed":False})
-    # A real runtime clock should be within this control's campaign.
-    # If not, it still fails closed without changing the file.
+    # The deterministic in-window clock isolates the intended failure:
+    # stale/missing provider evidence leaves the disabled control unchanged.
     original=cfg.read_bytes()
     with pytest.raises(ValueError):
         op.activate()

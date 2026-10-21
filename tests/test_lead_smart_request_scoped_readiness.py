@@ -25,9 +25,16 @@ def test_deployed_roofing_hash_stays_verified_and_any_drift_holds(tmp_path, monk
     site=tmp_path/"site"
     site.mkdir()
     html=site/"roofing.html"
-    html.write_bytes(Path("apps/empire-public-site/out/roofing.html").read_bytes()
-        if Path("apps/empire-public-site/out/roofing.html").exists()
-        else Path("/srv/empire_os/apps/empire-public-site/out/roofing.html").read_bytes())
+    # The founder-approved V2 static tree has a newer layout hash; this test
+    # checks the separately frozen buyer-reviewed indexable original. V2's
+    # source-preserving release path has independent compatibility tests.
+    reviewed_export=Path(
+        "/home/ubuntu/empire_releases/flagship_checkout_union_20261020/"
+        "out.pre-v2-public/roofing.html"
+    )
+    frozen_bytes=reviewed_export.read_bytes()
+    assert hashlib.sha256(frozen_bytes).hexdigest()==release.ROOFING_INDEXABLE_HTML_SHA256
+    html.write_bytes(frozen_bytes)
     report={"approved":True, "source_ref":"gmail:1a12bc009d04fcc9",
             "reviewed_source_sha256":APPROVED_HASH}
     assert release.approved_candidate_matches(report,root=root)
