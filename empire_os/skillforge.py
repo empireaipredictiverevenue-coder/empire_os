@@ -7,6 +7,7 @@ from empire_os.skill_exchange import SKILLS_ROOT, SAFE_NAME, TASK_SKILLS
 from empire_os.skill_review import review_local_skill
 from empire_os.skill_trust import SkillTrustError, read_trust_registry
 from empire_os.skillforge_learning import learning_index
+from empire_os.skillforge_harness2_bridge import skillforge_harness2_candidate
 from empire_os.skillforge_proposals import proposal_history
 from empire_os.okf_adapter import list_private_research
 
@@ -57,5 +58,7 @@ def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
             'approved_count': sum(s['trust'] == 'approved_pinned' for s in skills),
             'learning': learning,
             'review_queue': review_queue,
+            'harness2_guard_candidate': (skillforge_harness2_candidate(repo_root)
+                                         if repo_root is not None else None),
             'okf_research': okf_research,
             'external_download': False, 'execution_authority': 'none'}
