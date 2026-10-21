@@ -27,6 +27,7 @@ def _is_int(value:Any)->bool:
 def review_portfolio_commercial_readiness(
     portfolio:Mapping[str,Any], *, buyer_capacity:Mapping[str,Any]|None,
     relationships:Mapping[str,Any]|None, as_of:datetime,
+    prospect_reservoir:Mapping[str,Any]|None=None,
 )->dict[str,Any]:
     if (not isinstance(as_of,datetime) or as_of.tzinfo is None
         or as_of.utcoffset() is None):
@@ -106,7 +107,56 @@ def review_portfolio_commercial_readiness(
     # business, tenant, recipient, suppression subject or buyer's active buy box.
     reasons.append("NO_CANONICAL_SIGNAL_TO_BUYER_OR_CRM_IDENTITY_JOIN")
 
+    reservoir_summary={
+        "status":"NOT_ATTACHED",
+        "historical_canonical_prospect_count":None,
+        "current_canonical_count_verified":False,
+        "contactable_qualified_leads_verified":False,
+        "counting_across_populations_authorized":False,
+        "local_lead_control_rows":None,
+        "legacy_permit_project_rows":None,
+        "recent_market_window_acquisitions":None,
+    }
+    if prospect_reservoir is not None:
+        p=prospect_reservoir
+        if (not isinstance(p,Mapping)
+            or p.get("schema_version")!="empire.jev.prospect_reservoir_review.v1"
+            or p.get("mode")!="OBSERVE"
+            or p.get("status")!="HISTORIC_PROSPECT_RESERVOIR_VERIFIED_CURRENT_ELIGIBILITY_UNKNOWN"
+            or p.get("execution_authority")!="none"
+            or p.get("historical_distinct_id_set_matched_between_snapshots") is not True
+            or type(p.get("historical_empiredb_prospect_count")) is not int
+            or not 0<p["historical_empiredb_prospect_count"]<=10_000_000
+            or p.get("current_empiredb_prospect_count") is not None
+            or p.get("current_empiredb_reservoir_refresh_verified") is not False
+            or p.get("full_reservoir_commercial_rights_verified") is not False
+            or p.get("bulk_qualified_or_contactable_lead_total_proven") is not False
+            or p.get("counting_populations_additive") is not False
+            or p.get("qualified_records_for_mass_jev_inference")!=0
+            or p.get("automatic_outreach_authorized") is not False
+            or p.get("individual_consent_and_suppression_cleared") is not False
+            or p.get("database_writes") is not False):
+            raise ValueError("untrusted Jev historic prospect reservoir cannot join portfolio")
+        reservoir_summary={
+            "status":"HISTORIC_SOURCE_COUNT_ONLY_COMMERCIAL_REVALIDATION_REQUIRED",
+            "historical_canonical_prospect_count":p["historical_empiredb_prospect_count"],
+            "current_canonical_count_verified":False,
+            "contactable_qualified_leads_verified":False,
+            "counting_across_populations_authorized":False,
+            "local_lead_control_rows":p.get("existing_leads_control_rows"),
+            "legacy_permit_project_rows":p.get("permit_recovery_local_rows"),
+            "recent_market_window_acquisitions":p.get("recent_market_observed_acquisition_total"),
+        }
+        reasons.append("HISTORIC_PROSPECT_RECORDS_NEED_CURRENT_SOURCE_RIGHTS_AND_IDENTITY_PROOF")
     steps=[]
+    if prospect_reservoir is not None:
+        steps.append({
+            "task":"CANONICAL_PROSPECT_RESERVOIR_RIGHTS_AND_LINEAGE_AUDIT",
+            "historical_record_count":reservoir_summary["historical_canonical_prospect_count"],
+            "owner":"existing_empiredb_data_quality_and_research_owner",
+            "required_receipt":"current_restricted_count_source_origin_duplicate_consent_and_purpose_audit",
+            "action_authorized":False,
+        })
     if needs_identity:
         steps.append({
             "task":"FIRST_PARTY_IDENTITY_RESEARCH",
@@ -144,6 +194,9 @@ def review_portfolio_commercial_readiness(
         "status":"COMMERCIAL_EVIDENCE_GAPS_REQUIRE_OWNER_REVIEW",
         "as_of_utc":as_of.astimezone(timezone.utc).isoformat(),
         "source_signal_review_count":len(items),
+        "prospect_reservoir_review":reservoir_summary,
+        "mass_jev_person_inference_authorized":False,
+        "bulk_prospect_email_or_contact_authorized":False,
         "portfolio_lanes":dict(sorted(counts.items())),
         "buyer_capacity_status":buyer["status"],
         "buyer_capacity_source_current":buyer["source_current"],

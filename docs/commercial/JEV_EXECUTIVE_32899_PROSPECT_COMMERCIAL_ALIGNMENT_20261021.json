@@ -1,0 +1,104 @@
+{
+  "aggregate_suppression_or_bounce_review_count": 9,
+  "as_of_utc": "2026-10-21T22:38:19.638774+00:00",
+  "blocking_reasons": [
+    "UNVERIFIED_FIRST_PARTY_IDENTITY",
+    "NO_VERIFIED_SPECIFIC_COMMERCIAL_BUYBOX",
+    "CRM_OR_MAILBOX_EVIDENCE_NOT_CURRENT",
+    "INDIVIDUAL_SUPPRESSION_STATE_MUST_BE_CHECKED",
+    "NO_CANONICAL_SIGNAL_TO_BUYER_OR_CRM_IDENTITY_JOIN",
+    "HISTORIC_PROSPECT_RECORDS_NEED_CURRENT_SOURCE_RIGHTS_AND_IDENTITY_PROOF"
+  ],
+  "bulk_prospect_email_or_contact_authorized": false,
+  "buyer_capacity_auto_allocation": false,
+  "buyer_capacity_counts": {
+    "buyers_seen": 1057,
+    "capacity_verified": 0,
+    "commercially_activated": 0,
+    "delivery_destination_present": 485,
+    "delivery_verified": 0,
+    "fully_activated": 0,
+    "market_defined": 107,
+    "positive_capacity_configured": 121,
+    "reviewed": 1,
+    "terms_verified": 0
+  },
+  "buyer_capacity_source_current": true,
+  "buyer_capacity_status": "NO_VERIFIED_COMMERCIAL_CAPACITY",
+  "canonical_prospects_created": 0,
+  "commercial_offers_ready": 0,
+  "customer_delivery_authorized": false,
+  "database_writes": false,
+  "execution_authority": "none",
+  "individual_buyer_identity_join_verified": false,
+  "mailbox_current": false,
+  "mass_jev_person_inference_authorized": false,
+  "mode": "OBSERVE",
+  "new_replies_verified": false,
+  "outreach_sent": 0,
+  "payment_mutations": false,
+  "portfolio_lanes": {
+    "DISCARD": 1,
+    "MONITOR": 33,
+    "REVIEW_IDENTITY": 1
+  },
+  "prospect_reservoir_review": {
+    "contactable_qualified_leads_verified": false,
+    "counting_across_populations_authorized": false,
+    "current_canonical_count_verified": false,
+    "historical_canonical_prospect_count": 32899,
+    "legacy_permit_project_rows": 6500,
+    "local_lead_control_rows": 6828,
+    "recent_market_window_acquisitions": 62,
+    "status": "HISTORIC_SOURCE_COUNT_ONLY_COMMERCIAL_REVALIDATION_REQUIRED"
+  },
+  "relationship_counts_by_stage": {
+    "AWAITING_BUYER": 3,
+    "CONTACTED_AWAITING_RESPONSE": 39,
+    "DELIVERY_HOLD": 7,
+    "EVIDENCE_HOLD": 1,
+    "INBOUND_REVIEW_REQUIRED": 2,
+    "RESEARCH_ONLY": 108
+  },
+  "relationship_registry_fresh": true,
+  "relationship_registry_status": "GMAIL_SNAPSHOT_HOLD",
+  "review_steps": [
+    {
+      "action_authorized": false,
+      "historical_record_count": 32899,
+      "owner": "existing_empiredb_data_quality_and_research_owner",
+      "required_receipt": "current_restricted_count_source_origin_duplicate_consent_and_purpose_audit",
+      "task": "CANONICAL_PROSPECT_RESERVOIR_RIGHTS_AND_LINEAGE_AUDIT"
+    },
+    {
+      "action_authorized": false,
+      "affected_signal_review_count": 1,
+      "owner": "existing_research_and_buyer_scout",
+      "required_receipt": "independently_verified_company_identity",
+      "task": "FIRST_PARTY_IDENTITY_RESEARCH"
+    },
+    {
+      "action_authorized": false,
+      "affected_signal_review_count": 1,
+      "owner": "existing_buyer_scout_capacity_owner",
+      "required_receipt": "buyer_identity_and_niche_geo_terms_capacity_delivery",
+      "task": "BUYER_CAPACITY_AND_COMMERCIAL_TERMS_VERIFICATION"
+    },
+    {
+      "action_authorized": false,
+      "affected_relationship_review_count": 160,
+      "owner": "existing_tenant_crm_and_mailbox_owner",
+      "required_receipt": "current_thread_tenant_consent_suppression_and_contact_history",
+      "suppression_or_bounce_review_count": 9,
+      "task": "EXISTING_CRM_RELATIONSHIP_AND_SUPPRESSION_RECONCILIATION"
+    }
+  ],
+  "schema_version": "empire.jev.commercial_action_readiness.v1",
+  "source_signal_review_count": 35,
+  "specific_buybox_verified": false,
+  "status": "COMMERCIAL_EVIDENCE_GAPS_REQUIRE_OWNER_REVIEW",
+  "suppression_clear_for_any_individual": false,
+  "total_relationships": 160,
+  "verified_buyer_capacity_for_portfolio": false,
+  "verified_revenue": false
+}
