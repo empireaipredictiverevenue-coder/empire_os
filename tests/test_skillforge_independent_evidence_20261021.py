@@ -192,6 +192,7 @@ def test_untrusted_skillforge_review_report_cannot_spoof_approval():
         'independently_verified_skill_outcomes':0,
         'raw_identifiers_disclosed':False,'automatic_promotion':False,
         'inventory_truncated':False,
+        'coder_downstream_job_inventory_incomplete':False,
         'original_skillforge_invalid_observations':0,
         'second_read_rejected_observations':0,'family_count':1,
         'families':[{
@@ -201,6 +202,12 @@ def test_untrusted_skillforge_review_report_cannot_spoof_approval():
           'independently_verified_successful_agent_outcomes':0,
           'original_referenced_artifacts_independently_authenticated':False,
           'skill_approval_authorized':False,'review_only':True,
+          'verify_report_pass_is_not_independent_outcome_proof':True,
+          'downstream_coder_verify_jobs':{
+            'completed_verify_job_receipts':0,'completed_verify_report_pass':0,
+            'completed_verify_report_fail':0,'failed_verify_job_receipts':0,
+            'untrusted_or_inconsistent_verify_job_receipts':0,
+          },
         }],
     }
     assert len(merge_skillforge_evidence_into_review_plan(old,fake)['review_packets'])==1
@@ -321,3 +328,186 @@ def test_coder_scheduler_gaps_appear_only_in_nonexecuting_owner_review(tmp_path)
     assert receipt['independently_verified_code_implementations']==0
     assert receipt['auto_dispatch_eligible'] is False
     assert receipt['approved_for_implementation'] is False
+
+
+@pytest.mark.parametrize(('error','code'),[
+    ('HermesControlError: OmniRoute has no healthy eligible zero-cost Hermes mode',
+     'NO_HEALTHY_ELIGIBLE_MODEL_ROUTE'),
+    ('RuntimeError:model_provider_not_configured','MODEL_PROVIDER_NOT_CONFIGURED'),
+    ('PolicyError:path escapes workspace','WORKSPACE_PATH_POLICY_REJECTION'),
+    ('UnexpectedError: private-internal-detail-not-to-disclose',
+     'OTHER_FAILED_CODER_PLAN_JOB'),
+])
+def test_original_failed_plan_job_is_reviewed_not_counted_as_success(tmp_path,error,code):
+    done_path,task,completed=coder_receipts(tmp_path)
+    failed=completed.parent.parent/'failed'/completed.name
+    failed.parent.mkdir(parents=True,exist_ok=True)
+    job=json.loads(completed.read_text())
+    job['status']='FAILED'
+    job['error']=error
+    job['result']={'production_mutation':False}
+    failed.write_text(json.dumps(job))
+    completed.unlink()
+    row=family(review_independent_skill_evidence(tmp_path))
+    assert row['original_coder_plan_scheduler_pairs_correlated']==0
+    assert row['original_coder_plan_jobs_failed']==1
+    assert row['original_coder_plan_scheduler_pairs_uncorrelated']==0
+    assert row['original_coder_plan_failure_reason_counts']=={code:1}
+    assert row['independently_verified_code_implementations']==0
+    assert 'private-internal-detail' not in json.dumps(row)
+
+
+def test_duplicate_terminal_statuses_are_ambiguous_not_counted(tmp_path):
+    _,task,completed=coder_receipts(tmp_path)
+    failed=completed.parent.parent/'failed'/completed.name
+    failed.parent.mkdir(parents=True,exist_ok=True)
+    job=json.loads(completed.read_text())
+    job['status']='FAILED';job['error']='RuntimeError:model_provider_not_configured'
+    failed.write_text(json.dumps(job))
+    row=family(review_independent_skill_evidence(tmp_path))
+    assert row['original_coder_plan_scheduler_pairs_correlated']==0
+    assert row['original_coder_plan_jobs_failed']==0
+    assert row['original_coder_plan_scheduler_pairs_uncorrelated']==1
+
+
+def test_failed_job_wrong_work_id_is_not_correlated(tmp_path):
+    _,task,completed=coder_receipts(tmp_path)
+    failed=completed.parent.parent/'failed'/completed.name
+    failed.parent.mkdir(parents=True,exist_ok=True)
+    job=json.loads(completed.read_text())
+    job['status']='FAILED'
+    job['error']='RuntimeError:model_provider_not_configured'
+    job['payload']['department_work_id']='dept_work_'+'a'*24
+    failed.write_text(json.dumps(job))
+    completed.unlink()
+    row=family(review_independent_skill_evidence(tmp_path))
+    assert row['original_coder_plan_jobs_failed']==0
+    assert row['original_coder_plan_scheduler_pairs_uncorrelated']==1
+
+
+def test_failed_jobs_are_visible_in_existing_review_without_promotion(tmp_path):
+    from empire_os.system_improvement_review import refresh_review_packets
+    _empty_resolution(tmp_path)
+    coder_receipts(tmp_path,number=1)
+    _,task,completed=coder_receipts(tmp_path,number=2)
+    failed=completed.parent.parent/'failed'/completed.name
+    failed.parent.mkdir(parents=True,exist_ok=True)
+    job=json.loads(completed.read_text())
+    job['status']='FAILED'
+    job['error']='PolicyError:path escapes workspace'
+    job['result']={'production_mutation':False}
+    failed.write_text(json.dumps(job));completed.unlink()
+    data=refresh_review_packets(tmp_path)
+    rows=[x for x in data['packets'] if x['type']=='SKILLFORGE_ORIGINAL_PROVENANCE_REVIEW']
+    assert len(rows)==1
+    review=json.loads((tmp_path/rows[0]['path']).read_text())
+    assert review['canonical_done_observation_count']==2
+    assert review['original_coder_plan_scheduler_pairs_correlated']==1
+    assert review['original_coder_plan_jobs_failed']==1
+    assert review['original_coder_plan_scheduler_pairs_uncorrelated']==0
+    assert review['original_coder_plan_failure_reason_counts']=={
+        'WORKSPACE_PATH_POLICY_REJECTION':1}
+    assert review['department_done_is_not_coder_job_success'] is True
+    assert review['approved_for_implementation'] is False
+    assert review['auto_dispatch_eligible'] is False
+
+
+def _write_downstream_verification(root, source_number, *, verify_number,
+                                   state='completed', verdict='PASS'):
+    """Original scheduler receipts, synthetic for contract testing only."""
+    work,_,job=coder_receipts(root,number=source_number)
+    source_job=json.loads(job.read_text())
+    verify_id='coder_job_'+f'{verify_number:032x}'
+    output=root/'runtime/coder/jobs'/state/f'{verify_id}.json'
+    output.parent.mkdir(parents=True,exist_ok=True)
+    payload={
+        'source_plan_job_id':source_job['id'],
+        'source_plan_task_id':source_job['task_id'],
+        'department_work_id':json.loads(work.read_text())['id'],
+        'execution_authority':'none',
+    }
+    completed=state=='completed'
+    output.write_text(json.dumps({
+        'id':verify_id,'task_id':source_job['task_id'],'kind':'VERIFY',
+        'status':'COMPLETED' if completed else 'FAILED',
+        'error':None if completed else 'RuntimeError:verification_job_failed',
+        'payload':payload,
+        'result':({
+            'production_mutation':False,'execution_authority':'none',
+            'external_execution_performed':False,
+            'verification':{'verdict':verdict,'checks':[]},
+        } if completed else {}),
+    }))
+    return output
+
+
+def test_original_coder_verification_verdicts_are_review_only(tmp_path):
+    from empire_os.system_improvement_review import refresh_review_packets
+    _empty_resolution(tmp_path)
+    _write_downstream_verification(tmp_path,1,verify_number=301,verdict='PASS')
+    _write_downstream_verification(tmp_path,2,verify_number=302,verdict='FAIL')
+    _write_downstream_verification(tmp_path,3,verify_number=303,state='failed')
+    review=review_independent_skill_evidence(tmp_path)
+    row=family(review)
+    assert row['original_coder_plan_scheduler_pairs_correlated']==3
+    counts=row['downstream_coder_verify_jobs']
+    assert counts=={
+        'completed_verify_job_receipts':2,
+        'completed_verify_report_pass':1,
+        'completed_verify_report_fail':1,
+        'failed_verify_job_receipts':1,
+        'untrusted_or_inconsistent_verify_job_receipts':0,
+    }
+    assert row['independently_verified_code_implementations']==0
+    out=refresh_review_packets(tmp_path)
+    matches=[i for i in out['packets'] if i['type']=='SKILLFORGE_ORIGINAL_PROVENANCE_REVIEW']
+    assert len(matches)==1
+    payload=json.loads((tmp_path/matches[0]['path']).read_text())
+    assert payload['downstream_coder_verify_jobs']==counts
+    assert payload['verify_report_pass_is_not_independent_outcome_proof'] is True
+    assert payload['approved_for_implementation'] is False
+    assert payload['auto_dispatch_eligible'] is False
+
+
+def test_wrong_coder_verification_promotion_identity_is_not_success(tmp_path):
+    job=_write_downstream_verification(tmp_path,1,verify_number=306)
+    j=json.loads(job.read_text());j['payload']['department_work_id']='dept_work_'+'a'*24
+    job.write_text(json.dumps(j))
+    row=family(review_independent_skill_evidence(tmp_path))
+    assert row['downstream_coder_verify_jobs']['completed_verify_report_pass']==0
+    assert row['downstream_coder_verify_jobs']['untrusted_or_inconsistent_verify_job_receipts']==1
+
+
+def test_verify_report_without_real_checklist_is_counted_as_report_not_proof(tmp_path):
+    job=_write_downstream_verification(tmp_path,1,verify_number=310)
+    j=json.loads(job.read_text());j['result']['verification']['checks']='not-a-list'
+    job.write_text(json.dumps(j))
+    row=family(review_independent_skill_evidence(tmp_path))
+    assert row['downstream_coder_verify_jobs']['completed_verify_report_pass']==0
+    assert row['downstream_coder_verify_jobs']['untrusted_or_inconsistent_verify_job_receipts']==1
+    assert row['independently_verified_code_implementations']==0
+
+
+def test_duplicate_terminal_verify_receipts_never_count_as_pass(tmp_path):
+    completed=_write_downstream_verification(tmp_path,1,verify_number=401)
+    failed=completed.parent.parent/'failed'/completed.name
+    failed.parent.mkdir(parents=True,exist_ok=True)
+    record=json.loads(completed.read_text())
+    record['status']='FAILED'
+    record['error']='RuntimeError:failed after retry'
+    failed.write_text(json.dumps(record))
+    outcomes=family(review_independent_skill_evidence(tmp_path))['downstream_coder_verify_jobs']
+    assert outcomes['completed_verify_report_pass']==0
+    assert outcomes['untrusted_or_inconsistent_verify_job_receipts']>=1
+    assert outcomes['failed_verify_job_receipts']==0
+
+
+def test_malformed_verify_source_identifier_cannot_break_review(tmp_path):
+    record=_write_downstream_verification(tmp_path,1,verify_number=402)
+    value=json.loads(record.read_text())
+    value['payload']['source_plan_job_id']=['not-a-string']
+    record.write_text(json.dumps(value))
+    output=review_independent_skill_evidence(tmp_path)
+    assert output['status']=='SOURCE_DIVERSITY_REVIEW_ONLY'
+    assert family(output)['downstream_coder_verify_jobs']['completed_verify_report_pass']==0
+    assert output['promotion_ready_skill_count']==0

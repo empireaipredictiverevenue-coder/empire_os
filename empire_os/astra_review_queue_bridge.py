@@ -116,6 +116,7 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
         or source.get('raw_identifiers_disclosed') is not False
         or source.get('automatic_promotion') is not False
         or source.get('inventory_truncated') is not False
+        or source.get('coder_downstream_job_inventory_incomplete') is not False
         or source.get('original_skillforge_invalid_observations')!=0
         or source.get('second_read_rejected_observations')!=0):
         raise ValueError('unsafe or incomplete SkillForge provenance review')
@@ -143,14 +144,49 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             raise ValueError('untrusted SkillForge candidate evidence')
         correlated=family.get('original_coder_plan_scheduler_pairs_correlated',0)
         uncorrelated=family.get('original_coder_plan_scheduler_pairs_uncorrelated',0)
+        failed=family.get('original_coder_plan_jobs_failed',0)
+        failure_reasons=family.get('original_coder_plan_failure_reason_counts',{})
         if (type(correlated) is not int or type(uncorrelated) is not int
-            or correlated<0 or uncorrelated<0
-            or correlated+uncorrelated>(count)
+            or type(failed) is not int
+            or correlated<0 or uncorrelated<0 or failed<0
+            or correlated+uncorrelated+failed>(count)
             or family.get('independently_verified_code_implementations',0)!=0):
             raise ValueError('untrusted Coder scheduler evidence count')
         if (component=='empire_coder'
-            and correlated+uncorrelated != count):
+            and correlated+uncorrelated+failed != count):
             raise ValueError('incomplete Coder scheduler observation audit')
+        allowed_failure_codes={
+            'NO_HEALTHY_ELIGIBLE_MODEL_ROUTE',
+            'MODEL_PROVIDER_NOT_CONFIGURED',
+            'WORKSPACE_PATH_POLICY_REJECTION',
+            'OTHER_FAILED_CODER_PLAN_JOB',
+        }
+        downstream=family.get('downstream_coder_verify_jobs')
+        required_outcome_keys={
+            'completed_verify_job_receipts',
+            'completed_verify_report_pass',
+            'completed_verify_report_fail',
+            'failed_verify_job_receipts',
+            'untrusted_or_inconsistent_verify_job_receipts',
+        }
+        if (not isinstance(downstream,Mapping)
+            or set(downstream)!=required_outcome_keys
+            or any(type(value) is not int or value<0 or value>15000
+                   for value in downstream.values())
+            or (downstream['completed_verify_report_pass']+
+                downstream['completed_verify_report_fail'] !=
+                downstream['completed_verify_job_receipts'])
+            or family.get('verify_report_pass_is_not_independent_outcome_proof') is not True):
+            raise ValueError('untrusted original Coder VERIFY evidence')
+        if (component!='empire_coder'
+            and (correlated or uncorrelated or failed or any(downstream.values()))):
+            raise ValueError('Coder-only evidence on unrelated skill family')
+        if (not isinstance(failure_reasons,Mapping)
+            or len(failure_reasons)>4
+            or any(code not in allowed_failure_codes or type(n) is not int
+                   or n<1 for code,n in failure_reasons.items())
+            or sum(failure_reasons.values())!=failed):
+            raise ValueError('untrusted Coder PLAN job failure diagnosis')
         if count<2:continue
         key='skillforge|provenance|'+component+'|'+adapter
         item={
@@ -164,6 +200,11 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'distinct_evidence_reference_string_count':refs,
             'original_coder_plan_scheduler_pairs_correlated':correlated,
             'original_coder_plan_scheduler_pairs_uncorrelated':uncorrelated,
+            'original_coder_plan_jobs_failed':failed,
+            'original_coder_plan_failure_reason_counts':dict(sorted(failure_reasons.items())),
+            'department_done_is_not_coder_job_success':True,
+            'downstream_coder_verify_jobs':dict(downstream),
+            'verify_report_pass_is_not_independent_outcome_proof':True,
             'independently_verified_code_implementations':0,
             'source_schema':source['schema_version'],
             'next_review_action':(

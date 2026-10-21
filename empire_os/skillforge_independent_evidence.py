@@ -19,6 +19,7 @@ from empire_os.skillforge_learning import (
 
 MAX_OBSERVATIONS = 5000
 MAX_OBSERVATION_BYTES = 64_000
+MAX_CODER_JOB_RECEIPTS = 15000
 CODER_TASK_ID = re.compile(r"^coder_[0-9a-f]{32}$")
 CODER_JOB_ID = re.compile(r"^coder_job_[0-9a-f]{32}$")
 
@@ -37,17 +38,24 @@ def _read_safe(path: Path, limit: int) -> dict[str, Any]:
 
 
 
-def _correlate_original_coder_plan(root: Path, work: dict[str, Any],
-                                   refs: list[str]) -> bool:
-    """Link a Department DONE observation to original Coder scheduler files.
+def _coder_failed_reason(error: str) -> str:
+    """Bounded non-sensitive classification: never emit freeform error text."""
+    if error.startswith("HermesControlError: OmniRoute has no healthy eligible zero-cost Hermes mode"):
+        return "NO_HEALTHY_ELIGIBLE_MODEL_ROUTE"
+    if error.startswith("RuntimeError:model_provider_not_configured"):
+        return "MODEL_PROVIDER_NOT_CONFIGURED"
+    if error.startswith("PolicyError:path escapes workspace"):
+        return "WORKSPACE_PATH_POLICY_REJECTION"
+    return "OTHER_FAILED_CODER_PLAN_JOB"
 
-    This proves only a matched local PLAN task/job receipt. It explicitly
-    does not prove generated code executed, a valid patch, agent quality, or
-    independent business outcome.
-    """
+
+def _correlate_original_coder_plan(root: Path, work: dict[str, Any],
+                                   refs: list[str]) -> tuple[str, str | None]:
+    """Identify local PLAN job receipts, including failures, not code outcomes."""
     result=work["result"]
     task_id=result.get("coder_task_id")
     job_id=result.get("coder_job_id")
+    unresolved=("UNRESOLVED_CODER_PLAN_JOB", None)
     if (not isinstance(task_id,str) or not CODER_TASK_ID.fullmatch(task_id)
             or not isinstance(job_id,str) or not CODER_JOB_ID.fullmatch(job_id)
             or set(refs)!={f"coder_task:{task_id}",f"coder_job:{job_id}"}
@@ -55,34 +63,138 @@ def _correlate_original_coder_plan(root: Path, work: dict[str, Any],
             or result.get("implementation_performed") is not False
             or result.get("external_execution_performed") is not False
             or result.get("execution_authority")!="none"):
-        return False
+        return unresolved
     task_path=root/"runtime/coder/tasks"/(task_id+".json")
-    job_path=root/"runtime/coder/jobs/completed"/(job_id+".json")
+    completed_path=root/"runtime/coder/jobs/completed"/(job_id+".json")
+    failed_path=root/"runtime/coder/jobs/failed"/(job_id+".json")
+    # Duplicated receipts in both terminal directories cannot be trusted.
+    if completed_path.exists() and failed_path.exists():
+        return unresolved
+    is_completed=completed_path.is_file() and not completed_path.is_symlink()
+    is_failed=failed_path.is_file() and not failed_path.is_symlink()
+    if not (is_completed or is_failed):
+        return unresolved
     try:
         task=_read_safe(task_path,MAX_RECORD)
-        job=_read_safe(job_path,MAX_RECORD)
+        job=_read_safe(completed_path if is_completed else failed_path,MAX_RECORD)
     except (OSError,ValueError,UnicodeError,TypeError):
-        return False
+        return unresolved
     payload=job.get("payload")
     job_result=job.get("result")
-    return (
+    if not (
         task.get("id")==task_id and
         job.get("id")==job_id and
         job.get("task_id")==task_id and
-        job.get("status")=="COMPLETED" and
         job.get("kind")=="PLAN" and
-        job.get("error") is None and
         isinstance(payload,dict) and
         payload.get("department_work_id")==work.get("id") and
         payload.get("execution_authority")=="none" and
-        isinstance(job_result,dict) and
-        job_result.get("execution_authority")=="none" and
-        job_result.get("external_execution_performed") is False and
-        job_result.get("production_mutation") is False
-    )
+        isinstance(job_result,dict)
+    ):
+        return unresolved
+    if is_completed:
+        if (job.get("status")=="COMPLETED"
+            and job.get("error") is None
+            and job_result.get("execution_authority")=="none"
+            and job_result.get("external_execution_performed") is False
+            and job_result.get("production_mutation") is False):
+            return ("COMPLETED_CODER_PLAN_JOB",None)
+        return unresolved
+    error=job.get("error")
+    if (is_failed and job.get("status")=="FAILED"
+        and isinstance(error,str) and 0<len(error)<=10_000
+        and job_result.get("execution_authority") in (None,"none")
+        and job_result.get("external_execution_performed") is not True
+        and job_result.get("production_mutation") is not True):
+        return ("FAILED_CODER_PLAN_JOB",_coder_failed_reason(error))
+    return unresolved
+
+
+def _verify_coder_job_outcome(root: Path, expected_plans: dict[str, tuple[str,str]]
+                              ) -> tuple[dict[str,int], bool]:
+    """Bounded original VERIFY job linkage. A PASS is not independent proof."""
+    counts={
+        "completed_verify_job_receipts":0,
+        "completed_verify_report_pass":0,
+        "completed_verify_report_fail":0,
+        "failed_verify_job_receipts":0,
+        "untrusted_or_inconsistent_verify_job_receipts":0,
+    }
+    if not expected_plans:
+        return counts,False
+    root_jobs=root/"runtime/coder/jobs"
+    if root_jobs.is_symlink():
+        return counts,True
+    seen_jobs:set[str]=set()
+    inspected=0
+    incomplete=False
+    for state in ("completed","failed"):
+        folder=root_jobs/state
+        if folder.is_symlink():
+            incomplete=True
+            continue
+        if not folder.is_dir():
+            continue
+        for path in folder.glob("coder_job_*.json"):
+            inspected+=1
+            if inspected>MAX_CODER_JOB_RECEIPTS:
+                return counts,True
+            # Reject unreadable/unsafe receipts without interpreting content.
+            try:
+                job=_read_safe(path,MAX_RECORD)
+            except (OSError,ValueError,UnicodeError,TypeError):
+                incomplete=True
+                continue
+            payload=job.get("payload")
+            if not isinstance(payload,dict):
+                continue
+            source=payload.get("source_plan_job_id")
+            if (not isinstance(source,str) or source not in expected_plans
+                or job.get("kind")!="VERIFY"):
+                continue
+            task,work=expected_plans[source]
+            job_id=job.get("id")
+            if (not isinstance(job_id,str) or not CODER_JOB_ID.fullmatch(job_id)
+                or path.stem!=job_id or job_id in seen_jobs
+                or job.get("task_id")!=task
+                or payload.get("source_plan_task_id")!=task
+                or payload.get("department_work_id")!=work
+                or payload.get("execution_authority")!="none"):
+                counts["untrusted_or_inconsistent_verify_job_receipts"]+=1
+                continue
+            seen_jobs.add(job_id)
+            other_dir="failed" if state=="completed" else "completed"
+            # A contradictory terminal receipt cannot count as a PASS,
+            # regardless of which directory is traversed first.
+            if (root_jobs/other_dir/(job_id+".json")).exists():
+                counts["untrusted_or_inconsistent_verify_job_receipts"]+=1
+                continue
+            if state=="failed":
+                if job.get("status")=="FAILED":
+                    counts["failed_verify_job_receipts"]+=1
+                else:
+                    counts["untrusted_or_inconsistent_verify_job_receipts"]+=1
+                continue
+            result=job.get("result")
+            check=result.get("verification") if isinstance(result,dict) else None
+            verdict=check.get("verdict") if isinstance(check,dict) else None
+            if (job.get("status")!="COMPLETED" or job.get("error") is not None
+                or not isinstance(result,dict)
+                or result.get("production_mutation") is not False
+                or result.get("external_execution_performed") is True
+                or result.get("execution_authority") not in (None,"none")
+                or not isinstance(check,dict)
+                or not isinstance(check.get("checks"),list)
+                or verdict not in ("PASS","FAIL")):
+                counts["untrusted_or_inconsistent_verify_job_receipts"]+=1
+                continue
+            counts["completed_verify_job_receipts"]+=1
+            counts["completed_verify_report_pass"]+=int(verdict=="PASS")
+            counts["completed_verify_report_fail"]+=int(verdict=="FAIL")
+    return counts,incomplete
 
 def _source_context(root: Path, row: dict[str, str],
-                    indexed_done: dict[str, Path]) -> tuple[tuple[str, ...], dict[str, str], bool]:
+                    indexed_done: dict[str, Path]) -> tuple[tuple[str, ...], dict[str, str], tuple[str, str | None], tuple[str,str,str] | None]:
     # The existing SkillForge auditor already validated the candidate against
     # the original DONE work. Recheck the immutable-looking content during this
     # second read rather than trusting an index entry which may have changed.
@@ -116,13 +228,22 @@ def _source_context(root: Path, row: dict[str, str],
         # publish counts, never names, identities, work ids, or raw references.
         if isinstance(value,str) and value.strip() and len(value)<=512:
             context[field]=_sha(value)
-    linked = (
+    coder_outcome = (
         _correlate_original_coder_plan(root,work,refs)
         if row["component"]=="empire_coder"
            and row["adapter"]=="empire_coder_plan_bridge"
-        else False
+        else ("NOT_CODER",None)
     )
-    return tuple(hashes),context,linked
+    plan_link=None
+    if (row["component"]=="empire_coder"
+        and row["adapter"]=="empire_coder_plan_bridge"
+        and coder_outcome[0]=="COMPLETED_CODER_PLAN_JOB"):
+        plan_link=(
+            result["coder_job_id"],
+            result["coder_task_id"],
+            work["id"],
+        )
+    return tuple(hashes),context,coder_outcome,plan_link
 
 
 def review_independent_skill_evidence(root: str | Path, *,
@@ -151,11 +272,14 @@ def review_independent_skill_evidence(root: str | Path, *,
                  "workers":set(),"work_sources":set(),"missing_plan_count":0,
                  "missing_worker_count":0,
                  "coder_plan_scheduler_correlated":0,
-                 "coder_plan_scheduler_uncorrelated":0})
+                 "coder_plan_scheduler_uncorrelated":0,
+                 "coder_plan_scheduler_failed":0,
+                 "coder_plan_failure_reasons":defaultdict(int),
+                 "coder_completed_plan_job_sources":{}})
     rejected=0
     for row in validated:
         try:
-            ref_hashes,ctx,coder_scheduler_linked=_source_context(root,row,work_index)
+            ref_hashes,ctx,(coder_state,coder_reason),plan_link=_source_context(root,row,work_index)
         except (OSError,ValueError,UnicodeError,TypeError,OverflowError):
             rejected+=1
             continue
@@ -165,8 +289,14 @@ def review_independent_skill_evidence(root: str | Path, *,
         data["work_sources"].add(row["source_work_sha256"])
         data["refs"].update(ref_hashes)
         if key==("empire_coder","empire_coder_plan_bridge"):
-            data["coder_plan_scheduler_correlated"]+=int(coder_scheduler_linked)
-            data["coder_plan_scheduler_uncorrelated"]+=int(not coder_scheduler_linked)
+            data["coder_plan_scheduler_correlated"]+=int(coder_state=="COMPLETED_CODER_PLAN_JOB")
+            data["coder_plan_scheduler_failed"]+=int(coder_state=="FAILED_CODER_PLAN_JOB")
+            data["coder_plan_scheduler_uncorrelated"]+=int(coder_state=="UNRESOLVED_CODER_PLAN_JOB")
+            if coder_state=="FAILED_CODER_PLAN_JOB" and coder_reason is not None:
+                data["coder_plan_failure_reasons"][coder_reason]+=1
+            if plan_link is not None:
+                job_id,task_id,work_id=plan_link
+                data["coder_completed_plan_job_sources"][job_id]=(task_id,work_id)
         for name,bucket in (("plan_id","plans"),("goal_key","goals"),("worker_id","workers")):
             if name in ctx:
                 data[bucket].add(ctx[name])
@@ -175,6 +305,14 @@ def review_independent_skill_evidence(root: str | Path, *,
             elif name=="worker_id":
                 data["missing_worker_count"]+=1
 
+    # Downstream VERIFY work is advisory evidence only, not implementation.
+    coder_jobs_incomplete=False
+    for key,group in groups.items():
+        if key!=("empire_coder","empire_coder_plan_bridge"):
+            continue
+        counts,coder_jobs_incomplete=_verify_coder_job_outcome(
+            root,group["coder_completed_plan_job_sources"])
+        group["downstream_verify_receipts"]=counts
     families=[]
     for (component,adapter),data in sorted(groups.items()):
         distinct=len(data["refs"])
@@ -190,8 +328,19 @@ def review_independent_skill_evidence(root: str | Path, *,
             "missing_worker_context_count":data["missing_worker_count"],
             "original_coder_plan_scheduler_pairs_correlated":data["coder_plan_scheduler_correlated"],
             "original_coder_plan_scheduler_pairs_uncorrelated":data["coder_plan_scheduler_uncorrelated"],
+            "original_coder_plan_jobs_failed":data["coder_plan_scheduler_failed"],
+            "original_coder_plan_failure_reason_counts":dict(sorted(data["coder_plan_failure_reasons"].items())),
+            "department_done_is_not_coder_job_success":True,
             "coder_plan_scheduler_correlation_is_not_implementation_proof":True,
             "independently_verified_code_implementations":0,
+            "downstream_coder_verify_jobs":dict(data.get("downstream_verify_receipts") or {
+                "completed_verify_job_receipts":0,
+                "completed_verify_report_pass":0,
+                "completed_verify_report_fail":0,
+                "failed_verify_job_receipts":0,
+                "untrusted_or_inconsistent_verify_job_receipts":0,
+            }),
+            "verify_report_pass_is_not_independent_outcome_proof":True,
             "reference_diversity_status":(
                 "REUSED_SINGLE_REFERENCE_STRING" if distinct<=1
                 else "MULTIPLE_REFERENCE_STRINGS_CUSTODY_UNVERIFIED"),
@@ -203,7 +352,8 @@ def review_independent_skill_evidence(root: str | Path, *,
         }
         families.append(family)
 
-    audit_complete=invalid==0 and rejected==0 and truncated==0
+    audit_complete=(invalid==0 and rejected==0 and truncated==0
+                    and not coder_jobs_incomplete)
     return {
         "schema_version":"empire.skillforge.independent_evidence_review.v1",
         "mode":"OBSERVE","status":(
@@ -213,6 +363,7 @@ def review_independent_skill_evidence(root: str | Path, *,
         "original_skillforge_invalid_observations":invalid,
         "second_read_rejected_observations":rejected,
         "inventory_truncated":bool(truncated),
+        "coder_downstream_job_inventory_incomplete":bool(coder_jobs_incomplete),
         "family_count":len(families),
         "families_with_single_shared_reference":sum(
             x["reference_diversity_status"]=="REUSED_SINGLE_REFERENCE_STRING"
