@@ -39,3 +39,7 @@ def test_installer_rolls_back_guarded_only_and_never_promotes_customers():
     assert "CREATE ROLE" not in source
     assert "EMPIREDB_TENANT_OUTCOME_READER_DSN" not in source
     assert "--apply-owner-approved-observe" in source
+    # Do not clear rollback until the timer itself is active again.
+    assert (source.rfind("systemctl start empire-predictive-intelligence.timer")
+            < source.rfind("rollback_needed=0"))
+    assert "ActiveState --value)\" == 'active'" in source

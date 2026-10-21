@@ -139,9 +139,11 @@ assert data.get("probability_ready_product_count") == 0
 assert data.get("execution_authority") == "none"
 print("GUARDED_PREDICTIVE_REFRESH_SOURCE_ADMISSION_VERIFIED")
 PY
-rollback_needed=0
 systemctl start empire-predictive-intelligence.timer
 timer_stopped=0
+# Complete only when the original recurring refresh timer is active again.
+[[ "$(systemctl show empire-predictive-intelligence.timer -p ActiveState --value)" == 'active' ]]
+rollback_needed=0
 echo "PINNED_GUARDED_REFRESH_DEPLOYED=$SOURCE_SHA"
 echo "ROLLBACK_SERVICE_DROPIN=$DROPIN"
 echo "BEFORE_DEPLOY_RUNTIME_BACKUP=$backup_dir/latest.json"
