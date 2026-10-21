@@ -1,0 +1,112 @@
+{
+  "database_writes": false,
+  "editorial_signoffs": 0,
+  "original_html_observed": 3,
+  "original_json_metadata_observed": 1,
+  "outbound_authorized": false,
+  "rows": [
+    {
+      "anchored_passage_count": 4,
+      "body_bytes": 95354,
+      "body_sha256": "dab450008c04712190d0ff51e942017d3f199c60559a3ce8070fc5b309f5e921",
+      "bounded_passage_previews": [
+        "",
+        ""
+      ],
+      "buyer_intent_verified": false,
+      "customer_delivery_authorized": false,
+      "fetch_status": "ORIGINAL_HTML_OBSERVED_NOT_ADMITTED",
+      "label": "GB_roof_compliance",
+      "market": "GB",
+      "observed_at_utc": "2026-10-21T21:05:15.149033+00:00",
+      "original_source_admitted": false,
+      "reuse_rights_verified": false,
+      "source_url": "https://www.gov.uk/building-regulations-approval/when-you-need-approval",
+      "title": "Building regulations approval: When you need approval - GOV.UK"
+    },
+    {
+      "anchored_passage_count": 3,
+      "body_bytes": 128230,
+      "body_sha256": "b59524e97b62d034748d446d15deb70b76ff18c80cd316fb77c0cc8e92e9514d",
+      "bounded_passage_previews": [
+        "",
+        ""
+      ],
+      "buyer_intent_verified": false,
+      "customer_delivery_authorized": false,
+      "fetch_status": "ORIGINAL_HTML_OBSERVED_NOT_ADMITTED",
+      "label": "GB_competent_schemes",
+      "market": "GB",
+      "observed_at_utc": "2026-10-21T21:05:15.316672+00:00",
+      "original_source_admitted": false,
+      "reuse_rights_verified": false,
+      "source_url": "https://www.gov.uk/guidance/competent-person-scheme-current-schemes-and-how-schemes-are-authorised",
+      "title": "Competent person scheme - current schemes and how schemes are authorised - GOV.UK"
+    },
+    {
+      "buyer_intent_verified": false,
+      "customer_delivery_authorized": false,
+      "fetch_status": "ORIGINAL_HTML_NOT_ACCESSIBLE_IN_EXACT_URL_PREFLIGHT",
+      "label": "GB_Birmingham_planning",
+      "market": "GB",
+      "observed_at_utc": "2026-10-21T21:05:15.685329+00:00",
+      "original_source_admitted": false,
+      "reason": "HTTPError",
+      "reuse_rights_verified": false,
+      "source_url": "https://www.birmingham.gov.uk/info/20160/planning_applications/22/planning_online"
+    },
+    {
+      "buyer_intent_verified": false,
+      "customer_delivery_authorized": false,
+      "fetch_status": "ORIGINAL_HTML_NOT_ACCESSIBLE_IN_EXACT_URL_PREFLIGHT",
+      "label": "US_Chicago_permits",
+      "market": "US",
+      "observed_at_utc": "2026-10-21T21:05:16.225730+00:00",
+      "original_source_admitted": false,
+      "reason": "ValueError",
+      "reuse_rights_verified": false,
+      "source_url": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu/data?no_mobile=true"
+    },
+    {
+      "body_bytes": 186298,
+      "body_sha256": "143be19bcdb192534f8058ec9316705d135ae0dd2b60a991c36325a362e0b7f1",
+      "buyer_intent_verified": false,
+      "customer_delivery_authorized": false,
+      "fetch_status": "ORIGINAL_HTML_OBSERVED_NOT_ADMITTED",
+      "label": "GB_roof_planning_portal",
+      "market": "GB",
+      "observed_at_utc": "2026-10-21T21:05:59.797613+00:00",
+      "original_source_admitted": false,
+      "reuse_rights_verified": false,
+      "source_url": "https://www.planningportal.co.uk/permission/common-projects/roof/roof-planning-permission/",
+      "title": "Roof - Planning Permission - Roof - Planning Portal"
+    },
+    {
+      "body_bytes": 214344,
+      "body_sha256": "ca3cefb51746a3c187a2816a18fd15b24f9cb8631c7f9d70d3758b41bb8c30cb",
+      "buyer_intent_verified": false,
+      "column_count": 122,
+      "customer_delivery_authorized": false,
+      "dataset_id": "ydr8-5enu",
+      "dataset_name": "Building Permits",
+      "fetch_status": "ORIGINAL_JSON_METADATA_OBSERVED_NOT_ADMITTED",
+      "label": "US_Chicago_official_metadata",
+      "market": "US",
+      "metadata_fields": [
+        "id",
+        "name",
+        "columns"
+      ],
+      "observed_at_utc": "2026-10-21T21:06:00.010095+00:00",
+      "official_provider_label": "City of Chicago",
+      "original_source_admitted": false,
+      "record_rows_fetched": 0,
+      "reuse_rights_verified": false,
+      "source_url": "https://data.cityofchicago.org/api/views/ydr8-5enu.json"
+    }
+  ],
+  "schema": "empire.research.public_primary_candidate_preflight.v1",
+  "source_count": 6,
+  "source_rights_approved": 0,
+  "status": "PRIMARY_SOURCE_CANDIDATE_INSPECTION_NOT_ADMISSION"
+}
