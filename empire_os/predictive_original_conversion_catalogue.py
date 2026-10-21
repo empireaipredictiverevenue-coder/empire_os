@@ -29,7 +29,7 @@ EXPECTED_COLS = frozenset((
 ))
 OBJECT_SQL = """
 SELECT pg_catalog.to_regclass('public.original_conversion_predictions') IS NOT NULL,
-       pg_catalog.to_regprocedure('public.record_original_conversion_prediction_v1(text,text,jsonb,text)') IS NOT NULL,
+       pg_catalog.to_regprocedure('public.record_original_conversion_prediction_v1(text,text,text,text)') IS NOT NULL,
        pg_catalog.to_regprocedure('public.read_original_conversion_prediction_v1(text,text)') IS NOT NULL,
        pg_catalog.to_regprocedure('public.reject_original_conversion_prediction_change_v1()') IS NOT NULL
 """.strip()
@@ -69,7 +69,7 @@ SELECT p.proname::text, p.prosecdef, p.provolatile::text,
        pg_catalog.has_function_privilege(current_user,p.oid,'EXECUTE')
 FROM pg_catalog.pg_proc p
 WHERE p.oid=ANY(ARRAY[
-    pg_catalog.to_regprocedure('public.record_original_conversion_prediction_v1(text,text,jsonb,text)'),
+    pg_catalog.to_regprocedure('public.record_original_conversion_prediction_v1(text,text,text,text)'),
     pg_catalog.to_regprocedure('public.read_original_conversion_prediction_v1(text,text)'),
     pg_catalog.to_regprocedure('public.reject_original_conversion_prediction_change_v1()')
 ]::oid[])

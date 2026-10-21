@@ -140,13 +140,18 @@ def main():
         # mismatches are rejected by PostgreSQL, not just Python preflight.
         import json
         from hashlib import sha256
-        def try_write(who, tenant, payload):
+        def try_write(who, tenant, payload, *, forged_hash=None, raw=None):
             with psycopg.connect(user_dsn(socket, who), autocommit=True) as db:
                 db.execute("SET ROLE empire_original_conversion_prediction_writer")
-                encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
-                digest = sha256(encoded.encode()).hexdigest()
+                encoded = raw if raw is not None else json.dumps(
+                    payload, sort_keys=True, separators=(",", ":")
+                )
+                digest = (
+                    forged_hash if forged_hash is not None
+                    else sha256(encoded.encode()).hexdigest()
+                )
                 return db.execute(
-                    "SELECT public.record_original_conversion_prediction_v1(%s,%s,%s::jsonb,%s)",
+                    "SELECT public.record_original_conversion_prediction_v1(%s,%s,%s::text,%s)",
                     (tenant, payload["prediction_ref"], encoded, digest)
                 ).fetchone()[0]
 
@@ -159,6 +164,17 @@ def main():
         changed["predicted_probability"] = .9
         denied(lambda: try_write("conv_test_a", TENANT_A, changed),
                "CONV_REG_IMMUTABLE_IDENTITY_COLLISION")
+        # A valid-looking 64-hex SHA supplied by an untrusted client must
+        # not be treated as evidence unless PostgreSQL hashes the raw bytes.
+        denied(lambda: try_write(
+            "conv_test_a", TENANT_A, candidate["proposed_prediction"],
+            forged_hash="f" * 64
+        ), "CONV_REG_CLIENT_HASH_MISMATCH")
+        denied(lambda: try_write(
+            "conv_test_a", TENANT_A, candidate["proposed_prediction"],
+            raw=" " * 32769
+        ), "CONV_REG_PAYLOAD_INVALID")
+        print("ISOLATED_RAW_CLIENT_HASH_VERIFICATION_PASS")
         too_old = dict(candidate["proposed_prediction"])
         too_old["predicted_at"] = (now-timedelta(minutes=10)).isoformat()
         denied(lambda: try_write("conv_test_a", TENANT_A, too_old),

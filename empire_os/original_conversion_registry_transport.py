@@ -18,7 +18,7 @@ from empire_os.original_conversion_registry import (
 
 WRITE_SQL = (
     "SELECT public.record_original_conversion_prediction_v1("
-    "%s,%s,%s::jsonb,%s)"
+    "%s,%s,%s::text,%s)"
 )
 READ_SQL = (
     "SELECT public.read_original_conversion_prediction_v1(%s,%s)"

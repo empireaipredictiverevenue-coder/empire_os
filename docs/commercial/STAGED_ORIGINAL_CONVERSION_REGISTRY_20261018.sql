@@ -20,7 +20,7 @@ BEGIN
   END IF;
   IF pg_catalog.to_regclass('public.original_conversion_predictions') IS NOT NULL
      OR pg_catalog.to_regprocedure(
-       'public.record_original_conversion_prediction_v1(text,text,jsonb,text)'
+       'public.record_original_conversion_prediction_v1(text,text,text,text)'
      ) IS NOT NULL
      OR pg_catalog.to_regprocedure(
        'public.read_original_conversion_prediction_v1(text,text)'
@@ -37,6 +37,30 @@ BEGIN
   END IF;
   IF pg_catalog.to_regprocedure('public.empire_current_tenant_id()') IS NULL THEN
     RAISE EXCEPTION 'CONV_REG_CANONICAL_TENANT_BINDING_MISSING';
+  END IF;
+  -- Production owner and tenant resolver must match EmpireDB migration 018;
+  -- role/scope drift needs DBA review rather than an opportunistic install.
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles
+    WHERE rolname='empiredb_migrator'
+      AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
+  ) THEN
+    RAISE EXCEPTION 'CONV_REG_MIGRATOR_AUTHORITY_DRIFT';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='service_role'
+  ) THEN
+    RAISE EXCEPTION 'CONV_REG_SERVICE_ROLE_INVENTORY_MISSING';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_catalog.pg_proc AS f
+    WHERE f.oid=pg_catalog.to_regprocedure(
+      'public.empire_current_tenant_id()'
+    )
+      AND f.prosecdef AND f.provolatile='s'
+      AND f.proowner='empiredb_migrator'::pg_catalog.regrole
+  ) THEN
+    RAISE EXCEPTION 'CONV_REG_TENANT_RESOLVER_AUTHORITY_DRIFT';
   END IF;
 
   CREATE ROLE empire_original_conversion_prediction_writer
@@ -126,7 +150,7 @@ FOR EACH STATEMENT EXECUTE FUNCTION public.reject_original_conversion_prediction
 CREATE FUNCTION public.record_original_conversion_prediction_v1(
   p_tenant text,
   p_prediction_ref text,
-  p_payload jsonb,
+  p_payload_text text,
   p_client_hash text
 )
 RETURNS jsonb
@@ -143,11 +167,27 @@ DECLARE
   evidence_total bigint;
   evidence_unique bigint;
   server_hash text;
+  p_payload jsonb;
+  computed_client_hash text;
 BEGIN
   IF current_tenant IS NULL OR p_tenant IS NULL
      OR p_tenant <> current_tenant::text THEN
     RAISE EXCEPTION 'CONV_REG_TENANT_NOT_AUTHENTICATED';
   END IF;
+  -- Verify the exact UTF-8 bytes supplied by the caller, BEFORE JSONB
+  -- reserialization. A valid 64-hex string by itself is not enough.
+  IF p_payload_text IS NULL
+     OR pg_catalog.octet_length(p_payload_text) NOT BETWEEN 2 AND 32768
+     OR p_client_hash !~ '^[0-9a-f]{64}$' THEN
+    RAISE EXCEPTION 'CONV_REG_PAYLOAD_INVALID';
+  END IF;
+  computed_client_hash := pg_catalog.encode(
+    pg_catalog.sha256(pg_catalog.convert_to(p_payload_text,'UTF8')), 'hex'
+  );
+  IF computed_client_hash IS DISTINCT FROM p_client_hash THEN
+    RAISE EXCEPTION 'CONV_REG_CLIENT_HASH_MISMATCH';
+  END IF;
+  p_payload := p_payload_text::jsonb;
   IF jsonb_typeof(p_payload) <> 'object'
      OR (SELECT pg_catalog.count(*) FROM jsonb_object_keys(p_payload))
         <> 10
@@ -155,7 +195,6 @@ BEGIN
      OR p_prediction_ref IS DISTINCT FROM p_payload->>'prediction_ref'
      OR p_tenant IS DISTINCT FROM p_payload->>'tenant_id'
      OR p_prediction_ref NOT LIKE 'conversion_prediction_candidate:%'
-     OR p_client_hash !~ '^[0-9a-f]{64}$'
      OR (p_payload->>'opportunity_key') IS NULL
      OR length(p_payload->>'opportunity_key') NOT BETWEEN 1 AND 128
      OR (p_payload->>'model_name') IS NULL
@@ -295,11 +334,11 @@ AS $$
 $$;
 
 REVOKE ALL ON FUNCTION public.record_original_conversion_prediction_v1(
-  text,text,jsonb,text) FROM PUBLIC;
+  text,text,text,text) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.read_original_conversion_prediction_v1(
   text,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.record_original_conversion_prediction_v1(
-  text,text,jsonb,text) TO empire_original_conversion_prediction_writer;
+  text,text,text,text) TO empire_original_conversion_prediction_writer;
 GRANT EXECUTE ON FUNCTION public.read_original_conversion_prediction_v1(
   text,text) TO empire_original_conversion_prediction_reader;
 -- NO grant of either NOLOGIN role to any runtime account; credentials remain
