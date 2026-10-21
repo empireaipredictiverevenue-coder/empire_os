@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { forwardedAccessAssertion, requestPrivateResearch } from "@/lib/founder-research-internal";
+import { notFound } from "next/navigation";
+import { forwardedAccessAssertion, isSshFounderResearchMode, requestPrivateResearch, sshFounderRequestIsLocal, sshFounderServerCredential } from "@/lib/founder-research-internal";
 import ResearchWorkbench from "./research-workbench";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +15,11 @@ type Catalog = {
 };
 
 export default async function FounderResearchPage() {
-  const assertion = forwardedAccessAssertion((await headers()).get("cf-access-jwt-assertion"));
+  const requestHeaders = await headers();
+  if (isSshFounderResearchMode() && !sshFounderRequestIsLocal(requestHeaders)) notFound();
+  const assertion = isSshFounderResearchMode()
+    ? sshFounderServerCredential(requestHeaders)
+    : forwardedAccessAssertion(requestHeaders.get("cf-access-jwt-assertion"));
   const answer = assertion ? await requestPrivateResearch("catalog", assertion) : null;
   const catalog = answer?.ok ? answer.data as Catalog : null;
   return <main className="min-h-screen bg-[#06101e] px-5 py-10 text-white lg:px-12">

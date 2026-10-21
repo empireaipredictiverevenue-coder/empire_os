@@ -1,4 +1,4 @@
-import { forwardedAccessAssertion, requestPrivateResearch } from "@/lib/founder-research-internal";
+import { forwardedAccessAssertion, isSshFounderResearchMode, requestPrivateResearch, sshFounderRequestIsLocal, sshFounderServerCredential } from "@/lib/founder-research-internal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,15 +14,23 @@ function json(body: object, status: number) {
 }
 
 export async function POST(request: Request) {
-  const canonicalOrigin = process.env.EMPIRE_FOUNDER_RESEARCH_ORIGIN;
-  if (!canonicalOrigin || !/^https:\/\/[-.a-z0-9]+$/.test(canonicalOrigin)) {
+  const isSsh = isSshFounderResearchMode();
+  if (isSsh && !sshFounderRequestIsLocal(request.headers)) {
+    return json({ detail: "Private SSH Founder Console only" }, 404);
+  }
+  const canonicalOrigin = isSsh
+    ? `http://${request.headers.get("host")}`
+    : process.env.EMPIRE_FOUNDER_RESEARCH_ORIGIN;
+  if (!canonicalOrigin || (!isSsh && !/^https:\/\/[-.a-z0-9]+$/.test(canonicalOrigin))) {
     return json({ detail: "Research origin not configured" }, 503);
   }
   if (request.headers.get("origin") !== canonicalOrigin ||
       request.headers.get("sec-fetch-site") !== "same-origin") {
     return json({ detail: "Cross-origin execution refused" }, 403);
   }
-  const bearer = forwardedAccessAssertion(request.headers.get("cf-access-jwt-assertion"));
+  const bearer = isSsh
+    ? sshFounderServerCredential(request.headers)
+    : forwardedAccessAssertion(request.headers.get("cf-access-jwt-assertion"));
   if (!bearer) return json({ detail: "Verified Founder session required" }, 401);
   if (request.headers.get("content-type")?.split(";")[0]?.trim() !== "application/json") {
     return json({ detail: "JSON request required" }, 415);

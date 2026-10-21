@@ -7,6 +7,7 @@ implicitly become Founder sessions. No alternate account/identity database.
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import os
 import re
 from functools import lru_cache
@@ -56,3 +57,57 @@ def require_founder_access_jwt(request: Request) -> str:
         raise
     except (jwt.PyJWTError, ValueError, TimeoutError, OSError):
         raise HTTPException(401, "VERIFIED_FOUNDER_SESSION_REQUIRED") from None
+
+
+# An alternative *existing* authenticated Founder path is the SSH/loopback-only
+# Console. It must be independently ingress-reviewed and explicitly enabled.
+# This is NOT a public header- or email-based identity shortcut. SSH authenticates
+# the operator, while this bearer gates the server-to-server API bridge.
+SSH_AUTH_MODE = "ssh_loopback"
+SSH_KEY_ENV = "EMPIRE_RESEARCH_SSH_BRIDGE_SECRET"
+SSH_GATE_ENV = "EMPIRE_RESEARCH_SSH_PRIVATE_ENABLED"
+SSH_INGRESS_ENV = "EMPIRE_PRIVATE_FOUNDER_INGRESS_REVIEWED"
+
+
+def _valid_ssh_bridge_key(value: str) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_-]{48,256}", value) is not None
+
+
+def require_ssh_loopback_founder(request: Request) -> str:
+    """Local SSH-authenticated operator mode; no anonymous local API requests.
+
+    This is deliberately independent from Cloudflare Access and cannot be
+    selected by request headers, cookies, JWT claims or arbitrary hostnames.
+    It requires a strong privately configured server-to-server credential.
+    """
+    secret = os.environ.get(SSH_KEY_ENV, "")
+    if (os.environ.get(SSH_GATE_ENV) != "1"
+            or os.environ.get(SSH_INGRESS_ENV) != "1"
+            or not _valid_ssh_bridge_key(secret)):
+        raise HTTPException(503, "FOUNDER_RESEARCH_SSH_BOUNDARY_NOT_CONFIGURED")
+    peer = request.client.host if request.client else ""
+    try:
+        local_peer = ipaddress.ip_address(peer).is_loopback
+    except ValueError:
+        local_peer = False
+    # Forwarding signals at the internal API are never part of our trusted
+    # direct Next-to-loopback service-to-service request.
+    if (not local_peer or any(request.headers.get(key) for key in (
+            "forwarded", "x-forwarded-for", "x-forwarded-host",
+            "x-real-ip", "cf-connecting-ip", "cf-ray", "via"))):
+        raise HTTPException(403, "FOUNDER_RESEARCH_SSH_LOOPBACK_ONLY")
+    bearer = request.headers.get("authorization", "")
+    if (not bearer.startswith("Bearer ") or len(bearer) > 280
+            or not hmac.compare_digest(bearer[7:], secret)):
+        raise HTTPException(401, "FOUNDER_RESEARCH_PRIVATE_BRIDGE_REQUIRED")
+    return "founder-ssh-authenticated-operator"
+
+
+def require_founder_research_authority(request: Request) -> str:
+    """Default: verified Cloudflare JWT. SSH mode only via gated server env."""
+    mode = os.environ.get("EMPIRE_FOUNDER_RESEARCH_AUTH_MODE", "cloudflare_access")
+    if mode == "cloudflare_access":
+        return require_founder_access_jwt(request)
+    if mode == SSH_AUTH_MODE:
+        return require_ssh_loopback_founder(request)
+    raise HTTPException(503, "FOUNDER_RESEARCH_AUTH_MODE_UNRECOGNISED")

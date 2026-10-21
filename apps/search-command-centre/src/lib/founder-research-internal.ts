@@ -37,3 +37,40 @@ export async function requestPrivateResearch(
     return { ok: false, status: 503, data: { detail: "Research API unavailable" } };
   }
 }
+
+
+// The live Founder Console is SSH-forwarded and is NOT a Cloudflare Access app.
+// Preserve verified Cloudflare JWT by default. This opt-in transport can only
+// operate on the local-only Founder Console port after independently verified
+// ingress isolation and an operator-provisioned secret. SSH is the human login.
+export function isSshFounderResearchMode(): boolean {
+  return process.env.EMPIRE_FOUNDER_RESEARCH_AUTH_MODE === "ssh_loopback";
+}
+
+function sshPrivateBridgeSecret(): string | null {
+  const value = process.env.EMPIRE_RESEARCH_SSH_BRIDGE_SECRET ?? "";
+  if (process.env.EMPIRE_RESEARCH_SSH_PRIVATE_ENABLED !== "1"
+      || process.env.EMPIRE_PRIVATE_FOUNDER_INGRESS_REVIEWED !== "1"
+      || !/^[A-Za-z0-9_-]{48,256}$/.test(value)) return null;
+  return value;
+}
+
+export function sshFounderRequestIsLocal(headers: Pick<Headers, "get">): boolean {
+  if (!isSshFounderResearchMode() || !sshPrivateBridgeSecret()) return false;
+  const port = process.env.EMPIRE_RESEARCH_ISOLATED_STAGE === "1" ? "3098" : "3001";
+  const host = (headers.get("host") ?? "").toLowerCase();
+  const allowed = new Set([`localhost:${port}`, `127.0.0.1:${port}`]);
+  if (!allowed.has(host)) return false;
+  const forwardHost = headers.get("x-forwarded-host")?.toLowerCase();
+  if (forwardHost && !allowed.has(forwardHost)) return false;
+  const forwardedFor = headers.get("x-forwarded-for");
+  if (forwardedFor !== null && !["127.0.0.1", "::1"].includes(forwardedFor.trim())) return false;
+  if (["cf-connecting-ip", "cf-ray", "x-real-ip", "forwarded", "via"].some(
+    key => headers.get(key) !== null
+  )) return false;
+  return true;
+}
+
+export function sshFounderServerCredential(headers: Pick<Headers, "get">): string | null {
+  return sshFounderRequestIsLocal(headers) ? sshPrivateBridgeSecret() : null;
+}

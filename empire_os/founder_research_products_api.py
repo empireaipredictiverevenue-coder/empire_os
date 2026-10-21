@@ -15,7 +15,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, StrictBool
 
-from empire_os.founder_research_auth import require_founder_access_jwt
+from empire_os.founder_research_auth import require_founder_research_authority
 from empire_os.research.research_products import product_catalog, use_product
 
 
@@ -57,7 +57,7 @@ class ResearchExecutionBudget:
 def create_founder_research_products_router(
     product_runner: Callable = use_product,
     *,
-    require_founder: Callable[[Request], str] = require_founder_access_jwt,
+    require_founder: Callable[[Request], str] = require_founder_research_authority,
     execution_budget: ResearchExecutionBudget | None = None,
 ) -> APIRouter:
     budget = execution_budget or ResearchExecutionBudget()
