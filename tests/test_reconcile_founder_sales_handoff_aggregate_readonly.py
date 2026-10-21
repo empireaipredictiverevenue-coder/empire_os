@@ -17,6 +17,9 @@ def source(*, total=0, unlinked=0, missing_binding=0,
     return {
         "schema_version": "empire.founder.canonical_sales_source_aggregate.v1",
         "mode": "OBSERVE", "read_only": True, "database_writes": False,
+        "customer_rows_disclosed": False, "contact_data_disclosed": False,
+        "tenant_identifier_disclosed": False, "outbound_sent": False,
+        "payment_action": False,
         "status": (
             "NO_SALES_ACQUISITION_IN_CANONICAL_SOURCE"
             if total == 0
@@ -43,6 +46,8 @@ def tenant(*, commercial=0, predictive=0, total=None):
         "mode": "OBSERVE", "read_only": True,
         "prospect_ingest_performed": False,
         "tenant_binding_mutated": False,
+        "raw_customer_rows_read": False,
+        "outbound_authorized": False, "payment_authorized": False,
         "status": (
             "TENANT_VISIBLE_SALES_PROSPECTS_PRESENT"
             if commercial or predictive
@@ -80,11 +85,59 @@ def test_reconciles_only_aggregate_verified_contracts(s, t, expected):
     assert result["customer_identifiers_disclosed"] is False
 
 
+def test_empty_source_and_crm_never_claim_complete_evidence():
+    result = audit.reconcile(source(), tenant())
+    assert result["status"] == "NO_CANONICAL_SALES_ACQUISITION_OBSERVED"
+    assert result["source_evidence_consistent"] is None
+    assert result["tenant_scope_evidence_complete"] is None
+    assert result["founder_crm_delivery_verified"] is False
+
+
+def test_crm_sales_without_canonical_web_receipt_is_separate_review():
+    result = audit.reconcile(source(), tenant(commercial=1))
+    assert result["status"] == "CRM_SALES_WITHOUT_CANONICAL_WEB_ACQUISITION_PROOF"
+    assert result["next_action"] == "REVIEW_CRM_PROSPECT_SOURCE_PRIVATELY"
+    assert result["founder_crm_delivery_verified"] is False
+    assert result["customer_identifiers_disclosed"] is False
+
+
+@pytest.mark.parametrize("s,t", [
+    (source(total=1), tenant()),
+    (source(), tenant(commercial=1)),
+])
+def test_declared_probe_status_must_correspond_to_aggregate_counts(s,t):
+    opposite_source = dict(s)
+    opposite_source["status"] = (
+        "NO_SALES_ACQUISITION_IN_CANONICAL_SOURCE"
+        if s["sales_acquisition_rows"] else
+        "SALES_ACQUISITION_SOURCE_OBSERVED_REVIEW_REQUIRED"
+    )
+    result = audit.reconcile(opposite_source, t)
+    assert result["status"] == "HELD_UNVERIFIED_EVIDENCE"
+    assert result["reason_code"] == "CONTRADICTORY_ACQUISITION_COUNTS"
+
+    opposite_tenant = dict(t)
+    opposite_tenant["status"] = (
+        "NO_TENANT_VISIBLE_SALES_PROSPECTS"
+        if t["visible_commercial_sales_prospects"] else
+        "TENANT_VISIBLE_SALES_PROSPECTS_PRESENT"
+    )
+    result = audit.reconcile(s, opposite_tenant)
+    assert result["status"] == "HELD_UNVERIFIED_EVIDENCE"
+    assert result["reason_code"] == "CONTRADICTORY_ACQUISITION_COUNTS"
+
+
 @pytest.mark.parametrize("altered,expected", [
     ({"status": "UNVERIFIED"}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
     ({"database_writes": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
     ({"read_only": False}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
     ({"schema_version": "unknown.v0"}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"customer_rows_disclosed": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"contact_data_disclosed": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"tenant_identifier_disclosed": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"outbound_sent": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"payment_action": True}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
+    ({"execution_authority": "WRITE"}, "CANONICAL_SOURCE_PROBE_UNVERIFIED"),
 ])
 def test_source_must_match_exact_readonly_contract(altered, expected):
     bad = {**source(), **altered}
@@ -99,6 +152,10 @@ def test_source_must_match_exact_readonly_contract(altered, expected):
     {"prospect_ingest_performed": True},
     {"read_only": False},
     {"schema_version": "fake.v0"},
+    {"raw_customer_rows_read": True},
+    {"outbound_authorized": True},
+    {"payment_authorized": True},
+    {"execution_authority": "WRITE"},
 ])
 def test_tenant_reader_must_match_existing_verified_contract(altered):
     result = audit.reconcile(source(), {**tenant(), **altered})

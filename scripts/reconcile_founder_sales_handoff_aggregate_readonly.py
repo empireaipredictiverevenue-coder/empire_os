@@ -116,6 +116,12 @@ def reconcile(source: dict[str, Any], tenant: dict[str, Any]) -> dict[str, Any]:
             or source.get("mode") != "OBSERVE"
             or source.get("read_only") is not True
             or source.get("database_writes") is not False
+            or source.get("customer_rows_disclosed") is not False
+            or source.get("contact_data_disclosed") is not False
+            or source.get("tenant_identifier_disclosed") is not False
+            or source.get("outbound_sent") is not False
+            or source.get("payment_action") is not False
+            or source.get("execution_authority") != "NONE"
             or source.get("status") not in (
                 "NO_SALES_ACQUISITION_IN_CANONICAL_SOURCE",
                 "SALES_ACQUISITION_SOURCE_OBSERVED_REVIEW_REQUIRED",
@@ -128,6 +134,10 @@ def reconcile(source: dict[str, Any], tenant: dict[str, Any]) -> dict[str, Any]:
             or tenant.get("read_only") is not True
             or tenant.get("prospect_ingest_performed") is not False
             or tenant.get("tenant_binding_mutated") is not False
+            or tenant.get("raw_customer_rows_read") is not False
+            or tenant.get("outbound_authorized") is not False
+            or tenant.get("payment_authorized") is not False
+            or tenant.get("execution_authority") != "NONE"
             or tenant.get("status") not in (
                 "NO_TENANT_VISIBLE_SALES_PROSPECTS",
                 "TENANT_VISIBLE_SALES_PROSPECTS_PRESENT",
@@ -139,7 +149,12 @@ def reconcile(source: dict[str, Any], tenant: dict[str, Any]) -> dict[str, Any]:
         s = _counts(source, SOURCE_COUNTS)
         t = _counts(tenant, TENANT_COUNTS)
         total = s["sales_acquisition_rows"]
-        if (s["commercial_acquisition_rows"] + s["predictive_acquisition_rows"]
+        if ((total == 0) !=
+                (source["status"] == "NO_SALES_ACQUISITION_IN_CANONICAL_SOURCE")
+                or ((t["visible_commercial_sales_prospects"] +
+                     t["visible_predictive_revenue_prospects"]) == 0) !=
+                   (tenant["status"] == "NO_TENANT_VISIBLE_SALES_PROSPECTS")
+                or s["commercial_acquisition_rows"] + s["predictive_acquisition_rows"]
                 != total
                 or s["distinct_sales_prospects"] > total
                 or s["source_evidence_consistent_rows"] > total
@@ -157,16 +172,24 @@ def reconcile(source: dict[str, Any], tenant: dict[str, Any]) -> dict[str, Any]:
     flags.update({
         **s,
         **t,
+        # An empty source is not affirmative consent or tenant-custody proof.
         "source_evidence_consistent": (
-            s["source_evidence_consistent_rows"] == total
+            s["source_evidence_consistent_rows"] == total if total else None
         ),
         "tenant_scope_evidence_complete": (
-            s["founder_binding_exact_one_rows"] == total
+            s["founder_binding_exact_one_rows"] == total if total else None
         ),
     })
     if total == 0:
-        flags["status"] = "NO_CANONICAL_SALES_ACQUISITION_OBSERVED"
-        flags["next_action"] = "WAIT_FOR_GENUINE_OPTED_IN_ENQUIRY"
+        if (t["visible_commercial_sales_prospects"] +
+                t["visible_predictive_revenue_prospects"]) > 0:
+            # CRM rows may have another source. Never call them verified
+            # first-party web acquisitions without original lineage.
+            flags["status"] = "CRM_SALES_WITHOUT_CANONICAL_WEB_ACQUISITION_PROOF"
+            flags["next_action"] = "REVIEW_CRM_PROSPECT_SOURCE_PRIVATELY"
+        else:
+            flags["status"] = "NO_CANONICAL_SALES_ACQUISITION_OBSERVED"
+            flags["next_action"] = "WAIT_FOR_GENUINE_OPTED_IN_ENQUIRY"
     elif s["source_evidence_consistent_rows"] != total:
         flags["status"] = "CANONICAL_INTAKE_EVIDENCE_INCONSISTENT"
         flags["next_action"] = "AUDIT_SOURCE_RECEIPT_PRIVATELY"

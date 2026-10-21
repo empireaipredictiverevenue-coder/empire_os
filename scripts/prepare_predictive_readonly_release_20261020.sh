@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -53,6 +53,7 @@ case "$command" in
   commercial-example) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-intake) module=scripts.review_predictive_commercial_requirements_20261020 ;;
   commercial-crm) module=scripts.review_predictive_founder_crm_visibility_20261020 ;;
+  sales-path) module=scripts.review_predictive_sales_path_20261021 ;;
   catalog) module=scripts.review_predictive_catalog_readiness_20261020 ;;
   science) module=scripts.review_predictive_product_science_20261020 ;;
   science-agent) module=scripts.review_predictive_scientific_agent_20261020 ;;
@@ -99,6 +100,10 @@ EOF
     empire_os/predictive_commercial_intake_readiness.py \
     empire_os/predictive_commercial_evidence_chain.py \
     empire_os/predictive_existing_founder_crm_bridge.py \
+    empire_os/predictive_existing_sales_path_review.py \
+    scripts/review_predictive_sales_path_20261021.py \
+    scripts/probe_first_party_sales_http_readonly.py \
+    scripts/reconcile_founder_sales_handoff_aggregate_readonly.py \
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_intelligence.py \
@@ -171,6 +176,21 @@ assert value["canonical_original_acquisition_probe_checked"] is False
 assert value["original_customer_order_authenticated"] is False
 assert value["crm_write_performed"] is False
 assert value["outbound_sent"] is False
+'
+# Live public-form + restricted CRM bridge never asserts first-party conversion.
+"$TMP/bin/empire-predictive-observe" sales-path | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.first_party_sales_path_observe.v1"
+assert x["mode"]=="OBSERVE" and x["execution_authority"]=="none"
+assert x["canonical_acquisition_count_checked"] is False
+assert x["founder_crm_delivery_verified"] is False
+assert x["individual_prospect_lineage_authenticated"] is False
+assert x["customer_forecast_eligible"] is False
+assert x["authenticated_customer_order_verified"] is False
+assert x["database_writes"] is False and x["outbound_sent"] is False
+assert x["payment_action"] is False and x["source_customer_contact_disclosed"] is False
 '
 # The pinned product catalogue bridge must reconcile real owner snapshot policy,
 # but never mistake root-file custody for original DB/customer authentication.
