@@ -3,7 +3,7 @@
 # the original root-owned PostgreSQL SCRAM password file.
 set -euo pipefail
 
-RELEASE='/home/ubuntu/empire_releases/predictive_observe_261d07fe9b00'
+RELEASE='/home/ubuntu/empire_releases/predictive_observe_245aa93b86a4'
 MANIFEST="$RELEASE/metadata/critical_source_checksums.sha256"
 PYTHON='/srv/empire_os/.venv/bin/python'
 PASSFILE='/etc/empire/verified-order-reader/reader.pgpass'
