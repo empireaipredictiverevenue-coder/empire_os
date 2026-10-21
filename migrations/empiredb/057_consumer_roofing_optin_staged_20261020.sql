@@ -86,14 +86,16 @@ CREATE TABLE public.empire_consumer_consent_events (
     REFERENCES public.empire_consumer_subscriptions(subscription_id),
   consent_action text NOT NULL
     CHECK (consent_action IN ('opt_in_requested','opt_in_verified',
-                             'unsubscribed','erasure_requested','erasure_completed')),
+                             'unsubscribed','erasure_requested','erasure_completed',
+                             'suppressed_bounce','suppressed_complaint')),
   purpose text NOT NULL DEFAULT 'empire_own_brand_homeowner_updates'
     CHECK (purpose='empire_own_brand_homeowner_updates'),
   notice_version text NOT NULL CHECK (notice_version='roofing-homeowner-updates-v1'),
   evidence_digest text NOT NULL CHECK (evidence_digest ~ '^[a-f0-9]{64}$'),
   evidence_method text NOT NULL
     CHECK (evidence_method IN ('ORIGINAL_BROWSER_CHOICE','VERIFIED_EMAIL_TOKEN',
-                              'AUTHENTICATED_WITHDRAWAL','PRIVACY_OWNER_ERASURE')),
+                              'AUTHENTICATED_WITHDRAWAL','PRIVACY_OWNER_ERASURE',
+                              'VERIFIED_PROVIDER_EVENT')),
   observed_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 

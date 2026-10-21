@@ -14,7 +14,7 @@ import psycopg
 
 from empire_os.consumer_optin_private_service import Keys, PrivateConsumerOptinService
 from empire_os.consumer_optin_postgres_repository import ConsumerPostgresRepository
-from empire_os.consumer_optin_token_security import token_fingerprint
+from empire_os.consumer_optin_token_security import token_fingerprint, email_lookup_hmac
 
 DB="empire_consumer_optin_fixture"
 TEST_ROLE="empire_consumer_optin_writer"
@@ -36,7 +36,7 @@ class FakeSender:
     def provider_ready(self):
         return True
     def send_verification(self, **payload):
-        assert payload["recipient"]=="subscriber-only@example.test"
+        assert payload["recipient"] in ("subscriber-only@example.test","bounce-test@example.test")
         self.sent.append(payload)
         return "SYNTHETIC_NONLIVE_PROVIDER_ACK_20261020"
 
@@ -133,17 +133,65 @@ def main():
         consent_receipt=CONSENT,
     )
     assert len(sender.sent)==1
+    # A privacy-owner verified request erases the original encrypted email
+    # while retaining only purpose-specific suppression and audit evidence.
+    orig_lookup=email_lookup_hmac(
+        "subscriber-only@example.test", key=KEYS.email_hmac
+    )
+    assert store.apply_verified_privacy_action(
+        lookup=orig_lookup, action="privacy_erasure",
+        evidence_hmac="d"*64, checked_at=action_time+timedelta(seconds=4),
+    )
+    assert privileged_scalar(
+        "SELECT count(*) FROM public.empire_consumer_subscriptions "
+        "WHERE permission_state='erased' AND email_ciphertext IS NULL "
+        "AND email_key_reference IS NULL"
+    )==1
+    assert privileged_scalar(
+        "SELECT count(*) FROM public.empire_consumer_consent_events "
+        "WHERE consent_action IN ('erasure_requested','erasure_completed')"
+    )==2
+
+    # An original provider-authenticated bounce on a different synthetic
+    # pending signup must revoke the record before confirmation.
+    service._clock=lambda:datetime.now(timezone.utc)
+    assert service.request_verification(
+        email="bounce-test@example.test",
+        notice_version="roofing-homeowner-updates-v1",
+        consent_receipt=CONSENT,
+    )
+    bounce_lookup=email_lookup_hmac(
+        "bounce-test@example.test",key=KEYS.email_hmac
+    )
+    assert store.apply_verified_privacy_action(
+        lookup=bounce_lookup, action="bounce",
+        evidence_hmac="e"*64, checked_at=NOW+timedelta(minutes=3),
+    )
+    assert privileged_scalar(
+        "SELECT count(*) FROM public.empire_consumer_consent_events "
+        "WHERE consent_action='suppressed_bounce'"
+    )==1
+    assert privileged_scalar(
+        "SELECT count(*) FROM public.empire_consumer_email_suppressions"
+    )==2
+    assert not service.request_verification(
+        email="bounce-test@example.test",
+        notice_version="roofing-homeowner-updates-v1",
+        consent_receipt=CONSENT,
+    )
     print(json.dumps({
         "status":"REAL_POSTGRES_SYNTHETIC_LIFECYCLE_PASS",
         "database":"EPHEMERAL_CONSUMER_FIXTURE_ONLY",
         "source":"synthetic optin consent",
         "provider":"fake sender only",
         "transitions":["pending_verification","verified","unsubscribed"],
-        "suppression_tombstones":1,
-        "append_only_consent_events":3,
-        "single_use_tokens":2,
+        "suppression_tombstones":2,
+        "append_only_consent_events":7,
+        "single_use_tokens":4,
         "replay_blocked":True,
         "repeat_signup_after_suppression_blocked":True,
+        "privacy_erasure_ciphertext_removed":True,
+        "verified_provider_bounce_suppressed":True,
         "plaintext_emails_in_db":False,
         "production_db_modified":False,
         "emails_sent":0,

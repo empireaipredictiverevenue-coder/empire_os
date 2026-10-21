@@ -282,3 +282,91 @@ class ConsumerPostgresRepository:
                 (subscription_id,receipt_action,NOTICE,token_hmac,method),
             )
         return True
+
+    def apply_verified_privacy_action(
+        self, *, lookup: str, action: str, evidence_hmac: str,
+        checked_at: datetime,
+    ) -> bool:
+        """Handle verified bounce/complaint or owner-authorised erasure atomically.
+
+        Entry points MUST authenticate the email-provider webhook signature or
+        the original privacy-owner's request before calling this method. This
+        interface accepts only a keyed contact digest, never email plaintext.
+        The caller supplies independent evidence; this method does not validate
+        webhook signatures or authorise a privacy deletion by itself.
+        """
+        if not self.token_processing_writable():
+            return False
+        self._digest(lookup)
+        self._digest(evidence_hmac)
+        if action not in ("bounce", "complaint", "privacy_erasure"):
+            return False
+        if checked_at.tzinfo is None or checked_at.utcoffset() is None:
+            raise ValueError("UTC-aware verified action timestamp required")
+
+        with self._connect() as conn:
+            conn.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s,0))", (lookup,)
+            )
+            row = conn.execute(
+                "SELECT subscription_id, permission_state "
+                "FROM public.empire_consumer_subscriptions "
+                "WHERE email_lookup_hmac=%s AND purpose=%s FOR UPDATE",
+                (lookup, PURPOSE),
+            ).fetchone()
+            if row and row[1] == "erased":
+                return False
+            if row and row[1] == "unsubscribed" and action != "privacy_erasure":
+                return False
+
+            # A suppression record prevents a later consent import even if
+            # there is currently no corresponding subscriber row.
+            reason = "privacy_request" if action == "privacy_erasure" else action
+            conn.execute(
+                "INSERT INTO public.empire_consumer_email_suppressions "
+                "(email_lookup_hmac,purpose,reason) VALUES (%s,%s,%s) "
+                "ON CONFLICT (email_lookup_hmac) DO NOTHING",
+                (lookup, PURPOSE, reason),
+            )
+            if not row:
+                return True
+
+            subscription_id, _ = row
+            if action == "privacy_erasure":
+                # Never delete immutable legal/custody records without a
+                # separate approved retention policy, but remove the encrypted
+                # address and its decryption-key reference in this transaction.
+                conn.execute(
+                    "UPDATE public.empire_consumer_subscriptions SET "
+                    "permission_state='erased',email_ciphertext=NULL,"
+                    "email_key_reference=NULL,revoked_at=%s,erased_at=%s "
+                    "WHERE subscription_id=%s",
+                    (checked_at, checked_at, subscription_id),
+                )
+                consent_actions = ("erasure_requested", "erasure_completed")
+                method = "PRIVACY_OWNER_ERASURE"
+            else:
+                conn.execute(
+                    "UPDATE public.empire_consumer_subscriptions SET "
+                    "permission_state='unsubscribed',revoked_at=%s "
+                    "WHERE subscription_id=%s",
+                    (checked_at, subscription_id),
+                )
+                consent_actions = ("suppressed_" + action,)
+                method = "VERIFIED_PROVIDER_EVENT"
+
+            conn.execute(
+                "UPDATE public.empire_consumer_one_time_tokens "
+                "SET consumed_at=clock_timestamp() "
+                "WHERE subscription_id=%s AND consumed_at IS NULL",
+                (subscription_id,),
+            )
+            for consent_action in consent_actions:
+                conn.execute(
+                    "INSERT INTO public.empire_consumer_consent_events "
+                    "(subscription_id,consent_action,notice_version,evidence_digest,evidence_method) "
+                    "VALUES (%s,%s,%s,%s,%s)",
+                    (subscription_id, consent_action, NOTICE,
+                     evidence_hmac, method),
+                )
+        return True
