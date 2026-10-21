@@ -269,6 +269,46 @@ def build_review_packets(
         "department_work_queue_mutated": False,
     }
 
+def verify_review_source_freshness(kind: str, source: Mapping[str, Any],
+                                   *, now: datetime,
+                                   max_age_seconds: int = 3600) -> dict[str, Any]:
+    """Check snapshot-clock freshness without claiming source authenticity.
+
+    This is an existing-review-layer check, not a change to the digest-pinned
+    Harness² guard implementation or its recorded evaluation evidence.
+    """
+    if now.tzinfo is None or now.utcoffset() is None:
+        raise ValueError("timezone-aware review clock required")
+    if type(max_age_seconds) is not int or not 0 < max_age_seconds <= 86400:
+        raise ValueError("invalid bounded observation freshness window")
+    timestamp_field = {
+        "conversion": "observed_at",
+        "acquisition": "generated_at",
+        "revenue": "generated_at",
+    }.get(kind)
+    if timestamp_field is None:
+        raise ValueError("unknown original source freshness contract")
+    raw=source.get(timestamp_field)
+    if not isinstance(raw,str) or len(raw)>48:
+        raise ValueError("source observation timestamp missing")
+    try:
+        timestamp=datetime.fromisoformat(raw.replace("Z","+00:00"))
+    except ValueError as error:
+        raise ValueError("source observation timestamp invalid") from error
+    if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+        raise ValueError("source timestamp must be timezone-aware")
+    age=(now.astimezone(timezone.utc)-timestamp.astimezone(timezone.utc)).total_seconds()
+    if age < 0 or age > max_age_seconds:
+        raise ValueError("source observation stale or future-dated")
+    return {
+        "source_clock":timestamp.astimezone(timezone.utc).isoformat(),
+        "source_age_seconds":round(age,3),
+        "fresh_at_review":True,
+        "source_authenticity_independently_verified":False,
+        "execution_authority":"none",
+    }
+
+
 def refresh_review_packets(root: Path) -> dict[str, Any]:
     """Materialize isolated review packets, never runnable department jobs."""
     root = root.resolve()
@@ -310,6 +350,7 @@ def refresh_review_packets(root: Path) -> dict[str, Any]:
         try:
             _payload = _harness_json.loads(_source.read_text(encoding="utf-8"))
             verified_snapshot_facts(_kind, _payload)
+            verify_review_source_freshness(_kind, _payload, now=datetime.now(timezone.utc))
         except (OSError, ValueError, TypeError, KeyError, UnicodeError):
             valid_sources = False
             break

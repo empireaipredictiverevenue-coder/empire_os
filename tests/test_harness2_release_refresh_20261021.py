@@ -1,6 +1,7 @@
 """Release scope: original first-party source guard and review-only queue."""
 import json
 import shutil
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from empire_os.system_improvement_review import RESOLUTION, refresh_review_packets
 
@@ -13,6 +14,7 @@ PINNED=(
 )
 
 def prepare(root):
+    now=datetime.now(timezone.utc).isoformat()
     for relative in PINNED:
         dest=root/relative
         dest.parent.mkdir(parents=True,exist_ok=True)
@@ -28,12 +30,15 @@ def prepare(root):
     sources={
         'runtime/conversion/latest.json':{
             'mode':'OBSERVE','execution_authority':'none',
+            'observed_at':now,
             'counts':{'delivered_outreach_to_reply':{'entered':52,'converted':0}}},
         'runtime/buyer_acquisition/latest.json':{
             'mode':'OBSERVE','execution_authority':'none',
+            'generated_at':now,
             'icp_priority_target_count':13,'demand_gap_count':32},
         'runtime/revenue_pulse/latest.json':{
             'mode':'OBSERVE','execution_authority':'none',
+            'generated_at':now,
             'recognized_revenue_truth':{'recognized_revenue_cents':0}},
     }
     for relative,data in sources.items():
@@ -86,3 +91,28 @@ def test_invalid_conversion_stage_stops_queue_promotion(tmp_path):
     evidence.write_text(json.dumps(data))
     out=refresh_review_packets(root)
     assert len(_harness_packets(out))==0
+
+
+def test_stale_original_source_disqualifies_review_task(tmp_path):
+    root=prepare(tmp_path)
+    path=root/'runtime/conversion/latest.json'
+    data=json.loads(path.read_text())
+    data['observed_at']=(datetime.now(timezone.utc)-timedelta(hours=2)).isoformat()
+    path.write_text(json.dumps(data))
+    assert not _harness_packets(refresh_review_packets(root))
+
+def test_future_dated_revenue_source_disqualifies_review_task(tmp_path):
+    root=prepare(tmp_path)
+    path=root/'runtime/revenue_pulse/latest.json'
+    data=json.loads(path.read_text())
+    data['generated_at']=(datetime.now(timezone.utc)+timedelta(minutes=10)).isoformat()
+    path.write_text(json.dumps(data))
+    assert not _harness_packets(refresh_review_packets(root))
+
+def test_missing_acquisition_timestamp_disqualifies_review_task(tmp_path):
+    root=prepare(tmp_path)
+    path=root/'runtime/buyer_acquisition/latest.json'
+    data=json.loads(path.read_text())
+    data.pop('generated_at')
+    path.write_text(json.dumps(data))
+    assert not _harness_packets(refresh_review_packets(root))
