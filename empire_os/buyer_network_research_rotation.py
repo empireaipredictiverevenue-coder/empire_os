@@ -12,7 +12,7 @@ import re
 INVALID_DOMAINS = frozenset({
     "empire-ai.co.uk", "empire-ai.com", "empire-ai.co",
     "yourdomain.com", "example.com", "example.org", "example.net",
-    "localhost", "test.com",
+    "localhost", "test.com", "yoursite.com", "company.com", "insider.com",
 })
 ALLOWED_TLDS = frozenset({
     "com", "co", "uk", "io", "ai", "net", "org", "us", "ca", "au",
@@ -34,7 +34,7 @@ def accepted_domain(domain: str) -> bool:
             or d.startswith(("empire.", "localhost."))
             or is_do_not_pursue_domain(d)):
         return False
-    if d.endswith((".local", ".internal", ".test", ".example", ".localhost")):
+    if d.endswith((".local", ".internal", ".test", ".example", ".localhost", ".sentry.io")):
         return False
     labels = d.split(".")
     if len(labels) < 2 or labels[-1] not in ALLOWED_TLDS:

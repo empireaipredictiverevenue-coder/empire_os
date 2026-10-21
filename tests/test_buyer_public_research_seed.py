@@ -291,3 +291,26 @@ def test_real_query_domain_is_separated_from_static_seed_pool():
     assert result["fresh_search_result_status"]=="FRESH_DOMAIN_RESULTS_OBSERVED"
     assert result["source_method_comparison"]["query_methods"]["publisher_first"]["discovered_domains"]==1
     assert result["source_method_comparison"]["query_methods"]["publisher_first"]["verified_buyer_approvals"]==0
+
+
+def test_new_us_publisher_seeds_are_non_authoritative_without_extra_searches():
+    observed = {}
+    def search(queries, num):
+        observed["queries"] = list(queries)
+        return {}
+    report = build_public_research_seeds(
+        {}, search_fn=search, max_queries=2,
+        observed_at=datetime(2026, 10, 21, tzinfo=timezone.utc),
+        include_volume=False,
+    )
+    rows = {item["domain"]: item for item in report["seeds"]}
+    for domain in ("ringpartner.com", "leadsbycall.com", "leadspedio.com", "ringondemand.com"):
+        assert domain in rows
+        row = rows[domain]
+        assert "USA" in row["target_markets"]
+        assert row["outreach_authorized"] is False
+        assert row["buyer_capacity_verified"] is False
+        assert row["commercial_terms_verified"] is False
+        assert row["identity_verified"] is False
+    assert len(observed["queries"]) == 2
+    assert report["outbound_sent"] is False

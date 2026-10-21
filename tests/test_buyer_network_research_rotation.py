@@ -71,7 +71,7 @@ def test_cooldown_retries_are_bounded_and_do_not_require_manual_timer():
 
 def test_exclude_placeholder_owned_and_reserved_domains():
     for domain in (
-        "yourdomain.com", "empire-ai.co.uk", "example.com",
+        "yourdomain.com", "yoursite.com", "company.com", "insider.com", "o123.ingest.us.sentry.io", "empire-ai.co.uk", "example.com",
         "example.net", "company.local", "test.com", "127.0.0.1",
         "empire.buyer", "empire.predictive", "latest.json",
         "semrush.com", "ahrefs.com", "serpapi.com", "localfalcon.com",

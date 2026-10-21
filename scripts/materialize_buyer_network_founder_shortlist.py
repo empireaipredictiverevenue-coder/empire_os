@@ -10,6 +10,7 @@ from typing import Any
 from empire_os.buyer_network_integration import (
     BuyerNetworkIntegration,
 )
+from empire_os.buyer_network_contact_history_gate import load_context, review
 
 
 ROOT = Path("/srv/empire_os")
@@ -543,6 +544,14 @@ def build_markdown(
                     f"{item['already_known']}"
                 ),
                 (
+                    f"- Contact history: "
+                    f"{item.get('outreach_status', 'UNVERIFIED')}"
+                ),
+                (
+                    f"- Contact next action: "
+                    f"{item.get('contact_history', {}).get('next_action', 'RECONCILE')}"
+                ),
+                (
                     f"- Evidence count: "
                     f"{item['evidence_count']}"
                 ),
@@ -579,6 +588,7 @@ def main() -> int:
     existing_logic = (
         load_existing_logic()
     )
+    contact_context = load_context()
 
     # Fail closed on contextual/quarantine evidence and non-business domains.
     # 'already_known' is discovery history, NOT evidence of no prior outreach.
@@ -598,7 +608,9 @@ def main() -> int:
         if all("runtime/truth_quality_control/" in str(line) for line in lines):
             continue
         item = enrich(candidate)
-        item["outreach_status"] = "CONTACT_HISTORY_UNVERIFIED"
+        contact = review(domain, contact_context)
+        item["contact_history"] = contact
+        item["outreach_status"] = contact["state"]
         item["outbound_authority"] = False
         candidates.append(item)
 
@@ -644,6 +656,10 @@ def main() -> int:
 
         "shortlist_count":
             len(shortlist),
+
+        "contact_history_gate_enabled": True,
+        "contact_history_source": contact_context["source"],
+        "gmail_snapshot_fresh": contact_context["gmail_snapshot_fresh"],
 
         "existing_logic_modules":
             existing_logic,

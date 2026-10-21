@@ -78,6 +78,12 @@ _MULTIMARKET_REVIEW_SEEDS = (
     ("https://www.liveleads.ca/", "CA", ("home_services", "insurance", "legal")),
     ("https://centfix.ca/affiliates", "CA", ("home_services",)),
     ("https://xolar.ca/referral-program/", "CA", ("solar",)),
+    # 2026-10-21 first-party publisher pages; identity, terms and buyer
+    # capacity stay unverified pending the existing Scout evidence gates.
+    ("https://www.ringpartner.com/affiliate-program/", "USA", ("home_services", "legal", "insurance")),
+    ("https://leadsbycall.com/faq.html", "USA", ("home_services",)),
+    ("https://leadspedio.com/", "USA", ("home_services", "legal", "insurance")),
+    ("https://www.ringondemand.com/partners", "USA", ("legal", "insurance")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (
