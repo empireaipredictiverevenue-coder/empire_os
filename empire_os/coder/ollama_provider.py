@@ -134,6 +134,8 @@ class OllamaProvider:
             return ()
         names = []
         for row in body.get("models") or []:
+            if not isinstance(row, dict):
+                continue
             name = str(row.get("name") or "").strip()
             if name:
                 names.append(name)
