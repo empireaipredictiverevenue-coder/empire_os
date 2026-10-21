@@ -26,3 +26,14 @@ Don't create a second framework, alert API, finance reader, CSS toolkit, skill a
 - Corrected mobile intrinsic grid track sizing and separated hero CTA links to avoid content clipping behind overflow:hidden.
 - 20 National Storm Hub tests passed; Next production build succeeded; 19 SkillForge routing/trust tests previously passed.
 - Preview remains loopback-only on EmpireOS port 3149. No public domain or production service change occurred in this audit.
+
+## Immersive sliding experience — 2026-10-21
+
+The homepage now has an independently coded, genuinely interactive 3D Stormfront Array **instead of a globe**. The intent is atmospheric data-art, not a storm observation:
+- Three hero stories: read official forecast and source-limited predictor; check official active alerts; prepare a browser-local homeowner Storm Passport.
+- Autoplay only where reduced motion is not requested, pauses on hover/focus and stops on user interaction. Text remains visible without WebGL.
+- Separate editable hazard-guide slider beneath regional hubs, never an inferred hazard or damage verdict.
+- Desktop pointer tilt and subtle scroll parallax on a native Three.js terrain mesh and animated ribbon groups; no remote content or synthetic customer event.
+- At narrow widths or with reduced motion, a decorative CSS terrain-and-wave fallback replaces GPU rendering. Buttons, source links and ZIP input remain functional.
+- Safety invariant: 3D art markers are **not geolocated reports**. To create a real Atlas, use authenticated official geometry with issue times, coverage and source provenance.
+- Proof gate: Chrome viewport audits at 1440/820/390/320, real slider clicks, AJAX endpoints, reduced-motion fallback, WebGL detection, healthy server and 401 private founder finance route. Unit tests alone are insufficient.

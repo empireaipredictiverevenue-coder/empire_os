@@ -2,6 +2,17 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Interactive premium hero and hazard sliders (private candidate, 2026-10-21)
+
+- Removed the old decorative globe from the rendered homepage.
+- Implemented **native Three.js** in `components/StormfrontScene.jsx`, with original procedural layered terrain, stormfront ribbons, yellow signal beacons, pointer-responsive viewpoint and gentle scroll response.
+- **Conceptual weather art only**: this cannot be confused with official NWS alerts, observed storm tracks, geographic warning boundaries, proprietary forecast accuracy or confirmed house damage. Existing official NWS/SPC data continues to power the actual Atlas and Predictor.
+- Graceful static atmospheric fallback when WebGL is unavailable, user prefers reduced motion or viewport is small. Three.js loads asynchronously outside initial page rendering; no external 3D asset download is required.
+- Three-slide homepage journey with arrows, pagination, horizontal touch swipes, restrained 9-second automatic advance, focus/hover pause and reduced-motion support. Persistent ZIP search and genuine Predictor/Alerts/Passport navigation.
+- Four-slide editorial Hazard Lens selector with source-linked Hail/Wind, Flood, Hurricane and Tornado guides. This is *not* a real-time risk model.
+- Existing black / red / white / safety-yellow token system, themed buttons and founder/alerts/predictor pages are preserved. No change to production service or Cloudflare DNS.
+- Dependency pinned in the application package and lockfile: `three@0.180.0`.
+
 ## Premium emergency design comparison — Jack workflow (private candidate)
 
 - Distinct research references and `DISCOVER → SHAPE → DESIGN → MAKE → REVIEW → PROVE` workflow mapped to the existing **Empire Design Studio** candidate; no duplicate skill or agent.

@@ -1,9 +1,9 @@
 "use client";
 
-import {useEffect,useState} from "react";
+import {useEffect,useRef,useState} from "react";
 import {
   ArrowRight,ArrowUpRight,Bell,BookOpen,Bookmark,BookmarkCheck,Check,CheckCircle2,
-  ChevronDown,CloudLightning,Compass,ExternalLink,FileCheck2,Home,Layers,
+  ChevronDown,ChevronLeft,ChevronRight,CloudLightning,Compass,ExternalLink,FileCheck2,Home,Layers,
   LockKeyhole,MapPin,Menu,Radio,RefreshCw,Search,ShieldCheck,ShieldAlert,
   Sparkles,Wind,X,Building2,ChartNoAxesCombined,Clock3,CloudSun,Radar,
   Download,RotateCcw,Info,Globe2,ArrowDownRight
@@ -11,6 +11,9 @@ import {
 import {STATE_NAMES,normalizeZip,normalizeState} from "../lib/storm-data.js";
 import {summarizeHomeSource} from "../lib/home-source-view.js";
 import {formatWeatherTime} from "../lib/weather-time.js";
+import {HERO_STORIES,nextHeroIndex} from "../lib/hero-stories.js";
+import StormfrontScene from "../components/StormfrontScene.jsx";
+import HazardLenses from "../components/HazardLenses.jsx";
 
 const STORAGE_KEY="national-storm-hub-passport-preview-v1";
 const CHECKLIST=[
@@ -35,16 +38,6 @@ function ShellCard({children,className=""}) {
 function SiteMark() {
   return <span className="site-mark" aria-hidden="true"><CloudLightning size={24} strokeWidth={1.8}/></span>;
 }
-function GlobeVisual() {
-  return <div className="globe-scene" aria-label="Decorative spherical weather illustration. Not a live geographic warning map." role="img">
-    <div className="globe-orbit orbit-one"/><div className="globe-orbit orbit-two"/>
-    <div className="globe-sphere"><div className="sphere-graticule"/><div className="sphere-highlights"/></div>
-    <div className="globe-pulse pulse-a"/><div className="globe-pulse pulse-b"/>
-    <span className="globe-pin pin-one"/><span className="globe-pin pin-two"/><span className="globe-pin pin-three"/>
-    <div className="globe-readout readout-top"><span className="status-line"/> OBSERVATION NETWORK <span>01 / 03</span></div>
-    <div className="globe-readout readout-bottom">SOURCE-FIRST INTELLIGENCE <span>USA</span></div>
-  </div>;
-}
 function Status({state}) {
   if(state.kind==="loading")return <span className="status-chip muted"><span className="pulse-dot"/> CHECKING NWS</span>;
   if(state.kind==="error")return <span className="status-chip warning"><ShieldAlert size={13}/> SOURCE UNAVAILABLE</span>;
@@ -62,6 +55,32 @@ export default function HomePage(){
   const [hydrated,setHydrated]=useState(false);
   const [expandAlert,setExpandAlert]=useState(null);
   const [passportMessage,setPassportMessage]=useState("");
+  const [heroIndex,setHeroIndex]=useState(0);
+  const [heroPaused,setHeroPaused]=useState(false);
+  const [heroInteracted,setHeroInteracted]=useState(false);
+  const [reducedMotion,setReducedMotion]=useState(true);
+  const swipeStart=useRef(null);
+
+  useEffect(()=>{
+    const mq=window.matchMedia("(prefers-reduced-motion: reduce)");
+    const sync=()=>setReducedMotion(mq.matches);
+    sync();
+    mq.addEventListener?.("change",sync);
+    return ()=>mq.removeEventListener?.("change",sync);
+  },[]);
+
+  useEffect(()=>{
+    if(heroPaused||heroInteracted||reducedMotion)return;
+    const timer=window.setTimeout(()=>{
+      if(document.visibilityState==="visible")setHeroIndex(i=>nextHeroIndex(i,1));
+    },9000);
+    return ()=>clearTimeout(timer);
+  },[heroIndex,heroPaused,heroInteracted,reducedMotion]);
+
+  function goHero(next){
+    setHeroInteracted(true);
+    setHeroIndex(((next%HERO_STORIES.length)+HERO_STORIES.length)%HERO_STORIES.length);
+  }
 
   useEffect(()=>{
     try {
@@ -154,6 +173,7 @@ export default function HomePage(){
 
   const alerts=weather.kind==="ready"?weather.data.alerts:[];
   const sourceView=summarizeHomeSource(weather);
+  const activeStory=HERO_STORIES[heroIndex];
   const done=CHECKLIST.filter(([id])=>passport.tasks[id]).length;
   const passportState=passport.savedState?STATE_NAMES[passport.savedState]:null;
   return <div className="nsh">
@@ -173,11 +193,38 @@ export default function HomePage(){
     </header>
 
     <main id="home">
-      <section className="hero wrap" aria-labelledby="hero-title">
+      <section className="hero wrap hero-story-stage" aria-labelledby="hero-title"
+        onMouseEnter={()=>setHeroPaused(true)} onMouseLeave={()=>setHeroPaused(false)}
+        onFocusCapture={()=>setHeroPaused(true)} onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget))setHeroPaused(false);}}
+        onTouchStart={e=>{swipeStart.current={x:e.touches[0]?.clientX,y:e.touches[0]?.clientY};}}
+        onTouchEnd={e=>{
+          const start=swipeStart.current;swipeStart.current=null;
+          if(!start||!e.changedTouches[0])return;
+          const dx=e.changedTouches[0].clientX-start.x,dy=e.changedTouches[0].clientY-start.y;
+          if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.4)goHero(nextHeroIndex(heroIndex,dx<0?1:-1));
+        }}>
         <div className="hero-copy">
-          <div className="eyebrow"><span className="eyebrow-line"/> WEATHER INTELLIGENCE, REIMAGINED <span className="eyebrow-index">/ 01</span></div>
-          <h1 id="hero-title">When the weather changes, <em>know what matters.</em></h1>
-          <p className="hero-lead">One place to explore official storm information, prepare your home and keep the history that matters to you. Built for the moments before, during and after a storm.</p>
+          <div className="hero-story-control">
+            <span className="hero-story-tag">STORMFRONT INTELLIGENCE <span> / 0{heroIndex+1} OF 0{HERO_STORIES.length}</span></span>
+            <div className="hero-slide-nav" aria-label="Hero slide navigation">
+              <button type="button" onClick={()=>goHero(nextHeroIndex(heroIndex,-1))} aria-label="Previous story"><ChevronLeft size={18}/></button>
+              <button type="button" onClick={()=>goHero(nextHeroIndex(heroIndex,1))} aria-label="Next story"><ChevronRight size={18}/></button>
+            </div>
+          </div>
+          <div className="hero-story-copy" key={activeStory.id}>
+            <div className="eyebrow"><span className="eyebrow-line"/>{activeStory.kicker}<span className="eyebrow-index">/ {activeStory.number}</span></div>
+            <h1 id="hero-title">{activeStory.lead} <em>{activeStory.emphasis}</em></h1>
+            <p className="hero-lead">{activeStory.description}</p>
+          </div>
+          <div className="hero-slide-steps" role="group" aria-label="Choose a homepage story">
+            {HERO_STORIES.map((story,i)=><button key={story.id} type="button"
+              className={i===heroIndex?"hero-story-step active":"hero-story-step"}
+              aria-label={"Show story "+(i+1)+": "+story.kicker.toLowerCase()}
+              aria-pressed={i===heroIndex} onClick={()=>goHero(i)}>
+              <span>{story.number}</span><span className="hero-step-line"/><span>{story.id==="intelligence"?"Intelligence":story.id==="warnings"?"Live warnings":"Preparedness"}</span>
+            </button>)}
+          </div>
+          <div className="hero-primary-actions"><a href={activeStory.href} className="hero-featured-cta">{activeStory.cta}<ArrowUpRight size={17}/></a><a href={activeStory.secondaryHref} className="hero-secondary-cta">{activeStory.secondary}<ArrowRight size={16}/></a></div>
           <form className="zip-search" onSubmit={browseZip} aria-label="Explore storm information by ZIP code">
             <MapPin size={20} className="zip-pin" aria-hidden="true"/>
             <label htmlFor="zip-entry" className="sr-only">Five-digit US ZIP code</label>
@@ -186,10 +233,16 @@ export default function HomePage(){
           </form>
           {errorInput?<p className="form-error" id="zip-error" role="alert">{errorInput}</p>:<p className="microcopy" id="zip-help"><LockKeyhole size={13}/> No account needed. ZIP lookup uses an external public location service.</p>}
           <div className="hero-trust"><span><ShieldCheck size={16}/> Official sources</span><span><Clock3 size={16}/> Dated evidence</span><span><LockKeyhole size={16}/> Privacy by design</span></div>
-          <a href="/alerts" className="hero-alerts-cta"><Bell size={17}/> Check current storm alerts <ArrowRight size={16}/></a>
-          <a href="/predictor" className="hero-predictor-cta"><Sparkles size={17}/> Explore Storm Predictor <ArrowRight size={16}/></a>
         </div>
-        <div className="hero-art"><GlobeVisual/><div className="floating-weather"><div className="float-icon"><Radar size={21}/></div><div><span>STORM ATLAS</span><strong>Explore the evidence</strong><small>Forecasts ≠ confirmed damage</small></div><ArrowUpRight size={18}/></div><div className="art-note">CONCEPTUAL EARTH VISUAL • NOT AN ALERT BOUNDARY MAP</div></div>
+        <div className="hero-art stormfront-art">
+          <StormfrontScene sceneMode={activeStory.scene}/>
+          <div className="floating-weather stormfront-float">
+            <div className="float-icon"><Layers size={21}/></div>
+            <div><span>{activeStory.signal}</span><strong>{activeStory.detail}</strong><small>Illustration only • Not a live storm map</small></div>
+            <ArrowUpRight size={18}/>
+          </div>
+          <div className="art-note">INTERACTIVE THREE.JS ARTWORK • NOT OBSERVED STORMS OR WARNING BOUNDARIES</div>
+        </div>
       </section>
 
       <section className="source-snapshot wrap" aria-labelledby="source-snapshot-title">
@@ -208,6 +261,8 @@ export default function HomePage(){
       <section className="trust-ribbon" aria-label="Platform information"><div className="wrap trust-inner"><div>01 <span>SOURCE-GROUNDED WEATHER</span></div><div>02 <span>HOMEOWNER CONTROL</span></div><div>03 <span>REGIONAL KNOWLEDGE</span></div><div>04 <span>NO FALSE DAMAGE CLAIMS</span></div></div></section>
 
       <section className="state-hubs wrap" aria-label="Explore our founding state hubs"><div><span className="state-hub-eyebrow">FOUNDING REGIONAL EXPERIENCES</span><h2>One network. <em>Locally useful.</em></h2></div><div className="state-hub-cards"><a href="/states/texas"><span>TEXAS / HAIL &amp; WIND</span><strong>Texas Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a><a href="/states/florida"><span>FLORIDA / HURRICANES</span><strong>Florida Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a></div></section>
+
+      <HazardLenses/>
 
       <section className="predictor-feature wrap" aria-label="Introducing Storm Predictor"><div><span className="eyebrow"><span className="eyebrow-line"/> NEW / STORM INTELLIGENCE</span><h2>Meet the Storm <em>Predictor.</em></h2><p>From our existing EmpireOS storm intelligence work: a public, read-only weather research tool combining official NWS forecasts, active alerts and SPC severe-weather outlooks. No invented storm tracks. No unsupported property-damage claims.</p><a href="/predictor">Explore a ZIP forecast <ArrowRight size={17}/></a></div><div className="predictor-feature-right"><div><Radar size={26}/><span>National Weather Service</span><strong>Local forecasts &amp; alerts</strong></div><div><Layers size={26}/><span>Storm Prediction Center</span><strong>Day 1 categorical outlook</strong></div><div><ShieldCheck size={26}/><span>EmpireOS source review</span><strong>Evidence-only interpretation</strong></div></div></section>
 
