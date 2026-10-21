@@ -155,3 +155,66 @@ def test_llama_cpp_caps_evidence_before_cropping_required_instruction():
     text = captured[0]["messages"][1]["content"]
     assert len(text) <= 10000
     assert text.endswith(data.instruction)
+
+
+
+def test_llama_cpp_uses_native_constrained_json_for_original_patch_stages():
+    captured = []
+    body = json.dumps({
+        "choices": [{"message": {"content": '{"operation":"create_file"}'}}],
+    }).encode()
+
+    def capture(req, timeout):
+        captured.append(json.loads(req.data.decode("utf-8")))
+        return FakeResponse(body)
+
+    provider = LlamaCppProvider()
+    context = ContextPack("original scoped Python code", {}, (), (), 1000)
+    route = ModelRoute("llama_cpp", "qwen2.5-coder:1.5b", "local", True, 0)
+    stages = (
+        "Return STRICT JSON only using the patch strategy shape",
+        "Compare both patch strategies. Return concise critique only",
+        "Synthesize the patch. Return JSON only using exactly this shape",
+        "Rewrite the candidate into STRICT JSON ONLY",
+    )
+    with patch(
+        "empire_os.coder.llama_cpp_provider.request.urlopen",
+        side_effect=capture,
+    ):
+        for stage in stages:
+            result = provider.complete(ModelRequest(
+                task_id="existing_scoped_patch_test",
+                instruction=stage,
+                context=context,
+                route=route,
+                max_output_chars=1200,
+            ))
+            assert result.error is None
+    assert [item.get("response_format") for item in captured] == [
+        {"type": "json_object"},
+        None,
+        {"type": "json_object"},
+        {"type": "json_object"},
+    ]
+    assert [item["temperature"] for item in captured] == [0.0, 0.2, 0.0, 0.0]
+    assert all(item["max_tokens"] <= 300 for item in captured)
+
+
+def test_llama_cpp_normal_chat_stays_unconstrained():
+    captured = []
+    body = json.dumps({
+        "choices": [{"message": {"content": "A freeform code explanation"}}],
+    }).encode()
+
+    def capture(req, timeout):
+        captured.append(json.loads(req.data.decode("utf-8")))
+        return FakeResponse(body)
+
+    provider = LlamaCppProvider()
+    with patch(
+        "empire_os.coder.llama_cpp_provider.request.urlopen",
+        side_effect=capture,
+    ):
+        text = provider.chat([{"role": "user", "content": "Explain a small code change"}])
+    assert text == "A freeform code explanation"
+    assert "response_format" not in captured[0]

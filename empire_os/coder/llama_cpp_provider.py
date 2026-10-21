@@ -72,6 +72,7 @@ class LlamaCppProvider:
         messages: list[dict[str, Any]],
         temperature: float,
         max_tokens: int,
+        response_format: dict[str, str] | None = None,
     ) -> dict[str, Any]:
         payload = {
             "model": (
@@ -89,6 +90,11 @@ class LlamaCppProvider:
             ),
             "stream": False,
         }
+        # llama.cpp natively constrains JSON grammar in response_format.
+        # Prefer it for existing strict-JSON patch stages only. Critique
+        # and ordinary chat must remain unconstrained text.
+        if response_format is not None:
+            payload["response_format"] = response_format
 
         req = request.Request(
             f"{self.base_url}/v1/chat/completions",
@@ -243,10 +249,15 @@ class LlamaCppProvider:
             },
         ]
 
+        json_only = (
+            "STRICT JSON" in instruction.upper()
+            or "RETURN JSON ONLY" in instruction.upper()
+        )
         body = self._completion(
             model=model_request.route.model,
             messages=messages,
-            temperature=0.2,
+            temperature=0.0 if json_only else 0.2,
+            response_format={"type": "json_object"} if json_only else None,
             max_tokens=max(
                 64,
                 min(
