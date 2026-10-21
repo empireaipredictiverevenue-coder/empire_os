@@ -55,8 +55,11 @@ def revised_control(control: dict, start: datetime, end: datetime,
             or control.get("tracking_number") != NUMBER
             or control.get("stop_method") != "atomic_site_handoff_gate"):
         raise ValueError("recognized disabled pilot control required")
-    if type(max_handoffs) is not int or not 1 <= max_handoffs <= 10000:
-        raise ValueError("invalid maximum number of site handoffs")
+    # This launcher is for the current founder-corrected short pilot,
+    # not for a historic two-hour or recurring campaign. Keep the
+    # commercial handoff count tightly bounded even in a disabled preview.
+    if type(max_handoffs) is not int or not 1 <= max_handoffs <= 5:
+        raise ValueError("supervised pilot handoffs must be between 1 and 5")
     new = dict(control)
     new["starts_at"] = start.isoformat()
     new["ends_at"] = end.isoformat()

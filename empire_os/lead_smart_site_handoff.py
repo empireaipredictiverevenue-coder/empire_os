@@ -109,7 +109,17 @@ def _control(control: Mapping[str, Any], now: datetime) -> tuple[str, datetime]:
                 or not chicago_buyer_hours_open(now)):
             raise HandoffHeld()
     elif mode == "SUPERVISED_PILOT":
-        if not (0 < (end - start).total_seconds() <= 7200
+        elapsed_seconds = (end - start).total_seconds()
+        # The original 2h pilot is historical. After the founder explicitly
+        # revoked full-campaign scope, an operator cannot reuse those legacy
+        # limits simply by renaming the control to SUPERVISED_PILOT.
+        if control.get("full_campaign_scope_revoked") is True:
+            if not (600 <= elapsed_seconds <= 1200
+                    and control["max_site_handoffs"] <= 5
+                    and control.get("founder_authority_ref") ==
+                        "docs/evidence/lead_smart_founder_launch_intent_20261011.json"):
+                raise HandoffHeld()
+        if not (0 < elapsed_seconds <= 7200
                 and local_start.weekday() < 5
                 and local_start.date() == local_end.date()
                 and 480 <= local_start.hour * 60 + local_start.minute < 1080

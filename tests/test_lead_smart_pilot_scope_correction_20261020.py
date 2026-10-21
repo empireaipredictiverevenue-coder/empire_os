@@ -66,3 +66,38 @@ def test_legacy_full_scope_cannot_reactivate_if_correction_missing(tmp_path):
     shutil.copy2(src,dest)
     assert not (root/"docs/evidence/lead_smart_full_campaign_scope_correction_20261020.json").exists()
     assert founder_full_campaign_approved(root=root) is False
+
+
+def test_corrected_runtime_permits_only_small_supervised_window():
+    from datetime import timedelta
+    chicago_start = datetime(2026, 10, 21, 15, 0, tzinfo=timezone.utc)
+    for minutes in (10, 15, 20):
+        c = {**old_campaign(), "mode": "SUPERVISED_PILOT",
+             "enabled": True, "full_campaign_scope_revoked": True,
+             "monitoring_owner": "Founder pilot operator",
+             "max_site_handoffs": 5,
+             "starts_at": chicago_start.isoformat(),
+             "ends_at": (chicago_start+timedelta(minutes=minutes)).isoformat(),
+             "founder_authority_ref":
+                 "docs/evidence/lead_smart_founder_launch_intent_20261011.json"}
+        assert _control(c, chicago_start+timedelta(seconds=30))
+        for too_broad in (9, 21, 30, 60, 120):
+            modified = {**c, "ends_at": (
+                chicago_start+timedelta(minutes=too_broad)).isoformat()}
+            with pytest.raises(HandoffHeld):
+                _control(modified, chicago_start+timedelta(seconds=30))
+        for too_many in (6, 140, 10000):
+            with pytest.raises(HandoffHeld):
+                _control({**c, "max_site_handoffs": too_many},
+                         chicago_start+timedelta(seconds=30))
+        with pytest.raises(HandoffHeld):
+            _control({**c, "founder_authority_ref": (
+                "docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json")},
+                     chicago_start+timedelta(seconds=30))
+
+
+@pytest.mark.parametrize("excessive_handoffs", [6, 140, 10000, True, 0])
+def test_launcher_rejects_unapproved_volume_in_disabled_preview(excessive_handoffs):
+    start, end = window("2026-10-21T10:00",15)
+    with pytest.raises(ValueError):
+        revised_control(old_campaign(), start, end, excessive_handoffs)
