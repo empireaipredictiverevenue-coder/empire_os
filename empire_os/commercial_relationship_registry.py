@@ -1043,6 +1043,24 @@ def reconcile(
             founder_action = disposition["next_action"]
             action_reason = disposition["status"]
             needs_review = key == "lead-smart"
+        # If the authenticated thread's latest inbound message says a team
+        # decision is pending, keep it in the founder's review queue without
+        # proposing another chase or promoting a buyer email to authority.
+        # Older pending messages never supersede a newer reply or suppression.
+        decision_pending = (
+            record_mail_fresh and stage == "INBOUND_REVIEW_REQUIRED"
+            and not founder_excluded
+            and any(
+                event.get("event_code") == "BUYER_INTERNAL_DECISION_PENDING_REPORTED"
+                and event.get("direction") == "inbound"
+                and event.get("message_id") == record["last_inbound_message_id"]
+                for event in record.get("buyer_signal_events", [])
+            )
+        )
+        if decision_pending:
+            founder_action = "AWAIT_BUYER_INTERNAL_DECISION_NO_DUPLICATE_FOLLOWUP"
+            action_reason = "BUYER_REPORTED_INTERNAL_DECISION_PENDING"
+            needs_review = True
         if founder_excluded:
             founder_action = "DO_NOT_PURSUE_NO_CONTACT"
             needs_review = False

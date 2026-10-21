@@ -216,5 +216,26 @@ def test_pending_decision_event_flows_into_registry_without_launch_authority():
     assert any(e["event_code"] == "BUYER_INTERNAL_DECISION_PENDING_REPORTED"
                for e in row["automatically_recognized_buyer_events"])
     assert row["recognized_buyer_events_are_verified"] is False
+    assert row["next_founder_action"] == "AWAIT_BUYER_INTERNAL_DECISION_NO_DUPLICATE_FOLLOWUP"
+    assert row["founder_action_reason"] == "BUYER_REPORTED_INTERNAL_DECISION_PENDING"
+    assert row["founder_review_required"] is True
+    assert row["stage"] == "INBOUND_REVIEW_REQUIRED"
     assert row["outbound_authorized"] is False
     assert report["execution_authority"] == "NONE"
+
+    # A newer, different inbound message supersedes the pending decision;
+    # a founder suppression must also retain absolute priority.
+    newer = deepcopy(updated)
+    newer_lead = next(x for x in newer["threads"] if x["entity_key"] == "lead-smart")
+    newer_lead["last_inbound_message_id"] = "abcdef0123456789"
+    changed = reconcile(newer, {"candidate_count":0, "candidates":[]},
+                        {"shortlisted_count":0, "targets":[]}, now=now,
+                        do_not_pursue_domains=frozenset())
+    latest = next(x for x in changed["relationships"] if x["entity_key"] == "lead-smart")
+    assert latest["next_founder_action"] != "AWAIT_BUYER_INTERNAL_DECISION_NO_DUPLICATE_FOLLOWUP"
+    suppressed = reconcile(updated, {"candidate_count":0, "candidates":[]},
+                           {"shortlisted_count":0, "targets":[]}, now=now,
+                           do_not_pursue_domains=frozenset({"leadsmartinc.com"}))
+    blocked = next(x for x in suppressed["relationships"] if x["entity_key"] == "lead-smart")
+    assert blocked["next_founder_action"] == "DO_NOT_PURSUE_NO_CONTACT"
+    assert blocked["outbound_authorized"] is False
