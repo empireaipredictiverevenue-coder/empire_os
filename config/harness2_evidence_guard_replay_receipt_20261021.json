@@ -1,0 +1,51 @@
+{
+  "schema_version": "empire.astra.harness2_real_source_replay.v1",
+  "upstream_recursion_executed": true,
+  "real_sources_from_archived_run": true,
+  "recorded_model_outputs_replayed": true,
+  "fresh_model_calls": 0,
+  "harness_done": 2,
+  "harness_failed": 0,
+  "measured": {
+    "schema_version": "empire.astra.harness2_guard_comparison.v1",
+    "basis": "ORIGINAL_REDACTED_RUNTIME_SNAPSHOTS",
+    "tasks": {
+      "conversion": {
+        "baseline": {
+          "flags_ok": true,
+          "source_numbers_grounded": false,
+          "unsupported_accusations_or_corrections": false,
+          "pass": false
+        },
+        "guarded": {
+          "flags_ok": true,
+          "source_numbers_grounded": true,
+          "unsupported_accusations_or_corrections": false,
+          "pass": true
+        }
+      },
+      "acquisition": {
+        "baseline": {
+          "flags_ok": true,
+          "source_numbers_grounded": false,
+          "unsupported_accusations_or_corrections": false,
+          "pass": false
+        },
+        "guarded": {
+          "flags_ok": true,
+          "source_numbers_grounded": true,
+          "unsupported_accusations_or_corrections": false,
+          "pass": true
+        }
+      }
+    },
+    "baseline_passed": 0,
+    "guarded_passed": 2,
+    "task_count": 2,
+    "improves_evidence_grounding": true,
+    "production_activation_authorized": false,
+    "model_generated_code_executed": false,
+    "realized_revenue_improvement_proven": false
+  },
+  "production_promotion_authorized": false
+}

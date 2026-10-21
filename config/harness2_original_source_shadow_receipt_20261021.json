@@ -1,0 +1,48 @@
+{
+  "baseline_passed": 0,
+  "commercial_performance_improvement_verified": false,
+  "execution_authority": "none",
+  "generated_at": "2026-10-21T12:38:31.120512+00:00",
+  "guarded_passed": 3,
+  "independent_holdout_verified": false,
+  "independently_verified_agent_completions": 0,
+  "model_calls_attempted": 3,
+  "model_calls_succeeded": 3,
+  "production_promotion_authorized": false,
+  "schema_version": "empire.harness2.original_source_shadow_review_receipt.v1",
+  "skillforge_auto_approval": false,
+  "source": "three_original_read_only_empireos_observation_snapshots",
+  "source_owner_authentication_verified": false,
+  "tasks": [
+    {
+      "baseline_pass": false,
+      "commercial_outcome_verified": false,
+      "distinct_department_completion_proven": false,
+      "guarded_pass": true,
+      "model_call_status": "EVALUATED",
+      "original_observation_time": "2026-10-21T12:37:23.849834+00:00",
+      "original_source_sha256": "c3be4c5afcb4e11bdc8e816b6bd6d7c69c0f9af6018456f74cfd76610a399734",
+      "task_kind": "conversion"
+    },
+    {
+      "baseline_pass": false,
+      "commercial_outcome_verified": false,
+      "distinct_department_completion_proven": false,
+      "guarded_pass": true,
+      "model_call_status": "EVALUATED",
+      "original_observation_time": "2026-10-21T12:38:12.761386+00:00",
+      "original_source_sha256": "bd10604d9588bde8493dfdfbc1e65dc89dce53cddcc59c47251d68de83cb7710",
+      "task_kind": "acquisition"
+    },
+    {
+      "baseline_pass": false,
+      "commercial_outcome_verified": false,
+      "distinct_department_completion_proven": false,
+      "guarded_pass": true,
+      "model_call_status": "EVALUATED",
+      "original_observation_time": "2026-10-21T12:33:28.850105+00:00",
+      "original_source_sha256": "ff56cecac906ddf996a350bb9f8ce0e9c9c982b5a0ff7f13fb09e2255578251b",
+      "task_kind": "revenue"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "approved": false,
+  "baseline_grounding_pass_count": 0,
+  "candidate_id": "empire-harness2-evidence-guard-v1",
+  "execution_authority": "none",
+  "fresh_trial_path": "config/harness2_original_source_shadow_receipt_20261021.json",
+  "fresh_trial_sha256": "ad223691b56acf7408116e77ba2fcb480d997b21d7aef4693f346176f902a49b",
+  "guarded_grounding_pass_count": 2,
+  "independent_holdout_verified": false,
+  "independent_real_agent_completions": 0,
+  "model_driven_recursion_success_independently_verified": false,
+  "model_generated_patch_executed": false,
+  "original_evidence_tasks": 2,
+  "procedure_code_path": "empire_os/astra_harness_evidence_guard.py",
+  "procedure_code_sha256": "37ea1e50f5ed0d93bbb03c5f03f006ec44402a23dbcbc373b0be6a83ef8a3a2b",
+  "schema_version": "empire.skillforge.harness2_candidate.v1",
+  "skill_available_to_agents": false,
+  "source_replay_path": "config/harness2_evidence_guard_replay_receipt_20261021.json",
+  "source_replay_sha256": "2a70ec860ffc1ef31061893f66e887ba5029d2b88e2168a99777f95b6991efe3",
+  "source_review_schema": "empire.astra.harness2_guard_comparison.v1",
+  "status": "REVIEW_REQUIRED"
+}
