@@ -292,3 +292,47 @@ export type QuoraJevShadowReview = {
 export function getQuoraJevShadowReview() {
   return request<QuoraJevShadowReview>("/v1/search/quora/jev-shadow/review");
 }
+
+
+/** High-level Jev SEO task portfolio: observable evidence, no model execution. */
+export type SeoJevDepartmentReview = {
+  schema_version: "empire.search.jev_department_portfolio.v1";
+  mode: "OBSERVE";
+  scope: "EXISTING_SEO_DEPARTMENT";
+  task_count: number;
+  aggregate_observed_lane_count: number;
+  independent_case_evaluation_ready_count: 0;
+  origin_quora_questions_verified: 0;
+  jev_provider: "disabled";
+  jev_inference_calls: 0;
+  jev_scores_generated: 0;
+  provider_keys_accessed: false;
+  external_requests_performed_by_review: false;
+  typed_decision_plan_only: true;
+  database_writes: false;
+  publication_authority: false;
+  buyer_outreach_authority: false;
+  payment_authority: false;
+  execution_authority: "NONE";
+  task_board: Array<{
+    task_id: string;
+    title: string;
+    existing_owner: string;
+    risk_class: "medium" | "high";
+    evidence_state: "AGGREGATE_REVIEW_AVAILABLE" | "ORIGINAL_EVIDENCE_REQUIRED";
+    next_evidence_action: string;
+    jev_decision_goal: string;
+    aggregate_scalar_evidence: Record<string, number>;
+    labeled_real_cases: 0;
+    jev_prediction: null;
+    jev_score: null;
+    jev_confidence: null;
+    model_evaluation_authorized: false;
+    automatic_execution_authorized: false;
+    publishing_authorized: false;
+  }>;
+};
+
+export function getSeoJevDepartmentReview() {
+  return request<SeoJevDepartmentReview>("/v1/search/jev/department/review");
+}

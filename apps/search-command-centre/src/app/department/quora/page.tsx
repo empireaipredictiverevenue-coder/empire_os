@@ -3,8 +3,8 @@ import { connection } from "next/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
-  getQuoraResearchReview, getQuoraJevShadowReview,
-  type QuoraResearchReview, type QuoraJevShadowReview,
+  getQuoraResearchReview, getQuoraJevShadowReview, getSeoJevDepartmentReview,
+  type QuoraResearchReview, type QuoraJevShadowReview, type SeoJevDepartmentReview,
 } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -54,6 +54,32 @@ function trustedJev(
     && value.jev_use_case_readiness.provider_activation === false;
 }
 
+function trustedDepartment(
+  value: SeoJevDepartmentReview | null,
+): value is SeoJevDepartmentReview {
+  return !!value
+    && value.schema_version === "empire.search.jev_department_portfolio.v1"
+    && value.mode === "OBSERVE"
+    && value.scope === "EXISTING_SEO_DEPARTMENT"
+    && value.execution_authority === "NONE"
+    && value.jev_provider === "disabled"
+    && value.jev_inference_calls === 0 && value.jev_scores_generated === 0
+    && value.independent_case_evaluation_ready_count === 0
+    && value.external_requests_performed_by_review === false
+    && value.provider_keys_accessed === false
+    && value.typed_decision_plan_only === true
+    && value.database_writes === false && value.publication_authority === false
+    && value.buyer_outreach_authority === false && value.payment_authority === false
+    && value.task_count <= 20 && Array.isArray(value.task_board)
+    && value.task_board.length === value.task_count
+    && value.task_board.every(x =>
+       x.jev_prediction === null && x.jev_score === null
+       && x.model_evaluation_authorized === false
+       && x.automatic_execution_authorized === false
+       && x.publishing_authorized === false
+    );
+}
+
 const VERTICALS = [
   {key:"roofing",label:"Roofing and replacement"},
   {key:"hvac",label:"HVAC and heat pumps"},
@@ -88,12 +114,14 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const [response, jevResponse] = await Promise.all([
-    getQuoraResearchReview(), getQuoraJevShadowReview(),
+  const [response, jevResponse, departmentResponse] = await Promise.all([
+    getQuoraResearchReview(), getQuoraJevShadowReview(), getSeoJevDepartmentReview(),
   ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
   const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
     ? jevResponse.data : null;
+  const department = departmentResponse.ok && trustedDepartment(departmentResponse.data)
+    ? departmentResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -130,6 +158,39 @@ export default async function QuoraResearchDepartment() {
               <p>Evidence blockers: {jev.typed_decision_task_readiness.blockers.map(x => x.replaceAll("_"," ").toLowerCase()).join(" · ")}</p>
               <p>No automatic publication, outbound or third-party AI spending. Original Quora questions and independently reviewed labels are required before model evaluation.</p>
             </> : <p className={styles.cardDescription}>Jev evidence readiness is not independently available. No model activation or inference is assumed.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="seo-jev-portfolio">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>02 / SEO DEPARTMENT STRATEGY</span>
+            <h2 id="seo-jev-portfolio">High-level Jev decisions</h2>
+          </div><span>REVIEW ONLY</span></div>
+          <div className={styles.platformCard}>
+            {department ? <>
+              <p className={styles.cardDescription}>{department.task_count} decision tasks across the existing SEO department; {department.aggregate_observed_lane_count} have aggregate evidence to investigate. There are no Jev model scores, verified case labels or authorised automatic actions.</p>
+              <details open><summary><strong>Observed evidence to investigate</strong></summary>
+                <ol className={styles.todoList}>
+                  {department.task_board.filter(x=>x.evidence_state==="AGGREGATE_REVIEW_AVAILABLE").map((task,i)=><li key={task.task_id}>
+                    <span>{String(i+1).padStart(2,"0")}</span><div>
+                      <strong>{task.title}</strong>
+                      <small>{task.existing_owner} · Source aggregates, not Jev scores</small>
+                      <p>{task.next_evidence_action.replaceAll("_"," ").toLowerCase()}</p>
+                    </div>
+                  </li>)}
+                </ol>
+              </details>
+              <details><summary><strong>Held for original evidence</strong> — {department.task_count-department.aggregate_observed_lane_count}</summary>
+                <ol className={styles.todoList}>
+                  {department.task_board.filter(x=>x.evidence_state==="ORIGINAL_EVIDENCE_REQUIRED").map((task,i)=><li key={task.task_id}>
+                    <span>{String(i+1).padStart(2,"0")}</span><div>
+                      <strong>{task.title}</strong>
+                      <small>{task.existing_owner} · Human evidence review required</small>
+                      <p>{task.next_evidence_action.replaceAll("_"," ").toLowerCase()}</p>
+                    </div>
+                  </li>)}
+                </ol>
+              </details>
+            </> : <p className={styles.cardDescription}>The aggregate SEO department evidence board is unavailable or its safety contract did not verify. No work prioritisation has been inferred.</p>}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="quora-queue">
