@@ -1,0 +1,35 @@
+{
+  "execution_authority": "none",
+  "historical_source_commit_path_matches": 0,
+  "independent_code_implementations_verified": 0,
+  "individual_original_receipts": [
+    {
+      "automatic_skill_promotion": false,
+      "execution_authority": "none",
+      "explicit_original_implementation_commit_present": false,
+      "git_commit_path_set_confirmed": false,
+      "historical_verify_receipt_sha256": "03c8108bdd32f65678ed4f7d8cdae0e1024b35f0dcbcd443b5cfbec2da87a4bd",
+      "independently_verified_implementation": false,
+      "source_deployment_verified": false,
+      "status": "MISSING_EXPLICIT_IMPLEMENTATION_COMMIT"
+    },
+    {
+      "automatic_skill_promotion": false,
+      "execution_authority": "none",
+      "explicit_original_implementation_commit_present": false,
+      "git_commit_path_set_confirmed": false,
+      "historical_verify_receipt_sha256": "d18fe0d7666b12bb06ece91c1da3b5de2b065aa6b4acb0189aa749db09aa8536",
+      "independently_verified_implementation": false,
+      "source_deployment_verified": false,
+      "status": "MISSING_EXPLICIT_IMPLEMENTATION_COMMIT"
+    }
+  ],
+  "missing_explicit_implementation_commit_count": 2,
+  "mode": "ORIGINAL_SOURCE_READONLY",
+  "original_test_revision_reproduced": false,
+  "production_deployment_authenticated": false,
+  "schema_version": "empire.skillforge.coder_patch_provenance_audit.v1",
+  "selected_original_job_count": 2,
+  "skillforge_auto_approval": false,
+  "status": "MISSING_EXPLICIT_HISTORICAL_IMPLEMENTATION_COMMITS"
+}

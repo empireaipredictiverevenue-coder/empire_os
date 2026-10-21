@@ -113,3 +113,91 @@ def read_pinned_coder_replay(root:Path)->dict[str,Any]:
         }
     except (OSError,ValueError,TypeError,UnicodeError,subprocess.SubprocessError):
         return _base("REPLAY_TAMPER_OR_UNSAFE_ARTIFACT")
+
+
+PINNED_PATCH_PROVENANCE = Path("config/skillforge_coder_patch_provenance_20261021.json")
+PINNED_PATCH_SHA256 = "1b29644f7e8c07d7c067042588ab09ee8ee685a387986332d3871a881950a94e"
+
+
+def read_pinned_coder_patch_provenance(root:Path)->dict[str,Any]:
+    """Check original job-matched negative provenance evidence, never approve."""
+    root=Path(root).resolve()
+    hold={
+        "schema_version":"empire.skillforge.coder_patch_provenance_review.v1",
+        "status":"PINNED_ORIGINAL_PATCH_PROVENANCE_UNAVAILABLE",
+        "original_jobs_missing_implementation_commit":0,
+        "original_git_commit_path_matches":0,
+        "historical_source_revision_reproduced":False,
+        "independent_implementation_verified":False,
+        "auto_skill_approval_authorized":False,
+        "execution_authority":"none",
+    }
+    path=root/PINNED_PATCH_PROVENANCE
+    if not path.exists() and not path.is_symlink():
+        return hold
+    try:
+        if (path.is_symlink() or path.parent.is_symlink()
+            or not path.is_file() or not 0<path.stat().st_size<=12000):
+            raise ValueError("unsafe provenance receipt")
+        raw=path.read_bytes()
+        if sha256(raw).hexdigest()!=PINNED_PATCH_SHA256:
+            raise ValueError("changed pinned provenance receipt")
+        row=json.loads(raw)
+        if not isinstance(row,dict):
+            raise ValueError("invalid source audit")
+        # The pinned test-replay review has already checked the source Git
+        # test hashes. Its original receipt digests must match our separate
+        # *negative* patch-provenance receipt exactly.
+        pinned=read_pinned_coder_replay(root)
+        if pinned["status"]!="PINNED_CURRENT_REVISION_TEST_REPLAY_REVIEW_ONLY":
+            raise ValueError("original replay has not been authenticated")
+        replay=json.loads((root/PINNED_REPLAY).read_bytes())
+        original={r["historical_verify_receipt_sha256"]
+                  for r in replay["historical_original_receipts"]}
+        items=row.get("individual_original_receipts")
+        exact={
+            "schema_version":"empire.skillforge.coder_patch_provenance_audit.v1",
+            "mode":"ORIGINAL_SOURCE_READONLY",
+            "status":"MISSING_EXPLICIT_HISTORICAL_IMPLEMENTATION_COMMITS",
+            "selected_original_job_count":2,
+            "historical_source_commit_path_matches":0,
+            "missing_explicit_implementation_commit_count":2,
+            "independent_code_implementations_verified":0,
+            "original_test_revision_reproduced":False,
+            "production_deployment_authenticated":False,
+            "skillforge_auto_approval":False,
+            "execution_authority":"none",
+        }
+        if any(row.get(k)!=v for k,v in exact.items()):
+            raise ValueError("original patch provenance holds changed")
+        if (not isinstance(items,list) or len(items)!=2
+            or {item.get("historical_verify_receipt_sha256")
+                for item in items if isinstance(item,dict)}!=original):
+            raise ValueError("original source receipt digests mismatched")
+        for item in items:
+            expected={
+                "status":"MISSING_EXPLICIT_IMPLEMENTATION_COMMIT",
+                "explicit_original_implementation_commit_present":False,
+                "git_commit_path_set_confirmed":False,
+                "independently_verified_implementation":False,
+                "source_deployment_verified":False,
+                "automatic_skill_promotion":False,
+                "execution_authority":"none",
+            }
+            if (set(item)!=set(expected)|{"historical_verify_receipt_sha256"}
+                or any(item.get(k)!=v for k,v in expected.items())):
+                raise ValueError("ineligible original patch attribution")
+        return {
+            **hold,
+            "status":"PINNED_ORIGINAL_PATCH_PROVENANCE_HOLD",
+            "original_jobs_missing_implementation_commit":2,
+            "pinned_receipt_sha256":PINNED_PATCH_SHA256,
+            "missing_owner_evidence_requirement":(
+                "Original Coder implementation commit SHA and exact changed "
+                "files, independently verified against the source revision"),
+        }
+    except (OSError,ValueError,TypeError,UnicodeError):
+        return {
+            **hold,
+            "status":"PINNED_ORIGINAL_PATCH_PROVENANCE_TAMPER_HOLD",
+        }

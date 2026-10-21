@@ -370,12 +370,15 @@ def refresh_review_packets(root: Path) -> dict[str, Any]:
     # promotes a skill, dispatches a task or changes source data. A broken
     # SkillForge source audit cannot block unrelated review packets.
     from empire_os.skillforge_independent_evidence import review_independent_skill_evidence
-    from empire_os.skillforge_coder_replay_review import read_pinned_coder_replay
+    from empire_os.skillforge_coder_replay_review import (
+        read_pinned_coder_replay, read_pinned_coder_patch_provenance,
+    )
     from empire_os.astra_review_queue_bridge import merge_skillforge_evidence_into_review_plan
     try:
         _diversity=review_independent_skill_evidence(root)
         if _diversity["status"]=="SOURCE_DIVERSITY_REVIEW_ONLY":
             _diversity["coder_current_revision_replay"]=read_pinned_coder_replay(root)
+            _diversity["coder_original_patch_provenance"]=read_pinned_coder_patch_provenance(root)
             output=merge_skillforge_evidence_into_review_plan(output,_diversity)
     except (OSError,ValueError,TypeError,UnicodeError):
         pass

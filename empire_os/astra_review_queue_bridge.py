@@ -145,6 +145,25 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             replay_test_files=3
         elif replay.get('recorded_current_revision_tests_passed') is not False:
             raise ValueError('non-pinned replay cannot claim pass')
+    source_patch=source.get('coder_original_patch_provenance')
+    source_patch_status="NOT_AVAILABLE"
+    source_patch_missing=0
+    if source_patch is not None:
+        if (not isinstance(source_patch,Mapping)
+            or source_patch.get('schema_version')!='empire.skillforge.coder_patch_provenance_review.v1'
+            or source_patch.get('auto_skill_approval_authorized') is not False
+            or source_patch.get('independent_implementation_verified') is not False
+            or source_patch.get('historical_source_revision_reproduced') is not False
+            or source_patch.get('original_git_commit_path_matches')!=0
+            or source_patch.get('execution_authority')!='none'):
+            raise ValueError('original patch provenance not owner approved')
+        source_patch_status=source_patch.get('status')
+        if source_patch_status=="PINNED_ORIGINAL_PATCH_PROVENANCE_HOLD":
+            if source_patch.get('original_jobs_missing_implementation_commit')!=2:
+                raise ValueError('unexpected historical patch provenance')
+            source_patch_missing=2
+        elif source_patch.get('original_jobs_missing_implementation_commit')!=0:
+            raise ValueError('untrusted missing commit observation')
     packets={row['task_id']:row for row in existing.get('review_packets',[])
              if isinstance(row,Mapping) and isinstance(row.get('task_id'),str)}
     for family in families:
@@ -244,6 +263,10 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'current_revision_replay_fixed_test_file_count':(
                 replay_test_files if component=='empire_coder' else 0),
             'current_revision_replay_is_not_historical_implementation_proof':True,
+            'original_coder_patch_provenance_status':(
+                source_patch_status if component=='empire_coder' else 'NOT_APPLICABLE'),
+            'historical_verify_receipts_missing_implementation_commits':(
+                source_patch_missing if component=='empire_coder' else 0),
             'independently_verified_code_implementations':0,
             'source_schema':source['schema_version'],
             'next_review_action':(
