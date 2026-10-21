@@ -29,7 +29,9 @@ ALTER TABLE public.commercial_events
   ADD COLUMN product_id uuid,
   ADD COLUMN opportunity_id uuid,
   ADD COLUMN event_type text,
-  ADD COLUMN payload jsonb NOT NULL DEFAULT '{}'::jsonb;
+  ADD COLUMN payload jsonb NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN occurred_at timestamptz NOT NULL DEFAULT now(),
+  ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
 
 UPDATE public.fulfilment_orders SET
   product_id='a1111111-1111-4111-8111-111111111111'::uuid,

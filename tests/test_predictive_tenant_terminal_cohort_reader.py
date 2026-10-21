@@ -39,7 +39,7 @@ class CandidateCursor(Cursor):
     def fetchall(self):
         sql, params = self.last
         if sql == CANDIDATE_SQL:
-            assert params == (LIMIT + 1,)
+            assert params == (NOW, NOW, LIMIT + 1)
             return self.settings.get("candidates", [])
         return super().fetchall()
 

@@ -34,6 +34,10 @@ SELECT o.id::text,o.product_id::text,o.buyer_id::text,
           AND ce.product_id=o.product_id
           AND ce.opportunity_id IS NOT DISTINCT FROM o.opportunity_id
           AND ce.payload->>'actual_revenue'='true'
+          AND ce.occurred_at >= o.created_at
+          AND ce.created_at >= o.created_at
+          AND ce.occurred_at <= %s
+          AND ce.created_at <= %s
        ) AS recognized_event_candidates
 FROM public.fulfilment_orders o
 JOIN public.commercial_outcomes co ON co.fulfilment_order_id=o.id
@@ -76,11 +80,15 @@ def _rows_report(rows: Any, *, tenant: str, as_of: datetime) -> dict[str, Any]:
             "candidate_terminal_wins": None,
             "candidate_terminal_losses": None,
             "candidate_revenue_events_present": None,
+            "candidate_products_observed": None,
+            "largest_candidate_product_terminal_cohort": None,
+            "candidate_product_cohorts_reaching_20": None,
             "source_census_complete": False,
         }
     seen_outcomes: set[str] = set()
     seen_orders: set[str] = set()
     wins = losses = events = 0
+    per_product: dict[str, int] = {}
     for item in rows:
         if type(item) not in (list, tuple) or len(item) != 14:
             raise TenantCohortSourceHold("canonical row shape invalid")
@@ -112,6 +120,7 @@ def _rows_report(rows: Any, *, tenant: str, as_of: datetime) -> dict[str, Any]:
             if event_count:
                 raise TenantCohortSourceHold("loss and recognized revenue conflict")
             losses += 1
+        per_product[product] = per_product.get(product, 0) + 1
         seen_outcomes.add(outcome)
         seen_orders.add(order)
     return {
@@ -120,6 +129,9 @@ def _rows_report(rows: Any, *, tenant: str, as_of: datetime) -> dict[str, Any]:
         "candidate_terminal_wins": wins,
         "candidate_terminal_losses": losses,
         "candidate_revenue_events_present": events,
+        "candidate_products_observed": len(per_product),
+        "largest_candidate_product_terminal_cohort": max(per_product.values(), default=0),
+        "candidate_product_cohorts_reaching_20": sum(size >= 20 for size in per_product.values()),
         "source_census_complete": False,  # an as-of bounded read is not lifetime completeness
     }
 
@@ -176,7 +188,7 @@ def read_tenant_terminal_candidates(
                 report = _catalogue(tables, policies)
                 if not all(all(flags.values()) for flags in report.values()):
                     raise TenantCohortSourceHold("tenant table policies missing")
-                cur.execute(CANDIDATE_SQL, (LIMIT + 1,))
+                cur.execute(CANDIDATE_SQL, (now, now, LIMIT + 1))
                 candidates = cur.fetchall()
                 stats = _rows_report(candidates, tenant=tenant, as_of=now)
     except Exception:
