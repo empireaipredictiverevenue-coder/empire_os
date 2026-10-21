@@ -59,7 +59,9 @@ def test_handoff_returns_explicit_final_phone_choice_only_after_admission(monkey
     assert "keeps call recordings indefinitely" in preview.text
     assert calls == []  # Merely previewing must not consume a permit.
     response = CLIENT.post(
-        "/roofing/pilot-handoff", data={"zip": "10001", "recording_consent": "yes"},
+        "/roofing/pilot-handoff", data={"zip": "10001", "recording_consent": "yes",
+              "property_owner": "yes", "roof_project": "replacement",
+              "independent_request": "yes"},
         headers={"origin": "https://empire-ai.co.uk"},
     )
     assert response.status_code == 200
@@ -83,7 +85,9 @@ def test_denied_zip_and_failed_reservation_never_reveal_phone(monkeypatch):
     def unavailable(*_args, **_kwargs):
         raise HandoffHeld()
     monkeypatch.setattr(handoff, "reserve_site_handoff", unavailable)
-    denied_again = CLIENT.post("/roofing/pilot-handoff", data={"zip": "10001", "recording_consent": "yes"}, headers={"origin": "https://empire-ai.co.uk"})
+    denied_again = CLIENT.post("/roofing/pilot-handoff", data={"zip": "10001", "recording_consent": "yes",
+              "property_owner": "yes", "roof_project": "replacement",
+              "independent_request": "yes"}, headers={"origin": "https://empire-ai.co.uk"})
     assert denied_again.status_code == 503
     assert "tel:" not in denied_again.text
 
@@ -102,7 +106,10 @@ def test_acknowledgment_rechecks_live_eligibility_before_phone(monkeypatch):
     assert first.status_code == 200
     assert "href='tel:" not in first.text
     second = CLIENT.post("/roofing/pilot-handoff",
-                         data={"zip": "60601", "recording_consent": "yes"},
+                         data={"zip": "60601", "recording_consent": "yes",
+                               "property_owner": "yes",
+                               "roof_project": "installation",
+                               "independent_request": "yes"},
                          headers={"origin": "https://empire-ai.co.uk"})
     assert second.status_code == 503
     assert "tel:" not in second.text
@@ -168,3 +175,43 @@ def test_roofing_consent_page_links_specific_notice_not_only_youtube_policy(monk
     assert "/roofing/call-privacy" in response.text
     assert "recording_consent" in response.text
     assert "tel:" not in response.text
+
+def test_pre_dial_screen_requires_owner_and_eligible_roofing_scope(monkeypatch):
+    # No form claim is identity verification or a buyer-accepted payable event.
+    monkeypatch.setattr(handoff, "call_available", lambda _zip: True)
+    reserved = []
+    monkeypatch.setattr(handoff, "reserve_site_handoff",
+                        lambda *_args, **_kwargs: reserved.append(True))
+    url = "/roofing/pilot-handoff"
+    headers = {"origin": "https://empire-ai.co.uk"}
+    preview = CLIENT.post(url, data={"zip": "60601"}, headers=headers)
+    assert preview.status_code == 200
+    for field in ("property_owner", "roof_project", "independent_request",
+                  "recording_consent"):
+        assert f"name='{field}'" in preview.text
+    assert "tel:" not in preview.text
+    valid = {"zip": "60601", "property_owner": "yes",
+             "roof_project": "replacement", "independent_request": "yes",
+             "recording_consent": "yes"}
+    bad_cases = [
+        {"zip": "60601", "recording_consent": "yes"},  # old consent-only bypass
+        {**valid, "property_owner": "no"},
+        {**valid, "roof_project": "repair"},
+        {**valid, "roof_project": "inspection"},
+        {**valid, "roof_project": "storm"},
+        {**valid, "independent_request": "no"},
+        {**valid, "recording_consent": "no"},
+        {**valid, "property_owner": ""},
+        {**valid, "extra": "extra"},
+    ]
+    for case in bad_cases:
+        res = CLIENT.post(url, data=case, headers=headers)
+        assert res.status_code == 422
+        assert "tel:" not in res.text
+    duplicated = CLIENT.post(
+        url, content=("zip=60601&property_owner=yes&property_owner=yes"
+                      "&roof_project=replacement&independent_request=yes"
+                      "&recording_consent=yes"),
+        headers={**headers, "content-type": "application/x-www-form-urlencoded"})
+    assert duplicated.status_code == 422
+    assert not reserved  # No dial-link permits or traffic from invalid forms.

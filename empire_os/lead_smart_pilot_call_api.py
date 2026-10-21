@@ -117,7 +117,8 @@ async def public_roofing_pilot_handoff(request: Request):
     if request.headers.get("content-type", "").split(";")[0].strip().lower() != "application/x-www-form-urlencoded":
         return JSONResponse({"status": "INVALID_REQUEST"}, status_code=415, headers=HEADERS)
     body = await request.body()
-    if len(body) > 96:
+    # Bounded self-reported eligibility fields; no identity/PII is collected.
+    if len(body) > 192:
         return JSONResponse({"status": "INVALID_REQUEST"}, status_code=422, headers=HEADERS)
     try:
         fields = parse_qs(body.decode("ascii"), strict_parsing=True, keep_blank_values=True)
@@ -126,10 +127,21 @@ async def public_roofing_pilot_handoff(request: Request):
     # The buyer requires call recording. The first ZIP submission must never
     # disclose a dial link or consume a handoff permit. A separate, affirmative
     # visitor choice is required BEFORE the site offers the phone link.
-    acknowledgment = set(fields) == {"zip", "recording_consent"}
-    if (set(fields) not in ({"zip"}, {"zip", "recording_consent"})
+    qualified_fields = {
+        "zip", "recording_consent", "property_owner",
+        "roof_project", "independent_request",
+    }
+    acknowledgment = set(fields) == qualified_fields
+    if (set(fields) not in ({"zip"}, qualified_fields)
             or len(fields.get("zip", [])) != 1
-            or (acknowledgment and fields.get("recording_consent") != ["yes"])):
+            or (acknowledgment and (
+                fields.get("recording_consent") != ["yes"]
+                or fields.get("property_owner") != ["yes"]
+                or fields.get("roof_project") not in (["replacement"], ["installation"])
+                or fields.get("independent_request") != ["yes"]
+            ))):
+        # Answers are not retained, and cannot verify actual ownership,
+        # buyer acceptance, project qualification or a payable event.
         return JSONResponse({"status": "INVALID_REQUEST"}, status_code=422, headers=HEADERS)
     zip_code = fields["zip"][0]
     if not re.fullmatch(r"[0-9]{5}", zip_code):
@@ -156,6 +168,22 @@ async def public_roofing_pilot_handoff(request: Request):
             "If you do not agree to recording, do not place the call.</p>"
             "<form method='post' action='/roofing/pilot-handoff'>"
             f"<input type='hidden' name='zip' value='{zip_code}'>"
+            "<p>This call option is only for property-owning homeowners who "
+            "genuinely need roof replacement or new roof installation. "
+            "Renters, repair-only or inspection-only enquiries, solicitors, "
+            "and rewarded or coached calls are not eligible.</p>"
+            "<fieldset><legend>Check your project before calling</legend>"
+            "<label><input type='checkbox' name='property_owner' value='yes' "
+            "required> I own the property and am calling about my own roof.</label>"
+            "<label> Type of project: <select name='roof_project' required>"
+            "<option value=''>Select your project</option>"
+            "<option value='replacement'>Roof replacement</option>"
+            "<option value='installation'>New roof installation</option>"
+            "</select></label>"
+            "<label><input type='checkbox' name='independent_request' value='yes' "
+            "required> This is a genuine, voluntary project enquiry; I have not "
+            "been paid, rewarded or coached to make this call.</label>"
+            "</fieldset>"
             "<label><input type='checkbox' name='recording_consent' value='yes' "
             "required> I understand the recording and sharing described above "
             "and agree to proceed with a recorded call.</label>"
