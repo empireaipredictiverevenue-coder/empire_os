@@ -12,12 +12,18 @@ from empire_os.predictive_catalog_readiness_bridge import (
     ROOT_CATALOGUE, MAX_CLOCK_SKEW_SECONDS,
     ProductContractHold, _read_bounded_file, _review_catalogue, _stamp,
 )
+from empire_os.predictive_comparison_gap_report import (
+    build_comparison_gap_report,
+)
 
 
 def main(argv=None) -> int:
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--read-only", action="store_true", required=True)
-    parser.add_argument("--all-products", action="store_true")
+    mode=parser.add_mutually_exclusive_group()
+    mode.add_argument("--all-products", action="store_true")
+    mode.add_argument("--gaps", action="store_true")
+    mode.add_argument("--product-code")
     args=parser.parse_args(argv)
     try:
         now=datetime.now(timezone.utc)
@@ -31,7 +37,25 @@ def main(argv=None) -> int:
         report["source_original_empiredb_issuer_authenticated"]=False
         report["original_catalogue_sha256_change_detection_only"]=digest
         report["source_age_seconds"]=admitted["catalogue_age_seconds"]
-        if not args.all_products:
+        if args.gaps:
+            gaps=build_comparison_gap_report(report)
+            gaps["source_root_owned_snapshot_custody_verified"]=True
+            gaps["source_original_empiredb_issuer_authenticated"]=False
+            gaps["original_catalogue_sha256_change_detection_only"]=digest
+            gaps["source_age_seconds"]=admitted["catalogue_age_seconds"]
+            report=gaps
+        elif args.product_code is not None:
+            if (len(args.product_code)>90 or
+                    not all(c in "abcdefghijklmnopqrstuvwxyz0123456789_" for c in args.product_code)):
+                raise CataloguePricingHold("invalid original SKU identity")
+            matches=[row for row in report["products"]
+                     if row["product_code"]==args.product_code]
+            if len(matches)!=1:
+                raise CataloguePricingHold("original SKU is not in catalogue")
+            report["products"]=matches
+            report["selected_product_code"]=args.product_code
+            report["selected_product_read_only"]=True
+        elif not args.all_products:
             report.pop("products")
         print(json.dumps(report, sort_keys=True, allow_nan=False))
         return 0

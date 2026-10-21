@@ -28,12 +28,16 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command="${1}"
-if [[ "$command" == "commercial-intake" ]]; then
+if [[ "$command" == "comparison-product" ]]; then
+  if [[ "$#" -ne 2 || ! "$2" =~ ^[a-z0-9_]{2,90}$ ]]; then
+    echo "COMPARISON_REQUIRES_EXACT_CATALOGUE_PRODUCT_CODE" >&2; exit 2
+  fi
+elif [[ "$command" == "commercial-intake" ]]; then
   if [[ "$#" -ne 2 ]]; then
     echo "COMMERCIAL_INTAKE_REQUIRES_ORIGINAL_SOURCE_FILE" >&2
     echo "Use: empire-predictive-observe commercial-template > /home/ubuntu/commercial_requirement.json" >&2
@@ -67,7 +71,7 @@ case "$command" in
   measurement) module=scripts.review_predictive_measurement_instruments_20261020 ;;
   sources) module=scripts.review_predictive_primary_economic_sources_20261020 ;;
   owners) module=scripts.review_empire_cross_agent_release_board_20261020 ;;
-  comparison|comparison-all) module=scripts.review_predictive_comparison_20261021 ;;
+  comparison|comparison-all|comparison-gaps|comparison-product) module=scripts.review_predictive_comparison_20261021 ;;
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
@@ -86,6 +90,14 @@ fi
 if [[ "$command" == "comparison-all" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --all-products
+fi
+if [[ "$command" == "comparison-gaps" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --gaps
+fi
+if [[ "$command" == "comparison-product" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --product-code "$2"
 fi
 exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
   /srv/empire_os/.venv/bin/python -B -m "$module" --read-only
@@ -116,6 +128,7 @@ EOF
     empire_os/predictive_product_specific_competitors.py \
     empire_os/predictive_price_policy_evidence.py \
     empire_os/predictive_catalogue_price_comparison.py \
+    empire_os/predictive_comparison_gap_report.py \
     scripts/review_predictive_comparison_20261021.py \
     empire_os/predictive_intelligence.py \
     empire_os/predictive_cloud_materializer.py \
@@ -276,6 +289,33 @@ assert all(not c["feature_parity_verified"] and not c["price_justified_by_benchm
 assert all(not p["founder_policy_cost_ceiling_scenario"]["realized_margin_verified"] for p in x["products"])
 assert all(not p["founder_policy_cost_ceiling_scenario"]["price_justified_by_evidence"] for p in x["products"])
 assert x["execution_authority"]=="none"
+'
+"$TMP/bin/empire-predictive-observe" comparison-gaps | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.product_comparison_action_gaps.v1"
+assert x["product_count"]==86
+q=x["queue_counts"]
+assert q["founder_price_resolution_required"]==5
+assert q["unpriced_founder_economics_required"]==20
+assert q["legacy_priced_founder_economics_required"]==26
+assert q["source_approved_price_without_full_cost_policy"]==9
+assert q["product_scope_or_comparator_research_needed"]==25
+assert x["source_original_empiredb_issuer_authenticated"] is False
+assert x["price_changes_authorized"] is False
+assert x["astra_gpt6_independent_review"]=="NOT_EXECUTED"
+'
+"$TMP/bin/empire-predictive-observe" comparison-product meetily_pro | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["selected_product_code"]=="meetily_pro"
+assert x["selected_product_read_only"] is True
+assert len(x["products"])==1
+assert x["products"][0]["catalogue_listed_price_minor_units"] is None
+assert x["products"][0]["catalogue_price_original_custody"]=="LEGACY_CONFLICT_NEEDS_FOUNDER_RESOLUTION"
+assert x["products"][0]["catalogue_source_approval_is_customer_contract"] is False
 '
 # The science adapter MUST preserve unknown forecasts when original product
 # outcomes or forecast registry readback are absent.
