@@ -21,6 +21,14 @@ QUEUE = ROOT / "docs/seo/LEAD_SMART_QUORA_ANSWER_REVIEW_QUEUE_20261021.csv"
 EXPANSION_QUEUE = ROOT / "docs/seo/EMPIRE_QUORA_MULTINICHE_TOPIC_RESEARCH_20261021.csv"
 VERTICAL_PREFIXES = {"QROOF": "roofing", "QHVAC": "hvac", "QSOLA": "solar", "QDENT": "dental", "QLEGL": "legal", "QBUSI": "b2b"}
 SPECIALIST_VERTICALS = {"dental", "legal"}
+BROAD_DISCOVERY_TERMS = {
+    "roofing": "roof replacement",
+    "hvac": "heat pump installation",
+    "solar": "solar panel installation",
+    "dental": "dental consultation",
+    "legal": "find a lawyer",
+    "b2b": "lead generation",
+}
 SCHEMA = "empire.search_intelligence.quora_research.v1"
 MAX_ROWS = 64
 MAX_RESULTS = 96
@@ -100,6 +108,19 @@ def read_topic_queue(path: Path = QUEUE) -> tuple[dict[str, str], ...]:
     return tuple(rows)
 
 
+def permitted_discovery_queries(row: Mapping[str, str]) -> tuple[str, str]:
+    """Two declared Search Fabric queries; neither is Quora page evidence."""
+    seed_id = row.get("item_id", "")
+    for prefix, vertical in VERTICAL_PREFIXES.items():
+        if seed_id.startswith(prefix):
+            theme = row.get("question_theme", "")
+            return (
+                'site:quora.com "' + theme + '"',
+                "site:quora.com " + BROAD_DISCOVERY_TERMS[vertical],
+            )
+    raise QuoraEvidenceError("UNRECOGNISED_CURATED_VERTICAL")
+
+
 def _timestamp(value: Any, now: datetime) -> datetime:
     if not isinstance(value, str):
         raise QuoraEvidenceError("INVALID_SEARCH_OBSERVATION_TIME")
@@ -153,8 +174,8 @@ def review_quora_research(
                 or not isinstance(ref, str)
                 or not re.fullmatch(r"search-fabric:[a-zA-Z0-9:_-]{12,150}", ref)):
             raise QuoraEvidenceError("INVALID_QUORA_SEARCH_PROVENANCE")
-        query = 'site:quora.com "' + ids[seed_id]["question_theme"] + '"'
-        if row["source_query"] != query:
+        queries = permitted_discovery_queries(ids[seed_id])
+        if row["source_query"] not in queries:
             raise QuoraEvidenceError("SOURCE_QUERY_MISMATCH")
         url = canonical_question_url(row["question_url"])
         if url in seen:
@@ -199,7 +220,8 @@ def review_quora_research(
             "question_theme": theme,
             "topic": row["topic"],
             "proposed_owned_page": row["seo_page"],
-            "source_query_plan": 'site:quora.com "' + theme + '"',
+            "source_query_plan": permitted_discovery_queries(row)[0],
+            "broader_discovery_query_plan": permitted_discovery_queries(row)[1],
             "proposed_page_public_verified": False,
             "editorial_review_required": True,
             "intent_hypothesis": signal["intent_label"],
@@ -262,8 +284,8 @@ def review_quora_serp_snapshot(
     topics = {r["item_id"]: r for r in read_topic_queue(path)}
     if seed_id not in topics or not isinstance(snapshot, SerpSnapshot):
         raise QuoraEvidenceError("INVALID_SEARCH_FABRIC_SNAPSHOT")
-    expected = 'site:quora.com "' + topics[seed_id]["question_theme"] + '"'
-    if snapshot.query != expected:
+    allowed = permitted_discovery_queries(topics[seed_id])
+    if snapshot.query not in allowed:
         raise QuoraEvidenceError("SOURCE_QUERY_MISMATCH")
     empty = review_quora_research(path=path, now=clock)
     if (snapshot.available is not True or snapshot.cache is not False
@@ -298,7 +320,7 @@ def review_quora_serp_snapshot(
             "seed_id": seed_id, "question_url": url,
             "question_title": result.title,
             "source_ref": "search-fabric:" + sha256(evidence_bytes).hexdigest(),
-            "source_query": expected, "observed_at": observed.isoformat(),
+            "source_query": snapshot.query, "observed_at": observed.isoformat(),
             "provider": "search_fabric",
         })
     result = review_quora_research(converted, path=path, now=clock)

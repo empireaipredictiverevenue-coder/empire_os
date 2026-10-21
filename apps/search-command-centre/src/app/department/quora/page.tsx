@@ -104,7 +104,8 @@ export default async function QuoraResearchDepartment() {
                   <div>
                     <strong>{item.question_theme}</strong>
                     <small>{item.item_id} · {item.intent_hypothesis.replaceAll("_", " ").toLowerCase()} · Research only</small>
-                    <p>Search plan: <code>{item.source_query_plan}</code></p>
+                    <p>Precise query: <code>{item.source_query_plan}</code></p>
+                    <p>Broader fallback: <code>{item.broader_discovery_query_plan}</code> — search candidate only</p>
                     <p>Draft destination: <code>{item.proposed_owned_page}</code> (not release-approved)</p>
                     {item.specialist_editorial_review_required && <p>Specialist legal or clinical editorial verification required before any answer.</p>}
                   </div>

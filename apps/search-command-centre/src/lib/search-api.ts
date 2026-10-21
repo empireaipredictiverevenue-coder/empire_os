@@ -223,6 +223,7 @@ export type QuoraReviewTopic = {
   topic: string;
   proposed_owned_page: string;
   source_query_plan: string;
+  broader_discovery_query_plan: string;
   proposed_page_public_verified: false;
   editorial_review_required: true;
   intent_hypothesis: string;

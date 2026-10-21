@@ -11,7 +11,8 @@ import json
 
 from empire_os.search_fabric.search import search as fabric_search
 from empire_os.search_intelligence.quora_intelligence import (
-    QuoraEvidenceError, read_topic_queue, review_quora_serp_snapshot,
+    QuoraEvidenceError, permitted_discovery_queries, read_topic_queue,
+    review_quora_serp_snapshot,
 )
 from empire_os.search_intelligence.serp import (
     SearchFabricSerpAdapter, SerpSnapshotError,
@@ -22,6 +23,7 @@ def review_one_shot(
     seed_id: str,
     *,
     live: bool,
+    query_mode: str = "precise",
     search_fn=fabric_search,
     clock=None,
 ) -> dict:
@@ -29,13 +31,17 @@ def review_one_shot(
     seeds = {row["item_id"]: row for row in read_topic_queue()}
     if seed_id not in seeds:
         raise QuoraEvidenceError("UNKNOWN_CURATED_TOPIC_ID")
-    query = 'site:quora.com "' + seeds[seed_id]["question_theme"] + '"'
+    if query_mode not in ("precise", "broad"):
+        raise QuoraEvidenceError("UNSUPPORTED_QUORA_DISCOVERY_MODE")
+    queries = permitted_discovery_queries(seeds[seed_id])
+    query = queries[0] if query_mode == "precise" else queries[1]
     if not live:
         return {
             "schema_version": "empire.search.quora_one_shot.v1",
             "mode": "PLAN_ONLY",
             "seed_id": seed_id,
             "source_query": query,
+            "discovery_mode": query_mode,
             "search_request_performed": False,
             "verified_question_count": 0,
             "posting_authorized": False,
@@ -72,6 +78,7 @@ def review_one_shot(
         "mode": "OBSERVE",
         "seed_id": seed_id,
         "source_query": query,
+        "discovery_mode": query_mode,
         "search_request_performed": True,
         "source_status": status,
         "question_candidates": candidates,
@@ -88,9 +95,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed-id", required=True)
     parser.add_argument("--one-shot-live", action="store_true")
+    parser.add_argument("--broad", action="store_true",
+                        help="Use a bounded industry question search instead of the exact theme")
     args = parser.parse_args()
     try:
-        result = review_one_shot(args.seed_id, live=args.one_shot_live)
+        result = review_one_shot(
+            args.seed_id, live=args.one_shot_live,
+            query_mode="broad" if args.broad else "precise",
+        )
     except QuoraEvidenceError:
         result = {
             "schema_version": "empire.search.quora_one_shot.v1",
