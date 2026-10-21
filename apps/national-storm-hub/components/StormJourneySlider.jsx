@@ -41,14 +41,20 @@ export default function StormJourneySlider(){
   function move(delta){select(journeyIndex(index,delta));}
   function onTouchStart(e){
     if(e.touches.length!==1)return;
-    touch.current={x:e.touches[0].clientX,y:e.touches[0].clientY};
+    touch.current={x:e.touches[0].clientX,y:e.touches[0].clientY,
+      lastX:e.touches[0].clientX,lastY:e.touches[0].clientY};
+  }
+  function onTouchMove(e){
+    if(!touch.current||!e.touches.length)return;
+    touch.current.lastX=e.touches[0].clientX;
+    touch.current.lastY=e.touches[0].clientY;
   }
   function onTouchEnd(e){
     const start=touch.current;touch.current=null;
+    if(!start)return;
     const end=e.changedTouches[0];
-    if(!start||!end)return;
-    const dx=end.clientX-start.x;
-    const dy=end.clientY-start.y;
+    const dx=(end?.clientX??start.lastX)-start.x;
+    const dy=(end?.clientY??start.lastY)-start.y;
     if(Math.abs(dx)>65&&Math.abs(dx)>Math.abs(dy)*1.5)move(dx<0?1:-1);
   }
   function onKeys(e){
@@ -63,7 +69,8 @@ export default function StormJourneySlider(){
     onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}
     onFocusCapture={()=>setPaused(true)}
     onBlurCapture={e=>{if(!e.currentTarget.contains(e.relatedTarget))setPaused(false);}}
-    onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
+    onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+    onTouchCancel={()=>{touch.current=null;}}
     onKeyDown={onKeys}>
     <div className="journey-header">
       <div>

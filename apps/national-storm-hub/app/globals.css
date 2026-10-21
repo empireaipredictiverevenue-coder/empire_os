@@ -992,3 +992,6 @@ h1 em,h2 em {font-style:normal;background:linear-gradient(103deg,#95e9e9 5%,#4ac
  .journey-step-title{font-size:8px}
 }
 @media(prefers-reduced-motion:reduce){.journey-body{animation:none}.journey-head-controls button{transition:none}}
+
+/* Let the browser scroll vertically while JS handles deliberate horizontal swipes. */
+.storm-journey,.journey-stage{touch-action:pan-y}
