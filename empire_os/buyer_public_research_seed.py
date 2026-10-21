@@ -95,6 +95,11 @@ _MULTIMARKET_REVIEW_SEEDS = (
     ("https://getmapleleads.com/suppliers", "USA", ("home_services", "insurance", "solar")),
     ("https://www.mymoneycomparison.com/become-an-affiliate/", "UK", ("insurance",)),
     ("https://traffic2lead.com/publishers/", "AU", ("solar", "insurance", "education")),
+    # Publisher-only research for US home services, dental, legal, insurance
+    # and UK debt/claims programmes. Broad catalogue listings are NOT
+    # verified offers, publisher approvals or payable capacity.
+    ("https://www.bfount.com/affiliate.php", "USA", ("home_services", "legal", "insurance", "solar")),
+    ("https://www.callx.com/publishers", "USA", ("home_services", "legal", "insurance")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (
@@ -547,6 +552,10 @@ def publisher_review_page_path(domain: str) -> str | None:
 
 def publisher_review_page_paths(domain: str) -> tuple[str, ...]:
     """A bounded, independently reviewed first-party PPC/PPL page pair."""
+    # Explicitly reviewed legacy .php affiliate endpoint. Do not relax the
+    # general domain/path parser or follow third-party publisher redirects.
+    if _host(domain) == "bfount.com":
+        return ("/affiliate.php",)
     primary = publisher_review_page_path(domain)
     if primary is None:
         return ()

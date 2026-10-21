@@ -365,3 +365,31 @@ def test_new_multiniche_marketplaces_seeded_with_zero_commercial_authority():
         assert publisher_review_page_paths(domain) == (path,)
     assert count == [2]
     assert report["outbound_sent"] is False
+
+
+def test_new_2026_multiniche_call_and_lead_partner_pages_are_advisory():
+    from empire_os.buyer_public_research_seed import (
+        build_public_research_seeds,publisher_review_page_paths,
+    )
+    observed=[]
+    def search(queries,num):
+        observed.append(len(queries))
+        return {}
+    report=build_public_research_seeds(
+        {},search_fn=search,max_queries=2,include_volume=False,
+        observed_at=datetime(2026,10,21,tzinfo=timezone.utc),
+    )
+    rows={x['domain']:x for x in report['seeds']}
+    assert observed==[2]
+    for domain in ('bfount.com','callx.com'):
+        row=rows[domain]
+        assert row['outreach_authorized'] is False
+        assert row['commercial_terms_verified'] is False
+        assert row['buyer_capacity_verified'] is False
+        assert row['identity_verified'] is False
+        assert row['execution_authority']=='none'
+        assert 'USA' in row['target_markets']
+    assert publisher_review_page_paths('bfount.com')==('/affiliate.php',)
+    assert publisher_review_page_paths('callx.com')==('/publishers',)
+    assert publisher_review_page_paths('unreviewed-php-company.com')==()
+    assert report['outbound_sent'] is False
