@@ -114,6 +114,7 @@ def _agent_plan(source_report: dict) -> dict:
 def use_product(
     product: str, *,
     country: str = "both", niche: str = "dental", depth: str = "quality",
+    fresh_discovery: bool = False, search_fn=None,
     inspect_fn=None, observed_at: datetime | None = None,
 ) -> dict:
     """Runs actual bounded inspect work, or a guarded intake for unsupported sectors.
@@ -126,7 +127,12 @@ def use_product(
         observed_at = datetime.now(timezone.utc)
     if observed_at.utcoffset() is None:
         raise ValueError("TIMEZONE_AWARE_JOB_CLOCK_REQUIRED")
-    opts = {"country": country, "niche": niche, "depth": depth}
+    if type(fresh_discovery) is not bool:
+        raise ValueError("EXPLICIT_BOOLEAN_DISCOVERY_REQUIRED")
+    opts = {"country": country, "niche": niche, "depth": depth,
+            "probe_public_search": fresh_discovery}
+    if search_fn is not None:
+        opts["search_fn"] = search_fn
     if inspect_fn is not None:
         opts["inspect_fn"] = inspect_fn
     evidence = run_evidence(**opts)
@@ -138,6 +144,8 @@ def use_product(
         "market": country,
         "niche": niche,
         "depth": depth,
+        "fresh_discovery_requested": fresh_discovery,
+        "fresh_discovery_candidates_admitted": 0,
         "status": evidence["status"],
         "research": evidence,
         "execution_mode": "READ_ONLY_BOUNDED_ORIGINAL_SOURCES",

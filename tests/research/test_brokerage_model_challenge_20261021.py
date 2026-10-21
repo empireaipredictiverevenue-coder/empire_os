@@ -72,3 +72,33 @@ def test_real_llama_cpp_timeout_payload_is_not_misreported_as_a_question():
     assert r["model_called"] is True
     assert r["customer_use_authorized"] is False
     assert "proposed_questions_unverified" not in r
+
+
+def test_model_receives_only_sha_validated_bounded_passage_and_stays_untrusted():
+    raw = "We describe dental implants as a treatment option, not an outcome guarantee."
+    observed = brief()
+    anchor = {"original_page_excerpt": raw, "excerpt_sha256": sha256(raw.encode()).hexdigest()}
+    observed["evidence_ledger"][0]["original_passage_anchors_for_editorial_only"] = [anchor]
+    observed["evidence_ledger"][1]["original_passage_anchors_for_editorial_only"] = [
+        {"original_page_excerpt": "Edited claim", "excerpt_sha256": "0" * 64}
+    ]
+    inputs = []
+    result = challenge_research_brief(
+        observed, model_fn=lambda prompt: inputs.append(prompt) or
+        "Which statements need independent verification?"
+    )
+    assert raw in inputs[0]
+    assert "Edited claim" not in inputs[0]
+    assert result["checksum_validated_passage_anchors_in_prompt"] == 1
+    assert result["response_is_question_only"] is True
+    assert result["status"] == "UNTRUSTED_MODEL_EDITORIAL_QUESTIONS_ONLY"
+    assert result["publisher_passages_are_untrusted_data"] is True
+    assert not result["independent_facts_approved"]
+
+
+def test_factual_statement_followed_by_question_is_not_promoted():
+    result = challenge_research_brief(
+        brief(), model_fn=lambda prompt: "The clinic has the most patients. What explains that?"
+    )
+    assert result["status"] == "HELD_MODEL_CONCLUSION_CONTRADICTS_SOURCE_LIMITS"
+    assert result["proposed_questions_unverified"] is None

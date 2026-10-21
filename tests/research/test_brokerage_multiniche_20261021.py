@@ -71,8 +71,9 @@ def test_fresh_discovery_is_only_candidates_for_other_niches():
     def search(query, **kwargs):
         calls.append(query)
         return {
-            "searchParameters": {"engine": "bing_html", "cache": False},
-            "organic": [{"title": "Genuine verified example",
+            "searchParameters": {"engine": "bing_html", "cache": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+            "organic": [{"title": "UK roofing contractor published original source",
                          "link": "https://public-roofing.example-business.co.uk/services"}],
         }
     report = run(country="GB", niche="roofing", probe_public_search=True, search_fn=search)

@@ -18,6 +18,15 @@ from .brokerage_editorial_review import COUNTRY_SOURCES, SCHEMA as REVIEW_SCHEMA
 from .brokerage_niche_profiles import research_intake_plan
 
 SCHEMA = "empire.brokerage.evidence_decision_brief.v1"
+_NICHE_SOURCE_TERMS = {
+    "dental": ("dental", "dentist", "dentistry", "implant", "cma private dental"),
+    "roofing": ("roofing", "roofer", "roof repair", "roof contractor"),
+    "solar": ("solar", "photovoltaic", "pv installer"),
+    "hvac": ("hvac", "heating", "air conditioning", "heat pump"),
+    "legal": ("solicitor", "law firm", "legal service", "attorney", "lawyer"),
+    "property": ("property", "planning application", "brownfield", "development", "permit"),
+}
+
 _SEARCH_QUERIES = {
     "US": (
         "Chicago Lincoln Park dental implant clinic original service pages",
@@ -85,7 +94,7 @@ def discover_held_candidates(
     failures: list[str] = []
     for query in queries:
         try:
-            result = search_fn(query, num=5, engine="bing_html", use_cache=False)
+            result = search_fn(query, num=5, engine=None, use_cache=False)
             if not isinstance(result, Mapping):
                 raise ValueError("INVALID_SEARCH_FABRIC_RESULT")
             p = result.get("searchParameters")
@@ -94,6 +103,8 @@ def discover_held_candidates(
             if (result.get("error") or result.get("stale") or result.get("synthetic")
                 or p.get("stale") or p.get("synthetic")
                 or p.get("cache") is not False
+                or p.get("search_state") != "RESULTS"
+                or p.get("quality_gate") != "lexical_v2"
                 or p.get("engine") in (None, "none", "unknown")):
                 raise ValueError("NO_VERIFIED_FRESH_SEARCH_EVIDENCE")
             for row in result.get("organic", [])[:5]:
@@ -101,6 +112,9 @@ def discover_held_candidates(
                     continue
                 url = row.get("link") or row.get("url")
                 if not _valid_search_url(url) or url in seen:
+                    continue
+                searchable = " ".join(str(row.get(key) or "")[:500] for key in ("title", "snippet", "link")).casefold()
+                if not any(term in searchable for term in _NICHE_SOURCE_TERMS[niche]):
                     continue
                 seen.add(url)
                 items.append({

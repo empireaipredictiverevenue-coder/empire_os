@@ -101,9 +101,10 @@ def test_fresh_discovery_candidates_are_not_approved_sources():
     def fake(query, **kwargs):
         seen.append((query, kwargs))
         return {
-            "searchParameters": {"engine": "bing_html", "cache": False, "stale": False},
+            "searchParameters": {"engine": "bing_html", "cache": False, "stale": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
             "organic": [
-                {"title": "Actual agency", "link": "https://agency.example-corp.co.uk/services"},
+                {"title": "Birmingham dental implant original practice", "link": "https://agency.example-corp.co.uk/dental-implants"},
                 {"title": "Malicious", "link": "http://127.0.0.1:8769/health"},
                 {"title": "Reserved", "link": "https://example.com/pretend"},
             ],
@@ -112,7 +113,7 @@ def test_fresh_discovery_candidates_are_not_approved_sources():
     assert found["status"] == "FRESH_DISCOVERY_CANDIDATES_NOT_ADMITTED"
     assert len(found["candidate_urls"]) == 1
     assert len(seen) == 2
-    assert all(params["engine"] == "bing_html" and params["use_cache"] is False
+    assert all(params["engine"] is None and params["use_cache"] is False
                and params["num"] == 5 for _, params in seen)
     report = review_brokerage_editorial("GB", inspect_fn=offline_original, observed_at=NOW)
     combined = build_brokerage_decision_brief(report, search_diagnostic=found)
@@ -133,3 +134,32 @@ def test_untrusted_source_or_search_attempts_cannot_elevate_commercial_gates():
             report,
             search_diagnostic={"source_admissions": 1, "buyer_intent_verified": False},
         )
+
+
+def test_real_provider_quality_flag_is_not_enough_without_niche_relevance():
+    def real_shaped_generic(query, **kwargs):
+        return {
+            "searchParameters": {"engine": "bing_rss", "cache": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+            "organic": [{"title": "Chicago city homepage",
+                         "link": "https://www.chicago.gov/city/en.html"},
+                        {"title": "Visit Birmingham",
+                         "link": "https://visitbirmingham.com/"}],
+        }
+    result = discover_held_candidates("US", real_shaped_generic, niche="dental")
+    assert result["status"] == "SEARCH_PROVIDER_DEGRADED_OR_NO_FRESH_EVIDENCE"
+    assert result["candidate_urls"] == []
+    assert result["source_admissions"] == 0
+
+
+def test_search_fabric_result_cannot_admit_cross_niche_candidates():
+    def real_shaped_dental(query, **kwargs):
+        return {
+            "searchParameters": {"engine": "bing_html", "cache": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+            "organic": [{"title": "Birmingham dental implant practice",
+                         "link": "https://dental.example-business.co.uk/implants"}],
+        }
+    result = discover_held_candidates("GB", real_shaped_dental, niche="roofing")
+    assert not result["any_verified_fresh_results"]
+    assert result["source_admissions"] == 0

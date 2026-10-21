@@ -6,14 +6,20 @@ import stat
 
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 
 from empire_os.research.research_products import PRODUCTS, product_catalog, use_product
-from empire_os.founder_research_products_api import create_founder_research_products_router
+from empire_os.founder_research_products_api import (
+    ResearchExecutionBudget, create_founder_research_products_router
+)
 from scripts.use_empire_research_products_20261021 import save_private_result
 
 
 STAMP = datetime(2026, 10, 21, 13, tzinfo=timezone.utc)
+
+
+def fake_founder(request: Request):
+    return "verified-test-founder"
 
 
 def inspector(url):
@@ -106,16 +112,18 @@ def test_private_receipt_exclusive_owner_only(tmp_path):
 def test_private_router_catalog_and_readonly_agent_preview():
     app = FastAPI()
     app.include_router(create_founder_research_products_router(
-        product_runner=lambda p, country, niche, depth: use_product(
+        product_runner=lambda p, country, niche, depth, fresh_discovery: use_product(
             p, country=country, niche=niche, depth=depth,
-            inspect_fn=inspector, observed_at=STAMP,
-        )
+            fresh_discovery=fresh_discovery, inspect_fn=inspector, observed_at=STAMP,
+        ),
+        require_founder=fake_founder,
+        execution_budget=ResearchExecutionBudget(min_interval_seconds=0),
     ))
     with TestClient(app) as client:
         c = client.get("/v1/founder-research-products/catalog")
         assert c.status_code == 200
         assert len(c.json()["products"]) == 2
-        agent = client.get("/v1/founder-research-products/preview", params={
+        agent = client.post("/v1/founder-research-products/preview", json={
             "product": "empire_agent", "country": "US",
             "niche": "dental", "depth": "quality",
         })
@@ -124,7 +132,7 @@ def test_private_router_catalog_and_readonly_agent_preview():
             "WORK_COMPLETED_FOR_EDITORIAL_REVIEW"
         assert agent.json()["outbound_authorized"] is False
         assert agent.json()["database_writes"] is False
-        invalid = client.get("/v1/founder-research-products/preview", params={
+        invalid = client.post("/v1/founder-research-products/preview", json={
             "product": "empire_agent", "country": "FR",
         })
         assert invalid.status_code == 422
@@ -141,3 +149,31 @@ def test_private_receipt_no_customer_data_injected():
     assert "buyer" not in result or result.get("buyer") is None
     assert result["finance_authorized"] is False
     assert result["customer_delivery_authorized"] is False
+
+
+def test_fresh_discovery_is_explicit_and_never_admits_other_sector_pages():
+    seen = []
+    def candidate_search(query, **kwargs):
+        seen.append((query, kwargs))
+        return {
+            "organic": [{"title": "UK solar installer public service description",
+                         "link": "https://solar.example-business.co.uk/installer"}],
+            "searchParameters": {"engine": "bing_html", "cache": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+        }
+    r = use_product("empire_agent", country="GB", niche="solar", depth="quality",
+                    fresh_discovery=True, search_fn=candidate_search,
+                    inspect_fn=lambda url: (_ for _ in ()).throw(
+                        AssertionError("search candidates are not approved original sources")
+                    ))
+    assert r["status"] == "HELD_SOURCE_INTAKE_REQUIRED"
+    assert r["fresh_discovery_requested"] is True
+    assert r["original_source_count"] == 0
+    assert r["fresh_discovery_candidates_admitted"] == 0
+    assert len(seen) == 2
+    assert all(kwargs["use_cache"] is False and kwargs["engine"] is None
+               for _, kwargs in seen)
+    assert r["research"]["niche_intake_plans"][0][
+        "public_search_diagnostic"]["source_admissions"] == 0
+    assert r["editorial_approval_verified"] is False
+    assert r["outbound_authorized"] is False

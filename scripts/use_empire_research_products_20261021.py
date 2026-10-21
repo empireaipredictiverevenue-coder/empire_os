@@ -63,6 +63,8 @@ def main(argv=None):
                                        "hvac", "legal", "property"), default="dental")
     ap.add_argument("--depth", choices=("speed", "balanced", "quality"), default="quality")
     ap.add_argument("--save-private", action="store_true")
+    ap.add_argument("--fresh-discovery", action="store_true",
+                    help="bounded uncached Search Fabric candidates; not source admissions")
     args = ap.parse_args(argv)
     if args.catalog:
         print(json.dumps(product_catalog(), ensure_ascii=False, sort_keys=True, indent=2))
@@ -70,7 +72,7 @@ def main(argv=None):
     if not args.product:
         ap.error("--product required unless --catalog")
     report = use_product(args.product, country=args.country, niche=args.niche,
-                         depth=args.depth)
+                         depth=args.depth, fresh_discovery=args.fresh_discovery)
     if args.save_private:
         path = save_private_result(report)
         report = {**report, "private_receipt_path": str(path)}

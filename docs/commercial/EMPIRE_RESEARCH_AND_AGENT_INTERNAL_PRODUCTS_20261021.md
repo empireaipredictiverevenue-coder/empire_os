@@ -41,10 +41,11 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
 ## Private Founder Console API candidate
 New API factory `empire_os/founder_research_products_api.py` is registered in the existing `founder_dashboard_service.py` **only in this isolated branch**. It provides:
 - GET `/v1/founder-research-products/catalog` — product catalog, all configured niches/modes
-- GET `/v1/founder-research-products/preview?product=empire_research&country=US&niche=dental&depth=quality`
-- GET `/v1/founder-research-products/preview?product=empire_agent&country=GB&niche=dental&depth=quality`
+- POST `/v1/founder-research-products/preview` with bounded JSON `{ "product": "empire_research", "country": "US", "niche": "dental", "depth": "quality" }`
+- POST `/v1/founder-research-products/preview` with bounded JSON `{ "product": "empire_agent", "country": "GB", "niche": "dental", "depth": "quality", "fresh_discovery": false }`
+- Web candidate `/founder/research` with the same existing private Founder Console app; server-side Access session bridge only.
 
-Service is intended for the existing **loopback-only Founder Console**; the new router does not implement an independent authentication/tenant proof. It must NEVER be exposed directly to the public internet or white-label tenants, and there is NO live production web route until its original owner approves and deploys it behind founder-auth boundaries. No separate shadow account service, CRM, DB or agent shell was created.
+Service is intended for the existing **loopback-only Founder Console** and now fails closed unless a verifiable Cloudflare Access JWT with the exact Founder subject, issuer and audience is supplied. Identity deployment/configuration and a real authorised session remain independently unverified. It must NEVER be exposed directly to the public internet or white-label tenants, and there is NO live production web route until its original owner approves a guarded release. No separate shadow account service, CRM, DB or agent shell was created. See `EMPIRE_RESEARCH_FOUNDER_GUARDED_RELEASE_REVIEW_20261021.md` for exact gates, budgets, test receipts, owner approval requirements and rollback.
 
 ## Verified running product receipts
 
@@ -64,4 +65,4 @@ Service is intended for the existing **loopback-only Founder Console**; the new 
 
 ## Next owner action
 
-Existing Research/Founder Console owner to inspect this exact isolated candidate and its tests, verify user identity path and service loopback configuration, then stage a guarded preview deployment with rollback. Preserve all commercial and editorial gates. This is **internal productisation for use now via SSH/terminal**, not finished SaaS launch.
+Existing Research/Founder Console owner to inspect this exact isolated candidate and its tests, verify user identity path and service loopback configuration, then stage a guarded preview deployment with rollback. Preserve all commercial and editorial gates. SSH/terminal use is already functional. The new authenticated browser workstation is an **isolated build candidate only** until the existing Founder Console identity owner proves real session authority and authorises a guarded deployment; not a released SaaS product.
