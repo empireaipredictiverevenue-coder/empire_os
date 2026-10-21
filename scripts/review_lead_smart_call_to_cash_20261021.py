@@ -7,15 +7,19 @@ review never activates calls, mutates provider settings, or creates sales.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import argparse
 import hashlib
 import json
 import math
+import os
+import tempfile
 from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os import lead_smart_ringba_api_observer as observer
 
 SCHEMA = "empire.lead_smart.call_to_cash_proof.v1"
+LATEST = Path("/srv/empire_os/runtime/revenue/lead_smart/commercial_pulse/call_to_cash_latest.json")
 EXPECTED = observer.EXPECTED_CAMPAIGN_ID
 NUMBER = observer.EXPECTED_TRACKING_NUMBER
 
@@ -141,9 +145,47 @@ def run() -> dict[str, Any]:
     )
 
 
+def write_latest(result: Mapping[str, Any], *, path: Path = LATEST) -> None:
+    # Root-owned observation is read-only with respect to Ringba and
+    # admission controls. Never persist tokens, ANI or raw provider rows.
+    if os.geteuid() != 0 or result.get("schema_version") != SCHEMA:
+        raise PermissionError("root-owned verified observation required")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if path.is_symlink() or (path.exists()
+                            and (path.stat().st_uid != 0
+                                 or path.stat().st_mode & 0o077)):
+        raise PermissionError("unsafe existing observation path")
+    fd, tmp = tempfile.mkstemp(prefix=".call-to-cash-", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as out:
+            out.write(json.dumps(result, sort_keys=True, indent=2) + "\n")
+            out.flush()
+            os.fsync(out.fileno())
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--write-latest", action="store_true",
+                        help="persist privacy-safe observation with root-only permissions")
+    args = parser.parse_args()
     try:
         result = run()
+        result["observed_at_utc"] = datetime.now(timezone.utc).isoformat()
+        if args.write_latest:
+            write_latest(result)
+            print(json.dumps({
+                "status": "CALL_TO_CASH_OBSERVATION_SAVED",
+                "provider_exact_matches": result["provider_exact_matches_in_bounded_window"],
+                "accepted_payable_calls_verified": result["verified_accepted_payable_calls"],
+                "cash_payments_verified": result["verified_cash_payments"],
+                "execution_authority": "NONE",
+            }))
+            return 0
     except Exception as exc:
         # Exception messages can contain Ringba raw private responses.
         print(json.dumps({"schema_version": SCHEMA,

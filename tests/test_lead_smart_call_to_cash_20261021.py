@@ -83,3 +83,26 @@ def test_no_rows_is_not_revenue():
         exact_matches=[],exact_campaign_and_number_match_count=0), known_site_handoffs=0)
     assert out["verified_accepted_payable_calls"] == 0
     assert out["settled_revenue_usd_verified"] is None
+
+
+def test_write_latest_requires_root(monkeypatch, tmp_path):
+    from scripts import review_lead_smart_call_to_cash_20261021 as c
+    monkeypatch.setattr(c.os, "geteuid", lambda: 1000)
+    value = prove_from_observation(report(), known_site_handoffs=0)
+    with pytest.raises(PermissionError):
+        c.write_latest(value, path=tmp_path/"latest.json")
+    assert not (tmp_path/"latest.json").exists()
+
+
+def test_persisted_observation_is_permission_sealed(monkeypatch,tmp_path):
+    from scripts import review_lead_smart_call_to_cash_20261021 as c
+    monkeypatch.setattr(c.os, "geteuid", lambda: 0)
+    val = prove_from_observation(report(), known_site_handoffs=0)
+    p = tmp_path/"latest.json"
+    c.write_latest(val,path=p)
+    assert p.stat().st_mode & 0o777 == 0o600
+    assert json.loads(p.read_text())["verified_cash_payments"]==0
+    assert "real_ringba_call_id_001" not in p.read_text()
+    p.chmod(0o644)
+    with pytest.raises(PermissionError):
+        c.write_latest(val,path=p)
