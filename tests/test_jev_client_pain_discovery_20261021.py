@@ -182,3 +182,26 @@ def test_saas_first_users_and_churn_map_to_usable_research_hypotheses():
     assert "no_initial_saas_users" in pains
     assert "saas_retention_loss" in pains
     assert r["items"][0]["outreach_authorized"] is False
+
+
+
+def test_uk_membership_problem_with_no_solicitation_stays_out_of_sales():
+    r = discover_client_pains([row(
+        source="reddit",
+        url="https://www.reddit.com/r/smallbusinessuk/comments/member/",
+        niche="b2b",
+        title="I run a membership business",
+        text="It's tough to attract new members. I'm not looking for the solution.",
+    )], now=NOW)
+    assert r["items"][0]["pain_hypotheses"] == ["membership_customer_acquisition"]
+    assert r["items"][0]["review_lane"] == "NO_SOLICITATION"
+    assert r["items"][0]["evidence_priority"] == 0
+
+
+def test_law_firm_paid_lead_vendor_weak_quality_is_specific():
+    r = discover_client_pains([row(
+        source="reddit", url="https://www.reddit.com/r/LawFirm/comments/paid/",
+        niche="legal", title="I run a law firm",
+        text="I'm running $8K/month with a paid-lead vendor and the quality has been weak.",
+    )], now=NOW)
+    assert "low_quality_leads" in r["items"][0]["pain_hypotheses"]

@@ -55,9 +55,14 @@ PAIN_PATTERNS: dict[str, tuple[str, tuple[str, ...]]] = {
         r"\b(?:trial.to.paid|signup.to.paid|activation|onboarding) (?:conversion|rate|drop.?off) (?:is |are )?(?:low|poor|falling|terrible)\b",
         r"\b(?:users|customers|signups) (?:never|don.t|do not) (?:complete|finish|reach) (?:onboarding|activation|setup)\b",
     )),
+    "membership_customer_acquisition": ("lead_generation", (
+        r"\b(?:tough|hard|difficult|struggling) to attract (?:new )?members\b",
+        r"\b(?:membership|member) (?:growth|signups|acquisition) (?:is |has been )?(?:slow|falling|stalled|difficult)\b",
+    )),
     "low_quality_leads": ("lead_generation", (
         r"\b(?:junk|bad|low.quality|unqualified) leads\b",
         r"\b(?:leads|prospects) (?:are |feel )?(?:low.intent|junk|unqualified)\b",
+        r"\b(?:paid.lead vendor|bought leads?).{0,65}(?:quality.{0,18}weak|poor quality|weak quality)\b",
         r"\bleads (?:are|aren.t) (?:unqualified|qualified|relevant)\b",
     )),
     "paid_acquisition_waste": ("revenue_growth", (
