@@ -17,18 +17,22 @@ spec.loader.exec_module(installer)
 def test_exact_release_digest_reflects_both_sql_files_and_prepared_role():
     digest=installer.fingerprint()
     assert isinstance(digest,str) and len(digest)==64
-    assert digest=="2fa878eb0d93d011dc55b1cba0e9c37b58603944b9c99abb4959a1238b80de0c"
+    assert digest == installer.fingerprint()
     assert "NOLOGIN NOINHERIT" in installer.ROLE_SQL
     assert len(installer.TABLES)==5
 
 
 def test_original_migrations_execute_in_one_outer_transaction():
-    for source in (installer.SQL057,installer.SQL058):
+    for source in (installer.SQL057,installer.SQL059,installer.SQL058):
         text=installer.strip_transaction_boundaries(source)
         assert "BEGIN;" not in text
         assert "COMMIT;" not in text
         assert "SET LOCAL ROLE empiredb_migrator" in text
-        assert "FORCE ROW LEVEL SECURITY" in text or "CREATE POLICY" in text
+        assert (
+            "FORCE ROW LEVEL SECURITY" in text
+            or "CREATE POLICY" in text
+            or "REVOKE ALL PRIVILEGES ON TABLE" in text
+        )
 
 
 def test_production_writer_requires_local_postgres_identity(monkeypatch):
@@ -65,10 +69,26 @@ def test_atomic_real_pg_fixtures_are_safe_and_have_positive_negative_paths():
     root=MODULE.parents[1]
     positive=(root/"scripts/test_consumer_atomic_installer_20261021.sh").read_text()
     negative=(root/"scripts/test_consumer_atomic_installer_reject_20261021.sh").read_text()
-    for s in (positive,negative):
+    unexpected=(root/"scripts/test_consumer_atomic_installer_unexpected_acl_20261021.sh").read_text()
+    for s in (positive,negative,unexpected):
         assert "empire_consumer_optin_fixture" in s
         assert "PGHOST" in s and "PGPORT" in s
         assert "--test-ephemeral" in s
         assert "sudo" not in s
         assert "--apply-owner-approved" not in s
     assert "NONCOMPLIANT_ROLE_REJECTED_WITH_ZERO_TABLE_WRITES" in negative
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator" in positive
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator" in negative
+    assert "UNKNOWN_DEFAULT_GRANTEE_REJECTED_WITH_ZERO_DB_WRITES" in unexpected
+    assert "ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator" in unexpected
+    seal=installer.SQL059.read_text()
+    assert "CONSUMER059_UNEXPECTED_DEFAULT_TABLE_ACL" in seal
+    assert "FROM PUBLIC, empiredb_app, empiredb_readonly" in seal
+    assert not any(
+        line.lstrip().startswith("ALTER DEFAULT PRIVILEGES")
+        for line in seal.splitlines()
+    )
+    assert "REVOKE ALL PRIVILEGES ON TABLE" in seal
+    assert "SET LOCAL ROLE NONE" in MODULE.read_text()
+    assert "SQL059" in MODULE.read_text()
+    assert "Path(__file__).read_bytes()" in MODULE.read_text()

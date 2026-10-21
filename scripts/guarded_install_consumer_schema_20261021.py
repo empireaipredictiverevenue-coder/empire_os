@@ -27,6 +27,7 @@ import psycopg
 ROOT = Path(__file__).resolve().parents[1]
 SQL057 = ROOT / "migrations/empiredb/057_consumer_roofing_optin_staged_20261020.sql"
 SQL058 = ROOT / "migrations/empiredb/058_consumer_optin_private_role_staged_20261020.sql"
+SQL059 = ROOT / "migrations/empiredb/059_consumer_optin_default_acl_seal_20261021.sql"
 ROLE_SQL = (
     "CREATE ROLE empire_consumer_optin_writer "
     "NOLOGIN NOINHERIT NOSUPERUSER NOBYPASSRLS "
@@ -50,6 +51,10 @@ def fingerprint() -> str:
         ("ROLE_SQL", ROLE_SQL.encode("utf8")),
         (SQL057.name, SQL057.read_bytes()),
         (SQL058.name, SQL058.read_bytes()),
+        (SQL059.name, SQL059.read_bytes()),
+        # An approved hash must bind the actual installer code too; SQL and
+        # role text alone cannot safely pin executable production behaviour.
+        (Path(__file__).name, Path(__file__).read_bytes()),
     ):
         h.update(filename.encode("ascii") + b"\\0")
         h.update(len(raw).to_bytes(8, "big") + raw)
@@ -88,6 +93,25 @@ def query_state(conn) -> dict[str, Any]:
         "WHERE schemaname='public' AND tablename=ANY(%s)",
         (list(TABLES),),
     ).fetchall()
+    # Inspect only schema/default ACL metadata. In production other
+    # EmpireDB migrations have intentionally left broad default grants
+    # for the B2B app; those MUST be sealed on the new consumer tables,
+    # not modified globally.
+    default_acl = conn.execute(
+        "SELECT COALESCE(n.nspname,'GLOBAL'),"
+        "COALESCE(grantee.rolname,'PUBLIC'),"
+        "a.privilege_type,a.is_grantable "
+        "FROM pg_catalog.pg_default_acl d "
+        "JOIN pg_catalog.pg_roles owner ON owner.oid=d.defaclrole "
+        "LEFT JOIN pg_catalog.pg_namespace n ON n.oid=d.defaclnamespace "
+        "CROSS JOIN LATERAL pg_catalog.aclexplode(d.defaclacl) a "
+        "LEFT JOIN pg_catalog.pg_roles grantee ON grantee.oid=a.grantee "
+        "WHERE owner.rolname='empiredb_migrator' "
+        "AND d.defaclobjtype='r' "
+        "AND (d.defaclnamespace=0 OR n.nspname='public') "
+        "AND a.grantee<>d.defaclrole "
+        "ORDER BY 1,2,3,4"
+    ).fetchall()
     safe_role = bool(role and role == (False, False, False, False, False, False, False))
     return {
         "database": conn.execute("SELECT current_database()").fetchone()[0],
@@ -96,6 +120,11 @@ def query_state(conn) -> dict[str, Any]:
         "writer_compliant": safe_role,
         "consumer_table_count": len(existing),
         "consumer_policy_count": len(policies),
+        "migrator_default_table_grants": [
+            {"scope": scope, "grantee": grantee,
+             "privilege": privilege, "grant_option": grantable}
+            for scope, grantee, privilege, grantable in default_acl
+        ],
         "all_existing_tables_forced_rls": all(
             row[1] is True and row[2] is True and row[3] == "empiredb_migrator"
             for row in existing
@@ -173,6 +202,10 @@ def installer(mode: str, approved_digest: str = "") -> dict[str, Any]:
             if not before["writer_exists"]:
                 conn.execute(ROLE_SQL)
             conn.execute(strip_transaction_boundaries(SQL057))
+            conn.execute("SET LOCAL ROLE NONE")
+            # Seal ONLY the five newly created tables against documented
+            # inherited default ACLs before the private writer is granted.
+            conn.execute(strip_transaction_boundaries(SQL059))
             conn.execute("SET LOCAL ROLE NONE")
             conn.execute(strip_transaction_boundaries(SQL058))
             conn.execute("SET LOCAL ROLE NONE")
