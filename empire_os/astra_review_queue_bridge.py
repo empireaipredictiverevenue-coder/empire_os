@@ -164,6 +164,28 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             source_patch_missing=2
         elif source_patch.get('original_jobs_missing_implementation_commit')!=0:
             raise ValueError('untrusted missing commit observation')
+    original_test_replay=source.get('coder_historical_release_test_replay')
+    original_test_replay_status='NOT_AVAILABLE'
+    original_test_replay_count=0
+    if original_test_replay is not None:
+        if (not isinstance(original_test_replay,Mapping)
+            or original_test_replay.get('schema_version')!='empire.skillforge.original_revision_replay_review.v1'
+            or original_test_replay.get('automatic_skill_approval') is not False
+            or original_test_replay.get('production_deployment_verified') is not False
+            or original_test_replay.get('independent_department_completion_attributed') is not False
+            or original_test_replay.get('independent_implementation_outcome_verified') is not False
+            or original_test_replay.get('execution_authority')!='none'):
+            raise ValueError('untrusted historical Coder original revision replay')
+        original_test_replay_status=original_test_replay.get('status')
+        if original_test_replay_status=='PINNED_TWO_ORIGINAL_REVISION_TEST_REPLAYS_REVIEW_ONLY':
+            if (original_test_replay.get('historical_source_chains_verified')!=2
+                or original_test_replay.get('original_git_revisions_with_replayed_tests')!=2
+                or original_test_replay.get('historical_commits_on_current_branch')!=0):
+                raise ValueError('mismatched exact historical revision evidence')
+            original_test_replay_count=2
+        elif (original_test_replay.get('historical_source_chains_verified')!=0
+              or original_test_replay.get('original_git_revisions_with_replayed_tests')!=0):
+            raise ValueError('untrusted non-pinned original revision replay')
     packets={row['task_id']:row for row in existing.get('review_packets',[])
              if isinstance(row,Mapping) and isinstance(row.get('task_id'),str)}
     for family in families:
@@ -268,6 +290,11 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'historical_verify_receipts_missing_implementation_commits':(
                 source_patch_missing if component=='empire_coder' else 0),
             'independently_verified_code_implementations':0,
+            'original_revision_replay_status':(
+                original_test_replay_status if component=='empire_coder' else 'NOT_APPLICABLE'),
+            'historical_original_git_revisions_with_tests_replayed':(
+                original_test_replay_count if component=='empire_coder' else 0),
+            'historical_release_replay_is_not_attributed_department_work':True,
             'source_schema':source['schema_version'],
             'next_review_action':(
                 'Independently retrieve original source events for separate work completions; '

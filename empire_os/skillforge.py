@@ -11,6 +11,7 @@ from empire_os.skillforge_independent_evidence import review_independent_skill_e
 from empire_os.skillforge_coder_replay_review import (
     read_pinned_coder_replay, read_pinned_coder_patch_provenance,
 )
+from empire_os.skillforge_coder_historical_review import read_pinned_original_revision_replay
 from empire_os.skillforge_harness2_bridge import skillforge_harness2_candidate
 from empire_os.skillforge_proposals import proposal_history
 from empire_os.okf_adapter import list_private_research
@@ -71,6 +72,9 @@ def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
                                                if repo_root is not None else None),
             'coder_original_patch_provenance': (
                 read_pinned_coder_patch_provenance(repo_root)
+                if repo_root is not None else None),
+            'coder_historical_release_test_replay': (
+                read_pinned_original_revision_replay(repo_root)
                 if repo_root is not None else None),
             'review_queue': review_queue,
             'harness2_guard_candidate': (skillforge_harness2_candidate(repo_root)
