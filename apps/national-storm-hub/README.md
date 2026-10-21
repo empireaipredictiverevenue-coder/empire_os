@@ -2,6 +2,14 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Premium emergency design comparison — Jack workflow (private candidate)
+
+- Distinct research references and `DISCOVER → SHAPE → DESIGN → MAKE → REVIEW → PROVE` workflow mapped to the existing **Empire Design Studio** candidate; no duplicate skill or agent.
+- Two visual directions, **Signal Noir** and **Command Red**, using black, emergency red, white and safety yellow throughout the existing frontend. Source warning status and property-damage semantics remain unchanged.
+- `NEXT_PUBLIC_NSH_DESIGN_LAB=1` at **preview build time** shows an in-page direction switch; absent in normal builds. Review only; not a public design configurator.
+- Chrome screenshot evidence at 1440/820/390/320 and unit/build checks required before release. No 3D weather engine or official alert-boundary map has been added by a color-theme change.
+- The actual production National Storm Hub service/DNS is not changed by this isolated branch.
+
 ## Impeccable-informed UI polish (private candidate, 2026-10-21)
 
 - Reuses the existing Hermes Impeccable catalogue **reference** and records actual audience, brand, evidence boundaries and design direction in first-party `PRODUCT.md` and `DESIGN.md`.

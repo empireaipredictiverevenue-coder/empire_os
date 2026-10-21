@@ -1,4 +1,5 @@
 import "./globals.css";
+import ThemeReview from "../components/ThemeReview.jsx";
 export const metadata = {
   metadataBase: new URL("https://nationalstormhub.com"),
   title: "National Storm Hub | Weather intelligence & home preparedness",
@@ -8,5 +9,5 @@ export const metadata = {
   openGraph: {title:"National Storm Hub",type:"website",siteName:"National Storm Hub"},
 };
 export default function RootLayout({children}) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<ThemeReview/></body></html>;
 }

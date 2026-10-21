@@ -3,7 +3,9 @@
 Design reference: existing Hermes optional skill catalogue entry at /home/ubuntu/.hermes/hermes-agent/optional-skills/creative/impeccable/SKILL.md (metadata stub, NOT full installed skill). Upstream: pbakaus/impeccable (Apache-2.0). Not approved in Empire SkillForge; reference its public design concepts, never auto-load or run third-party hooks.
 
 ## Direction
-A premium meteorological observatory meets calm public-service journalism: deep navy, electric cyan information details and sparing warm gold. Existing Manrope display and DM Sans body typography. Typography and source provenance before decorative cards. Cinematic graphic globe is explicitly illustrative; no implied live storm positions.
+**Private comparative design candidate:** Signal Noir (default) versus Command Red (more intense). Premium meteorological observatory meets a restrained emergency-response identity: graphite near-black, vivid emergency red for selected action and sourced severe-warning hierarchy, warm safety yellow for caution and key source details, and bright white editorial typography. Existing Manrope display and DM Sans body typography remain unchanged. Typography, truth/provenance and conversion clarity come before decorative cards. The cinematic conceptual globe is illustrative; it must never imply verified live storm positions.
+
+Research-to-design references and Jack Roberts workflow are recorded in `DESIGN_REFERENCES_JACK_20261021.md`. Actual Empire Design Studio instructions already exist in `/home/ubuntu/empire_worktrees/empire_design_studio_20261018/empire_os/skills_library/skills/empire-design-studio/SKILL.md` and are **candidate guidance, not an approved runtime skill**.
 
 ## Quality passes
 - CRITIQUE: prioritize ZIP lookup, Alerts, Predictor and official source.

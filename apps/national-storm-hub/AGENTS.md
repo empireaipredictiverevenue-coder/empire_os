@@ -32,6 +32,12 @@ The owner is `empire_os/skill_exchange.py`. Use `recommend_work_item_skills` to 
 
 The Hermes optional-skill metadata stub exists at `/home/ubuntu/.hermes/hermes-agent/optional-skills/creative/impeccable/SKILL.md` and references upstream `pbakaus/impeccable` (Apache-2.0). It is **not** the complete installed skill, and is **not** approved in SkillForge. Do not claim that `/impeccable audit` or its detector CLI has been executed unless the reviewed tool is actually available. Use the first-party `PRODUCT.md` and `DESIGN.md` in this application for bounded critique, polish, hardening and responsive review. Keep the existing app architecture and truthful source states.
 
+## Reuse Jack Roberts' design framework through existing Empire Design Studio
+
+The original Empire Design Studio was previously built in `/home/ubuntu/empire_worktrees/empire_design_studio_20261018/empire_os/skills_library/skills/empire-design-studio/SKILL.md`. Its research-to-proof process is `DISCOVER → SHAPE → DESIGN → MAKE → REVIEW → PROVE`. Reuse that process and `apps/national-storm-hub/DESIGN_REFERENCES_JACK_20261021.md`. Do not create a second design-agent framework, run unapproved SkillForge candidate instructions, install a new website framework or assume the flagship Three.js renderer is already part of this app.
+
+For this candidate the owner requested a premium **black / red / white / safety-yellow** emergency-weather identity with strong data intelligence. Compare two private design directions and check actual Chrome captures at 1440/820/390/320 widths. Never copy Dribbble source/imagery, manufacture meteorological indicators, or allow brand red to make a no-alert state look like a severe warning.
+
 ## Reuse real operational code
 
 - Historical classifier: `empire_os/storm_predictor.py`, which identifies NWS warning event types but does not verify household damage or buyer demand.
