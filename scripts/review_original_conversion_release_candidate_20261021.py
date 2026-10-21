@@ -21,6 +21,8 @@ FILES=(
     "empire_os/predictive_original_conversion_catalogue.py",
     "scripts/check_original_conversion_isolated_pg_20261018.py",
     "scripts/run_guarded_conversion_catalogue_readonly_20261021.sh",
+    "scripts/review_original_conversion_dba_prerequisites_20261021.py",
+    "scripts/run_guarded_original_conversion_dba_preflight_20261021.sh",
 )
 REQUIRED={
     FILES[0]:(
@@ -55,6 +57,19 @@ REQUIRED={
         "set -euo pipefail",
         "--run-read-only",
         "PGPASSFILE=",
+    ),
+    FILES[6]:(
+        "MAX_BACKUP_AGE_HOURS=24",
+        "PRE_DDL_BACKUP_AND_AUTHORITY_METADATA_REVIEW_READY",
+        "independent_restoration_or_pitr_drill_verified",
+        "release_commit_approved_for_database_ddl",
+        "archive_mode_enabled",
+    ),
+    FILES[7]:(
+        "set -euo pipefail",
+        "sha256sum",
+        "ORIGINAL_CONVERSION_DBA_PREFLIGHT_NO_DATABASE_MUTATION",
+        "--run-read-only",
     ),
 }
 
