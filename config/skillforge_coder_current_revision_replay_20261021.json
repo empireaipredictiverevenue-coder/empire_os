@@ -1,0 +1,46 @@
+{
+  "current_revision_head_unchanged": true,
+  "current_revision_test_exit_code": 0,
+  "current_revision_test_files_unchanged": true,
+  "current_revision_test_subprocess_executed": true,
+  "current_revision_test_workspace_clean": true,
+  "current_revision_tests_passed": true,
+  "current_test_file_sha256": {
+    "tests/test_competitor_search_presence.py": "5654fb5d201fd3e295d0e2cc33e6b54f045e244be940de32935529ac3d9591ae",
+    "tests/test_organic_search_legacy_recovery.py": "31516e57b29c131f7e330432d9d1c0bbfe90ebb81872838859d0c68a0be9d157",
+    "tests/test_search_traffic_forecast.py": "50ef5ca09802f7e321632a73fe840da1871b55457a9daa4ae2b2d5458f6701e6"
+  },
+  "current_worktree_head": "d10c71c57e919e33de7c39778b62a0a685dee731",
+  "execution_authority": "none",
+  "fixed_test_files": [
+    "tests/test_search_traffic_forecast.py",
+    "tests/test_organic_search_legacy_recovery.py",
+    "tests/test_competitor_search_presence.py"
+  ],
+  "historical_original_receipts": [
+    {
+      "historical_verify_job_reference_sha256": "204fd81783f6dd1e71b6a8bb396dcde8dbd77c91215d80883eaaaaf0648a787c",
+      "historical_verify_receipt_sha256": "03c8108bdd32f65678ed4f7d8cdae0e1024b35f0dcbcd443b5cfbec2da87a4bd",
+      "source_plan_reference_sha256": "b31c1e307e2c8a2d2df01e6eb14c33859131555d76415f4b3636cec929a0fbaa",
+      "source_work_reference_sha256": "f5f71a8c60f4a8c023b00f36475f0cae7ba9c4b8586133186679f75704a6a8e3"
+    },
+    {
+      "historical_verify_job_reference_sha256": "54ac081ed793a0e5a0ce124ee0f1030f3fcd53d1025c0fdc16251cc3f7cc8613",
+      "historical_verify_receipt_sha256": "d18fe0d7666b12bb06ece91c1da3b5de2b065aa6b4acb0189aa749db09aa8536",
+      "source_plan_reference_sha256": "38a91c06dd54cfe92205918ae88b28906d20806a9d07adbe599ed9087fb82254",
+      "source_work_reference_sha256": "8e9cb1ea3e54cd50623b580cb56390c649972952ad743124edf029b32a096c6e"
+    }
+  ],
+  "historical_production_change_authenticated": false,
+  "historical_production_revision_tested": false,
+  "historical_source_revision_reproduced": false,
+  "independent_agent_completion_or_owner_attestation": false,
+  "independently_verified_business_outcomes": 0,
+  "independently_verified_code_implementations": 0,
+  "mode": "ISOLATED_DEVELOPMENT_READONLY_TEST_REPLAY",
+  "production_activation_authorized": false,
+  "schema_version": "empire.skillforge.coder_current_revision_test_replay.v1",
+  "selected_historical_receipt_count": 2,
+  "skillforge_promotion_authorized": false,
+  "source_original_root_used_for_read_only_receipts": true
+}

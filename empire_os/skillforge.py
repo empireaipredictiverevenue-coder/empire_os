@@ -8,6 +8,7 @@ from empire_os.skill_review import review_local_skill
 from empire_os.skill_trust import SkillTrustError, read_trust_registry
 from empire_os.skillforge_learning import learning_index
 from empire_os.skillforge_independent_evidence import review_independent_skill_evidence
+from empire_os.skillforge_coder_replay_review import read_pinned_coder_replay
 from empire_os.skillforge_harness2_bridge import skillforge_harness2_candidate
 from empire_os.skillforge_proposals import proposal_history
 from empire_os.okf_adapter import list_private_research
@@ -64,6 +65,8 @@ def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
             'learning': learning,
             'independent_evidence_review': (review_independent_skill_evidence(repo_root)
                                              if repo_root is not None else None),
+            'coder_current_revision_replay': (read_pinned_coder_replay(repo_root)
+                                               if repo_root is not None else None),
             'review_queue': review_queue,
             'harness2_guard_candidate': (skillforge_harness2_candidate(repo_root)
                                          if repo_root is not None else None),

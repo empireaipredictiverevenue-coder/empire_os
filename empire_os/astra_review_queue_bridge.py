@@ -123,6 +123,28 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
     families=source.get('families')
     if not isinstance(families,list) or len(families)>16 or source.get('family_count')!=len(families):
         raise ValueError('invalid SkillForge family review set')
+    replay=source.get('coder_current_revision_replay')
+    replay_status='NOT_AVAILABLE'
+    replay_test_files=0
+    if replay is not None:
+        if (not isinstance(replay,Mapping)
+            or replay.get('schema_version')!='empire.skillforge.coder_replay_review.v1'
+            or replay.get('skillforge_promotion_authorized') is not False
+            or replay.get('automatic_dispatch_authorized') is not False
+            or replay.get('independently_verified_code_implementations')!=0
+            or replay.get('historical_source_revision_reproduced') is not False
+            or replay.get('recorded_replay_attested_by_independent_owner') is not False
+            or replay.get('execution_authority')!='none'):
+            raise ValueError('invalid current-revision test replay evidence')
+        replay_status=replay.get('status')
+        if replay_status=='PINNED_CURRENT_REVISION_TEST_REPLAY_REVIEW_ONLY':
+            if (replay.get('recorded_current_revision_tests_passed') is not True
+                or replay.get('recorded_test_files')!=3
+                or replay.get('distinct_historical_coder_plans')!=2):
+                raise ValueError('unsafe recorded current-revision replay proof')
+            replay_test_files=3
+        elif replay.get('recorded_current_revision_tests_passed') is not False:
+            raise ValueError('non-pinned replay cannot claim pass')
     packets={row['task_id']:row for row in existing.get('review_packets',[])
              if isinstance(row,Mapping) and isinstance(row.get('task_id'),str)}
     for family in families:
@@ -217,6 +239,11 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'downstream_coder_verify_jobs':dict(downstream),
             'verify_report_pass_is_not_independent_outcome_proof':True,
             'test_path_availability_is_not_test_reexecution':True,
+            'current_revision_replay_status':(
+                replay_status if component=='empire_coder' else 'NOT_APPLICABLE'),
+            'current_revision_replay_fixed_test_file_count':(
+                replay_test_files if component=='empire_coder' else 0),
+            'current_revision_replay_is_not_historical_implementation_proof':True,
             'independently_verified_code_implementations':0,
             'source_schema':source['schema_version'],
             'next_review_action':(
