@@ -47,7 +47,9 @@ def _read_private(
     return payload
 
 
-def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> None:
+def attach_founder_reported_external_contacts(
+    report: dict, evidence: dict, *, previous: dict | None = None
+) -> None:
     """Annotate self-reported external outreach, never equate it to Gmail proof."""
     if (evidence.get("schema_version")
             != "empire.founder_reported_external_contacts.v1"
@@ -60,13 +62,25 @@ def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> N
         domain: row for row in report["relationships"]
         for domain in row.get("identity_domains", [])
     }
+    # A fresh discovery queue can lose a company whose founder-submitted
+    # contact was already recorded. Preserve only previously established
+    # exact matches as HISTORY_ONLY, not as a newly approved buyer.
+    previous_contacts = {}
+    for old in (previous or {}).get("relationships", []):
+        if not isinstance(old, dict):
+            continue
+        contact = old.get("founder_reported_external_contact")
+        if isinstance(contact, dict) and contact.get("domain") == old.get("entity_key"):
+            previous_contacts[contact["domain"]] = contact
     seen = set()
     reviewed = []
+    history_only_count = 0
     for item in observations:
         if not isinstance(item, dict):
             raise RelationshipEvidenceError("invalid_founder_contact_item")
         domain = item.get("domain")
-        if not isinstance(domain, str) or domain not in by_domain or domain in seen:
+        if (not isinstance(domain, str) or domain in seen
+                or (domain not in by_domain and domain not in previous_contacts)):
             raise RelationshipEvidenceError("unknown_or_duplicate_founder_contact")
         seen.add(domain)
         try:
@@ -89,7 +103,14 @@ def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> N
                 or item.get("products_requested") != ["PAY_PER_CALL"]
                 or item.get("future_followup_topic") != ["PAY_PER_LEAD", "PAY_PER_CALL"]):
             raise RelationshipEvidenceError("unsupported_founder_contact_assertion")
-        row = by_domain[domain]
+        previous_contact = previous_contacts.get(domain)
+        if domain not in by_domain and (
+            previous_contact is None
+            or previous_contact.get("reported_date") != reported_date
+            or previous_contact.get("direction") != item["direction"]
+            or previous_contact.get("channel") != item["channel"]
+        ):
+            raise RelationshipEvidenceError("historical_founder_contact_source_mismatch")
         contact = {
             "domain": domain,
             "reported_date": reported_date,
@@ -103,6 +124,13 @@ def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> N
             "next_after_response": "DISCUSS_PAY_PER_LEAD_AND_PAY_PER_CALL",
             "outbound_authorized": False,
         }
+        row = by_domain.get(domain)
+        if row is None:
+            contact["history_only"] = True
+            contact["next_action"] = "HOLD_PREVIOUS_APPLICATION_NO_DUPLICATE_INTRO"
+            history_only_count += 1
+            reviewed.append(contact)
+            continue
         row["founder_reported_external_contact"] = contact
         if row["stage"] == "RESEARCH_ONLY":
             row["next_founder_action"] = (
@@ -114,6 +142,7 @@ def attach_founder_reported_external_contacts(report: dict, evidence: dict) -> N
         reviewed.append(contact)
     report["founder_reported_external_contact_queue"] = reviewed
     report["founder_reported_external_contact_count"] = len(reviewed)
+    report["founder_reported_contact_history_only_count"] = history_only_count
 
 
 def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
@@ -268,7 +297,7 @@ def build(root: Path = ROOT) -> dict:
         founder_contacts = _read_private(
             founder_contact_path, limit=16_000, require_private=True,
         )
-        attach_founder_reported_external_contacts(result, founder_contacts)
+        attach_founder_reported_external_contacts(result, founder_contacts, previous=previous)
     else:
         result["founder_reported_external_contact_queue"] = []
         result["founder_reported_external_contact_count"] = 0

@@ -1143,3 +1143,52 @@ def test_founder_no_contact_hold_beats_even_exact_reviewed_reply():
         assert rows[key]["next_founder_action"] == "DO_NOT_PURSUE_NO_CONTACT"
         assert rows[key]["founder_review_required"] is False
         assert rows[key]["outbound_authorized"] is False
+
+
+def test_previous_founder_application_survives_discovery_queue_rotation_without_buyer_claim():
+    from scripts.reconcile_buyer_email_relationships import (
+        attach_founder_reported_external_contacts,
+    )
+    old = {
+        "relationships": [{
+            "entity_key": "joinglobalwiz.com",
+            "founder_reported_external_contact": {
+                "domain": "joinglobalwiz.com",
+                "reported_date": "2026-10-10",
+                "direction": "founder_submitted_application",
+                "channel": "website_application_form",
+            },
+        }],
+    }
+    fresh = {"relationships": [], "outbound_sent": False}
+    item = {
+        "domain": "joinglobalwiz.com",
+        "reported_date": "2026-10-10",
+        "direction": "founder_submitted_application",
+        "channel": "website_application_form",
+        "delivery_confirmed": False,
+        "reply_confirmed": False,
+        "buyer_programme_approved": False,
+        "products_requested": ["PAY_PER_CALL"],
+        "future_followup_topic": ["PAY_PER_LEAD", "PAY_PER_CALL"],
+        "next_action": "AWAIT_APPLICATION_RESPONSE_NO_DUPLICATE_CONTACT",
+    }
+    evidence = {
+        "schema_version": "empire.founder_reported_external_contacts.v1",
+        "origin": "founder_direct_confirmation_in_chat",
+        "observations": [item],
+    }
+    attach_founder_reported_external_contacts(fresh,evidence,previous=old)
+    assert fresh["relationships"] == []
+    assert fresh["founder_reported_contact_history_only_count"] == 1
+    hold = fresh["founder_reported_external_contact_queue"][0]
+    assert hold["history_only"] is True
+    assert hold["delivery_verified"] is False
+    assert hold["buyer_approved"] is False
+    assert hold["outbound_authorized"] is False
+    # A prior record cannot justify a different or forged submission.
+    altered = {**evidence, "observations": [{**item, "reported_date": "2026-10-11"}]}
+    with pytest.raises(RelationshipEvidenceError, match="historical_founder_contact_source_mismatch"):
+        attach_founder_reported_external_contacts(
+            {"relationships":[]},altered,previous=old
+        )
