@@ -365,6 +365,18 @@ def refresh_review_packets(root: Path) -> dict[str, Any]:
             "harness2_skillforge_candidate": _candidate,
         }
         output = merge_into_review_plan(output, _review)
+    # Reuse the existing isolated engineering review queue for original-source
+    # independence gaps in the *existing* SkillForge observations. This never
+    # promotes a skill, dispatches a task or changes source data. A broken
+    # SkillForge source audit cannot block unrelated review packets.
+    from empire_os.skillforge_independent_evidence import review_independent_skill_evidence
+    from empire_os.astra_review_queue_bridge import merge_skillforge_evidence_into_review_plan
+    try:
+        _diversity=review_independent_skill_evidence(root)
+        if _diversity["status"]=="SOURCE_DIVERSITY_REVIEW_ONLY":
+            output=merge_skillforge_evidence_into_review_plan(output,_diversity)
+    except (OSError,ValueError,TypeError,UnicodeError):
+        pass
     modified = 0
     unchanged = 0
     pointers = []
