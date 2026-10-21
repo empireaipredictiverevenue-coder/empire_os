@@ -385,7 +385,16 @@ def _unscoped_cached_snapshot_safe(payload: Mapping[str, Any]) -> bool:
     tenant receipt. Only a zero-cohort OBSERVE snapshot is safe to reuse.
     """
     return (
-        payload.get("tenant_id") is None
+        payload.get("schema_version") == "empire.predictive_intelligence.v1"
+        and payload.get("mode") == "OBSERVE"
+        and payload.get("source_scope_admission_status")
+        == "GLOBAL_SOURCE_EMPTY_BUT_ISSUER_UNVERIFIED"
+        and type(payload.get("unscoped_source_rows_quarantined_count")) is int
+        and payload["unscoped_source_rows_quarantined_count"] == 0
+        and payload.get("original_tenant_source_authenticated") is False
+        and payload.get("original_outcome_issuer_authenticated") is False
+        and payload.get("original_forecast_registered_before_outcome") is False
+        and payload.get("tenant_id") is None
         and payload.get("product_estimates") == {}
         and type(payload.get("source_outcome_count")) is int
         and payload["source_outcome_count"] == 0

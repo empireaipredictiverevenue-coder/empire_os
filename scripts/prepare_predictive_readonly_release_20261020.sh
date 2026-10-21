@@ -102,6 +102,13 @@ EOF
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_intelligence.py \
+    empire_os/sb.py \
+    empire_os/canonical_data_gateway.py \
+    empire_os/data_query.py \
+    empire_os/data_values.py \
+    empire_os/runtime_env.py \
+    empire_os/quant_brain.py \
+    scripts/build_predictive_intelligence.py \
     empire_os/predictive_source_owner_deployment_preflight.py \
     scripts/review_predictive_source_owner_deployment_20261020.py \
     empire_os/predictive_tenant_outcome_reader_preflight.py \
