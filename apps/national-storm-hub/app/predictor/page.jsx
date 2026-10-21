@@ -2,10 +2,9 @@
 import {useEffect,useState} from "react";
 import Link from "next/link";
 import {CloudLightning,ArrowLeft,ArrowRight,ExternalLink,ShieldCheck,CloudSun,AlertTriangle,MapPin,Clock3,Wind,Info,Radio,RefreshCw,Layers} from "lucide-react";
+import {formatWeatherTime} from "../../lib/weather-time.js";
 function pretty(value){
-  if(!value)return "Unknown time";
-  const d=new Date(value);return Number.isFinite(d.getTime())?
-   new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}).format(d):"Unknown time";
+ return formatWeatherTime(value,"Unknown time");
 }
 function Flag({state}) {return <span className={state==="AVAILABLE"?"source-mark":"source-mark unavailable"}>{state==="AVAILABLE"?"SOURCE RECEIVED":state?.replaceAll("_"," ")||"UNAVAILABLE"}</span>;}
 export default function Predictor(){

@@ -3,15 +3,14 @@ import Link from "next/link";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {AlertTriangle,ArrowLeft,ArrowRight,ArrowUpRight,Bell,BellOff,Bookmark,Check,ChevronDown,Clock3,CloudLightning,ExternalLink,MapPin,Radio,RefreshCw,ShieldCheck,ShieldAlert,Info} from "lucide-react";
 import {STATE_NAMES,normalizeZip,normalizeState} from "../../lib/storm-data.js";
+import {formatWeatherTime} from "../../lib/weather-time.js";
 
 const REGION_KEY="nsh.alerts.region.v1";
 const READ_KEY="nsh.alerts.acknowledged.v1";
 const CHECK_EVERY_MS=300000;
 const stateOptions=Object.entries(STATE_NAMES).sort((a,b)=>a[1].localeCompare(b[1]));
 function stamp(str){
- if(!str)return "Not provided by source";
- const date=new Date(str);
- return Number.isFinite(date.getTime())?new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}).format(date):"Source time unavailable";
+ return formatWeatherTime(str,"Source time unavailable");
 }
 export default function AlertsCentre(){
  const [region,setRegion]=useState({state:"TX"});

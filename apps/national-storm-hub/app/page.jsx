@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {STATE_NAMES,normalizeZip,normalizeState} from "../lib/storm-data.js";
 import {summarizeHomeSource} from "../lib/home-source-view.js";
+import {formatWeatherTime} from "../lib/weather-time.js";
 
 const STORAGE_KEY="national-storm-hub-passport-preview-v1";
 const CHECKLIST=[
@@ -23,10 +24,7 @@ const CHECKLIST=[
 const INITIAL_PASSPORT={savedZip:"",savedState:"",tasks:{},bookmarks:[]};
 const STATES=Object.entries(STATE_NAMES).sort((a,b)=>a[1].localeCompare(b[1]));
 function formatted(value) {
-  if (!value) return "Time unavailable";
-  const date=new Date(value);
-  if (!Number.isFinite(date.getTime())) return "Time unavailable";
-  return new Intl.DateTimeFormat("en-US",{dateStyle:"medium",timeStyle:"short",timeZoneName:"short"}).format(date);
+  return formatWeatherTime(value,"Time unavailable");
 }
 function IconLabel({icon:Icon,children,className=""}) {
   return <span className={"icon-label "+className}><Icon size={15} strokeWidth={1.8}/>{children}</span>;
