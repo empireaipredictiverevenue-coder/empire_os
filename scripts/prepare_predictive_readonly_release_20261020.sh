@@ -113,6 +113,7 @@ EOF
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_point_in_time_features.py \
     empire_os/predictive_competitive_product_comparison.py \
+    empire_os/predictive_product_specific_competitors.py \
     empire_os/predictive_price_policy_evidence.py \
     empire_os/predictive_catalogue_price_comparison.py \
     scripts/review_predictive_comparison_20261021.py \
@@ -268,7 +269,10 @@ assert len(x["products"])==x["catalogue_product_count"]
 assert all(p["evidence_backed_price_justified"] is False for p in x["products"])
 assert all(p["automatic_price_changes_authorized"] is False for p in x["products"])
 assert all(p["foreign_currency_converted_to_usd"] is False for p in x["products"])
-assert all(len(p["competitor_categories"])==6 for p in x["products"])
+assert all(p["no_reliable_direct_comparator_yet"] is True for p in x["products"])
+assert x["adjacent_reference_count"] == sum(len(p["competitor_categories"]) for p in x["products"])
+assert x["products_without_adjacent_reference"] == sum(not p["competitor_categories"] for p in x["products"])
+assert all(not c["feature_parity_verified"] and not c["price_justified_by_benchmark"] for p in x["products"] for c in p["competitor_categories"])
 assert all(not p["founder_policy_cost_ceiling_scenario"]["realized_margin_verified"] for p in x["products"])
 assert all(not p["founder_policy_cost_ceiling_scenario"]["price_justified_by_evidence"] for p in x["products"])
 assert x["execution_authority"]=="none"

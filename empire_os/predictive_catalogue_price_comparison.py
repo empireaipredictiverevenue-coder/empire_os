@@ -20,6 +20,9 @@ from empire_os.predictive_competitive_product_comparison import (
 from empire_os.predictive_price_policy_evidence import (
     PricingPolicyHold, review_price_policy_ceiling,
 )
+from empire_os.predictive_product_specific_competitors import (
+    review_product_specific_competitors,
+)
 
 SCHEMA = "empire.predictive_revenue.catalogue_price_comparison.v1"
 MAX_AMT = 1_000_000_000_000
@@ -106,17 +109,28 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
                 counters["approved_ceiling_scenarios_meeting_margin"] += 1
             else:
                 counters["approved_ceiling_scenarios_below_margin"] += 1
-        categories = set(SEGMENTS_BY_FAMILY[family])
+        lane = review_product_specific_competitors(
+            product_code=code, product_family=family,
+        )
         competitors = [
             {
                 "vendor": b["vendor"],
                 "product": b["product"],
-                "category_overlap": sorted(categories.intersection(b["segments"])),
+                "research_source_url": b["research_source_url"],
+                "comparison_type": b["comparison_type"],
                 "feature_parity_verified": False,
                 "total_price_comparability_verified": False,
+                "published_reference_unit": b["published_reference_unit"],
+                "published_reference_price_usd_minor": b[
+                    "published_reference_price_usd_minor"
+                ],
+                "price_justified_by_benchmark": False,
             }
-            for b in BENCHMARKS
+            for b in lane["benchmarks"]
         ]
+        counters["adjacent_reference_count"] += len(competitors)
+        if not competitors:
+            counters["products_without_adjacent_reference"] += 1
         entries.append({
             "product_code": code,
             "product_family": family,
@@ -138,7 +152,9 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
             "evidence_backed_price_justified": False,
             "price_review_status": "HOLD_ORIGINAL_SCOPE_COST_AND_BENEFIT_PROOF",
             "founder_policy_cost_ceiling_scenario": policy,
+            "competitor_lane": lane["lane"],
             "competitor_categories": competitors,
+            "no_reliable_direct_comparator_yet": True,
             "automatic_price_changes_authorized": False,
             "external_sales_or_pricing_published": False,
         })
@@ -166,6 +182,11 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
             "approved_ceiling_scenarios_below_margin"
         ],
         "approved_cost_ceiling_scenario_is_actual_margin": False,
+        "adjacent_reference_count": counters["adjacent_reference_count"],
+        "products_without_adjacent_reference": counters[
+            "products_without_adjacent_reference"
+        ],
+        "all_vendor_references_are_research_only": True,
         "original_catalogue_source_authenticated": False,
         "flagship_comparison_schema": FLAGSHIP_SCHEMA,
         "products": entries,

@@ -51,7 +51,14 @@ def test_real_catalogue_all_86_skus_and_all_six_currencies_preserved():
         assert item["customer_value_independently_measured"] is False
         assert item["automatic_price_changes_authorized"] is False
         assert item["external_sales_or_pricing_published"] is False
-        assert len(item["competitor_categories"]) == 6
+        assert all(
+            cmp["feature_parity_verified"] is False
+            and cmp["total_price_comparability_verified"] is False
+            and cmp["research_source_url"].startswith("https://")
+            and cmp["price_justified_by_benchmark"] is False
+            for cmp in item["competitor_categories"]
+        )
+        assert item["no_reliable_direct_comparator_yet"] is True
     for tier in PREDICTIVE_REVENUE_PRODUCTS:
         item=mapped[tier.product_code]
         assert item["catalogue_listed_price_minor_units"] == tier.deployment_price_cents

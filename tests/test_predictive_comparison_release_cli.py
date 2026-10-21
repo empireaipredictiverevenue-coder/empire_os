@@ -37,6 +37,12 @@ def test_cli_full_review_retains_all_sku_currency_and_no_repricing(capsys):
         p["founder_policy_cost_ceiling_scenario"]["realized_margin_verified"] is False
         for p in result["products"]
     )
+    assert result["adjacent_reference_count"] == sum(
+        len(p["competitor_categories"]) for p in result["products"]
+    )
+    assert result["products_without_adjacent_reference"] == sum(
+        not p["competitor_categories"] for p in result["products"]
+    )
 
 
 def test_cli_source_hold_is_redacted_and_fails_closed(monkeypatch, capsys):
@@ -62,6 +68,7 @@ def test_release_launcher_has_comparison_without_repricing_service():
     assert '"$TMP/bin/empire-predictive-observe" comparison |' in content
     assert "empire_os/predictive_point_in_time_features.py" in content
     assert "empire_os/predictive_competitive_product_comparison.py" in content
+    assert "empire_os/predictive_product_specific_competitors.py" in content
     assert "empire_os/predictive_catalogue_price_comparison.py" in content
     assert "empire_os/predictive_price_policy_evidence.py" in content
     assert "scripts/review_predictive_comparison_20261021.py" in content
