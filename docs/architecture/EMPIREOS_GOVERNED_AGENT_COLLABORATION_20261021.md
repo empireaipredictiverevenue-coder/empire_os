@@ -6,7 +6,11 @@ Integrate Agent-OS-like persona and coordination **into existing EmpireOS**.
 Do not create separate AI companies, autonomous identities, schedulers,
 databases, queues, SaaS dashboards or external-facing A2A agents.
 
-Implemented in isolated feature branch, not deployed or activated.
+Core collaboration code was selectively integrated into the existing production
+repository at commit `7ea86d5bf` and passed 57 scoped regression tests.
+The collaboration runtime remains **not activated**: no trusted agent keys
+were provisioned, no agent model adapters were connected, and no public
+Kanban endpoint, new worker or scheduler was started.
 
 - Existing `empire_os/departments.py` is the authoritative catalogue of
   departments and roles. Registration fails if an agent claims a new department
