@@ -512,3 +512,74 @@ def test_exact_direct_assignment_stays_verified_for_next_day_retry_not_forever()
     assert readiness(track={**source,"tracking_number_assigned":False},now=now)["gates"]["tracking_verified"] is False
     later=NOW+timedelta(hours=49)
     assert readiness(track=source,now=later)["gates"]["tracking_verified"] is False
+
+def test_newer_lead_smart_caller_local_hours_supersede_old_chicago_authority():
+    from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
+    from empire_os.lead_smart_operating_hours import evaluate_buyer_hours
+    current = datetime(2026, 10, 21, 15, 10, tzinfo=timezone.utc)
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    supersession = policy["operating_hours_supersession"]
+    assert supersession["source_ref"] == "gmail:1a15ea2dfa8c46b1"
+    assert supersession["rule"] == "HOURS_DEPEND_ON_CALLER_TIMEZONE"
+    assert supersession["caller_timezone_verified"] is False
+    assert supersession["buyer_acceptance_window_verified"] is False
+    original = evaluate_buyer_hours(
+        REPORT, policy["operating_hours_confirmation"], now=current
+    )
+    assert original["operating_hours_verified"] is True  # historical view only
+    reconciled = evaluate_buyer_hours(
+        REPORT, policy["operating_hours_confirmation"], now=current,
+        superseding_buyer_policy=supersession,
+    )
+    assert reconciled["within_reported_window"] is True
+    assert reconciled["buyer_window_open_now"] is False
+    assert reconciled["operating_hours_verified"] is False
+    assert reconciled["hours_policy_confirmed"] is False
+    assert reconciled["supersession_review_required"] is True
+    assert reconciled["supersession_source_ref"] == "gmail:1a15ea2dfa8c46b1"
+    assert reconciled["execution_authority"] == "NONE"
+
+    # Even a future arbitrary boolean must not silently "verify" caller location.
+    unreviewed = {**supersession, "caller_timezone_verified": True,
+                  "buyer_acceptance_window_verified": True}
+    fail_closed = evaluate_buyer_hours(
+        REPORT, policy["operating_hours_confirmation"], now=current,
+        superseding_buyer_policy=unreviewed,
+    )
+    assert fail_closed["operating_hours_verified"] is False
+
+
+def test_full_release_cannot_pass_using_superseded_chicago_policy():
+    from empire_os.buyer_supply_policy import lead_smart_confirmed_roofing_policy
+    policy = lead_smart_confirmed_roofing_policy(
+        source_ref="gmail:1a10c6b2530f2951"
+    )
+    now = datetime(2026, 10, 21, 15, 10, tzinfo=timezone.utc)
+    fresh = {
+        "state": "VERIFIED", "tracking_verified": True,
+        "verified_at": now.isoformat(), "source_observed_at": now.isoformat(),
+    }
+    zips = {
+        "zip_targeting_gate_verified": True,
+        "zip_coverage_activation_verified": True,
+        "source_fresh_for_targeting": True,
+        "source_observed_at": now.isoformat(),
+        "verified_freshness": {"source_newest_last_updated": now.isoformat()},
+    }
+    result = build_launch_readiness(
+        tracking=fresh, zip_gate=zips,
+        routing={"routing_runtime_verified": True, "observed_at": now.isoformat()},
+        operating_hours=policy["operating_hours"],
+        timezone_confirmation=policy["operating_hours_confirmation"],
+        operating_hours_supersession=policy["operating_hours_supersession"],
+        caller_id_pass_through_verified=True, buyer_landing_page_approved=True,
+        legal_release_verified=True, recording_notice_and_retention_verified=True,
+        landing_publication_authorized=True, founder_live_traffic_authorized=True,
+        pilot_stop_verified=True, now=now,
+    )
+    assert result["blockers"] == ["operating_hours_verified"]
+    assert result["launch_ready"] is False
+    assert result["call_cta_enabled"] is False
+    assert result["execution_authority"] == "NONE"

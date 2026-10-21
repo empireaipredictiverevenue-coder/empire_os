@@ -49,6 +49,7 @@ def evaluate_buyer_hours(
     timezone_confirmation: Mapping[str, Any] | None,
     *,
     now: datetime | None = None,
+    superseding_buyer_policy: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -66,7 +67,15 @@ def evaluate_buyer_hours(
     within_window = start_hour * 60 <= minute_of_day < end_hour * 60
     # Confirmed hours POLICY is independent of whether the clock is inside
     # this particular operating window. Caller routing remains fail-closed.
-    hours_policy_confirmed = contract_matches and confirmation_valid
+    # The 21 Oct buyer correction says hours depend on the caller's time
+    # zone, NOT the old universal Chicago time. We have no authenticated
+    # caller-zone or receiving-buyer window mapping. Any newer policy claim
+    # holds the legacy policy; extra "verified" flags cannot self-clear it.
+    supersession_review_required = superseding_buyer_policy is not None
+    hours_policy_confirmed = (
+        contract_matches and confirmation_valid
+        and not supersession_review_required
+    )
     verified = hours_policy_confirmed and within_window
     return {
         "schema_version": "empire.lead_smart.operating_hours_gate.v1",
@@ -76,6 +85,14 @@ def evaluate_buyer_hours(
         "buyer_zone_name": zone_name if confirmation_valid else None,
         "within_reported_window": within_window,
         "hours_policy_confirmed": hours_policy_confirmed,
+        "supersession_review_required": supersession_review_required,
+        "supersession_source_ref": (
+            superseding_buyer_policy.get("source_ref")
+            if isinstance(superseding_buyer_policy, Mapping)
+            and superseding_buyer_policy.get("source_ref")
+                == "gmail:1a15ea2dfa8c46b1"
+            else None
+        ),
         "buyer_window_open_now": within_window if hours_policy_confirmed else False,
         "evaluated_at": now.isoformat(),
         "operating_hours_verified": verified,

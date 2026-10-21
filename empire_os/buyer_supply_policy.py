@@ -337,6 +337,17 @@ def lead_smart_confirmed_roofing_policy(*, source_ref: str) -> dict[str, Any]:
         "confirmed_at": "2026-10-09T19:35:28Z",
         "zone_name": "America/Chicago",
     }
+    # This newer buyer reply supersedes treating Chicago as the confirmed
+    # operating zone for every US homeowner. It does not supply a per-caller
+    # timezone/receiving-buyer acceptance proof. Fail closed until reviewed.
+    policy["operating_hours_supersession"] = {
+        "source_ref": "gmail:1a15ea2dfa8c46b1",
+        "reported_at": "2026-10-21T13:24:51Z",
+        "rule": "HOURS_DEPEND_ON_CALLER_TIMEZONE",
+        "caller_timezone_verified": False,
+        "buyer_acceptance_window_verified": False,
+        "review_required": True,
+    }
 
     policy["evidence"] = {
         "observed_at": "2026-10-05T14:15:08Z",

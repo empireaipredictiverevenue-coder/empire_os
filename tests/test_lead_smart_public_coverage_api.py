@@ -100,3 +100,17 @@ def test_gateway_registers_public_zip_lookup():
     assert result.status_code == 200
     assert result.json()["coverage_guidance"] == "LISTED_IN_RECENT_COVERAGE"
     assert result.json()["call_authorized"] is False
+
+def test_live_source_buyer_hours_preview_never_promotes_old_chicago_window(monkeypatch):
+    from datetime import datetime, timezone
+    from empire_os.lead_smart_homeowner_eligibility import buyer_hours_preview
+    at_chicago_morning = datetime(2026, 10, 21, 15, tzinfo=timezone.utc)
+    monkeypatch.setattr(api, "buyer_hours_preview",
+                        lambda: buyer_hours_preview(now=at_chicago_morning))
+    result = client.post("/roofing/coverage-check", json={"zip": "00501"})
+    assert result.status_code == 200
+    body = result.json()
+    assert body["within_reported_hours"] is False
+    assert body["time_zone_interpretation_verified"] is False
+    assert body["call_authorized"] is False
+    assert "handoff_form_action" not in body

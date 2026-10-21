@@ -300,8 +300,11 @@ def compute_live_launch_readiness(
 
         operating_hours=policy["operating_hours"],
 
-        # Verified source: Lead Smart Support Agent 9 October 2026.
+        # The Chicago-only 9 Oct guidance was superseded by the 21 Oct
+        # buyer's caller-local-hours clarification. A confirmed ZIP alone
+        # does not verify caller origin or receiving-buyer active hours.
         timezone_confirmation=policy["operating_hours_confirmation"],
+        operating_hours_supersession=policy["operating_hours_supersession"],
 
         # Pass-through is contractually required on Direct, but evidence
         # of the runtime caller-ANI path has not been independently proved.

@@ -111,6 +111,7 @@ def build_launch_readiness(
     routing: Mapping[str, Any],
     operating_hours: Mapping[str, Any] | None = None,
     timezone_confirmation: Mapping[str, Any] | None = None,
+    operating_hours_supersession: Mapping[str, Any] | None = None,
     caller_id_pass_through_verified: bool = False,
     buyer_landing_page_approved: bool = False,
     legal_release_verified: bool = False,
@@ -184,6 +185,7 @@ def build_launch_readiness(
         operating_hours,
         timezone_confirmation,
         now=now,
+        superseding_buyer_policy=operating_hours_supersession,
     )
 
     gates = {

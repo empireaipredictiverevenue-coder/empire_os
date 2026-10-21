@@ -136,6 +136,11 @@ def test_buyer_hour_preview_handles_central_time_dst_without_call_authority(
 ):
     now = datetime.fromisoformat(when)
     result = buyer_hours_preview(now=now)
-    assert result["within_reported_window"] is expected
+    # Historic Chicago clock is preserved for diagnostic comparison only.
+    # The latest buyer source says hours depend on caller timezone.
+    assert result["legacy_chicago_window_observed"] is expected
+    assert result["within_reported_window"] is False
+    assert result["current_buyer_hours_policy"] == "CALLER_LOCAL_TIMEZONE_UNVERIFIED"
+    assert result["newer_buyer_hours_source_ref"] == "gmail:1a15ea2dfa8c46b1"
     assert result["timezone_interpretation_verified"] is False
     assert result["call_authorized"] is False

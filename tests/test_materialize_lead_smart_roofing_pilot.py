@@ -179,6 +179,8 @@ def test_lead_smart_support_evidence_flows_to_commercial_truth_without_activatio
     assert truth["operating_hours_confirmation"]["zone_name"] == "America/Chicago"
     assert truth["direct_route_requirements"]["direct_ivr_collects_zip"] is True
     assert truth["direct_route_requirements"]["caller_id_pass_through_verified"] is False
-    assert truth["landing_review_report"]["approved"] is False
+    # Buyer visual approval of the frozen candidate is recorded; live
+    # routing, payability and independent consent gates remain closed.
+    assert truth["landing_review_report"]["approved"] is True
     assert result["traffic_enabled"] is False
     assert result["execution_authority"] == "none"

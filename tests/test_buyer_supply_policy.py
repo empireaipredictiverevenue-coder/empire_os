@@ -293,7 +293,9 @@ def test_lead_smart_oct9_support_clarifications_preserve_unknowns():
     assert policy["routing"]["routing_verified"] is False
 
     landing = policy["routing"]["landing_review_report"]
-    assert landing["status"] == "AWAITING_SETH_REVIEW"
-    assert landing["approved"] is False
+    # The original frozen visual candidate was subsequently buyer-approved;
+    # that historical approval is distinct from live call admission.
+    assert landing["status"] == "BUYER_VISUAL_APPROVED_FROZEN_CANDIDATE"
+    assert landing["approved"] is True
     assert landing["call_button_must_remain_disabled"] is True
     assert policy["review"]["landing_pages_reviewed"] is False

@@ -126,11 +126,10 @@ def make_public_zip_preview(
 
 
 def buyer_hours_preview(*, now: datetime | None = None) -> dict[str, Any]:
-    """Local Central Time guidance, never independent authorization.
+    """Historical Chicago clock only; newer caller-local hours unverified.
 
-    Seth used 'CST'; whether his hours follow daylight-saving transitions
-    remains to be confirmed. We therefore display an assumed zone and
-    explicitly prevent this calculation from granting a call.
+    A ZIP preview cannot prove the caller's origin timezone or a currently
+    accepting receiving buyer. Never expose the historical window as open.
     """
     current = now or datetime.now(timezone.utc)
     if current.tzinfo is None:
@@ -142,9 +141,12 @@ def buyer_hours_preview(*, now: datetime | None = None) -> dict[str, Any]:
     in_window = start * 60 <= local_minutes < end * 60
     return {
         "timezone_assumption": "America/Chicago (DST interpretation unverified)",
-        "buyer_hours_reported": "Mon-Fri 08:00-18:00; Sat-Sun 10:00-16:00",
+        "buyer_hours_reported": "Historic Chicago hours; superseded by caller-local guidance",
         "local_time": local.isoformat(),
-        "within_reported_window": in_window,
+        "legacy_chicago_window_observed": in_window,
+        "newer_buyer_hours_source_ref": "gmail:1a15ea2dfa8c46b1",
+        "current_buyer_hours_policy": "CALLER_LOCAL_TIMEZONE_UNVERIFIED",
+        "within_reported_window": False,
         "timezone_interpretation_verified": False,
         "call_authorized": False,
         "execution_authority": "NONE",
