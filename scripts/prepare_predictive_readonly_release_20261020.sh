@@ -107,6 +107,14 @@ EOF
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_intelligence.py \
+    empire_os/predictive_cloud_materializer.py \
+    empire_os/predictive_cloud_status.py \
+    empire_os/predictive_cloud_formula.py \
+    empire_os/predictive_cloud_v3.py \
+    empire_os/future_trend_intelligence.py \
+    empire_os/control_fabric.py \
+    empire_os/departments.py \
+    scripts/run_predictive_cloud_materializer.py \
     empire_os/sb.py \
     empire_os/canonical_data_gateway.py \
     empire_os/data_query.py \
@@ -315,6 +323,47 @@ if grep -q "Traceback" "$TMP/metadata/missing_intake_error.txt"; then
   exit 6
 fi
 rm -f "$TMP/metadata/missing_intake_error.txt"
+# Cloud materializer must not promote forged local counts on a release build.
+# Run only on an isolated temporary runtime; never write live Cloud caches.
+(cd "$TMP" && PYTHONPATH="$TMP" /srv/empire_os/.venv/bin/python -B - <<'PY'
+import json, tempfile
+from pathlib import Path
+from empire_os.predictive_cloud_materializer import refresh_predictive_cloud_materializers
+with tempfile.TemporaryDirectory(prefix="empire-cloud-canary-") as d:
+    root=Path(d)
+    for rel, payload in (
+        ("runtime/opportunity_factory/value_latest.json", {
+            "candidate_count": 1,
+            "items": [{
+                "status": "AVAILABLE",
+                "expected_revenue_cents": 100_000,
+                "expected_gross_profit_cents": 80_000,
+                "quant_input_evidence": {"evidence_refs": ["not-authenticated"]},
+            }],
+        }),
+        ("runtime/predictive_intelligence/latest.json", {
+            "probability_ready_product_count": 4,
+            "timing_ready_product_count": 4,
+            "matched_outcome_count": 200,
+            "original_tenant_source_authenticated": True,
+            "original_outcome_issuer_authenticated": True,
+            "original_forecast_registered_before_outcome": True,
+        }),
+    ):
+        path=root/rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(payload))
+    outcome=refresh_predictive_cloud_materializers(root)
+    assert outcome["prediction_ready_component_count"] == 0
+    for key in ("future_trend", "predictive_cloud_formula"):
+        row=outcome[key]
+        assert row["algorithm_available"] is True
+        assert row["prediction_ready"] is False
+        assert row["independent_source_admitted"] is False
+        assert row["source_admission_state"] == "UNVERIFIED_LOCAL_SNAPSHOT_ONLY"
+        assert row["normalized_economic_candidate_count"] == 0
+PY
+)
 mv -T -- "$TMP" "$RELEASE"
 trap - EXIT
 echo "RELEASE_PATH=$RELEASE"

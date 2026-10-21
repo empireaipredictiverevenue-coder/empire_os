@@ -133,11 +133,11 @@ def test_available_economics_do_not_become_actual_revenue(
 
     assert result["future_trend"][
         "prediction_ready"
-    ] is True
+    ] is False
 
     assert result["predictive_cloud_formula"][
         "prediction_ready"
-    ] is True
+    ] is False
 
     assert result["future_trend"][
         "actual_revenue"

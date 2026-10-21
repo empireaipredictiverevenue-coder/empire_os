@@ -111,39 +111,54 @@ def refresh_predictive_cloud_materializers(
 
     economic_rows = _available_economic_items(value)
 
-    candidate_count = int(
-        value.get("candidate_count")
-        or radar.get("candidate_count")
-        or 0
-    )
+    # Treat local source counts as untrusted observations; reject booleans,
+    # huge values and malformed source data rather than raising an exception.
+    candidate_count = next((
+        count for count in (
+            value.get("candidate_count"), radar.get("candidate_count")
+        ) if type(count) is int and 0 <= count <= 1_000_000
+    ), 0)
 
-    probability_ready = int(
-        predictive.get(
-            "probability_ready_product_count"
+    # These two inputs are local materialized files, NOT authenticated
+    # EmpireDB issuer/tenant/version/forecast-registry receipts. In particular,
+    # plausible per-product counts and evidence_refs can be self-asserted by a
+    # legacy global RPC. Source-reported counts must never promote Cloud
+    # prediction readiness or be labelled independently verified.
+    def reported_count(key: str) -> int | None:
+        raw = predictive.get(key)
+        return (
+            raw if type(raw) is int and 0 <= raw <= 1_000_000
+            else None
         )
-        or 0
-    )
 
-    timing_ready = int(
-        predictive.get(
-            "timing_ready_product_count"
-        )
-        or 0
+    source_reported_probability = reported_count(
+        "probability_ready_product_count"
     )
+    source_reported_timing = reported_count(
+        "timing_ready_product_count"
+    )
+    source_reported_outcomes = reported_count("matched_outcome_count")
 
-    verified_outcomes = int(
-        predictive.get("matched_outcome_count")
-        or 0
-    )
+    # No independent authenticated customer cohort/issuer read is performed by
+    # this materializer; even locally flagged 'verified' source rows are not
+    # original receipts. Future admission belongs to the existing source
+    # owner's separate tenant-scoped DB reader and frozen forecast registry.
+    independent_source_admitted = False
+    probability_ready = 0
+    timing_ready = 0
+    verified_outcomes = 0
 
     trend_ready = (
-        bool(economic_rows)
+        independent_source_admitted
+        and bool(economic_rows)
         and probability_ready > 0
         and timing_ready > 0
         and verified_outcomes > 0
     )
 
-    trend_blockers: list[str] = []
+    trend_blockers: list[str] = [
+        "independent_tenant_issuer_and_frozen_forecast_receipts_required"
+    ]
 
     if not economic_rows:
         trend_blockers.append(
@@ -189,9 +204,11 @@ def refresh_predictive_cloud_materializers(
         ),
 
         "candidate_count": candidate_count,
-        "normalized_economic_candidate_count": len(
-            economic_rows
-        ),
+        # Local opportunity economics have plausible refs, not independent
+        # issuer/settlement/expense attestation; do not label as verified.
+        "normalized_economic_candidate_count": 0,
+        "source_reported_economic_candidate_count": len(economic_rows),
+        "economic_rows_independently_verified": False,
 
         "probability_ready_product_count": (
             probability_ready
@@ -200,6 +217,11 @@ def refresh_predictive_cloud_materializers(
         "verified_terminal_outcome_count": (
             verified_outcomes
         ),
+        "source_reported_probability_ready_product_count": source_reported_probability,
+        "source_reported_timing_ready_product_count": source_reported_timing,
+        "source_reported_matched_outcome_count": source_reported_outcomes,
+        "independent_source_admitted": independent_source_admitted,
+        "source_admission_state": "UNVERIFIED_LOCAL_SNAPSHOT_ONLY",
 
         "blockers": trend_blockers,
 
@@ -215,11 +237,14 @@ def refresh_predictive_cloud_materializers(
     }
 
     formula_ready = (
-        bool(economic_rows)
+        independent_source_admitted
+        and bool(economic_rows)
         and probability_ready > 0
     )
 
-    formula_blockers: list[str] = []
+    formula_blockers: list[str] = [
+        "independent_tenant_issuer_and_frozen_forecast_receipts_required"
+    ]
 
     if not economic_rows:
         formula_blockers.append(
@@ -255,12 +280,17 @@ def refresh_predictive_cloud_materializers(
         ),
 
         "candidate_count": candidate_count,
-        "normalized_economic_candidate_count": len(
-            economic_rows
-        ),
+        # Local opportunity economics have plausible refs, not independent
+        # issuer/settlement/expense attestation; do not label as verified.
+        "normalized_economic_candidate_count": 0,
+        "source_reported_economic_candidate_count": len(economic_rows),
+        "economic_rows_independently_verified": False,
         "probability_ready_product_count": (
             probability_ready
         ),
+        "source_reported_probability_ready_product_count": source_reported_probability,
+        "independent_source_admitted": independent_source_admitted,
+        "source_admission_state": "UNVERIFIED_LOCAL_SNAPSHOT_ONLY",
 
         "blockers": formula_blockers,
 
@@ -300,6 +330,9 @@ def refresh_predictive_cloud_materializers(
         "predictive_cloud_formula": formula,
 
         "runtime_component_count": 2,
+        "source_admission_state": "UNVERIFIED_LOCAL_SNAPSHOT_ONLY",
+        "original_tenant_issuer_authenticated": False,
+        "frozen_original_forecast_registry_verified": False,
         "prediction_ready_component_count": (
             int(trend_ready)
             + int(formula_ready)
