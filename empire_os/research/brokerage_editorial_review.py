@@ -23,9 +23,19 @@ US_SOURCES = (
     ("Lincoln Park Cosmetic Dental Associates", "https://www.lincolnparkcosmeticdentists.com/implants"),
     ("Advanced Dental Care", "https://chicagogeneraldentistry.com/services/implant-dentistry/"),
 )
-VALID_URLS = frozenset(url for _, url in US_SOURCES)
-SCHEMA = "empire.research.brokerage_us_uk_editorial_review.v1"
-MAX_BYTES = 350_000
+GB_SOURCES = (
+    ("CMA — Private dental services market study",
+     "https://www.gov.uk/cma-cases/private-dental-services-market-study"),
+    ("Highfield Dental — Birmingham dental implants",
+     "https://highfielddental.co.uk/dental-implants/"),
+    ("Six Ways Dental — Birmingham practice",
+     "https://www.sixwaysdental.co.uk/"),
+)
+COUNTRY_SOURCES = {"US": US_SOURCES, "GB": GB_SOURCES}
+VALID_URLS = frozenset(url for source_list in COUNTRY_SOURCES.values()
+                       for _, url in source_list)
+SCHEMA = "empire.research.brokerage_us_uk_editorial_review.v2"
+MAX_BYTES = 600_000
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -61,8 +71,8 @@ class _Headings(HTMLParser):
             return
         if self.heading_level and len(self.headings) < 5:
             self.headings.append(value[:180])
-        if len(self.visible) < 40:
-            self.visible.append(value[:110])
+        if len(self.visible) < 350:
+            self.visible.append(value[:220])
 
 
 def inspect_known_source(url: str) -> dict:
@@ -90,11 +100,21 @@ def inspect_known_source(url: str) -> dict:
     parsed.feed(body.decode("utf-8", errors="replace"))
     if not parsed.headings:
         return {"status": "ORIGINAL_PUBLIC_SOURCE_HEADINGS_MISSING"}
+    # Lexical observations support a comparison, not clinical/market claims.
+    visible_text = " ".join(parsed.visible).casefold()
+    scoped_terms = (
+        "dental implants", "implant placement", "implant surgery",
+        "surgeon", "dentures", "3d mapping", "full arch",
+        "private dental services", "market study", "price transparency",
+    )
+    source_signals = [term for term in scoped_terms if term in visible_text]
     return {
         "status": "ORIGINAL_HTML_HEADINGS_INSPECTED",
         "content_sha256": sha256(body).hexdigest(),
         "document_headings": parsed.headings[:4],
         "visible_excerpt": " ".join(parsed.visible)[:850],
+        "literal_source_terms_observed": source_signals,
+        "term_presence_is_not_clinical_or_ranking_proof": True,
     }
 
 
@@ -112,11 +132,11 @@ def review_brokerage_editorial(
         observed_at = datetime.now(timezone.utc)
     if not isinstance(observed_at, datetime) or observed_at.utcoffset() is None:
         raise ValueError("TRUSTED_REVIEW_CLOCK_REQUIRED")
-    # Only the US lane has already researched source URLs. UK awaits
-    # a separately verified original-source selection, never US reuse.
+    # Every region owns its exact independent original-source catalogue;
+    # never treat US clinic claims as UK market research.
     question = ("Lincoln Park Chicago dental implant public offer comparison"
                 if country == "US" else
-                "UK dental practice expansion public market research")
+                "Birmingham dental implant published services and UK CMA market context")
     profile = ResearchProfile(
         mode="quality",
         lanes=("official", "company", "web"),
@@ -125,15 +145,14 @@ def review_brokerage_editorial(
     )
 
     def curated_search(query: str, *, num: int):
-        if country != "US":
-            return {"organic": []}
-        # Not a search API. This reproduces ONLY the original-source URLs
-        # already identified by the existing Research team.
+        # Not a live search API. Re-read ONLY exact original source URLs
+        # independently selected and manually reviewed per jurisdiction.
         return {"organic": [
             {"title": title, "url": url,
-             "source_lane": "original_company_page",
-             "discovery_engine": "CURATED_PRIOR_SOURCE_LEDGER"}
-            for title, url in US_SOURCES[:num]
+             "source_lane": ("first_party_official" if "gov.uk" in url
+                             else "original_company_page"),
+             "discovery_engine": "CURATED_ORIGINAL_SOURCE_LEDGER"}
+            for title, url in COUNTRY_SOURCES[country][:num]
         ]}
 
     research = research_with_profile(
@@ -145,6 +164,7 @@ def review_brokerage_editorial(
     )
     sources = research["evidence"]["source_observations"]
     inspected = sum(row.get("original_page_inspected") is True for row in sources)
+    expected_count = len(COUNTRY_SOURCES[country])
     digest = None
     if original_sample is not None:
         path = Path(original_sample)
@@ -154,13 +174,13 @@ def review_brokerage_editorial(
     return {
         "schema_version": SCHEMA,
         "status": ("ORIGINAL_SOURCE_PAGES_INSPECTED_EDITORIAL_PENDING"
-                   if country == "US" and inspected == len(US_SOURCES)
-                   else "SOURCE_DISCOVERY_AND_EDITORIAL_PENDING"),
+                   if inspected == expected_count else
+                   "SOURCE_DISCOVERY_AND_EDITORIAL_PENDING"),
         "market_country": country,
         "observed_at_utc": observed_at.astimezone(timezone.utc).isoformat(),
         "search_engine_live": False,
-        "discovery_origin": "PREVIOUSLY_CURATED_FIRST_PARTY_SOURCE_URLS"
-                            if country == "US" else "NOT_YET_RESEARCHED",
+        "discovery_origin": "MANUALLY_REVIEWED_ORIGINAL_SOURCE_URLS",
+        "sources_curated_per_country": True,
         "source_count": len(sources),
         "original_pages_inspected": inspected,
         "original_sample_sha256": digest,
@@ -181,7 +201,7 @@ def review_brokerage_editorial(
         "next_owner": "existing_search_and_market_intelligence",
         "next_action": (
             "CURRENT_ORIGINAL_SOURCE_CLAIM_AND_RIGHTS_QA_SIGNED_REVIEW"
-            if inspected == len(US_SOURCES) and country == "US"
+            if inspected == expected_count
             else "RESEARCH_AND_INSPECT_ORIGINAL_PUBLIC_SOURCES"
         ),
     }

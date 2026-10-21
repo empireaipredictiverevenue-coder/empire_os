@@ -46,12 +46,19 @@ def test_us_uses_original_sources_and_requires_actual_signed_editorial_decision(
         assert r[field] is False, field
 
 
-def test_uk_not_automatically_filled_by_us_sources():
-    r = review_brokerage_editorial("GB", inspect_fn=lambda url: (_ for _ in ()).throw(
-        AssertionError("UK has no approved source catalogue")), observed_at=NOW)
-    assert r["source_count"] == r["original_pages_inspected"] == 0
-    assert r["status"] == "SOURCE_DISCOVERY_AND_EDITORIAL_PENDING"
-    assert r["next_action"] == "RESEARCH_AND_INSPECT_ORIGINAL_PUBLIC_SOURCES"
+def test_uk_has_its_own_independently_curated_primary_sources():
+    r = review_brokerage_editorial("GB", inspect_fn=lambda url: {
+        "status": "ORIGINAL_HTML_HEADINGS_INSPECTED",
+        "content_sha256": sha256(url.encode()).hexdigest(),
+        "document_headings": ["Observed original UK source"],
+    }, observed_at=NOW)
+    assert r["source_count"] == r["original_pages_inspected"] == 3
+    assert r["status"] == "ORIGINAL_SOURCE_PAGES_INSPECTED_EDITORIAL_PENDING"
+    assert all(url not in {s["url"] for s in r["source_observations"]}
+               for _, url in US_SOURCES)
+    assert any(s["source_lane"] == "first_party_official"
+               for s in r["source_observations"])
+    assert r["editorial_owner_signed_off"] is False
     assert r["outbound_authorized"] is False
 
 

@@ -184,6 +184,12 @@ def run_research(
                             for h in (inspected.get("document_headings") or [])[:4]
                         ]
                         entry["visible_excerpt"] = _text(inspected.get("visible_excerpt"), 1200)
+                        literal_terms = inspected.get("literal_source_terms_observed")
+                        entry["literal_source_terms_observed"] = [
+                            _text(term, 50) for term in
+                            (literal_terms if isinstance(literal_terms, list) else [])[:12]
+                            if isinstance(term, str)
+                        ]
                 else:
                     entry["inspection_status"] = "INVALID_INSPECTOR_RESULT"
             except Exception as exc:
