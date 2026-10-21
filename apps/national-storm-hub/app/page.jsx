@@ -34,7 +34,19 @@ function ShellCard({children,className=""}) {
   return <div className={"shell-card "+className}>{children}</div>;
 }
 function SiteMark() {
-  return <span className="site-mark" aria-hidden="true"><CloudLightning size={24} strokeWidth={1.8}/></span>;
+  const [failed,setFailed]=useState(false);
+  return <span className="site-mark site-mark-brand" aria-hidden="true">
+    {!failed?<img src="/visuals/storm-hub-mark.webp" alt="" width="52" height="65" onError={()=>setFailed(true)}/>:
+      <CloudLightning size={24} strokeWidth={1.8}/>}
+  </span>;
+}
+function FooterBrand(){
+  const [fallback,setFallback]=useState(false);
+  return <a className="brand footer-brand" href="#home" aria-label="National Storm Hub home">
+    {!fallback?<img className="footer-logo-lockup" src="/visuals/national-storm-hub-logo.webp"
+      alt="National Storm Hub" width="245" height="175" onError={()=>setFallback(true)}/>:
+      <><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></>}
+  </a>;
 }
 function GlobeVisual() {
   // Decorative, cinematic globe—not a weather map. No invented hazard pins,
@@ -214,12 +226,13 @@ export default function HomePage(){
 
       <section className="state-hubs wrap" aria-label="State weather and preparedness guides"><div><span className="state-hub-eyebrow">STATE GUIDES</span><h2>Storm guidance, <em>close to home.</em></h2></div><div className="state-hub-cards"><a href="/states/texas"><span>TEXAS / HAIL &amp; WIND</span><strong>Texas Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a><a href="/states/florida"><span>FLORIDA / HURRICANES</span><strong>Florida Storm Hub</strong><span>Local preparedness &amp; official sources <ArrowUpRight size={15}/></span></a></div></section>
 
-      <section className="predictor-feature wrap" aria-label="Storm Predictor">
+      <section className="predictor-feature wrap predictor-cinematic" aria-label="Storm Predictor">
         <div>
           <span className="eyebrow">LOCAL FORECASTS</span>
           <h2>See what's ahead <em>for your area.</em></h2>
           <p>Look up the National Weather Service forecast, active warnings and the Storm Prediction Center outlook for a US ZIP code. Each result links to its source.</p>
           <a href="/predictor">Try Storm Predictor <ArrowRight size={17}/></a>
+          <small className="concept-art-caveat">Storm scene is illustrative, not a current weather or warning map.</small>
         </div>
       </section>
 
@@ -300,6 +313,6 @@ export default function HomePage(){
 
       <section className="final-cta wrap"><span className="eyebrow">BE READY FOR WHAT'S NEXT</span><h2>Weather will change. <em>How you prepare can too.</em></h2><a href="#atlas">Explore Storm Atlas <ArrowRight size={17}/></a></section>
     </main>
-    <footer className="site-footer"><div className="wrap footer-inner"><div><a className="brand footer-brand" href="#home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/alerts">Live Storm Alerts</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a><a href="https://science.nasa.gov/resource/blue-marble-2002/" target="_blank" rel="noreferrer">Hero Earth imagery: NASA Blue Marble <ExternalLink size={13}/></a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
+    <footer className="site-footer"><div className="wrap footer-inner"><div><FooterBrand/><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/alerts">Live Storm Alerts</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a><a href="https://science.nasa.gov/resource/blue-marble-2002/" target="_blank" rel="noreferrer">Hero Earth imagery: NASA Blue Marble <ExternalLink size={13}/></a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
   </div>;
 }

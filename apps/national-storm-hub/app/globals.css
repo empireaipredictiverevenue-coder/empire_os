@@ -995,3 +995,77 @@ h1 em,h2 em {font-style:normal;background:linear-gradient(103deg,#95e9e9 5%,#4ac
 
 /* Let the browser scroll vertically while JS handles deliberate horizontal swipes. */
 .storm-journey,.journey-stage{touch-action:pan-y}
+
+/* Approved National Storm Hub art direction: original cinematic globe retained.
+   Branded mark and atmospheric guides use locally hosted generated artwork,
+   never real event boundaries or official weather satellite imagery. */
+.home-clean .site-mark-brand{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:45px;height:52px;min-width:45px;
+  padding:0;overflow:visible;flex-shrink:0;
+  background:none;border:0;box-shadow:none;
+}
+.home-clean .site-mark-brand img{
+  display:block;width:44px;height:52px;object-fit:contain;
+  filter:drop-shadow(0 0 8px rgba(208,62,58,.2));
+}
+.home-clean .site-header .brand{gap:8px;align-items:center}
+.home-clean .footer-brand .site-mark-brand{width:40px;height:48px;min-width:40px}
+.home-clean .footer-brand .site-mark-brand img{width:40px;height:48px}
+.journey-cinematic-image{isolation:isolate}
+.journey-cinematic-photo{
+  position:absolute;inset:0;z-index:0;pointer-events:none;
+  background-position:center;background-size:cover;background-repeat:no-repeat;
+  transform:scale(1.015);transition:opacity .36s ease;
+}
+.journey-stage-prepare .journey-cinematic-photo{
+  background-image:linear-gradient(90deg,rgba(5,11,19,.33),rgba(5,10,17,.08)),
+    url("/visuals/storm-prepare.webp");
+}
+.journey-stage-understand .journey-cinematic-photo{
+  background-image:linear-gradient(90deg,rgba(5,9,16,.25),rgba(5,9,16,.13)),
+    url("/visuals/storm-understand.webp");
+}
+.journey-stage-recover .journey-cinematic-photo{
+  background-image:linear-gradient(90deg,rgba(8,11,15,.28),rgba(6,9,15,.17)),
+    url("/visuals/storm-recover.webp");
+}
+.journey-cinematic-image:after{
+  z-index:1;
+  background:linear-gradient(180deg,rgba(4,9,15,.06) 0%,rgba(4,8,13,.12) 45%,rgba(3,6,11,.79) 100%);
+}
+.journey-visual-glyph{width:125px;height:125px;background:rgba(10,20,30,.34);
+  backdrop-filter:blur(6px);border:1px solid rgba(247,218,157,.31);
+  box-shadow:0 12px 55px rgba(0,0,0,.24)}
+.journey-visual-glyph svg{width:50px;height:50px}
+.journey-scene-word{z-index:2;color:rgba(246,247,247,.34);
+  text-shadow:0 3px 25px rgba(0,0,0,.45)}
+.journey-scene-caption{z-index:3;text-shadow:0 3px 12px rgba(0,0,0,.7)}
+.home-clean .predictor-feature.predictor-cinematic{
+  isolation:isolate;overflow:hidden;position:relative;
+  background:linear-gradient(90deg,#11161c 1%,rgba(13,19,28,.96) 30%,
+    rgba(12,18,26,.55) 77%,rgba(12,18,26,.44) 100%),
+    url("/visuals/storm-intelligence-background.webp") right center / cover no-repeat;
+}
+.home-clean .predictor-feature.predictor-cinematic>div{position:relative;z-index:2}
+.home-clean .predictor-feature.predictor-cinematic h2,
+.home-clean .predictor-feature.predictor-cinematic p{
+  text-shadow:0 2px 16px rgba(0,0,0,.35);
+}
+@media(max-width:720px){
+ .journey-atmosphere{min-height:260px}
+ .journey-cinematic-photo{background-position:57% center}
+ .journey-visual-glyph{width:112px;height:112px}
+ .home-clean .predictor-feature.predictor-cinematic{
+  background:linear-gradient(90deg,rgba(8,16,24,.93),rgba(8,16,24,.79)),
+     url("/visuals/storm-intelligence-background.webp") 68% center / cover no-repeat;
+ }
+}
+@media(prefers-reduced-motion:reduce){
+ .journey-cinematic-photo{transition:none;transform:none}
+}
+
+.home-clean .footer-logo-lockup{width:245px;height:auto;max-height:164px;object-fit:contain;object-position:left center;display:block}
+.home-clean .footer-brand{display:inline-flex;max-width:100%}
+.home-clean .concept-art-caveat{display:block;color:#c9c1bb;font-size:10px;line-height:1.6;margin-top:18px;letter-spacing:.01em}
+@media(max-width:530px){.home-clean .footer-logo-lockup{width:215px;max-height:145px}}

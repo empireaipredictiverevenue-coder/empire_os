@@ -86,12 +86,13 @@ export default function StormJourneySlider(){
     </div>
     <div className={"journey-stage journey-stage-"+story.tone} role="group"
       aria-label={"Storm preparation guide, step "+(index+1)+" of "+STORM_JOURNEYS.length}>
-      <div className="journey-atmosphere" aria-hidden="true">
+      <div className="journey-atmosphere journey-cinematic-image" aria-hidden="true">
+        <div className="journey-cinematic-photo"/>
         <div className="journey-light journey-light-first"/>
         <div className="journey-light journey-light-second"/>
         <div className="journey-visual-glyph"><VisualIcon size={84} strokeWidth={1.05}/></div>
         <span className="journey-scene-word">{story.label}</span>
-        <span className="journey-scene-caption">STORM HUB / HOMEOWNER GUIDE</span>
+        <span className="journey-scene-caption">CONCEPT ART / NOT LIVE WEATHER</span>
       </div>
       <div className="journey-body" key={story.id}>
         <div className="journey-stage-label"><span className="journey-marker"/>{story.eyebrow}</div>

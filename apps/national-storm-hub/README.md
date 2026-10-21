@@ -2,6 +2,19 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Approved brand and cinematic artwork — staging candidate (2026-10-21)
+
+- Reuses the founder-approved National Storm Hub radar/compass logo; desktop header and Passport display its emblem, footer displays the full lockup.
+- Keeps the **original NASA Blue Marble cinematic globe hero**, not the rejected Stormfront Array or extra hero-carousel variant.
+- Prepare / Understand / Recover now use three existing commissioned editorial storm images. The Predictor introduction uses the previously approved cinematic storm background. All visuals are illustrative; actual alerts/forecast remain official-source-derived.
+- The website does **not** depict real current storm positions, geographical warning boundaries, observed home damage or service demand from these artworks. Product is US ZIP-based; British-Isles concept art is not a UK-specific live feed.
+- Exact approved optimized WebP images are packaged separately as `national_storm_hub_approved_assets.zip`. They are **not yet mounted in this isolated worktree**; the frontend has a built-in CSS gradient and original logo-icon fallback. Do **not publish** the visual release until staging the ZIP and running browser screenshots.
+- Stage only into this isolated worktree:
+  `python3 scripts/install_approved_visuals_20261021.py /tmp/nsh-approved-assets.zip`.
+  The installer checks six exact filenames, WebP headers and SHA-256 digests, refuses unexpected files, and never writes to production.
+- A second clean install/build, verified image HTTP 200 responses, desktop/mobile screenshots, and a guarded founder release review are required before switching the production systemd service.
+- No changes to EmpireDB, CRM, outbound, buyer evidence, USDT/BSC payment gates, or read-only Storm Intelligence integration.
+
 ## Homeowner journey slider (private preview, 2026-10-21)
 
 - Replaces the three static **Prepare / Understand / Recover** cards with a full-width, high-contrast editorial slider. Each of the three stages has its own restrained atmospheric artwork, practical checklist and two purposeful links, without copying the Empire AI corporate homepage or adding another globe.
