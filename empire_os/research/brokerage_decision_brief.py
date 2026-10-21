@@ -15,6 +15,7 @@ import json
 import re
 
 from .brokerage_editorial_review import COUNTRY_SOURCES, SCHEMA as REVIEW_SCHEMA
+from .brokerage_niche_profiles import research_intake_plan
 
 SCHEMA = "empire.brokerage.evidence_decision_brief.v1"
 _SEARCH_QUERIES = {
@@ -56,6 +57,8 @@ def _valid_search_url(value: Any) -> bool:
 def discover_held_candidates(
     country: str,
     search_fn: Callable[..., Mapping[str, Any]] | None,
+    *,
+    niche: str = "dental",
 ) -> dict[str, Any]:
     """Search Fabric discovery with strict freshness; no result auto-admission.
 
@@ -65,6 +68,9 @@ def discover_held_candidates(
     """
     if country not in COUNTRY_SOURCES:
         raise ValueError("BROKERAGE_MARKET_COUNTRY_UNSUPPORTED")
+    niche_plan = research_intake_plan(niche, country)
+    queries = (_SEARCH_QUERIES[country] if niche == "dental"
+               else tuple(niche_plan["search_queries"]))
     if search_fn is None:
         return {
             "status": "SEARCH_NOT_RUN_NO_VERIFIED_PROVIDER",
@@ -77,7 +83,7 @@ def discover_held_candidates(
     items: list[dict[str, str]] = []
     seen: set[str] = set()
     failures: list[str] = []
-    for query in _SEARCH_QUERIES[country]:
+    for query in queries:
         try:
             result = search_fn(query, num=5, engine="bing_html", use_cache=False)
             if not isinstance(result, Mapping):
@@ -111,7 +117,7 @@ def discover_held_candidates(
             "FRESH_DISCOVERY_CANDIDATES_NOT_ADMITTED" if items
             else "SEARCH_PROVIDER_DEGRADED_OR_NO_FRESH_EVIDENCE"
         ),
-        "queries_attempted": len(_SEARCH_QUERIES[country]),
+        "queries_attempted": len(queries),
         "provider_errors": failures,
         "candidate_urls": items[:10],
         "any_verified_fresh_results": bool(items),

@@ -20,6 +20,7 @@ from empire_os.research.brokerage_decision_brief import (
 from empire_os.research.brokerage_model_challenge import (
     challenge_research_brief, default_local_compute_challenge
 )
+from empire_os.research.brokerage_niche_profiles import NICHES, research_intake_plan
 
 US_SAMPLE = Path(
     "/home/ubuntu/empire_worktrees/agency_acquisition_conversion_20261020/"
@@ -28,14 +29,44 @@ US_SAMPLE = Path(
 )
 
 
-def run(*, country: str, probe_public_search: bool = False,
+def run(*, country: str, niche: str = "dental",
+        probe_public_search: bool = False,
         local_model_challenge: bool = False,
         inspect_fn=None, search_fn=None, model_fn=None) -> dict:
     if country not in ("US", "GB", "both"):
         raise ValueError("EXPLICIT_MARKET_COUNTRY_REQUIRED")
+    if niche not in NICHES:
+        raise ValueError("EXPLICIT_SUPPORTED_RESEARCH_NICHE_REQUIRED")
     markets = ("US", "GB") if country == "both" else (country,)
     if probe_public_search and search_fn is None:
         from empire_os.search_fabric.search import search as search_fn
+    if niche != "dental":
+        # No silent conversion of the dental original-source catalogue into
+        # other industries. Show a useful market-specific intake and discovery
+        # state, without claiming any accepted original-source evidence.
+        intakes = []
+        for market in markets:
+            plan = research_intake_plan(niche, market)
+            plan["public_search_diagnostic"] = discover_held_candidates(
+                market, search_fn if probe_public_search else None, niche=niche
+            )
+            intakes.append(plan)
+        return {
+            "schema_version": "empire.brokerage.deep_research_operator.v1",
+            "mode": "OBSERVE",
+            "niche": niche,
+            "scope": list(markets),
+            "status": "HELD_NICHE_ORIGINAL_SOURCE_INTAKE_REQUIRED",
+            "market_reports": [],
+            "niche_intake_plans": intakes,
+            "research_owner": "existing_search_and_market_intelligence",
+            "editorial_signoff_verified": False,
+            "genuine_buyer_or_revenue_proven": False,
+            "outbound_sent": False,
+            "financial_actions": False,
+            "database_writes": False,
+            "next_action": "REVIEW_NICHE_COUNTRY_ORIGINAL_SOURCE_AND_RIGHTS_INTAKE",
+        }
     results = []
     for market in markets:
         kwargs = {"original_sample": US_SAMPLE if market == "US" else None}
@@ -57,6 +88,7 @@ def run(*, country: str, probe_public_search: bool = False,
     return {
         "schema_version": "empire.brokerage.deep_research_operator.v1",
         "mode": "OBSERVE",
+        "niche": niche,
         "scope": list(markets),
         "status": ("ORIGINAL_MARKET_SOURCES_OBSERVED_REVIEW_PENDING"
                    if all(x["status"] == "SOURCE_EVIDENCE_READY_FOR_EDITORIAL_REVIEW"
@@ -83,7 +115,22 @@ def render_markdown(report: dict) -> str:
         "",
         "Status: " + report["status"],
         "",
+        "Niche: " + report.get("niche", "dental"),
+        "",
     ]
+    if report.get("niche_intake_plans"):
+        for plan in report["niche_intake_plans"]:
+            lines.extend([
+                "## " + plan["country"] + " — source intake required", "",
+                "Buyer decision: " + plan["buyer_problem_to_qualify"], "",
+                "Research question: " + plan["research_question"], "",
+                "Original sources admitted: **none**", "",
+                "Discovery: " + plan["public_search_diagnostic"]["status"], "",
+                "Risks to avoid: " + ", ".join(plan["unverified_inferences_to_avoid"]),
+                "", "Next: " + plan["next_action"], "",
+            ])
+        lines.append("No original sources, buyer claims or external send clearance.")
+        return "\n".join(lines)
     for item in report["market_reports"]:
         lines.extend([
             "## " + item["country"] + " — original source evidence",
@@ -129,11 +176,13 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--read-only", required=True, action="store_true")
     ap.add_argument("--country", choices=("US", "GB", "both"), required=True)
+    ap.add_argument("--niche", choices=tuple(NICHES), default="dental")
     ap.add_argument("--format", choices=("json", "markdown"), default="markdown")
     ap.add_argument("--probe-public-search", action="store_true")
     ap.add_argument("--local-model-challenge", action="store_true")
     args = ap.parse_args(argv)
-    result = run(country=args.country, probe_public_search=args.probe_public_search,
+    result = run(country=args.country, niche=args.niche,
+                 probe_public_search=args.probe_public_search,
                  local_model_challenge=args.local_model_challenge)
     print(json.dumps(result, sort_keys=True, indent=2)
           if args.format == "json" else render_markdown(result))
