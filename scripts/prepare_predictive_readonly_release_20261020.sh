@@ -28,12 +28,16 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU|comparison-astra|comparison-astra-all}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU|comparison-astra|comparison-astra-all|trends|trends-template|trends-series FILE}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command="${1}"
-if [[ "$command" == "comparison-product" ]]; then
+if [[ "$command" == "trends-series" ]]; then
+  if [[ "$#" -ne 2 || ! -f "$2" || -L "$2" ]]; then
+    echo "TRENDS_REQUIRES_REAL_NON_SYMLINK_SOURCE_FILE" >&2; exit 2
+  fi
+elif [[ "$command" == "comparison-product" ]]; then
   if [[ "$#" -ne 2 || ! "$2" =~ ^[a-z0-9_]{2,90}$ ]]; then
     echo "COMPARISON_REQUIRES_EXACT_CATALOGUE_PRODUCT_CODE" >&2; exit 2
   fi
@@ -72,6 +76,7 @@ case "$command" in
   sources) module=scripts.review_predictive_primary_economic_sources_20261020 ;;
   owners) module=scripts.review_empire_cross_agent_release_board_20261020 ;;
   comparison|comparison-all|comparison-gaps|comparison-product|comparison-astra|comparison-astra-all) module=scripts.review_predictive_comparison_20261021 ;;
+  trends|trends-template|trends-series) module=scripts.review_predictive_trend_horizons_20261022 ;;
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
@@ -106,6 +111,18 @@ fi
 if [[ "$command" == "comparison-astra-all" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --astra-review-all
+fi
+if [[ "$command" == "trends-template" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --template
+fi
+if [[ "$command" == "trends-series" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --series-file "$2"
+fi
+if [[ "$command" == "trends" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --runtime
 fi
 exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
   /srv/empire_os/.venv/bin/python -B -m "$module" --read-only
@@ -156,6 +173,8 @@ EOF
     empire_os/predictive_cloud_formula.py \
     empire_os/predictive_cloud_v3.py \
     empire_os/future_trend_intelligence.py \
+    empire_os/predictive_trend_horizon_review.py \
+    scripts/review_predictive_trend_horizons_20261022.py \
     empire_os/control_fabric.py \
     empire_os/departments.py \
     scripts/run_predictive_cloud_materializer.py \
@@ -353,6 +372,29 @@ fingerprint=x.pop("review_packet_sha256")
 for k in ("source_root_owned_snapshot_custody_verified","source_original_empiredb_issuer_authenticated","source_age_seconds"):
  x.pop(k)
 assert hashlib.sha256(json.dumps(x,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()==fingerprint
+'
+"$TMP/bin/empire-predictive-observe" trends | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_intelligence.future_trend_horizons.v1"
+assert x["mode"]=="OBSERVE"
+assert x["trend_horizons_days"]==[7,30,90]
+assert x["historical_trend_analysis_executed"] is False
+assert x["future_projection_or_calibration_verified"] is False
+assert x["reviewable_original_market_series_authenticated"] is False
+assert x["true_conversion_revenue_proven"] is False
+assert x["database_writes"] is False and x["execution_authority"]=="none"
+'
+"$TMP/bin/empire-predictive-observe" trends-template | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_intelligence.trend_series_intake.v1"
+assert x["status"]=="UNFILLED_REAL_SOURCE_REQUIRED"
+assert x["observations"]==[]
+assert x["source_usage_rights_independently_verified"] is False
+assert x["not_a_customer_forecast"] is True
 '
 # The science adapter MUST preserve unknown forecasts when original product
 # outcomes or forecast registry readback are absent.
