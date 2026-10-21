@@ -169,7 +169,9 @@ def build_checkpoint(*, root: Path, now: datetime) -> dict[str, Any]:
             "chat": "Website & Growth",
             "lane": "website_growth",
             "current_state": (
-                "FLAGSHIP_V2_PUBLISHED_VERIFIED_HISTORICAL_CHECKOUT_PIN_PENDING"
+                "V2_AND_BROKERAGE_FIRST_PAINT_PUBLISHED_LEGACY_PIN_PENDING"
+                if v2_live and v2.get("reviewed_brokerage_first_paint_overlay_verified") is True
+                else "FLAGSHIP_V2_PUBLISHED_VERIFIED_HISTORICAL_CHECKOUT_PIN_PENDING"
                 if v2_live
                 else "PUBLIC_CONVERSION_ROUTE_HOLD" if route_held
                 else "CHECKOUT_RELEASE_HTML_PROVENANCE_HOLD" if asset_held

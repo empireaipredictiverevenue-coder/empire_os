@@ -11,6 +11,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from empire_os.flagship_v2_brokerage_overlay_attestation import exact_v2_plus_reviewed_brokerage
+
 CANONICAL_ROOT = Path("/srv/empire_os")
 V2_RECEIPT = Path(
     "/home/ubuntu/empire_releases/flagship_checkout_union_20261020"
@@ -88,14 +90,23 @@ def attest_public_flagship_v2(root: Path) -> dict[str, Any]:
         )
     except (OSError, TypeError, ValueError, OverflowError):
         verified = False
+    reviewed_patch = False
+    if not verified:
+        reviewed_patch = exact_v2_plus_reviewed_brokerage(
+            site=root / PUBLIC_RELATIVE, receipt=V2_RECEIPT,
+        )
+    exact = verified or reviewed_patch
     return {
         "status": (
             "EXACT_APPROVED_V2_PUBLIC_STATIC_BYTES_VERIFIED" if verified
+            else "V2_WITH_EXACT_REVIEWED_BROKERAGE_FIRST_PAINT_VERIFIED" if reviewed_patch
             else "V2_PUBLICATION_SOURCE_NOT_VERIFIED"
         ),
-        "exact_published_bytes_verified": verified,
+        "exact_published_bytes_verified": exact,
+        "approved_base_inventory_sha256": EXPECTED_INVENTORY if exact else None,
         "approved_inventory_sha256": EXPECTED_INVENTORY if verified else None,
-        "verified_static_file_count": 632 if verified else None,
+        "verified_static_file_count": 632 if verified else 645 if reviewed_patch else None,
+        "reviewed_brokerage_first_paint_overlay_verified": reviewed_patch,
         "historical_october_checkout_manifest_replaced": False,
         "payment_and_outbound_authorized": False,
         "legal_or_unapproved_editorial_activated": False,
