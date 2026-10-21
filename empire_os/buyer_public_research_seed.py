@@ -87,6 +87,14 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # Explicit first-party call/click/lead publisher marketplaces: these
     # programme pages are research evidence, never buyer or payout authority.
     ("https://visiqua.com/calls/", "USA", ("home_services", "insurance")),
+    # 2026-10-21 existing first-party publisher/supplier programmes:
+    # calls across multiple verticals, consented lead resale, UK insurance
+    # cost-per-lead/whitelabel and AU/US/UK cross-market offers.
+    # These entries are RESEARCH ONLY, with zero attribution or send authority.
+    ("https://www.lucent.media/publishers", "USA", ("home_services", "legal", "insurance", "solar")),
+    ("https://getmapleleads.com/suppliers", "USA", ("home_services", "insurance", "solar")),
+    ("https://www.mymoneycomparison.com/become-an-affiliate/", "UK", ("insurance",)),
+    ("https://traffic2lead.com/publishers/", "AU", ("solar", "insurance", "education")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (

@@ -332,3 +332,36 @@ def test_visiqua_multi_format_publisher_pages_researched_without_authority():
     assert row['identity_verified'] is False
     assert publisher_review_page_paths('visiqua.com') == ('/calls','/clicks','/leads')
     assert report['query_count'] == 2
+
+
+def test_new_multiniche_marketplaces_seeded_with_zero_commercial_authority():
+    from empire_os.buyer_public_research_seed import (
+        publisher_review_page_paths, build_public_research_seeds,
+    )
+    count = []
+    def fake_search(queries, num):
+        count.append(len(queries))
+        return {}
+    report = build_public_research_seeds(
+        {}, search_fn=fake_search, max_queries=2,
+        observed_at=datetime(2026,10,21,tzinfo=timezone.utc),
+        include_volume=False,
+    )
+    targets = {
+        "lucent.media": ("USA", "/publishers"),
+        "getmapleleads.com": ("USA", "/suppliers"),
+        "mymoneycomparison.com": ("UK", "/become-an-affiliate"),
+        "traffic2lead.com": ("AU", "/publishers"),
+    }
+    by_domain = {x["domain"]: x for x in report["seeds"]}
+    for domain,(market,path) in targets.items():
+        assert domain in by_domain
+        row=by_domain[domain]
+        assert market in row["target_markets"]
+        assert row["outreach_authorized"] is False
+        assert row["commercial_terms_verified"] is False
+        assert row["buyer_capacity_verified"] is False
+        assert row["identity_verified"] is False
+        assert publisher_review_page_paths(domain) == (path,)
+    assert count == [2]
+    assert report["outbound_sent"] is False
