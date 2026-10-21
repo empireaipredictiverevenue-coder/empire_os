@@ -16,6 +16,7 @@ from scripts.review_consumer_private_identity_session_20261021 import (
     original_readonly_session,
 )
 from scripts import diagnose_consumer_private_identity_hold_20261021 as segmented
+from scripts import review_consumer_table_acl_detail_20261021 as acl_detail
 from unittest.mock import patch
 import scripts.review_consumer_private_identity_session_20261021 as original
 
@@ -68,6 +69,34 @@ def main():
             )
     assert segmented_result["status"]=="CONSUMER_PRIVATE_IDENTITY_DIAGNOSTIC_PASS"
     assert segmented_result["first_failing_stage"]=="NONE"
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(acl_detail.os,"geteuid",return_value=0):
+            acl_readback=acl_detail.diagnostic(
+                original=original,connect=authenticated
+            )
+    assert acl_readback["status"]=="CONSUMER_ACL_READONLY_PASS"
+    assert len(acl_readback["table_checks"])==5
+
+    # An unexpected B2B grant on ONE fixture table must be identified
+    # precisely and held. This is a disposable PG18 fixture, NEVER live.
+    with psycopg.connect(
+        dbname="empiredb",host="localhost",port=port
+    ) as admin:
+        admin.execute(
+            "GRANT SELECT ON public.empire_consumer_subscriptions TO empiredb_app"
+        )
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(acl_detail.os,"geteuid",return_value=0):
+            drift=acl_detail.diagnostic(original=original,connect=authenticated)
+    assert drift["status"]=="CONSUMER_ACL_READONLY_HOLD"
+    assert drift["first_failed_table"]=="empire_consumer_subscriptions"
+    assert drift["first_failed_checks"]==["crm_app_select_denied"]
+    with psycopg.connect(
+        dbname="empiredb",host="localhost",port=port
+    ) as admin:
+        admin.execute(
+            "REVOKE SELECT ON public.empire_consumer_subscriptions FROM empiredb_app"
+        )
     with psycopg.connect(
         dbname="empiredb",host="localhost",port=port
     ) as admin:
