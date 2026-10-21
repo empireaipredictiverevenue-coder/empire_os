@@ -132,6 +132,7 @@ def inspect_prospective_registry_readback(
         "reason": "authenticated_canonical_db_receipt_required",
         "database_timestamp_consistent": False,
         "tenant_identity_consistent": False,
+        "database_payload_integrity_consistent": False,
         "immutable_registry_proven": False,
         "original_prediction_registered": False,
         "eligible_for_calibration": False,
@@ -168,10 +169,18 @@ def inspect_prospective_registry_readback(
     canonical = json.dumps(expected, sort_keys=True, separators=(",", ":"))
     if receipt.get("payload_sha256") != sha256(canonical.encode()).hexdigest():
         return dict(base, reason="readback_hash_incorrect")
+    server_sha = receipt.get("server_payload_sha256")
+    if (type(server_sha) is not str or len(server_sha) != 64
+            or any(char not in "0123456789abcdef" for char in server_sha)
+            or readback.get("server_payload_sha256") != server_sha):
+        return dict(base, reason="independent_database_digest_missing_or_mismatched")
+    if readback.get("server_payload_integrity_valid") is not True:
+        return dict(base, reason="database_payload_integrity_not_confirmed")
     return dict(base,
         status="MATCHED_UNAUTHENTICATED_INPUT",
         reason="database_identity_and_timestamp_authentication_still_required",
         consistent=True,
         database_timestamp_consistent=True,
         tenant_identity_consistent=True,
+        database_payload_integrity_consistent=True,
     )

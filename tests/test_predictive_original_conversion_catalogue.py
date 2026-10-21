@@ -47,7 +47,10 @@ def installed():
             ("record_original_conversion_prediction_v1",True,"v",False),
             ("reject_original_conversion_prediction_change_v1",False,"v",False),
         ],
-        "triggers":[("original_conversion_prediction_immutable","O",False)],
+        "triggers":[
+            ("original_conversion_prediction_immutable","O",False),
+            ("original_conversion_prediction_truncate_guard","O",False),
+        ],
     }
 
 
@@ -152,6 +155,7 @@ def test_full_metadata_is_review_candidate_not_registry_or_science_approval():
     ("routines",[]),
     ("triggers",[]),
     ("triggers",[("original_conversion_prediction_immutable","D",False)]),
+    ("triggers",[("original_conversion_prediction_immutable","O",False)]),
 ])
 def test_partial_or_unsafe_privileges_hold(field,replacement):
     src=installed()

@@ -12,7 +12,7 @@ The dedicated `public.original_conversion_predictions` migration and its writer/
 - Dedicated table and exact declared writer, reader and immutable trigger-function names.
 - Dedicated NOLOGIN/NOBYPASSRLS role presence and unexpected login membership (no new grants).
 - Force-RLS/table permissions.
-- Exact source-described 14 columns, tenant-scoped read/insert policy metadata, function volatility/SECURITY DEFINER shape and original immutability trigger enablement.
+- Exact source-described 15 columns, tenant-scoped read/insert policy metadata, function volatility/SECURITY DEFINER shape and both original UPDATE/DELETE and TRUNCATE guard triggers.
 
 Metadata matching is only a candidate for further DBA review. It cannot prove trigger code correctness, original transactions, source tenant isolation, immutable registration, recorded-before-outcome chronology, actual receipts or customer readiness.
 

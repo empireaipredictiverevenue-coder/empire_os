@@ -28,12 +28,15 @@ def valid_review_material():
         "tenant_id": prediction["tenant_id"],
         "recorded_at": NOW.isoformat(),
         "payload_sha256": digest,
+        "server_payload_sha256": "a" * 64,
     }
     readback = {
         "prediction_ref": prediction["prediction_ref"],
         "tenant_id": prediction["tenant_id"],
         "recorded_at": NOW.isoformat(),
         "payload_sha256": digest,
+        "server_payload_sha256": "a" * 64,
+        "server_payload_integrity_valid": True,
         "prediction": dict(prediction),
     }
     return candidate, receipt, readback
@@ -56,6 +59,7 @@ def test_matching_mocked_receipt_never_pretends_authenticity():
     )
     assert review["status"] == "MATCHED_UNAUTHENTICATED_INPUT"
     assert review["consistent"] is True
+    assert review["database_payload_integrity_consistent"] is True
     assert review["immutable_registry_proven"] is False
     assert review["original_prediction_registered"] is False
     assert review["eligible_for_calibration"] is False
@@ -67,6 +71,9 @@ def test_matching_mocked_receipt_never_pretends_authenticity():
     (lambda a,b: b.update(tenant_id="other"), "readback_identity_mismatch"),
     (lambda a,b: a.update(payload_sha256="f" * 64), "readback_hash_mismatch"),
     (lambda a,b: b["prediction"].update(predicted_probability=0.9), "readback_payload_mismatch"),
+    (lambda a,b: b.update(server_payload_sha256="b" * 64), "independent_database_digest_missing_or_mismatched"),
+    (lambda a,b: a.update(server_payload_sha256="not-a-sha"), "independent_database_digest_missing_or_mismatched"),
+    (lambda a,b: b.update(server_payload_integrity_valid=False), "database_payload_integrity_not_confirmed"),
     (lambda a,b: b.update(recorded_at=(NOW + timedelta(minutes=1)).isoformat()), "readback_timestamp_mismatch"),
     (lambda a,b: a.update(recorded_at=(NOW - timedelta(minutes=15)).isoformat()), "readback_timestamp_mismatch"),
 ])
@@ -186,6 +193,10 @@ def test_staged_sql_is_not_automatic_migration_and_contains_required_guards():
         "ON CONFLICT (tenant_id,prediction_ref) DO NOTHING",
         "existing_row public.original_conversion_predictions%ROWTYPE",
         "CONV_REG_CONCURRENT_RECORD_UNAVAILABLE",
+        "original_conversion_prediction_truncate_guard",
+        "BEFORE TRUNCATE",
+        "server_payload_sha256",
+        "pg_catalog.sha256",
     ):
         assert required in sql
     assert "GRANT empire_original_conversion_prediction_writer TO " not in sql

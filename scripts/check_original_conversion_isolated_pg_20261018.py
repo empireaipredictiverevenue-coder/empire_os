@@ -109,6 +109,9 @@ def main():
             tenant_id=TENANT_A, prediction_ref=candidate["candidate_prediction_ref"])
         assert row and row["prediction"]["predicted_probability"] == 0.6
         assert row["recorded_at"] == receipt["recorded_at"]
+        assert row["server_payload_sha256"] == receipt["server_payload_sha256"]
+        assert row["server_payload_integrity_valid"] is True
+        assert len(row["server_payload_sha256"]) == 64
         assert transport.register_review(candidate, as_of=now)["eligible_for_calibration"] is False
         print("ISOLATED_REGISTRATION_PASS: idempotent insert and readback; learning held")
         other = PostgresOriginalConversionRegistry(
@@ -128,7 +131,10 @@ def main():
             denied(lambda: db.execute(
                 "DELETE FROM public.original_conversion_predictions"),
                 "CONV_REG_APPEND_ONLY")
-        print("ISOLATED_APPEND_ONLY_PASS")
+            denied(lambda: db.execute(
+                "TRUNCATE TABLE public.original_conversion_predictions"),
+                "CONV_REG_APPEND_ONLY")
+        print("ISOLATED_APPEND_ONLY_PASS: update, delete and truncate blocked")
 
         # Database-side checks: invalid clocks, changed identity, and tenant
         # mismatches are rejected by PostgreSQL, not just Python preflight.

@@ -72,6 +72,10 @@ CREATE TABLE public.original_conversion_predictions (
   prediction_json jsonb NOT NULL,
   client_payload_sha256 text NOT NULL
     CHECK(client_payload_sha256 ~ '^[0-9a-f]{64}$'),
+  -- Hash of PostgreSQL's canonical JSONB representation, independently
+  -- computed in the DB. NOT a signature or proof of original issuer.
+  server_payload_sha256 text NOT NULL
+    CHECK(server_payload_sha256 ~ '^[0-9a-f]{64}$'),
   recorded_at timestamptz NOT NULL DEFAULT clock_timestamp(),
   UNIQUE (tenant_id,prediction_ref),
   CHECK(jsonb_typeof(source_evidence) = 'array'
@@ -112,6 +116,12 @@ $$;
 CREATE TRIGGER original_conversion_prediction_immutable
 BEFORE UPDATE OR DELETE ON public.original_conversion_predictions
 FOR EACH ROW EXECUTE FUNCTION public.reject_original_conversion_prediction_change_v1();
+-- Row triggers do NOT fire on TRUNCATE. Guard against the table owner's
+-- accidental or routine truncate too; a superuser still cannot be
+-- cryptographically prevented from overriding a database-local audit.
+CREATE TRIGGER original_conversion_prediction_truncate_guard
+BEFORE TRUNCATE ON public.original_conversion_predictions
+FOR EACH STATEMENT EXECUTE FUNCTION public.reject_original_conversion_prediction_change_v1();
 
 CREATE FUNCTION public.record_original_conversion_prediction_v1(
   p_tenant text,
@@ -132,6 +142,7 @@ DECLARE
   probability numeric;
   evidence_total bigint;
   evidence_unique bigint;
+  server_hash text;
 BEGIN
   IF current_tenant IS NULL OR p_tenant IS NULL
      OR p_tenant <> current_tenant::text THEN
@@ -185,6 +196,12 @@ BEGIN
     RAISE EXCEPTION 'CONV_REG_NOT_PROSPECTIVE';
   END IF;
 
+  -- Independent DB-computed digest of the exact JSONB value that will be
+  -- stored. Unlike the client SHA, this cannot be supplied by the caller.
+  server_hash := pg_catalog.encode(
+    pg_catalog.sha256(pg_catalog.convert_to(p_payload::text,'UTF8')),
+    'hex'
+  );
   -- Return pre-existing immutable evidence when exactly identical.
   -- A later ON CONFLICT handles concurrent submissions safely.
   SELECT * INTO existing_row
@@ -192,7 +209,8 @@ BEGIN
   WHERE tenant_id=current_tenant AND prediction_ref=p_prediction_ref;
   IF FOUND THEN
     IF existing_row.prediction_json IS DISTINCT FROM p_payload
-       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash THEN
+       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash
+       OR existing_row.server_payload_sha256 IS DISTINCT FROM server_hash THEN
       RAISE EXCEPTION 'CONV_REG_IMMUTABLE_IDENTITY_COLLISION';
     END IF;
     RETURN pg_catalog.jsonb_build_object(
@@ -200,7 +218,8 @@ BEGIN
       'prediction_ref',existing_row.prediction_ref,
       'tenant_id',existing_row.tenant_id::text,
       'recorded_at',existing_row.recorded_at,
-      'payload_sha256',existing_row.client_payload_sha256
+      'payload_sha256',existing_row.client_payload_sha256,
+      'server_payload_sha256',existing_row.server_payload_sha256
     );
   END IF;
 
@@ -208,12 +227,12 @@ BEGIN
     tenant_id, prediction_ref, opportunity_key,
     predicted_probability, model_name, model_version,
     proposed_at,horizon_until,source_evidence,prediction_json,
-    client_payload_sha256,recorded_at
+    client_payload_sha256,server_payload_sha256,recorded_at
   ) VALUES (
     current_tenant,p_prediction_ref,p_payload->>'opportunity_key',
     probability,p_payload->>'model_name',p_payload->>'model_version',
     proposed,horizon,p_payload->'evidence_refs',p_payload,p_client_hash,
-    now_at
+    server_hash,now_at
   )
   ON CONFLICT (tenant_id,prediction_ref) DO NOTHING
   RETURNING * INTO existing_row;
@@ -225,7 +244,8 @@ BEGIN
       RAISE EXCEPTION 'CONV_REG_CONCURRENT_RECORD_UNAVAILABLE';
     END IF;
     IF existing_row.prediction_json IS DISTINCT FROM p_payload
-       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash THEN
+       OR existing_row.client_payload_sha256 IS DISTINCT FROM p_client_hash
+       OR existing_row.server_payload_sha256 IS DISTINCT FROM server_hash THEN
       RAISE EXCEPTION 'CONV_REG_IMMUTABLE_IDENTITY_COLLISION';
     END IF;
     RETURN pg_catalog.jsonb_build_object(
@@ -233,7 +253,8 @@ BEGIN
       'prediction_ref',existing_row.prediction_ref,
       'tenant_id',existing_row.tenant_id::text,
       'recorded_at',existing_row.recorded_at,
-      'payload_sha256',existing_row.client_payload_sha256
+      'payload_sha256',existing_row.client_payload_sha256,
+      'server_payload_sha256',existing_row.server_payload_sha256
     );
   END IF;
   RETURN pg_catalog.jsonb_build_object(
@@ -241,7 +262,8 @@ BEGIN
     'prediction_ref',existing_row.prediction_ref,
     'tenant_id',existing_row.tenant_id::text,
     'recorded_at',existing_row.recorded_at,
-    'payload_sha256',existing_row.client_payload_sha256
+    'payload_sha256',existing_row.client_payload_sha256,
+      'server_payload_sha256',existing_row.server_payload_sha256
   );
 END
 $$;
@@ -258,6 +280,11 @@ AS $$
    'tenant_id',v.tenant_id::text,
    'recorded_at',v.recorded_at,
    'payload_sha256',v.client_payload_sha256,
+   'server_payload_sha256',v.server_payload_sha256,
+   'server_payload_integrity_valid',
+     (v.server_payload_sha256 = pg_catalog.encode(
+       pg_catalog.sha256(pg_catalog.convert_to(v.prediction_json::text,'UTF8')),
+       'hex')),
    'prediction',v.prediction_json
  )
  FROM public.original_conversion_predictions AS v

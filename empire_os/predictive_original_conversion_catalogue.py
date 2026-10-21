@@ -24,7 +24,8 @@ EXPECTED_COLS = frozenset((
     "id", "tenant_id", "prediction_ref", "opportunity_key",
     "prediction_type", "predicted_probability", "model_name",
     "model_version", "proposed_at", "horizon_until", "source_evidence",
-    "prediction_json", "client_payload_sha256", "recorded_at",
+    "prediction_json", "client_payload_sha256", "server_payload_sha256",
+    "recorded_at",
 ))
 OBJECT_SQL = """
 SELECT pg_catalog.to_regclass('public.original_conversion_predictions') IS NOT NULL,
@@ -179,7 +180,8 @@ def _metadata_report(
                   all((r[1],r[2],r[3])==names.get(r[0])
                       for r in routines))
     trigger_safe=(triggers==[
-        ("original_conversion_prediction_immutable","O",False)
+        ("original_conversion_prediction_immutable","O",False),
+        ("original_conversion_prediction_truncate_guard","O",False),
     ])
     shape_ready = (
         all(objects) and role_safe and table_safe
