@@ -157,3 +157,52 @@ approved CRM/inbound intake owner with idempotent canonical receipt,
 tenant membership verification, evidence provenance, contact consent
 retention/revocation, operator attribution and readback. Until then
 `canonical_crm_receipts=0` and `durable_queue_verified=false`.
+
+
+## 21 October — restart-persistent *offline* receptionist enquiry receipt (not EmpireDB CRM)
+
+The previously delivered signed Voice call engine and existing
+\`OfflineRecoveryStore\` now have a narrow opt-in persistence bridge for
+**dark/synthetic staging only**. We did not create another canonical database
+or replace the native EmpireDB customer/CRM authority.
+
+- The existing offline recovery SQLite store owns one additional
+  \`offline_reception_enquiry_drafts\` local table. It stores only tenant ID,
+  pseudonymous call ID, deterministic enquiry ID, appointment/callback type,
+  an approved service code, broad time preference, explicit consent flag and
+  pending review status — not ANI, caller name, email, speech/audio or notes.
+- \`append_reception_draft_offline\` atomically inserts the first draft,
+  returns False for identical retries and rejects contradictory same-tenant
+  enquiry/call IDs. \`reception_drafts_for_tenant\` reads only that tenant and
+  revalidates every reconstructed draft; it fails closed for absent/invalid
+  or overflowing tables.
+- \`InboundReceptionCallEngine(on_consented_draft=...)\` writes the local draft
+  **before** acknowledging that it was prepared. On unavailable/read-only
+  store the signed callback returns an error and leaves the consent step
+  retryable rather than claiming an accepted enquiry.
+- The opt-in owner-review HTTP app may use
+  \`load_offline_drafts(verified_crm_tenant_id)\` to read this private local
+  store through the **same existing canonical CRM tenant resolver**. This
+  callback must acquire a fresh SQLite read-only connection per HTTP request;
+  do not share a SQLite connection across TestClient/server threads.
+  Unknown/untrusted/mismatched tenant results fail closed.
+- A fresh application and a fresh read-only SQLite connection see the
+  exact same persisted staging receipt. A different tenant does not.
+  Synthetic signed webhook → explicit consent → local commit → new
+  app → owner-only review is covered by
+  \`test_same_existing_offline_store_survives_restart_and_crm_owner_can_read\`.
+
+**Production boundary:** SQLite is not EmpireDB, the persisted staging item
+is NOT a customer receipt accepted by canonical CRM, and the callback's
+pending draft is not a prospect or verified revenue. A production
+multiworker/restart-safe solution still needs native EmpireDB schema (057
+is HELD/UNAPPLIED), a separately approved least-privilege write policy, a
+signed event/call replay store, proper retention/erasure and private owner
+readback. Neither the new local table nor the test app is installed as a
+production web service. No phone route, canonical database, Calendar grant,
+customer message or payment was activated.
+
+The product next action is to implement and independently verify the
+canonical approved native CRM/inbound receipt admission with identity,
+revocation and operational delivery; only then run a supervised customer
+phone-call-to-enquiry demonstration.

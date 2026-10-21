@@ -294,3 +294,154 @@ def test_existing_crm_reader_returns_empty_rows_after_verified_tenant_session():
     assert r.status_code == 200
     assert r.json()["enquiry_drafts_count"] == 0
     assert r.json()["crm_writes"] is False
+
+
+
+def test_same_existing_offline_store_survives_restart_and_crm_owner_can_read(tmp_path):
+    """Synthetic signed phone HTTP, real local disk SQLite, no EmpireDB writes."""
+    from empire_os.inbound_recovery_store import OfflineRecoveryStore
+
+    path = tmp_path / "existing-recovery-store.sqlite3"
+    with OfflineRecoveryStore(path):
+        pass
+
+    # Separate short-lived connections per webhook/read, as a real HTTP
+    # worker requires. SQLite connections cannot be shared across threads.
+    def append_local(data):
+        with OfflineRecoveryStore(path) as store:
+            return store.append_reception_draft_offline(data)
+
+    def read_local(tenant):
+        with OfflineRecoveryStore(path, read_only=True) as store:
+            return store.reception_drafts_for_tenant(tenant)
+
+    eng = InboundReceptionCallEngine(
+        routes=tuple(engine().registry._routes.values()),
+        profiles=engine().profiles,
+        event_url=API,
+        on_consented_draft=append_local,
+    )
+    client = TestClient(create_inbound_reception_voice_app(
+        engine=eng, signature_secret=SECRET, api_key=KEY,
+        application_id=APPLICATION, enabled=True,
+        resolve_authenticated_crm_read=synthetic_owner_resolver(A),
+        crm_owner_review_enabled=True,
+        load_offline_drafts=read_local,
+    ))
+    fill_one_consent(client, prefix="durable-a")
+    assert read(client).status_code == 200
+    assert read(client).json()["offline_staging_receipts_count"] == 1
+    assert len(read_local(A)) == 1
+    assert read_local(B) == ()
+
+    # A brand new process-local phone controller, same pre-existing disk file.
+    with OfflineRecoveryStore(path, read_only=True) as persisted:
+        assert len(persisted.reception_drafts_for_tenant(A)) == 1
+        fresh_client = TestClient(create_inbound_reception_voice_app(
+            engine=engine(), signature_secret=SECRET, api_key=KEY,
+            application_id=APPLICATION, enabled=True,
+            resolve_authenticated_crm_read=synthetic_owner_resolver(A),
+            crm_owner_review_enabled=True,
+            load_offline_drafts=read_local,
+        ))
+        after_restart = read(fresh_client)
+        assert after_restart.status_code == 200
+        result = after_restart.json()
+        assert result["enquiry_drafts_count"] == 1
+        assert result["offline_staging_receipts_count"] == 1
+        assert result["canonical_crm_receipts"] == 0
+        assert result["durable_queue_verified"] is False
+        assert result["crm_writes"] is False
+        other_client = TestClient(create_inbound_reception_voice_app(
+            engine=engine(), signature_secret=SECRET, api_key=KEY,
+            application_id=APPLICATION, enabled=True,
+            resolve_authenticated_crm_read=synthetic_owner_resolver(B),
+            crm_owner_review_enabled=True,
+            load_offline_drafts=read_local,
+        ))
+        assert read(other_client).json()["enquiry_drafts_count"] == 0
+
+
+def test_offline_durable_replay_is_idempotent_and_conflict_held(tmp_path):
+    from dataclasses import replace
+    from empire_os.inbound_recovery_store import OfflineRecoveryStore
+    from empire_os.inbound_reception_intake import draft_for_call
+
+    data = draft_for_call(
+        tenant_id=A, call_id="synthetic-call-11111111",
+        kind="appointment", service="roof_inspection", window="morning",
+    )
+    path = tmp_path / "existing-recovery-store.sqlite3"
+    with OfflineRecoveryStore(path) as repo:
+        assert repo.append_reception_draft_offline(data) is True
+        assert repo.append_reception_draft_offline(data) is False
+        with pytest.raises(ValueError, match="conflicting_reception_draft"):
+            repo.append_reception_draft_offline(replace(data, preferred_time_window="evening"))
+        assert len(repo.reception_drafts_for_tenant(A)) == 1
+    with OfflineRecoveryStore(path, read_only=True) as reader:
+        assert reader.reception_drafts_for_tenant(A) == (data,)
+        with pytest.raises(ValueError, match="offline_store_read_only"):
+            reader.append_reception_draft_offline(data)
+
+
+def test_offline_sink_failure_never_acknowledges_or_creates_phantom_lead(tmp_path):
+    from empire_os.inbound_recovery_store import OfflineRecoveryStore
+    path = tmp_path / "recovery.sqlite"
+    with OfflineRecoveryStore(path) as prepared:
+        pass
+    with OfflineRecoveryStore(path, read_only=True) as reader:
+        base = engine()
+        shared = InboundReceptionCallEngine(
+            routes=tuple(base.registry._routes.values()), profiles=base.profiles,
+            event_url=API,
+            on_consented_draft=reader.append_reception_draft_offline,
+        )
+        client = TestClient(create_inbound_reception_voice_app(
+            engine=shared, signature_secret=SECRET, api_key=KEY,
+            application_id=APPLICATION, enabled=True,
+        ))
+        steps = [None, "appointment", "roof inspection", "morning"]
+        for i, utterance in enumerate(steps):
+            signed_post(
+                client, number=NUMBER_A, call="synthetic-call-11111111",
+                utterance=utterance, nonce="failure-sink-jti-" + str(i),
+            )
+        data = {"to": NUMBER_A, "uuid": "synthetic-call-11111111",
+                "speech": {"results": [{"text": "yes you may contact me", "confidence": 0.99}]}}
+        raw = json.dumps(data, sort_keys=True, separators=(",", ":")).encode()
+        token = jwt.encode({
+            "iss": "Vonage", "api_key": KEY, "application_id": APPLICATION,
+            "jti": "failure-sink-final-jti",
+            "iat": int(datetime.now(timezone.utc).timestamp()),
+            "payload_hash": sha256(raw).hexdigest(),
+        }, SECRET, algorithm="HS256")
+        response = client.post(
+            "/v1/inbound-reception/vonage/input", content=raw,
+            headers={"authorization": "Bearer " + token,
+                     "content-type": "application/json"},
+        )
+        assert response.status_code == 422
+        assert shared.sessions["synthetic-call-11111111"].closed is False
+        assert shared.sessions["synthetic-call-11111111"].intake_stage == "permission"
+        assert shared.review_handoffs_for_tenant(A) == ()
+        assert reader.reception_drafts_for_tenant(A) == ()
+
+
+def test_offline_reader_wrong_tenant_result_is_not_silently_filtered():
+    from empire_os.inbound_reception_intake import draft_for_call
+    wrong = draft_for_call(
+        tenant_id=B, call_id="synthetic-call-22222222",
+        kind="appointment", service="teeth_cleaning", window="afternoon",
+    )
+    _, client = create_client(
+        owner_resolver=synthetic_owner_resolver(A), review_enabled=False,
+    )
+    eng = engine()
+    active = TestClient(create_inbound_reception_voice_app(
+        engine=eng, signature_secret=SECRET, api_key=KEY,
+        application_id=APPLICATION, enabled=True,
+        resolve_authenticated_crm_read=synthetic_owner_resolver(A),
+        crm_owner_review_enabled=True,
+        load_offline_drafts=lambda _tenant: (wrong,),
+    ))
+    assert read(active).status_code == 503

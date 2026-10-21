@@ -9,6 +9,7 @@ durable shared replay/session storage and operator-authorised DID ownership.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 import re
 from typing import Any
 from urllib.parse import urlparse
@@ -132,12 +133,16 @@ class InboundReceptionCallEngine:
         *,
         event_url: str,
         max_sessions: int = 500,
+        on_consented_draft: Callable[[CRMEnquiryDraft], bool] | None = None,
     ):
         self.registry = InboundNumberRegistry(routes)
         self.profiles = dict(profiles)
         if not (1 <= max_sessions <= 5000):
             raise ValueError("invalid_session_cap")
         self.max_sessions = max_sessions
+        if on_consented_draft is not None and not callable(on_consented_draft):
+            raise ValueError("valid_reception_draft_sink_required")
+        self.on_consented_draft = on_consented_draft
         self.sessions: dict[str, CallSession] = {}
         self.pending_handoffs: dict[tuple[str, str], CRMEnquiryDraft] = {}
         self.event_url = event_url
@@ -323,9 +328,9 @@ class InboundReceptionCallEngine:
                     "say yes, you may contact me, or press one. "
                     "To decline, say no or press two.",
                 )
-            session.closed = True
-            session.intake_stage = ""
             if permission is False:
+                session.closed = True
+                session.intake_stage = ""
                 session.last_action = "contact_permission_declined"
                 session.requested_service = ""
                 session.preferred_time_window = ""
@@ -344,7 +349,19 @@ class InboundReceptionCallEngine:
             key = (session.tenant_id, session.call_uuid)
             if key in self.pending_handoffs and self.pending_handoffs[key] != packet:
                 raise ValueError("conflicting_reception_enquiry")
+            # Persist (local dark staging only) before acknowledging anything.
+            # If the durable sink fails, keep the consent step retryable and
+            # never emit a false receipt or enqueue a phantom CRM enquiry.
+            if self.on_consented_draft is not None:
+                try:
+                    sink_result = self.on_consented_draft(packet)
+                    if type(sink_result) is not bool:
+                        raise ValueError("reception_draft_sink_receipt_not_boolean")
+                except Exception as exc:
+                    raise ValueError("reception_draft_sink_unavailable") from exc
             self.pending_handoffs[key] = packet
+            session.closed = True
+            session.intake_stage = ""
             session.last_action = "enquiry_drafted_for_human_review"
             session.requested_service = ""
             session.preferred_time_window = ""

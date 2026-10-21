@@ -12,6 +12,7 @@ from threading import Lock
 from fastapi import APIRouter, HTTPException, Request, Response
 
 from empire_os.inbound_reception_call_flow import InboundReceptionCallEngine
+from empire_os.inbound_reception_intake import CRMEnquiryDraft
 from empire_os.inbound_reception_recovery_bridge import (
     project_reception_recovery_review,
 )
@@ -27,6 +28,7 @@ def create_inbound_reception_crm_owner_review_router(
     resolve_authenticated_read: Callable[[Request], AuthenticatedRevenueCrmRead | None],
     enabled: bool = False,
     review_lock: object | None = None,
+    load_offline_drafts: Callable[[str], tuple[CRMEnquiryDraft, ...]] | None = None,
 ) -> APIRouter:
     """Reuse the canonical CRM resolver and dedicated LOGIN/session_user read.
 
@@ -38,6 +40,8 @@ def create_inbound_reception_crm_owner_review_router(
         raise ValueError("existing_reception_engine_required")
     if not callable(resolve_authenticated_read):
         raise ValueError("existing_crm_tenant_resolver_required")
+    if load_offline_drafts is not None and not callable(load_offline_drafts):
+        raise ValueError("offline_reception_reader_invalid")
     owner_lock = review_lock if review_lock is not None else Lock()
     if not hasattr(owner_lock, "__enter__") or not hasattr(owner_lock, "__exit__"):
         raise ValueError("shared_reception_lock_required")
@@ -105,7 +109,17 @@ def create_inbound_reception_crm_owner_review_router(
             # Shared lock with the signed Voice API prevents concurrent
             # webhook writes from changing the snapshot mid-review.
             with owner_lock:
-                drafts = engine.review_handoffs_for_tenant(access.tenant_id)
+                drafts = (
+                    load_offline_drafts(access.tenant_id)
+                    if load_offline_drafts is not None
+                    else engine.review_handoffs_for_tenant(access.tenant_id)
+                )
+                if (not isinstance(drafts, tuple)
+                    or any(
+                        not isinstance(item, CRMEnquiryDraft)
+                        or item.tenant_id != access.tenant_id for item in drafts
+                    )):
+                    raise ValueError("offline_reception_reader_tenant_mismatch")
                 # A distinct no-PII recent queue cap; do not auto-evict or
                 # falsely claim complete CRM visibility if over capacity.
                 if len(drafts) > 500:
@@ -129,6 +143,9 @@ def create_inbound_reception_crm_owner_review_router(
             "recovered_revenue_claimed": False,
             "appointment_confirmed": False,
             "durable_queue_verified": False,
+            "offline_staging_receipts_count": (
+                len(drafts) if load_offline_drafts is not None else 0
+            ),
         }
 
     return router

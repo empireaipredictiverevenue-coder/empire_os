@@ -15,6 +15,7 @@ from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from fastapi.responses import JSONResponse
 
 from empire_os.inbound_reception_call_flow import InboundReceptionCallEngine
+from empire_os.inbound_reception_intake import CRMEnquiryDraft
 from empire_os.inbound_signature_verification import (
     InvalidVoiceCallback, verify_vonage_voice_callback,
 )
@@ -29,6 +30,7 @@ def create_inbound_reception_voice_app(
     enabled: bool = False,
     resolve_authenticated_crm_read: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
     crm_owner_review_enabled: bool = False,
+    load_offline_drafts: Callable[[str], tuple[CRMEnquiryDraft, ...]] | None = None,
 ) -> FastAPI:
     if not signature_secret or not api_key or not application_id:
         raise ValueError("signed_reception_credentials_required")
@@ -41,6 +43,10 @@ def create_inbound_reception_voice_app(
         title="Empire AI Receptionist — isolated signed call adapter",
         docs_url=None, redoc_url=None, openapi_url=None,
     )
+    if load_offline_drafts is not None and not callable(load_offline_drafts):
+        raise ValueError("offline_reception_reader_invalid")
+    if load_offline_drafts is not None and resolve_authenticated_crm_read is None:
+        raise ValueError("offline_reception_reader_requires_existing_crm_auth")
     recent: dict[str, tuple[str, list[dict]]] = {}
     lock = Lock()
     if callable(resolve_authenticated_crm_read):
@@ -52,6 +58,7 @@ def create_inbound_reception_voice_app(
             resolve_authenticated_read=resolve_authenticated_crm_read,
             enabled=crm_owner_review_enabled,
             review_lock=lock,
+            load_offline_drafts=load_offline_drafts,
         ))
 
     @app.middleware("http")

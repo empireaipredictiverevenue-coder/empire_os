@@ -16,6 +16,7 @@ from empire_os.inbound_provider_contract import (
     build_trusted_inbound_status,
 )
 from empire_os.inbound_revenue_recovery import RecoveryEvent, RecoveryLedger
+from empire_os.inbound_reception_intake import CRMEnquiryDraft
 from empire_os.inbound_signature_verification import (
     VerifiedVoiceCallback,
     verify_vonage_voice_callback,
@@ -60,6 +61,20 @@ class OfflineRecoveryStore:
             );
             CREATE INDEX IF NOT EXISTS recovery_tenant_call_time_idx
                 ON recovery_events(tenant_id, call_id, occurred_at);
+            CREATE TABLE IF NOT EXISTS offline_reception_enquiry_drafts (
+                tenant_id TEXT NOT NULL,
+                enquiry_id TEXT NOT NULL,
+                call_id TEXT NOT NULL,
+                enquiry_type TEXT NOT NULL CHECK(enquiry_type IN ('appointment','callback')),
+                requested_service TEXT NOT NULL,
+                preferred_time_window TEXT NOT NULL CHECK(
+                    preferred_time_window IN ('morning','afternoon','evening','anytime')),
+                source TEXT NOT NULL CHECK(source = 'signed_inbound_reception_candidate'),
+                status TEXT NOT NULL CHECK(status = 'PENDING_HUMAN_REVIEW_NOT_SUBMITTED'),
+                caller_consented_to_review INTEGER NOT NULL CHECK(caller_consented_to_review = 1),
+                PRIMARY KEY (tenant_id, enquiry_id),
+                UNIQUE (tenant_id, call_id)
+            );
             CREATE TABLE IF NOT EXISTS verified_voice_callbacks (
                 api_key TEXT NOT NULL,
                 jwt_id TEXT NOT NULL,
@@ -187,6 +202,98 @@ class OfflineRecoveryStore:
         result["store"] = "offline_sqlite_persisted"
         result["database_writes"] = False
         return result
+
+    @staticmethod
+    def _reception_draft_fields(draft: CRMEnquiryDraft) -> tuple:
+        """Privacy-minimal, synthetic/dark staging only. No actual CRM receipt."""
+        from empire_os.inbound_reception_intake import draft_for_call
+        if not isinstance(draft, CRMEnquiryDraft):
+            raise ValueError("invalid_reception_draft")
+        if (draft.status != "PENDING_HUMAN_REVIEW_NOT_SUBMITTED"
+            or draft.source != "signed_inbound_reception_candidate"
+            or draft.caller_consented_to_review is not True
+            or draft.crm_write_performed or draft.outbound_authorized
+            or draft.appointment_confirmed or draft.contact_identity_included):
+            raise ValueError("unsafe_reception_draft")
+        if (not isinstance(draft.tenant_id, str)
+            or len(draft.tenant_id) > 160
+            or not isinstance(draft.call_id, str)
+            or not 8 <= len(draft.call_id) <= 96):
+            raise ValueError("invalid_reception_scope")
+        expected = draft_for_call(
+            tenant_id=draft.tenant_id, call_id=draft.call_id,
+            kind=draft.enquiry_type, service=draft.requested_service,
+            window=draft.preferred_time_window,
+        )
+        if draft != expected:
+            raise ValueError("conflicting_reception_draft")
+        return (
+            draft.tenant_id, draft.enquiry_id, draft.call_id,
+            draft.enquiry_type, draft.requested_service,
+            draft.preferred_time_window, draft.source, draft.status,
+            int(draft.caller_consented_to_review),
+        )
+
+    def append_reception_draft_offline(self, draft: CRMEnquiryDraft) -> bool:
+        """Atomic local staging receipt; NEVER a canonical EmpireDB CRM write.
+
+        Repeated identical signed events return False; contradictory same-call
+        consent payloads cannot silently overwrite evidence. Do not log PII.
+        """
+        if self.read_only:
+            raise ValueError("offline_store_read_only")
+        fields = self._reception_draft_fields(draft)
+        with self._conn:
+            existing = self._conn.execute(
+                "SELECT tenant_id,enquiry_id,call_id,enquiry_type,"
+                "requested_service,preferred_time_window,source,status,"
+                "caller_consented_to_review FROM offline_reception_enquiry_drafts "
+                "WHERE tenant_id=? AND (enquiry_id=? OR call_id=?)",
+                (draft.tenant_id, draft.enquiry_id, draft.call_id),
+            ).fetchone()
+            if existing is not None:
+                if tuple(existing) != fields:
+                    raise ValueError("conflicting_reception_draft_replay")
+                return False
+            self._conn.execute(
+                "INSERT INTO offline_reception_enquiry_drafts "
+                "(tenant_id,enquiry_id,call_id,enquiry_type,requested_service,"
+                "preferred_time_window,source,status,caller_consented_to_review) "
+                "VALUES (?,?,?,?,?,?,?,?,?)", fields,
+            )
+        return True
+
+    def reception_drafts_for_tenant(self, tenant_id: str) -> tuple[CRMEnquiryDraft, ...]:
+        """Explicit tenant filter; caller must authenticate via CRM owner route."""
+        if not isinstance(tenant_id, str) or not tenant_id.strip():
+            raise ValueError("tenant_required")
+        try:
+            rows = self._conn.execute(
+                "SELECT tenant_id,enquiry_id,call_id,enquiry_type,"
+                "requested_service,preferred_time_window,source,status,"
+                "caller_consented_to_review FROM offline_reception_enquiry_drafts "
+                "WHERE tenant_id=? ORDER BY enquiry_id LIMIT 501",
+                (tenant_id,),
+            ).fetchall()
+        except sqlite3.Error as exc:
+            raise ValueError("offline_reception_draft_storage_unavailable") from exc
+        if len(rows) > 500:
+            raise ValueError("offline_reception_draft_review_capacity_held")
+        drafts: list[CRMEnquiryDraft] = []
+        for r in rows:
+            try:
+                candidate = CRMEnquiryDraft(
+                    tenant_id=r[0], enquiry_id=r[1], call_id=r[2],
+                    enquiry_type=r[3], requested_service=r[4],
+                    preferred_time_window=r[5], source=r[6],
+                    status=r[7], caller_consented_to_review=bool(r[8]),
+                )
+                if self._reception_draft_fields(candidate) != tuple(r):
+                    raise ValueError("offline_reception_draft_integrity_error")
+            except (TypeError, ValueError) as exc:
+                raise ValueError("offline_reception_draft_integrity_error") from exc
+            drafts.append(candidate)
+        return tuple(drafts)
 
 
 def ingest_signed_vonage_status_offline(
