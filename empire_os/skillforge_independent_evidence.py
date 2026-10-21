@@ -10,6 +10,7 @@ from collections import defaultdict
 from hashlib import sha256
 from pathlib import Path
 import json
+import re
 from typing import Any
 
 from empire_os.skillforge_learning import (
@@ -18,6 +19,8 @@ from empire_os.skillforge_learning import (
 
 MAX_OBSERVATIONS = 5000
 MAX_OBSERVATION_BYTES = 64_000
+CODER_TASK_ID = re.compile(r"^coder_[0-9a-f]{32}$")
+CODER_JOB_ID = re.compile(r"^coder_job_[0-9a-f]{32}$")
 
 
 def _sha(value: str) -> str:
@@ -33,8 +36,53 @@ def _read_safe(path: Path, limit: int) -> dict[str, Any]:
     return item
 
 
+
+def _correlate_original_coder_plan(root: Path, work: dict[str, Any],
+                                   refs: list[str]) -> bool:
+    """Link a Department DONE observation to original Coder scheduler files.
+
+    This proves only a matched local PLAN task/job receipt. It explicitly
+    does not prove generated code executed, a valid patch, agent quality, or
+    independent business outcome.
+    """
+    result=work["result"]
+    task_id=result.get("coder_task_id")
+    job_id=result.get("coder_job_id")
+    if (not isinstance(task_id,str) or not CODER_TASK_ID.fullmatch(task_id)
+            or not isinstance(job_id,str) or not CODER_JOB_ID.fullmatch(job_id)
+            or set(refs)!={f"coder_task:{task_id}",f"coder_job:{job_id}"}
+            or len(refs)!=2
+            or result.get("implementation_performed") is not False
+            or result.get("external_execution_performed") is not False
+            or result.get("execution_authority")!="none"):
+        return False
+    task_path=root/"runtime/coder/tasks"/(task_id+".json")
+    job_path=root/"runtime/coder/jobs/completed"/(job_id+".json")
+    try:
+        task=_read_safe(task_path,MAX_RECORD)
+        job=_read_safe(job_path,MAX_RECORD)
+    except (OSError,ValueError,UnicodeError,TypeError):
+        return False
+    payload=job.get("payload")
+    job_result=job.get("result")
+    return (
+        task.get("id")==task_id and
+        job.get("id")==job_id and
+        job.get("task_id")==task_id and
+        job.get("status")=="COMPLETED" and
+        job.get("kind")=="PLAN" and
+        job.get("error") is None and
+        isinstance(payload,dict) and
+        payload.get("department_work_id")==work.get("id") and
+        payload.get("execution_authority")=="none" and
+        isinstance(job_result,dict) and
+        job_result.get("execution_authority")=="none" and
+        job_result.get("external_execution_performed") is False and
+        job_result.get("production_mutation") is False
+    )
+
 def _source_context(root: Path, row: dict[str, str],
-                    indexed_done: dict[str, Path]) -> tuple[tuple[str, ...], dict[str, str]]:
+                    indexed_done: dict[str, Path]) -> tuple[tuple[str, ...], dict[str, str], bool]:
     # The existing SkillForge auditor already validated the candidate against
     # the original DONE work. Recheck the immutable-looking content during this
     # second read rather than trusting an index entry which may have changed.
@@ -68,7 +116,13 @@ def _source_context(root: Path, row: dict[str, str],
         # publish counts, never names, identities, work ids, or raw references.
         if isinstance(value,str) and value.strip() and len(value)<=512:
             context[field]=_sha(value)
-    return tuple(hashes),context
+    linked = (
+        _correlate_original_coder_plan(root,work,refs)
+        if row["component"]=="empire_coder"
+           and row["adapter"]=="empire_coder_plan_bridge"
+        else False
+    )
+    return tuple(hashes),context,linked
 
 
 def review_independent_skill_evidence(root: str | Path, *,
@@ -95,11 +149,13 @@ def review_independent_skill_evidence(root: str | Path, *,
     groups:dict[tuple[str,str],dict[str,Any]]=defaultdict(
         lambda: {"records":0,"refs":set(),"plans":set(),"goals":set(),
                  "workers":set(),"work_sources":set(),"missing_plan_count":0,
-                 "missing_worker_count":0})
+                 "missing_worker_count":0,
+                 "coder_plan_scheduler_correlated":0,
+                 "coder_plan_scheduler_uncorrelated":0})
     rejected=0
     for row in validated:
         try:
-            ref_hashes,ctx=_source_context(root,row,work_index)
+            ref_hashes,ctx,coder_scheduler_linked=_source_context(root,row,work_index)
         except (OSError,ValueError,UnicodeError,TypeError,OverflowError):
             rejected+=1
             continue
@@ -108,6 +164,9 @@ def review_independent_skill_evidence(root: str | Path, *,
         data["records"]+=1
         data["work_sources"].add(row["source_work_sha256"])
         data["refs"].update(ref_hashes)
+        if key==("empire_coder","empire_coder_plan_bridge"):
+            data["coder_plan_scheduler_correlated"]+=int(coder_scheduler_linked)
+            data["coder_plan_scheduler_uncorrelated"]+=int(not coder_scheduler_linked)
         for name,bucket in (("plan_id","plans"),("goal_key","goals"),("worker_id","workers")):
             if name in ctx:
                 data[bucket].add(ctx[name])
@@ -129,6 +188,10 @@ def review_independent_skill_evidence(root: str | Path, *,
             "distinct_worker_context_count":len(data["workers"]),
             "missing_plan_context_count":data["missing_plan_count"],
             "missing_worker_context_count":data["missing_worker_count"],
+            "original_coder_plan_scheduler_pairs_correlated":data["coder_plan_scheduler_correlated"],
+            "original_coder_plan_scheduler_pairs_uncorrelated":data["coder_plan_scheduler_uncorrelated"],
+            "coder_plan_scheduler_correlation_is_not_implementation_proof":True,
+            "independently_verified_code_implementations":0,
             "reference_diversity_status":(
                 "REUSED_SINGLE_REFERENCE_STRING" if distinct<=1
                 else "MULTIPLE_REFERENCE_STRINGS_CUSTODY_UNVERIFIED"),

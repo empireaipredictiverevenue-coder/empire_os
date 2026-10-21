@@ -141,6 +141,16 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             or family.get('skill_approval_authorized') is not False
             or family.get('review_only') is not True):
             raise ValueError('untrusted SkillForge candidate evidence')
+        correlated=family.get('original_coder_plan_scheduler_pairs_correlated',0)
+        uncorrelated=family.get('original_coder_plan_scheduler_pairs_uncorrelated',0)
+        if (type(correlated) is not int or type(uncorrelated) is not int
+            or correlated<0 or uncorrelated<0
+            or correlated+uncorrelated>(count)
+            or family.get('independently_verified_code_implementations',0)!=0):
+            raise ValueError('untrusted Coder scheduler evidence count')
+        if (component=='empire_coder'
+            and correlated+uncorrelated != count):
+            raise ValueError('incomplete Coder scheduler observation audit')
         if count<2:continue
         key='skillforge|provenance|'+component+'|'+adapter
         item={
@@ -152,6 +162,9 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'component':component,'adapter':adapter,
             'canonical_done_observation_count':count,
             'distinct_evidence_reference_string_count':refs,
+            'original_coder_plan_scheduler_pairs_correlated':correlated,
+            'original_coder_plan_scheduler_pairs_uncorrelated':uncorrelated,
+            'independently_verified_code_implementations':0,
             'source_schema':source['schema_version'],
             'next_review_action':(
                 'Independently retrieve original source events for separate work completions; '

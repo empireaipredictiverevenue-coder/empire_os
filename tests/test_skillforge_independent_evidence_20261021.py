@@ -217,3 +217,107 @@ def test_untrusted_skillforge_review_report_cannot_spoof_approval():
     fake['families'][0]['skill_approval_authorized']=True
     with pytest.raises(ValueError):
         merge_skillforge_evidence_into_review_plan(old,fake)
+
+
+def coder_receipts(root, number=123):
+    work_id='dept_work_'+f'{number:024x}'
+    task_id='coder_'+f'{number:032x}'
+    job_id='coder_job_'+f'{number:032x}'
+    done_path=root/'runtime/departments/work/done'/f'{work_id}.json'
+    done_path.parent.mkdir(parents=True,exist_ok=True)
+    result={
+        'adapter':'empire_coder_plan_bridge',
+        'coder_task_id':task_id,'coder_job_id':job_id,
+        'implementation_performed':False,
+        'external_execution_performed':False,
+        'execution_authority':'none',
+    }
+    done_path.write_text(json.dumps({
+        'id':work_id,'status':'DONE','authority':'observe',
+        'error':None,'target_component':'empire_coder',
+        'result':result,
+        'result_evidence_refs':[
+            'coder_task:'+task_id,'coder_job:'+job_id,
+        ],
+    }))
+    task=root/'runtime/coder/tasks'/f'{task_id}.json'
+    job=root/'runtime/coder/jobs/completed'/f'{job_id}.json'
+    task.parent.mkdir(parents=True,exist_ok=True)
+    job.parent.mkdir(parents=True,exist_ok=True)
+    task.write_text(json.dumps({'id':task_id,'status':'running'}))
+    job.write_text(json.dumps({
+        'id':job_id,'task_id':task_id,
+        'status':'COMPLETED','kind':'PLAN','error':None,
+        'payload':{'department_work_id':work_id,'execution_authority':'none'},
+        'result':{
+            'execution_authority':'none','external_execution_performed':False,
+            'production_mutation':False,'stage':'REFINED',
+        },
+    }))
+    assert capture_completed_work(root,work_id)['status']=='candidate_saved'
+    return done_path,task,job
+
+
+def test_coder_completed_plan_receipt_is_not_an_implementation(tmp_path):
+    coder_receipts(tmp_path)
+    review=review_independent_skill_evidence(tmp_path)
+    data=family(review)
+    assert data['original_coder_plan_scheduler_pairs_correlated']==1
+    assert data['original_coder_plan_scheduler_pairs_uncorrelated']==0
+    assert data['independently_verified_code_implementations']==0
+    assert data['coder_plan_scheduler_correlation_is_not_implementation_proof'] is True
+    assert review['promotion_ready_skill_count']==0
+
+
+@pytest.mark.parametrize('tamper',[
+    lambda task,job:task.unlink(),
+    lambda task,job:job.unlink(),
+    lambda task,job:job.write_text(json.dumps({
+        **json.loads(job.read_text()),'task_id':'coder_'+'b'*32,
+    })),
+    lambda task,job:job.write_text(json.dumps({
+        **json.loads(job.read_text()),'status':'FAILED',
+    })),
+    lambda task,job:job.write_text(json.dumps({
+        **json.loads(job.read_text()),
+        'result':{**json.loads(job.read_text())['result'],'production_mutation':True},
+    })),
+])
+def test_coder_missing_failed_or_wrong_original_job_not_proven(tmp_path,tamper):
+    _,task,job=coder_receipts(tmp_path)
+    tamper(task,job)
+    review=review_independent_skill_evidence(tmp_path)
+    row=family(review)
+    assert row['original_coder_plan_scheduler_pairs_correlated']==0
+    assert row['original_coder_plan_scheduler_pairs_uncorrelated']==1
+    assert row['independently_verified_code_implementations']==0
+    assert review['status']=='SOURCE_DIVERSITY_REVIEW_ONLY'
+    assert review['promotion_ready_skill_count']==0
+
+
+def test_coder_original_symlink_cannot_be_counted(tmp_path):
+    _,task,job=coder_receipts(tmp_path)
+    copy=tmp_path/'fake-task'
+    task.rename(copy)
+    task.symlink_to(copy)
+    data=family(review_independent_skill_evidence(tmp_path))
+    assert data['original_coder_plan_scheduler_pairs_correlated']==0
+    assert data['original_coder_plan_scheduler_pairs_uncorrelated']==1
+
+
+def test_coder_scheduler_gaps_appear_only_in_nonexecuting_owner_review(tmp_path):
+    from empire_os.system_improvement_review import refresh_review_packets
+    _empty_resolution(tmp_path)
+    coder_receipts(tmp_path,number=1)
+    _,task,job=coder_receipts(tmp_path,number=2)
+    job.unlink()
+    result=refresh_review_packets(tmp_path)
+    matched=[p for p in result['packets']
+             if p['type']=='SKILLFORGE_ORIGINAL_PROVENANCE_REVIEW']
+    assert len(matched)==1
+    receipt=json.loads((tmp_path/matched[0]['path']).read_text())
+    assert receipt['original_coder_plan_scheduler_pairs_correlated']==1
+    assert receipt['original_coder_plan_scheduler_pairs_uncorrelated']==1
+    assert receipt['independently_verified_code_implementations']==0
+    assert receipt['auto_dispatch_eligible'] is False
+    assert receipt['approved_for_implementation'] is False
