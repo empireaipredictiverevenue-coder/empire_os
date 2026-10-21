@@ -172,6 +172,13 @@ def test_running_existing_community_cycle_twice_in_one_slot_is_idempotent(
     assert first["fetched_observations"]==1
     assert first["icp_research_learning"]["episode_count"]==1
     assert first["icp_research_learning"]["execution_authority"]=="NONE"
+    assert first["jev_client_pain_discovery"]["execution_authority"]=="none"
+    assert first["jev_client_pain_discovery"]["outbound_sent"]==0
+    assert "items" not in first["jev_client_pain_discovery"]
+    private = root/"jev_client_pain_review_latest.json"
+    assert private.exists()
+    assert private.stat().st_mode & 0o777 == 0o600
+    assert json.loads(private.read_text())["items"]
 
     assert cycle.main()==0
     second=json.loads((root/"latest.json").read_text())

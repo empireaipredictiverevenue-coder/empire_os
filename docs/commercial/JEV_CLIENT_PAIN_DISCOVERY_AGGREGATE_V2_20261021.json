@@ -1,0 +1,37 @@
+{
+  "buyer_purchase_intent_verified": false,
+  "canonical_social_intent_rows_loaded": 35,
+  "commercial_matching_requires_owner_validation": true,
+  "contactable_prospects": 0,
+  "crm_writes": false,
+  "execution_authority": "none",
+  "generated_at_utc": "2026-10-21T23:04:05.583111+00:00",
+  "identity_verification_required": true,
+  "mode": "OBSERVE",
+  "observations_submitted": 48,
+  "observations_with_pain_or_topic": 15,
+  "offer_review_counts": {
+    "empire_automation_os": 1
+  },
+  "outbound_sent": 0,
+  "pain_counts": {},
+  "pain_taxonomy_candidates": 0,
+  "prospects_verified": 0,
+  "quality_counters": {
+    "duplicate_source": 13,
+    "no_problem_evidence": 20
+  },
+  "review_lane_counts": {
+    "MONITOR_UNVERIFIED": 14,
+    "REVIEW_IDENTITY": 1
+  },
+  "schema_version": "empire.jev.client_pain_discovery.v1",
+  "source_counts": {
+    "linkedin": 6,
+    "reddit": 9
+  },
+  "source_rights_and_consent_verified": false,
+  "source_scope": "existing_community_history_plus_canonical_social_intent",
+  "status": "CLIENT_PAIN_DISCOVERY_OWNER_REVIEW_ONLY",
+  "verified_client_pain_points": 0
+}

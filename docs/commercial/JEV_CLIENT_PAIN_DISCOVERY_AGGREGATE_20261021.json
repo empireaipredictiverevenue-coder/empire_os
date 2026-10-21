@@ -1,0 +1,33 @@
+{
+  "buyer_purchase_intent_verified": false,
+  "commercial_matching_requires_owner_validation": true,
+  "contactable_prospects": 0,
+  "crm_writes": false,
+  "execution_authority": "none",
+  "generated_at_utc": "2026-10-21T23:03:06.509939+00:00",
+  "identity_verification_required": true,
+  "mode": "OBSERVE",
+  "observations_submitted": 13,
+  "observations_with_pain_or_topic": 13,
+  "offer_review_counts": {
+    "empire_automation_os": 1
+  },
+  "outbound_sent": 0,
+  "pain_counts": {},
+  "pain_taxonomy_candidates": 0,
+  "prospects_verified": 0,
+  "quality_counters": {},
+  "review_lane_counts": {
+    "MONITOR_UNVERIFIED": 12,
+    "REVIEW_IDENTITY": 1
+  },
+  "schema_version": "empire.jev.client_pain_discovery.v1",
+  "source_counts": {
+    "linkedin": 6,
+    "reddit": 7
+  },
+  "source_rights_and_consent_verified": false,
+  "source_scope": "existing_community_intent_observation_history",
+  "status": "CLIENT_PAIN_DISCOVERY_OWNER_REVIEW_ONLY",
+  "verified_client_pain_points": 0
+}

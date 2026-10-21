@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from collections import Counter
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,6 +17,7 @@ from empire_os.community_intent import (
 )
 from empire_os.control_fabric import EventEnvelope, route_event
 from empire_os.pain_solution_engine import build_pain_solution_briefs
+from empire_os.jev_client_pain_discovery import discover_client_pains
 from empire_os.search_fabric.reliable_search import search_reliable
 from empire_os.icp_intent_source_atlas import (
     REDDIT_ROTATION as ICP_REDDIT_ROTATION,
@@ -272,6 +275,13 @@ def main() -> int:
     ]
 
     pain_briefs = build_pain_solution_briefs(observations)
+    # Shadow Jev client-pain review: same observations, no extra search/API,
+    # no buyer identity promotion, CRM mutation, messaging or revenue actions.
+    jev_pain_review = discover_client_pains(
+        [row.as_dict() for row in observations],
+        now=now,
+        include_private_source_links=True,
+    )
     routed_pains = []
     for brief in pain_briefs:
         if brief.opportunity_event is None:
@@ -350,6 +360,10 @@ def main() -> int:
             "linkedin": linkedin_status,
         },
         "pain_points": dict(pain_counts.most_common()),
+        "jev_client_pain_discovery": {
+            key: value for key, value in jev_pain_review.items()
+            if key != "items"
+        },
         "pain_solution_briefs": [
             row.as_dict() for row in pain_briefs
         ],
@@ -360,6 +374,21 @@ def main() -> int:
         ],
     }
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    # The private founder queue retains the public evidence URL so Research can
+    # independently inspect it. It is gitignored and permission restricted.
+    # Never include the individual source links in the normal cycle payload.
+    private_queue = OUTPUT.parent / "jev_client_pain_review_latest.json"
+    fd, tmp_private = tempfile.mkstemp(
+        prefix=".jev_pain_", suffix=".tmp", dir=OUTPUT.parent,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as stream:
+            json.dump(jev_pain_review, stream, indent=2, sort_keys=True)
+            stream.write("\n")
+        os.replace(tmp_private, private_queue)
+    finally:
+        if os.path.exists(tmp_private):
+            os.unlink(tmp_private)
     tmp = OUTPUT.with_suffix(".json.tmp")
     tmp.write_text(
         json.dumps(payload, indent=2, sort_keys=True) + "\n"
