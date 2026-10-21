@@ -2,6 +2,13 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Website alerts and private Revenue Pulse (2026-10-21)
+
+- Public `/alerts` — state, ZIP and Storm Passport area lookups; five-minute NWS rechecks while page remains open; optional browser notifications only for new severe warnings after permission; never a substitute for official emergency warning channels.
+- Private `/founder/revenue-pulse` — founder-key protected company-wide EmpireOS Pulse V3 and observed conversion-gap alerts, with automatic refresh and optional in-session pop-ups.
+- Private `/api/founder/revenue-pulse` — environment-key authentication, no-store headers, unknown National Storm Hub tenant financial metrics until genuine source-ledger evidence is connected.
+- Neither the visitor dashboard nor the private founder dashboard triggers customer outreach, sales automation, fund movement or chat reminders.
+
 ## Implemented
 
 ### Evidence-first depth candidate (2026-10-21)

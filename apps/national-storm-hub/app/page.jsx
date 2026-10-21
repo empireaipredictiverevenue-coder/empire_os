@@ -2,7 +2,7 @@
 
 import {useEffect,useState} from "react";
 import {
-  ArrowRight,ArrowUpRight,BookOpen,Bookmark,BookmarkCheck,Check,CheckCircle2,
+  ArrowRight,ArrowUpRight,Bell,BookOpen,Bookmark,BookmarkCheck,Check,CheckCircle2,
   ChevronDown,CloudLightning,Compass,ExternalLink,FileCheck2,Home,Layers,
   LockKeyhole,MapPin,Menu,Radio,RefreshCw,Search,ShieldCheck,ShieldAlert,
   Sparkles,Wind,X,Building2,ChartNoAxesCombined,Clock3,CloudSun,Radar,
@@ -163,6 +163,7 @@ export default function HomePage(){
       <nav className={menuOpen?"nav-links open":"nav-links"} aria-label="Main navigation">
         <a href="#atlas" onClick={()=>setMenuOpen(false)}>Storm Atlas</a>
         <a href="/predictor" onClick={()=>setMenuOpen(false)}>Storm Predictor</a>
+        <a href="/alerts" onClick={()=>setMenuOpen(false)}>Live Alerts</a>
         <a href="#passport" onClick={()=>setMenuOpen(false)}>Storm Passport</a>
         <a href="/recovery" onClick={()=>setMenuOpen(false)}>Prepare & Recover</a>
         <a href="#pro" onClick={()=>setMenuOpen(false)}>For Contractors</a>
@@ -185,6 +186,7 @@ export default function HomePage(){
           </form>
           {errorInput?<p className="form-error" id="zip-error" role="alert">{errorInput}</p>:<p className="microcopy" id="zip-help"><LockKeyhole size={13}/> No account needed. ZIP lookup uses an external public location service.</p>}
           <div className="hero-trust"><span><ShieldCheck size={16}/> Official sources</span><span><Clock3 size={16}/> Dated evidence</span><span><LockKeyhole size={16}/> Privacy by design</span></div>
+          <a href="/alerts" className="hero-alerts-cta"><Bell size={17}/> Check current storm alerts <ArrowRight size={16}/></a>
           <a href="/predictor" className="hero-predictor-cta"><Sparkles size={17}/> Explore Storm Predictor <ArrowRight size={16}/></a>
         </div>
         <div className="hero-art"><GlobeVisual/><div className="floating-weather"><div className="float-icon"><Radar size={21}/></div><div><span>STORM ATLAS</span><strong>Explore the evidence</strong><small>Forecasts ≠ confirmed damage</small></div><ArrowUpRight size={18}/></div><div className="art-note">CONCEPTUAL EARTH VISUAL • NOT AN ALERT BOUNDARY MAP</div></div>
@@ -260,6 +262,6 @@ export default function HomePage(){
 
       <section className="final-cta wrap"><span className="eyebrow">STAY PREPARED. STAY INFORMED.</span><h2>Weather will change. <em>How you prepare can too.</em></h2><a href="#atlas">Explore Storm Atlas <ArrowRight size={17}/></a></section>
     </main>
-    <footer className="site-footer"><div className="wrap footer-inner"><div><a className="brand footer-brand" href="#home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
+    <footer className="site-footer"><div className="wrap footer-inner"><div><a className="brand footer-brand" href="#home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a><p>Independent weather information and property preparedness. Not an official emergency alert service.</p></div><div className="footer-links"><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">National Weather Service <ExternalLink size={13}/></a><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Ready.gov <ExternalLink size={13}/></a><a href="#passport">Storm Passport</a><a href="/predictor">Storm Predictor</a><a href="/alerts">Live Storm Alerts</a><a href="/founder/revenue-pulse">Founder Revenue Pulse</a><a href="/research">Research &amp; Sources</a><a href="/recovery">Recovery Guide</a><a href="#pro">Storm Hub Pro</a></div></div><div className="wrap bottom-footer"><span>© {new Date().getFullYear()} National Storm Hub · A planned Empire AI-operated brand.</span><span>Preview release · Source transparency first</span></div></footer>
   </div>;
 }
