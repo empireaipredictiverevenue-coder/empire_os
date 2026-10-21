@@ -25,6 +25,7 @@ from .metadata import generate_metadata
 from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
+from .quora_intelligence import QuoraEvidenceError, review_quora_research
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
     AiAnswerObservation,
@@ -56,6 +57,25 @@ from empire_os.tag_intelligence import (
 from empire_os.timesfm_shadow import configured_timesfm_provider
 
 
+
+
+class QuoraSearchFabricCandidateRequest(BaseModel):
+    """Provider-labelled search-result hypothesis, never confirmed Quora page."""
+    model_config = {"extra": "forbid"}
+    seed_id: str = Field(min_length=5, max_length=32)
+    question_url: str = Field(min_length=15, max_length=300)
+    question_title: str = Field(min_length=12, max_length=240)
+    source_ref: str = Field(min_length=20, max_length=160)
+    source_query: str = Field(min_length=5, max_length=350)
+    observed_at: str = Field(min_length=16, max_length=40)
+    provider: str
+
+
+class QuoraSearchFabricPreviewRequest(BaseModel):
+    model_config = {"extra": "forbid"}
+    observations: list[QuoraSearchFabricCandidateRequest] = Field(
+        default_factory=list, max_length=96
+    )
 
 
 class AiCitationObservationRequest(BaseModel):
@@ -309,6 +329,36 @@ def create_search_router(
             raise HTTPException(
                 status_code=503,
                 detail="department_evidence_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/quora/review")
+    def quora_research_review(response: Response):
+        """Existing SEO-owned Quora editorial queue; no network, no posting."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return review_quora_research()
+        except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.post("/quora/search-fabric/preview")
+    def quora_search_fabric_preview(
+        request: QuoraSearchFabricPreviewRequest, response: Response
+    ):
+        """Review provenance-bound fabric results without any Quora mutation."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return review_quora_research(
+                [item.model_dump() for item in request.observations]
+            )
+        except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
+            raise HTTPException(
+                status_code=422, detail="invalid_quora_search_evidence",
                 headers={"Cache-Control": "no-store"},
             ) from None
 
