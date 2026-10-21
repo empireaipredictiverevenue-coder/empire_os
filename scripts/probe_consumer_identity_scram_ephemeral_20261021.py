@@ -15,6 +15,9 @@ from scripts.provision_consumer_private_identity_20261021 import (
 from scripts.review_consumer_private_identity_session_20261021 import (
     original_readonly_session,
 )
+from scripts import diagnose_consumer_private_identity_hold_20261021 as segmented
+from unittest.mock import patch
+import scripts.review_consumer_private_identity_session_20261021 as original
 
 
 def main():
@@ -56,6 +59,15 @@ def main():
         password=password,connect=authenticated
     )
     assert all(production_readback.values())
+    # Also prove the segmented read-only diagnostic reaches SUCCESS using
+    # the same original SQL and synthetic fixture credential.
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(segmented.os,"geteuid",return_value=0):
+            segmented_result=segmented.diagnosed_readonly(
+                original=original,connect=authenticated
+            )
+    assert segmented_result["status"]=="CONSUMER_PRIVATE_IDENTITY_DIAGNOSTIC_PASS"
+    assert segmented_result["first_failing_stage"]=="NONE"
     with psycopg.connect(
         dbname="empiredb",host="localhost",port=port
     ) as admin:
