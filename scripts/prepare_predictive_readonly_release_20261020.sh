@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -67,6 +67,7 @@ case "$command" in
   measurement) module=scripts.review_predictive_measurement_instruments_20261020 ;;
   sources) module=scripts.review_predictive_primary_economic_sources_20261020 ;;
   owners) module=scripts.review_empire_cross_agent_release_board_20261020 ;;
+  comparison|comparison-all) module=scripts.review_predictive_comparison_20261021 ;;
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
@@ -81,6 +82,10 @@ fi
 if [[ "$command" == "cost-sector" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -B -m "$module" --read-only --probe-sector-bls-v1
+fi
+if [[ "$command" == "comparison-all" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --all-products
 fi
 exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
   /srv/empire_os/.venv/bin/python -B -m "$module" --read-only
@@ -106,6 +111,10 @@ EOF
     scripts/reconcile_founder_sales_handoff_aggregate_readonly.py \
     empire_os/predictive_catalog_intelligence_contracts.py \
     empire_os/predictive_catalog_readiness_bridge.py \
+    empire_os/predictive_point_in_time_features.py \
+    empire_os/predictive_competitive_product_comparison.py \
+    empire_os/predictive_catalogue_price_comparison.py \
+    scripts/review_predictive_comparison_20261021.py \
     empire_os/predictive_intelligence.py \
     empire_os/predictive_cloud_materializer.py \
     empire_os/predictive_cloud_status.py \
@@ -228,6 +237,34 @@ assert x["tenant_customer_forecast_verified"] is False
 assert x["enterprise_delivery_verified"] is False
 assert x["actual_revenue_verified"] is False
 assert x["database_writes"] is False
+assert x["execution_authority"]=="none"
+'
+# Competitive comparison is a READ-ONLY, exact-source category overlap. Never
+# transform SaaS monthly seat fees into an enterprise project price or ROI.
+"$TMP/bin/empire-predictive-observe" comparison | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.catalogue_price_comparison.v1"
+assert x["catalogue_product_count"]>=5
+assert x["catalogue_prices_unknown"]+x["catalogue_prices_observed_not_authenticated"]==x["catalogue_product_count"]
+assert x["founder_approved_flagship_prices_count"]==5
+assert x["source_root_owned_snapshot_custody_verified"] is True
+assert x["source_original_empiredb_issuer_authenticated"] is False
+assert x["astra_gpt6_independent_review"]=="NOT_EXECUTED"
+assert x["price_change_authority"]=="none"
+assert x["database_writes"] is False and x["outbound_sent"] is False
+assert "products" not in x
+'
+"$TMP/bin/empire-predictive-observe" comparison-all | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert len(x["products"])==x["catalogue_product_count"]
+assert all(p["evidence_backed_price_justified"] is False for p in x["products"])
+assert all(p["automatic_price_changes_authorized"] is False for p in x["products"])
+assert all(p["foreign_currency_converted_to_usd"] is False for p in x["products"])
+assert all(len(p["competitor_categories"])==6 for p in x["products"])
 assert x["execution_authority"]=="none"
 '
 # The science adapter MUST preserve unknown forecasts when original product
