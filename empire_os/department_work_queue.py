@@ -232,7 +232,21 @@ class DepartmentWorkQueue:
         *,
         worker_id: str | None = None,
         lease_seconds: int = 300,
+        department_key: str | None = None,
+        allowed_components: tuple[str, ...] | None = None,
+        tenant_scope: str | None = None,
     ) -> DepartmentWorkItem | None:
+        """Claim atomically; optional scope limits serve the existing agent team.
+
+        Unscoped callers retain their legacy semantics. Scoped claims may
+        never take work from another department or tenant. These filters do
+        not grant execution or expand the Department worker's authority.
+        """
+        if department_key is None:
+            if allowed_components is not None or tenant_scope is not None:
+                raise DepartmentWorkQueueError("scoped_filters_require_department")
+        elif not department_key or not allowed_components:
+            raise DepartmentWorkQueueError("scoped claim requires department and capabilities")
         now = datetime.now(timezone.utc)
         with self._locked():
             candidates: list[
@@ -240,6 +254,14 @@ class DepartmentWorkQueue:
             ] = []
             for path in self.ready.glob("*.json"):
                 item = self._load(path)
+                if department_key is not None:
+                    if (
+                        department_key not in item.department_keys
+                        or item.target_component not in allowed_components
+                        or item.tenant_id != tenant_scope
+                        or item.authority not in {"observe", "internal_write"}
+                    ):
+                        continue
                 candidates.append(
                     (-item.priority, item.created_at, path, item)
                 )
@@ -265,6 +287,36 @@ class DepartmentWorkQueue:
                 self._write(destination, item)
                 return item
         return None
+
+    def release_claim(self, *, work_id: str, worker_id: str,
+                      lease_id: str) -> DepartmentWorkItem:
+        """Atomically return an agent-held work lease to READY, without DONE.
+
+        Only the exact current worker + lease can yield. A stale, spoofed,
+        finished or reassigned lease cannot affect the canonical job.
+        """
+        work_id = self._safe(work_id)
+        with self._locked():
+            current = self.running / f"{work_id}.json"
+            if not current.is_file() or current.is_symlink():
+                raise DepartmentWorkQueueError("current_running_lease_required")
+            active = self._load(current)
+            if (
+                not lease_id or not worker_id
+                or active.worker_id != worker_id
+                or active.lease_id != lease_id
+                or active.status is not DepartmentWorkStatus.RUNNING
+            ):
+                raise DepartmentWorkQueueError("claim_lease_mismatch")
+            active.status = DepartmentWorkStatus.READY
+            active.lease_id = None
+            active.worker_id = None
+            active.lease_expires_at = None
+            active.updated_at = self._now()
+            self._write(current, active)
+            destination = self.ready / current.name
+            current.replace(destination)
+            return active
 
     # EMPIRE_HYBRID_FACTORY_PHASE4_REVIEW: only a leased RUNNING item can enter REVIEW.
     def submit_for_review(
