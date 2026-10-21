@@ -63,7 +63,7 @@ def test_release_launcher_has_comparison_without_repricing_service():
     from pathlib import Path
     content=(Path(__file__).resolve().parents[1] /
              "scripts/prepare_predictive_readonly_release_20261020.sh").read_text()
-    assert 'comparison|comparison-all|comparison-gaps|comparison-product) module=scripts.review_predictive_comparison_20261021' in content
+    assert 'comparison|comparison-all|comparison-gaps|comparison-product|comparison-astra|comparison-astra-all) module=scripts.review_predictive_comparison_20261021' in content
     assert 'if [[ "$command" == "comparison-gaps" ]]' in content
     assert 'if [[ "$command" == "comparison-product" ]]' in content
     assert 'empire_os/predictive_comparison_gap_report.py' in content

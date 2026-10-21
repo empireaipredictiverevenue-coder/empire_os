@@ -28,7 +28,7 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU|comparison-astra|comparison-astra-all}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -71,7 +71,7 @@ case "$command" in
   measurement) module=scripts.review_predictive_measurement_instruments_20261020 ;;
   sources) module=scripts.review_predictive_primary_economic_sources_20261020 ;;
   owners) module=scripts.review_empire_cross_agent_release_board_20261020 ;;
-  comparison|comparison-all|comparison-gaps|comparison-product) module=scripts.review_predictive_comparison_20261021 ;;
+  comparison|comparison-all|comparison-gaps|comparison-product|comparison-astra|comparison-astra-all) module=scripts.review_predictive_comparison_20261021 ;;
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
@@ -98,6 +98,14 @@ fi
 if [[ "$command" == "comparison-product" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --product-code "$2"
+fi
+if [[ "$command" == "comparison-astra" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --astra-review
+fi
+if [[ "$command" == "comparison-astra-all" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --astra-review-all
 fi
 exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
   /srv/empire_os/.venv/bin/python -B -m "$module" --read-only
@@ -129,6 +137,7 @@ EOF
     empire_os/predictive_price_policy_evidence.py \
     empire_os/predictive_catalogue_price_comparison.py \
     empire_os/predictive_comparison_gap_report.py \
+    empire_os/predictive_astra_product_review_packet.py \
     scripts/review_predictive_comparison_20261021.py \
     empire_os/predictive_intelligence.py \
     empire_os/predictive_cloud_materializer.py \
@@ -316,6 +325,34 @@ assert len(x["products"])==1
 assert x["products"][0]["catalogue_listed_price_minor_units"] is None
 assert x["products"][0]["catalogue_price_original_custody"]=="LEGACY_CONFLICT_NEEDS_FOUNDER_RESOLUTION"
 assert x["products"][0]["catalogue_source_approval_is_customer_contract"] is False
+'
+"$TMP/bin/empire-predictive-observe" comparison-astra | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_revenue.astra_gpt6_review_input.v1"
+assert x["source_inventory_count"]==86
+assert x["reviewed_source_counts"]["active_but_unverified_catalogue"]==9
+assert x["reviewed_source_counts"]["price_conflicts"]==5
+assert x["reviewed_source_counts"]["catalogue_or_version_unverified"]==60
+assert x["independent_astra_gpt6_invocation_executed"] is False
+assert x["prices_approved_by_this_packet"] is False
+assert x["source_original_empiredb_issuer_authenticated"] is False
+assert "products" not in x
+assert x["execution_authority"]=="none"
+'
+"$TMP/bin/empire-predictive-observe" comparison-astra-all | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys,hashlib
+x=json.load(sys.stdin)
+assert len(x["products"])==86
+assert all(p["review_disposition"]=="EVIDENCE_HOLD_NO_CUSTOMER_APPROVAL" for p in x["products"])
+assert sum(p["conflicting_historical_prices_research_only"] is not None for p in x["products"])==5
+assert x["independent_reviewer_signature_verified"] is False
+fingerprint=x.pop("review_packet_sha256")
+for k in ("source_root_owned_snapshot_custody_verified","source_original_empiredb_issuer_authenticated","source_age_seconds"):
+ x.pop(k)
+assert hashlib.sha256(json.dumps(x,sort_keys=True,separators=(",",":"),allow_nan=False).encode()).hexdigest()==fingerprint
 '
 # The science adapter MUST preserve unknown forecasts when original product
 # outcomes or forecast registry readback are absent.

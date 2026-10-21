@@ -15,6 +15,9 @@ from empire_os.predictive_catalog_readiness_bridge import (
 from empire_os.predictive_comparison_gap_report import (
     build_comparison_gap_report,
 )
+from empire_os.predictive_astra_product_review_packet import (
+    AstraReviewPacketHold, build_astra_product_review_packet,
+)
 
 
 def main(argv=None) -> int:
@@ -23,6 +26,8 @@ def main(argv=None) -> int:
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument("--all-products", action="store_true")
     mode.add_argument("--gaps", action="store_true")
+    mode.add_argument("--astra-review", action="store_true")
+    mode.add_argument("--astra-review-all", action="store_true")
     mode.add_argument("--product-code")
     args=parser.parse_args(argv)
     try:
@@ -37,7 +42,17 @@ def main(argv=None) -> int:
         report["source_original_empiredb_issuer_authenticated"]=False
         report["original_catalogue_sha256_change_detection_only"]=digest
         report["source_age_seconds"]=admitted["catalogue_age_seconds"]
-        if args.gaps:
+        if args.astra_review or args.astra_review_all:
+            report=build_astra_product_review_packet(
+                catalogue, report, snapshot_sha256=digest,
+            )
+            report["source_root_owned_snapshot_custody_verified"]=True
+            report["source_original_empiredb_issuer_authenticated"]=False
+            report["source_age_seconds"]=admitted["catalogue_age_seconds"]
+            if not args.astra_review_all:
+                report.pop("products")
+                report["review_product_details_omitted_count"]=86
+        elif args.gaps:
             gaps=build_comparison_gap_report(report)
             gaps["source_root_owned_snapshot_custody_verified"]=True
             gaps["source_original_empiredb_issuer_authenticated"]=False
@@ -59,7 +74,7 @@ def main(argv=None) -> int:
             report.pop("products")
         print(json.dumps(report, sort_keys=True, allow_nan=False))
         return 0
-    except (CataloguePricingHold, ProductContractHold, ValueError, TypeError, OSError, KeyError, AssertionError):
+    except (CataloguePricingHold, AstraReviewPacketHold, ProductContractHold, ValueError, TypeError, OSError, KeyError, AssertionError):
         print(json.dumps({
             "schema_version":SCHEMA,
             "mode":"OBSERVE",
