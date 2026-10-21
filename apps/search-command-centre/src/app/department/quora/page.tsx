@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import { headers } from "next/headers";
+import { notFound } from "next/navigation";
 import { getQuoraResearchReview, type QuoraResearchReview } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -42,6 +44,29 @@ const VERTICALS = [
 
 export default async function QuoraResearchDepartment() {
   await connection();
+  // Follow the existing frozen private-agency SSH/loopback ingress boundary.
+  // The header check is defence in depth; it is not independent user auth.
+  if (process.env.EMPIRE_PRIVATE_FOUNDER_INGRESS_REVIEWED !== "1") {
+    notFound();
+  }
+  const requestHeaders = await headers();
+  const allowed = new Set(["127.0.0.1:3001", "localhost:3001"]);
+  if (process.env.EMPIRE_QUORA_PREVIEW_LOOPBACK_PORT === "3109") {
+    allowed.add("127.0.0.1:3109");
+    allowed.add("localhost:3109");
+  }
+  const host = requestHeaders.get("host")?.toLowerCase() ?? "";
+  const forwardedHost = requestHeaders.get("x-forwarded-host")?.toLowerCase();
+  const forwardedFor = requestHeaders.get("x-forwarded-for");
+  const nonLocalForwarding = forwardedFor !== null
+    && !["127.0.0.1", "::1"].includes(forwardedFor.trim());
+  const proxySignal = [
+    "x-real-ip", "forwarded", "via", "cf-connecting-ip", "cf-ray",
+  ].some(name => requestHeaders.has(name));
+  if (!allowed.has(host) || (forwardedHost && !allowed.has(forwardedHost))
+      || nonLocalForwarding || proxySignal) {
+    notFound();
+  }
   const response = await getQuoraResearchReview();
   const d = response.ok && trusted(response.data) ? response.data : null;
   return <main className={styles.analytics}>
