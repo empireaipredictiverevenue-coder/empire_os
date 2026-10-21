@@ -29,6 +29,7 @@ from .quora_intelligence import QuoraEvidenceError, review_quora_research
 from .jev_shadow_review import JevSeoEvidenceError, review_quora_jev_shadow
 from .jev_department_review import JevDepartmentEvidenceError, review_jev_department_portfolio
 from .jev_pilot_receipt import JevReceiptUnavailable, review_jev_private_pilot_receipt
+from .jev_intake_receipt import JevIntakeReceiptUnavailable, read_verified_original_page_summary
 from .department_snapshot import DepartmentSnapshotUnavailable
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
@@ -346,6 +347,19 @@ def create_search_router(
         except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
             raise HTTPException(
                 status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/jev/evidence/summary")
+    def jev_original_page_evidence_summary(response: Response):
+        """Pinned original GSC observations; zero accepted labels, no URL exposure."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return read_verified_original_page_summary()
+        except (JevIntakeReceiptUnavailable, OSError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="jev_original_page_evidence_unavailable",
                 headers={"Cache-Control": "no-store"},
             ) from None
 

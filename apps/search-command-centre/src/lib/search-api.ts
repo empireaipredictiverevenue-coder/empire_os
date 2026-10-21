@@ -367,3 +367,32 @@ export type JevRealPilotReceipt = {
 export function getJevRealPilotReceipt() {
   return request<JevRealPilotReceipt>("/v1/search/jev/pilot/receipt");
 }
+
+
+/** A pinned private receipt: real source observations, zero human labels. */
+export type JevOriginalPageEvidenceSummary = {
+  schema_version: "empire.search.jev_original_page_review_summary.v1";
+  mode: "OBSERVE";
+  observed_url_case_count: number;
+  observed_impressions_from_sample: number;
+  reviewed_human_labels: 0;
+  benchmark_ready_cases: 0;
+  original_page_evidence_required: true;
+  authenticated_human_review_required: true;
+  training_rights_verified: false;
+  automatic_model_calls: false;
+  publication_authority: false;
+  private_receipt_sha256: string;
+  case_details_exposed: false;
+  proposed_jev_model_outputs: 0;
+  current_review_state: "PENDING_ORIGINAL_PAGE_AND_AUTHENTICATED_HUMAN_REVIEW";
+  provider_inference_from_status_read: false;
+  automatic_model_evaluation_enabled: false;
+  external_requests_performed: false;
+  database_writes: false;
+  execution_authority: "NONE";
+};
+
+export function getJevOriginalPageEvidenceSummary() {
+  return request<JevOriginalPageEvidenceSummary>("/v1/search/jev/evidence/summary");
+}

@@ -4,9 +4,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   getQuoraResearchReview, getQuoraJevShadowReview, getSeoJevDepartmentReview,
-  getJevRealPilotReceipt,
+  getJevRealPilotReceipt, getJevOriginalPageEvidenceSummary,
   type QuoraResearchReview, type QuoraJevShadowReview, type SeoJevDepartmentReview,
-  type JevRealPilotReceipt,
+  type JevRealPilotReceipt, type JevOriginalPageEvidenceSummary,
 } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -103,6 +103,24 @@ function trustedPilot(value: JevRealPilotReceipt | null):
     && value.human_review_yes_probability <= 1;
 }
 
+function trustedOriginalIntake(value: JevOriginalPageEvidenceSummary | null):
+  value is JevOriginalPageEvidenceSummary {
+  return !!value && value.schema_version === "empire.search.jev_original_page_review_summary.v1"
+    && value.mode === "OBSERVE" && value.execution_authority === "NONE"
+    && value.reviewed_human_labels === 0 && value.benchmark_ready_cases === 0
+    && value.authenticated_human_review_required === true
+    && value.original_page_evidence_required === true
+    && value.training_rights_verified === false
+    && value.case_details_exposed === false
+    && value.automatic_model_calls === false
+    && value.publication_authority === false
+    && value.provider_inference_from_status_read === false
+    && value.observed_url_case_count >= 1 && value.observed_url_case_count <= 250
+    && value.proposed_jev_model_outputs === 0
+    && value.external_requests_performed === false
+    && value.database_writes === false;
+}
+
 const VERTICALS = [
   {key:"roofing",label:"Roofing and replacement"},
   {key:"hvac",label:"HVAC and heat pumps"},
@@ -137,9 +155,9 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const [response, jevResponse, departmentResponse, pilotResponse] = await Promise.all([
+  const [response, jevResponse, departmentResponse, pilotResponse, intakeResponse] = await Promise.all([
     getQuoraResearchReview(), getQuoraJevShadowReview(), getSeoJevDepartmentReview(),
-    getJevRealPilotReceipt(),
+    getJevRealPilotReceipt(), getJevOriginalPageEvidenceSummary(),
   ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
   const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
@@ -148,6 +166,8 @@ export default async function QuoraResearchDepartment() {
     ? departmentResponse.data : null;
   const pilot = pilotResponse.ok && trustedPilot(pilotResponse.data)
     ? pilotResponse.data : null;
+  const intake = intakeResponse.ok && trustedOriginalIntake(intakeResponse.data)
+    ? intakeResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -198,6 +218,19 @@ export default async function QuoraResearchDepartment() {
               <p>Human review yes-probability: <strong>{(pilot.human_review_yes_probability*100).toFixed(0)}%</strong> · Input tokens: <strong>{pilot.usage_input_tokens}</strong> · Observed cost: <strong>${pilot.usage_cost_usd.toFixed(6)}</strong></p>
               <p>Automatic Jev calls remain off. The result cannot approve redirects, publishing, buyer outreach, revenue or payments.</p>
             </> : <p className={styles.cardDescription}>An independently validated Jev inference receipt is not available. Do not assume paid model use or prediction accuracy.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="seo-jev-original-evidence">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>03 / HUMAN EVALUATION DATASET</span>
+            <h2 id="seo-jev-original-evidence">Original URL review intake</h2>
+          </div><span>PRIVATE EVIDENCE · NO MODEL REQUEST</span></div>
+          <div className={styles.platformCard}>
+            {intake ? <>
+              <p className={styles.cardDescription}>We recovered <strong>{intake.observed_url_case_count} deduplicated original owned-URL observations</strong> in a private, source-checked GSC review queue. These represent {intake.observed_impressions_from_sample} impressions in the sampled page window, not sitewide visits or enquiries.</p>
+              <p>Accepted human labels: <strong>{intake.reviewed_human_labels}</strong> · Benchmark-ready cases: <strong>{intake.benchmark_ready_cases}</strong> · Automatic Jev evaluation: <strong>Off</strong></p>
+              <p>Next: authenticate independent reviewers, inspect original URL/content evidence, document rights, and label each actual case. URL-level cases cannot be compared directly with the separate one-shot aggregate Jev decision.</p>
+            </> : <p className={styles.cardDescription}>Private reviewed source cases are not available or failed their pinned receipt checks. No human ground-truth labels have been inferred.</p>}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="seo-jev-portfolio">
