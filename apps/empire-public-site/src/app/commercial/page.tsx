@@ -113,6 +113,7 @@ export default function CommercialPage() {
         <h1 className="mt-5 max-w-5xl text-5xl font-semibold tracking-[-.055em] md:text-7xl">Turn the opportunity into a <span className="text-cyan-300">real proposal.</span></h1>
         <p className="mt-5 max-w-3xl text-base leading-7 text-slate-400">Empire AI consultancy and Digital Avatar solutions. Discuss outcomes with our founder before agreeing scope, terms, delivery or payment.</p>
       </section>
+      <BrokeragePremiumDiscovery />
       <div className="grid gap-10 pb-20 lg:grid-cols-[1fr_1fr]">
         <section aria-label="Approved pricing">
           <h2 className="mb-4 text-xl font-semibold">Founder-approved starting prices</h2>
@@ -194,7 +195,6 @@ export default function CommercialPage() {
           </form>
         </section>
       </div>
-      <BrokeragePremiumDiscovery />
       <CommercialBuyerExplanation />
       <TamBuyingIntentEvidenceGuide />
     </div>

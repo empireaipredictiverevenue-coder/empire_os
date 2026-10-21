@@ -116,9 +116,32 @@ export default function BrokeragePremiumDiscovery() {
     }
   }
 
-  if (!catalog) return null;
+  // Keep discoverability and the two genuine *unpriced* service names in
+  // first-paint HTML. This is a static informational preview, NOT a usable
+  // enquiry form. Submission is added only after the reviewed live GET passes.
+  if (!catalog) return <section id="premium-brokerage" aria-label="Premium Data Brokerage enquiries"
+    className="relative mx-auto max-w-7xl px-5 py-10 text-white md:px-10">
+    <div className="rounded-[2rem] border border-cyan-300/20 bg-[#061127] p-6 md:p-9">
+      <p className="text-xs font-semibold uppercase tracking-[.2em] text-cyan-300">Empire AI · Intelligence services</p>
+      <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">Agency & enterprise market intelligence</h2>
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">Research tailored to real commercial decisions. Scope and pricing are discussed individually; no subscription or payment is created by an enquiry.</p>
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <article className="rounded-xl border border-white/15 bg-white/[.035] p-5">
+          <h3 className="text-lg font-semibold text-cyan-100">Agency Intelligence</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Evidence-linked local market research for B2B agencies.</p>
+          <p className="mt-3 text-xs text-cyan-200">Discuss a custom scope</p>
+        </article>
+        <article className="rounded-xl border border-white/15 bg-white/[.035] p-5">
+          <h3 className="text-lg font-semibold text-cyan-100">Enterprise Territory Intelligence</h3>
+          <p className="mt-2 text-sm leading-6 text-slate-300">Evidence-linked market selection for multi-territory operators.</p>
+          <p className="mt-3 text-xs text-cyan-200">Discuss a custom scope</p>
+        </article>
+      </div>
+      <p className="mt-5 text-xs leading-5 text-slate-400" aria-live="polite">The enquiry form becomes available when the live service is verified in your browser.</p>
+    </div>
+  </section>;
 
-  return <section aria-label="Premium Data Brokerage enquiries"
+  return <section id="premium-brokerage" aria-label="Premium Data Brokerage enquiries"
     className="relative mx-auto max-w-7xl px-5 py-14 text-white md:px-10">
     <div className="rounded-[2rem] border border-cyan-300/15 bg-[radial-gradient(ellipse_at_top_right,rgba(13,112,191,.16),transparent_52%),linear-gradient(145deg,#061127,#020817)] p-6 shadow-[0_20px_100px_rgba(0,0,0,.25)] md:p-10">
       <p className="text-xs font-semibold uppercase tracking-[.2em] text-cyan-300">
