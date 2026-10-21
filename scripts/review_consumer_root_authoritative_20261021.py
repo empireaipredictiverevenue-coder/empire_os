@@ -69,6 +69,9 @@ SELECT pg_catalog.jsonb_build_object(
   SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='empire_consumer_optin_writer'
    AND NOT rolcanlogin AND NOT rolinherit AND NOT rolsuper AND NOT rolbypassrls
    AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication),
+ 'writer_public_schema_usage',
+    pg_catalog.has_schema_privilege(
+      'empire_consumer_optin_writer','public','USAGE'),
  'exact_one_writer_membership',(
   SELECT count(*)=1 AND COALESCE(bool_and(
    r.rolname='empire_consumer_optin_writer'
@@ -132,7 +135,7 @@ def _validated_admin_acl(state: dict) -> tuple[bool,dict]:
     expected=(
         "correct_database","five_forced_rls_owned_tables",
         "exact_scoped_policies","login_restricted","writer_restricted",
-        "exact_one_writer_membership",
+        "writer_public_schema_usage", "exact_one_writer_membership",
     )
     checks={name:state.get(name) is True for name in expected}
     details=state.get("table_acl")

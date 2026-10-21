@@ -119,6 +119,11 @@ class PrivateConsumerConnectionFactory:
         if (not table_count or table_count[0]!=5
             or not policies or policies[0]!=5):
             raise RuntimeError("CONSUMER_SCHEMA_AUTHORITY_INVALID")
+        schema_usage=conn.execute(
+            "SELECT has_schema_privilege(current_user,'public','USAGE')"
+        ).fetchone()
+        if schema_usage!=(True,):
+            raise RuntimeError("CONSUMER_PUBLIC_SCHEMA_USAGE_MISSING")
         for table in TABLES:
             name="public."+table
             # The restricted service login must not ask PostgreSQL to check

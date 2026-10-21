@@ -54,3 +54,22 @@ sudo -n /srv/empire_os/.venv/bin/python -B \
 A PASS means `CONSUMER_ROOT_AND_LOGIN_READONLY_VERIFIED` and the five per-table privileged catalogue checks all true. If HOLD, **do not start the service**, and treat the report as final owner-level evidence; investigate direct security drift only, not another iterative tier of checkers.
 
 The next build should focus on original authenticated private service + scoped systemd LoadCredential delegation, provider mail receipt and suppression webhooks, and legal/privacy approval. Public opt-in and buyer-data sharing remain OFF.
+
+
+## 21 October follow-up: SCOPED_LOGIN 42501 — reproducible missing schema USAGE
+
+Despite passing privileged table ACL checks, the founder's next production result was `{"status":"CONSUMER_ROOT_READONLY_HOLD","step":"SCOPED_LOGIN","sqlstate":"42501","database_modified":false,"email_sent":false,"subscriber_rows_fetched":false}`. Do not mark the live private service ready.
+
+**Confirmed reproduction in real disposable PostgreSQL 18:** with all five table `SELECT` ACLs intact, removing `USAGE` on schema `public` from `empire_consumer_optin_writer` and `PUBLIC` caused the *same exact* `SCOPED_LOGIN/42501` result on `SELECT 1 FROM public.empire_consumer_subscriptions LIMIT 0`. Restoring only `GRANT USAGE ON SCHEMA public TO empire_consumer_optin_writer` in the disposable fixture resolved it. This proves a concrete possible cause, **not that the live database is missing this grant**. Migration 058 explicitly included that GRANT; production could have drifted later.
+
+The source now checks writer schema `USAGE` separately in privileged `ADMIN_SQL` and before private repository use. **218 selected tests + PostgreSQL 18 test PASS.** No live privilege changes performed.
+
+**One direct, read-only production fact** should be checked via the founder's existing postgres local peer role, avoiding any more staged diagnostic installers:
+
+```bash
+sudo -n -u postgres /usr/bin/psql -X -q -A -t -v ON_ERROR_STOP=1 \
+ -h /var/run/postgresql -p 5432 -U postgres -d empiredb \
+ -c "SELECT json_build_object('writer_schema_usage',has_schema_privilege('empire_consumer_optin_writer','public','USAGE'),'writer_subscription_select',has_table_privilege('empire_consumer_optin_writer','public.empire_consumer_subscriptions','SELECT'));"
+```
+
+If schema usage is `false` and table SELECT is `true`, the minimal remedy is a narrowly scoped GRANT on `public` to the *existing writer* only. That is a **separate production privilege mutation requiring founder approval**, and must have pre/post-readback of exact five RLS tables and no CRM/PUBLIC access. If usage already true, do **not** issue a speculative GRANT; inspect actual restricted-login failing statement rather than continuing arbitrary changes.

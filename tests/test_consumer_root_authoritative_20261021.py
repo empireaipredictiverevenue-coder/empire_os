@@ -18,6 +18,7 @@ def admin_state():
         "exact_scoped_policies":True,
         "login_restricted":True,
         "writer_restricted":True,
+        "writer_public_schema_usage":True,
         "exact_one_writer_membership":True,
         "table_acl":[{
             "name":name,"writer_select":True,"crm_denied":True,
@@ -30,6 +31,15 @@ def test_validated_admin_acl_safe_and_complete():
     pass_,details=guard._validated_admin_acl(admin_state())
     assert pass_ and len(details["tables"])==5
     assert all(details["checks"].values())
+
+
+def test_missing_schema_usage_holds_even_if_every_table_select_is_granted():
+    state=admin_state()
+    state["writer_public_schema_usage"]=False
+    passed,details=guard._validated_admin_acl(state)
+    assert passed is False
+    assert details["checks"]["writer_public_schema_usage"] is False
+    assert all(all(row.values()) for row in details["tables"].values())
 
 
 @pytest.mark.parametrize(("table_idx","field"),[

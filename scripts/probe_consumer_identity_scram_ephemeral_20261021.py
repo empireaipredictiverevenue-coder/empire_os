@@ -125,6 +125,48 @@ def main():
         admin.execute(
             "REVOKE SELECT ON public.empire_consumer_subscriptions FROM empiredb_app"
         )
+    # Reproduce production's 42501 without changing any table ACL:
+    # remove schema USAGE from the writer and PUBLIC on this temporary DB.
+    # The administrator's table-level has_table_privilege still reports
+    # SELECT true, but the writer cannot execute a SELECT on that table.
+    with psycopg.connect(
+        dbname="empiredb",host="localhost",port=port
+    ) as admin:
+        admin.execute("REVOKE USAGE ON SCHEMA public FROM empire_consumer_optin_writer")
+        admin.execute("REVOKE USAGE ON SCHEMA public FROM PUBLIC")
+        assert admin.execute(
+            "SELECT has_table_privilege('empire_consumer_optin_writer',"
+            "'public.empire_consumer_subscriptions','SELECT')"
+        ).fetchone()==(True,)
+        assert admin.execute(
+            "SELECT has_schema_privilege('empire_consumer_optin_writer',"
+            "'public','USAGE')"
+        ).fetchone()==(False,)
+    # The original restricted-select probe reproduces 42501 exactly.
+    try:
+        with authenticated() as conn:
+            conn.execute("SET TRANSACTION READ ONLY")
+            conn.execute("SET LOCAL ROLE "+WRITER)
+            conn.execute("SELECT 1 FROM public.empire_consumer_subscriptions LIMIT 0")
+    except psycopg.Error as ex:
+        assert ex.sqlstate=="42501"
+    else:
+        raise AssertionError("SCHEMA_USAGE_REVOKE_NOT_ENFORCED")
+    # The corrected administrator readback catches missing schema USAGE
+    # *before* opening a potentially confusing scoped consumer session.
+    with patch.object(original,"read_custody",return_value=(password,{})):
+        with patch.object(final_guard.os,"geteuid",return_value=0):
+            schema_missing=final_guard.check(
+                original=original,admin=fixture_admin,connect=authenticated
+            )
+    assert schema_missing["status"]=="CONSUMER_ROOT_ACL_HOLD"
+    assert schema_missing["step"]=="ADMIN_ACL"
+    assert schema_missing["catalogue"]["checks"]["writer_public_schema_usage"] is False
+    with psycopg.connect(
+        dbname="empiredb",host="localhost",port=port
+    ) as admin:
+        admin.execute("GRANT USAGE ON SCHEMA public TO empire_consumer_optin_writer")
+
     with psycopg.connect(
         dbname="empiredb",host="localhost",port=port
     ) as admin:

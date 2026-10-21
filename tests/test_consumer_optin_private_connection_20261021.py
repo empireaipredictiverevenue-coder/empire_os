@@ -25,7 +25,8 @@ class Cursor:
 
 class FakeConnection:
     def __init__(self, *, wrong_user=False, unsafe_role=False,
-                 broad_reader=False, schema_count=5, extra_memberships=0):
+                 broad_reader=False, schema_count=5, extra_memberships=0,
+                 schema_usage=True):
         self.commands=[]
         self.closed=False
         self.wrong_user=wrong_user
@@ -33,6 +34,7 @@ class FakeConnection:
         self.broad_reader=broad_reader
         self.schema_count=schema_count
         self.extra_memberships=extra_memberships
+        self.schema_usage=schema_usage
     def execute(self, sql, params=()):
         self.commands.append((sql,params))
         if sql.startswith("SELECT session_user"):
@@ -50,6 +52,8 @@ class FakeConnection:
             return Cursor((self.schema_count,))
         if "FROM pg_policies" in sql:
             return Cursor((5,))
+        if "has_schema_privilege(current_user" in sql:
+            return Cursor((self.schema_usage,))
         if "has_table_privilege(current_user,%s,'SELECT')" in sql:
             return Cursor((True,not self.broad_reader))
         if sql.startswith("SELECT EXISTS("):
@@ -117,6 +121,7 @@ def test_private_login_enters_scoped_role_and_verifies_original_schema():
     dict(broad_reader=True),
     dict(schema_count=4),
     dict(extra_memberships=1),
+    dict(schema_usage=False),
 ])
 def test_wrong_login_or_broad_grants_close_connection(case):
     fake=FakeConnection(**case)
