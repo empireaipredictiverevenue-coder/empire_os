@@ -72,6 +72,29 @@ def attach_founder_reported_external_contacts(
         contact = old.get("founder_reported_external_contact")
         if isinstance(contact, dict) and contact.get("domain") == old.get("entity_key"):
             previous_contacts[contact["domain"]] = contact
+    # A founder-confirmed application can disappear from today's discovery.
+    # The preceding reconciliation preserves it in a separate HISTORY_ONLY
+    # review queue, not the current relationship list. Recognise that exact,
+    # previously verified no-send record on every later reconciliation cycle,
+    # otherwise the 15-minute Gmail evidence service fails after one refresh.
+    older_reviews = (previous or {}).get("founder_reported_external_contact_queue", [])
+    if not isinstance(older_reviews, list) or len(older_reviews) > 20:
+        raise RelationshipEvidenceError("invalid_historical_founder_contact_queue")
+    for prior in older_reviews:
+        if not isinstance(prior, dict):
+            raise RelationshipEvidenceError("invalid_historical_founder_contact_item")
+        if prior.get("history_only") is not True:
+            continue
+        key = prior.get("domain")
+        if (not isinstance(key, str) or key in previous_contacts
+                or prior.get("source") != "FOUNDER_REPORTED_NOT_INDEPENDENTLY_VERIFIED"
+                or prior.get("next_action") != "HOLD_PREVIOUS_APPLICATION_NO_DUPLICATE_INTRO"
+                or prior.get("delivery_verified") is not False
+                or prior.get("reply_verified") is not False
+                or prior.get("buyer_approved") is not False
+                or prior.get("outbound_authorized") is not False):
+            raise RelationshipEvidenceError("unsafe_historical_founder_contact_item")
+        previous_contacts[key] = prior
     seen = set()
     reviewed = []
     history_only_count = 0

@@ -1192,3 +1192,51 @@ def test_previous_founder_application_survives_discovery_queue_rotation_without_
         attach_founder_reported_external_contacts(
             {"relationships":[]},altered,previous=old
         )
+
+
+def test_repeated_rotations_preserve_historical_founder_application_indefinitely():
+    from scripts.reconcile_buyer_email_relationships import (
+        attach_founder_reported_external_contacts,
+    )
+    company="joinglobalwiz.com"
+    item = {
+        "domain":company, "reported_date":"2026-10-10",
+        "direction":"founder_submitted_application",
+        "channel":"website_application_form",
+        "delivery_confirmed":False, "reply_confirmed":False,
+        "buyer_programme_approved":False,
+        "products_requested":["PAY_PER_CALL"],
+        "future_followup_topic":["PAY_PER_LEAD","PAY_PER_CALL"],
+        "next_action":"AWAIT_APPLICATION_RESPONSE_NO_DUPLICATE_CONTACT",
+    }
+    evidence={"schema_version":"empire.founder_reported_external_contacts.v1",
+              "origin":"founder_direct_confirmation_in_chat",
+              "observations":[item]}
+    previous = {
+        "relationships":[{
+            "entity_key":company,
+            "founder_reported_external_contact":{
+                "domain":company,"reported_date":"2026-10-10",
+                "direction":"founder_submitted_application",
+                "channel":"website_application_form",
+            },
+        }],
+    }
+    for _ in range(5):
+        report={"relationships":[],"outbound_sent":False}
+        attach_founder_reported_external_contacts(report,evidence,previous=previous)
+        assert len(report['founder_reported_external_contact_queue'])==1
+        assert report['founder_reported_contact_history_only_count']==1
+        old=report['founder_reported_external_contact_queue'][0]
+        assert old['history_only'] is True
+        assert old['outbound_authorized'] is False
+        assert old['delivery_verified'] is False
+        assert old['buyer_approved'] is False
+        previous=report
+
+    from copy import deepcopy
+    corrupt=deepcopy(previous)
+    corrupt['founder_reported_external_contact_queue'][0]['outbound_authorized']=True
+    with pytest.raises(RelationshipEvidenceError,match="unsafe_historical_founder_contact_item"):
+        attach_founder_reported_external_contacts(
+            {"relationships":[]},evidence,previous=corrupt)
