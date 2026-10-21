@@ -41,6 +41,20 @@ PAIN_PATTERNS: dict[str, tuple[str, tuple[str, ...]]] = {
         r"\b(?:not fully booked|schedule (?:not|isn.t) (?:full|booked))\b",
         r"\b(?:only see|seeing just) [0-9]+(?:[-–][0-9]+)? (?:new patients|nps) (?:per |a )?week\b",
     )),
+    "no_initial_saas_users": ("lead_generation", (
+        r"\b(?:struggling|hard|difficult) (?:to |with )?(?:get(?:ting)?|find(?:ing)?|attract(?:ing)?) (?:my |our )?first (?:users|customers|clients)\b",
+        r"\b(?:no|zero|haven.t (?:got|gotten)|not getting) (?:meaningful )?(?:signups|users|installs|installations)\b",
+        r"\b(?:no|zero) (?:paying )?(?:customers|users) after (?:launch|launching|months)\b",
+    )),
+    "saas_retention_loss": ("revenue_growth", (
+        r"\b(?:churn|retention) (?:is |has been )?(?:killing us|too high|terrible|poor|a problem)\b",
+        r"\b(?:customers|users|subscribers) (?:quietly )?(?:disappear|leave|churn|cancel) (?:after|within|before)\b",
+        r"\b(?:struggling|failing|hard) to (?:retain|keep) (?:users|customers|subscribers)\b",
+    )),
+    "saas_activation_friction": ("sales_conversion", (
+        r"\b(?:trial.to.paid|signup.to.paid|activation|onboarding) (?:conversion|rate|drop.?off) (?:is |are )?(?:low|poor|falling|terrible)\b",
+        r"\b(?:users|customers|signups) (?:never|don.t|do not) (?:complete|finish|reach) (?:onboarding|activation|setup)\b",
+    )),
     "low_quality_leads": ("lead_generation", (
         r"\b(?:junk|bad|low.quality|unqualified) leads\b",
         r"\b(?:leads|prospects) (?:are |feel )?(?:low.intent|junk|unqualified)\b",
@@ -235,7 +249,7 @@ def discover_client_pains(
         # A mention in informational content is research, not a client pain.
         lane = ("NO_SOLICITATION" if contact_opt_out else
                 "EXCLUDE_NONBUYER" if excluded else
-                "REVIEW_IDENTITY" if current_evidence and jev["recommendation"] in REVIEWABLE else
+                "REVIEW_IDENTITY" if current_evidence and concrete and jev["recommendation"] in REVIEWABLE else
                 "REVIEW_PAIN_HYPOTHESIS" if current_evidence and concrete
                     and state["actor_type"] in {"owner_operator", "decision_maker"}
                     and orientation == "neutral" else

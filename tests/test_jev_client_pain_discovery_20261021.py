@@ -161,3 +161,24 @@ def test_self_reported_but_not_buying_is_only_pain_hypothesis_review():
     assert result["items"][0]["review_lane"] == "REVIEW_PAIN_HYPOTHESIS"
     assert result["items"][0]["unverified_commercial_need"] is True
     assert result["items"][0]["outreach_authorized"] is False
+
+
+
+def test_generic_topic_cannot_be_identity_review_without_specific_pain():
+    r = discover_client_pains([row(
+        title="I own a business", text="We need help with our CRM."
+    )], now=NOW)
+    assert r["review_lane_counts"].get("REVIEW_IDENTITY", 0) == 0
+
+
+def test_saas_first_users_and_churn_map_to_usable_research_hypotheses():
+    r = discover_client_pains([row(
+        source="reddit", url="https://www.reddit.com/r/SaaS/comments/test",
+        title="Struggling to get my first users",
+        text="I own a SaaS startup. No meaningful signups and users quietly disappear after a week.",
+        niche="saas",
+    )], now=NOW)
+    pains = r["items"][0]["pain_hypotheses"]
+    assert "no_initial_saas_users" in pains
+    assert "saas_retention_loss" in pains
+    assert r["items"][0]["outreach_authorized"] is False
