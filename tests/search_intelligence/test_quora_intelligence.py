@@ -33,7 +33,7 @@ def example(**overrides):
 
 def test_existing_8_topics_are_reused_with_no_claimed_quora_posts():
     r = review_quora_research(now=NOW)
-    assert r["topic_count"] == 8
+    assert r["topic_count"] == 56
     assert r["source_candidates_count"] == 0
     assert r["fresh_source_candidate_count"] == 0
     assert r["verified_quora_questions"] == 0
@@ -132,7 +132,7 @@ def test_service_private_quora_reader_and_preview_are_both_fail_closed():
     client = TestClient(build_search_intelligence_service())
     read = client.get("/v1/search/quora/review")
     assert read.status_code == 200
-    assert read.json()["topic_count"] == 8
+    assert read.json()["topic_count"] == 56
     assert read.headers["cache-control"] == "no-store"
     assert read.json()["execution_authority"] == "NONE"
     preview = client.post("/v1/search/quora/search-fabric/preview",

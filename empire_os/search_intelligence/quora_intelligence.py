@@ -18,6 +18,9 @@ from .semantic_opportunity_review import review_semantic_opportunity
 
 ROOT = Path(__file__).resolve().parents[2]
 QUEUE = ROOT / "docs/seo/LEAD_SMART_QUORA_ANSWER_REVIEW_QUEUE_20261021.csv"
+EXPANSION_QUEUE = ROOT / "docs/seo/EMPIRE_QUORA_MULTINICHE_TOPIC_RESEARCH_20261021.csv"
+VERTICAL_PREFIXES = {"QROOF": "roofing", "QHVAC": "hvac", "QSOLA": "solar", "QDENT": "dental", "QLEGL": "legal", "QBUSI": "b2b"}
+SPECIALIST_VERTICALS = {"dental", "legal"}
 SCHEMA = "empire.search_intelligence.quora_research.v1"
 MAX_ROWS = 64
 MAX_RESULTS = 96
@@ -54,23 +57,32 @@ def canonical_question_url(url: Any) -> str:
 
 
 def read_topic_queue(path: Path = QUEUE) -> tuple[dict[str, str], ...]:
-    if path.is_symlink() or not path.is_file() or path.stat().st_size > 32000:
-        raise QuoraEvidenceError("QUORA_TOPIC_QUEUE_UNAVAILABLE")
-    with path.open(encoding="utf-8", newline="") as handle:
-        reader = csv.DictReader(handle)
-        if tuple(reader.fieldnames or ()) != CSV_COLUMNS:
-            raise QuoraEvidenceError("QUORA_TOPIC_SCHEMA_DRIFT")
-        rows = list(reader)
+    # Keep the original eight buyer-reviewed roofing topics byte-for-byte;
+    # append the cross-sector expansion only for the canonical queue.
+    paths = (path, EXPANSION_QUEUE) if path == QUEUE else (path,)
+    rows: list[dict[str, str]] = []
+    for selected in paths:
+        if (selected.is_symlink() or not selected.is_file()
+                or selected.stat().st_size > 32000):
+            raise QuoraEvidenceError("QUORA_TOPIC_QUEUE_UNAVAILABLE")
+        with selected.open(encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if tuple(reader.fieldnames or ()) != CSV_COLUMNS:
+                raise QuoraEvidenceError("QUORA_TOPIC_SCHEMA_DRIFT")
+            rows.extend(reader)
     if not 1 <= len(rows) <= MAX_ROWS:
         raise QuoraEvidenceError("QUORA_TOPIC_COUNT_INVALID")
     ids = set()
+    unique_themes = set()
     for row in rows:
         topic_id, theme, page = (
             row.get("item_id"), row.get("question_theme"), row.get("seo_page"),
         )
         if (not isinstance(topic_id, str)
                 or not re.fullmatch(r"Q[A-Z0-9]{5,18}", topic_id)
-                or topic_id in ids or not isinstance(theme, str)
+                or topic_id in ids
+                or not any(topic_id.startswith(prefix) for prefix in VERTICAL_PREFIXES)
+                or not isinstance(theme, str) or theme.casefold().strip() in unique_themes
                 or not 15 <= len(theme) <= 240 or not theme.strip()
                 or not isinstance(page, str)
                 or not re.fullmatch(r"/[a-z0-9/-]{3,150}", page)
@@ -84,6 +96,7 @@ def read_topic_queue(path: Path = QUEUE) -> tuple[dict[str, str], ...]:
                 or None in row):
             raise QuoraEvidenceError("UNAPPROVED_OR_DUPLICATE_QUORA_TOPIC")
         ids.add(topic_id)
+        unique_themes.add(theme.casefold().strip())
     return tuple(rows)
 
 
@@ -154,6 +167,8 @@ def review_quora_research(
         )
         candidates.append({
             "seed_id": seed_id,
+            "vertical": next(v for prefix, v in VERTICAL_PREFIXES.items()
+                             if seed_id.startswith(prefix)),
             "question_url_candidate": url,
             "question_title_candidate": title,
             "source_ref": ref,
@@ -175,8 +190,12 @@ def review_quora_research(
         signal = review_semantic_opportunity(
             theme, source_kind="PAGE_TITLE_UNMEASURED"
         )
+        vertical = next(v for prefix, v in VERTICAL_PREFIXES.items()
+                        if row["item_id"].startswith(prefix))
         topics.append({
             "item_id": row["item_id"],
+            "vertical": vertical,
+            "specialist_editorial_review_required": vertical in SPECIALIST_VERTICALS,
             "question_theme": theme,
             "topic": row["topic"],
             "proposed_owned_page": row["seo_page"],
@@ -196,6 +215,14 @@ def review_quora_research(
         "original_topic_digest": "sha256:" + sha256(
             path.read_bytes()
         ).hexdigest(),
+        "expansion_topic_digest": (
+            "sha256:" + sha256(EXPANSION_QUEUE.read_bytes()).hexdigest()
+            if path == QUEUE else None
+        ),
+        "vertical_topic_counts": {
+            vertical: sum(t["vertical"] == vertical for t in topics)
+            for vertical in VERTICAL_PREFIXES.values()
+        },
         "topic_count": len(topics),
         "topics": topics,
         "source_candidates_count": len(candidates),

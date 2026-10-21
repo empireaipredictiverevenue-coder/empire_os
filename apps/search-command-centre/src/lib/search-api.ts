@@ -217,6 +217,8 @@ export function getSeoDepartmentReview() {
 // Existing private Search Intelligence Quora editorial review: research only.
 export type QuoraReviewTopic = {
   item_id: string;
+  vertical: "roofing" | "hvac" | "solar" | "dental" | "legal" | "b2b";
+  specialist_editorial_review_required: boolean;
   question_theme: string;
   topic: string;
   proposed_owned_page: string;
@@ -233,6 +235,7 @@ export type QuoraResearchReview = {
   mode: "OBSERVE";
   existing_search_fabric: "SOURCE_CANDIDATES_ONLY";
   topic_count: number;
+  vertical_topic_counts: Record<string, number>;
   topics: QuoraReviewTopic[];
   source_candidates_count: number;
   fresh_source_candidate_count: number;

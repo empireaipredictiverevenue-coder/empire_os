@@ -18,8 +18,27 @@ function trusted(value: QuoraResearchReview | null): value is QuoraResearchRevie
     && value.production_writes === false
     && value.third_party_visits_first_party === false
     && Array.isArray(value.topics) && value.topic_count === value.topics.length
-    && value.topic_count <= 64;
+    && value.topic_count <= 64
+    && !!value.vertical_topic_counts
+    && ["roofing","hvac","solar","dental","legal","b2b"].every(
+      key => Number.isInteger(value.vertical_topic_counts[key]) &&
+        value.vertical_topic_counts[key] === value.topics.filter(x => x.vertical === key).length
+    )
+    && value.topics.every(x =>
+      x.editorial_review_required === true &&
+      x.answer_publication_state === "RESEARCH_ONLY" &&
+      x.proposed_page_public_verified === false
+    );
 }
+
+const VERTICALS = [
+  {key:"roofing",label:"Roofing and replacement"},
+  {key:"hvac",label:"HVAC and heat pumps"},
+  {key:"solar",label:"Solar and battery storage"},
+  {key:"dental",label:"Dental and patient decisions"},
+  {key:"legal",label:"Legal service research"},
+  {key:"b2b",label:"B2B growth and predictive revenue"},
+] as const;
 
 export default async function QuoraResearchDepartment() {
   await connection();
@@ -51,18 +70,22 @@ export default async function QuoraResearchDepartment() {
         <section className={styles.analyticsSection} aria-labelledby="quora-queue">
           <div className={styles.sectionLead}><div><span className={styles.overline}>01 / EDITORIAL QUEUE</span><h2 id="quora-queue">Questions worth researching</h2></div><span>HUMAN REVIEW REQUIRED</span></div>
           <div className={styles.platformCard}>
-            <p className={styles.cardDescription}>These are prepared research queries. Before answering, verify that a genuine Quora question exists, read it in context, and produce a useful original answer. Do not link unpublished homeowner guides.</p>
-            <ol className={styles.todoList}>
-              {d.topics.map((item,i)=><li key={item.item_id}>
-                <span>{String(i+1).padStart(2, "0")}</span>
-                <div>
-                  <strong>{item.question_theme}</strong>
-                  <small>{item.item_id} · {item.intent_hypothesis.replaceAll("_", " ").toLowerCase()} · Research only</small>
-                  <p>Search plan: <code>{item.source_query_plan}</code></p>
-                  <p>Draft guide: <code>{item.proposed_owned_page}</code> (not release-approved)</p>
-                </div>
-              </li>)}
-            </ol>
+            <p className={styles.cardDescription}>These are 56 prepared topic hypotheses across six industries, not observed Quora questions. Verify each original question, answer substantively and disclose relevant affiliations. Do not link unpublished pages or route dental/legal research into the Lead Smart roofing buyer.</p>
+            {VERTICALS.map(({key,label}) => <details key={key} open={key==="roofing"}>
+              <summary><strong>{label}</strong> — {d.vertical_topic_counts[key]} question topics</summary>
+              <ol className={styles.todoList}>
+                {d.topics.filter(item=>item.vertical===key).map((item,i)=><li key={item.item_id}>
+                  <span>{String(i+1).padStart(2, "0")}</span>
+                  <div>
+                    <strong>{item.question_theme}</strong>
+                    <small>{item.item_id} · {item.intent_hypothesis.replaceAll("_", " ").toLowerCase()} · Research only</small>
+                    <p>Search plan: <code>{item.source_query_plan}</code></p>
+                    <p>Draft destination: <code>{item.proposed_owned_page}</code> (not release-approved)</p>
+                    {item.specialist_editorial_review_required && <p>Specialist legal or clinical editorial verification required before any answer.</p>}
+                  </div>
+                </li>)}
+              </ol>
+            </details>)}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="quora-gates">

@@ -1,0 +1,49 @@
+item_id,question_theme,topic,seo_page,seo_page_public_verified,actual_quora_question_url,quora_account_verified,answer_status,owner_review,link_approved,geography_caveat
+QROOF009,What should be included in a roof replacement warranty,roof-warranty,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Contract and warranty terms must be verified
+QROOF010,How can homeowners compare asphalt and metal roofing estimates,roof-material-comparison,/roofing/replacement-vs-repair,false,,false,RESEARCH_ONLY,REQUIRED,false,Do not promise roof lifespan or local savings
+QROOF011,What questions should homeowners ask after hail damages a roof,roof-hail-safety,/roofing,false,,false,RESEARCH_ONLY,REQUIRED,false,No insurance coverage guarantees or remote damage diagnosis
+QROOF012,When should a roof deck be inspected during replacement,roof-decking,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Avoid unsafe inspection advice
+QROOF013,How can roof ventilation issues affect a replacement proposal,roof-ventilation,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Design suitability needs qualified local assessment
+QROOF014,What should be clarified in roofing contractor change orders,roof-contracts,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,No legal interpretation of a specific contract
+QROOF015,How can homeowners compare roofing quotes with different scopes,roof-estimate-scopes,/roofing/replacement-vs-repair,false,,false,RESEARCH_ONLY,REQUIRED,false,No endorsement of unverified contractors
+QROOF016,What can a homeowner check before signing a roof installation agreement,roof-installation-readiness,/roofing/installation-checklist,false,,false,RESEARCH_ONLY,REQUIRED,false,Licensing and permits vary by jurisdiction
+QHVAC001,Should a homeowner repair or replace an aging air conditioner,hvac-repair-replacement,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,No remote equipment diagnosis
+QHVAC002,How do I compare heat pump and conventional HVAC estimates,hvac-system-comparison,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,Efficiency and incentives require local verification
+QHVAC003,What should be included in an HVAC installation quote,hvac-quote-scope,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,No contractor recommendations without evidence
+QHVAC004,When is ductwork testing helpful before replacing HVAC equipment,hvac-ductwork,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,Avoid unsupported performance guarantees
+QHVAC005,What questions should homeowners ask about HVAC sizing,hvac-sizing,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,Qualified load calculation required
+QHVAC006,How can a homeowner assess an HVAC maintenance plan,hvac-maintenance,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,No arbitrary service schedule claims
+QHVAC007,What should I verify about HVAC installation permits and licensing,hvac-licensing,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,Laws differ by US state and UK area
+QHVAC008,Which warranty details matter for a new heat pump,hvac-warranty,/industries/hvac,false,,false,RESEARCH_ONLY,REQUIRED,false,Verify manufacturer terms and installer qualifications
+QSOLA001,How should homeowners compare solar panel installation quotes,solar-quote-comparison,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,Do not invent savings or buyer availability
+QSOLA002,Which roof conditions matter before installing rooftop solar,solar-roof-readiness,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,Roof inspection required; avoid unsafe rooftop advice
+QSOLA003,How do I check assumptions in a solar payback estimate,solar-payback,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,Electricity tariffs and incentives require evidence
+QSOLA004,What questions should I ask about a solar panel warranty,solar-warranty,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,Separate hardware workmanship and output claims
+QSOLA005,When might home battery storage be worth evaluating,solar-battery,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,No financial advice or unsupported savings
+QSOLA006,How do shading and roof orientation affect solar proposals,solar-site-planning,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,No site-specific production promises
+QSOLA007,Who is responsible for solar installation permits and inspections,solar-permitting,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,Jurisdiction and network approval must be checked
+QSOLA008,How can I compare cash purchase and financed solar offers,solar-financing,/industries/solar,false,,false,RESEARCH_ONLY,REQUIRED,false,No personalised financing recommendation
+QDENT001,What should patients ask before considering dental implants,dental-implant-questions,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,Clinical suitability requires dentist consultation
+QDENT002,How can patients compare clear aligner and braces consultations,dental-aligner-evaluation,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,No medical treatment recommendation
+QDENT003,What information should be included in a written dental treatment plan,dental-treatment-plans,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,Medical consent and clinical judgement required
+QDENT004,What questions help compare restorative dental care providers,dental-provider-diligence,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,No endorsement or diagnosis
+QDENT005,How are implant costs typically broken down in a dental estimate,dental-implant-pricing,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,No invented prices or insurance benefits
+QDENT006,Which follow-up questions are useful after a dental consultation,dental-care-decisions,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,Avoid replacing advice from qualified clinician
+QDENT007,What should patients ask about cosmetic dental treatment risks,dental-cosmetic-risks,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,Specialist editorial review needed
+QDENT008,How can a patient verify dentist registration and credentials,dental-licensing,/industries/dental,false,,false,RESEARCH_ONLY,REQUIRED,false,Check current local register not directory claims
+QLEGL001,What questions should I ask before hiring a personal injury solicitor,legal-lawyer-diligence,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,No case-specific legal advice
+QLEGL002,How can clients compare legal fee agreements and expenses,legal-fee-comparison,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,Legal terms depend on jurisdiction
+QLEGL003,What information is useful to prepare for an initial legal consultation,legal-consultation,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,No personal case data collection
+QLEGL004,How can someone verify a lawyer's licence in their jurisdiction,legal-professional-verification,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,Check authoritative local regulator
+QLEGL005,How do I assess a law firm's experience in a relevant practice area,legal-practice-fit,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,Avoid outcomes guarantees
+QLEGL006,Which questions help understand litigation timelines and uncertainty,legal-case-process,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,No deadlines or limitation advice without counsel
+QLEGL007,How can people recognise questionable mass tort advertising,legal-mass-tort-marketing,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,No solicitation or eligibility promises
+QLEGL008,What questions should I ask about privacy before discussing a legal case,legal-client-privacy,/industries/legal,false,,false,RESEARCH_ONLY,REQUIRED,false,Legal confidentiality varies by context
+QBUSI001,How can a small business measure whether lead generation is profitable,b2b-lead-economics,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,Do not claim validated return on investment
+QBUSI002,Which metrics show whether a sales pipeline is healthy,b2b-pipeline-measurement,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,No fictitious revenue or forecasts
+QBUSI003,What should agencies check before buying lead generation software,b2b-agency-software,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,Disclose Empire AI affiliation
+QBUSI004,How do businesses check whether a pay per call programme is legitimate,b2b-call-quality,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,No unverified payout guarantees
+QBUSI005,What are practical alternatives to paid ads for business lead growth,b2b-organic-search,/commercial,false,,false,RESEARCH_ONLY,REQUIRED,false,Do not imply free traffic is automatic
+QBUSI006,How do you verify that a lead is real before counting revenue,b2b-evidence-controls,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,Never claim test or estimated sales are settled
+QBUSI007,What questions should teams ask before using AI sales agents,b2b-ai-governance,/predictive-revenue,false,,false,RESEARCH_ONLY,REQUIRED,false,Data permissions and human approval matter
+QBUSI008,How can small companies compare SEO and referral acquisition channels,b2b-channel-comparison,/commercial,false,,false,RESEARCH_ONLY,REQUIRED,false,Traffic does not establish first party sales
