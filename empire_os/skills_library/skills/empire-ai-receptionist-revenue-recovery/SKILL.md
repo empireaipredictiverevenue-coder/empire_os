@@ -27,7 +27,7 @@ Two distinct cases must remain distinct: (1) **answered** AI receptionist appoin
 
 - Receptionist conversation: `empire_os/inbound_reception_call_flow.py`, `inbound_reception_intake.py`, `inbound_reception_voice_api.py`, `inbound_revenue_recovery.py`.
 - Vonage number ownership, signature and signed offline receipts: `inbound_provider_contract.py`, `inbound_signature_verification.py`, `inbound_recovery_store.py`.
-- Verified missed-call recovery and results: `inbound_opportunity_intelligence.py`, `inbound_recovery_scorecard.py`, `inbound_source_attribution.py`, `inbound_recovery_patterns.py`, `inbound_booking_workflow.py` and `inbound_booking_store.py`.
+- Verified missed-call recovery and results: `inbound_opportunity_intelligence.py`, `inbound_recovery_scorecard.py`, `inbound_source_attribution.py`, `inbound_recovery_patterns.py`, `inbound_booking_workflow.py` and `inbound_booking_store.py`. The read-only cross-link to existing RecoveryLedger is `inbound_reception_recovery_bridge.py`; it does not create or submit canonical CRM prospects.
 - Customer voice/FAQ/hours: `inbound_business_hours.py`, `inbound_tenant_knowledge.py` and existing `voice_gateway_api.py` / `voice_lab.py` **without editing their currently live outbound call route**.
 - Existing tenant CRM/read-only owner surfaces: `revenue_crm_api.py` and EmpireDB `public.empire_crm_tenant_memberships`; own-account authorisation must be proven, not inferred from a caller-provided tenant.
 - Google Calendar completion/registry/vault: existing `inbound_google_calendar_*.py`, `inbound_calendar_*.py`, only when owner OAuth and booking receipt gates independently pass.

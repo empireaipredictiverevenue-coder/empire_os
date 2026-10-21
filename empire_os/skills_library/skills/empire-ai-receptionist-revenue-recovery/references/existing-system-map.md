@@ -15,7 +15,7 @@
 | Signed Voice callback | `inbound_signature_verification.py`, `inbound_reception_voice_api.py` | Valid signed webhook and integrity hash; offline tests are not live telephony |
 | Answer / listen / consent | `inbound_reception_call_flow.py`, `inbound_reception_intake.py` | Bounded spoken/scripted response and explicit contact permission |
 | Customer service/hours | `inbound_tenant_knowledge.py`, `inbound_business_hours.py` | Reviewed approved facts and verified staffed schedule |
-| Enquiry for review | `CRMEnquiryDraft` in `inbound_reception_intake.py` | In-memory synthetic draft only until verified CRM owner receipt |
+| Enquiry for review | `CRMEnquiryDraft` in `inbound_reception_intake.py`, plus `inbound_reception_recovery_bridge.py` | In-memory synthetic draft and read-only existing RecoveryLedger projection only until verified CRM owner receipt |
 | Provider terminal missed call | `inbound_provider_contract.py`, `inbound_recovery_store.py` | Signed and durable provider outcome in real trusted source |
 | Missed opportunity | `inbound_opportunity_intelligence.py` | Trusted unanswered/busy/rejected event not yet verified recovered/suppressed |
 | Consent and appointment workflow | `inbound_booking_workflow.py`, `inbound_booking_store.py` | Immutable order of verified real provider/calendar/consent evidence |

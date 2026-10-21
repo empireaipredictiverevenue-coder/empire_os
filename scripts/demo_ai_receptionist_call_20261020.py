@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from empire_os.inbound_provider_contract import InboundNumberRoute
 from empire_os.inbound_reception_call_flow import InboundReceptionCallEngine
 from empire_os.inbound_reception_voice_api import create_inbound_reception_voice_app
+from empire_os.inbound_reception_recovery_bridge import project_reception_recovery_review
 from empire_os.inbound_revenue_recovery import TenantReceptionProfile
 
 SIGNATURE_SECRET = "local-demo-synthetic-voice-signature-32-bytes"
@@ -95,6 +96,7 @@ def run_demo(intent: str = "appointment") -> dict:
             }, "synthetic-input-jti-" + str(index))
             steps.extend(a["action"] for a in closing)
     handoffs = engine.review_handoffs_for_tenant(route.tenant_id)
+    recovery_review = project_reception_recovery_review(route.tenant_id, handoffs)
     return {
         "schema": "empire.ai-receptionist.signed-call-demo.v1",
         "status": "PASS_SYNTHETIC_SIGNED_WEBHOOK_CONVERSATION",
@@ -106,6 +108,12 @@ def run_demo(intent: str = "appointment") -> dict:
         "review_draft_service": handoffs[0].requested_service if handoffs else None,
         "review_draft_window": handoffs[0].preferred_time_window if handoffs else None,
         "human_review_required": True,
+        "reception_recovery_bridge_status": "READ_ONLY_OFFLINE_PROJECTION",
+        "recovery_bridge_enquiry_count": recovery_review["enquiry_drafts_count"],
+        "recovery_bridge_missed_calls": recovery_review["recovery_scorecard"]["missed_calls"],
+        "recovery_bridge_verified_recovered_calls":
+            recovery_review["recovery_scorecard"]["verified_recovered_calls"],
+        "recovery_bridge_new_crm_prospects": recovery_review["new_crm_prospects"],
         "crm_write_performed": False,
         "steps": steps,
         "inbound_phone_call_completed": False,

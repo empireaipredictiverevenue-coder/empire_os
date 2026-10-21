@@ -21,6 +21,9 @@ def test_synthetic_http_conversation_coverage(intent):
     )
     assert result["review_draft_created"] is (intent in ("appointment", "callback"))
     assert result["crm_write_performed"] is False
+    assert result["recovery_bridge_new_crm_prospects"] == 0
+    assert result["recovery_bridge_verified_recovered_calls"] == 0
+    assert result["recovery_bridge_missed_calls"] == 0
     assert result["voice_provider_connected"] is False
     assert result["actual_revenue"] is False
     assert result["contact_recorded"] is False

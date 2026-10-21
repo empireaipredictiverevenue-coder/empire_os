@@ -77,3 +77,38 @@ Synthetic demo:
 Expected: PASS_SYNTHETIC_SIGNED_WEBHOOK_CONVERSATION, review_draft_created
 true, review_draft_service roofing, review_draft_window morning and
 crm_write_performed false.
+
+## 21 October — receptionist-to-existing-RevenueLedger review bridge
+
+`empire_os/inbound_reception_recovery_bridge.py` links a consented in-memory
+`CRMEnquiryDraft` (same exact tenant/provider call) with the **existing**
+`RecoveryLedger` and `build_inbound_recovery_scorecard`. This is a local
+read-only projection, not a parallel missed-revenue engine or a canonical
+CRM write. It rejects unsafe/forged drafts, deduplicates one enquiry per call,
+filters other tenants and checks signed-provider-origin/status only when
+the calling adapter declares authenticated source custody (not independently
+attested inside this function).
+
+The review distinguishes:
+- one AI-answered call (not a missed call);
+- provider-authenticated unresolved missed call (not recovered);
+- contradictory answered + missed state (manual reconciliation);
+- no authenticated disposition (unknown; synthetic test default).
+
+It deliberately **never** promotes the draft to a canonical CRM prospect,
+contacts the caller, confirms a booking, registers payment, or claims recovered
+revenue. Calendar and financial receipts require their existing independent
+owners/readers. With only synthetic receptionist callbacks, both the
+missed-call count and recovered-revenue count stay zero.
+
+The existing signed synthetic demo now shows:
+`recovery_bridge_enquiry_count=1`,
+`recovery_bridge_new_crm_prospects=0`,
+`recovery_bridge_missed_calls=0`,
+`recovery_bridge_verified_recovered_calls=0`.
+
+Next genuine capability: replace the in-process review packet with an
+authenticated, durable tenant-scoped receipt in the **already existing**
+EmpireDB CRM; no arbitrary new CRM table, public endpoint or caller message.
+Independent CRM membership/identity, consent/retention and signed Voice event
+proof must pass before calling that step active.
