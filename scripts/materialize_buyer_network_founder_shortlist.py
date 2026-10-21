@@ -580,23 +580,27 @@ def main() -> int:
         load_existing_logic()
     )
 
-    candidates = [
-        enrich(candidate)
-
-        for candidate
-        in queue.get(
-            "candidates",
-            [],
-        )
-
-        if candidate.get(
-            "status"
-        )
-        in (
-            "READY_TO_APPROACH",
-            "VERIFY_REQUIREMENTS",
-        )
-    ]
+    # Fail closed on contextual/quarantine evidence and non-business domains.
+    # 'already_known' is discovery history, NOT evidence of no prior outreach.
+    blocked = {"company.com", "insider.com", "sentry.io"}
+    candidates = []
+    for candidate in queue.get("candidates", []):
+        domain = str(candidate.get("domain") or "").lower()
+        if candidate.get("status") not in ("READY_TO_APPROACH", "VERIFY_REQUIREMENTS"):
+            continue
+        if domain in blocked or domain.endswith(".sentry.io"):
+            continue
+        lines = candidate.get("evidence", {}).get("lines", [])
+        if not isinstance(lines, list) or not lines:
+            continue
+        # Quarantine and synthetic truth-control observations are not
+        # independent confirmation of a live publisher programme.
+        if all("runtime/truth_quality_control/" in str(line) for line in lines):
+            continue
+        item = enrich(candidate)
+        item["outreach_status"] = "CONTACT_HISTORY_UNVERIFIED"
+        item["outbound_authority"] = False
+        candidates.append(item)
 
     candidates.sort(
         key=lambda item: (

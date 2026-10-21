@@ -513,6 +513,12 @@ def main() -> int:
         for domain, profile
         in profiles.items()
         if accepted_domain(domain)
+        and domain not in {"company.com", "insider.com"}
+        and not domain.endswith(".sentry.io")
+        and any(
+            "runtime/truth_quality_control/" not in str(line)
+            for line in profile.get("evidence_lines", [])
+        )
     ]
 
     priority_order = {
