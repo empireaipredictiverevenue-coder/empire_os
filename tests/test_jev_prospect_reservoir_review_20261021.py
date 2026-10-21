@@ -18,7 +18,13 @@ SNAP={
 
 
 def params():
-    return {k:json.loads((ROOT/v).read_text()) for k,v in SNAP.items()}
+    # Synthetic temporal fixture: other agents continuously refresh the
+    # production snapshots while this pinned test clock remains unchanged.
+    # Never turn a genuinely stale *live* source into current evidence.
+    data={k:json.loads((ROOT/v).read_text()) for k,v in SNAP.items()}
+    data["leads_runtime"]["generated_at"]=(NOW-timedelta(minutes=3)).isoformat()
+    data["current_markets"]["generated_at"]=(NOW-timedelta(minutes=3)).isoformat()
+    return data
 
 
 def audit(**changes):
