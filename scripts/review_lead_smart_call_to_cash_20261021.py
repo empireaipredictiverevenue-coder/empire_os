@@ -41,9 +41,58 @@ def opaque_id(value: Any) -> str | None:
     return "sha256:" + hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
+def detail_by_call_id(payload: Any, *, expected_ids: list[str]) -> dict[str, dict[str, Any]]:
+    """Keep only source-confirmed connection/duplicate flags; discard ANI/audio.
+
+    A Ringba ConnectedCall event does NOT identify the specific buyer target.
+    No raw target phone, recording URL, caller number or call ID is persisted.
+    """
+    if not isinstance(payload, dict) or payload.get("isSuccessful") is not True:
+        raise ValueError("provider detail response not authenticated")
+    records = (payload.get("report") or {}).get("records")
+    if not isinstance(records, list) or len(records) > 10:
+        raise ValueError("invalid provider detail rows")
+    if len(expected_ids) != len(set(expected_ids)) or len(expected_ids) > 10:
+        raise ValueError("invalid bounded call IDs")
+    found = {}
+    for rec in records:
+        if not isinstance(rec, dict):
+            raise ValueError("bad provider detail row")
+        call_id = rec.get("inboundCallId")
+        if (call_id not in expected_ids or call_id in found
+                or rec.get("campaignId") != EXPECTED
+                or rec.get("number") != NUMBER):
+            raise ValueError("provider detail identity mismatch")
+        events = rec.get("events")
+        if not isinstance(events, list):
+            raise ValueError("missing provider call events")
+        names = [e.get("name") for e in events if isinstance(e, dict)]
+        connected_event = "ConnectedCall" in names
+        provider_connection = (
+            rec.get("hasConnected") is True
+            and connected_event
+            and (safe_seconds(rec.get("connectedCallLengthInSeconds")) or 0) > 0
+        )
+        found[call_id] = {
+            "detail_authenticated": True,
+            "provider_connected_call_event_verified": provider_connection,
+            "provider_duplicate_flag_observed":
+                rec.get("isDuplicate") if type(rec.get("isDuplicate")) is bool else None,
+            "provider_detail_connected_seconds":
+                safe_seconds(rec.get("connectedCallLengthInSeconds")),
+            "provider_detail_total_seconds":
+                safe_seconds(rec.get("callLengthInSeconds")),
+            "buyer_destination_identity_verified": False,
+        }
+    if set(found) != set(expected_ids):
+        raise ValueError("missing requested provider call detail")
+    return found
+
+
 def prove_from_observation(report: Mapping[str, Any], *,
                            known_site_handoffs: int | None,
-                           ledger_present: bool = False) -> dict[str, Any]:
+                           ledger_present: bool = False,
+                           detail_report: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if (
         report.get("schema_version") != observer.SCHEMA_VERSION
         or report.get("campaign_id_expected") != EXPECTED
@@ -61,6 +110,10 @@ def prove_from_observation(report: Mapping[str, Any], *,
         report["exact_campaign_and_number_match_count"] != len(rows)
     ):
         raise ValueError("provider exact-match count disagreement")
+    detail = detail_by_call_id(detail_report,
+                               expected_ids=[r["call_id"] for r in rows
+                                   if isinstance(r, dict) and isinstance(r.get("call_id"), str)]
+                               ) if detail_report is not None else {}
     calls = []
     ids = set()
     for row in rows:
@@ -89,6 +142,13 @@ def prove_from_observation(report: Mapping[str, Any], *,
                 else None
             ),
             "source_provenance": "UNATTRIBUTED_RINGBA_ROW",
+            "provider_detail_authenticated":
+                detail.get(row.get("call_id"), {}).get("detail_authenticated", False),
+            "provider_connected_call_event_verified":
+                detail.get(row.get("call_id"), {}).get("provider_connected_call_event_verified", False),
+            "provider_duplicate_flag_observed":
+                detail.get(row.get("call_id"), {}).get("provider_duplicate_flag_observed"),
+            "provider_buyer_destination_identity_verified": False,
             "test_call_possible": True,
             "buyer_leg_connection_verified": False,
             "buyer_accepted_payable_call_verified": False,
@@ -109,6 +169,10 @@ def prove_from_observation(report: Mapping[str, Any], *,
         "site_handoff_ledger_present": ledger_present,
         "provider_rows_not_matched_to_site_handoffs": len(calls),
         "provider_buyer_leg_connections_verified": 0,
+        "provider_connected_call_events_observed": sum(
+            1 for c in calls if c["provider_connected_call_event_verified"]),
+        "provider_details_authenticated": sum(
+            1 for c in calls if c["provider_detail_authenticated"]),
         "verified_accepted_payable_calls": 0,
         "verified_cash_payments": 0,
         "provider_reported_row_summaries": calls,
@@ -139,9 +203,23 @@ def run() -> dict[str, Any]:
         handoffs = ledger.get("site_handoffs")
     else:
         handoffs = 0
+    ids = [r.get("call_id") for r in report["exact_matches"]
+           if isinstance(r, dict) and isinstance(r.get("call_id"), str)]
+    details = None
+    if 0 < len(ids) <= 10:
+        try:
+            _status, details = observer._json_request(
+                token=token, method="POST",
+                url=f"{observer.BASE_URL}/{account}/calllogs/detail",
+                payload={"inboundCallIds": ids},
+            )
+        except Exception:
+            # A restricted detail role does not remove independently
+            # authenticated identity/call-log evidence.
+            details = None
     return prove_from_observation(
         report, known_site_handoffs=handoffs,
-        ledger_present=ledger_present,
+        ledger_present=ledger_present, detail_report=details,
     )
 
 

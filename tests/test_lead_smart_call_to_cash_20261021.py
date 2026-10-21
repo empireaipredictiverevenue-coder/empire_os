@@ -106,3 +106,52 @@ def test_persisted_observation_is_permission_sealed(monkeypatch,tmp_path):
     p.chmod(0o644)
     with pytest.raises(PermissionError):
         c.write_latest(val,path=p)
+
+
+def test_ringba_detail_connected_event_does_not_prove_buyer_or_payout():
+    from scripts.review_lead_smart_call_to_cash_20261021 import detail_by_call_id
+    cid = "real_ringba_call_id_001"
+    raw = {
+        "isSuccessful": True,
+        "report": {"records": [{
+            "inboundCallId": cid,
+            "campaignId": api.EXPECTED_CAMPAIGN_ID,
+            "number": api.EXPECTED_TRACKING_NUMBER,
+            "hasConnected": True,
+            "isDuplicate": True,
+            "connectedCallLengthInSeconds": 32,
+            "callLengthInSeconds": 48,
+            "inboundPhoneNumber": "+19995550000",
+            "recordingUrl": "https://private-recording.invalid",
+            "events": [{"name": "ConnectedCall", "callConnectionDt": 1},
+                       {"name": "CompletedCall"}],
+        }]},
+    }
+    stripped = detail_by_call_id(raw, expected_ids=[cid])
+    assert stripped[cid]["provider_connected_call_event_verified"] is True
+    assert stripped[cid]["provider_duplicate_flag_observed"] is True
+    result = prove_from_observation(report(), known_site_handoffs=0,
+                                    detail_report=raw)
+    assert result["provider_connected_call_events_observed"] == 1
+    assert result["provider_buyer_leg_connections_verified"] == 0
+    assert result["verified_accepted_payable_calls"] == 0
+    assert result["verified_cash_payments"] == 0
+    assert result["provider_reported_row_summaries"][0][
+        "provider_buyer_destination_identity_verified"] is False
+    blob = json.dumps(result)
+    assert "+19995550000" not in blob
+    assert "private-recording" not in blob
+    assert cid not in blob
+
+
+@pytest.mark.parametrize("damage", [
+    {"isSuccessful": False},
+    {"report": {"records": []}},
+    {"report": {"records": [{"inboundCallId": "unexpected"}]}},
+])
+def test_unreliable_detail_cannot_promote_connection(damage):
+    from scripts.review_lead_smart_call_to_cash_20261021 import detail_by_call_id
+    base = {"isSuccessful": True, "report": {"records": []}}
+    with pytest.raises(ValueError):
+        detail_by_call_id({**base, **damage},
+                          expected_ids=["real_ringba_call_id_001"])
