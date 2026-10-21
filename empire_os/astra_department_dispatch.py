@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.department_adapter_registry import eligible_specialist_reopen_reasons
 from empire_os.skill_exchange import recommend_work_item_skills
 from empire_os.okf_adapter import list_private_research
 from empire_os.astra_okf_auto_retrieval import auto_retrieve_for_astra
@@ -24,12 +25,43 @@ def _read(path: Path) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _goal_priority_map(snapshot: Mapping[str, Any]) -> dict[str, int]:
+    """Bound Paperclip-style goal alignment using Empire's OWN goal priorities.
+
+    A missing, invalid, disabled or duplicate goal keeps the legacy baseline.
+    Never accept AI-inferred DICE factors or change work authority here.
+    Priority 80..87 remains below existing completion-board class minimum 88.
+    """
+    goals = snapshot.get("goals")
+    if not isinstance(goals, list):
+        return {}
+    result: dict[str, int] = {}
+    duplicate: set[str] = set()
+    for goal in goals:
+        if not isinstance(goal, Mapping):
+            continue
+        key = goal.get("key")
+        value = goal.get("priority")
+        if not isinstance(key, str) or not key or goal.get("status") != "active":
+            continue
+        if key in result:
+            duplicate.add(key)
+            continue
+        if type(value) is not int or not 0 <= value <= 100:
+            continue
+        result[key] = min(87, max(80, 80 + (value - 85) // 2))
+    for key in duplicate:
+        result.pop(key, None)
+    return result
+
+
 def dispatch_executive_plan(
     repo_root: str | Path, *, okf_bundle_path: str | Path | None = None,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
     snapshot = _read(root / ASTRA_EXECUTIVE)
     plan_id = str(snapshot.get("plan_id") or "").strip()
+    goal_priorities = _goal_priority_map(snapshot)
     queue = DepartmentWorkQueue(root)
 
     # Advisory-only: the OKF catalogue is inspected separately from Astra's
@@ -60,6 +92,8 @@ def dispatch_executive_plan(
     existing = 0
     authority_blocked = 0
     unowned = 0
+    specialist_retry_held_count = 0
+    goal_priority_applied_count = 0
     items: list[dict[str, Any]] = []
     admitted_steps: list[Mapping[str, Any]] = []
 
@@ -87,20 +121,29 @@ def dispatch_executive_plan(
                 unowned += 1
                 continue
 
-            priority = 80
+            priority = goal_priorities.get(str(step.get("goal_key") or ""), 80)
             work, created = queue.enqueue_step(
                 plan_id=plan_id,
                 step=step,
                 priority=priority,
-                reopen_blocked_reasons=(
-                    "specialist_adapter_required",
+                reopen_blocked_reasons=eligible_specialist_reopen_reasons(
+                    root, str(step.get("target_component") or "").strip(),
                 ),
             )
             queued += int(created)
             existing += int(not created)
+            goal_priority_applied_count += int(created and priority > 80)
+            retry_held = (
+                work.status.value == "BLOCKED"
+                and work.error == "specialist_adapter_required"
+                and not eligible_specialist_reopen_reasons(root, work.target_component)
+            )
+            specialist_retry_held_count += int(retry_held)
             admitted_steps.append(step)
             items.append({
                 "work_id": work.id,
+                "effective_priority": work.priority,
+                "specialist_retry_held": retry_held,
                 "step_id": work.step_id,
                 "departments": list(work.department_keys),
                 "target_component": work.target_component,
@@ -129,6 +172,8 @@ def dispatch_executive_plan(
         "existing_count": existing,
         "authority_blocked_count": authority_blocked,
         "unowned_count": unowned,
+        "goal_priority_applied_to_new_work_count": goal_priority_applied_count,
+        "specialist_retry_held_count": specialist_retry_held_count,
         "queue_counts": queue.counts(),
         "items": items,
         "okf_research_advisory": okf_advisory,

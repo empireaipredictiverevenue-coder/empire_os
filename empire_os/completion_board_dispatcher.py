@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from empire_os.completion_capability_registry import WORKSTREAMS
 from empire_os.department_work_queue import DepartmentWorkQueue
+from empire_os.department_adapter_registry import eligible_specialist_reopen_reasons
 from empire_os.founder_directives import classify_authority
 from empire_os.master_execution_ledger import parse_checklist
 from empire_os.completion_task_memory import (
@@ -418,7 +419,9 @@ def dispatch_completion_board(
                 plan_id=plan_id,
                 step=step,
                 priority=priority,
-                reopen_blocked_reasons=("specialist_adapter_required",),
+                reopen_blocked_reasons=eligible_specialist_reopen_reasons(
+                    root, step["target_component"],
+                ),
             )
             queued += int(created)
             existing += int(not created)
