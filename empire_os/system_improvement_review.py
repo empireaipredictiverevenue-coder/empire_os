@@ -287,6 +287,43 @@ def refresh_review_packets(root: Path) -> dict[str, Any]:
         if candidate.get("workstream") == path.stem:
             dossiers[path.stem] = candidate
     output = build_review_packets(root, resolution=resolution, dossiers=dossiers)
+    # Only admit the bounded, source-linked Harness²/SkillForge review into
+    # this existing non-executable queue. Real sales observations are checked
+    # with the trusted guard, and a pinned candidate is still never approved.
+    # This is not a forecast, payment, buyer reply or Department completion.
+    from empire_os.astra_review_queue_bridge import merge_into_review_plan
+    from empire_os.astra_harness_evidence_guard import verified_snapshot_facts
+    from empire_os.skillforge_harness2_bridge import skillforge_harness2_candidate
+    import json as _harness_json
+    observed_inputs = {
+        "conversion": "runtime/conversion/latest.json",
+        "acquisition": "runtime/buyer_acquisition/latest.json",
+        "revenue": "runtime/revenue_pulse/latest.json",
+    }
+    valid_sources = True
+    for _kind, _relative in observed_inputs.items():
+        _source = root / _relative
+        if (_source.is_symlink() or not _source.is_file() or
+                not 0 < _source.stat().st_size <= 2_000_000):
+            valid_sources = False
+            break
+        try:
+            _payload = _harness_json.loads(_source.read_text(encoding="utf-8"))
+            verified_snapshot_facts(_kind, _payload)
+        except (OSError, ValueError, TypeError, KeyError, UnicodeError):
+            valid_sources = False
+            break
+    if valid_sources:
+        _candidate = skillforge_harness2_candidate(root)
+        _review = {
+            "schema_version": "empire.astra.unified_intelligence_review.v1",
+            "mode": "OBSERVE", "execution_authority": "none",
+            "campaign_activation_authorized": False,
+            "outbound_authorized": False,
+            "owner_actions": [],
+            "harness2_skillforge_candidate": _candidate,
+        }
+        output = merge_into_review_plan(output, _review)
     modified = 0
     unchanged = 0
     pointers = []
