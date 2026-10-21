@@ -336,3 +336,34 @@ export type SeoJevDepartmentReview = {
 export function getSeoJevDepartmentReview() {
   return request<SeoJevDepartmentReview>("/v1/search/jev/department/review");
 }
+
+
+/** One verified Jev pilot receipt. Fetch never invokes a model or bills. */
+export type JevRealPilotReceipt = {
+  schema_version: "empire.search.jev_one_shot_private_receipt_review.v1";
+  mode: "ONE_SHOT_SHADOW_ONLY";
+  provider_key: "openrouter_typesafe_jev";
+  model: string;
+  actual_jev_inference_calls_observed: 1;
+  decision_label: string;
+  decision_confidence: number;
+  human_review_yes_probability: number;
+  investigation_priority_score: number;
+  usage_input_tokens: number;
+  usage_cost_usd: number;
+  source_scope: "FIRST_PARTY_GSC_PAGE_SAMPLE_AGGREGATES_ONLY";
+  accuracy_or_ground_truth_verified: false;
+  independent_eval_cases_ready: 0;
+  provider_enabled_for_unattended_runs: false;
+  new_provider_calls_triggered: 0;
+  replay_billing_authorized: false;
+  publication_authorized: false;
+  outreach_or_payment_authorized: false;
+  external_requests_performed_by_review: false;
+  database_writes: false;
+  execution_authority: "NONE";
+};
+
+export function getJevRealPilotReceipt() {
+  return request<JevRealPilotReceipt>("/v1/search/jev/pilot/receipt");
+}

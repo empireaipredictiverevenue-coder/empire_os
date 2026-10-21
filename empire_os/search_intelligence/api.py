@@ -28,6 +28,7 @@ from .quality import ContentQualityEvaluator
 from .quora_intelligence import QuoraEvidenceError, review_quora_research
 from .jev_shadow_review import JevSeoEvidenceError, review_quora_jev_shadow
 from .jev_department_review import JevDepartmentEvidenceError, review_jev_department_portfolio
+from .jev_pilot_receipt import JevReceiptUnavailable, review_jev_private_pilot_receipt
 from .department_snapshot import DepartmentSnapshotUnavailable
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
@@ -345,6 +346,19 @@ def create_search_router(
         except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
             raise HTTPException(
                 status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/jev/pilot/receipt")
+    def jev_live_pilot_receipt(response: Response):
+        """Proof of one real Jev inference; read only, no model request."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return review_jev_private_pilot_receipt()
+        except (JevReceiptUnavailable, OSError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="jev_pilot_receipt_unavailable",
                 headers={"Cache-Control": "no-store"},
             ) from None
 

@@ -4,7 +4,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   getQuoraResearchReview, getQuoraJevShadowReview, getSeoJevDepartmentReview,
+  getJevRealPilotReceipt,
   type QuoraResearchReview, type QuoraJevShadowReview, type SeoJevDepartmentReview,
+  type JevRealPilotReceipt,
 } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -80,6 +82,27 @@ function trustedDepartment(
     );
 }
 
+function trustedPilot(value: JevRealPilotReceipt | null):
+  value is JevRealPilotReceipt {
+  return !!value
+    && value.schema_version === "empire.search.jev_one_shot_private_receipt_review.v1"
+    && value.mode === "ONE_SHOT_SHADOW_ONLY"
+    && value.provider_key === "openrouter_typesafe_jev"
+    && value.model.startsWith("typesafe/jev-1.13")
+    && value.actual_jev_inference_calls_observed === 1
+    && value.execution_authority === "NONE"
+    && value.provider_enabled_for_unattended_runs === false
+    && value.new_provider_calls_triggered === 0
+    && value.independent_eval_cases_ready === 0
+    && value.accuracy_or_ground_truth_verified === false
+    && value.publication_authorized === false
+    && value.outreach_or_payment_authorized === false
+    && value.database_writes === false
+    && value.usage_cost_usd >= 0 && value.usage_cost_usd <= 0.0005
+    && value.human_review_yes_probability >= 0
+    && value.human_review_yes_probability <= 1;
+}
+
 const VERTICALS = [
   {key:"roofing",label:"Roofing and replacement"},
   {key:"hvac",label:"HVAC and heat pumps"},
@@ -114,14 +137,17 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const [response, jevResponse, departmentResponse] = await Promise.all([
+  const [response, jevResponse, departmentResponse, pilotResponse] = await Promise.all([
     getQuoraResearchReview(), getQuoraJevShadowReview(), getSeoJevDepartmentReview(),
+    getJevRealPilotReceipt(),
   ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
   const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
     ? jevResponse.data : null;
   const department = departmentResponse.ok && trustedDepartment(departmentResponse.data)
     ? departmentResponse.data : null;
+  const pilot = pilotResponse.ok && trustedPilot(pilotResponse.data)
+    ? pilotResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -154,10 +180,24 @@ export default async function QuoraResearchDepartment() {
           <div className={styles.platformCard}>
             {jev ? <>
               <p className={styles.cardDescription}>The existing Jev decision contracts cover {jev.reviewed_topics_count} research topics. This is an evidence-readiness check, not a Jev prediction or performance benchmark.</p>
-              <p>Real labelled cases: <strong>{jev.real_labeled_case_count}</strong> · Jev predictions: <strong>{jev.jev_model_predictions_count}</strong> · Model evaluation ready: <strong>No</strong></p>
+              <p>Real labelled Quora cases: <strong>{jev.real_labeled_case_count}</strong> · Quora-specific Jev evaluations: <strong>{jev.jev_model_predictions_count}</strong> · Model evaluation ready: <strong>No</strong></p>
               <p>Evidence blockers: {jev.typed_decision_task_readiness.blockers.map(x => x.replaceAll("_"," ").toLowerCase()).join(" · ")}</p>
               <p>No automatic publication, outbound or third-party AI spending. Original Quora questions and independently reviewed labels are required before model evaluation.</p>
             </> : <p className={styles.cardDescription}>Jev evidence readiness is not independently available. No model activation or inference is assumed.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="seo-jev-real">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>02 / VERIFIED INFERENCE</span>
+            <h2 id="seo-jev-real">Jev model pilot</h2>
+          </div><span>ONE EXTERNAL CALL · NO REPLAY</span></div>
+          <div className={styles.platformCard}>
+            {pilot ? <>
+              <p className={styles.cardDescription}>Actual TypeSafe Jev inference observed through our existing OpenRouter gateway. One manual, tightly capped call evaluated aggregate legacy-404 Search Console evidence; this is not verified decision accuracy.</p>
+              <p>Model: <code>{pilot.model}</code> · Decision: <strong>{pilot.decision_label.replaceAll("_"," ").toLowerCase()}</strong> · Confidence: <strong>{(pilot.decision_confidence*100).toFixed(0)}%</strong></p>
+              <p>Human review yes-probability: <strong>{(pilot.human_review_yes_probability*100).toFixed(0)}%</strong> · Input tokens: <strong>{pilot.usage_input_tokens}</strong> · Observed cost: <strong>${pilot.usage_cost_usd.toFixed(6)}</strong></p>
+              <p>Automatic Jev calls remain off. The result cannot approve redirects, publishing, buyer outreach, revenue or payments.</p>
+            </> : <p className={styles.cardDescription}>An independently validated Jev inference receipt is not available. Do not assume paid model use or prediction accuracy.</p>}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="seo-jev-portfolio">
