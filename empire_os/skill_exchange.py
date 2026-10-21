@@ -89,6 +89,15 @@ COMPONENT_TASKS = {
     'buyer_capacity_readiness': 'evidence_analysis',
     'agent_tool_execution_plane': 'engineering_review',
     'commercial_reply_classification': 'commercial_reply',
+    # National Storm Hub reuses the EXISTING Empire-owned SkillForge packs.
+    # These are discovery-only selectors. They do not grant loading,
+    # deployment, revenue, notification, outreach or payment authority.
+    'national_storm_hub_weather_evidence': 'evidence_analysis',
+    'national_storm_hub_storm_predictor': 'predictive_forecast',
+    'national_storm_hub_website_release': 'engineering_review',
+    'national_storm_hub_seo_editorial': 'seo_research',
+    'national_storm_hub_revenue_pulse': 'revenue_reconciliation',
+    'national_storm_hub_skill_capture': 'skill_authoring',
 }
 
 
