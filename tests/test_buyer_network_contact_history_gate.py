@@ -174,3 +174,70 @@ def test_confirmed_bounce_does_not_override_proven_inbound_conversation(tmp_path
     assert result["state"]=="EXISTING_CONVERSATION"
     assert result["confirmed_hard_bounce"] is True
     assert result["outbound_authorized"] is False
+
+
+def test_older_personal_gmail_application_thread_held_against_duplicate_intro(tmp_path):
+    import os
+    source=tmp_path/"multiformat_publisher_founder_review_latest.json"
+    row={
+        "domain":"aceleads.co.uk",
+        "existing_thread_id":"1a134b27eca68158",
+        "existing_inbound_message_id":"1a134b27eca68158",
+        "existing_sent_message_id":"1a144f1ca76a4625",
+        "verified_public_contact":"info@aceleads.co.uk",
+        "provider_send_confirmed":True,
+        "publisher_approval_verified":False,
+        "outbound_authorized":False,
+    }
+    source.write_text(json.dumps({
+       "schema_version":"empire.buyer_multiformat_founder_review.v1",
+       "companies":[row],
+    }))
+    os.chmod(source,0o600)
+    make_context(tmp_path,[])
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"no-workspace.json")
+    reviewed=review("aceleads.co.uk",ctx)
+    assert reviewed["state"]=="FOUNDER_REVIEWED_PRIOR_GMAIL_THREAD"
+    assert reviewed["founder_reviewed_original_gmail_thread"] is True
+    assert reviewed["founder_reviewed_gmail_thread_id"]==row["existing_thread_id"]
+    assert reviewed["outbound_authorized"] is False
+    assert review("unknownbuyer.com",ctx)["state"]=="UNKNOWN_HISTORY"
+
+    # Public or tampered evidence cannot turn an unknown entity into known.
+    source.write_text(json.dumps({
+       "schema_version":"empire.buyer_multiformat_founder_review.v1",
+       "companies":[{**row,"existing_sent_message_id":"unverified"}],
+    }))
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"no-workspace.json")
+    assert ctx["available"] is False
+    assert review("aceleads.co.uk",ctx)["state"]=="SOURCE_UNAVAILABLE"
+
+
+def test_prior_gmail_hold_never_supersedes_a_canonical_suppression(tmp_path):
+    import os
+    source=tmp_path/"multiformat_publisher_founder_review_latest.json"
+    source.write_text(json.dumps({
+       "schema_version":"empire.buyer_multiformat_founder_review.v1",
+       "companies":[{
+          "domain":"aceleads.co.uk",
+          "existing_thread_id":"1a134b27eca68158",
+          "existing_inbound_message_id":"1a134b27eca68158",
+          "existing_sent_message_id":"1a144f1ca76a4625",
+          "verified_public_contact":"info@aceleads.co.uk",
+          "provider_send_confirmed":True,
+          "publisher_approval_verified":False,
+          "outbound_authorized":False,
+       }],
+    }))
+    os.chmod(source,0o600)
+    make_context(tmp_path,[{
+       "entity_key":"aceleads.co.uk",
+       "identity_domains":["aceleads.co.uk"],
+       "do_not_pursue":True,
+    }])
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"no-workspace.json")
+    assert review("aceleads.co.uk",ctx)["state"]=="DO_NOT_PURSUE"
+    assert review("aceleads.co.uk",ctx)["outbound_authorized"] is False

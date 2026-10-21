@@ -77,6 +77,48 @@ def read_confirmed_delivery_failures(path: Path) -> dict[str, dict]:
 
 
 
+def read_founder_reviewed_original_gmail_threads(path: Path) -> dict[str, dict]:
+    """Hold repeated first introductions using anchored, owner-reviewed Gmail IDs.
+
+    The primary Gmail importer intentionally covers a bounded set of buyer
+    threads. Prior outreach reviewed in Gmail can be held here without
+    claiming mailbox-wide completeness or sending authority.
+    """
+    # Reuse the same private-file and schema checks as hard-bounce evidence.
+    read_confirmed_delivery_failures(path)
+    if not path.exists() and not path.is_symlink():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise ValueError("FOUNDER_PRIOR_GMAIL_SOURCE_UNREADABLE") from exc
+    prior: dict[str, dict] = {}
+    for row in data["companies"]:
+        if (row.get("existing_inbound_message_id") is None and
+                row.get("existing_sent_message_id") is None):
+            continue
+        domain = domain_key(row.get("domain"))
+        thread_id = str(row.get("existing_thread_id") or "")
+        inbound = str(row.get("existing_inbound_message_id") or "")
+        outbound = str(row.get("existing_sent_message_id") or "")
+        recipient = str(row.get("verified_public_contact") or "").casefold()
+        if (not domain or domain in prior or not recipient.endswith("@" + domain)
+                or not GMAIL_ID.fullmatch(thread_id)
+                or not GMAIL_ID.fullmatch(inbound)
+                or not GMAIL_ID.fullmatch(outbound)
+                or row.get("provider_send_confirmed") is not True
+                or row.get("outbound_authorized") is not False
+                or row.get("publisher_approval_verified") is not False):
+            raise ValueError("FOUNDER_PRIOR_GMAIL_EVIDENCE_INVALID")
+        prior[domain] = {
+            "source": "FOUNDER_REVIEWED_ORIGINAL_PERSONAL_GMAIL_THREAD",
+            "thread_id": thread_id,
+            "last_outbound_message_id": outbound,
+            "original_inbound_message_id": inbound,
+        }
+    return prior
+
+
 def domain_key(value: object) -> str:
     return str(value or "").strip().lower().rstrip(".").removeprefix("www.")
 
@@ -130,13 +172,16 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
         founder_review_path = registry_path.parent / FOUNDER_REVIEW.name
     try:
         delivery_holds = read_confirmed_delivery_failures(founder_review_path)
+        prior_founder_gmail = read_founder_reviewed_original_gmail_threads(founder_review_path)
         delivery_source_safe = True
     except ValueError:
         delivery_holds = {}
+        prior_founder_gmail = {}
         delivery_source_safe = False
     return {
         "available": delivery_source_safe,
         "confirmed_delivery_holds": delivery_holds,
+        "prior_founder_gmail": prior_founder_gmail,
         "founder_review_delivery_source_safe": delivery_source_safe,
         "relationships": relationships,
         "workspace_sent": workspace_rows,
@@ -155,6 +200,7 @@ def review(domain: str, context: Mapping) -> dict:
     observation = context.get("observations", {}).get(key) or {}
     workspace_sent = context.get("workspace_sent", {}).get(key) or {}
     confirmed_bounce = context.get("confirmed_delivery_holds", {}).get(key) or {}
+    prior_founder_thread = context.get("prior_founder_gmail", {}).get(key) or {}
     have_relation = bool(relation)
     have_form = bool(observation)
     threads = relation.get("gmail_thread_ids") or []
@@ -180,6 +226,8 @@ def review(domain: str, context: Mapping) -> dict:
         state, action = "DELIVERY_HOLD", "VERIFY_DIFFERENT_DELIVERY_CHANNEL"
     elif sent:
         state, action = "ALREADY_CONTACTED", "REVIEW_PRIOR_OUTBOUND_BEFORE_FOLLOW_UP"
+    elif prior_founder_thread:
+        state, action = "FOUNDER_REVIEWED_PRIOR_GMAIL_THREAD", "REVIEW_ORIGINAL_GMAIL_THREAD_NO_DUPLICATE_FIRST_INTRO"
     elif workspace_sent:
         state, action = "WORKSPACE_SENT_ALREADY_CONTACTED", "REVIEW_WORKSPACE_THREAD_NO_DUPLICATE_INTRO"
     elif have_relation:
@@ -199,6 +247,8 @@ def review(domain: str, context: Mapping) -> dict:
         "thread_count": len(threads),
         "bounced_addresses": sorted(set(bounced)),
         "confirmed_hard_bounce": bool(confirmed_bounce),
+        "founder_reviewed_original_gmail_thread": bool(prior_founder_thread),
+        "founder_reviewed_gmail_thread_id": prior_founder_thread.get("thread_id"),
         "confirmed_hard_bounce_code": confirmed_bounce.get("delivery_failure_code"),
         "last_outbound_at": relation.get("last_outbound_at") or workspace_sent.get("last_sent_at"),
         "last_inbound_at": relation.get("last_inbound_at"),
