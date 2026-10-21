@@ -10,6 +10,41 @@ def write_json(root, relative, payload):
     path.write_text(json.dumps(payload))
 
 
+def test_future_dated_component_is_not_counted_fresh(tmp_path):
+    anchor = datetime(2026, 10, 21, 11, 0, tzinfo=timezone.utc)
+    write_json(
+        tmp_path, "runtime/predictive_intelligence/latest.json",
+        {"generated_at": "2026-10-21T11:20:00+00:00",
+         "probability_ready_product_count": 100,
+         "matched_outcome_count": 500},
+    )
+    status = build_predictive_cloud_status(tmp_path, now=anchor)
+    component = status["components"]["predictive_intelligence"]
+    assert component["available"] is True
+    assert component["freshness"] == "future_untrusted"
+    assert component["age_seconds"] is None
+    assert "predictive_intelligence" in status["future_untrusted_components"]
+    assert status["fresh_component_count"] == 0
+    assert status["runtime_all_sources_fresh"] is False
+    assert status["framework_operational"] is False
+    assert status["customer_forecast_verified"] is False
+    assert status["commercial_prediction_authorized"] is False
+
+
+def test_small_clock_skew_is_bounded_but_never_customer_proof(tmp_path):
+    anchor = datetime(2026, 10, 21, 11, 0, tzinfo=timezone.utc)
+    write_json(
+        tmp_path, "runtime/revenue_pulse/latest.json",
+        {"generated_at": "2026-10-21T11:00:45+00:00"},
+    )
+    status = build_predictive_cloud_status(tmp_path, now=anchor)
+    assert status["components"]["revenue_pulse"]["freshness"] == "fresh"
+    assert status["components"]["revenue_pulse"]["age_seconds"] == 0
+    assert status["fresh_component_count"] == 1
+    assert status["framework_operational"] is False
+    assert status["customer_forecast_verified"] is False
+
+
 def test_status_preserves_missing_components_as_unavailable(tmp_path):
     result = build_predictive_cloud_status(
         tmp_path,

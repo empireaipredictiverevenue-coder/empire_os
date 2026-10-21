@@ -11,6 +11,7 @@ from empire_os.predictive_cloud_materializer import (
 from empire_os.predictive_cloud_status import (
     refresh_predictive_cloud_status,
 )
+from empire_os.optimization_status import refresh_optimization_status
 
 
 ROOT = Path("/srv/empire_os")
@@ -23,6 +24,14 @@ def main() -> int:
         )
     )
 
+    # Refresh the existing, local-only optimization capability inventory.
+    # This is status evidence, NOT a solver run or QPU invocation.
+    optimization = refresh_optimization_status(ROOT)
+    assert optimization["external_qpu_called"] is False
+    assert optimization["third_party_runtime_allowed"] is False
+    assert optimization["automatic_production_routing"] is False
+    assert optimization["execution_authority"] == "none"
+
     status = refresh_predictive_cloud_status(
         ROOT
     )
@@ -31,6 +40,11 @@ def main() -> int:
         json.dumps(
             {
                 "materializer": materialized,
+                "optimization_fabric": {
+                    "status": optimization.get("status"),
+                    "external_qpu_called": False,
+                    "execution_authority": "none",
+                },
                 "predictive_cloud": {
                     "component_count": (
                         status.get("component_count")

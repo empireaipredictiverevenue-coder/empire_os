@@ -953,15 +953,18 @@ def build_predictive_cloud_status(
         age_seconds = None
         freshness = "unknown"
         if observed is not None:
-            age_seconds = max(
-                0,
-                int((current - observed).total_seconds()),
-            )
-            freshness = (
-                "fresh"
-                if age_seconds <= int(config["fresh_seconds"])
-                else "stale"
-            )
+            age = (current - observed).total_seconds()
+            # A material future timestamp is not a fresh measurement. A
+            # two-minute skew allowance covers normal clock/queue drift.
+            if age < -120:
+                freshness = "future_untrusted"
+            else:
+                age_seconds = max(0, int(age))
+                freshness = (
+                    "fresh"
+                    if age_seconds <= int(config["fresh_seconds"])
+                    else "stale"
+                )
 
         components[name] = {
             "available": True,
@@ -989,6 +992,21 @@ def build_predictive_cloud_status(
         if row["available"] and row["freshness"] == "unknown"
     ]
 
+    future_untrusted = [
+        name for name, row in components.items()
+        if row["freshness"] == "future_untrusted"
+    ]
+    fresh_count = sum(
+        row["freshness"] == "fresh" for row in components.values()
+    )
+    # Availability means a JSON artifact exists; it is NOT a verified
+    # customer forecasting system or evidence-backed revenue engine.
+    runtime_all_sources_fresh = (
+        fresh_count == len(components)
+        and not unavailable and not stale and not unknown_freshness
+        and not future_untrusted
+    )
+
     department_validation = validate_departments(
         registered_components={
             row.name for row in default_registry()
@@ -1003,6 +1021,14 @@ def build_predictive_cloud_status(
         "available_component_count": sum(
             row["available"] for row in components.values()
         ),
+        "fresh_component_count": fresh_count,
+        "future_untrusted_components": future_untrusted,
+        "runtime_all_sources_fresh": runtime_all_sources_fresh,
+        "framework_operational": runtime_all_sources_fresh,
+        "customer_forecast_verified": False,
+        "original_terminal_outcomes_authenticated_by_status": False,
+        "original_frozen_forecast_registry_authenticated_by_status": False,
+        "commercial_prediction_authorized": False,
         "unavailable_components": unavailable,
         "stale_components": stale,
         "unknown_freshness_components": unknown_freshness,

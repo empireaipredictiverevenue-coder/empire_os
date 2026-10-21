@@ -109,6 +109,17 @@ EOF
     empire_os/predictive_intelligence.py \
     empire_os/predictive_cloud_materializer.py \
     empire_os/predictive_cloud_status.py \
+    empire_os/predictive_cloud_status_api.py \
+    empire_os/optimization_status.py \
+    empire_os/business_optimization_product.py \
+    empire_os/intelligence_optimization_fabric.py \
+    empire_os/solver_intelligence.py \
+    empire_os/optimization_problem_factory.py \
+    empire_os/optimization_runtime.py \
+    empire_os/optimization_shards.py \
+    empire_os/optimization_benchmark_ledger.py \
+    empire_os/solver_adapters/greedy_binary.py \
+    empire_os/solver_adapters/exact_binary.py \
     empire_os/predictive_cloud_formula.py \
     empire_os/predictive_cloud_v3.py \
     empire_os/future_trend_intelligence.py \
