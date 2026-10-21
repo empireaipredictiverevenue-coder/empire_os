@@ -1,0 +1,29 @@
+{
+  "db_writes": false,
+  "deterministic_median_elapsed_ms_30_samples": 0.289,
+  "deterministic_review_lane_counts": {
+    "EDITORIAL_REVIEW": 8,
+    "HOLD": 4,
+    "REINSPECT_SOURCE": 2,
+    "RIGHTS_REVIEW": 1
+  },
+  "execution_authority": "none",
+  "external_paid_jev_api_called": false,
+  "human_editorial_signoff_present": false,
+  "input_sha256": "d06f9e501cadce879597284c6ffbcd85287169b60a16d565f402b1bc0fa54387",
+  "local_shadow_attempts": 2,
+  "messages_sent": 0,
+  "model_disagreements_with_deterministic": 2,
+  "model_review_status_counts": {
+    "SHADOW_ESCALATE": 2
+  },
+  "observed_model_latency_ms": [
+    2925.737,
+    2243.421
+  ],
+  "original_source_count": 15,
+  "schema_version": "empire.research.jev_shadow_triage_receipt.v1",
+  "shadow_model_has_no_commercial_authority": true,
+  "status": "RESEARCH_LOCAL_SHADOW_COMPARISON_REVIEW_ONLY",
+  "trusted_source_admissions": 0
+}
