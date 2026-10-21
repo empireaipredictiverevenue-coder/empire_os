@@ -28,6 +28,10 @@ The owner is `empire_os/skill_exchange.py`. Use `recommend_work_item_skills` to 
 
 **Do not invoke candidate skill instructions.** The current SkillForge approval registry may contain zero approved skills. Verify exact digest-pinned approval using the existing `empire_os.skill_trust` gate before a task is allowed to load a skill. Discovery is not approval. Never edit `config/skill_trust_registry.json` as a convenience.
 
+## Impeccable design reference (existing Hermes catalogue)
+
+The Hermes optional-skill metadata stub exists at `/home/ubuntu/.hermes/hermes-agent/optional-skills/creative/impeccable/SKILL.md` and references upstream `pbakaus/impeccable` (Apache-2.0). It is **not** the complete installed skill, and is **not** approved in SkillForge. Do not claim that `/impeccable audit` or its detector CLI has been executed unless the reviewed tool is actually available. Use the first-party `PRODUCT.md` and `DESIGN.md` in this application for bounded critique, polish, hardening and responsive review. Keep the existing app architecture and truthful source states.
+
 ## Reuse real operational code
 
 - Historical classifier: `empire_os/storm_predictor.py`, which identifies NWS warning event types but does not verify household damage or buyer demand.

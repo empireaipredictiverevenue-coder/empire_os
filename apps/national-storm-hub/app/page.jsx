@@ -9,6 +9,7 @@ import {
   Download,RotateCcw,Info,Globe2,ArrowDownRight
 } from "lucide-react";
 import {STATE_NAMES,normalizeZip,normalizeState} from "../lib/storm-data.js";
+import {summarizeHomeSource} from "../lib/home-source-view.js";
 
 const STORAGE_KEY="national-storm-hub-passport-preview-v1";
 const CHECKLIST=[
@@ -154,13 +155,14 @@ export default function HomePage(){
   }
 
   const alerts=weather.kind==="ready"?weather.data.alerts:[];
+  const sourceView=summarizeHomeSource(weather);
   const done=CHECKLIST.filter(([id])=>passport.tasks[id]).length;
   const passportState=passport.savedState?STATE_NAMES[passport.savedState]:null;
   return <div className="nsh">
     <div className="top-alert" role="note"><span className="top-alert-dot"/> INDEPENDENT WEATHER INFORMATION PLATFORM <span className="top-alert-sep">/</span> For emergency warnings, follow <a href="https://www.weather.gov/" target="_blank" rel="noreferrer">weather.gov <ArrowUpRight size={12}/></a></div>
     <header className="site-header">
       <a className="brand" href="#home" aria-label="National Storm Hub home"><SiteMark/><span>NATIONAL<span className="brand-highlight">STORM</span>HUB<span className="brand-period">.</span></span></a>
-      <nav className={menuOpen?"nav-links open":"nav-links"} aria-label="Main navigation">
+      <nav id="site-main-navigation" className={menuOpen?"nav-links open":"nav-links"} aria-label="Main navigation">
         <a href="#atlas" onClick={()=>setMenuOpen(false)}>Storm Atlas</a>
         <a href="/predictor" onClick={()=>setMenuOpen(false)}>Storm Predictor</a>
         <a href="/alerts" onClick={()=>setMenuOpen(false)}>Live Alerts</a>
@@ -169,7 +171,7 @@ export default function HomePage(){
         <a href="#pro" onClick={()=>setMenuOpen(false)}>For Contractors</a>
       </nav>
       <a className="header-action" href="#passport">My Storm Passport <ArrowUpRight size={16}/></a>
-      <button type="button" className="mobile-menu" aria-label={menuOpen?"Close menu":"Open menu"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X/>:<Menu/>}</button>
+      <button type="button" className="mobile-menu" aria-controls="site-main-navigation" aria-label={menuOpen?"Close menu":"Open menu"} aria-expanded={menuOpen} onClick={()=>setMenuOpen(!menuOpen)}>{menuOpen?<X/>:<Menu/>}</button>
     </header>
 
     <main id="home">
@@ -190,6 +192,19 @@ export default function HomePage(){
           <a href="/predictor" className="hero-predictor-cta"><Sparkles size={17}/> Explore Storm Predictor <ArrowRight size={16}/></a>
         </div>
         <div className="hero-art"><GlobeVisual/><div className="floating-weather"><div className="float-icon"><Radar size={21}/></div><div><span>STORM ATLAS</span><strong>Explore the evidence</strong><small>Forecasts ≠ confirmed damage</small></div><ArrowUpRight size={18}/></div><div className="art-note">CONCEPTUAL EARTH VISUAL • NOT AN ALERT BOUNDARY MAP</div></div>
+      </section>
+
+      <section className="source-snapshot wrap" aria-labelledby="source-snapshot-title">
+        <div className="snapshot-context">
+          <span className="snapshot-overline"><span className={"snapshot-indicator "+sourceView.phase}/> LIVE DATA / NWS SOURCE STATUS</span>
+          <h2 id="source-snapshot-title">{sourceView.title}</h2>
+          <p>{sourceView.detail}</p>
+        </div>
+        <div className="snapshot-details">
+          <div><span>SELECTED AREA</span><strong>{sourceView.area}</strong></div>
+          <div><span>LAST SOURCE CHECK</span><strong>{sourceView.checked_at?<time dateTime={sourceView.checked_at}>{formatted(sourceView.checked_at)}</time>:"Not verified"}</strong></div>
+        </div>
+        <a className="snapshot-action" href="/alerts">View official alerts <ArrowUpRight size={17}/></a>
       </section>
 
       <section className="trust-ribbon" aria-label="Platform information"><div className="wrap trust-inner"><div>01 <span>SOURCE-GROUNDED WEATHER</span></div><div>02 <span>HOMEOWNER CONTROL</span></div><div>03 <span>REGIONAL KNOWLEDGE</span></div><div>04 <span>NO FALSE DAMAGE CLAIMS</span></div></div></section>

@@ -502,3 +502,33 @@ h1 em,h2 em {font-style:normal;background:linear-gradient(103deg,#95e9e9 5%,#4ac
 @media(max-width:750px){.alerts-results{grid-template-columns:1fr}.alerts-next{flex-direction:column;align-items:flex-start}.alerts-notify-section{flex-direction:column;align-items:flex-start}.alerts-controls{grid-template-columns:1fr}.alerts-controls>div:last-child{grid-column:auto}.alerts-source-info{flex-direction:column;align-items:flex-start}}
 @media(max-width:530px){.alerts-statusbar{flex-direction:column;align-items:flex-start}.alerts-status-right{width:100%;justify-content:space-between}.alerts-results{padding:12px}.alerts-record{padding:16px}.alerts-warning-banner{font-size:11px}.founder-pulse-metrics{grid-template-columns:1fr 1fr;gap:7px}.founder-pulse-metrics>div{padding:12px}.founder-pulse-metrics strong{font-size:21px}.founder-pulse-status{flex-direction:column;align-items:flex-start}.founder-login{padding:22px}.founder-pulse-finance strong{font-size:18px}.founder-alert-head{flex-wrap:wrap}.founder-pulse-content{padding-bottom:60px}}
 .founder-alert-notice{font-size:11px;line-height:1.8;color:var(--sub);margin:0}.founder-session>div{flex-wrap:wrap;justify-content:flex-end}@media(max-width:600px){.founder-session{flex-direction:column;align-items:flex-start}.founder-session>div{justify-content:flex-start}}
+
+/* Impeccable-informed pass: a calm, source-backed editorial snapshot instead of
+   decorative dashboards or unsupported real-time weather claims. */
+.source-snapshot{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,.8fr) auto;gap:32px;align-items:center;padding:30px 0 36px;border-top:1px solid rgba(141,218,227,.25);border-bottom:1px solid rgba(141,218,227,.25);margin-bottom:24px}
+.snapshot-overline{display:flex;align-items:center;gap:10px;font-size:10px;font-weight:800;letter-spacing:.11em;color:#b6d4dd}
+.snapshot-indicator{height:8px;width:8px;flex-shrink:0;border-radius:50%;background:#88a0ad}
+.snapshot-indicator.available{background:#89e2d4;box-shadow:0 0 0 4px rgba(102,217,198,.11)}
+.snapshot-indicator.unavailable{background:#e9b382;box-shadow:0 0 0 4px rgba(223,169,101,.10)}
+.snapshot-context h2{font-size:clamp(19px,2vw,29px);line-height:1.2;letter-spacing:-.05em;margin:10px 0}
+.snapshot-context p{color:#afc4ce;font-size:12px;line-height:1.7;max-width:580px;margin:0}
+.snapshot-details{display:grid;gap:15px;padding-left:25px;border-left:1px solid rgba(140,194,208,.26)}
+.snapshot-details>div{display:grid;gap:6px;min-width:0}
+.snapshot-details span{color:#8cb0be;font-size:10px;letter-spacing:.11em;font-weight:800}
+.snapshot-details strong{font-size:12px;line-height:1.5;color:#d8e9ee;overflow-wrap:anywhere}
+.snapshot-action{display:inline-flex;align-items:center;justify-content:center;gap:12px;padding:13px 16px;min-height:44px;border:1px solid rgba(113,228,233,.42);border-radius:5px;color:#adf0f1;font-size:12px;font-weight:800;white-space:nowrap;transition:background .2s ease,border-color .2s ease}
+.snapshot-action:hover{background:rgba(90,201,214,.09);border-color:#83e7eb}
+/* Wider transition prevents the six-link navigation from colliding with the
+   brand or the Passport button on tablet-sized screens. */
+@media(max-width:1180px){
+  .site-header{gap:16px}
+  .nav-links{display:none;position:absolute;top:70px;left:0;right:0;z-index:12;margin:0;padding:17px 22px;flex-direction:column;align-items:stretch;background:#0b212d;border:1px solid #416574;border-radius:8px;box-shadow:0 24px 55px rgba(0,0,0,.5)}
+  .nav-links.open{display:flex}
+  .nav-links a{display:block;min-height:44px;padding:13px 4px;font-size:13px}
+  .mobile-menu{display:flex;align-items:center;justify-content:center;margin-left:0;min-width:44px;min-height:44px}
+  .header-action{margin-left:auto}
+}
+@media(max-width:1000px){.source-snapshot{grid-template-columns:minmax(0,1fr) minmax(0,.7fr);gap:18px}.snapshot-action{justify-self:start;grid-column:1/-1}}
+@media(max-width:650px){.source-snapshot{grid-template-columns:1fr;gap:19px;padding:24px 0 30px}.snapshot-details{border-left:0;padding-left:0;grid-template-columns:1fr 1fr}.snapshot-action{grid-column:auto;width:100%}.snapshot-context p{font-size:12px}}
+@media(max-width:390px){.snapshot-details{grid-template-columns:1fr}.snapshot-details strong{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.snapshot-action{transition:none}}

@@ -2,6 +2,13 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Impeccable-informed UI polish (private candidate, 2026-10-21)
+
+- Reuses the existing Hermes Impeccable catalogue **reference** and records actual audience, brand, evidence boundaries and design direction in first-party `PRODUCT.md` and `DESIGN.md`.
+- Improves responsive navigation and introduces a verified-source status strip using the homepage's **existing** NWS Atlas request; no extra polling or data provider.
+- Distinguishes loading, zero alerts, unavailable source and returned records; unknown weather conditions are never presented as safe.
+- The full Impeccable CLI and agent commands have **not** been installed or executed; this is a bounded manually implemented visual and UX pass. A browser screenshot audit remains required before visual production signoff.
+
 ## Website alerts and private Revenue Pulse (2026-10-21)
 
 - Public `/alerts` — state, ZIP and Storm Passport area lookups; five-minute NWS rechecks while page remains open; optional browser notifications only for new severe warnings after permission; never a substitute for official emergency warning channels.
