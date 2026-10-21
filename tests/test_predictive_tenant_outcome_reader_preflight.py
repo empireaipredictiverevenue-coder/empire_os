@@ -54,9 +54,9 @@ class Cursor:
             )
         if sql == ROLE_SQL:
             if params == (LOGIN,):
-                return self.settings.get("login_role", (True, False, False, False))
+                return self.settings.get("login_role", (True, False, False, False, False, False, False))
             if params == ("empiredb_tenant_reader",):
-                return self.settings.get("reader_role", (False, False, False, False))
+                return self.settings.get("reader_role", (False, False, False, False, False, False, False))
         raise AssertionError("unapproved scalar source")
 
     def fetchall(self):
@@ -144,11 +144,19 @@ def test_no_select_grant_still_has_gap():
     ("identity", ("empiredb", "off", LOGIN, "empiredb_tenant_reader", TENANT)),
     ("identity", ("empiredb", "on", "postgres", "empiredb_tenant_reader", TENANT)),
     ("identity", ("empiredb", "on", LOGIN, "empiredb_app", TENANT)),
-    ("login_role", (True, True, False, False)),
-    ("login_role", (True, False, True, False)),
-    ("login_role", (True, False, False, True)),
-    ("reader_role", (False, False, True, False)),
-    ("reader_role", (True, False, False, False)),
+    ("login_role", (True, True, False, False, False, False, False)),
+    ("login_role", (True, False, True, False, False, False, False)),
+    ("login_role", (True, False, False, True, False, False, False)),
+    ("login_role", (True, False, False, False, True, False, False)),
+    ("login_role", (True, False, False, False, False, True, False)),
+    ("login_role", (True, False, False, False, False, False, True)),
+    ("reader_role", (False, False, True, False, False, False, False)),
+    ("reader_role", (True, False, False, False, False, False, False)),
+    ("reader_role", (False, False, False, False, True, False, False)),
+    ("reader_role", (False, False, False, False, False, True, False)),
+    ("reader_role", (False, False, False, False, False, False, True)),
+    ("login_role", (True, False, False, False)),  # incomplete metadata
+    ("reader_role", (False, False, False, False)),  # incomplete metadata
 ])
 def test_bad_authority_cannot_inspect_original_source(bad):
     key, value = bad

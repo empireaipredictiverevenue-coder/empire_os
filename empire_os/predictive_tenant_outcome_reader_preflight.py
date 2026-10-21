@@ -18,7 +18,8 @@ TABLE_POLICY = {
     "commercial_outcomes": "order056_outcomes_tenant_select",
 }
 ROLE_SQL = (
-    "SELECT rolcanlogin,rolsuper,rolbypassrls,rolinherit "
+    "SELECT rolcanlogin,rolsuper,rolbypassrls,rolinherit,"
+    "rolcreatedb,rolcreaterole,rolreplication "
     "FROM pg_catalog.pg_roles WHERE rolname=%s"
 )
 IDENTITY_SQL = (
@@ -50,12 +51,16 @@ class TenantEvidencePolicyHold(ValueError):
 
 
 def _role(row: Any, *, login: bool) -> bool:
-    if type(row) not in (tuple, list) or len(row) != 4:
+    if type(row) not in (tuple, list) or len(row) != 7:
         return False
     if any(type(x) is not bool for x in row):
         return False
-    can_login, superuser, bypass_rls, inherits = row
-    return can_login is login and not (superuser or bypass_rls or inherits)
+    (can_login, superuser, bypass_rls, inherits,
+     create_db, create_role, replication) = row
+    return (can_login is login and not any((
+        superuser, bypass_rls, inherits,
+        create_db, create_role, replication,
+    )))
 
 
 def _catalogue(
