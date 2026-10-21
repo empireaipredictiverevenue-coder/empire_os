@@ -29,7 +29,7 @@ US_SAMPLE = Path(
 )
 
 
-def run(*, country: str, niche: str = "dental",
+def run(*, country: str, niche: str = "dental", depth: str = "quality",
         probe_public_search: bool = False,
         local_model_challenge: bool = False,
         inspect_fn=None, search_fn=None, model_fn=None) -> dict:
@@ -37,6 +37,8 @@ def run(*, country: str, niche: str = "dental",
         raise ValueError("EXPLICIT_MARKET_COUNTRY_REQUIRED")
     if niche not in NICHES:
         raise ValueError("EXPLICIT_SUPPORTED_RESEARCH_NICHE_REQUIRED")
+    if depth not in ("speed", "balanced", "quality"):
+        raise ValueError("EXPLICIT_SUPPORTED_RESEARCH_DEPTH_REQUIRED")
     markets = ("US", "GB") if country == "both" else (country,)
     if probe_public_search and search_fn is None:
         from empire_os.search_fabric.search import search as search_fn
@@ -55,6 +57,7 @@ def run(*, country: str, niche: str = "dental",
             "schema_version": "empire.brokerage.deep_research_operator.v1",
             "mode": "OBSERVE",
             "niche": niche,
+            "depth": depth,
             "scope": list(markets),
             "status": "HELD_NICHE_ORIGINAL_SOURCE_INTAKE_REQUIRED",
             "market_reports": [],
@@ -69,7 +72,8 @@ def run(*, country: str, niche: str = "dental",
         }
     results = []
     for market in markets:
-        kwargs = {"original_sample": US_SAMPLE if market == "US" else None}
+        kwargs = {"original_sample": US_SAMPLE if market == "US" else None,
+                  "mode": depth}
         if inspect_fn is not None:
             kwargs["inspect_fn"] = inspect_fn
         evidence = review_brokerage_editorial(market, **kwargs)
@@ -89,6 +93,7 @@ def run(*, country: str, niche: str = "dental",
         "schema_version": "empire.brokerage.deep_research_operator.v1",
         "mode": "OBSERVE",
         "niche": niche,
+        "depth": depth,
         "scope": list(markets),
         "status": ("ORIGINAL_MARKET_SOURCES_OBSERVED_REVIEW_PENDING"
                    if all(x["status"] == "SOURCE_EVIDENCE_READY_FOR_EDITORIAL_REVIEW"
@@ -185,11 +190,12 @@ def main(argv=None) -> int:
     ap.add_argument("--read-only", required=True, action="store_true")
     ap.add_argument("--country", choices=("US", "GB", "both"), required=True)
     ap.add_argument("--niche", choices=tuple(NICHES), default="dental")
+    ap.add_argument("--depth", choices=("speed", "balanced", "quality"), default="quality")
     ap.add_argument("--format", choices=("json", "markdown"), default="markdown")
     ap.add_argument("--probe-public-search", action="store_true")
     ap.add_argument("--local-model-challenge", action="store_true")
     args = ap.parse_args(argv)
-    result = run(country=args.country, niche=args.niche,
+    result = run(country=args.country, niche=args.niche, depth=args.depth,
                  probe_public_search=args.probe_public_search,
                  local_model_challenge=args.local_model_challenge)
     print(json.dumps(result, sort_keys=True, indent=2)

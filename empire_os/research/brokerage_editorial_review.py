@@ -131,6 +131,7 @@ def review_brokerage_editorial(
     inspect_fn: Callable[[str], Mapping] = inspect_known_source,
     original_sample: Path | None = None,
     observed_at: datetime | None = None,
+    mode: str = "quality",
 ) -> dict:
     """Evidence-only plan and review receipt. No signed editorial approval."""
     if country not in ("US", "GB"):
@@ -145,11 +146,14 @@ def review_brokerage_editorial(
                 if country == "US" else
                 "Birmingham dental implant published services and UK CMA market context")
     profile = ResearchProfile(
-        mode="quality",
+        mode=mode,
         lanes=("official", "company", "web"),
         country=country,
         sector="dental",
     )
+
+    profile.validate()
+    max_curated_sources = {"speed": 1, "balanced": 2, "quality": 3}[mode]
 
     def curated_search(query: str, *, num: int):
         # Not a live search API. Re-read ONLY exact original source URLs
@@ -159,7 +163,7 @@ def review_brokerage_editorial(
              "source_lane": ("first_party_official" if "gov.uk" in url
                              else "original_company_page"),
              "discovery_engine": "CURATED_ORIGINAL_SOURCE_LEDGER"}
-            for title, url in COUNTRY_SOURCES[country][:num]
+            for title, url in COUNTRY_SOURCES[country][:min(num, max_curated_sources)]
         ]}
 
     research = research_with_profile(
@@ -184,6 +188,9 @@ def review_brokerage_editorial(
                    if inspected == expected_count else
                    "SOURCE_DISCOVERY_AND_EDITORIAL_PENDING"),
         "market_country": country,
+        "research_depth": mode,
+        "curated_source_budget": max_curated_sources,
+        "original_source_catalogue_total": expected_count,
         "observed_at_utc": observed_at.astimezone(timezone.utc).isoformat(),
         "search_engine_live": False,
         "discovery_origin": "MANUALLY_REVIEWED_ORIGINAL_SOURCE_URLS",
