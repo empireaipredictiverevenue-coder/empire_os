@@ -110,6 +110,62 @@ def _correlate_original_coder_plan(root: Path, work: dict[str, Any],
     return unresolved
 
 
+
+def _internal_pytest_receipt(result: dict[str, Any],
+                            payload: dict[str, Any]) -> bool:
+    """Check recorded pytest/diff return codes; does not rerun any tests.
+
+    VERIFY can be driven either by the bounded deterministic verifier or the
+    generic Coder verifier. Both must name the exact requested test files and
+    report a passing git diff check. A summary verdict alone is insufficient.
+    """
+    tests=payload.get("tests")
+    report=result.get("verification")
+    if (not isinstance(tests,list) or not 0<len(tests)<=100
+        or len(tests)!=len(set(tests))
+        or any(not isinstance(t,str) or not t.startswith("tests/")
+               or not t.endswith(".py") or len(t)>256
+               or ".." in Path(t).parts or "\\" in t
+               or "//" in t for t in tests)
+        or result.get("tests")!=tests
+        or not isinstance(report,dict)
+        or report.get("verdict")!="PASS"
+        or not isinstance(report.get("checks"),list)):
+        return False
+    checks=report["checks"]
+    if len(checks)>64:
+        return False
+    diff_ok=pytest_ok=False
+    for check in checks:
+        if not isinstance(check,dict):
+            return False
+        name=check.get("name")
+        passed=check.get("passed")
+        rc=check.get("returncode")
+        if passed is not True:
+            return False
+        if name=="git_diff_check":
+            if rc==0 and type(rc) is int:
+                diff_ok=True
+            else:
+                return False
+        if name=="pytest":
+            if (rc==0 and type(rc) is int and check.get("tests")==tests):
+                pytest_ok=True
+            else:
+                return False
+        if isinstance(name,str) and name.startswith("command:") and "pytest" in name:
+            cmd=check.get("command")
+            if (rc==0 and type(rc) is int and isinstance(cmd,list)
+                and len(cmd)>=len(tests)+3
+                and all(isinstance(k,str) for k in cmd)
+                and cmd[-len(tests):]==tests
+                and "pytest" in cmd):
+                pytest_ok=True
+            else:
+                return False
+    return diff_ok and pytest_ok
+
 def _verify_coder_job_outcome(root: Path, expected_plans: dict[str, tuple[str,str]]
                               ) -> tuple[dict[str,int], bool]:
     """Bounded original VERIFY job linkage. A PASS is not independent proof."""
@@ -117,6 +173,10 @@ def _verify_coder_job_outcome(root: Path, expected_plans: dict[str, tuple[str,st
         "completed_verify_job_receipts":0,
         "completed_verify_report_pass":0,
         "completed_verify_report_fail":0,
+        "completed_verify_pass_with_internal_test_receipt":0,
+        "completed_verify_pass_without_sufficient_test_receipt":0,
+        "internal_test_receipts_all_named_test_paths_present":0,
+        "internal_test_receipts_one_or_more_test_paths_missing":0,
         "failed_verify_job_receipts":0,
         "untrusted_or_inconsistent_verify_job_receipts":0,
     }
@@ -191,6 +251,19 @@ def _verify_coder_job_outcome(root: Path, expected_plans: dict[str, tuple[str,st
             counts["completed_verify_job_receipts"]+=1
             counts["completed_verify_report_pass"]+=int(verdict=="PASS")
             counts["completed_verify_report_fail"]+=int(verdict=="FAIL")
+            if verdict=="PASS":
+                has_test_proof=_internal_pytest_receipt(result,payload)
+                counts["completed_verify_pass_with_internal_test_receipt"]+=int(has_test_proof)
+                counts["completed_verify_pass_without_sufficient_test_receipt"]+=int(not has_test_proof)
+                if has_test_proof:
+                    # Availability is a current filesystem observation, not a
+                    # fresh test execution or authentic code-change receipt.
+                    declared=payload["tests"]
+                    present=all(
+                        (root/test).is_file() and not (root/test).is_symlink()
+                        for test in declared)
+                    counts["internal_test_receipts_all_named_test_paths_present"]+=int(present)
+                    counts["internal_test_receipts_one_or_more_test_paths_missing"]+=int(not present)
     return counts,incomplete
 
 def _source_context(root: Path, row: dict[str, str],
@@ -337,10 +410,15 @@ def review_independent_skill_evidence(root: str | Path, *,
                 "completed_verify_job_receipts":0,
                 "completed_verify_report_pass":0,
                 "completed_verify_report_fail":0,
+                "completed_verify_pass_with_internal_test_receipt":0,
+                "completed_verify_pass_without_sufficient_test_receipt":0,
+                "internal_test_receipts_all_named_test_paths_present":0,
+                "internal_test_receipts_one_or_more_test_paths_missing":0,
                 "failed_verify_job_receipts":0,
                 "untrusted_or_inconsistent_verify_job_receipts":0,
             }),
             "verify_report_pass_is_not_independent_outcome_proof":True,
+            "test_path_availability_is_not_test_reexecution":True,
             "reference_diversity_status":(
                 "REUSED_SINGLE_REFERENCE_STRING" if distinct<=1
                 else "MULTIPLE_REFERENCE_STRINGS_CUSTODY_UNVERIFIED"),

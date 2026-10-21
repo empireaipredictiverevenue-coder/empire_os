@@ -166,6 +166,10 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'completed_verify_job_receipts',
             'completed_verify_report_pass',
             'completed_verify_report_fail',
+            'completed_verify_pass_with_internal_test_receipt',
+            'completed_verify_pass_without_sufficient_test_receipt',
+            'internal_test_receipts_all_named_test_paths_present',
+            'internal_test_receipts_one_or_more_test_paths_missing',
             'failed_verify_job_receipts',
             'untrusted_or_inconsistent_verify_job_receipts',
         }
@@ -176,7 +180,14 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             or (downstream['completed_verify_report_pass']+
                 downstream['completed_verify_report_fail'] !=
                 downstream['completed_verify_job_receipts'])
-            or family.get('verify_report_pass_is_not_independent_outcome_proof') is not True):
+            or (downstream['completed_verify_pass_with_internal_test_receipt']+
+                downstream['completed_verify_pass_without_sufficient_test_receipt'] !=
+                downstream['completed_verify_report_pass'])
+            or (downstream['internal_test_receipts_all_named_test_paths_present']+
+                downstream['internal_test_receipts_one_or_more_test_paths_missing'] !=
+                downstream['completed_verify_pass_with_internal_test_receipt'])
+            or family.get('verify_report_pass_is_not_independent_outcome_proof') is not True
+            or family.get('test_path_availability_is_not_test_reexecution') is not True):
             raise ValueError('untrusted original Coder VERIFY evidence')
         if (component!='empire_coder'
             and (correlated or uncorrelated or failed or any(downstream.values()))):
@@ -205,6 +216,7 @@ def merge_skillforge_evidence_into_review_plan(existing:Mapping, source:Mapping)
             'department_done_is_not_coder_job_success':True,
             'downstream_coder_verify_jobs':dict(downstream),
             'verify_report_pass_is_not_independent_outcome_proof':True,
+            'test_path_availability_is_not_test_reexecution':True,
             'independently_verified_code_implementations':0,
             'source_schema':source['schema_version'],
             'next_review_action':(

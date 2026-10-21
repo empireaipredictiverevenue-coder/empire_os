@@ -203,9 +203,15 @@ def test_untrusted_skillforge_review_report_cannot_spoof_approval():
           'original_referenced_artifacts_independently_authenticated':False,
           'skill_approval_authorized':False,'review_only':True,
           'verify_report_pass_is_not_independent_outcome_proof':True,
+          'test_path_availability_is_not_test_reexecution':True,
           'downstream_coder_verify_jobs':{
             'completed_verify_job_receipts':0,'completed_verify_report_pass':0,
-            'completed_verify_report_fail':0,'failed_verify_job_receipts':0,
+            'completed_verify_report_fail':0,
+            'completed_verify_pass_with_internal_test_receipt':0,
+            'completed_verify_pass_without_sufficient_test_receipt':0,
+            'internal_test_receipts_all_named_test_paths_present':0,
+            'internal_test_receipts_one_or_more_test_paths_missing':0,
+            'failed_verify_job_receipts':0,
             'untrusted_or_inconsistent_verify_job_receipts':0,
           },
         }],
@@ -455,6 +461,10 @@ def test_original_coder_verification_verdicts_are_review_only(tmp_path):
         'completed_verify_job_receipts':2,
         'completed_verify_report_pass':1,
         'completed_verify_report_fail':1,
+        'completed_verify_pass_with_internal_test_receipt':0,
+        'completed_verify_pass_without_sufficient_test_receipt':1,
+        'internal_test_receipts_all_named_test_paths_present':0,
+        'internal_test_receipts_one_or_more_test_paths_missing':0,
         'failed_verify_job_receipts':1,
         'untrusted_or_inconsistent_verify_job_receipts':0,
     }
@@ -511,3 +521,117 @@ def test_malformed_verify_source_identifier_cannot_break_review(tmp_path):
     assert output['status']=='SOURCE_DIVERSITY_REVIEW_ONLY'
     assert family(output)['downstream_coder_verify_jobs']['completed_verify_report_pass']==0
     assert output['promotion_ready_skill_count']==0
+
+
+def _insert_verified_test_receipt(path, *, mode='deterministic'):
+    job=json.loads(path.read_text())
+    tests=['tests/test_original_task.py']
+    job['payload']['tests']=tests
+    result=job['result']
+    result['tests']=tests
+    if mode=='deterministic':
+        result['verification']['checks']=[
+            {'name':'pytest','passed':True,'returncode':0,'tests':tests},
+            {'name':'git_diff_check','passed':True,'returncode':0},
+        ]
+    else:
+        result['verification']['checks']=[
+            {'name':'security_scan','passed':True,'returncode':None,'command':[]},
+            {'name':'git_status','passed':True,'returncode':0,'command':['git','status','--short']},
+            {'name':'git_diff_check','passed':True,'returncode':0,'command':['git','diff','--check']},
+            {'name':'command:python -m pytest','passed':True,'returncode':0,
+             'command':['/srv/empire_os/.venv/bin/python','-m','pytest','-q',*tests]},
+        ]
+    path.write_text(json.dumps(job))
+    return path
+
+
+@pytest.mark.parametrize('mode',['deterministic','generic'])
+def test_pinned_internal_pytest_receipt_is_verified_as_record_only(tmp_path,mode):
+    job=_write_downstream_verification(tmp_path,1,verify_number=501)
+    _insert_verified_test_receipt(job,mode=mode)
+    report=review_independent_skill_evidence(tmp_path)
+    counts=family(report)['downstream_coder_verify_jobs']
+    assert counts['completed_verify_report_pass']==1
+    assert counts['completed_verify_pass_with_internal_test_receipt']==1
+    assert counts['completed_verify_pass_without_sufficient_test_receipt']==0
+    assert counts['internal_test_receipts_all_named_test_paths_present']==0
+    assert counts['internal_test_receipts_one_or_more_test_paths_missing']==1
+    assert report['independently_verified_skill_outcomes']==0
+    assert report['promotion_ready_skill_count']==0
+
+
+@pytest.mark.parametrize('mutation',[
+    lambda record:record['result'].update(tests=['tests/test_wrong.py']),
+    lambda record:record['result']['verification']['checks'][0].update(returncode=1),
+    lambda record:record['result']['verification']['checks'][0].update(passed=False),
+    lambda record:record['payload'].update(tests=['tests/../../outside.py']),
+    lambda record:record['result']['verification']['checks'].pop(),
+])
+def test_forged_pytest_passing_receipt_remains_unproven(tmp_path,mutation):
+    job=_write_downstream_verification(tmp_path,1,verify_number=502)
+    _insert_verified_test_receipt(job)
+    packet=json.loads(job.read_text());mutation(packet);job.write_text(json.dumps(packet))
+    report=review_independent_skill_evidence(tmp_path)
+    counts=family(report)['downstream_coder_verify_jobs']
+    assert counts['completed_verify_report_pass']==1
+    assert counts['completed_verify_pass_with_internal_test_receipt']==0
+    assert counts['completed_verify_pass_without_sufficient_test_receipt']==1
+    assert report['promotion_ready_skill_count']==0
+
+
+def test_mismatched_generic_pytest_command_cannot_count_as_test_proof(tmp_path):
+    job=_write_downstream_verification(tmp_path,1,verify_number=503)
+    _insert_verified_test_receipt(job,mode='generic')
+    packet=json.loads(job.read_text())
+    packet['result']['verification']['checks'][-1]['command'][-1]='tests/test_other.py'
+    job.write_text(json.dumps(packet))
+    outcomes=family(review_independent_skill_evidence(tmp_path))['downstream_coder_verify_jobs']
+    assert outcomes['completed_verify_report_pass']==1
+    assert outcomes['completed_verify_pass_with_internal_test_receipt']==0
+    assert outcomes['completed_verify_pass_without_sufficient_test_receipt']==1
+
+
+def test_internal_pytest_counters_flow_into_existing_nonexecuting_review(tmp_path):
+    from empire_os.system_improvement_review import refresh_review_packets
+    _empty_resolution(tmp_path)
+    job=_write_downstream_verification(tmp_path,1,verify_number=504)
+    _insert_verified_test_receipt(job)
+    _write_downstream_verification(tmp_path,2,verify_number=505)
+    review=refresh_review_packets(tmp_path)
+    rows=[r for r in review['packets'] if r['type']=='SKILLFORGE_ORIGINAL_PROVENANCE_REVIEW']
+    assert len(rows)==1
+    packet=json.loads((tmp_path/rows[0]['path']).read_text())
+    assert packet['downstream_coder_verify_jobs']['completed_verify_pass_with_internal_test_receipt']==1
+    assert packet['downstream_coder_verify_jobs']['completed_verify_pass_without_sufficient_test_receipt']==1
+    assert packet['independently_verified_code_implementations']==0
+    assert packet['auto_dispatch_eligible'] is False
+    assert packet['approved_for_implementation'] is False
+
+
+def test_test_path_presence_flag_does_not_become_fresh_execution(tmp_path):
+    job=_write_downstream_verification(tmp_path,1,verify_number=601)
+    _insert_verified_test_receipt(job)
+    path=tmp_path/'tests/test_original_task.py'
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text('def test_example(): assert True\n')
+    report=review_independent_skill_evidence(tmp_path)
+    data=family(report)
+    counts=data['downstream_coder_verify_jobs']
+    assert counts['internal_test_receipts_all_named_test_paths_present']==1
+    assert counts['internal_test_receipts_one_or_more_test_paths_missing']==0
+    assert data['test_path_availability_is_not_test_reexecution'] is True
+    assert report['independently_verified_skill_outcomes']==0
+    assert report['promotion_ready_skill_count']==0
+
+def test_symlinked_test_path_is_not_available_verified_evidence(tmp_path):
+    job=_write_downstream_verification(tmp_path,1,verify_number=602)
+    _insert_verified_test_receipt(job)
+    real=tmp_path/'actual-test.py';real.write_text('def test_example(): assert True\n')
+    path=tmp_path/'tests/test_original_task.py'
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.symlink_to(real)
+    report=review_independent_skill_evidence(tmp_path)
+    counts=family(report)['downstream_coder_verify_jobs']
+    assert counts['internal_test_receipts_all_named_test_paths_present']==0
+    assert counts['internal_test_receipts_one_or_more_test_paths_missing']==1
