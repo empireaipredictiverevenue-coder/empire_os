@@ -7,9 +7,11 @@ shared durable session/replay and end-to-end customer signoff are verified.
 from __future__ import annotations
 
 import copy
+from collections.abc import Callable
 from threading import Lock
 
 from fastapi import FastAPI, HTTPException, Request
+from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from fastapi.responses import JSONResponse
 
 from empire_os.inbound_reception_call_flow import InboundReceptionCallEngine
@@ -25,9 +27,15 @@ def create_inbound_reception_voice_app(
     api_key: str,
     application_id: str,
     enabled: bool = False,
+    resolve_authenticated_crm_read: Callable[[Request], AuthenticatedRevenueCrmRead | None] | None = None,
+    crm_owner_review_enabled: bool = False,
 ) -> FastAPI:
     if not signature_secret or not api_key or not application_id:
         raise ValueError("signed_reception_credentials_required")
+    if crm_owner_review_enabled and (
+        not enabled or not callable(resolve_authenticated_crm_read)
+    ):
+        raise ValueError("crm_owner_review_requires_enabled_voice_and_existing_crm_auth")
 
     app = FastAPI(
         title="Empire AI Receptionist — isolated signed call adapter",
@@ -35,6 +43,16 @@ def create_inbound_reception_voice_app(
     )
     recent: dict[str, tuple[str, list[dict]]] = {}
     lock = Lock()
+    if callable(resolve_authenticated_crm_read):
+        from empire_os.inbound_reception_crm_owner_review import (
+            create_inbound_reception_crm_owner_review_router,
+        )
+        app.include_router(create_inbound_reception_crm_owner_review_router(
+            engine=engine,
+            resolve_authenticated_read=resolve_authenticated_crm_read,
+            enabled=crm_owner_review_enabled,
+            review_lock=lock,
+        ))
 
     @app.middleware("http")
     async def privacy_headers(request: Request, call_next):

@@ -112,3 +112,48 @@ authenticated, durable tenant-scoped receipt in the **already existing**
 EmpireDB CRM; no arbitrary new CRM table, public endpoint or caller message.
 Independent CRM membership/identity, consent/retention and signed Voice event
 proof must pass before calling that step active.
+
+
+## 21 October — existing Revenue CRM authenticated owner review (candidate)
+
+The old blocker was NOT an absent CRM implementation. The canonical Revenue
+CRM has a read-only, dedicated PostgreSQL tenant transport with tenant scope
+verified via session_user and public.empire_current_tenant_id(). The
+`public.prospects` view concerns canonical commercial prospects; an
+unidentified caller's in-memory receptionist request must not be promoted
+to that B2B pipeline or treated as a verified person.
+
+New source:
+- `empire_os/inbound_reception_crm_owner_review.py`
+- `empire_os/inbound_reception_voice_api.py` now takes optional
+  `resolve_authenticated_crm_read` and `crm_owner_review_enabled=False`
+- `tests/test_inbound_reception_crm_owner_review.py`
+
+An authorised, separately configured candidate service can expose
+`GET /v1/inbound-reception/crm-review/enquiries` **only** if explicitly
+enabled with the existing `build_authenticated_revenue_crm_resolver`
+(or equivalently trusted existing signed CRM resolver). It expects
+`AuthenticatedRevenueCrmRead` bound to a dedicated
+`PostgresRevenueCrmRepository`. It invokes the original repository's
+read-only `prospects(limit=1)` to require existing EmpireDB login
+tenant authority: authenticated session_user, SET LOCAL ROLE, matching
+`empire_current_tenant_id()` and tenant-scoped rows. A customer-supplied
+tenant header/query cannot select records. The same call engine and lock
+used by signed Voice webhooks provide the in-process enquiry snapshot,
+which includes service code, time preference, explicit review consent and
+status PENDING_HUMAN_REVIEW_NOT_SUBMITTED. No raw audio or speech transcript,
+customer telephone number, name, outbound authority or payment.
+
+**Default is off** and no existing public or live CRM route was modified.
+The candidate is only useful in the same single-process runtime until
+the native EmpireDB receipt store for voice sessions and consent is
+independently approved and verified. It does NOT constitute durable
+customer enquiries, a real CRM receipt, canonical prospect conversion,
+any completed appointment or generated revenue. It creates no DB table,
+no financial actions, no customer outbound and no job/timer.
+
+The first actual production admission must be wired to an existing
+approved CRM/inbound intake owner with idempotent canonical receipt,
+tenant membership verification, evidence provenance, contact consent
+retention/revocation, operator attribution and readback. Until then
+`canonical_crm_receipts=0` and `durable_queue_verified=false`.

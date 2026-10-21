@@ -27,6 +27,7 @@
 - The separately deployed `empire-inbound-recovery-staging.service` is *private Calendar staging* on localhost `127.0.0.1:8794`, not a deployed voice answering system.
 - New signed receptionist API is isolated and default-disabled; it is not attached to real Vonage numbers and relies on in-process replay/session state.
 - Current `CRMEnquiryDraft` has no real caller contact identity and does **not** write to `public.empire_crm_tenant_memberships`, canonical prospects, or payment sources.
+- `inbound_reception_crm_owner_review.py` provides a **default-off** private tenant-authenticated review endpoint, using `AuthenticatedRevenueCrmRead` and `PostgresRevenueCrmRepository` from the existing Revenue CRM reader. Only the same in-memory signed-voice engine's consented drafts are displayed; no persistent CRM receipt or real enquiry admission.
 - Version 057 native PostgreSQL RLS migration is held/unapplied in the last checked state. Do not infer schema activation from source existence. Only production DBA can authorise/verify a migration.
 - No first-party paid recovery is proven by the current synthetic demo or feature tests.
 
