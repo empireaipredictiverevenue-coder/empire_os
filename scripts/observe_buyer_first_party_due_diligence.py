@@ -101,10 +101,31 @@ def run(*,root:Path=ROOT,plan_only:bool=False,max_domains:int=MAX_DOMAINS_PER_CY
     if not isinstance(shortlist,list) or len(shortlist)>500 or source.get('shortlist_count')!=len(shortlist):
         raise DueDiligenceError('due_diligence_invalid_shortlist')
     old={}
+    legacy_excluded=[]
+    prior_digest=None
     if (base/OUTPUT).exists():
-        previous,_=_read(base/OUTPUT,2_000_000)
-        # Enforce the trust/schema contract instead of discarding old holds.
-        verified_observation_holds(previous,now_epoch=now)
+        previous,prior_digest=_read(base/OUTPUT,2_000_000)
+        # A newly tightened entity gate can invalidate legacy placeholder and
+        # telemetry rows. Exclude ONLY those rows, after validating every
+        # remaining historical proof. Never drop a verified critical HOLD.
+        try:
+            verified_observation_holds(previous,now_epoch=now)
+        except DueDiligenceError as exc:
+            if str(exc)!='due_diligence_observation_invalid':
+                raise
+            if not isinstance(previous.get('observations'),list):
+                raise
+            invalid=[item for item in previous['observations']
+                     if not isinstance(item,dict) or not accepted_domain(str(item.get('domain') or ''))]
+            if (not invalid or any(not isinstance(item,dict)
+                    or item.get('critical_broken_links') != []
+                    or item.get('outbound_authorized') is not False
+                    for item in invalid)):
+                raise
+            legacy_excluded=sorted(str(item['domain']) for item in invalid)
+            previous={**previous,'observations':[
+                item for item in previous['observations'] if accepted_domain(str(item.get('domain') or ''))]}
+            verified_observation_holds(previous,now_epoch=now)
         for item in previous['observations']:
             if isinstance(item,dict) and accepted_domain(str(item.get('domain') or '')):
                 old[item['domain']]=item
@@ -172,6 +193,8 @@ def run(*,root:Path=ROOT,plan_only:bool=False,max_domains:int=MAX_DOMAINS_PER_CY
         'observed_domain_count':len(retained),
         'new_checks_performed':len(observations),
         'observations':retained,
+        'excluded_invalid_legacy_domains':legacy_excluded,
+        'prior_report_sha256':prior_digest if legacy_excluded else None,
         'outbound_sent':False,'outbound_authorized':False,'db_write':False,
         'signups_performed':False,'traffic_activated':False,'execution_authority':'none',
     }

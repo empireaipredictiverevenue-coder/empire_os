@@ -144,3 +144,20 @@ def test_strong_evidence_can_be_ready():
         result["status"]
         == "READY_TO_APPROACH"
     )
+
+
+def test_failed_search_cycle_never_erases_previous_queue(tmp_path):
+    import json
+    import pytest
+    mod = module()
+    broken = tmp_path / "discovery.json"
+    broken.write_text(json.dumps({"schema_version":"buyer-network-discovery-v1",
+                                  "runs":[{"query":"roofing publishers","status":"HOLD"}]}))
+    prior = tmp_path / "candidate_queue_latest.json"
+    previous = '{"known_good_queue":"preserved"}\n'
+    prior.write_text(previous)
+    mod.DISCOVERY = broken
+    mod.OUTPUT = prior
+    with pytest.raises(RuntimeError, match="DISCOVERY_UNAVAILABLE_PRESERVE_EXISTING_BUYER_QUEUE"):
+        mod.main()
+    assert prior.read_text() == previous

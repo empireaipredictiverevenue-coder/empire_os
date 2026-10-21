@@ -236,3 +236,42 @@ def test_first_party_partial_capture_remains_review_only():
             'execution_authority':'none','outbound_sent':False,'observations':[row]}
     assert row['critical_broken_links']==[]
     assert verified_observation_holds(report,now_epoch=1100.)=={}
+
+
+def test_legacy_placeholder_telemetry_excluded_without_erasing_valid_hold(tmp_path):
+    base=_runner_fixture(tmp_path,domains=(DOMAIN,))
+    fetch,_=make_fetch(broken=True)
+    legit=observe_domain(DOMAIN,fetch=fetch,now_epoch=100_000.)
+    unwanted={**legit,'domain':'company.com','state':'UNAVAILABLE',
+              'home':{'status':'UNAVAILABLE'},'checked_links':[],
+              'critical_broken_links':[]}
+    original={'schema_version':'empire.buyer_due_diligence.v1',
+              'mode':'OBSERVE','execution_authority':'none','outbound_sent':False,
+              'observations':[legit,unwanted]}
+    path=base/cycle.OUTPUT
+    path.write_text(json.dumps(original))
+    planned=cycle.run(root=tmp_path,plan_only=True,now_epoch=100_100.)
+    assert planned['status']=='PLAN_ONLY'
+    assert 'company.com' in path.read_text()  # plan never rewrites source
+    outcome=cycle.run(root=tmp_path,now_epoch=100_100.)
+    assert outcome['automated_evidence_hold_count']==1
+    next_report=json.loads(path.read_text())
+    assert [x['domain'] for x in next_report['observations']]==[DOMAIN]
+    assert next_report['excluded_invalid_legacy_domains']==['company.com']
+    assert next_report['prior_report_sha256']
+    assert next_report['outbound_sent'] is False
+
+
+def test_legacy_invalid_domain_with_critical_hold_fails_closed(tmp_path):
+    base=_runner_fixture(tmp_path,domains=(DOMAIN,))
+    fetch,_=make_fetch(broken=True)
+    row=observe_domain(DOMAIN,fetch=fetch,now_epoch=100_000.)
+    row={**row,'domain':'company.com'}
+    p=base/cycle.OUTPUT
+    content=json.dumps({'schema_version':'empire.buyer_due_diligence.v1',
+              'mode':'OBSERVE','execution_authority':'none','outbound_sent':False,
+              'observations':[row]})
+    p.write_text(content)
+    with pytest.raises(DueDiligenceError,match='observation_invalid'):
+        cycle.run(root=tmp_path,plan_only=True,now_epoch=100_100.)
+    assert p.read_text()==content

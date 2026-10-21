@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.buyer_network_research_rotation import accepted_domain
+from empire_os.buyer_network_contact_history_gate import load_context, review
 
 from empire_os.buyer_network_integration import (
     BuyerNetworkIntegration,
@@ -499,6 +500,10 @@ def main() -> int:
     profiles = collect_domain_context(
         discovery
     )
+    # A failed or interrupted Search Fabric cycle must not erase the last
+    # candidate queue. Leave the existing artifact untouched for review.
+    if not profiles:
+        raise RuntimeError("DISCOVERY_UNAVAILABLE_PRESERVE_EXISTING_BUYER_QUEUE")
 
     known_domains = (
         existing_runtime_domains()
@@ -527,6 +532,14 @@ def main() -> int:
         "WATCH": 2,
         "REJECT": 3,
     }
+
+    # Discovery rank must never be mistaken for a fresh, uncontacted lead.
+    contact_context = load_context()
+    for item in candidates:
+        contact = review(item["domain"], contact_context)
+        item["contact_history"] = contact
+        item["outreach_status"] = contact["state"]
+        item["outbound_authorized"] = False
 
     candidates.sort(
         key=lambda item: (
@@ -589,6 +602,10 @@ def main() -> int:
 
         "status_counts":
             counts,
+
+        "contact_history_gate_enabled": True,
+        "contact_history_source": contact_context["source"],
+        "gmail_snapshot_fresh": contact_context["gmail_snapshot_fresh"],
 
         "candidates":
             candidates,

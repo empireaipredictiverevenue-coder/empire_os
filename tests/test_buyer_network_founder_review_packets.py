@@ -92,3 +92,10 @@ def test_tooling_only_not_genuine():
             }
         }
     )
+
+
+def test_report_packet_domain_gate_does_not_admit_placeholder_or_telemetry():
+    mod = module()
+    for domain in ("yoursite.com", "company.com", "insider.com",
+                   "o4509242520240129.ingest.us.sentry.io"):
+        assert mod.valid_domain(domain) is False

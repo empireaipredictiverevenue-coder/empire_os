@@ -8,6 +8,8 @@ from typing import Any
 
 from empire_os.buyer_review_holds import load_review_holds
 from empire_os.buyer_first_party_due_diligence import load_due_diligence
+from empire_os.buyer_network_research_rotation import accepted_domain
+from empire_os.buyer_network_contact_history_gate import load_context, review
 
 
 ROOT = Path("/srv/empire_os")
@@ -61,7 +63,7 @@ def valid_domain(domain: str) -> bool:
         domain or ""
     ).strip().lower()
 
-    if not domain:
+    if not accepted_domain(domain):
         return False
 
     if domain.startswith("empire."):
@@ -262,6 +264,7 @@ def main():
     queue = json.loads(
         QUEUE.read_text()
     )
+    contact_context = load_context()
 
     active = active_verified_domains(
         discovery
@@ -289,6 +292,7 @@ def main():
 
         if not valid_domain(domain):
             continue
+        contact = review(domain, contact_context)
 
         manual_hold = manual_holds.get(domain)
         if manual_hold is not None:
@@ -398,6 +402,7 @@ def main():
                     "due_diligence_link_count": site_review.get("link_count", 0),
                     "commercial_terms_verified": False,
                     "payout_economics_verified": False,
+                    "contact_history": contact,
 
                     "authority":
                         "FOUNDER_REVIEW_ONLY",
