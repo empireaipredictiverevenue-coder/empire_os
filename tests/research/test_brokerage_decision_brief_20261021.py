@@ -147,7 +147,8 @@ def test_real_provider_quality_flag_is_not_enough_without_niche_relevance():
                          "link": "https://visitbirmingham.com/"}],
         }
     result = discover_held_candidates("US", real_shaped_generic, niche="dental")
-    assert result["status"] == "SEARCH_PROVIDER_DEGRADED_OR_NO_FRESH_EVIDENCE"
+    assert result["status"] == "SEARCH_RESPONDED_NO_RELEVANT_FRESH_CANDIDATES"
+    assert result["niche_rejected"] >= 2
     assert result["candidate_urls"] == []
     assert result["source_admissions"] == 0
 
@@ -163,3 +164,40 @@ def test_search_fabric_result_cannot_admit_cross_niche_candidates():
     result = discover_held_candidates("GB", real_shaped_dental, niche="roofing")
     assert not result["any_verified_fresh_results"]
     assert result["source_admissions"] == 0
+
+
+def test_market_mismatch_rejected_without_claiming_provider_outage():
+    def provider(query, **kwargs):
+        return {
+            "searchParameters": {"engine": "bing_html", "cache": False,
+                                 "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+            "organic": [
+                {"title": "UK roofing company services",
+                 "link": "https://roofing.example-company.co.uk/services"},
+                {"title": "Chicago roofing contractors",
+                 "link": "https://roofco.example-business.com/chicago-roofing"},
+            ],
+        }
+    us = discover_held_candidates("US", provider, niche="roofing")
+    gb = discover_held_candidates("GB", provider, niche="roofing")
+    assert len(us["candidate_urls"]) == 1
+    assert us["candidate_urls"][0]["url"].endswith("/chicago-roofing")
+    assert us["market_rejected"] >= 1
+    assert len(gb["candidate_urls"]) == 1
+    assert gb["candidate_urls"][0]["url"].endswith(".co.uk/services")
+    assert gb["market_rejected"] >= 1
+    assert us["source_admissions"] == gb["source_admissions"] == 0
+
+
+def test_good_provider_off_topic_is_different_from_degraded():
+    fake = lambda query, **k: {
+        "searchParameters": {"engine": "bing_rss", "cache": False,
+                             "search_state": "RESULTS", "quality_gate": "lexical_v2"},
+        "organic": [{"title": "Visit Birmingham tourism",
+                     "link": "https://visitbirmingham.com/"}],
+    }
+    report = discover_held_candidates("GB", fake, niche="dental")
+    assert report["fresh_provider_responses"] == 2
+    assert report["status"] == "SEARCH_RESPONDED_NO_RELEVANT_FRESH_CANDIDATES"
+    assert report["niche_rejected"] >= 1
+    assert report["provider_errors"] == []

@@ -72,6 +72,51 @@ NICHES = {
     ),
 }
 
+# Query-only market probes, not an approved original-source catalogue.
+# One independent reference metro per country while source rights remain held.
+DISCOVERY_QUERIES = {
+    ("roofing", "US"): (
+        "Chicago Illinois roofing contractors official service pages",
+        "Chicago Illinois roofing building permits official city records",
+    ),
+    ("roofing", "GB"): (
+        "Birmingham UK roofing contractor published services original",
+        "Birmingham City Council roofing roof planning official guidance",
+    ),
+    ("solar", "US"): (
+        "Chicago Illinois solar installer published company services",
+        "Illinois solar incentives official utility programme documentation",
+    ),
+    ("solar", "GB"): (
+        "Birmingham UK solar panel installer original services",
+        "UK solar installation MCS certification official register",
+    ),
+    ("hvac", "US"): (
+        "Chicago Illinois HVAC heating cooling contractor original services",
+        "Illinois HVAC contractor registration official government",
+    ),
+    ("hvac", "GB"): (
+        "Birmingham UK heating HVAC contractor original services",
+        "UK Gas Safe Register heating engineer original verification",
+    ),
+    ("legal", "US"): (
+        "Chicago Illinois mass tort law firm original practice areas",
+        "Illinois ARDC attorney registration official",
+    ),
+    ("legal", "GB"): (
+        "Birmingham UK solicitor legal practice original services",
+        "SRA solicitor firm register Birmingham official",
+    ),
+    ("property", "US"): (
+        "Chicago official development permit applications city",
+        "Chicago Illinois official building zoning data",
+    ),
+    ("property", "GB"): (
+        "Birmingham City Council planning applications official portal",
+        "Birmingham UK brownfield land register official",
+    ),
+}
+
 COUNTRIES = ("US", "GB")
 SOURCE_READY_ONLY = frozenset({("dental", "US"), ("dental", "GB")})
 
@@ -94,10 +139,10 @@ def research_intake_plan(niche: str, country: str) -> dict:
         "research_question": question,
         "evidence_categories_to_verify": list(spec.evidence_categories),
         "unverified_inferences_to_avoid": list(spec.high_risk_inferences),
-        "search_queries": [
-            question,
-            question + " official original primary source",
-        ],
+        "search_queries": list(DISCOVERY_QUERIES.get(
+            (niche, country),
+            (question, question + " official original primary source"),
+        )),
         "source_catalogue_state": (
             "EXISTING_CURATED_DENTAL_ORIGINALS"
             if ready else "ORIGINAL_SOURCES_NOT_YET_ADMITTED"

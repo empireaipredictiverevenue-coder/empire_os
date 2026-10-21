@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import ResearchIntakeReview, { type ResearchIntake, type MarketSearchReport } from "./research-intake-review";
 
 type Catalog = {
   products?: Record<string, { title?: string; description?: string }>;
@@ -11,7 +12,8 @@ type Catalog = {
 type ResearchReport = {
   status?: string;
   original_source_count?: number;
-  research?: { market_reports?: Array<{
+  research?: { niche_intake_plans?: ResearchIntake[]; market_reports?: Array<{
+    current_search_discovery?: MarketSearchReport["current_search_discovery"];
     country?: string;
     evidence_fingerprint_sha256?: string;
     evidence_ledger?: Array<{
@@ -111,6 +113,7 @@ export default function ResearchWorkbench({ catalog }: { catalog: Catalog }) {
             {(source.original_passage_anchors_for_editorial_only ?? []).slice(0, 2).map((anchor, k) => <p key={k} className="mt-2 border-l border-cyan-400/30 pl-3 text-xs text-slate-400">{anchor.original_page_excerpt}</p>)}
           </div>)}
         </div>)}
+        <ResearchIntakeReview intakes={result.research?.niche_intake_plans} marketReports={result.research?.market_reports} />
         {result.agent_workflow?.step_receipts?.map((step, i) => <div key={step.step ?? i} className="rounded-xl border border-white/10 p-4">
           <p className="text-sm font-semibold text-white">{step.step} · {step.state}</p>
           <p className="mt-1 text-sm text-slate-400">{step.explanation}</p>

@@ -20,11 +20,11 @@ from .brokerage_niche_profiles import research_intake_plan
 SCHEMA = "empire.brokerage.evidence_decision_brief.v1"
 _NICHE_SOURCE_TERMS = {
     "dental": ("dental", "dentist", "dentistry", "implant", "cma private dental"),
-    "roofing": ("roofing", "roofer", "roof repair", "roof contractor"),
+    "roofing": ("roofing", "roofer", "roof repair", "roof contractor", "roof works"),
     "solar": ("solar", "photovoltaic", "pv installer"),
-    "hvac": ("hvac", "heating", "air conditioning", "heat pump"),
+    "hvac": ("hvac", "heating", "air conditioning", "heat pump", "gas safe"),
     "legal": ("solicitor", "law firm", "legal service", "attorney", "lawyer"),
-    "property": ("property", "planning application", "brownfield", "development", "permit"),
+    "property": ("property", "planning", "brownfield", "development", "permit", "zoning"),
 }
 
 _SEARCH_QUERIES = {
@@ -63,6 +63,26 @@ def _valid_search_url(value: Any) -> bool:
         return False
 
 
+def _candidate_market_match(country: str, url: str, searchable: str) -> bool:
+    """Require a geographic source cue, without inferring service coverage."""
+    host = (urlsplit(url).hostname or "").lower()
+    if country == "GB":
+        if host.endswith(".uk"):
+            return True
+        return bool(re.search(
+            r"\b(?:birmingham|united kingdom|uk|britain|british|england|scotland|wales)\b",
+            searchable, re.I,
+        ))
+    if country == "US":
+        if host.endswith((".us", ".gov")):
+            return True
+        return bool(re.search(
+            r"\b(?:chicago|illinois|united states|usa|u\.s\.a\.|u\.s\.)\b",
+            searchable, re.I,
+        ))
+    return False
+
+
 def discover_held_candidates(
     country: str,
     search_fn: Callable[..., Mapping[str, Any]] | None,
@@ -92,6 +112,10 @@ def discover_held_candidates(
     items: list[dict[str, str]] = []
     seen: set[str] = set()
     failures: list[str] = []
+    provider_results_seen = 0
+    niche_rejected = 0
+    market_rejected = 0
+    fresh_provider_responses = 0
     for query in queries:
         try:
             result = search_fn(query, num=5, engine=None, use_cache=False)
@@ -107,14 +131,20 @@ def discover_held_candidates(
                 or p.get("quality_gate") != "lexical_v2"
                 or p.get("engine") in (None, "none", "unknown")):
                 raise ValueError("NO_VERIFIED_FRESH_SEARCH_EVIDENCE")
+            fresh_provider_responses += 1
             for row in result.get("organic", [])[:5]:
                 if not isinstance(row, Mapping) or row.get("synthetic"):
                     continue
                 url = row.get("link") or row.get("url")
                 if not _valid_search_url(url) or url in seen:
                     continue
+                provider_results_seen += 1
                 searchable = " ".join(str(row.get(key) or "")[:500] for key in ("title", "snippet", "link")).casefold()
                 if not any(term in searchable for term in _NICHE_SOURCE_TERMS[niche]):
+                    niche_rejected += 1
+                    continue
+                if not _candidate_market_match(country, url, searchable):
+                    market_rejected += 1
                     continue
                 seen.add(url)
                 items.append({
@@ -129,9 +159,15 @@ def discover_held_candidates(
     return {
         "status": (
             "FRESH_DISCOVERY_CANDIDATES_NOT_ADMITTED" if items
-            else "SEARCH_PROVIDER_DEGRADED_OR_NO_FRESH_EVIDENCE"
+            else ("SEARCH_RESPONDED_NO_RELEVANT_FRESH_CANDIDATES"
+                  if fresh_provider_responses else
+                  "SEARCH_PROVIDER_DEGRADED_OR_NO_FRESH_EVIDENCE")
         ),
         "queries_attempted": len(queries),
+        "fresh_provider_responses": fresh_provider_responses,
+        "provider_results_seen": provider_results_seen,
+        "niche_rejected": niche_rejected,
+        "market_rejected": market_rejected,
         "provider_errors": failures,
         "candidate_urls": items[:10],
         "any_verified_fresh_results": bool(items),

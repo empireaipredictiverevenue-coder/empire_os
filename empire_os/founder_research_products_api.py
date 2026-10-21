@@ -13,7 +13,7 @@ from time import monotonic
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StrictBool
 
 from empire_os.founder_research_auth import require_founder_access_jwt
 from empire_os.research.research_products import product_catalog, use_product
@@ -25,7 +25,7 @@ class PreviewRequest(BaseModel):
     country: Literal["US", "GB", "both"] = "both"
     niche: Literal["dental", "roofing", "solar", "hvac", "legal", "property"] = "dental"
     depth: Literal["speed", "balanced", "quality"] = "quality"
-    fresh_discovery: bool = False
+    fresh_discovery: StrictBool = False
 
 
 class ResearchExecutionBudget:

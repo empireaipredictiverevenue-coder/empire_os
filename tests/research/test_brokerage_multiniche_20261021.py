@@ -96,3 +96,22 @@ def test_bad_niche_rejected():
         research_intake_plan("dental", "FR")
     with pytest.raises(ValueError, match="NICHE"):
         discover_held_candidates("GB", None, niche="unknown")
+
+
+
+def test_all_non_dental_markets_have_independent_specific_search_probes():
+    seen = set()
+    for niche in ("roofing", "solar", "hvac", "legal", "property"):
+        for country in ("US", "GB"):
+            plan = research_intake_plan(niche, country)
+            queries = plan["search_queries"]
+            assert len(queries) == 2
+            assert all(isinstance(q, str) and len(q) >= 25 for q in queries)
+            assert all("dental" not in q.casefold() for q in queries)
+            assert ("Chicago" in " ".join(queries) or "Illinois" in " ".join(queries)) if country == "US" else ("Birmingham" in " ".join(queries) or "UK" in " ".join(queries))
+            assert plan["source_catalogue_state"] == "ORIGINAL_SOURCES_NOT_YET_ADMITTED"
+            assert plan["source_reuse_rights_verified"] is False
+            assert plan["editorial_signed_off"] is False
+            assert tuple(queries) not in seen
+            seen.add(tuple(queries))
+    assert len(seen) == 10

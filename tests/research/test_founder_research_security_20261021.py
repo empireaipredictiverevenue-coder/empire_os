@@ -88,6 +88,8 @@ def test_execution_cooldown_exclusive_and_no_get():
         assert client.get(PATH + "/preview?product=empire_agent").status_code == 405
         assert client.post(PATH + "/preview", json={"product": "not-allowed"}).status_code == 422
         assert client.post(PATH + "/preview", json={"product": "empire_agent", "shell": "id"}).status_code == 422
+        assert client.post(PATH + "/preview", json={"product": "empire_agent", "fresh_discovery": "true"}).status_code == 422
+        assert client.post(PATH + "/preview", json={"product": "empire_agent", "fresh_discovery": 1}).status_code == 422
     assert attempted == []
 
 
