@@ -314,3 +314,21 @@ def test_new_us_publisher_seeds_are_non_authoritative_without_extra_searches():
         assert row["identity_verified"] is False
     assert len(observed["queries"]) == 2
     assert report["outbound_sent"] is False
+
+
+def test_visiqua_multi_format_publisher_pages_researched_without_authority():
+    from empire_os.buyer_public_research_seed import publisher_review_page_paths
+    report = build_public_research_seeds(
+        {}, search_fn=lambda queries, num: {}, max_queries=2,
+        observed_at=datetime(2026, 10, 21, tzinfo=timezone.utc),
+        include_volume=False,
+    )
+    row = next(item for item in report['seeds'] if item['domain']=='visiqua.com')
+    assert row['website'] == 'https://visiqua.com/calls/'
+    assert row['target_markets'] == ['USA']
+    assert row['outreach_authorized'] is False
+    assert row['buyer_capacity_verified'] is False
+    assert row['commercial_terms_verified'] is False
+    assert row['identity_verified'] is False
+    assert publisher_review_page_paths('visiqua.com') == ('/calls','/clicks','/leads')
+    assert report['query_count'] == 2

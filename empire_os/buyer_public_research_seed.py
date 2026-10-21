@@ -84,6 +84,9 @@ _MULTIMARKET_REVIEW_SEEDS = (
     ("https://leadsbycall.com/faq.html", "USA", ("home_services",)),
     ("https://leadspedio.com/", "USA", ("home_services", "legal", "insurance")),
     ("https://www.ringondemand.com/partners", "USA", ("legal", "insurance")),
+    # Explicit first-party call/click/lead publisher marketplaces: these
+    # programme pages are research evidence, never buyer or payout authority.
+    ("https://visiqua.com/calls/", "USA", ("home_services", "insurance")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (
@@ -542,4 +545,6 @@ def publisher_review_page_paths(domain: str) -> tuple[str, ...]:
     # Exact Polyares first-party PPL programme page, not a general URL crawl.
     if _host(domain) == "polyares.com":
         return (primary, "/pay-per-lead-affiliate-program")
+    if _host(domain) == "visiqua.com":
+        return (primary, "/clicks", "/leads")
     return (primary,)
