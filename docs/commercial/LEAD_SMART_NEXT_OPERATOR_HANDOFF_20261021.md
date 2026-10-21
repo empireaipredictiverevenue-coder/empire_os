@@ -94,3 +94,26 @@ curl -sS -L -o /dev/null -w '%{http_code}\n' https://empire-ai.co.uk/roofing
 **Commercial mission is NOT complete.** Handoff complete; launch is blocked on genuine external evidence and founder-scoped activation. Stop pretending code/test/page views represent success. Continue only authorised work. Next user-visible update should be short: **Executed / Actual accepted calls and cash / One blocker owner / Next real action**. Do not launch out-of-hours or fabricate revenue.
 
 **This handoff is the source-of-truth continuation brief for the next agent.**
+
+## Closing check / organic demand research — 21 Oct 2026 10:06 UTC
+
+- Revalidated live EmpireOS readiness against canonical production: call controller `enabled=false`, historical `FULL_CAMPAIGN` mode explicitly `full_campaign_scope_revoked=true`. Tracking, ZIP and buyer landing source gates pass. Eight other launch/consent/routing/owner gates remain red. Public website `/`, `/roofing`, `/roofing/call-privacy`, `/industries/roofing` all return 200; POST `/roofing/pilot-handoff` returns 503. Four roofing evidence timers active. No live activation occurred.
+- Rechecked Gmail thread after the approved terms send `1a15dc2f341f4638`; **no newer buyer response**. Avoid repeat follow-up while pending.
+- Authenticated call-to-cash verifier `scripts/review_lead_smart_call_to_cash_20261021.py`: one provider exact-match historic row, signed provider connected event + duplicate marker but buyer destination not independently authenticated. 32-second reported connected / 48-second total historical row, zero actual first-party site handoffs verified, zero accepted payable calls, zero settled payments. Missing handoff ledger is reported as missing, not a zero-filled observation.
+- Verified public homeowner demand research, **no user/contact data scraped or approached**:
+  - Sept 12 Winnetka, IL owner asks about full roof replacement options; originally shared on Reddit https://www.reddit.com/r/ChicagoHomeTalk/comments/1wemnnq/north_shore_chicago_roofing_contractor/ — this is *unconfirmed current demand* and no confirmed qualifying ZIP, permission or access to publish.
+  - Oct 15 general US homeowner seeks roof-replacement quote evaluation: https://www.reddit.com/r/homeowners/comments/1x6gs9w/first_time_buying_a_new_roof_i_could_use_some/ — location/approved ZIP unknown; **not an attributable buyer lead**.
+  - Sept 5 ChicagoSuburbs discussion shows distrust of high-pressure storm sellers: https://www.reddit.com/r/ChicagoSuburbs/comments/1w85pxs/are_those_storm_damage_roofing_companies_a_scam/ — use clear, non-pushy consumer information; not a sales lead.
+- First researched **potential** local complementary organisations; each still needs partnership rights, approved source attribution and recipient/suppression review before outreach:
+  - Chicago Building Inspections, https://www.inspectingchicago.com/ (roof assessments, public business contact info@inspectingchicago.com).
+  - ALPS Property Management, https://thealpsgroup.com/chicago-property-management/ (single-family/HOA management, public business contact info@thealpsgroup.com).
+  - Field Street Properties, https://www.fieldstreetproperties.com/ (western Chicago suburbs, maintenance/inspection, publicly displayed regina@fieldstreetproperties.com).
+  - Chicagoland Home Inspectors, https://thehomeinspectors.com/ (Chicago, roof inspections, public business email Info@TheHomeInspectors.com; their website says they do not partner with real estate agents, so check fit before contacting).
+  - HomeRiver Group Chicago, https://www.chicago-propertymanagement.com/ (owner rehabilitation and maintenance).
+  - Evernest Chicago, https://www.chicagoproperty.management/ (single-family property management).
+  - Gutter Santiago, https://guttersantiago.com/gutter-santiago-contact/ (gutter/roofline service; likely overlap with buyer's trade, so evaluate conflict).
+  - Redefined Restoration, public Chicago restoration provider (possible service competition; do not assume interested).
+- No newly researched local organisation was emailed or promised any fee, no Reddit/community comment or social post was published, and there is **no platform Reddit posting connector in this operation**. Metricool currently reports no connected social network for this brand, so no owned social post could be sent. The previously sent Roofing Mate/Roofing Calculators emails remain the only outside publisher outreach.
+- **Critical acquisition restriction**: the campaign source ID remains `EMPIRE_FIRST_PARTY_ORGANIC`; third-party visitor introductions must not be laundered as owned SEO. Do not solicit actual homeowner call traffic into the disabled admissions endpoint. Confirm buyer permission and source-specific attribution before any partner referral, and do not promise referral payouts.
+
+Commercial closeout: the **preparatory work and evidence checks are complete as far as current authority allows; the user's revenue mission is not complete**. Next operator must get the answered-terms reply, independent legal/recording signoff, Ringba buyer-leg/ANI evidence or permissible documented owner attestation, and new exact founder-scoped activation before any true call-acquisition experiment. No revenue recognised.
