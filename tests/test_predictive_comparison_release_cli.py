@@ -11,6 +11,10 @@ def test_cli_summary_verified_local_file_not_original_db(capsys):
     assert cli.main(["--read-only"]) == 0
     result=json.loads(capsys.readouterr().out)
     assert result["catalogue_product_count"] == 86
+    assert result["approved_cost_ceiling_scenarios_available"] == 26
+    assert result["approved_ceiling_scenarios_meeting_margin"] == 26
+    assert result["approved_ceiling_scenarios_below_margin"] == 0
+    assert result["approved_cost_ceiling_scenario_is_actual_margin"] is False
     assert "products" not in result
     assert result["source_root_owned_snapshot_custody_verified"] is True
     assert result["source_original_empiredb_issuer_authenticated"] is False
@@ -29,6 +33,10 @@ def test_cli_full_review_retains_all_sku_currency_and_no_repricing(capsys):
     }
     assert all(p["automatic_price_changes_authorized"] is False
                for p in result["products"])
+    assert all(
+        p["founder_policy_cost_ceiling_scenario"]["realized_margin_verified"] is False
+        for p in result["products"]
+    )
 
 
 def test_cli_source_hold_is_redacted_and_fails_closed(monkeypatch, capsys):
@@ -55,6 +63,7 @@ def test_release_launcher_has_comparison_without_repricing_service():
     assert "empire_os/predictive_point_in_time_features.py" in content
     assert "empire_os/predictive_competitive_product_comparison.py" in content
     assert "empire_os/predictive_catalogue_price_comparison.py" in content
+    assert "empire_os/predictive_price_policy_evidence.py" in content
     assert "scripts/review_predictive_comparison_20261021.py" in content
     assert "automatic_price_changes_authorized" in content
     assert 'price_change_authority' in content

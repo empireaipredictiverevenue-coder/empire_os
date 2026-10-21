@@ -17,6 +17,9 @@ from empire_os.predictive_competitive_product_comparison import (
     BENCHMARKS, SCHEMA as FLAGSHIP_SCHEMA,
     compare_predictive_enterprise_products,
 )
+from empire_os.predictive_price_policy_evidence import (
+    PricingPolicyHold, review_price_policy_ceiling,
+)
 
 SCHEMA = "empire.predictive_revenue.catalogue_price_comparison.v1"
 MAX_AMT = 1_000_000_000_000
@@ -91,6 +94,18 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
             counters["catalogue_prices_unknown"] += 1
         else:
             counters["catalogue_prices_observed_not_authenticated"] += 1
+        try:
+            policy = review_price_policy_ceiling(original)
+        except PricingPolicyHold:
+            raise CataloguePricingHold(
+                "original price policy ceiling contradicts catalogue"
+            ) from None
+        if policy["policy_ceiling_scenario_available"]:
+            counters["approved_cost_ceiling_scenarios_available"] += 1
+            if policy["policy_ceiling_passes"]:
+                counters["approved_ceiling_scenarios_meeting_margin"] += 1
+            else:
+                counters["approved_ceiling_scenarios_below_margin"] += 1
         categories = set(SEGMENTS_BY_FAMILY[family])
         competitors = [
             {
@@ -122,6 +137,7 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
             "forecast_eligible": False,
             "evidence_backed_price_justified": False,
             "price_review_status": "HOLD_ORIGINAL_SCOPE_COST_AND_BENEFIT_PROOF",
+            "founder_policy_cost_ceiling_scenario": policy,
             "competitor_categories": competitors,
             "automatic_price_changes_authorized": False,
             "external_sales_or_pricing_published": False,
@@ -140,6 +156,16 @@ def review_catalogue_price_comparison(catalogue: Mapping[str, Any]) -> dict[str,
             "catalogue_prices_observed_not_authenticated"
         ],
         "founder_approved_flagship_prices_count": len(authoritative_prices),
+        "approved_cost_ceiling_scenarios_available": counters[
+            "approved_cost_ceiling_scenarios_available"
+        ],
+        "approved_ceiling_scenarios_meeting_margin": counters[
+            "approved_ceiling_scenarios_meeting_margin"
+        ],
+        "approved_ceiling_scenarios_below_margin": counters[
+            "approved_ceiling_scenarios_below_margin"
+        ],
+        "approved_cost_ceiling_scenario_is_actual_margin": False,
         "original_catalogue_source_authenticated": False,
         "flagship_comparison_schema": FLAGSHIP_SCHEMA,
         "products": entries,

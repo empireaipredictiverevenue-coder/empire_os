@@ -113,6 +113,7 @@ EOF
     empire_os/predictive_catalog_readiness_bridge.py \
     empire_os/predictive_point_in_time_features.py \
     empire_os/predictive_competitive_product_comparison.py \
+    empire_os/predictive_price_policy_evidence.py \
     empire_os/predictive_catalogue_price_comparison.py \
     scripts/review_predictive_comparison_20261021.py \
     empire_os/predictive_intelligence.py \
@@ -249,6 +250,9 @@ assert x["schema_version"]=="empire.predictive_revenue.catalogue_price_compariso
 assert x["catalogue_product_count"]>=5
 assert x["catalogue_prices_unknown"]+x["catalogue_prices_observed_not_authenticated"]==x["catalogue_product_count"]
 assert x["founder_approved_flagship_prices_count"]==5
+assert x["approved_cost_ceiling_scenarios_available"]>=0
+assert x["approved_ceiling_scenarios_meeting_margin"]+x["approved_ceiling_scenarios_below_margin"]==x["approved_cost_ceiling_scenarios_available"]
+assert x["approved_cost_ceiling_scenario_is_actual_margin"] is False
 assert x["source_root_owned_snapshot_custody_verified"] is True
 assert x["source_original_empiredb_issuer_authenticated"] is False
 assert x["astra_gpt6_independent_review"]=="NOT_EXECUTED"
@@ -265,6 +269,8 @@ assert all(p["evidence_backed_price_justified"] is False for p in x["products"])
 assert all(p["automatic_price_changes_authorized"] is False for p in x["products"])
 assert all(p["foreign_currency_converted_to_usd"] is False for p in x["products"])
 assert all(len(p["competitor_categories"])==6 for p in x["products"])
+assert all(not p["founder_policy_cost_ceiling_scenario"]["realized_margin_verified"] for p in x["products"])
+assert all(not p["founder_policy_cost_ceiling_scenario"]["price_justified_by_evidence"] for p in x["products"])
 assert x["execution_authority"]=="none"
 '
 # The science adapter MUST preserve unknown forecasts when original product
