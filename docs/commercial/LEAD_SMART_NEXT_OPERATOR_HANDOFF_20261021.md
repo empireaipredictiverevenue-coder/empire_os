@@ -1,5 +1,7 @@
 # Empire AI / ASTRA — Lead Smart roofing campaign: FULL OPERATOR HANDOFF
 
+> **NEWER BUYER REPLY — 21 Oct 2026, 13:24:51 UTC:** Lead Smart corrected the earlier assumed 120 connected-second duration and payable payout status, and clarified dynamic ZIP coverage, caller-local hours, payment rails and scrubs. The original checkpoint below is historical, not current terms. Read [the verified-source commercial correction](LEAD_SMART_BUYER_TERMS_CORRECTION_20261021.md) before considering any call activation. No buyer-route, payout or traffic switch was made.
+
 **Checkpoint:** 21 October 2026, production inspected ~09:45 UTC. **Status: LIVE WEBSITE, CALL ADMISSION OFF, NO VERIFIED PAYABLE REVENUE.** This handoff closes the engineering/evidence work in this chat; it does **not** claim the revenue objective has been achieved.
 
 ## Owner mandate — do not drift

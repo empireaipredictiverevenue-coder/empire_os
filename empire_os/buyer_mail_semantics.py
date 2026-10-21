@@ -24,6 +24,7 @@ EVENT_CODES = frozenset({
     "COMPLETE_BUYER_REQUIREMENTS_SENT",
     "PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED",
     "BUYER_INTERNAL_DECISION_PENDING_REPORTED",
+    "ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED",
 })
 
 def _decode(data: Any) -> str:
@@ -166,6 +167,16 @@ def classify_visible_claims(visible: str, *, outbound: bool = False) -> list[str
                     re.search(r"\b(confirm|verification|evidence|screenshot|could|please)\b",text)
                     and re.search(r"\b(target|route|destination|buyer leg)\b",text)):
                 events.add("PILOT_TECHNICAL_REQUIREMENTS_SENT")
+    # Source-bound roofing clarification: both the revised variable duration
+    # and the explicit preliminary (NOT confirmed) payout plus approved wire
+    # option must occur in the buyer's NEW visible reply. This is a reported
+    # statement, never proof of an accepted call, negotiated contract, or cash.
+    if (not outbound
+            and re.search(r"\b60\s*[-–]\s*150\s+seconds?\s+in\s+total\b", text)
+            and re.search(r"\btop[ -]?line\s+payout\s+and\s+not\s+the\s+confirmed\s+payout\b", text)
+            and re.search(r"\bach\s*,\s*wire\s+and\s+paypal\b", text)
+            and re.search(r"\bcoverage\s+tool\s+updates\s+1\s+time\s+a\s+day\b", text)):
+        events.add("ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED")
     if outbound and re.search(r"\b(could you|please (?:send|confirm|provide)|we need)\b",text):
         groups = [
             r"\b(campaign|buy.?box|accepted (?:jobs|services|zip|markets))\b",

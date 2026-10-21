@@ -1061,6 +1061,25 @@ def reconcile(
             founder_action = "AWAIT_BUYER_INTERNAL_DECISION_NO_DUPLICATE_FOLLOWUP"
             action_reason = "BUYER_REPORTED_INTERNAL_DECISION_PENDING"
             needs_review = True
+        # The buyer has corrected payout duration and preliminary Ringba
+        # values. Review that actual latest reply before any pilot release;
+        # neither the email nor this recognition establishes commercial
+        # acceptance, a payable call or permission for auto-send.
+        revised_roofing_terms = (
+            key == "lead-smart"
+            and record_mail_fresh and stage == "INBOUND_REVIEW_REQUIRED"
+            and not founder_excluded
+            and any(
+                event.get("event_code") == "ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED"
+                and event.get("direction") == "inbound"
+                and event.get("message_id") == record["last_inbound_message_id"]
+                for event in record.get("buyer_signal_events", [])
+            )
+        )
+        if revised_roofing_terms:
+            founder_action = "REVIEW_LEAD_SMART_REVISED_TERMS_BEFORE_CALLS"
+            action_reason = "BUYER_REVISED_ROOFING_TERMS_REPORTED"
+            needs_review = True
         if founder_excluded:
             founder_action = "DO_NOT_PURSUE_NO_CONTACT"
             needs_review = False

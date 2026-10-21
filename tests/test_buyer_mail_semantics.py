@@ -239,3 +239,64 @@ def test_pending_decision_event_flows_into_registry_without_launch_authority():
     blocked = next(x for x in suppressed["relationships"] if x["entity_key"] == "lead-smart")
     assert blocked["next_founder_action"] == "DO_NOT_PURSUE_NO_CONTACT"
     assert blocked["outbound_authorized"] is False
+
+
+def test_revised_roofing_commercial_rules_are_recognized_only_from_direct_buyer_claims():
+    buyer_reply = (
+        "No. The range is from 60-150 seconds in total. "
+        "If you send via the rtb the bid and duration are passed along to you.\n\n"
+        "Yes, but the coverage tool updates 1 time a day, and buyers can pause "
+        "and change throughout the day. The payout shown is also the top line "
+        "payout and not the confirmed payout.\n\n"
+        "ACH, Wire and PayPal are the only options."
+    )
+    code = "ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED"
+    assert code in classify_visible_claims(buyer_reply)
+    assert code not in classify_visible_claims(buyer_reply, outbound=True)
+    assert code not in classify_visible_claims(
+        "We have 60-150 seconds in total but the payout is confirmed and final. "
+        "ACH, Wire and PayPal are the only options."
+    )
+    assert code not in classify_visible_claims(
+        "The payout shown is the top line payout and not the confirmed payout."
+    )
+    assert code not in classify_visible_claims(
+        "Thanks, understood.\nOn Wednesday, Lead Smart wrote:\n" + buyer_reply
+    )
+
+
+def test_latest_roofing_buyer_terms_correct_pending_decision_without_granting_authority():
+    from tests.test_connected_gmail_buyer_metadata import inputs
+    old, index = inputs()
+    inbound = index["threads"][0]["messages"][1]
+    inbound["recognized_codes"] = ["ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED"]
+    now = datetime(2026, 10, 10, 12, tzinfo=timezone.utc)
+    updated, _ = refreshed_summary(old, index, now=now)
+    report = reconcile(updated, {"candidate_count": 0, "candidates": []},
+                       {"shortlisted_count": 0, "targets": []}, now=now,
+                       do_not_pursue_domains=frozenset())
+    row = next(x for x in report["relationships"] if x["entity_key"] == "lead-smart")
+    assert row["next_founder_action"] == "REVIEW_LEAD_SMART_REVISED_TERMS_BEFORE_CALLS"
+    assert row["founder_action_reason"] == "BUYER_REVISED_ROOFING_TERMS_REPORTED"
+    assert row["founder_review_required"] is True
+    assert row["recognized_buyer_events_are_verified"] is False
+    assert row["commercial_buyer_approved"] is False
+    assert row["outbound_authorized"] is False
+    assert row["realised_revenue_proven"] is False
+    assert report["execution_authority"] == "NONE"
+
+    # A newer message, different buyer or suppression cannot inherit this status.
+    different = deepcopy(updated)
+    lead = next(x for x in different["threads"] if x["entity_key"] == "lead-smart")
+    lead["last_inbound_message_id"] = "abcdef0123456789"
+    revised = reconcile(different, {"candidate_count": 0, "candidates": []},
+                        {"shortlisted_count": 0, "targets": []}, now=now,
+                        do_not_pursue_domains=frozenset())
+    lead_row = next(x for x in revised["relationships"] if x["entity_key"] == "lead-smart")
+    assert lead_row["next_founder_action"] != "REVIEW_LEAD_SMART_REVISED_TERMS_BEFORE_CALLS"
+
+    suppressed = reconcile(updated, {"candidate_count": 0, "candidates": []},
+                           {"shortlisted_count": 0, "targets": []}, now=now,
+                           do_not_pursue_domains=frozenset({"leadsmartinc.com"}))
+    lead_row = next(x for x in suppressed["relationships"] if x["entity_key"] == "lead-smart")
+    assert lead_row["next_founder_action"] == "DO_NOT_PURSUE_NO_CONTACT"
