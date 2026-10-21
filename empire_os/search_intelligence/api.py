@@ -26,6 +26,7 @@ from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
 from .quora_intelligence import QuoraEvidenceError, review_quora_research
+from .jev_shadow_review import JevSeoEvidenceError, review_quora_jev_shadow
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
     AiAnswerObservation,
@@ -342,6 +343,19 @@ def create_search_router(
         except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
             raise HTTPException(
                 status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/quora/jev-shadow/review")
+    def quora_jev_shadow_review(response: Response):
+        """SEO typed-decision readiness: NO Jev provider call or live action."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return review_quora_jev_shadow()
+        except (JevSeoEvidenceError, QuoraEvidenceError, OSError, UnicodeError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="quora_jev_shadow_source_unavailable",
                 headers={"Cache-Control": "no-store"},
             ) from None
 

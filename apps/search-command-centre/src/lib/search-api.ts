@@ -258,3 +258,37 @@ export type QuoraResearchReview = {
 export function getQuoraResearchReview() {
   return request<QuoraResearchReview>("/v1/search/quora/review");
 }
+
+
+/** SEO Jev typed-decision readiness; this API never invokes a model. */
+export type QuoraJevShadowReview = {
+  schema_version: "empire.search.quora_jev_shadow_readiness.v1";
+  mode: "OBSERVE";
+  provider_key: "disabled";
+  provider_invoked: false;
+  external_requests_performed: false;
+  external_tokens_billed: 0;
+  jev_model_predictions_count: 0;
+  real_labeled_case_count: 0;
+  reviewed_topics_count: number;
+  vertical_topic_counts: Record<string, number>;
+  cases_ready_for_model_evaluation: 0;
+  typed_decision_task_readiness: {
+    promotion_review_ready: false;
+    shadow_eval_ready: false;
+    blockers: string[];
+  };
+  jev_use_case_readiness: {
+    provider_activation: false;
+    review_ready: false;
+    warnings: string[];
+  };
+  publishing_authorized: false;
+  buyer_routing_authorized: false;
+  production_writes: false;
+  execution_authority: "NONE";
+};
+
+export function getQuoraJevShadowReview() {
+  return request<QuoraJevShadowReview>("/v1/search/quora/jev-shadow/review");
+}

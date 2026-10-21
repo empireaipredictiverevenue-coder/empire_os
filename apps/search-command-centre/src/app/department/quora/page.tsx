@@ -2,7 +2,10 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { getQuoraResearchReview, type QuoraResearchReview } from "@/lib/search-api";
+import {
+  getQuoraResearchReview, getQuoraJevShadowReview,
+  type QuoraResearchReview, type QuoraJevShadowReview,
+} from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
 export const metadata = {
@@ -31,6 +34,24 @@ function trusted(value: QuoraResearchReview | null): value is QuoraResearchRevie
       x.answer_publication_state === "RESEARCH_ONLY" &&
       x.proposed_page_public_verified === false
     );
+}
+
+function trustedJev(
+  value: QuoraJevShadowReview | null, count: number,
+): value is QuoraJevShadowReview {
+  return !!value
+    && value.schema_version === "empire.search.quora_jev_shadow_readiness.v1"
+    && value.mode === "OBSERVE" && value.execution_authority === "NONE"
+    && value.provider_key === "disabled" && value.provider_invoked === false
+    && value.external_requests_performed === false && value.external_tokens_billed === 0
+    && value.jev_model_predictions_count === 0
+    && value.cases_ready_for_model_evaluation === 0
+    && value.real_labeled_case_count === 0
+    && value.reviewed_topics_count === count
+    && value.publishing_authorized === false && value.buyer_routing_authorized === false
+    && value.production_writes === false
+    && value.typed_decision_task_readiness.promotion_review_ready === false
+    && value.jev_use_case_readiness.provider_activation === false;
 }
 
 const VERTICALS = [
@@ -67,8 +88,12 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const response = await getQuoraResearchReview();
+  const [response, jevResponse] = await Promise.all([
+    getQuoraResearchReview(), getQuoraJevShadowReview(),
+  ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
+  const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
+    ? jevResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -91,6 +116,21 @@ export default async function QuoraResearchDepartment() {
           <div className={styles.stat}><div className={styles.statHeading}>Search candidates</div><div className={styles.statValue}>{d.source_candidates_count}</div><p className={styles.statDetail}>Unverified results from Search Fabric</p></div>
           <div className={styles.stat}><div className={styles.statHeading}>Verified questions</div><div className={styles.statValue}>{d.verified_quora_questions}</div><p className={styles.statDetail}>Requires direct page review</p></div>
           <div className={styles.stat}><div className={styles.statHeading}>Published answers</div><div className={styles.statValue}>{d.published_answers_verified}</div><p className={styles.statDetail}>Not inferred from topic research</p></div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="quora-jev">
+          <div className={styles.sectionLead}>
+            <div><span className={styles.overline}>01 / TYPED DECISION INTELLIGENCE</span>
+              <h2 id="quora-jev">Jev readiness</h2></div>
+            <span>READ ONLY · NO PROVIDER CALL</span>
+          </div>
+          <div className={styles.platformCard}>
+            {jev ? <>
+              <p className={styles.cardDescription}>The existing Jev decision contracts cover {jev.reviewed_topics_count} research topics. This is an evidence-readiness check, not a Jev prediction or performance benchmark.</p>
+              <p>Real labelled cases: <strong>{jev.real_labeled_case_count}</strong> · Jev predictions: <strong>{jev.jev_model_predictions_count}</strong> · Model evaluation ready: <strong>No</strong></p>
+              <p>Evidence blockers: {jev.typed_decision_task_readiness.blockers.map(x => x.replaceAll("_"," ").toLowerCase()).join(" · ")}</p>
+              <p>No automatic publication, outbound or third-party AI spending. Original Quora questions and independently reviewed labels are required before model evaluation.</p>
+            </> : <p className={styles.cardDescription}>Jev evidence readiness is not independently available. No model activation or inference is assumed.</p>}
+          </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="quora-queue">
           <div className={styles.sectionLead}><div><span className={styles.overline}>01 / EDITORIAL QUEUE</span><h2 id="quora-queue">Questions worth researching</h2></div><span>HUMAN REVIEW REQUIRED</span></div>
