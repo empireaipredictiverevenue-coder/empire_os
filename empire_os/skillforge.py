@@ -39,7 +39,11 @@ def catalogue(*, root: Path = SKILLS_ROOT, registry_path: Path | None = None,
         skills.append({'name': name, 'sha256': digest, 'tasks': tasks,
                        'trust': 'approved_pinned' if approved else 'candidate_not_approved',
                        'review_reasons': review['reasons'], 'execution_authority': 'none'})
-    learning = learning_index(repo_root) if repo_root is not None else None
+    # The canonical SkillForge review path supports up to 5,000 original
+    # observations. The older 500-row default is only a quick summary and
+    # would falsely label a 1,000+ observation production audit incomplete.
+    learning = (learning_index(repo_root, max_observations=5000)
+                if repo_root is not None else None)
     review_queue = proposal_history(repo_root) if repo_root is not None else None
     okf_research = None
     if okf_bundle_path is not None:

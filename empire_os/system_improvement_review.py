@@ -131,6 +131,8 @@ def build_review_packets(
         raise ValueError("unsafe or unverifiable source resolution")
     packets: list[dict[str, Any]] = []
     counts: dict[str, set[str]] = defaultdict(set)
+    missing_tenant: dict[str, set[str]] = defaultdict(set)
+    diagnostics: dict[str, set[str]] = defaultdict(set)
     examples: dict[str, dict[str, Any]] = {}
     for opportunity in resolution.get("items") or []:
         if not isinstance(opportunity, Mapping):
@@ -146,6 +148,12 @@ def build_review_packets(
             group = claim + "|" + source
             if key:
                 counts[group].add(str(key))
+                if req.get("tenant_binding_status") == "MISSING_TENANT_SCOPE":
+                    missing_tenant[group].add(str(key))
+            diag = req.get("source_diagnostic") or {}
+            if isinstance(diag, Mapping):
+                diagnostics[group].update(str(v) for v in (diag.get("reasons") or [])
+                                          if isinstance(v, str) and len(v) <= 90)
             examples[group] = dict(req)
 
     for group, keys in sorted(counts.items()):
@@ -158,6 +166,11 @@ def build_review_packets(
             "claim_type": claim,
             "target_capability": source,
             "affected_opportunity_count": len(keys),
+            "opportunities_without_tenant_scope": len(missing_tenant[group]),
+            "source_health_reason_codes": sorted(diagnostics[group]),
+            "source_remediation": list((
+                (resolution.get("commercial_source_health") or {}).get("sources") or {}
+            ).get(source, {}).get("next_remediation") or [])[:4],
             "current_reason": ref.get("evidence_state"),
             "admissible_source_types": ref.get("allowed_source_kinds") or [],
             "existing_source_observers": probes,
@@ -336,8 +349,8 @@ def review_board(plan: Mapping[str, Any]) -> str:
         f"Source-backed engineering reviews: "
         f"**{plan.get('source_backed_engineering_review_count', 0)}**.",
         "",
-        "| Priority | Claim/workstream | Owner capability | Affected opportunities | Proof-source status |",
-        "|---|---|---|---:|---|",
+        "| Priority | Claim/workstream | Owner capability | Affected opportunities | Tenant-unscoped | Proof-source status |",
+        "|---|---|---|---:|---:|---|",
     ]
     for item in items:
         claim = item.get("claim_type") or item.get("workstream") or "unknown"
@@ -347,7 +360,8 @@ def review_board(plan: Mapping[str, Any]) -> str:
         )
         lines.append(
             f"| {item['priority']} | {claim} | {capability} | "
-            f"{item.get('affected_opportunity_count', 0)} | {source_status} |"
+            f"{item.get('affected_opportunity_count', 0)} | "
+            f"{item.get('opportunities_without_tenant_scope', 0)} | {source_status} |"
         )
     lines.extend([
         "",
@@ -362,6 +376,12 @@ def review_board(plan: Mapping[str, Any]) -> str:
             continue
         source_info = item.get("existing_source_observers") or []
         label = str(item.get("claim_type")) + " / " + str(item.get("target_capability"))
+        blockers = item.get("source_health_reason_codes") or []
+        if blockers:
+            lines.append(f"- **{label} — blockers:** " + ", ".join(str(v) for v in blockers[:8]))
+        actions = item.get("source_remediation") or []
+        for action in actions[:3]:
+            lines.append(f"  - Proposed governed repair: {action.get('action', 'review_original_source')} (not executed)")
         if not source_info:
             lines.append(f"- **{label}**: source observer not yet mapped in this review bridge; upstream source existence unverified")
             continue
