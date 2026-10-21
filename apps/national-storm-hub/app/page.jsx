@@ -11,6 +11,7 @@ import {
 import {STATE_NAMES,normalizeZip,normalizeState} from "../lib/storm-data.js";
 import {summarizeHomeSource} from "../lib/home-source-view.js";
 import {formatWeatherTime} from "../lib/weather-time.js";
+import StormJourneySlider from "../components/StormJourneySlider.jsx";
 
 const STORAGE_KEY="national-storm-hub-passport-preview-v1";
 const CHECKLIST=[
@@ -282,14 +283,7 @@ export default function HomePage(){
 
       <section className="research-invite wrap"><div><span className="eyebrow">OUR SOURCES</span><h2>Know where the <em>information comes from.</em></h2><p>See the official sources we use, what they cover and where their limits matter.</p></div><a href="/research">Read the research library <ArrowRight size={16}/></a></section>
 
-      <section id="prepare" className="section recovery-section wrap" aria-labelledby="recovery-title">
-        <div className="section-intro"><div><div className="eyebrow">PREPARE · STAY SAFE · RECOVER</div><h2 id="recovery-title">A clearer path <em>through the storm.</em></h2><p>Information that helps you decide what to do next, without pressure or invented urgency.</p></div></div>
-        <div className="recovery-cards">
-          <ShellCard className="recovery-card"><span className="card-index">01 / PREPARE</span><div className="recovery-icon"><Home size={26}/></div><h3>Before it arrives.</h3><p>Review household plans, safe property maintenance, important documents and official warning channels.</p><a href="https://www.ready.gov/" target="_blank" rel="noreferrer">Preparedness guidance <ArrowUpRight size={16}/></a></ShellCard>
-          <ShellCard className="recovery-card"><span className="card-index">02 / UNDERSTAND</span><div className="recovery-icon"><Radio size={26}/></div><h3>When conditions change.</h3><p>Follow National Weather Service warnings, source timestamps and local authorities. Always prioritise safety.</p><a href="https://www.weather.gov/" target="_blank" rel="noreferrer">Official weather alerts <ArrowUpRight size={16}/></a></ShellCard>
-          <ShellCard className="recovery-card"><span className="card-index">03 / RECOVER</span><div className="recovery-icon"><ShieldCheck size={26}/></div><h3>After the weather clears.</h3><p>Document observations safely, organise next steps and explore trustworthy repair resources when needed.</p><a href="https://www.ready.gov/recovering-disaster" target="_blank" rel="noreferrer">Recovery guidance <ArrowUpRight size={16}/></a></ShellCard>
-        </div>
-      </section>
+      <StormJourneySlider/>
 
       <section id="pro" className="pro-section"><div className="wrap pro-grid">
           <div>

@@ -2,6 +2,14 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Homeowner journey slider (private preview, 2026-10-21)
+
+- Replaces the three static **Prepare / Understand / Recover** cards with a full-width, high-contrast editorial slider. Each of the three stages has its own restrained atmospheric artwork, practical checklist and two purposeful links, without copying the Empire AI corporate homepage or adding another globe.
+- Includes previous/next buttons, explicit stage selectors, horizontal swipe on touch devices, keyboard left/right on controls, focus/hover pause, and optional gentle advance only while on-screen and only when the visitor has not interacted. The visitor's reduced-motion preference is respected.
+- Source-linked actions lead to Storm Passport, current official NWS alerts and recovery guidance, with Ready.gov/weather.gov external references. Nothing infers home damage, current storm severity or paid contractor readiness.
+- Tested **31 website unit tests**, Next.js production build and actual Chrome click interactions at **1440, 820, 390 and 320 pixels**, with no horizontal overflow or browser JS errors. Mobile state transitions and their links were verified.
+- Read-only preview uses port `3165` on loopback; public `nationalstormhub.com` remains unchanged pending founder review.
+
 ## Reusing EmpireOS intelligence systems (private integration candidate)
 
 - The existing National Storm Hub public `/api/predictor` now includes a deterministic `intelligence` evidence review based on the **same** official NWS warning/forecast and SPC requests. No second feed, LLM inference or independent background poller is created.
