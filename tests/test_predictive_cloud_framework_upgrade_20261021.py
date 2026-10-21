@@ -43,6 +43,31 @@ def test_guard_exact_old_hash_and_restore_service():
         assert forbidden not in code
 
 
+def test_after_rollback_reuses_only_verified_root_owned_release():
+    code = SCRIPT.read_text()
+    assert 'if [[ -e "$TARGET" ]]; then' in code
+    assert '[[ "$(stat -c \'%u\' "$TARGET")" == 0 ]]' in code
+    assert 'find "$TARGET" ! -user root -print -quit' in code
+    assert 'find "$TARGET" -perm /022 -print -quit' in code
+    assert 'find "$TARGET" -type l -print -quit' in code
+    assert '(cd "$TARGET" && sha256sum --status -c "$MANIFEST")' in code
+    assert "PREVIOUS_VERIFIED_ROOT_OWNED_RELEASE_REUSED" in code
+    assert code.index("rollback_needed=1") > code.index(
+        'if [[ ! -e "$TARGET" ]]; then'
+    )
+
+
+def test_in_process_verifier_uses_pinned_api_not_cwd_shadow():
+    code = SCRIPT.read_text()
+    assert 'env -i PATH=/usr/bin:/bin PYTHONPATH="$TARGET"' in code
+    assert '/srv/empire_os/.venv/bin/python -P -B -' in code
+    assert 'EMPIRE_CLOUD_EXPECTED_CODE="$TARGET"' in code
+    assert 'from empire_os import predictive_cloud_status_api as status_api' in code
+    assert 'Path(status_api.__file__).resolve() == expected.resolve()' in code
+    assert '"WRONG_CLOUD_API_MODULE_HOLD"' in code
+    assert 'status=read_predictive_cloud_status(root/"status_latest.json", now=now)' in code
+
+
 def test_existing_cloud_timer_and_other_services_never_replaced():
     code = SCRIPT.read_text()
     assert "predictive_cloud_guard_f4fe409c56fa" in code

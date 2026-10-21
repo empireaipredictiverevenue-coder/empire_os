@@ -27,7 +27,17 @@ BEFORE_OLD_RUNNER_SHA='8e165e3e9efe610a73b36b6608d8449f181538a01692f3563f113839a
 sha () { sha256sum "$1" | cut -d' ' -f1; }
 preflight () {
   [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]
-  [[ -f "$MANIFEST" && ! -L "$SOURCE" && ! -e "$TARGET" && ! -L "$TARGET" ]]
+  [[ -f "$MANIFEST" && ! -L "$SOURCE" && ! -L "$TARGET" ]]
+  # A previous post-install rollback leaves its fully verified root-owned
+  # release in /opt. Reuse only when its contents and custody are intact.
+  if [[ -e "$TARGET" ]]; then
+    [[ -d "$TARGET" ]]
+    [[ "$(stat -c '%u' "$TARGET")" == 0 ]]
+    [[ -z "$(find "$TARGET" -type l -print -quit)" ]]
+    [[ -z "$(find "$TARGET" ! -user root -print -quit)" ]]
+    [[ -z "$(find "$TARGET" -perm /022 -print -quit)" ]]
+    (cd "$TARGET" && sha256sum --status -c "$MANIFEST")
+  fi
   grep -qx "SOURCE_COMMIT=$SHA" "$SOURCE/metadata/source.txt"
   (cd "$SOURCE" && sha256sum --status -c "$MANIFEST")
   [[ "$(sha "$UNIT")" == "$BEFORE_UNIT_SHA" ]]
@@ -83,18 +93,24 @@ done
 systemctl stop "$TIMER"
 timer_stopped=1
 [[ "$(systemctl show "$SERVICE" -p ActiveState --value)" != 'active' ]]
-git -c safe.directory="$OWNER" -C "$OWNER" archive "$SHA" | tar -xf - -C "$stage"
-mkdir -p "$stage/bin"
-cp -- "$SOURCE/bin/empire-predictive-observe" "$stage/bin/empire-predictive-observe"
-cp -- "$MANIFEST" "$stage/.verified-source-checksums.sha256"
-(cd "$stage" && sha256sum --status -c .verified-source-checksums.sha256)
-if find "$stage" -type l -print -quit | grep -q .; then
-  echo 'SYMLINKED_SOURCE_HELD' >&2; exit 4
+if [[ ! -e "$TARGET" ]]; then
+  git -c safe.directory="$OWNER" -C "$OWNER" archive "$SHA" | tar -xf - -C "$stage"
+  mkdir -p "$stage/bin"
+  cp -- "$SOURCE/bin/empire-predictive-observe" "$stage/bin/empire-predictive-observe"
+  cp -- "$MANIFEST" "$stage/.verified-source-checksums.sha256"
+  (cd "$stage" && sha256sum --status -c .verified-source-checksums.sha256)
+  if find "$stage" -type l -print -quit | grep -q .; then
+    echo 'SYMLINKED_SOURCE_HELD' >&2; exit 4
+  fi
+  chown -R root:root "$stage"
+  find "$stage" -type d -exec chmod 0555 {} +
+  find "$stage" -type f -exec chmod 0444 {} +
+  mv -T -- "$stage" "$TARGET"
+else
+  # Refuse to reuse any post-rollback target that changed after preflight.
+  (cd "$TARGET" && sha256sum --status -c "$MANIFEST")
+  echo 'PREVIOUS_VERIFIED_ROOT_OWNED_RELEASE_REUSED'
 fi
-chown -R root:root "$stage"
-find "$stage" -type d -exec chmod 0555 {} +
-find "$stage" -type f -exec chmod 0444 {} +
-mv -T -- "$stage" "$TARGET"
 rollback_needed=1
 tmp="$(mktemp "$(dirname "$DROPIN")/.60-cloud-framework.XXXXXXXX")"
 cat > "$tmp" <<EOF
@@ -107,11 +123,19 @@ chown root:root "$tmp"; chmod 0644 "$tmp"
 mv -T -- "$tmp" "$DROPIN"
 systemctl daemon-reload
 systemctl start "$SERVICE"
-env PYTHONPATH="$TARGET" /srv/empire_os/.venv/bin/python -B - <<'PY'
+# Python's stdin default sys.path includes cwd (/srv/empire_os), which
+# shadowed the pinned Cloud API on the first attempt. -P removes that implicit
+# path; a minimal env pins import provenance to the root-owned /opt release.
+env -i PATH=/usr/bin:/bin PYTHONPATH="$TARGET" EMPIRE_CLOUD_EXPECTED_CODE="$TARGET" \
+  /srv/empire_os/.venv/bin/python -P -B - <<'PY'
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-from empire_os.predictive_cloud_status_api import read_predictive_cloud_status
+from empire_os import predictive_cloud_status_api as status_api
+expected=Path(os.environ["EMPIRE_CLOUD_EXPECTED_CODE"]) / "empire_os/predictive_cloud_status_api.py"
+assert Path(status_api.__file__).resolve() == expected.resolve(), "WRONG_CLOUD_API_MODULE_HOLD"
+read_predictive_cloud_status=status_api.read_predictive_cloud_status
 root=Path("/srv/empire_os/runtime/predictive_cloud")
 now=datetime.now(timezone.utc)
 for filename in ("future_trend_latest.json","formula_latest.json"):
