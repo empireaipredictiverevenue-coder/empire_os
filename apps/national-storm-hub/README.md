@@ -4,6 +4,19 @@ Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate 
 
 ## Implemented
 
+### Evidence-first depth candidate (2026-10-21)
+- `/predictor`: working ZIP-first Storm Predictor; combines official NWS point forecast, active NWS alerts and NOAA SPC Day 1 categorical polygon query; no property damage claims.
+- `/api/predictor?zip=75201`: 3 independent provider checks with source freshness, statuses and fail-closed partial/unavailable conditions.
+- `/research`: public source register and limitations of weather forecasts, historical records, storm alerts and federal sources.
+- `/recovery`: homeowner before/during/after safety-first guide with hazard-specific advice and primary source links.
+- Homepage links to new tools, deep research and safety guidance. Existing homepage and state pages are retained.
+- The old `empire_os/storm_predictor.py` NWS-warning classification set is mirrored in `lib/predictor.js`; the side-effecting agent daemon, notifications and CRM are NOT called from the public app.
+- Tested with Dallas (75201), Miami (33101) and Anchorage (99501); non-CONUS outlook appropriately labels itself out-of-coverage.
+
+**This section describes a development candidate and is not live until the independent release is reviewed and deployed.**
+
+## Implemented
+
 - National brand homepage with responsive weather-themed visual design
 - Distinct Texas and Florida state-hub preview pages with original preparedness guidance and authoritative local sources
 - State selection for all 50 states plus DC
