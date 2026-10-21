@@ -12,6 +12,9 @@ from empire_os.consumer_optin_connection_custody import PrivateConsumerConnectio
 from scripts.provision_consumer_private_identity_20261021 import (
     scram_verifier,role_statement,LOGIN,WRITER
 )
+from scripts.review_consumer_private_identity_session_20261021 import (
+    original_readonly_session,
+)
 
 
 def main():
@@ -49,6 +52,10 @@ def main():
         assert conn.execute(
             "SELECT count(*) FROM public.empire_consumer_subscriptions"
         ).fetchone()[0]==0
+    production_readback=original_readonly_session(
+        password=password,connect=authenticated
+    )
+    assert all(production_readback.values())
     with psycopg.connect(
         dbname="empiredb",host="localhost",port=port
     ) as admin:
