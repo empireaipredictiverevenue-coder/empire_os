@@ -1,0 +1,18 @@
+{
+  "schema_version": "empire.rd_innovator_seed.v1",
+  "proposals": [
+    {
+      "name": "National Storm Hub — Storm Passport and Atlas",
+      "problem": "US homeowners need accessible source-grounded storm information, property preparedness history and genuinely optional access to verified recovery services.",
+      "hypothesis": "A ZIP-first free Passport and evidence-backed Atlas could improve returning use and support a distinct contractor intelligence product without unconsented lead sales.",
+      "experiment": "Offline prototype; independently verify NWS alert freshness, event provenance, saved ZIP and consent separation; test with users before partner activation.",
+      "reuse_components": [
+        "empire_os/storm_predictor.py",
+        "empire_os/storm_intelligence_runtime.py",
+        "empire_os/storm_opportunity_bridge.py",
+        "empire_os/storm_product_integration.py",
+        "empire_os/departments.py"
+      ]
+    }
+  ]
+}

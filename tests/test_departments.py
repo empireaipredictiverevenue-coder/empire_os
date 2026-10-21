@@ -23,6 +23,8 @@ def test_agents_are_roles_inside_departments_not_departments_themselves():
     assert "growth" in by_key["marketing_growth"].agent_roles
     assert "research" in by_key["rd_innovation"].agent_roles
     assert "engineering" in by_key["rd_innovation"].agent_roles
+    assert "innovator" in by_key["rd_innovation"].agent_roles
+    assert "supervisor" in by_key["strategy"].agent_roles
 
 
 def test_component_can_serve_multiple_departments():

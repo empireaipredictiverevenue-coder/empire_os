@@ -82,6 +82,15 @@ Owns:
 - market intelligence
 
 ### Product Innovation Lab
+- existing Innovator agent as an R&D research role, not a new daemon
+- founder-owned venture seeds and legacy ideas reviewed in the existing
+  department-cycle snapshot by `empire_os/rd_innovator_review.py`
+- Strategy's existing Supervisor role reviews R&D readiness; it does not
+  auto-restart the historical Innovator/Supervisor containers as a side effect
+- proposals start at IDEA; historical revenue claims and legacy ship_action
+  recommendations never promote to build, outreach, payment or release
+- National Storm Hub / Storm Passport is the first explicitly seeded case:
+  `docs/NATIONAL_STORM_HUB_INNOVATION_SEED_20261021.json`
 - free tools
 - new MRR products
 - intelligence feeds

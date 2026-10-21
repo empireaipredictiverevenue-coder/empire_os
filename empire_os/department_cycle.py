@@ -33,6 +33,7 @@ from empire_os.business_optimization_policy_intelligence import (
 from empire_os.source_intelligence_handoff import (
     dispatch_source_intelligence_handoffs,
 )
+from empire_os.rd_innovator_review import review_innovator_rd_intake
 
 
 OUTPUT = Path("runtime/astra/department_cycle_latest.json")
@@ -433,6 +434,9 @@ def run_department_cycle(
             ),
         },
         "marketing_growth": observe_marketing_agency(root),
+        # Reuse the existing department heartbeat for Innovator research
+        # intake with Strategy Supervisor review. No autonomous ships.
+        "rd_innovator_review": review_innovator_rd_intake(root),
         # Existing department-cycle timer owns this passive revenue-first
         # observation. No extra daemon, provider call or dispatch is created.
         "revenue_first_hook_review": review_revenue_first_hooks_in_cycle(root),

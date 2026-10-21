@@ -173,6 +173,7 @@ def default_departments() -> tuple[DepartmentSpec, ...]:
                 "deep_research",
                 "product_research",
                 "engineering",
+                "innovator",
             ),
             kpis=(
                 "validated_research",
