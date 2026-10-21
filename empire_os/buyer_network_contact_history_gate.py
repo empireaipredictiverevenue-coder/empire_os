@@ -9,6 +9,8 @@ from __future__ import annotations
 from collections.abc import Mapping
 from pathlib import Path
 import json
+import re
+import stat
 
 from empire_os.workspace_sent_domain_receipts import (
     WorkspaceSentHistoryError, read_previous,
@@ -19,13 +21,69 @@ REGISTRY = Path("/srv/empire_os/runtime/buyer_network_intelligence/commercial_re
 EXTERNAL_CONTACTS = Path("/srv/empire_os/runtime/buyer_network_intelligence/founder_reported_external_contacts_latest.json")
 WORKSPACE_SENT = Path("/srv/empire_os/runtime/buyer_network_intelligence/workspace_sent_domain_receipts_latest.json")
 
+FOUNDER_REVIEW = Path("/srv/empire_os/runtime/buyer_network_intelligence/multiformat_publisher_founder_review_latest.json")
+GMAIL_ID = re.compile(r"^[0-9a-f]{16,32}$")
+
+
+def read_confirmed_delivery_failures(path: Path) -> dict[str, dict]:
+    """Read a restricted founder-reviewed provider DSN, never infer from SENT.
+
+    An absent optional source is not clearance. A malformed or untrusted source
+    fails closed rather than treating hard bounces as successful outreach.
+    """
+    if not path.exists() and not path.is_symlink():
+        return {}
+    if (path.is_symlink() or not path.is_file() or
+            path.stat().st_size > 1_000_000 or
+            stat.S_IMODE(path.stat().st_mode) != 0o600):
+        raise ValueError("FOUNDER_DELIVERY_SOURCE_UNSAFE")
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if (not isinstance(data, dict) or
+                data.get("schema_version") != "empire.buyer_multiformat_founder_review.v1" or
+                not isinstance(data.get("companies"), list) or
+                len(data["companies"]) > 80):
+            raise ValueError("FOUNDER_DELIVERY_SOURCE_SCHEMA_INVALID")
+        holds: dict[str, dict] = {}
+        for row in data["companies"]:
+            if not isinstance(row, dict):
+                raise ValueError("FOUNDER_DELIVERY_SOURCE_ROW_INVALID")
+            if row.get("provider_delivery_failed") is not True:
+                continue
+            domain = domain_key(row.get("domain"))
+            recipient = str(row.get("delivery_failed_recipient") or "").casefold()
+            sent_id = str(row.get("gmail_sent_message_id") or "")
+            bounce_id = str(row.get("provider_delivery_failure_message_id") or "")
+            if (not domain or domain in holds or
+                    recipient != str(row.get("verified_public_contact") or "").casefold() or
+                    not recipient.endswith("@" + domain) or
+                    row.get("provider_delivery_failure_code") != "550_NO_SUCH_USER_HERE" or
+                    row.get("provider_send_confirmed") is not True or
+                    row.get("provider_delivery_verified") is not False or
+                    row.get("delivery_failed_original_sent_message_id") != sent_id or
+                    not GMAIL_ID.fullmatch(sent_id) or
+                    not GMAIL_ID.fullmatch(bounce_id) or
+                    row.get("outbound_authorized") is not False):
+                raise ValueError("FOUNDER_DELIVERY_PROOF_INVALID")
+            holds[domain] = {
+                "reason": "VERIFIED_PROVIDER_HARD_BOUNCE",
+                "delivery_failure_code": "550_NO_SUCH_USER_HERE",
+                "gmail_bounce_message_id": bounce_id,
+                "failed_recipient": recipient,
+            }
+        return holds
+    except (OSError, UnicodeError, TypeError, AttributeError) as exc:
+        raise ValueError("FOUNDER_DELIVERY_SOURCE_UNREADABLE") from exc
+
+
 
 def domain_key(value: object) -> str:
     return str(value or "").strip().lower().rstrip(".").removeprefix("www.")
 
 
 def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_CONTACTS,
-                 workspace_path: Path = WORKSPACE_SENT) -> dict:
+                 workspace_path: Path = WORKSPACE_SENT,
+                 founder_review_path: Path | None = None) -> dict:
     """Fail closed when a source cannot be read or has the wrong schema."""
     try:
         registry = json.loads(registry_path.read_text(encoding="utf-8"))
@@ -66,8 +124,20 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
             workspace_source_available = True
     except WorkspaceSentHistoryError:
         pass
+    # Derive the companion review source from the supplied registry directory,
+    # so isolated test registries never load production owner data.
+    if founder_review_path is None:
+        founder_review_path = registry_path.parent / FOUNDER_REVIEW.name
+    try:
+        delivery_holds = read_confirmed_delivery_failures(founder_review_path)
+        delivery_source_safe = True
+    except ValueError:
+        delivery_holds = {}
+        delivery_source_safe = False
     return {
-        "available": True,
+        "available": delivery_source_safe,
+        "confirmed_delivery_holds": delivery_holds,
+        "founder_review_delivery_source_safe": delivery_source_safe,
         "relationships": relationships,
         "workspace_sent": workspace_rows,
         "workspace_source_available": workspace_source_available,
@@ -84,6 +154,7 @@ def review(domain: str, context: Mapping) -> dict:
     relation = context.get("relationships", {}).get(key) or {}
     observation = context.get("observations", {}).get(key) or {}
     workspace_sent = context.get("workspace_sent", {}).get(key) or {}
+    confirmed_bounce = context.get("confirmed_delivery_holds", {}).get(key) or {}
     have_relation = bool(relation)
     have_form = bool(observation)
     threads = relation.get("gmail_thread_ids") or []
@@ -103,6 +174,8 @@ def review(domain: str, context: Mapping) -> dict:
             state, action = "EXISTING_CONVERSATION_PARTIAL_BOUNCE", "REVIEW_EXISTING_THREAD_AVOID_BOUNCED_ADDRESS"
         else:
             state, action = "EXISTING_CONVERSATION", "REVIEW_EXISTING_THREAD_AND_TERMS"
+    elif confirmed_bounce:
+        state, action = "DELIVERY_HOLD", "NO_RETRY_VERIFIED_HARD_BOUNCE_VERIFY_OFFICIAL_ALTERNATIVE"
     elif bounced:
         state, action = "DELIVERY_HOLD", "VERIFY_DIFFERENT_DELIVERY_CHANNEL"
     elif sent:
@@ -125,6 +198,8 @@ def review(domain: str, context: Mapping) -> dict:
         "founder_external_contact": have_form,
         "thread_count": len(threads),
         "bounced_addresses": sorted(set(bounced)),
+        "confirmed_hard_bounce": bool(confirmed_bounce),
+        "confirmed_hard_bounce_code": confirmed_bounce.get("delivery_failure_code"),
         "last_outbound_at": relation.get("last_outbound_at") or workspace_sent.get("last_sent_at"),
         "last_inbound_at": relation.get("last_inbound_at"),
         "registry_stage": relation.get("stage"),

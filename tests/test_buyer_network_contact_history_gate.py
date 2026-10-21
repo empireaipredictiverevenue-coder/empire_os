@@ -64,3 +64,113 @@ def test_reply_from_real_partner_is_not_hidden_by_one_bounced_address(tmp_path):
     assert item["state"] == "EXISTING_CONVERSATION_PARTIAL_BOUNCE"
     assert "AVOID_BOUNCED_ADDRESS" in item["next_action"]
     assert item["outbound_authorized"] is False
+
+
+def test_provider_dsn_overrides_workspace_sent_mail_and_holds_exact_failed_address(tmp_path):
+    import os
+    from empire_os.buyer_network_contact_history_gate import read_confirmed_delivery_failures
+
+    ctx=make_context(tmp_path,[])
+    found=tmp_path/"multiformat_publisher_founder_review_latest.json"
+    found.write_text(json.dumps({
+        "schema_version":"empire.buyer_multiformat_founder_review.v1",
+        "companies":[{
+            "domain":"getmapleleads.com",
+            "provider_delivery_failed":True,
+            "provider_delivery_failure_code":"550_NO_SUCH_USER_HERE",
+            "gmail_sent_message_id":"1a1609763ff99e96",
+            "gmail_sent_thread_id":"1a1608b157033429",
+            "provider_delivery_failure_message_id":"1a1609809ea130ee",
+            "delivery_failed_original_sent_message_id":"1a1609763ff99e96",
+            "delivery_failed_recipient":"partners@getmapleleads.com",
+            "verified_public_contact":"partners@getmapleleads.com",
+            "provider_send_confirmed":True,
+            "provider_delivery_verified":False,
+            "outbound_authorized":False,
+        }],
+    }))
+    os.chmod(found,0o600)
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"unavailable_workspace.json")
+    # Previously confirmed Workspace SENT must not override the later DSN.
+    ctx["workspace_sent"]={"getmapleleads.com":{"last_sent_at":"2026-10-21"}}
+    r=review("getmapleleads.com",ctx)
+    assert r["state"]=="DELIVERY_HOLD"
+    assert r["confirmed_hard_bounce"] is True
+    assert r["confirmed_hard_bounce_code"]=="550_NO_SUCH_USER_HERE"
+    assert r["outbound_authorized"] is False
+    assert "NO_RETRY" in r["next_action"]
+    assert review("otherbuyer.com",ctx)["state"]=="UNKNOWN_HISTORY"
+
+    # The evidence must be private; otherwise every contact is held.
+    os.chmod(found,0o644)
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"unavailable_workspace.json")
+    assert ctx["available"] is False
+    assert review("getmapleleads.com",ctx)["state"]=="SOURCE_UNAVAILABLE"
+
+
+def test_delivery_receipt_requires_exact_original_send_and_verified_recipient(tmp_path):
+    import os
+    import pytest
+    from empire_os.buyer_network_contact_history_gate import read_confirmed_delivery_failures
+    p=tmp_path/"multiformat_publisher_founder_review_latest.json"
+    base={
+        "domain":"getmapleleads.com",
+        "provider_delivery_failed":True,
+        "provider_delivery_failure_code":"550_NO_SUCH_USER_HERE",
+        "gmail_sent_message_id":"1a1609763ff99e96",
+        "provider_delivery_failure_message_id":"1a1609809ea130ee",
+        "delivery_failed_original_sent_message_id":"1a1609763ff99e96",
+        "delivery_failed_recipient":"partners@getmapleleads.com",
+        "verified_public_contact":"partners@getmapleleads.com",
+        "provider_send_confirmed":True,
+        "provider_delivery_verified":False,
+        "outbound_authorized":False,
+    }
+    for variant in [
+        {**base,"delivery_failed_recipient":"other@getmapleleads.com"},
+        {**base,"delivery_failed_original_sent_message_id":"1a1609763ff99e97"},
+        {**base,"provider_delivery_failure_code":"550_UNVERIFIED"},
+        {**base,"outbound_authorized":True},
+        {**base,"gmail_sent_message_id":"bogus"},
+    ]:
+        p.write_text(json.dumps({
+            "schema_version":"empire.buyer_multiformat_founder_review.v1",
+            "companies":[variant],
+        }))
+        os.chmod(p,0o600)
+        with pytest.raises(ValueError,match="FOUNDER_DELIVERY_PROOF_INVALID"):
+            read_confirmed_delivery_failures(p)
+
+
+def test_confirmed_bounce_does_not_override_proven_inbound_conversation(tmp_path):
+    import os
+    p=tmp_path/"multiformat_publisher_founder_review_latest.json"
+    p.write_text(json.dumps({
+        "schema_version":"empire.buyer_multiformat_founder_review.v1",
+        "companies":[{
+            "domain":"getmapleleads.com",
+            "provider_delivery_failed":True,
+            "provider_delivery_failure_code":"550_NO_SUCH_USER_HERE",
+            "gmail_sent_message_id":"1a1609763ff99e96",
+            "provider_delivery_failure_message_id":"1a1609809ea130ee",
+            "delivery_failed_original_sent_message_id":"1a1609763ff99e96",
+            "delivery_failed_recipient":"partners@getmapleleads.com",
+            "verified_public_contact":"partners@getmapleleads.com",
+            "provider_send_confirmed":True,
+            "provider_delivery_verified":False,
+            "outbound_authorized":False,
+        }],
+    }))
+    os.chmod(p,0o600)
+    make_context(tmp_path,[
+        {"entity_key":"getmapleleads.com","last_inbound_at":"2026-10-22T10:00:00+00:00",
+         "identity_domains":["getmapleleads.com"]},
+    ])
+    ctx=load_context(tmp_path/"registry.json",tmp_path/"forms.json",
+                     tmp_path/"unavailable_workspace.json")
+    result=review("getmapleleads.com",ctx)
+    assert result["state"]=="EXISTING_CONVERSATION"
+    assert result["confirmed_hard_bounce"] is True
+    assert result["outbound_authorized"] is False
