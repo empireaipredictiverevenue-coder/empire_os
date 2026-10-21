@@ -23,11 +23,18 @@ MAX_EXCERPT_WORDS = 25
 MAX_ANCHORS = 8
 
 
-def extract_source_passage_anchors(html_bytes: bytes) -> list[dict]:
+def extract_source_passage_anchors(
+    html_bytes: bytes, *, terms: tuple[str, ...] = TERMS,
+) -> list[dict]:
     """Return up to eight short original-page source anchors, never claims."""
     if (not isinstance(html_bytes, bytes) or not html_bytes
             or len(html_bytes) > MAX_DOCUMENT_BYTES):
         raise ValueError("BOUNDED_ORIGINAL_DOCUMENT_BYTES_REQUIRED")
+    if (not isinstance(terms, tuple) or not 1 <= len(terms) <= 12
+            or any(not isinstance(t, str) or not 3 <= len(t) <= 40
+                   or not re.fullmatch(r"[a-z0-9 ]+", t) for t in terms)
+            or len(set(terms)) != len(terms)):
+        raise ValueError("BOUNDED_SOURCE_TERM_CATALOGUE_REQUIRED")
     text = html_bytes.decode("utf-8", errors="replace")
     soup = BeautifulSoup(text, "html.parser")
     for node in list(soup.find_all(
@@ -47,7 +54,7 @@ def extract_source_passage_anchors(html_bytes: bytes) -> list[dict]:
         seen.add(block)
         blocks.append(block)
     anchors = []
-    for term in TERMS:
+    for term in terms:
         occurrences = []
         needle = re.compile(r"(?<![a-zA-Z])" + re.escape(term) + r"(?![a-zA-Z])",
                             re.IGNORECASE)

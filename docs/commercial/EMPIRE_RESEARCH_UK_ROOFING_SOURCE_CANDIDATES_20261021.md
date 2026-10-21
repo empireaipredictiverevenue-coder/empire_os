@@ -27,3 +27,14 @@ The named candidates are not automatically added to `COUNTRY_SOURCES` or to any 
 4. Only after authentic signed Research approval may a separate validated niche/country source catalogue become eligible for controlled internal research inspection; customer distribution and commercial permission remain separate gates.
 
 **Commercial actions: 0 · Source rights accepted: 0 · New catalogue admissions: 0 · CRM writes: 0 · Revenue claimed: 0.**
+
+
+## Verified exact-URL publisher-page preflight (same day)
+
+The original-source candidate check now uses `scripts.review_brokerage_uk_roofing_candidate_pages_20261021 --read-only` in the existing Research worktree. It accepts **only the two exact URLs above**, refuses redirects, demands public HTTPS HTML and a bounded 600,000-byte body, then records publisher page SHA-256 and at most eight 165-character/25-word anchored passages with the existing research parser. This is deliberately separate from the independently approved dental original-source catalogue.
+
+- **EHS Roofing:** HTTP 200; HTML body length **6,868 bytes**, no H1/H2 headings, but publisher document title was observed as **EHS Roofing | Birmingham Based Roofing Contractors** and a roofing passage was checksum-bound. Source-candidate outcome: `CANDIDATE_ORIGINAL_PAGE_OBSERVED_NOT_ADMITTED`. No licence, claim accuracy, publisher ownership, actual fulfilment capacity, buying intent or commercial use is established.
+- **Central Roofing:** server returned HTTP **202** with a 209-byte response rather than an inspectable original HTML page. Outcome: `CANDIDATE_ORIGINAL_PAGE_FETCH_HELD`. The earlier search result is **not** proof that this current exact source page can be inspected.
+- Batch outcome: **1 original publisher candidate inspected; 1 held; 0 source admissions; 0 editorial approvals; 0 commercial actions**.
+
+Do not present these two source observations as an approved UK roofing report. Rights and first-party custody remain for the independent Research/editorial owner. New candidate fetches are not available as a general-purpose browser or scraper.
