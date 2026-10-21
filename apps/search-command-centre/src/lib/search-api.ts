@@ -212,3 +212,45 @@ export async function getRevenueAttributionData() {
 export function getSeoDepartmentReview() {
   return request<SeoDepartmentReview>("/v1/search/department/review");
 }
+
+
+// Existing private Search Intelligence Quora editorial review: research only.
+export type QuoraReviewTopic = {
+  item_id: string;
+  question_theme: string;
+  topic: string;
+  proposed_owned_page: string;
+  source_query_plan: string;
+  proposed_page_public_verified: false;
+  editorial_review_required: true;
+  intent_hypothesis: string;
+  sector_hypothesis: string;
+  answer_publication_state: "RESEARCH_ONLY";
+};
+
+export type QuoraResearchReview = {
+  schema_version: "empire.search_intelligence.quora_research.v1";
+  mode: "OBSERVE";
+  existing_search_fabric: "SOURCE_CANDIDATES_ONLY";
+  topic_count: number;
+  topics: QuoraReviewTopic[];
+  source_candidates_count: number;
+  fresh_source_candidate_count: number;
+  verified_quora_questions: number;
+  published_answers_verified: number;
+  owned_seo_sessions_verified: number;
+  third_party_visits_first_party: false;
+  affiliate_links_authorized: false;
+  automated_posting_authorized: false;
+  owner_editorial_signoff_verified: false;
+  organic_buyer_enquiries_verified: false;
+  buyer_accepted_calls_verified: false;
+  realized_revenue_verified: false;
+  external_requests_performed: false;
+  production_writes: false;
+  execution_authority: "NONE";
+};
+
+export function getQuoraResearchReview() {
+  return request<QuoraResearchReview>("/v1/search/quora/review");
+}

@@ -209,6 +209,7 @@ function Workspace({ report: d }: { report: SeoDepartmentReview }) {
 
 const NAV: Array<{label:string; href:string; icon:IconName}>=[
   ...MENU,
+  {label:"Quora research",href:"/department/quora",icon:"research"},
   {label:"Raw evidence",href:"/department/evidence",icon:"research"},
 ];
 
