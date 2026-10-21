@@ -1,0 +1,44 @@
+{
+  "canonical_prospects_created": 0,
+  "court_observations_not_treated_as_buyers": true,
+  "db_writes": false,
+  "deterministic_portfolio_median_elapsed_ms_20_samples": 78.805,
+  "deterministic_review_lane_counts": {
+    "DISCARD": 1,
+    "MONITOR": 33,
+    "REVIEW_IDENTITY": 1
+  },
+  "distinct_original_intent_events_reviewed": 35,
+  "eligible_unresolved_intent_signals": 35,
+  "execution_authority": "none",
+  "external_paid_jev_api_called": false,
+  "financial_actions": 0,
+  "generated_at_utc": "2026-10-21T22:20:15.415430+00:00",
+  "human_capacity_review_required_before_outreach": true,
+  "intent_signals_selected": 35,
+  "local_model_reported_latency_ms": [
+    2107.752
+  ],
+  "local_shadow_attempts": 1,
+  "local_shadow_status_counts": {
+    "SHADOW_ESCALATE": 1
+  },
+  "manual_qualified_buyer_review_required": true,
+  "mode": "OBSERVE",
+  "model_cannot_override_canonical_intent_decisions": true,
+  "original_signal_record_count": 374,
+  "outreach_sent": 0,
+  "permit_records_not_treated_as_buyers": true,
+  "schema_version": "empire.jev.commercial_intent_private_safe_review.v1",
+  "selected_source_counts": {
+    "courtlistener": 50,
+    "linkedin_intent": 11,
+    "permits_nyc": 289,
+    "reddit_intent": 24
+  },
+  "source_duplicates_collapsed": 0,
+  "source_root": "existing_canonical_signal_inbox",
+  "status": "LIVE_ORIGINAL_SIGNAL_PORTFOLIO_SHADOW_REVIEW_ONLY",
+  "unverified_identity_records_not_promoted": true,
+  "verified_buyer_enquiries": 0
+}
