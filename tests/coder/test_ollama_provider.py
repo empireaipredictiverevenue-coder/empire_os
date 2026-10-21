@@ -97,3 +97,17 @@ def test_ollama_provider_uses_shared_inference_lock(tmp_path):
         result = provider.complete(req)
     assert result.text == "locked"
     assert lock_path.exists()
+
+
+
+def test_models_skips_null_and_non_mapping_catalog_rows():
+    body = json.dumps({
+        "models": [None, 27, "unexpected", {"name": " qwen2.5-coder:7b "},
+                   {"name": ""}, {"name": "qwen2.5-coder:7b"}],
+    }).encode()
+    with patch(
+        "empire_os.coder.ollama_provider.request.urlopen",
+        return_value=FakeResponse(body),
+    ):
+        names = OllamaProvider().models()
+    assert names == ("qwen2.5-coder:7b",)
