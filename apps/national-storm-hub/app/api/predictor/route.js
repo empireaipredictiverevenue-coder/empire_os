@@ -1,6 +1,7 @@
 import {NextResponse} from "next/server";
 import {normalizeZip,geocodeFromZippopotam,nwsAlertUrl,normalizeAlerts} from "../../../lib/storm-data.js";
 import {normalizePeriods,verifiedForecastUrl,spcQueryUrl,normalizeSpc,summarizePredictor} from "../../../lib/predictor.js";
+import {reviewOfficialWeatherIntelligence} from "../../../lib/storm-intelligence-bridge.js";
 export const dynamic="force-dynamic";
 const BASE_HEADERS={"Cache-Control":"no-store"};
 const AGENT=process.env.STORM_HUB_NWS_USER_AGENT||"NationalStormHub/0.2 (https://nationalstormhub.com)";
@@ -67,5 +68,8 @@ export async function GET(req){
   result.predictor=summarizePredictor({
     alerts:result.alerts.items,periods:result.forecast.periods,spc:result.spc.category
   });
+  // Reuse the same three original-source lookups: no second poller and no model-generated
+  // homeowner, storm damage or commercial demand inference.
+  result.intelligence=reviewOfficialWeatherIntelligence(result);
   return NextResponse.json(result,{status:good===0?503:200,headers:BASE_HEADERS});
 }

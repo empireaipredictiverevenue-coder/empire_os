@@ -882,3 +882,16 @@ h1 em,h2 em {font-style:normal;background:linear-gradient(103deg,#95e9e9 5%,#4ac
   .home-clean .nav-links{background:#14171c;border-color:rgba(248,219,105,.2)}
   .home-clean .mobile-menu{color:var(--hub-yellow)}
 }
+/* Evidence only: National Storm Hub ↔ EmpireOS Intelligence bridge */
+.nsh-intelligence-review{margin-top:22px;padding-top:22px;border-top:1px solid rgba(210,231,237,.23)}
+.nsh-intelligence-checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin-top:16px}
+.nsh-intelligence-checks article{min-width:0;padding:16px;background:rgba(9,18,28,.33);border:1px solid rgba(156,202,217,.23);border-radius:7px}
+.nsh-intelligence-checks p{font-size:12px;color:#c2d7df;line-height:1.75;margin:13px 0 0}
+.nsh-intelligence-boundary{color:#d9bb88!important;font-size:12px!important;padding-top:15px}
+.founder-storm-intelligence{background:#102632;border:1px solid #3a5b69;border-radius:8px;overflow:hidden}
+.founder-storm-intelligence .founder-alert-head{margin:0}
+.founder-storm-body{padding:19px 23px}
+.founder-storm-body p{font-size:12px;line-height:1.85;color:#c6d5dc;margin:0 0 13px}
+.founder-storm-body p:last-child{margin-bottom:0}
+.founder-storm-warning{border-left:3px solid #e8b776;padding:12px;background:rgba(216,153,71,.075);color:#e7cca0!important}
+@media(max-width:800px){.nsh-intelligence-checks{grid-template-columns:1fr}}

@@ -35,7 +35,7 @@ export default function Predictor(){
    <section className="wrap predictor-hero"><Link className="state-back" href="/"><ArrowLeft size={15}/> National Storm Hub</Link>
     <div className="eyebrow"><span className="eyebrow-line"/> STORM INTELLIGENCE / PUBLIC BETA</div>
     <h1>Storm Predictor<span className="punctuation">.</span><br/><em>Evidence before assumptions.</em></h1>
-    <p>Explore the official short-range outlook, local National Weather Service forecast and active weather warnings for a ZIP code. Our EmpireOS-derived signal review helps put the sources in context—it does not invent storm tracks or predict damage to individual homes.</p>
+    <p>Explore the official short-range outlook, local National Weather Service forecast and active weather warnings for a ZIP code. The source review puts official warnings and forecasts in context. It does not predict damage to individual homes.</p>
     <form onSubmit={e=>{e.preventDefault();go(zip);}} className="zip-search" aria-label="Storm Predictor ZIP lookup"><MapPin size={20} className="zip-pin"/><label className="sr-only" htmlFor="predictor-zip">ZIP code</label><input id="predictor-zip" value={zip} onChange={e=>setZip(e.target.value.replace(/[^0-9]/g,"").slice(0,5))} inputMode="numeric" maxLength={5} placeholder="Enter your ZIP code, e.g. 75201"/><button type="submit" disabled={busy}>{busy?"Checking...":"View local forecast"} <ArrowRight size={16}/></button></form>
     {error&&<p className="form-error" role="alert">{error}</p>}
     <div className="hero-trust"><span><ShieldCheck size={17}/> NWS official feeds</span><span><Layers size={17}/> SPC outlook</span><span><Info size={17}/> No damage claims</span></div>
@@ -63,7 +63,17 @@ export default function Predictor(){
           <p className="data-missing">The forecast source is unavailable. Do not substitute missing data with estimated conditions.</p>}
         <a href="https://www.weather.gov/" target="_blank" rel="noreferrer" className="predictor-source-link">Read the official National Weather Service forecast <ExternalLink size={13}/></a>
       </div>
-      <div className="predictor-interpretation"><div className="eyebrow"><span className="eyebrow-line"/> EMPIREOS PREDICTOR REVIEW</div><h3>{view.predictor.signal_count?"Severe-weather warnings are present in the NWS feed.":"No tracked severe-weather warning types were found."}</h3><p>The legacy EmpireOS predictor recognises tornado warnings, severe thunderstorm warnings, high wind warnings and flash-flood warnings as signals for further review. The public version does not forecast household damage, commercial demand, sales or insurance outcomes.</p><p><strong>Evidence state:</strong> {view.alerts.status==="AVAILABLE"?"Warning classifications checked.":"Warning source unavailable."} <strong>Next action:</strong> consult official guidance and prepare safely.</p></div>
+      <div className="predictor-interpretation"><div className="eyebrow"><span className="eyebrow-line"/> STORM INTELLIGENCE / EVIDENCE REVIEW</div>
+        <h3>{view.alerts.status!=="AVAILABLE"?"Warning classification unavailable.":view.predictor.signal_count?"Tracked severe-weather warning types were returned.":"No tracked warning types were returned at this check."}</h3><p>We check returned tornado, severe-thunderstorm, high-wind and flash-flood warnings for further review. These issued alerts do not establish damage to a home or predict demand for repair services.</p><p><strong>Evidence state:</strong> {view.alerts.status==="AVAILABLE"?"Warning classifications checked.":"Warning source unavailable."} <strong>Next action:</strong> consult official guidance and prepare safely.</p>
+        {view.intelligence&&<div className="nsh-intelligence-review">
+          <div className="fine-label">EMPIREOS SOURCE REVIEW · {view.intelligence.source_state.replaceAll("_"," ")}</div>
+          <div className="nsh-intelligence-checks">{view.intelligence.source_context.map(item=><article key={item.type}>
+            <span className={item.available?"source-mark":"source-mark unavailable"}>{item.type.replaceAll("_"," ")} · {item.available?"CHECKED":"UNAVAILABLE"}</span>
+            <p>{item.message}</p>
+          </article>)}</div>
+          <p className="nsh-intelligence-boundary"><strong>Verification boundary:</strong> this tool cannot verify property damage, homeowner intent, contractor capacity or revenue. Missing sources remain unknown.</p>
+        </div>}
+      </div>
     </div>}
    </section>
    <section className="wrap predictor-education"><div><h2>Understand the difference.</h2><p>Forecasts, alerts and historical storm reports answer different questions. National Storm Hub keeps them separate, so visitors don't mistake a forecast for an observed event—or a warning for verified damage.</p></div><div className="predictor-steps"><div><span>01 / FORECAST</span><h3>What might happen?</h3><p>Local NWS forecast periods and SPC severe-weather outlooks.</p></div><div><span>02 / ACTIVE ALERT</span><h3>What is being warned?</h3><p>Official watches, warnings and advisories as issued.</p></div><div><span>03 / HISTORICAL</span><h3>What was recorded?</h3><p>NOAA's retrospective Storm Events Database; records arrive after review.</p></div></div><div className="more-links"><Link href="/research">Research & sources <ArrowRight size={16}/></Link><Link href="/recovery">Preparedness & recovery <ArrowRight size={16}/></Link></div></section>

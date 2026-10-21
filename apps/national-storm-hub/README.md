@@ -2,6 +2,14 @@
 
 Standalone consumer-facing **Next.js** app; not part of the Empire AI corporate site's route tree.
 
+## Reusing EmpireOS intelligence systems (private integration candidate)
+
+- The existing National Storm Hub public `/api/predictor` now includes a deterministic `intelligence` evidence review based on the **same** official NWS warning/forecast and SPC requests. No second feed, LLM inference or independent background poller is created.
+- The private Founder Console reads the **existing** `/srv/empire_os/runtime/storm_opportunity/latest.json` through `/api/founder/storm-intelligence`, guarded by the existing founder-only access key and no-store headers. It does not expose raw event, tenant, buyer or opportunity records.
+- The actual runtime snapshot observed on October 21 was from **October 5**. The private console explicitly displays **STALE**; current candidate counts and event metrics stay unknown.
+- Public forecasts, NWS warnings and internal commercial readiness remain distinct. No inferred property damage, buyer demand, contractor capacity, payable enquiries, revenue, payment activation or outbound.
+- See `INTELLIGENCE_INTEGRATION_20261021.md` for boundaries and test evidence. This branch is **not deployed publicly**.
+
 ## Restored cinematic globe, distinct Storm Hub branding (private candidate)
 
 - The **original cinematic Earth composition** is back, now using locally hosted NASA Blue Marble western-hemisphere imagery, with original deep atmospheric lighting. It is a historical source mosaic, not a live storm, warning boundary or weather product. Original reference: https://science.nasa.gov/resource/blue-marble-2002/
