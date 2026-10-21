@@ -187,7 +187,7 @@ The audit prints JSON to stdout, does not run external code, and exits nonzero
 if expected local files or upstream pins are absent. No claimed runtime
 performance, ROI, security audit or deployment follows from a green result.
 
-## Implemented integration (feature branch, NOT deployed)
+## Implemented integration (production commit 4908cb56b)
 
 This evaluation now includes real, narrowly scoped changes to EmpireOS's
 **existing** Executive/completion-board dispatchers, without changing its
@@ -240,7 +240,4 @@ source-path symlink isolation, direct-target registry synchronisation,
 active/malformed/duplicate goal handling, priority ordering, exclusion of
 founder-gated steps, and unchanged priorities for previously queued work.
 
-**Activation:** Branch-only until existing release owner reviews the exact
-diff and its interaction with parallel in-progress production edits. Do not
-cherry-pick over uncommitted production changes or restart the live timer
-without a separately verified deployment and rollback procedure.
+**Production receipt:** Selectively committed seven integration files as `4908cb56b` on the existing EmpireOS production branch, without touching the pre-existing modified shared worker. The production checkout passed 59 scoped regression tests and seven static audit tests. The existing department heartbeat completed with exit status 0 and subsequently wrote a dispatch snapshot at 2026-10-21T22:49:03Z containing both new counters (0 holds and 0 newly prioritised for that particular current plan). That is evidence of runtime loading, not measured throughput or revenue improvement. The existing ops-control timer already owns `ops_sentinel` observation; no second sentinel runtime was added. Rollback requires a reviewed revert of commit `4908cb56b` that preserves concurrent production edits.
