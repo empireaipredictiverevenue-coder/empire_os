@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Empire AI · Private Revenue CRM</title>
+<style>
+:root{color-scheme:dark;font:15px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:#060b16;color:#edf4ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 85% -5%,#0c2f60 0,transparent 45%),#060b16;min-height:100vh}
+.shell{max-width:1120px;margin:auto;padding:28px 20px 70px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 0 28px;border-bottom:1px solid #24334e}
+.brand{display:flex;align-items:center;gap:12px;font-size:20px;font-weight:750;letter-spacing:.01em}
+.brand-mark{display:grid;place-items:center;border:1px solid #417dc0;color:#cfa959;width:42px;height:42px;border-radius:50%;box-shadow:0 0 30px #1d65ba66}
+.kicker{color:#d3ac66;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}
+h1{font-size:clamp(27px,4vw,42px);line-height:1.14;letter-spacing:-.03em;margin:8px 0 14px}
+h2{font-size:20px;letter-spacing:-.01em;margin:0 0 6px}p{margin:0 0 14px;color:#b0bfd9}
+.lead{max-width:700px;margin:30px 0}.tiny{font-size:12px;color:#91a2c4}
+.panel{border:1px solid #29446b;background:linear-gradient(150deg,#111f36,#0b1325);border-radius:18px;box-shadow:0 16px 45px #0005;padding:24px;margin-top:18px}
+form{display:grid;grid-template-columns:1fr 1fr;gap:14px}.field{display:grid;gap:5px}label{font-size:12px;color:#b6c8e6;font-weight:650}
+input{background:#071223;border:1px solid #354d70;color:#edf5ff;border-radius:9px;padding:12px 14px;font:inherit;min-width:0}
+input:focus{outline:2px solid #3f9bdf;outline-offset:1px}#tenant-field{grid-column:1/-1}
+.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:17px}
+button{font:inherit;border-radius:9px;background:#1463ab;color:white;border:1px solid #5eace7;font-weight:680;padding:10px 17px;cursor:pointer}
+button:focus-visible{outline:3px solid #d3ac66;outline-offset:3px}
+button:hover{background:#267cc2}button.secondary{background:#13233d;border-color:#37547a}
+button:disabled{cursor:wait;opacity:.55}.status{color:#d6af6a;font-size:13px;margin-top:15px;min-height:22px}
+.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:24px 0}
+.metric{padding:15px;border:1px solid #263b5c;background:#0e1b31;border-radius:12px}.metric b{display:block;font-size:24px}.metric span{font-size:12px;color:#9babca}
+.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:15px 0}
+.card{border:1px solid #294161;border-radius:13px;padding:17px;background:#0d1a2f}
+.card h3{font-size:16px;margin:5px 0;color:#f0f5ff;overflow-wrap:anywhere}
+.meta{color:#a9bcda;font-size:12px;overflow-wrap:anywhere}
+.tag{display:inline-block;font-size:11px;font-weight:760;padding:4px 9px;border-radius:30px;border:1px solid #597aaa;color:#a6d6ff}
+.tag.hold{color:#f4c29a;border-color:#996a53}.tag.gap{color:#e7c06c;border-color:#896c3c}
+.warn{border-left:3px solid #d8a64f;padding:10px 13px;background:#2c251844;color:#e6cfa2;font-size:13px}
+.empty{color:#b9c9e2;padding:16px 0}.details{border-top:1px solid #304560;margin-top:12px;padding-top:12px}
+code{font-size:12px;background:#07101e;border-radius:5px;padding:3px 5px;overflow-wrap:anywhere}
+dl{display:grid;grid-template-columns:160px 1fr;gap:6px 12px;font-size:13px}dt{color:#96a8c7}dd{margin:0;overflow-wrap:anywhere}
+footer{margin-top:28px;font-size:12px;color:#8fa3c7;border-top:1px solid #20314d;padding-top:16px}
+[hidden]{display:none!important}
+@media(max-width:700px){form,.cards,.grid{grid-template-columns:1fr}#tenant-field{grid-column:1}dl{grid-template-columns:1fr}dd{margin-bottom:8px}.shell{padding:20px 14px}}
+.workspace-nav{display:flex;gap:10px;flex-wrap:wrap;padding:15px 0;border-bottom:1px solid #24334e}
+.workspace-nav a{color:#c9dcfa;background:#0f213c;border:1px solid #37547a;border-radius:9px;padding:8px 12px;text-decoration:none;font-weight:650;font-size:13px}
+.workspace-nav a:focus-visible{outline:2px solid #d3ac66;outline-offset:2px}
+.workspace-nav a:hover{background:#203956}
+.workspace-nav a[aria-current="page"]{border-color:#d3ac66;color:#fff6da}
+.workspace-progress{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:17px 0}
+.workspace-progress span{display:block;background:#0b203b;border:1px solid #2b486b;border-radius:10px;padding:11px 9px;color:#c9d7ed;font-size:12px;text-align:center}
+.workspace-progress strong{display:block;color:#f2e4c8;font-size:14px}
+@media(max-width:740px){.workspace-progress{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+<script src="/v1/revenue-crm/review-console.js" defer></script>
+</head>
+<body>
+<div class="shell">
+<header>
+  <div class="brand"><span class="brand-mark" aria-hidden="true">◎</span><span>Empire AI <span class="kicker">Private CRM</span></span></div>
+  <span class="kicker">Predictive Revenue · Observe</span>
+</header>
+<nav aria-label="Authenticated Smart CRM workspace" class="workspace-nav" id="workspace-nav" hidden>
+<a href="#contacts-workspace">Contacts</a>
+<a href="#opportunities-workspace">Opportunities</a>
+<a href="#sales-actions-workspace">Sales Actions</a>
+<a href="#partner-conversations">Conversations</a>
+<a href="#revenue-workspace">Revenue</a>
+<a href="#intelligence-workspace">Startup &amp; agents</a>
+</nav>
+<div class="lead">
+  <div class="kicker">Founder sales intelligence</div>
+  <h1>Revenue opportunity review</h1>
+  <p>One private place to inspect actual CRM stages, candidate buyer signals and the next internal commercial action. Scores are not sales, forecasts are not payments, and no message is sent from this screen.</p>
+</div>
+<section id="login-panel" class="panel" aria-label="Private CRM login">
+  <h2>Sign in to your existing CRM</h2>
+  <p>Use your approved Empire AI CRM credentials and tenant ID. Access is checked by the current first-party CRM service.</p>
+  <form id="login-form">
+    <div class="field"><label for="account">CRM account email</label><input id="account" name="account" type="email" autocomplete="username" placeholder="phil@empire-ai.co.uk" required maxlength="254"></div>
+    <div class="field"><label for="password">CRM password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+    <div class="field" id="tenant-field"><label for="tenant">Approved tenant ID (UUID)</label><input id="tenant" name="tenant" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx" required></div>
+    <div class="actions"><button id="sign-in" type="submit">Sign in securely</button><span class="tiny">This page does not persist credentials or access tokens. Browser password-manager settings are separate.</span></div>
+  </form>
+  <p class="status" id="login-status" role="status" aria-live="polite"></p>
+  <p class="tiny">Use your existing recovered Workspace CRM login. Do not share passwords or tokens in chat.</p>
+</section>
+<section id="review-panel" hidden aria-label="CRM evidence reviews">
+  <div class="actions"><button id="refresh" type="button">Refresh authorised sales sources</button><button id="sign-out" type="button" class="secondary">Sign out</button></div>
+  <p id="review-status" class="status" role="status" aria-live="polite"></p>
+  <div class="warn">Evidence review only. Contacts, pipeline prospects, conversation observations and payments are distinct. No sending, promotion, fulfilment or agent execution is authorised here.</div>
+  <div class="workspace-progress" aria-label="CRM commercial workflow">
+    <span><strong>01</strong>Contacts</span><span><strong>02</strong>Opportunities</span>
+    <span><strong>03</strong>Sales Actions</span><span><strong>04</strong>Conversations</span>
+    <span><strong>05</strong>Revenue</span>
+  </div>
+  <div class="grid" aria-live="polite">
+    <div class="metric"><b id="total">—</b><span>CRM prospects loaded</span></div>
+    <div class="metric"><b id="held">—</b><span>Contact holds</span></div>
+    <div class="metric"><b id="reviews">—</b><span>Internal action reviews</span></div>
+    <div class="metric"><b id="missing">—</b><span>Evidence unavailable</span></div>
+  </div>
+  <section id="opportunities-workspace" class="panel" aria-label="Tenant CRM opportunities">
+    <h2>Opportunities · authenticated CRM prospects</h2>
+    <p class="tiny">Only actual tenant-scoped CRM prospect rows. A research candidate, inferred intent or unbound agent task is not automatically a sales opportunity.</p>
+    <div class="field"><label for="filter">Filter loaded prospects</label><input id="filter" placeholder="Prospect ID, industry, company, action" autocomplete="off"></div>
+    <div id="results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="contacts-workspace" class="panel" aria-label="Authenticated CRM contacts and buyers">
+    <h2>Contacts &amp; buyer organisations · tenant-scoped read</h2>
+    <p class="tiny">This existing endpoint reads CRM buyer organisations, NOT an independently verified personal-contact directory. The full Contacts module remains evidence-gated.</p>
+    <p class="tiny">Only records returned by the current signed CRM tenant reader. A CRM buyer record does not prove live buying intent, consent or commercial capacity.</p>
+    <p id="buyer-review-status" class="status" role="status" aria-live="polite">Sign in to inspect buyer records.</p>
+    <div id="buyer-results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="sales-actions-workspace" class="panel" aria-label="Internal CRM sales actions">
+    <h2>Sales Actions · read-only internal review</h2>
+    <p id="sales-actions-workspace-status" class="status" role="status" aria-live="polite">Sign in to read prospect action reviews.</p>
+    <p class="tiny">The preceding opportunity cards contain the canonical per-prospect action-review details. No messaging, task execution or sales-stage mutation is enabled.</p>
+  </section>
+  <section class="panel" aria-label="UK solar CRM tenant name duplicate review">
+    <h2>UK solar · six-company CRM duplicate preview</h2>
+    <p class="tiny">Tenant-authenticated, read-only exact company-name comparison against the existing CRM. A name match is not evidence of a real contact, authorised outreach, a reply, a customer or revenue.</p>
+    <p id="solar-preview-status" class="status" role="status" aria-live="polite">Private duplicate review not read.</p>
+    <p id="solar-preview-coverage" class="tiny" role="status" aria-live="polite">Tenant row-window coverage not established.</p>
+    <div id="solar-preview-results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="partner-conversations" class="panel" aria-label="Existing commercial partner conversations">
+    <h2>Existing partner conversations · source review</h2>
+    <p class="tiny">Original provider-backed threads, separate from tenant CRM clients. Buying intent, payable terms and revenue are not independently verified. Viewing this list does not authorise contact.</p>
+    <p id="partner-source-status" class="status" role="status" aria-live="polite">Authorised partner source not read.</p>
+    <p id="partner-action-summary" class="tiny" role="status" aria-live="polite">Founder review queue not loaded.</p>
+    <div id="partner-source-results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="win-plans" class="panel" aria-label="AI Sales Director source matched win plans">
+    <h2>AI Win Plans · verified conversation next steps</h2>
+    <p class="tiny">Five original reviewed partner threads, matched to first-party Gmail relationship evidence. Pre-call research and next actions are review only; these are NOT paying customers, forecast probabilities or scheduled follow-ups.</p>
+    <p id="win-plan-status" class="status" role="status" aria-live="polite">Private Win Plans not read.</p>
+    <p id="win-plan-coverage" class="tiny" role="status" aria-live="polite">Full mailbox coverage not established.</p>
+    <div id="win-plan-results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="inbound-enquiries" class="panel" aria-label="First-party incoming sales enquiries">
+    <h2>Incoming website enquiries · owner review</h2>
+    <p class="tiny">Buyer-stated requests held by the original first-party inbox; not verified clients or CRM prospects. This is not a marketing subscriber list.</p>
+    <p id="inbound-source-status" class="status" role="status" aria-live="polite">Authorised inbound source not read.</p>
+    <div id="inbound-source-results" class="cards" aria-live="polite"></div>
+  </section>
+  <section id="revenue-workspace" class="panel" aria-label="Revenue evidence and payment verification">
+    <h2>Revenue · settlement evidence</h2>
+    <p class="status" id="revenue-evidence-status" role="status" aria-live="polite">Verified tenant settlement reader not connected; no revenue amount claimed.</p>
+    <p class="tiny">A proposal, prospect, predicted close or buyer conversation is not an accepted and settled order. Existing checkout and economic-memory systems remain governed independently; no payment or revenue reconciliation is activated by this page.</p>
+  </section>
+  <section id="intelligence-workspace" class="panel" aria-label="Intelligence and authenticated agent task review">
+    <h2>Startup Revenue Intelligence · Research · Jev · ASTRA</h2>
+    <p class="tiny">Startup Revenue Intelligence and specialist agent findings require an independently verified tenant-bound opportunity receipt before CRM promotion. The existing Research, Jev and ASTRA systems remain separate; model recommendations do not create sales records.</p>
+    <h3>Authenticated tenant Kanban · internal read only</h3>
+    <p id="kanban-status" class="status" role="status" aria-live="polite">Sign in to review tenant-bound internal tasks.</p>
+    <div id="kanban-results" class="cards" aria-live="polite"></div>
+    <p class="tiny">Unbound agent work and other tenant's tasks must never be shown. This panel cannot register agents, assign new work or execute tasks.</p>
+  </section>
+</section>
+<footer>Empire AI Private CRM · Least-privilege, read-only pilot · No external outbound, billing or publication from this screen.</footer>
+</div>
+</body>
+</html>
