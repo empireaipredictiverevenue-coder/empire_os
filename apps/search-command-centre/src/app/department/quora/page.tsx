@@ -4,9 +4,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   getQuoraResearchReview, getQuoraJevShadowReview, getSeoJevDepartmentReview,
-  getJevRealPilotReceipt, getJevOriginalPageEvidenceSummary,
+  getJevRealPilotReceipt, getJevOriginalPageEvidenceSummary, getSeoAiFirstSummary, getJevCaseModelSummary,
   type QuoraResearchReview, type QuoraJevShadowReview, type SeoJevDepartmentReview,
-  type JevRealPilotReceipt, type JevOriginalPageEvidenceSummary,
+  type JevRealPilotReceipt, type JevOriginalPageEvidenceSummary, type SeoAiFirstSummary, type JevCaseModelSummary,
 } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -121,6 +121,48 @@ function trustedOriginalIntake(value: JevOriginalPageEvidenceSummary | null):
     && value.database_writes === false;
 }
 
+function trustedAiFirst(value: SeoAiFirstSummary | null):
+  value is SeoAiFirstSummary {
+  return !!value && value.schema_version === "empire.search.ai_first_seo_summary.v1"
+    && value.mode === "OBSERVE" && value.execution_authority === "NONE"
+    && value.observed_cases_reviewed === 30 && value.local_model_inference_attempts === 30
+    && value.model_candidates_returned >= 0 && value.model_candidates_returned <= 30
+    && value.deep_ai_research_queue_count >= 0 && value.deep_ai_research_queue_count <= 30
+    && value.human_labels_created === 0
+    && value.benchmark_accuracy_measured === false
+    && value.original_content_verified === false
+    && value.automatic_jev_inference_enabled === false
+    && value.external_paid_jev_calls === 0
+    && value.source_paths_exposed === false && value.publication_authority === false
+    && value.shadow_model === "convaiinnovations/laya:onnx"
+    && value.provider === "existing_local_laya_http"
+    && value.model_output_status === "UNVERIFIED_RESEARCH_CANDIDATES"
+    && value.receipt_read_calls_to_model === 0;
+}
+
+function trustedJevCases(value: JevCaseModelSummary | null):
+  value is JevCaseModelSummary {
+  return !!value
+    && value.schema_version === "empire.search.jev_original_page_case_summary.v1"
+    && value.mode === "REAL_PROVIDER_EVALUATION_SHADOW"
+    && value.provider_key === "openrouter_typesafe_jev"
+    && value.verified_provider_batches === 6
+    && value.original_page_cases_assessed === 30
+    && value.validated_model_responses === 30
+    && value.model_confidence_at_least_0_80 + value.model_confidence_below_0_80 === 30
+    && value.reported_cost_usd >= 0 && value.reported_cost_usd <= 0.006
+    && value.model_prediction_accuracy_verified === false
+    && value.original_page_copy_verified === false
+    && value.model_outputs_are_human_labels === false
+    && value.model_research_recommendations_are_authorised_fixes === false
+    && value.unattended_provider_calls_enabled === false
+    && value.new_inference_requests_during_status === 0
+    && value.external_buyer_or_personal_data_sent === false
+    && value.case_url_paths_exposed === false
+    && value.manual_publication_or_redirect_authority === false
+    && value.execution_authority === "NONE";
+}
+
 const VERTICALS = [
   {key:"roofing",label:"Roofing and replacement"},
   {key:"hvac",label:"HVAC and heat pumps"},
@@ -155,9 +197,10 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const [response, jevResponse, departmentResponse, pilotResponse, intakeResponse] = await Promise.all([
+  const [response, jevResponse, departmentResponse, pilotResponse, intakeResponse, aiResponse, jevCasesResponse] = await Promise.all([
     getQuoraResearchReview(), getQuoraJevShadowReview(), getSeoJevDepartmentReview(),
-    getJevRealPilotReceipt(), getJevOriginalPageEvidenceSummary(),
+    getJevRealPilotReceipt(), getJevOriginalPageEvidenceSummary(), getSeoAiFirstSummary(),
+    getJevCaseModelSummary(),
   ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
   const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
@@ -168,6 +211,10 @@ export default async function QuoraResearchDepartment() {
     ? pilotResponse.data : null;
   const intake = intakeResponse.ok && trustedOriginalIntake(intakeResponse.data)
     ? intakeResponse.data : null;
+  const ai = aiResponse.ok && trustedAiFirst(aiResponse.data)
+    ? aiResponse.data : null;
+  const jevCases = jevCasesResponse.ok && trustedJevCases(jevCasesResponse.data)
+    ? jevCasesResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -231,6 +278,33 @@ export default async function QuoraResearchDepartment() {
               <p>Accepted human labels: <strong>{intake.reviewed_human_labels}</strong> · Benchmark-ready cases: <strong>{intake.benchmark_ready_cases}</strong> · Automatic Jev evaluation: <strong>Off</strong></p>
               <p>Next: authenticate independent reviewers, inspect original URL/content evidence, document rights, and label each actual case. URL-level cases cannot be compared directly with the separate one-shot aggregate Jev decision.</p>
             </> : <p className={styles.cardDescription}>Private reviewed source cases are not available or failed their pinned receipt checks. No human ground-truth labels have been inferred.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="seo-ai-first-pass">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>04 / AI DOES THE FIRST PASS</span>
+            <h2 id="seo-ai-first-pass">AI original-page investigation</h2>
+          </div><span>LOCAL MODEL · SHADOW ONLY</span></div>
+          <div className={styles.platformCard}>
+            {ai ? <>
+              <p className={styles.cardDescription}>Empire's existing local Laya model attempted initial evidence review of {ai.observed_cases_reviewed} original first-party URL observations. This is AI-led triage, not manual data entry, and it incurred zero external Jev usage charges.</p>
+              <p>AI proposals: <strong>{ai.model_candidates_returned}</strong> · Deeper AI research required: <strong>{ai.deep_ai_research_queue_count}</strong> · Human labels fabricated: <strong>0</strong></p>
+              <p>Unverified historical content still needs source research. The model does not automatically redirect, publish, contact buyers or infer revenue. Human approval is reserved for public or commercially consequential actions.</p>
+            </> : <p className={styles.cardDescription}>Local AI first-pass receipt is unavailable or not source verified. The original GSC evidence remains available; no AI result has been invented.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="seo-jev-case-assessments">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>05 / TYPE SAFE JEV FULL COHORT</span>
+            <h2 id="seo-jev-case-assessments">AI-reviewed original-page cases</h2>
+          </div><span>MODEL RESULTS · NOT SEO FIXES</span></div>
+          <div className={styles.platformCard}>
+            {jevCases ? <>
+              <p className={styles.cardDescription}><strong>{jevCases.validated_model_responses} actual Jev assessments</strong> across {jevCases.verified_provider_batches} bounded provider calls. No buyer or customer data was sent; first-party URL paths and page-only metrics formed the evidence.</p>
+              <p>Source-audit recommendations: <strong>{jevCases.model_choice_counts.SOURCE_AUDIT ?? 0}</strong> · Confidence at least 80%: <strong>{jevCases.model_confidence_at_least_0_80}</strong> · Needs deeper AI research: <strong>{jevCases.model_confidence_below_0_80}</strong></p>
+              <p>Total reported inference cost: <strong>${jevCases.reported_cost_usd.toFixed(6)}</strong> · Repeat billing: <strong>Off</strong></p>
+              <p>The next AI task is recovering original source and publication-rights evidence. Historical content is not yet verified; no redirects, public changes, buyer outreach or payments were authorised.</p>
+            </> : <p className={styles.cardDescription}>Validated Jev provider results for all 30 owned URLs are unavailable. This desk does not invent case assessments.</p>}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="seo-jev-portfolio">

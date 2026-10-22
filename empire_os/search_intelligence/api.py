@@ -30,6 +30,8 @@ from .jev_shadow_review import JevSeoEvidenceError, review_quora_jev_shadow
 from .jev_department_review import JevDepartmentEvidenceError, review_jev_department_portfolio
 from .jev_pilot_receipt import JevReceiptUnavailable, review_jev_private_pilot_receipt
 from .jev_intake_receipt import JevIntakeReceiptUnavailable, read_verified_original_page_summary
+from .ai_first_receipt import AiFirstReceiptHeld, read_ai_first_summary
+from .jev_case_receipts import JevCaseReceiptHeld, reviewed_case_summary
 from .department_snapshot import DepartmentSnapshotUnavailable
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
@@ -347,6 +349,32 @@ def create_search_router(
         except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
             raise HTTPException(
                 status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/jev/cases/summary")
+    def seo_jev_case_model_summary(response: Response):
+        """Six pinned Jev model receipts, no provider calls or original URL paths."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return reviewed_case_summary()
+        except (JevCaseReceiptHeld, OSError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="seo_jev_case_receipts_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/jev/ai-first/summary")
+    def seo_ai_first_summary(response: Response):
+        """Private aggregate AI investigation results, zero model calls on GET."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return read_ai_first_summary()
+        except (AiFirstReceiptHeld, OSError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="seo_ai_first_private_receipt_unavailable",
                 headers={"Cache-Control": "no-store"},
             ) from None
 

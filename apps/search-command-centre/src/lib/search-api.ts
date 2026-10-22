@@ -396,3 +396,61 @@ export type JevOriginalPageEvidenceSummary = {
 export function getJevOriginalPageEvidenceSummary() {
   return request<JevOriginalPageEvidenceSummary>("/v1/search/jev/evidence/summary");
 }
+
+
+/** Bounded local-model SEO investigation; no source URLs or autonomous actions. */
+export type SeoAiFirstSummary = {
+  schema_version: "empire.search.ai_first_seo_summary.v1";
+  mode: "OBSERVE";
+  observed_cases_reviewed: 30;
+  local_model_inference_attempts: 30;
+  model_candidates_returned: number;
+  deep_ai_research_queue_count: number;
+  human_labels_created: 0;
+  benchmark_accuracy_measured: false;
+  original_content_verified: false;
+  automatic_jev_inference_enabled: false;
+  external_paid_jev_calls: 0;
+  source_paths_exposed: false;
+  publication_authority: false;
+  execution_authority: "NONE";
+  shadow_model: "convaiinnovations/laya:onnx";
+  provider: "existing_local_laya_http";
+  model_output_status: "UNVERIFIED_RESEARCH_CANDIDATES";
+  receipt_read_calls_to_model: 0;
+  original_404_content_recovery_required: true;
+  review_recommended_to_ai_research_desk: true;
+};
+
+export function getSeoAiFirstSummary() {
+  return request<SeoAiFirstSummary>("/v1/search/jev/ai-first/summary");
+}
+
+
+/** Six pinned TypeSafe Jev batches; 30 public-owned URL paths, never exposed. */
+export type JevCaseModelSummary = {
+  schema_version: "empire.search.jev_original_page_case_summary.v1";
+  mode: "REAL_PROVIDER_EVALUATION_SHADOW";
+  provider_key: "openrouter_typesafe_jev";
+  verified_provider_batches: 6;
+  original_page_cases_assessed: 30;
+  validated_model_responses: 30;
+  model_choice_counts: Record<string, number>;
+  model_confidence_at_least_0_80: number;
+  model_confidence_below_0_80: number;
+  reported_cost_usd: number;
+  model_prediction_accuracy_verified: false;
+  original_page_copy_verified: false;
+  model_outputs_are_human_labels: false;
+  model_research_recommendations_are_authorised_fixes: false;
+  unattended_provider_calls_enabled: false;
+  new_inference_requests_during_status: 0;
+  external_buyer_or_personal_data_sent: false;
+  case_url_paths_exposed: false;
+  manual_publication_or_redirect_authority: false;
+  execution_authority: "NONE";
+};
+
+export function getJevCaseModelSummary() {
+  return request<JevCaseModelSummary>("/v1/search/jev/cases/summary");
+}
