@@ -1,0 +1,30 @@
+{
+  "as_of_date": "2026-10-22",
+  "contacts_collected": 0,
+  "outbound_sent": 0,
+  "schema_version": "empire.jev.first_party_site_manual_observations.v1",
+  "source_method": "bounded_independent_public_web_read_plus_server_https_get",
+  "website_results": {
+    "Anatra Fire Protection Inc.": {
+      "latest_http_observed": 429,
+      "live_get_brand_match_observed_before": true,
+      "status": "FIRST_PARTY_SITE_ORIGIN_HTTP_429_LATEST_RECHECK",
+      "web_search_independent_company_identity": true,
+      "website_url": "https://anatra-fire.myshopify.com/"
+    },
+    "Lutz Plumbing Inc": {
+      "latest_http_observed": 200,
+      "live_get_brand_match_observed_before": true,
+      "status": "FIRST_PARTY_BRANDED_WEBSITE_OBSERVED",
+      "web_search_independent_company_identity": true,
+      "website_url": "https://lutzplumbingsf.com/"
+    },
+    "Vitality Remodeling LLC": {
+      "latest_http_observed": 200,
+      "live_get_brand_match_observed_before": true,
+      "status": "FIRST_PARTY_BRANDED_WEBSITE_OBSERVED",
+      "web_search_independent_company_identity": true,
+      "website_url": "https://vitality-remodeling.com/"
+    }
+  }
+}
