@@ -123,13 +123,14 @@ def _consume_once_identity_probe_marker(
     marker: Path = Path(
         "/srv/empire_os/runtime/coder/agent_signing_observe_once_20261022.flag"
     ),
+    *,
+    expected: bytes = b"EMPIRE_CODER_PROCESS_SIGNING_OBSERVE_ONLY_V1" + bytes((10,)),
 ) -> bool:
     """Consume only our exact small, owner-private observe-only marker.
 
     It cannot enable messaging, open a task, or register a key; the marker
     only opts in to one transient process signing observation.
     """
-    expected = b"EMPIRE_CODER_PROCESS_SIGNING_OBSERVE_ONLY_V1" + bytes((10,))
     try:
         fd = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW)
     except OSError:
@@ -187,8 +188,28 @@ def _observe_existing_worker_signing_identity() -> None:
         )
 
 
+def _observe_existing_root_identity_preflight() -> None:
+    """Exactly one read-only root-helper origin check, never task pickup."""
+    if not _consume_once_identity_probe_marker(
+        Path("/srv/empire_os/runtime/coder/agent_root_preflight_once_20261022.flag"),
+        expected=b"EMPIRE_CODER_ROOT_IDENTITY_PREFLIGHT_ONLY_V1" + bytes((10,)),
+    ):
+        return
+    try:
+        from empire_os.managed_agent_identity_socket_probe import (
+            probe_current_coder_process,
+        )
+        result = probe_current_coder_process()
+        print("CODER_ROOT_IDENTITY_PREFLIGHT " + json.dumps(result, sort_keys=True),
+              file=sys.stderr)
+    except Exception as exc:
+        print("CODER_ROOT_IDENTITY_PREFLIGHT_HELD_" + type(exc).__name__,
+              file=sys.stderr)
+
+
 def main(argv: list[str] | None = None) -> int:
     _apply_background_priority()
+    _observe_existing_root_identity_preflight()
     _observe_existing_worker_signing_identity()
     args = parser().parse_args(argv)
     workspace = Path(args.workspace)
