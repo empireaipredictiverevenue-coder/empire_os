@@ -1,0 +1,100 @@
+{
+  "backup_site_tar_sha256": "c4d578f449df29e3f24f88147ceee96793a8fa9d5388b0e61c017b12fad4fba5",
+  "backup_sql_sha256": "702428eb5871f113865fb81f20fe7d9cfdb7806a872dc80f61a692de092dd82f",
+  "bootstrap": {
+    "native_wpdb_innodb_ready": true,
+    "pages_created": 6,
+    "php": "8.5.4",
+    "plugin_active": true,
+    "status": "NATIVE_WP_MYSQL_STAGE_BOOTSTRAP_PASS",
+    "synthetic_attachment_id": 11,
+    "synthetic_only": true,
+    "theme": "empire-local-services",
+    "vehicle_id": 10,
+    "wordpress": "6.8.11"
+  },
+  "browser_check_count": 22,
+  "browser_checks": {
+    "admin_login_success": true,
+    "admin_no_server_5xx": true,
+    "all_external_browser_requests_blocked": true,
+    "desktop_hero_present": true,
+    "desktop_home_200": true,
+    "desktop_no_horizontal_overflow": true,
+    "inventory_image_present": true,
+    "keyboard_focusable_element": true,
+    "login_page_200": true,
+    "login_password_field_present": true,
+    "login_username_field_correct": true,
+    "mobile_home_200": true,
+    "mobile_inventory_200": true,
+    "mobile_no_horizontal_overflow": true,
+    "staff_cancel_receipt": true,
+    "staff_confirmation_receipt": true,
+    "staff_form_present": true,
+    "staff_hold_listed": true,
+    "staff_hold_receipt": true,
+    "staff_recent_table_present": true,
+    "staff_workbench_200": true,
+    "synthetic_vehicle_visible": true
+  },
+  "browser_version": "Chrome/139.0.7258.66",
+  "customer_bookings_enabled": false,
+  "external_requests_blocked": 6,
+  "loopback_only_http": true,
+  "mariadb_unix_socket_only": true,
+  "observed_utc": "2026-10-22T19:31:39.101630+00:00",
+  "outbound_or_payments_enabled": false,
+  "php_version": "8.5.4",
+  "production_changes": false,
+  "responsive": {
+    "desktop": {
+      "document": 1440,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 1440
+    },
+    "mobile": {
+      "document": 390,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 390
+    }
+  },
+  "restore_verified": {
+    "active_theme": "empire-local-services",
+    "attachment_sha256": "8538b217070301eb7cc7f7db1c53149523c1c54fe9783610f746b6e945cdb8e6",
+    "booking_audit_events": 3,
+    "booking_rows": 1,
+    "pages": 7,
+    "production_modified": false,
+    "status": "NATIVE_WP_MYSQL_RESTORE_PASS",
+    "vehicles": 1
+  },
+  "screenshots": {
+    "home-desktop.png": {
+      "bytes": 77087,
+      "sha256": "b134b890493d9f302aa024788533f551b1c60b9d4e8640cd948a79149a32335e"
+    },
+    "home-mobile.png": {
+      "bytes": 68830,
+      "sha256": "62ca18dcc1726735e40233d7ecf8b589bb89ec8bc5a997c785af4fd471b2241a"
+    },
+    "staff-desktop.png": {
+      "bytes": 75286,
+      "sha256": "53ecc2ed7f201237f55ce951b5b328a20c7ac79188a928f5d64c9da56533d5cf"
+    },
+    "stock-mobile.png": {
+      "bytes": 39702,
+      "sha256": "e58b33add238f430330a0d56b53a5e633b7331e218d4a8b5cb831fd8d6df58c6"
+    }
+  },
+  "source_manifest_sha256": {
+    "scripts/native_wp_v03/bootstrap.php": "40224f83e5d9a1489e60a1a564ce5fdda28c171a20cf7a9d6a2eeb413fb12a38",
+    "scripts/native_wp_v03/browser_acceptance.cjs": "7924892f288226940c66e8159f85f9888b106bac2b0998750daab61fcfd908c0",
+    "scripts/native_wp_v03/restore_verify.php": "424bf402621bc05b16a0343db9f8458eba7d47dba50c3ebe1e10d6ed522c01d0",
+    "scripts/native_wp_v03/run_disposable_native_wp.sh": "718b7e2028a0a6297f273dcf33ceb1537d3be49b5df0d8749d7e92a870a538a8"
+  },
+  "status": "NATIVE_WORDPRESS_MYSQL_BROWSER_BACKUP_RESTORE_PASS",
+  "synthetic_data_only": true,
+  "wordPress_mysql_same_runtime": true,
+  "wordpress_version": "6.8.11"
+}
