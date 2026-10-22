@@ -16,6 +16,7 @@ GSC_OWNER_DIR = Path("/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261
 # Owner-delivered count-only receipt from the existing canonical source reader.
 # Intentionally absent unless independently supplied by an authorised owner.
 ENQUIRY_RELATIVE = Path("runtime/gtm_pipeline/owner_sales_enquiry_counts_latest.json")
+BROKERAGE_RELATIVE = Path("runtime/data_brokerage/internal_product_catalog_latest.json")
 JEV_SCHEMA = "empire.jev.client_pain_production_observe.v1"
 GSC_SCHEMA = "empire.search.weekly_two_page_outcome_observer.v1"
 SALES_SCHEMA = "empire.founder.canonical_sales_source_aggregate.v1"
@@ -232,6 +233,47 @@ def review_sales_counts(receipt: Mapping[str, Any] | None, *, now: datetime) -> 
     return result
 
 
+def review_brokerage_catalog(catalog: Mapping[str, Any] | None, *, now: datetime) -> dict[str, Any]:
+    """Observe old internal brokerage inventory, NEVER contact or distribution rights."""
+    result = {
+        "status": "HELD_UNVERIFIED_BROKERAGE_INVENTORY",
+        "internal_product_count": None,
+        "source_rights_cleared_for_sale": False,
+        "independently_verified_buyers": None,
+        "enquiry_receipts_verified": False,
+        "product_publication_authorized": False,
+        "buyer_matching_authorized": False,
+    }
+    if not isinstance(catalog, Mapping) or any((
+        catalog.get("schema_version") != "empire.data_brokerage.internal_product_catalog.v1",
+        catalog.get("status") != "FOUR_ORIGINAL_DATA_PRODUCTS_IN_INTERNAL_BROKERAGE_REVIEW",
+        catalog.get("mode") != "OBSERVE",
+        catalog.get("execution_authority") != "none",
+        catalog.get("canonical_database") != "EmpireDB",
+        catalog.get("billing_activation_enabled") is not False,
+        catalog.get("product_publication_authorized") is not False,
+        catalog.get("third_party_resale_authorized") is not False,
+        catalog.get("external_paid_sources_used") is not False,
+        catalog.get("marketing_outbound_sent") is not False,
+        catalog.get("independently_verified_buyer_count") != 0,
+        catalog.get("verified_payment_count") != 0,
+        catalog.get("customer_distributions_approved") != 0,
+        not _ts(catalog.get("generated_at"), now, timedelta(days=7)),
+    )):
+        return result
+    products = catalog.get("products")
+    count = catalog.get("product_count")
+    if (type(count) is not int or count != 4 or not isinstance(products, list)
+            or len(products) != count):
+        return result
+    return {
+        **result,
+        "status": "BROKERAGE_INTERNAL_RESEARCH_PRODUCTS_RIGHTS_AND_BUYERS_HELD",
+        "internal_product_count": count,
+        "independently_verified_buyers": 0,
+    }
+
+
 def observe_product_sources(
     root: Path, *, now: datetime | None = None,
     gsc_directory: Path = GSC_OWNER_DIR,
@@ -246,6 +288,8 @@ def observe_product_sources(
                 gsc_report = _read(path, now=current, max_age=timedelta(days=7))
                 if gsc_report is not None:
                     break
+    brokerage = _read(root / BROKERAGE_RELATIVE, now=current,
+                      max_age=timedelta(days=7))
     sales_path = root / ENQUIRY_RELATIVE
     sales = _read(sales_path, now=current, max_age=timedelta(hours=24))
     # The count receipt must be delivered by the authorised root-level DB
@@ -256,6 +300,7 @@ def observe_product_sources(
         "jev": review_jev(jev, now=current),
         "organic_search": review_organic(gsc_report, now=current),
         "first_party_enquiries": review_sales_counts(sales, now=current),
+        "brokerage": review_brokerage_catalog(brokerage, now=current),
         "source_category_separation_enforced": True,
         "automatic_acquisition_or_outbound_authorized": False,
         "execution_authority": "none",

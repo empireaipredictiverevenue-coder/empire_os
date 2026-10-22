@@ -116,3 +116,21 @@ measurement; then rights-cleared brokerage scope/enquiry and approved
 commercial-product attribution. Never collapse Google impressions, public
 discussion, visitor-declared URLs and accepted buyer interest into one
 "qualified leads" number.
+
+### Data Brokerage source observation (23 Oct)
+
+The same existing GTM cycle also reads only the bounded, existing
+`runtime/data_brokerage/internal_product_catalog_latest.json` metadata.
+Original per-record raw data, third-party source rows and buyer identities
+are not ingested. The current owner catalog verifies **four internal
+research-product records**, **zero independently verified buyers**, no
+distribution approval, no resale rights clearance, no live publishing and
+no payments. GTM reports
+`BROKERAGE_INTERNAL_RESEARCH_PRODUCTS_RIGHTS_AND_BUYERS_HELD`.
+This does NOT mean brokerage products are live customer offers or that
+the unpriced public enquiry has generated a buyer. The separately owned
+first-party intake/rights/fulfilment systems remain unchanged.
+
+**Test update:** 83 targeted GTM tests passed with the brokerage fail-closed
+contract. No public listing, pricing, email, CRM promotion, database write,
+fund transfer or revenue recognition was performed by this integration.

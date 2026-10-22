@@ -154,3 +154,28 @@ def test_aggregate_jev_and_gsc_only_no_source_contact_data(tmp_path):
     assert a["organic_search"]["gsc_page_metrics"][0]["gsc_clicks"]==2
     assert a["first_party_enquiries"]["status"].startswith("HELD")
     assert "@" not in json.dumps(a)
+
+def test_brokerage_catalog_observed_but_never_sales_authorized():
+    from empire_os.gtm_commercial_source_bridge import review_brokerage_catalog
+    fixture = {
+        "schema_version":"empire.data_brokerage.internal_product_catalog.v1",
+        "status":"FOUR_ORIGINAL_DATA_PRODUCTS_IN_INTERNAL_BROKERAGE_REVIEW",
+        "mode":"OBSERVE", "execution_authority":"none",
+        "canonical_database":"EmpireDB", "billing_activation_enabled":False,
+        "product_publication_authorized":False,
+        "third_party_resale_authorized":False,
+        "external_paid_sources_used":False,
+        "marketing_outbound_sent":False,
+        "independently_verified_buyer_count":0, "verified_payment_count":0,
+        "customer_distributions_approved":0,
+        "generated_at":NOW.isoformat(),
+        "product_count":4,
+        "products":[{}, {}, {}, {}],
+    }
+    observed=review_brokerage_catalog(fixture,now=NOW)
+    assert observed["internal_product_count"] == 4
+    assert observed["buyer_matching_authorized"] is False
+    assert observed["source_rights_cleared_for_sale"] is False
+    assert observed["enquiry_receipts_verified"] is False
+    fixture["third_party_resale_authorized"]=True
+    assert review_brokerage_catalog(fixture,now=NOW)["internal_product_count"] is None
