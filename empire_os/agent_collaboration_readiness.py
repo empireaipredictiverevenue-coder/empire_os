@@ -13,14 +13,16 @@ from empire_os.departments import default_departments
 from empire_os.department_collaboration import build_kanban_board
 
 
-def review_existing_agent_collaboration(root: str | Path) -> dict[str, Any]:
+def review_existing_agent_collaboration(
+    root: str | Path, *, include_managed_runtime_identity: bool = False,
+) -> dict[str, Any]:
     root = Path(root).resolve()
     departments = default_departments()
     workers = worker_registry_snapshot()
     board = build_kanban_board(root, max_cards_per_lane=1)
     counts = {name: lane["total"] for name, lane in board["lanes"].items()}
 
-    return {
+    result = {
         "schema_version": "empire.agent_collaboration_readiness.v1",
         "status": "CODE_INTEGRATED_CREDENTIAL_AND_RUNTIME_BINDING_HELD",
         "operating_mode": "OBSERVE",
@@ -44,3 +46,7 @@ def review_existing_agent_collaboration(root: str | Path) -> dict[str, Any]:
         "execution_authority": "none",
         "next_gate": "identity_provenance_and_runtime_credential_provisioning",
     }
+    if include_managed_runtime_identity:
+        from empire_os.agent_runtime_identity_evidence import inspect_agent_team
+        result["managed_runtime_identity_evidence"] = inspect_agent_team()
+    return result
