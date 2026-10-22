@@ -1,0 +1,28 @@
+{
+  "accepted_attempts": 1,
+  "audit_events_after_concurrency": 1,
+  "audits_after_cancel_rebook": 3,
+  "bookings_after_concurrency": 1,
+  "browser_tested": false,
+  "cancel_rebook_passed": true,
+  "denied_conflicting_attempts": 1,
+  "independent_simultaneous_php_processes": 2,
+  "mariadb_version": "11.8.6-MariaDB-5ubuntu0.1 from Ubuntu",
+  "mysql_tcp_enabled": false,
+  "observed_utc": "2026-10-22T18:23:03.703031+00:00",
+  "occupied_quarter_hour_slots": 4,
+  "php_version": "8.5.4",
+  "platform": "ISOLATED_USER_SCOPED_MARIADB_UNIX_SOCKET_NO_TCP",
+  "production_changes": false,
+  "schema_version": "empire.agency.car_yard_v03_real_mariadb_concurrency.v1",
+  "source_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-car-yard/includes/class-empire-yard-booking-rules.php": "a370c31c262609922325e19ca6317de9d9fa492ff53006c6a3202399760e52e1",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-car-yard/includes/class-empire-yard-booking-store.php": "a5a1b2625653b786567b527a033de3edfbd171a02d33dd6f89f3a8eb03eef0e7",
+    "scripts/run_empire_yard_disposable_mysql_v03_20261022.sh": "ef90ce80c99520a03cf3eb1bf9cd9eb65c85e24b10d669b3ca4b5f0e7b70a658",
+    "tests/verify_empire_car_yard_real_mariadb_20261022.php": "c04cc238ea6bcfda33330cd9b89a3f4ff8b629d801e0b7b8fc2bfff0c7df720d"
+  },
+  "status": "REAL_MARIADB_TWO_PROCESS_INNODB_CONCURRENCY_PASS",
+  "synthetic_only": true,
+  "temporary_database_teardown_registered": true,
+  "wordpress_with_mysql_tested": false
+}
