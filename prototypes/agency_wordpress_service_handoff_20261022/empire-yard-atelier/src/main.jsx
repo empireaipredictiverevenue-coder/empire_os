@@ -1,0 +1,158 @@
+import React, { Component, useEffect, useId, useState } from 'react'
+import { createRoot } from 'react-dom/client'
+import { motion, useReducedMotion } from 'motion/react'
+import { ArrowUpRight, ArrowRight, ShieldCheck, ScanLine, CalendarDays, CarFront, Sparkles, Compass } from 'lucide-react'
+import ShowroomScene from './ShowroomScene.jsx'
+import './tailwind.css'
+
+// Local Magic UI-inspired animated-grid pattern (not externally loaded).
+function AnimatedGrid({ reduce }) {
+  const patternId = useId().replace(/:/g, '')
+  return (
+    <svg aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full opacity-50" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid slice">
+      <defs><pattern id={patternId} width="70" height="70" patternUnits="userSpaceOnUse">
+        <path d="M70 0H0V70" stroke="#80b5be" strokeOpacity=".17" fill="none" strokeWidth=".7" />
+      </pattern></defs>
+      <rect width="800" height="600" fill={'url(#'+patternId+')'} />
+      {Array.from({ length: 10 }, (_, i) => (
+        <motion.rect key={i} x={(i * 127 + 70) % 750} y={(i * 79 + 80) % 550} width="70" height="70" fill="#b4dce4"
+          initial={{ opacity: .025 }} animate={reduce ? { opacity: .04 } : { opacity: [.02, .14, .02] }}
+          transition={{ duration: 4.2, delay: i * .42, repeat: reduce ? 0 : Infinity, ease: 'easeInOut' }}
+        />
+      ))}
+    </svg>
+  )
+}
+class WebGLErrorBoundary extends Component {
+  constructor(props) { super(props); this.state = { failed: false } }
+  static getDerivedStateFromError() { return { failed: true } }
+  render() { return this.state.failed ? <SceneFallback /> : this.props.children }
+}
+function SceneFallback() {
+  return <div data-3d-fallback="true" className="flex h-full w-full flex-col items-center justify-center gap-7 bg-[radial-gradient(ellipse_at_center,#294b56_0%,#102631_62%,#061823_100%)]">
+    <CarFront className="h-32 w-32 text-[#d2b77d]/90" strokeWidth={.65} aria-hidden="true" />
+    <span className="text-center text-[10px] font-semibold uppercase tracking-[.29em] text-slate-300">Interactive showroom concept</span>
+  </div>
+}
+function Hero3D({ reduce }) {
+  const [supported, setSupported] = useState(false)
+  useEffect(() => {
+    try {
+      const canvas = document.createElement('canvas')
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
+      setSupported(!!gl)
+      if (gl) gl.getExtension('WEBGL_lose_context')?.loseContext()
+    } catch { setSupported(false) }
+  }, [])
+  return <div className="relative isolate h-[300px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
+    {supported && !reduce ? <WebGLErrorBoundary><ShowroomScene motionAllowed={!reduce} /></WebGLErrorBoundary> : <SceneFallback />}
+    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
+      <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">3D Concept Studio</span>
+      <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">01 / EXPLORE</span>
+    </div>
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-[#07141d] via-[#07141d]/75 to-transparent px-4 pb-4 pt-10 sm:px-7 sm:pb-6">
+      <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200"><ScanLine className="h-4 w-4 text-[#d6b579]" /> Procedural vehicle geometry</span>
+      <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]">No external model</span>
+    </div>
+  </div>
+}
+function Button({ children, href, primary = false }) {
+  return <a href={href} className={(primary
+    ? 'bg-[#dfbd82] text-[#11232b] hover:bg-[#f2d8a9]'
+    : 'border border-white/30 bg-white/5 text-white hover:bg-white/10'
+  ) + ' inline-flex min-h-12 items-center justify-center gap-3 rounded-md px-6 py-3 text-xs font-extrabold uppercase tracking-[.11em] no-underline transition-colors focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#eecb87]'}>
+    {children}<ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+  </a>
+}
+const features = [
+  { num: '01', icon: Compass, title: 'Discovery, refined.', copy: 'Fictional showroom inventory with clear filters and a responsive presentation. Real stock feeds need client authorisation.' },
+  { num: '02', icon: ScanLine, title: 'Details worth exploring.', copy: 'Honest model specifications and image spaces without fabricated availability, reviews or pricing claims.' },
+  { num: '03', icon: CalendarDays, title: 'A smarter workshop.', copy: 'The private workbench uses database-backed slot protection. Customer booking remains disabled.' }
+]
+const concepts = [
+  { num: 'I', name: 'Grand Tourer', colors: 'from-[#2b4c57] via-[#122d39] to-[#061b27]' },
+  { num: 'II', name: 'Urban Explorer', colors: 'from-[#aa9471] via-[#5f655e] to-[#152d34]' },
+  { num: 'III', name: 'Electric Era', colors: 'from-[#436b71] via-[#2b414a] to-[#101a26]' }
+]
+function App() {
+  const reduce = !!useReducedMotion()
+  const [menu, setMenu] = useState(false)
+  const reveal = reduce ? false : { opacity: 0, y: 22 }
+  return <div data-react-showroom="true" className="min-h-screen bg-[#f5f2eb] font-sans text-[#0b1e28] antialiased">
+    <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-white focus:p-3 focus:text-black">Skip to main content</a>
+    <div className="bg-[#dfbd82] px-4 py-2 text-center text-[9px] font-black uppercase tracking-[.2em] text-[#17303b] sm:text-[10px]">
+      <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Fictional design preview — no live dealership, prices or bookings</span>
+    </div>
+    <header className="relative z-30 border-b border-white/10 bg-[#091923] text-white">
+      <nav aria-label="Primary navigation" className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-4 px-5 py-5 md:px-10 lg:py-6">
+        <a href="/" className="inline-flex items-center gap-3 no-underline" aria-label="Atelier Motors concept home">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ddb982]/65 text-[#ddb982]"><CarFront className="h-6 w-6" strokeWidth={1.3}/></span>
+          <span className="text-[15px] font-black tracking-[.18em] text-white">ATELIER <span className="text-[#dbbc88]">MOTORS</span><span className="mt-0.5 block text-[8px] tracking-[.32em] text-[#b6c9cf]">SHOWROOM CONCEPT</span></span>
+        </a>
+        <button aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-expanded={menu} onClick={() => setMenu(!menu)} className="rounded border border-white/30 px-3 py-2 text-[11px] uppercase tracking-widest text-white md:hidden">{menu ? 'Close' : 'Menu'}</button>
+        <div className={(menu ? 'flex' : 'hidden') + ' w-full flex-col gap-5 md:flex md:w-auto md:flex-row md:items-center md:gap-9'}>
+          {[['The studio','#studio'],['The collection','#collection'],['Experience','#experience'],['Inventory','/demo-stock/']].map(([label,href])=>
+            <a key={label} href={href} className="text-[11px] font-bold uppercase tracking-[.14em] text-[#d4e0e3] no-underline hover:text-[#dfbd82]">{label}</a>
+          )}
+          <a href="/contact/" className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-[#dfbd82]/70 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] text-[#e6c691] no-underline hover:bg-white/10">Enquiry info <ArrowUpRight className="h-4 w-4" /></a>
+        </div>
+      </nav>
+    </header>
+    <main id="main">
+      <section id="studio" aria-labelledby="studio-title" className="relative isolate overflow-hidden bg-[#091923] text-white">
+        <AnimatedGrid reduce={reduce}/>
+        <div className="pointer-events-none absolute -left-60 top-[-150px] h-[600px] w-[600px] rounded-full bg-[#22505a]/35 blur-[135px]" />
+        <div className="relative mx-auto grid max-w-[1320px] items-center gap-12 px-5 pb-10 pt-16 md:px-10 lg:min-h-[720px] lg:grid-cols-[.91fr_1.09fr] lg:gap-7 lg:pb-20 lg:pt-20">
+          <div className="relative z-10 max-w-[610px]">
+            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.05}} className="mb-6 inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[.27em] text-[#dcbc85]"><span className="h-px w-8 bg-[#dcbc85]" /> The future of the showroom</motion.p>
+            <motion.h1 id="studio-title" initial={reveal} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}} className="max-w-[11ch] font-serif text-[clamp(3.4rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]">Drive something <em className="font-normal text-[#dcbc85]">extraordinary.</em></motion.h1>
+            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.22}} className="mb-8 mt-7 max-w-[50ch] text-[15px] leading-[1.85] text-[#bacbd2] sm:text-base">An immersive WordPress dealership concept with cinematic 3D, refined inventory discovery, and a governed service-workshop foundation.</motion.p>
+            <motion.div initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.3}} className="flex flex-wrap gap-3"><Button primary href="/demo-stock/">Explore fictional stock</Button><Button href="#experience">Discover the concept</Button></motion.div>
+            <div className="mt-10 flex flex-wrap items-center gap-5 border-t border-white/15 pt-5 text-[10px] uppercase tracking-[.14em] text-[#aabdc4]"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#dcbc85]"/> React + Three.js</span><span>Mobile-first</span><span>WordPress native</span></div>
+          </div>
+          <motion.div initial={reduce?false:{opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
+            <Hero3D reduce={reduce}/><p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]">Illustrative 3D geometry — no real manufacturer design</p>
+          </motion.div>
+        </div>
+        <div className="relative border-t border-white/10 bg-black/20"><div className="mx-auto flex max-w-[1320px] flex-wrap justify-between gap-3 px-5 py-5 text-[10px] font-semibold uppercase tracking-[.18em] text-[#b4c8ce] md:px-10"><span>01 — A digital showroom</span><span>02 — Evidence-led inventory</span><span>03 — Private workshop intelligence</span></div></div>
+      </section>
+      <section id="experience" className="bg-[#f5f2eb] px-5 py-20 md:px-10 md:py-28">
+        <div className="mx-auto max-w-[1240px]">
+          <div className="mb-12 grid items-end gap-7 lg:grid-cols-[1.05fr_.95fr]">
+            <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#916d3b]">Luxury in every interaction</p><h2 className="max-w-[15ch] font-serif text-[clamp(2.9rem,5vw,5.1rem)] leading-[1.08] tracking-[-.06em]">Built to make an <em>impression.</em></h2></div>
+            <p className="max-w-[55ch] text-base leading-[1.9] text-[#596a71]">A dealership website should feel as considered as the vehicles it presents. This demo connects visual polish to practical administration without pretending a customer has gone live.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">{features.map(({num,icon:Icon,title,copy})=><motion.article key={num} whileHover={reduce?undefined:{y:-5}} className="flex min-h-[310px] flex-col rounded-lg border border-[#dce2df] bg-white p-7 shadow-[0_22px_55px_rgba(8,25,35,.035)] sm:p-9">
+            <div className="mb-auto flex items-start justify-between"><span className="text-xs font-extrabold tracking-[.24em] text-[#b39462]">{num}</span><Icon className="h-8 w-8 text-[#294f5b]" strokeWidth={1.3}/></div>
+            <h3 className="mt-10 font-serif text-3xl tracking-tight">{title}</h3><p className="mt-3 text-sm leading-[1.8] text-[#64757b]">{copy}</p>
+          </motion.article>)}</div>
+        </div>
+      </section>
+      <section id="collection" className="bg-[#edece6] px-5 py-20 md:px-10 md:py-28">
+        <div className="mx-auto max-w-[1240px]">
+          <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
+            <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#916d3b]">The collection</p><h2 className="font-serif text-[clamp(2.9rem,5vw,5rem)] leading-[1.08] tracking-[-.06em]">Explore the possibilities.</h2></div>
+            <a href="/demo-stock/" className="inline-flex items-center gap-2 border-b border-[#947a4d] pb-2 text-[11px] font-black uppercase tracking-widest text-[#173b48] no-underline">See demonstrator inventory <ArrowRight className="h-4 w-4"/></a>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">{concepts.map(item=><article key={item.num} className="group overflow-hidden rounded-lg border border-[#d1d9d6] bg-white">
+            <div className={'relative flex h-64 flex-col justify-between overflow-hidden bg-gradient-to-br p-6 '+item.colors}>
+              <AnimatedGrid reduce={reduce}/><span className="relative z-10 text-[10px] font-black uppercase tracking-[.23em] text-[#f1d8a9]">Concept {item.num}</span>
+              <CarFront className="relative z-10 mx-auto h-28 w-28 text-[#dfeaec]/70 drop-shadow-lg transition-transform duration-500 group-hover:scale-110" strokeWidth={.7} aria-hidden="true"/>
+              <span className="relative z-10 text-[10px] font-semibold uppercase tracking-widest text-slate-300">Visual direction only</span>
+            </div><div className="p-7"><h3 className="font-serif text-2xl tracking-tight">{item.name}</h3><p className="mt-2 text-sm text-[#6a787e]">Inventory presentation concept</p><p className="mt-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-[#987545]">No actual vehicle listing <ArrowUpRight className="h-4 w-4"/></p></div>
+          </article>)}</div>
+        </div>
+      </section>
+      <section className="bg-[#102832] px-5 py-20 text-white md:px-10 md:py-28"><div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 rounded-xl border border-[#d4ae75]/35 bg-[radial-gradient(ellipse_at_top_right,#214957_0%,#102832_50%,#091923_100%)] p-8 md:flex-row md:items-center md:p-14">
+        <div><p className="mb-4 text-[10px] font-bold uppercase tracking-[.26em] text-[#d6b47d]">A secure commercial foundation</p><h2 className="max-w-[16ch] font-serif text-[clamp(2.7rem,4vw,4.5rem)] leading-[1.1] tracking-[-.05em]">Designed to be extraordinary. Built to be responsible.</h2><p className="mt-5 max-w-[62ch] text-sm leading-[1.9] text-[#b9cbd2]">Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled.</p></div>
+        <Button primary href="/contact/">Enquiry requirements</Button>
+      </div></section>
+    </main>
+    <footer className="border-t border-white/10 bg-[#07151f] px-5 py-12 text-[#b9c9ce] md:px-10"><div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-6 md:flex-row">
+      <div><p className="text-sm font-black uppercase tracking-[.2em] text-white">Atelier <span className="text-[#d5b47c]">Motors</span></p><p className="mt-2 max-w-[44ch] text-xs leading-7">Fictional WordPress + React showroom made for internal Empire AI capability testing.</p></div>
+      <div className="text-xs leading-7 md:text-right"><p>No real vehicles, sales offers, reservations or customer data.</p><p>Client identity, privacy and commercial terms remain pending.</p></div>
+    </div></footer>
+  </div>
+}
+const mount = document.getElementById('empire-yard-react-root')
+if (mount) createRoot(mount).render(<App/>)
