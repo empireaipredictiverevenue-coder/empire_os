@@ -1,0 +1,21 @@
+{
+  "schema": "empire.agency.connector-registry.v1",
+  "environment": "synthetic_staging",
+  "connectors": [
+    {
+      "id": "wp-synthetic-inventory-read-v1",
+      "tenant_id": "empire-agency-demo",
+      "site_id": "car-yard-synthetic",
+      "source": "wordpress_rest",
+      "transport": "stdio_to_wordpress_loopback",
+      "allowed_operations": [
+        "capabilities:read",
+        "vehicles:read"
+      ],
+      "allow_writes": false,
+      "auth_type": "wordpress_application_password",
+      "credential_binding": "runtime_environment_only",
+      "enabled_by_default": false
+    }
+  ]
+}
