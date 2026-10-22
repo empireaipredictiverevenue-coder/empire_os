@@ -20,7 +20,29 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Mapping
 
-from empire_os.agent_runtime_identity_evidence import MANAGED_WORKERS, ExistingWorkerBinding
+# Deliberately self-contained: root-pinned helper releases MUST NOT import
+# the editable /srv/empire_os agent catalogue at runtime. Pin this exact
+# allowlist in the independent protected helper release.
+@dataclass(frozen=True)
+class ExistingWorkerBinding:
+    agent_id: str
+    unit: str
+    department: str
+    role: str
+    component: str
+    expected_user: str = "ubuntu"
+
+
+MANAGED_WORKERS = (
+    ExistingWorkerBinding(
+        "empire_coder", "empire-coder-worker.service",
+        "engineering", "coder", "empire_coder",
+    ),
+    ExistingWorkerBinding(
+        "department_executive", "empire-department-cycle.service",
+        "strategy", "executive_operations", "astra_executive",
+    ),
+)
 
 PEER_SIZE = struct.calcsize("3i")
 SYSTEM_UNIT = re.compile(r"^[a-z0-9][a-z0-9@_.-]{1,127}\.service$")
@@ -64,6 +86,9 @@ def _kernel_bound_request(conn: socket.socket) -> tuple[KernelPeer, dict[str, st
         conn.settimeout(3.0)
         conn.setsockopt(socket.SOL_SOCKET, socket.SO_PASSCRED, 1)
         connected_peer = _kernel_peer(conn)
+        # Protocol readiness is NOT an auth response. It ensures that
+        # SO_PASSCRED is active before the peer sends its ONE request.
+        conn.sendall(b"EMPIRE_AGENT_IDENTITY_READY_V1" + bytes((10,)))
         frame, controls, flags, _addr = conn.recvmsg(
             MAX_IDENTITY_FRAME + 1, socket.CMSG_SPACE(PEER_SIZE),
             socket.MSG_CMSG_CLOEXEC,
@@ -236,7 +261,7 @@ def validate_managed_peer_binding(
 
 
 def attest_connected_managed_worker(
-    conn: socket.socket, *, agent_id: str,
+    conn: socket.socket, *, agent_id: str | None = None,
     proc_root: Path = Path("/proc"),
     show: Callable[[str], Mapping[str, str]] = _systemd_main,
 ) -> dict[str, object]:
@@ -250,9 +275,10 @@ def attest_connected_managed_worker(
     if os.geteuid() != 0:
         raise AgentPeerDenied("root_owned_helper_required")
     peer, request = _kernel_bound_request(conn)
-    if request["agent_id"] != agent_id:
+    claimed_agent_id = request["agent_id"]
+    if agent_id is not None and claimed_agent_id != agent_id:
         raise AgentPeerDenied("identity_preflight_agent_mismatch")
-    spec = {item.agent_id: item for item in MANAGED_WORKERS}.get(agent_id)
+    spec = {item.agent_id: item for item in MANAGED_WORKERS}.get(claimed_agent_id)
     if spec is None:
         raise AgentPeerDenied("agent_not_in_existing_worker_allowlist")
     try:
@@ -271,7 +297,7 @@ def attest_connected_managed_worker(
         unit_state = show(spec.unit)
         second_ticks = _proc_start_ticks(peer.pid, proc_root)
         return validate_managed_peer_binding(
-            agent_id=agent_id, peer=peer,
+            agent_id=claimed_agent_id, peer=peer,
             unit_state=unit_state,
             proc_uid=proc_uid, proc_gid=proc_gid, cgroup=cgroup,
             start_before=first_ticks, start_after=second_ticks,

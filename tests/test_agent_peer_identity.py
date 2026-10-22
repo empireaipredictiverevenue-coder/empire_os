@@ -226,6 +226,7 @@ def test_per_message_credential_mismatch_is_held(monkeypatch):
         family=socket.AF_UNIX, type=socket.SOCK_STREAM,
         setsockopt=lambda *_a: None,
         settimeout=lambda *_a: None,
+        sendall=lambda *_a: None,
         recvmsg=lambda *_a: (
             b'{"op":"identity_preflight","agent_id":"empire_coder",'
             b'"nonce":"validnonce_abcdefghij"}' + bytes((10,)),
@@ -259,3 +260,45 @@ def test_file_descriptor_transfer_or_truncated_ancillary_is_never_authorised():
         os.close(fd)
         server.close()
         sender.close()
+
+
+def test_server_enables_passcred_before_client_writes_request():
+    from threading import Thread
+    from empire_os.agent_peer_identity import _kernel_bound_request
+    server, sender = socket.socketpair(socket.AF_UNIX, socket.SOCK_STREAM)
+    outcome = {}
+    try:
+        server.settimeout(2)
+        sender.settimeout(2)
+        def reader():
+            try:
+                outcome["result"] = _kernel_bound_request(server)
+            except BaseException as exc:
+                outcome["error"] = repr(exc)
+        thread = Thread(target=reader, daemon=True)
+        thread.start()
+        assert sender.recv(1024) == b"EMPIRE_AGENT_IDENTITY_READY_V1" + bytes((10,))
+        sender.sendall(
+            b'{"op":"identity_preflight","agent_id":"empire_coder",'
+            b'"nonce":"handshake_nonce_abcdefgh"}' + bytes((10,))
+        )
+        thread.join(timeout=3)
+        assert not thread.is_alive()
+        assert "error" not in outcome, outcome
+        peer, request = outcome["result"]
+        assert peer.pid == os.getpid()
+        assert peer.uid == os.getuid()
+        assert request["agent_id"] == "empire_coder"
+    finally:
+        server.close()
+        sender.close()
+
+
+def test_root_pinned_existing_worker_list_matches_canonical_source():
+    from empire_os.agent_peer_identity import MANAGED_WORKERS as root_pinned
+    from empire_os.agent_runtime_identity_evidence import MANAGED_WORKERS as canonical
+    as_scope = lambda item: (
+        item.agent_id, item.unit, item.department, item.role,
+        item.component, item.expected_user,
+    )
+    assert tuple(map(as_scope, root_pinned)) == tuple(map(as_scope, canonical))
