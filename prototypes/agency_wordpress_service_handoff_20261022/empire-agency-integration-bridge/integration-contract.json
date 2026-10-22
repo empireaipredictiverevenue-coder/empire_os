@@ -1,0 +1,139 @@
+{
+  "schema": "empire.agency.connectivity.contract.v1",
+  "status": "STAGING_ONLY_NOT_PRODUCTION_CONNECTED",
+  "wordpress": {
+    "companion_plugin": "empire-agency-integration-bridge",
+    "api_base": "/wp-json/empire-agency/v1",
+    "expose_only_if": [
+      "EMPIRE_AGENCY_STAGING_INTEGRATIONS_ENABLED=true",
+      "EMPIRE_AGENCY_SYNTHETIC_INVENTORY_ONLY=true",
+      "WP_ENVIRONMENT_TYPE=local|development"
+    ],
+    "authentication": "WordPress REST authentication; HTTPS application passwords for future machine clients, signed in WP cookie nonce for dashboard",
+    "authorization": "manage_options for this local synthetic single-site demonstration; never a substitute for tenant-scoped production ACLs",
+    "methods": [
+      "GET"
+    ],
+    "resource_allowlist": [
+      {
+        "id": "capabilities.read",
+        "path": "/capabilities",
+        "rate_policy": "bounded_read",
+        "privacy": "no_private_data",
+        "enabled_in_staging": true
+      },
+      {
+        "id": "vehicles.read",
+        "path": "/vehicles",
+        "rate_policy": "paged_limit_max_20",
+        "privacy": "synthetic_only",
+        "enabled_in_staging": true
+      }
+    ],
+    "prohibited": [
+      "unapproved inventory writes",
+      "booking hold/confirm/cancel APIs",
+      "customer data",
+      "CRM writes",
+      "mass exports",
+      "payment mutations",
+      "server-side arbitrary URL fetch",
+      "open proxy"
+    ]
+  },
+  "mcp": {
+    "protocol": "Model Context Protocol",
+    "endpoint_live": false,
+    "tools_active": false,
+    "intended_host": "separate trusted EmpireOS connector runtime, not publicly within WordPress",
+    "tool_descriptors": [
+      {
+        "name": "agency_get_capabilities",
+        "enabled": false,
+        "source": "GET /capabilities",
+        "input_schema": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": false
+        }
+      },
+      {
+        "name": "agency_list_demo_vehicles",
+        "enabled": false,
+        "source": "GET /vehicles",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "page": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "additionalProperties": false
+        }
+      }
+    ],
+    "future_auth": "MCP protected resource OAuth 2.1 audience-bound tokens + discovery and scopes, or local stdio environment identity; no direct reuse or passthrough of third-party tokens",
+    "future_scope": "agency.demo.inventory.read",
+    "tenant_binding": "unimplemented, required before any real client/site connected",
+    "approvals": [
+      "identity and actor verification",
+      "per-tenant scope",
+      "credential isolation",
+      "read/write separation",
+      "audit receipt",
+      "source rights/consent",
+      "explicit founder/client permission for external writes"
+    ]
+  },
+  "future_adapters": [
+    {
+      "name": "WordPress native inventory",
+      "direction": "read",
+      "state": "synthetic_staging_only"
+    },
+    {
+      "name": "Dealer management systems / stock feeds",
+      "direction": "import",
+      "state": "design_only_rights_not_verified"
+    },
+    {
+      "name": "CRM/EmpireOS canonical tenant",
+      "direction": "conditional evidence handoff",
+      "state": "design_only_no_tenant_binding"
+    },
+    {
+      "name": "Google/Outlook Calendar",
+      "direction": "appointment scheduling",
+      "state": "design_only_no_customer_consent"
+    },
+    {
+      "name": "Approved analytics / search console",
+      "direction": "read",
+      "state": "design_only_no_accounts"
+    },
+    {
+      "name": "Email / messaging",
+      "direction": "outbound",
+      "state": "disabled_needs_approval_suppression"
+    },
+    {
+      "name": "Finance / payments",
+      "direction": "money movement",
+      "state": "disabled"
+    }
+  ],
+  "guarantees": {
+    "no_secret_in_manifest": true,
+    "no_public_customer_api": true,
+    "no_live_mcp_server": true,
+    "production_changed": false,
+    "public_booking_enabled": false
+  }
+}
