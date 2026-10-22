@@ -14,6 +14,9 @@ from empire_os.predictive_crypto_signal_research import (
 from empire_os.predictive_crypto_paper_walkforward import (
     SCHEMA,review_crypto_personal_walkforward,
 )
+from empire_os.predictive_crypto_kraken_personal import (
+    read_personal_public_spot,
+)
 
 MAX_BYTES=1_000_000
 CONTRACT="empire.predictive_intelligence.crypto_completed_candles_intake.v1"
@@ -88,6 +91,8 @@ def main(argv=None)->int:
     group.add_argument("--template",action="store_true")
     group.add_argument("--paper-file")
     group.add_argument("--walkforward-file")
+    group.add_argument("--public-btc-hourly",action="store_true")
+    group.add_argument("--public-eth-hourly",action="store_true")
     args=parser.parse_args(argv)
     try:
         if args.template:
@@ -104,6 +109,8 @@ def main(argv=None)->int:
                 "fixed_research_risk_fraction":.005,
                 "historical_walkforward_available":True,
                 "historical_market_data_authenticated":False,
+                "public_spot_snapshot_manual_fetch_available":True,
+                "public_spot_snapshot_is_historical_backtest_evidence":False,
                 "ninety_nine_percent_accuracy_verified":False,
                 "personal_use_only":True,
                 "commercialization_approved":False,
@@ -111,6 +118,11 @@ def main(argv=None)->int:
                 "database_writes":False,
                 "execution_authority":"none",
             }
+        elif args.public_btc_hourly or args.public_eth_hourly:
+            output=read_personal_public_spot(
+                instrument="BTC/USD" if args.public_btc_hourly else "ETH/USD",
+                interval_minutes=60,
+            )
         else:
             input_path=Path(args.paper_file or args.walkforward_file)
             output=_private_paper(_read(input_path),replay=bool(args.walkforward_file))

@@ -13,6 +13,7 @@ FILES=(
   empire_os/predictive_crypto_signal_research.py
   empire_os/predictive_crypto_research_scorecard.py
   empire_os/predictive_crypto_paper_walkforward.py
+  empire_os/predictive_crypto_kraken_personal.py
   scripts/review_predictive_crypto_personal_20261022.py
 )
 [[ -z "$(git -C "$OWNER" status --porcelain)" ]] ||
@@ -32,12 +33,16 @@ if [[ "$#" == 0 ]]; then
   mode=--capabilities
 elif [[ "$#" == 1 && "$1" == "--template" ]]; then
   mode=--template
+elif [[ "$#" == 1 && "$1" == "--btc" ]]; then
+  mode=--public-btc-hourly
+elif [[ "$#" == 1 && "$1" == "--eth" ]]; then
+  mode=--public-eth-hourly
 elif [[ "$#" == 2 && ( "$1" == "--paper" || "$1" == "--walkforward" ) && -f "$2" && ! -L "$2" ]]; then
   mode=--paper-file
   [[ "$1" == "--walkforward" ]] && mode=--walkforward-file
   file="$2"
 else
-  echo 'Usage: empire-crypto-personal [--template | --paper ORIGINAL.json | --walkforward ORIGINAL.json]' >&2
+  echo 'Usage: empire-crypto-personal [--btc | --eth | --template | --paper ORIGINAL.json | --walkforward ORIGINAL.json]' >&2
   exit 2
 fi
 if [[ -n "${file:-}" ]]; then

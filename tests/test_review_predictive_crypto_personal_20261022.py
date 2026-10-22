@@ -89,6 +89,27 @@ def test_poisoned_or_unsafe_data_fails_closed(tmp_path,capsys,bad):
     assert report["database_writes"] is False
 
 
+def test_private_public_snapshot_switches_do_not_enable_exchange_trading(monkeypatch,capsys):
+    calls=[]
+    def fake(*,instrument,interval_minutes):
+        calls.append((instrument,interval_minutes))
+        return {
+            "schema_version":"empire.predictive_intelligence.crypto_personal_public_ohlcv.v1",
+            "status":"PERSONAL_SPOT_SNAPSHOT_RESEARCH_ONLY",
+            "paper_signal":{"status":"NO_TRADE"},
+            "live_orders_or_wallet_access":False,
+            "execution_authority":"none",
+        }
+    monkeypatch.setattr(cli,"read_personal_public_spot",fake)
+    assert cli.main(["--read-only","--public-btc-hourly"])==0
+    output=json.loads(capsys.readouterr().out)
+    assert output["paper_signal"]["status"]=="NO_TRADE"
+    assert output["live_orders_or_wallet_access"] is False
+    assert cli.main(["--read-only","--public-eth-hourly"])==0
+    capsys.readouterr()
+    assert calls==[("BTC/USD",60),("ETH/USD",60)]
+
+
 def test_private_release_source_contract():
     shell=(Path(__file__).resolve().parents[1]/
            "scripts/prepare_private_crypto_personal_release_20261022.sh")
@@ -96,6 +117,9 @@ def test_private_release_source_contract():
     assert "REFUSE_DIRTY_PERSONAL_CRYPTO_RELEASE" in raw
     assert "sha256sum --status -c" in raw
     assert "predictive_crypto_paper_walkforward.py" in raw
+    assert "predictive_crypto_kraken_personal.py" in raw
+    assert "--public-btc-hourly" in raw
+    assert "--public-eth-hourly" in raw
     assert "review_predictive_crypto_personal_20261022.py" in raw
     assert "LIVE_ORDERS_AND_PRODUCTION_UNCHANGED=true" in raw
     assert "git -C" in raw and "archive" in raw

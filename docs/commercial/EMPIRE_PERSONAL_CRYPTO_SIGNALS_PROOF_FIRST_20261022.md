@@ -52,3 +52,9 @@ Sources:
 - Walk-forward and costs: https://arxiv.org/abs/2609.34510 ; https://arxiv.org/abs/2606.00060
 
 **Integrity boundary:** Source hashes detect changes, not original owner signatures. No trading claims until independently validated and no merchant or financial permissions are changed by this release.
+
+## Optional one-shot founder-private public spot snapshot
+
+A new strict `empire_os/predictive_crypto_kraken_personal.py` adapter makes a single HTTPS **public GET** to Kraken's spot OHLC endpoint for only BTC/USD or ETH/USD, at 1-hour intervals. It never accepts API keys or account tokens, and does not call trading endpoints. `empire-crypto-personal --btc` / `--eth` merely shows a research candidate or NO_TRADE as of the fetched completed candle, with a mandatory modeled stop and hypothetical position size; it is not a broker order or an instruction to trade. Kraken says its final OHLC entry is still forming, so the adapter always drops it and rejects stale/inconsistent remaining bars.
+
+**Critical source custody:** Every historical bar is stamped first-available/ingested at the *actual fetch time*. We will not invent its original historical availability, so the live snapshot **cannot be presented as a point-in-time historical walk-forward result**. True proof needs prospective original snapshot retention, venue costs and receipts. No feed is scheduled and market-data redistribution is not authorized. Kraken's public endpoint access is subject to its terms; non-personal commercial uses may require prior approval. Source: https://support.kraken.com/articles/360000919986-public-endpoint-examples-you-can-try-them-directly-in-a-web-browser- and https://docs-legacy.kraken.com/api/docs/guides/global-intro/.
