@@ -417,6 +417,37 @@ def create_revenue_crm_router(
                 status_code=503, detail="authenticated_crm_read_unavailable",
             ) from None
 
+    @router.get("/department-kanban")
+    def authenticated_department_kanban(
+        request: Request,
+        max_cards_per_lane: int = Query(default=20, ge=1, le=50),
+    ) -> dict[str, Any]:
+        """Read the existing Department queue under the CRM tenant login.
+
+        This endpoint is deliberately unavailable in the legacy/hub router.
+        An authenticated tenant can see ONLY exactly tenant-bound records.
+        Tenant-unbound internal team work remains founder-internal and is not
+        exposed through any tenant token, including the founder's CRM login.
+        """
+        if resolve_authenticated_read is None:
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_scope_required",
+            )
+        repo = require_repository(request)
+        if not isinstance(repo, PostgresRevenueCrmRepository):
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_read_unavailable",
+            )
+        # Require the existing dedicated login's DB session-user and tenant
+        # binding to actually pass before returning local queue metadata.
+        guarded_crm_read(lambda: repo.prospects(limit=1))
+        from empire_os.department_collaboration import build_kanban_board
+        return build_kanban_board(
+            evidence_root,
+            tenant_id=repo.tenant_id,
+            max_cards_per_lane=max_cards_per_lane,
+        )
+
     @router.post("/search-growth/preview")
     def search_growth_preview(req: RevenueCrmSearchGrowthRequest):
         try:
