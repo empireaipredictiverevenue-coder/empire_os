@@ -62,6 +62,7 @@ class AuthorizedConnectorRead:
     wp_origin: str
     user_id: str
     operations: tuple[str, ...]
+    expires_at: int
 
 
 def _decode(value: Any, length: int) -> bytes:
@@ -179,5 +180,5 @@ def authorize_agency_connector(
     return AuthorizedConnectorRead(
         tenant_id=tenant, site_id=claims["site_id"], connector_id=claims["connector_id"],
         credential_ref=claims["credential_ref"], wp_origin=claims["wp_origin"],
-        user_id=claims["sub"], operations=OPERATIONS,
+        user_id=claims["sub"], operations=OPERATIONS, expires_at=expiry,
     )

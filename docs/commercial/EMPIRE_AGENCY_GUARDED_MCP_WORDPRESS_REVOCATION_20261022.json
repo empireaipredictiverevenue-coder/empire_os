@@ -1,0 +1,48 @@
+{
+  "credential_revoked_after_test": true,
+  "crm_payments_outbound_activated": false,
+  "limitations": "Real WordPress/MariaDB; synthetic, not canonical EmpireDB membership and site grants; no production OAuth, issuer, vault or client connector activation.",
+  "loopback_http_only": true,
+  "mcp_checks": {
+    "authenticated_capabilities_real_wordpress": true,
+    "authenticated_synthetic_inventory_real_mariadb": true,
+    "closed_session_denied_before_wordpress": true,
+    "exactly_two_wordpress_reads_before_revocation": true,
+    "mid_session_credential_revoked_denied_before_wordpress": true,
+    "mid_session_membership_revoked_denied_before_wordpress": true,
+    "mid_session_registry_revoked_denied_before_wordpress": true,
+    "mid_session_site_grant_revoked_denied_before_wordpress": true,
+    "two_read_only_tools": true
+  },
+  "mcp_checks_passed": 9,
+  "membership_source": "synthetic_mutable_stage_fixture_not_canonical_empiredb",
+  "mid_session_revocation_checked_before_each_http_read": true,
+  "native_mariadb_database": true,
+  "native_wordpress_plugin_enabled": true,
+  "observed_utc": "2026-10-22T22:14:51.639582+00:00",
+  "php_version": "8.5.4",
+  "post_revocation_http_status": 401,
+  "production_changes": false,
+  "schema_version": "empire.agency.guarded_mcp_wp_mysql_revocation.v1",
+  "scope": {
+    "connector_id": "wp-synthetic-inventory-read-v1",
+    "site_id": "car-yard-synthetic",
+    "tenant_id": "empire-agency-demo"
+  },
+  "secret_values_in_receipt": false,
+  "source_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-agency-mcp-stdio/connector-registry.staging.json": "9da5fec255a4a270ba44d0dc6514e0f236da6e4a675b996d3410bbc27570fedd",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-agency-mcp-stdio/revocation-guard.mjs": "59ecf2171f40a225d5f950bbf63d524df97ffd98dfe8008e1f2c665be300e7a0",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-agency-mcp-stdio/scoped-policy.test.mjs": "51a03cefe710b6b2a8b02525a78b49291656c67d84a360b37b5e86f9114fd739",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-agency-mcp-stdio/scoped-server.mjs": "c8e9a790de0ddc864599db78d5725d62bf72d619400dd4962ba149b3de3f0454",
+    "scripts/agency_mcp_live_wp_e2e/guarded_real_wp.mjs": "3a30a8b1ca67f34edd15efffeb0b31ddb6ca6a74d7aef95b493bbce0f2703b42",
+    "scripts/agency_mcp_live_wp_e2e/revoke_api.php": "840a2f1c56f72cb7756ffa51cb28cf4bea91602162a3a08c2e6dba5c6c69c3be",
+    "scripts/agency_mcp_live_wp_e2e/run_guarded_revocation_e2e.sh": "ca2a89cc91aa5e3d2258476d6fbe7f1e10b13408a4804f8f7721f25a9758db5d",
+    "scripts/agency_mcp_live_wp_e2e/setup_api.php": "21cdb944af490c1bcd253496d6e7d8386773a622e6233f4a3e8fcff34f5b6a9b",
+    "scripts/agency_mcp_live_wp_e2e/verify_revoke.mjs": "0fad364bf4f024c40fd7e0a3d817add6fb31848aed62385f74e7f9ea38cba4cd"
+  },
+  "status": "REAL_WORDPRESS_MYSQL_GUARDED_MCP_SYNTHETIC_REVOCATION_PASS",
+  "test_site_temporary": true,
+  "wordpress_real_application_password_authentication": true,
+  "wordpress_version": "6.8.11"
+}

@@ -206,10 +206,10 @@ def _prepared_session_fixture(source,tmp_path):
             trusted_registry_reader=registry,consume_nonce=nonce,
             trusted_credential_directory=directory,trusted_uid=os.getuid(),
             now=lambda:NOW)
-    return prepare,canonical_memberships,canonical_registry,secret,envelope_claims
+    return prepare,canonical_memberships,canonical_registry,secret,envelope_claims, (membership,grant,registry,directory)
 
 def test_three_way_signed_membership_registry_and_credential_preflight(source,tmp_path):
-    prepare,member,registry,secret,claims=_prepared_session_fixture(source,tmp_path)
+    prepare,member,registry,secret,claims,context=_prepared_session_fixture(source,tmp_path)
     session=prepare()
     assert session.authority.site_id==SITE
     assert session._application_password=="synthetic agency staging password 12345"
@@ -218,7 +218,7 @@ def test_three_way_signed_membership_registry_and_credential_preflight(source,tm
     assert session.nonsecret_receipt()["credential_contents_exposed"] is False
 
 def test_revoked_membership_registry_and_secret_fail_before_launch(source,tmp_path):
-    prepare,member,registry,secret,claims=_prepared_session_fixture(source,tmp_path)
+    prepare,member,registry,secret,claims,context=_prepared_session_fixture(source,tmp_path)
     member["active"]=False
     with pytest.raises(ValueError):prepare()
     member["active"]=True
@@ -232,7 +232,7 @@ def test_revoked_membership_registry_and_secret_fail_before_launch(source,tmp_pa
     with pytest.raises(ValueError):prepare()
 
 def test_cross_tenant_signed_grant_cannot_select_different_site_registry(source,tmp_path):
-    prepare,member,registry,secret,claims=_prepared_session_fixture(source,tmp_path)
+    prepare,member,registry,secret,claims,context=_prepared_session_fixture(source,tmp_path)
     with pytest.raises(ValueError):prepare({**claims,"site_id":"someone-else-site"})
     with pytest.raises(ValueError):prepare({**claims,"tenant_id":"5e8d111a-6785-4c79-8841-1542a6b9cd66"})
 
@@ -243,3 +243,40 @@ def test_preflight_is_separate_from_unapproved_live_service():
     assert "subprocess" not in source and "Popen" not in source
     assert "read_private_connector_password" in source
     assert "trusted_registry_reader" in source
+
+
+from empire_os.agency_connector_preflight import revalidate_agency_read_operation
+
+def _recheck(session,context,operation="vehicles:read",now=NOW):
+    membership,grant,registry,directory=context
+    return revalidate_agency_read_operation(
+        session,operation,membership_reader=membership,site_grant_reader=grant,
+        trusted_registry_reader=registry,trusted_credential_directory=directory,
+        trusted_uid=os.getuid(),now=lambda:now)
+
+def test_each_operation_requires_fresh_tenant_site_registry_and_secret(source,tmp_path):
+    prepare,member,registry,secret,claims,context=_prepared_session_fixture(source,tmp_path)
+    session=prepare()
+    assert _recheck(session,context)
+    assert _recheck(session,context,"capabilities:read")
+    with pytest.raises(ValueError):_recheck(session,context,"bookings:write")
+    member["active"]=False
+    with pytest.raises(ValueError):_recheck(session,context)
+    member["active"]=True
+    registry["active"]=False
+    with pytest.raises(ValueError):_recheck(session,context)
+    registry["active"]=True
+    secret.write_text("rotated secret revokes existing active mcp session")
+    secret.chmod(0o600)
+    with pytest.raises(ValueError):_recheck(session,context)
+
+def test_authority_expires_during_mcp_session_and_no_unverified_reuse(source,tmp_path):
+    prepare,member,registry,secret,claims,context=_prepared_session_fixture(source,tmp_path)
+    session=prepare()
+    assert _recheck(session,context,now=NOW+89)
+    with pytest.raises(ValueError):_recheck(session,context,now=NOW+90)
+    with pytest.raises(ValueError):
+        revalidate_agency_read_operation("an-unverified-session","vehicles:read",
+          membership_reader=lambda *_:None,site_grant_reader=lambda *_:None,
+          trusted_registry_reader=lambda *_:None,trusted_credential_directory=tmp_path,
+          trusted_uid=os.getuid(),now=lambda:NOW)
