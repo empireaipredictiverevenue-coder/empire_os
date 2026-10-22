@@ -1,0 +1,80 @@
+{
+  "audit_at_utc": "2026-10-22T12:55:51.415355+00:00",
+  "buyer_company_identifications_verified": 0,
+  "canonical_crm_records_created": 0,
+  "commercial_offers_ready": 0,
+  "counterparty_receipt_sha256": "7ad84a7b072fe19cefee4c0961f6f0d454f666beec40f5c90bd6faa083836b10",
+  "database_writes": false,
+  "execution_authority": "none",
+  "historic_empiredb_records_eligible_for_bulk_sale": 0,
+  "lead_supply_counts": {
+    "held_for_evidence": 84,
+    "selected": 180,
+    "sellable": 0,
+    "waiting_for_buyer_capacity": 96
+  },
+  "lead_supply_snapshot_observed_at": "2026-10-22T12:53:01.220160+00:00",
+  "lead_supply_status": "CURRENT_AGGREGATE_RESEARCH_ONLY_ZERO_SELLABLE",
+  "live_customer_purchase_requests_reconfirmed": 0,
+  "messages_sent": 0,
+  "mode": "OBSERVE",
+  "no_paid_traffic": true,
+  "original_public_source_fingerprint_verified": true,
+  "paid_revenue_verified": false,
+  "plans": [
+    {
+      "buyer_company_verified": false,
+      "closed_job_attribution_proven": false,
+      "commercial_offer_ready": false,
+      "contact_authorized": false,
+      "model": "TEN_PERCENT_OF_VERIFIED_CLOSED_JOBS",
+      "next_owner_review": [
+        "CONFIRM_DIRECT_COMPANY_DISCLOSURE_AND_CURRENT_DEMAND",
+        "VERIFY_ORGANIC_APPOINTMENT_SOURCE_AND_CONSENT",
+        "ESTABLISH_ACCEPTED_APPOINTMENT_AND_CLOSED_JOB_AUDIT",
+        "CHECK_REFUNDS_DISPUTES_PAYMENT_AND_MARGIN",
+        "CHECK_PRIOR_RELATIONSHIP_AND_SUPPRESSION"
+      ],
+      "organic_appointment_delivery_proven": false,
+      "payment_terms_and_disputes_agreed": false,
+      "proposed_pilot": "ZERO_DELIVERY_INTERNAL_FEASIBILITY_CHECK",
+      "public_case_reference": "1wciats",
+      "purchase_requirement_current": false,
+      "qualified_appointment_definition_agreed": false,
+      "scope": "TENNESSEE_ROOFING_APPOINTMENTS"
+    },
+    {
+      "actual_accepted_record_count": 0,
+      "batch_acceptance_criteria_verified": false,
+      "business_website_status_independently_checked": false,
+      "commercial_offer_ready": false,
+      "company_identity_verified": false,
+      "contact_authorized": false,
+      "contract_and_payment_proof": false,
+      "full_batch_record_target": 50,
+      "gross_payment_per_fully_accepted_batch_usd": 150,
+      "maximum_stated_gross_base_payment_usd": 150,
+      "model": "FIFTY_ACCEPTED_RECORDS_FOR_USD_150_PLUS_CONTINGENT_COMMISSION",
+      "next_owner_review": [
+        "RECONFIRM_REQUEST_AND_LEGAL_AGENCY",
+        "OBTAIN_WRITTEN_BATCH_ACCEPTANCE_AND_PAYMENT_TERMS",
+        "REVIEW_LAWFUL_BUSINESS_DATA_SOURCES_AND_PERMITTED_USE",
+        "TEST_PRIVATE_NON_CONTACT_SAMPLE_FOR_WEBSITE_STATUS_ACCURACY",
+        "MEASURE_RESEARCH_AND_QA_COST_BEFORE_PROMISING_FIFTY_RECORDS",
+        "CHECK_PRIOR_RELATIONSHIP_AND_SUPPRESSION"
+      ],
+      "projected_profit_verified": false,
+      "proposed_pilot": "ZERO_DELIVERY_PRIVATE_SYNTHETIC_QA_DRY_RUN",
+      "public_case_reference": "1uk1vw1",
+      "scope": "US_BUSINESS_WEBSITE_STATUS_RESEARCH",
+      "source_reuse_and_contact_purpose_rights_verified": false
+    }
+  ],
+  "promised_deliveries": 0,
+  "qualified_organic_deliveries_verified": 0,
+  "recipient_records_opened": 0,
+  "schema_version": "empire.jev.public_b2b_preoffer_review.v1",
+  "status": "B2B_PREOFFER_READINESS_HELD_RESEARCH_ONLY",
+  "two_public_post_hypotheses_not_two_verified_buyers": true,
+  "valid_communication_consent_and_suppression_receipt": false
+}
