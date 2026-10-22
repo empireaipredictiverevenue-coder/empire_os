@@ -69,3 +69,50 @@ Production runtime directory is root-owned. The observer was not separately
 activated as an independent service. Existing GTM service will use the adapter
 on its next execution through its existing runner. Verify the resulting
 artifact under the service's credentials before calling this deployed.
+
+## Next integration: JEV + organic + first-party count-only (23 Oct)
+
+**Implemented and unit-tested:** `empire_os/gtm_commercial_source_bridge.py`
+is now called by the existing `gtm_integration_observer.py`, which is
+already invoked by the existing GTM pipeline service. No extra daemon,
+timer, outbound route, website modification, CRM writer or database query.
+
+- **JEV:** Reads only the existing `runtime/jev_client_pain_discovery/aggregate_latest.json`.
+  Requires current `CLIENT_PAIN_DISCOVERY_OWNER_REVIEW_ONLY` schema,
+  safe rights/identity/authority flags and UTC timestamp. Exports theme-level
+  counts and proposed product mapping, never the private evidence URLs or
+  people. Live result: `NO_CONCRETE_JEV_PAIN_THEMES_IN_CURRENT_RECEIPT`.
+- **Organic:** Reads an owner-generated private weekly GSC page report
+  from `/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022`
+  in a bounded, page-only, read-only manner. Strictly validates the
+  canonical Google property, page set, dates, source state, evidence type
+  and no execution. Current result: both pages
+  `NO_PAGE_IN_RETURNED_GSC_ROWS`. This is **not a measured zero**;
+  postrelease organic conversion attribution remains unknown.
+- **Genuine enquiries:** Reserves a count-only intake from the existing
+  founder-authorised canonical sales aggregate reader
+  (`empire.founder.canonical_sales_source_aggregate.v1`).
+  The authorised DB owner must independently produce and attest a fresh
+  root-owned receipt at
+  `runtime/gtm_pipeline/owner_sales_enquiry_counts_latest.json`;
+  include `observed_at_utc` and the exact existing count/consent fields,
+  without customer identifiers. **No attempt is made to call the privileged
+  operator or to create the missing receipt.** Without that proof the state
+  stays `HELD_NO_OWNER_VERIFIED_ENQUIRY_COUNTS`, NOT zero.
+  Even nonzero count-only proof is NOT authenticated per-person consent
+  for GTM auto-contact and NOT verified organic source attribution.
+- Product source observations are stored within the already-running
+  `integration_observer_latest.json` under `product_sources`. This is
+  review/decision information, not an independent buyer candidate queue.
+
+**Verified** with 82 focused GTM tests passing. Read-only local output:
+JEV no concrete themes; GSC no returned page rows; first-party count unknown.
+All reported outbound/CRM/payment/recognised-revenue actions remain false.
+
+**Next source-owning implementations:** a canonical per-enquiry signed receipt
+reader from the existing CRM/tenant owner; direct JEV evidence references
+without PII; verified owner SEO session-to-intake attribution after lawful
+measurement; then rights-cleared brokerage scope/enquiry and approved
+commercial-product attribution. Never collapse Google impressions, public
+discussion, visitor-declared URLs and accepted buyer interest into one
+"qualified leads" number.

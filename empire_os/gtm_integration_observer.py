@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.gtm_agent import GTM_AGENT_ID, decide_next_gtm_action
+from empire_os.gtm_commercial_source_bridge import observe_product_sources
 from empire_os.opportunity_source_custody import source_fresh
 
 RADAR = Path("runtime/opportunity_radar/latest.json")
@@ -146,6 +147,9 @@ def observe_gtm_integration(root: Path, *, now: datetime | None = None) -> dict[
         radar_source_fresh=source_fresh(radar_path, radar, now=clock),
         commercial_loop_fresh=_recent_file(loop_path, clock),
     )
+    # Existing JEV, owner GSC and independently authorised first-party
+    # aggregate receipts remain separate source classes, not CRM candidates.
+    payload["product_sources"] = observe_product_sources(root, now=clock)
     output = root / OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(".json.tmp")
