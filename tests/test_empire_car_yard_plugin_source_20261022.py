@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / 'prototypes/agency_wordpress_service_handoff_20261022/empire-car-yard'
 MAIN = SOURCE / 'empire-car-yard.php'
 RULES = SOURCE / 'includes/class-empire-yard-booking-rules.php'
+STORE = SOURCE / 'includes/class-empire-yard-booking-store.php'
 
 
 def test_plugin_structure_and_api_contract():
@@ -36,7 +37,7 @@ def test_booking_is_pure_offline_rules_not_activated_publicly():
     for forbidden in ('admin_post_', 'wp_ajax_', 'rest_api_init', 'register_rest_route', 'wp_mail(', 'wp_insert_post(', '$wpdb->insert', 'wp_remote_post(', 'payment', 'stripe', 'usdt'):
         assert forbidden not in main.lower(), forbidden
     assert 'No customer-submission endpoint exists' in main
-    assert 'not wired to public or admin writes' in main
+    assert 'Booking persistence is dormant' in main
     assert 'getTransitions' in rules
     assert 'Ambiguous DST local time' in rules
     assert 'ACTIVE' in rules
@@ -48,7 +49,7 @@ def test_php_is_parseable_where_cli_is_authorised_and_available():
     php = shutil.which('php')
     if php is None:
         return  # reported as not run separately; never assert PHP execution took place
-    for path in (MAIN, RULES):
+    for path in (MAIN, RULES, STORE):
         run = subprocess.run([php, '-l', str(path)], text=True, capture_output=True)
         assert run.returncode == 0, run.stderr
 
@@ -65,6 +66,7 @@ def test_package_is_small_and_contains_only_non_executable_source_files(tmp_path
         assert set(z.namelist()) == {
             'empire-car-yard/empire-car-yard.php',
             'empire-car-yard/includes/class-empire-yard-booking-rules.php',
+            'empire-car-yard/includes/class-empire-yard-booking-store.php',
         }
     assert package(SOURCE, tmp_path / 'second.zip')['sha256'] == manifest['sha256']
 

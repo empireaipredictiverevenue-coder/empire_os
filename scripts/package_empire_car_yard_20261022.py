@@ -6,7 +6,7 @@ from pathlib import Path
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 import json
 
-REQUIRED = ('empire-car-yard.php', 'includes/class-empire-yard-booking-rules.php')
+REQUIRED = ('empire-car-yard.php', 'includes/class-empire-yard-booking-rules.php', 'includes/class-empire-yard-booking-store.php')
 
 
 def package(source: Path, target: Path) -> dict:
@@ -38,6 +38,8 @@ def package(source: Path, target: Path) -> dict:
         'files': len(entries),
         'live_wordpress_verified': False,
         'booking_persistence_implemented': False,
+        'booking_store_source_staged': True,
+        'database_schema_installed': False,
         'public_bookings_enabled': False,
         'production_changes': False,
     }
@@ -45,5 +47,5 @@ def package(source: Path, target: Path) -> dict:
 
 if __name__ == '__main__':
     root = Path(__file__).resolve().parents[1]
-    output = root / 'prototypes/agency_wordpress_service_handoff_20261022/dist/empire-car-yard-capability-demo-0.1.0.zip'
+    output = root / 'prototypes/agency_wordpress_service_handoff_20261022/dist/empire-car-yard-capability-demo-0.2.0.zip'
     print(json.dumps(package(root / 'prototypes/agency_wordpress_service_handoff_20261022/empire-car-yard', output), sort_keys=True))
