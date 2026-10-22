@@ -8,10 +8,12 @@ Use the real Jev/GSC investigation as editorial research prioritisation. Create 
 - Source evidence: 30 first-party GSC legacy-404 page observations, 44 historical sampled impressions, zero observed clicks, Jev recommending SOURCE_AUDIT for 30 cases. 15 potentially relevant topics / 19 impressions; 15 off-core / 25 impressions. These numbers do **not** establish future SEO demand or a buyer.
 - Existing flagship /predictive-revenue and B2B /industries/roofing return HTTP 200 and have an established customer-review route at /commercial. No first-party buyer opportunity, ranking uplift or paid event has been established by this pilot.
 
-## Candidate changes (additive; three site source files)
+## Candidate changes (additive; four site source files)
 1. `apps/empire-public-site/src/components/PredictiveRevenueBuyerExplanation.tsx`: one new plain-language answer to **How do you test a revenue forecast against actual results?** Requires dated snapshot and cohort, independent opportunity/order/payment outcomes, cancellations and missing states. Does not promise forecasting performance, invent customer testimonials or change product pricing.
 2. `apps/empire-public-site/src/app/predictive-revenue/layout.tsx`: tighter B2B forecasting title/description. **Canonical was already correct and is preserved** as https://empire-ai.co.uk/predictive-revenue. No generic homepage canonical override required.
 3. `apps/empire-public-site/src/lib/industry-buying-editorial.ts`: one new B2B roofing buyer checklist: distinguish tracked visitor, attempted call, independently observed buyer connection, written accepted event and settlement. The existing sector CTA remains /commercial. Does NOT activate Ringba, buyer route, homeowner transfer, national coverage, payout or real call routing.
+
+4. `apps/empire-public-site/src/app/predictive-revenue/page.tsx`: one-line responsive header change (`flex-wrap` and mobile gap). The original 320px Chromium preview exposed a 357px document scroll width caused by the navigation badge. Rebuilt candidate Chromium diagnostic measured 320px after the fix; no form submission, pricing, attribution or payment logic changed.
 
 No changes to `/roofing` consumer acquisition, the two homeowner guides (including their existing robots policies), site hero, animations, company forms, privacy, payment APIs, outbound, contact suppression, redirects, static sitemap or other industry pages.
 
@@ -19,7 +21,7 @@ No changes to `/roofing` consumer acquisition, the two homeowner guides (includi
 - Next.js 16.3.5 `next build --webpack` compiled and completed TypeScript and static generation for all 19 pages in the isolated worktree.
 - This is a **static export**, so testing with `next start` is incorrect. Validation uses actual `out/*.html` and `scripts/verify_public_seo_pilot_candidate_20261022.py --export-dir .../out`.
 - Static HTML gate verifies self-canonical, single H1/main, unique title/description, original copy in prerendered HTML, nonbinding B2B form, opt-in and privacy links, no new tel/insecure links, existing solar and consumer educational disclaimers, consumer guide noindex and no legacy AEO restoration.
-- Responsive CSS class presence is verified. **No 375px browser screenshot, Lighthouse/Core Web Vitals, cross-device keyboard test or mobile visual sign-off has been performed**; a browser is not installed in the remote runtime. That remains a public release hold.
+- Responsive CSS classes and a real headless Chromium 320px width check are now verified using the existing first-party Puppeteer installation. The first pre-fix 320px preview failed with 37px horizontal overflow; the updated preview measured 320px with none. Full 320/390/820/1440 combined-overlay browser checks, accessibility inspection, keyboard QA and founder visual approval must be evaluated and recorded separately before public release.
 - No actual buyer enquiry is submitted as a test; the endpoint's end-to-end successful lead receipt is **not** asserted.
 
 ## Before release

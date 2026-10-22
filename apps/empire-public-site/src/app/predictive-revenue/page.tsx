@@ -171,7 +171,7 @@ export default function PredictiveRevenuePage() {
     <main className="min-h-screen bg-[#020817] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_78%_8%,rgba(37,99,235,.2),transparent_28%),radial-gradient(circle_at_12%_72%,rgba(6,182,212,.1),transparent_25%)]" />
       <div className="relative mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-12">
-        <div className="mb-10 flex items-center justify-between">
+        <div className="mb-10 flex flex-wrap items-center justify-between gap-3">
           <a
             href="/commercial"
             className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 px-4 py-2 text-xs font-semibold text-cyan-200 transition hover:border-cyan-300/50"
