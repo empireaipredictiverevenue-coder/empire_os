@@ -9,10 +9,14 @@ from __future__ import annotations
 import os
 import pwd
 import re
+import hashlib
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Mapping, Any
+
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from empire_os.departments import default_departments
 
@@ -25,6 +29,24 @@ class ExistingWorkerBinding:
     role: str
     component: str
     expected_user: str = "ubuntu"
+
+
+@dataclass(frozen=True)
+class ManagedWorkerSigningIdentity:
+    """Private Ed25519 signer provided by trusted worker bootstrap only.
+
+    Never serialize, log, register automatically or share with peer workers.
+    """
+
+    profile: Any
+    private_key: Ed25519PrivateKey
+
+    def sign(self, envelope: Mapping[str, Any]) -> str:
+        from empire_os.department_collaboration import _canonical
+        return self.private_key.sign(_canonical(envelope)).hex()
+
+    def public_key(self):
+        return self.private_key.public_key()
 
 
 # These are workload candidates, not dynamically minted authenticated agents.
@@ -169,7 +191,9 @@ def preflight_local_managed_binding(
     from empire_os.department_collaboration import AgentCredential, validate_profile
     mapping = {entry.agent_id: entry for entry in MANAGED_WORKERS}
     entry = mapping.get(agent_id)
-    if entry is None or not isinstance(credential, AgentCredential):
+    if entry is None or not isinstance(
+        credential, (AgentCredential, ManagedWorkerSigningIdentity)
+    ):
         raise ValueError("managed_credential_binding_not_registered")
     profile = credential.profile
     validate_profile(profile)
@@ -179,8 +203,12 @@ def preflight_local_managed_binding(
         or profile.role != entry.role
         or profile.tenant_id is not None
         or profile.allowed_components != (entry.component,)
-        or len(credential.key) < 32
     ):
+        raise ValueError("managed_role_or_key_scope_mismatch")
+    if isinstance(credential, AgentCredential):
+        if len(credential.key) < 32:
+            raise ValueError("managed_role_or_key_scope_mismatch")
+    elif not isinstance(credential.private_key, Ed25519PrivateKey):
         raise ValueError("managed_role_or_key_scope_mismatch")
     data = dict(show(entry.unit))
     evidence = inspect_existing_worker(
@@ -196,6 +224,16 @@ def preflight_local_managed_binding(
         or main_pid < 1 or main_pid != actual_pid
     ):
         raise ValueError("current_managed_process_identity_not_attested")
+    signer_metadata = {"signing_mode": "legacy_hmac"}
+    if isinstance(credential, ManagedWorkerSigningIdentity):
+        public = credential.public_key().public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+        signer_metadata = {
+            "signing_mode": "ed25519_private_in_managed_process",
+            "public_key_sha256": hashlib.sha256(public).hexdigest(),
+        }
     return {
         "agent_id": entry.agent_id,
         "unit": entry.unit,
@@ -203,6 +241,7 @@ def preflight_local_managed_binding(
         "credential_shape_checked": True,
         "trusted_broker_key_registration_still_required": True,
         "execution_authority": "none",
+        **signer_metadata,
     }
 
 

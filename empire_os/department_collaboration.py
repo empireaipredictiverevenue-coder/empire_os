@@ -16,6 +16,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
 from empire_os.department_work_queue import DepartmentWorkQueue, DepartmentWorkQueueError
 from empire_os.departments import default_departments
 
@@ -75,6 +78,35 @@ class AgentCredential:
     profile: AgentProfile
     # At least 256 bits, provisioned outside files/conversation and never logged.
     key: bytes
+
+
+@dataclass(frozen=True)
+class AgentPublicCredential:
+    """Verified public-only agent identity, never private signing material."""
+
+    profile: AgentProfile
+    key: Ed25519PublicKey
+
+
+def _verify_agent_signature(
+    credential: AgentCredential | AgentPublicCredential,
+    envelope: Mapping[str, Any], signature: str,
+) -> bool:
+    if not isinstance(signature, str):
+        return False
+    payload = _canonical(envelope)
+    if isinstance(credential, AgentCredential):
+        expected = hmac.new(credential.key, payload, hashlib.sha256).hexdigest()
+        return hmac.compare_digest(expected, signature)
+    if isinstance(credential, AgentPublicCredential):
+        if len(signature) != 128 or any(c not in "0123456789abcdef" for c in signature):
+            return False
+        try:
+            credential.key.verify(bytes.fromhex(signature), payload)
+            return True
+        except (InvalidSignature, ValueError):
+            return False
+    return False
 
 
 def _canonical(value: Mapping[str, Any]) -> bytes:
@@ -202,14 +234,21 @@ class DepartmentCollaboration:
     """Internal authenticated mailbox and scoped pickup for EXISTING agents."""
 
     def __init__(self, root: str | Path,
-                 credentials: Mapping[str, AgentCredential] | None = None):
+                 credentials: Mapping[str, AgentCredential | AgentPublicCredential] | None = None):
         self.root = Path(root).resolve()
         self.credentials = dict(credentials or {})
         self.messages = self.root / "runtime/departments/collaboration/messages"
         self.pickup_nonces = self.root / "runtime/departments/collaboration/pickup_nonces"
         for agent_id, credential in self.credentials.items():
             validate_profile(credential.profile)
-            if agent_id != credential.profile.agent_id or len(credential.key) < 32:
+            if agent_id != credential.profile.agent_id:
+                raise CollaborationDenied("invalid_trusted_agent_registration")
+            if isinstance(credential, AgentCredential):
+                if len(credential.key) < 32:
+                    raise CollaborationDenied("invalid_trusted_agent_registration")
+            elif not isinstance(credential, AgentPublicCredential) or not isinstance(
+                credential.key, Ed25519PublicKey
+            ):
                 raise CollaborationDenied("invalid_trusted_agent_registration")
 
     def _authorized(self, envelope: Mapping[str, Any], signature: str,
@@ -222,8 +261,7 @@ class DepartmentCollaboration:
         cred = self.credentials[agent_id]
         if envelope.get("op") != operation or not isinstance(signature, str):
             raise CollaborationDenied("wrong_signed_operation")
-        expected = hmac.new(cred.key, _canonical(envelope), hashlib.sha256).hexdigest()
-        if not hmac.compare_digest(expected, signature):
+        if not _verify_agent_signature(cred, envelope, signature):
             raise CollaborationDenied("invalid_agent_signature")
         return cred.profile
 
@@ -339,9 +377,8 @@ class DepartmentCollaboration:
             signed["reply_to"] = record["reply_to"]
         if signed["op"] != "send" or signed["agent_id"] != agent:
             return None
-        expected = hmac.new(credential.key, _canonical(signed), hashlib.sha256).hexdigest()
         signature = record.get("signature")
-        if not isinstance(signature, str) or not hmac.compare_digest(signature, expected):
+        if not _verify_agent_signature(credential, signed, signature):
             return None
         return record
 
