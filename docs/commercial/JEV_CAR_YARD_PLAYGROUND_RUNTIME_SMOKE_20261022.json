@@ -1,0 +1,62 @@
+{
+  "anonymous_booking_created": 0,
+  "customer_messages_or_site_bids_sent": 0,
+  "customer_site_handover_accepted": false,
+  "execution_authority": "none",
+  "expected_local_loopback_port": 9478,
+  "five_wp_page_renderings": {
+    "/": {
+      "expected_demo_content": true,
+      "http": 200
+    },
+    "/about/": {
+      "expected_demo_content": true,
+      "http": 200
+    },
+    "/areas/": {
+      "expected_demo_content": true,
+      "http": 200
+    },
+    "/contact/": {
+      "expected_demo_content": true,
+      "http": 200
+    },
+    "/services/": {
+      "expected_demo_content": true,
+      "http": 200
+    }
+  },
+  "mysql_innodb_booking_transactions_tested": false,
+  "private_vehicle_cpt_registered": true,
+  "production_changes": false,
+  "public_person_data_collection_enabled": false,
+  "runtime_kind": "OFFICIAL_WORDPRESS_PLAYGROUND_CLI_EPHEMERAL_LOCALHOST",
+  "runtime_php_version_configured": "8.3",
+  "runtime_wordpress_version_configured": "6.8",
+  "schema_version": "empire.jev.car_yard_wp_playground_runtime_smoke.v1",
+  "site_mobile_browser_rendering_tested": false,
+  "smoke_at_utc": "2026-10-22T16:37:02.515981+00:00",
+  "status": "REAL_PLAYGROUND_WORDPRESS_PHP_THEME_AND_PRIVATE_ROUTE_SMOKE_PASS",
+  "unauthed_private_write_and_booking_routes_rejected": {
+    "GET /wp-json/empire-yard/v1/internal/reservations": {
+      "anonymous_forbidden": true,
+      "http": 401
+    },
+    "POST /wp-json/empire-yard/v1/internal/reservations": {
+      "anonymous_forbidden": true,
+      "http": 401
+    },
+    "POST /wp-json/empire-yard/v1/internal/reservations/1/cancel": {
+      "anonymous_forbidden": true,
+      "http": 401
+    },
+    "POST /wp-json/wp/v2/empire_vehicle": {
+      "anonymous_forbidden": true,
+      "http": 401
+    }
+  },
+  "wordpress_email_transport_and_consent_tested": false,
+  "wordpress_site_editor_authenticated_workflow_tested": false,
+  "wordpress_staff_internal_booking_tested": false,
+  "wordpress_vehicle_admin_crud_tested": false
+}

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "features": {
+    "networking": false
+  },
+  "landingPage": "/",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "6.8"
+  },
+  "steps": [
+    {
+      "step": "activateTheme",
+      "themeFolderName": "empire-local-services"
+    },
+    {
+      "pluginPath": "empire-car-yard-internal/empire-car-yard-internal.php",
+      "step": "activatePlugin"
+    },
+    {
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n$pages = array('home'=>'Demo Home','services'=>'Demo Services','about'=>'Demo About','areas'=>'Demo Areas','contact'=>'Demo Contact');\nforeach ($pages as $slug=>$name) {\n $found=get_page_by_path($slug);\n if (!$found) { $id=wp_insert_post(array('post_title'=>$name,'post_name'=>$slug,'post_type'=>'page','post_status'=>'publish','post_content'=>'Fictional WordPress capability demo. No customer services or booking requests accepted.')); }\n else { $id=$found->ID; }\n if ($slug==='home' && is_numeric($id)) { update_option('show_on_front','page');update_option('page_on_front',(int)$id); }\n}\n",
+      "step": "runPHP"
+    },
+    {
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n$u=get_user_by('login','admin');\nif ($u) { wp_set_current_user((int) $u->ID); }\n$admin_can=(bool) current_user_can('manage_options');\n$inventory_can=(bool) current_user_can('edit_empire_vehicles');\n$exists=post_type_exists('empire_vehicle');\n$id=wp_insert_post(array('post_type'=>'empire_vehicle','post_status'=>'draft','post_title'=>'FICTIONAL CAR INVENTORY 0001'),true);\n$created=!is_wp_error($id) && is_int($id) && $id>0;\n$meta=false;$read=false;$updated=false;$deleted=false;\nif ($created) {\n update_post_meta($id,'_empire_stock_status','available');\n update_post_meta($id,'_empire_model_year',2021);\n update_post_meta($id,'_empire_make','Fictional Test Make');\n update_post_meta($id,'_empire_price_aud_cents',1250000);\n $meta=(get_post_meta($id,'_empire_stock_status',true)==='available' &&\n        (int) get_post_meta($id,'_empire_model_year',true)===2021 &&\n        (int) get_post_meta($id,'_empire_price_aud_cents',true)===1250000);\n $found=get_post($id);\n $read=!!$found && $found->post_type==='empire_vehicle';\n $changed=wp_update_post(array('ID'=>$id,'post_title'=>'FICTIONAL CAR INVENTORY UPDATED'),true);\n $updated=!is_wp_error($changed) && get_post($id)->post_title==='FICTIONAL CAR INVENTORY UPDATED';\n $del=wp_delete_post($id,true);\n $deleted=!empty($del) && null===get_post($id);\n}\n$proof=array('schema_version'=>'empire.jev.wordpress_disposable_inventory_crud.v1',\n 'admin_can_manage_site'=>$admin_can,'admin_vehicle_role_cap_present'=>$inventory_can,\n 'inventory_post_type_registered'=>$exists,'fictional_stock_created'=>$created,\n 'fictional_meta_round_trip'=>$meta,'fictional_stock_read'=>$read,\n 'fictional_inventory_update'=>$updated,'fictional_stock_deleted'=>$deleted,\n 'fictional_post_ids_left_after_test'=>0,'real_business_or_customer_records'=>0,\n 'real_customer_booking_created'=>0,'production_changes'=>false);\n$uploads=wp_upload_dir();\nfile_put_contents($uploads['basedir'].'/empire-car-yard-sandbox-inventory-crud-fixture.json',wp_json_encode($proof));\n",
+      "step": "runPHP"
+    }
+  ]
+}

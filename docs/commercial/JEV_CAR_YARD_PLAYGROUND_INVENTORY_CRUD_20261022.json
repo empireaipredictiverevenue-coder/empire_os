@@ -1,0 +1,19 @@
+{
+  "admin_site_and_vehicle_cap_verified": true,
+  "auth_wp_admin_editor_browser_tested": false,
+  "blueprint_source_sha256": "99d08ebed60206ef21aa4c02c7f1f5de85dee453d918c9676d2e624f2c014451",
+  "db_backend": "PLAYGROUND_SQLITE_NOT_MYSQL_INNODB",
+  "execution_authority": "none",
+  "fictional_inventory_crud_all_passed": true,
+  "mysql_booking_conflict_rollback_tested": false,
+  "observed_at_utc": "2026-10-22T16:44:07.337992+00:00",
+  "php_crud_output_sha256": "113816d4be1f7bb884dbc1b6b6723b278dd6240f27ba813974074f538ecc2a1f",
+  "production_changes": false,
+  "real_customer_data_used": false,
+  "runtime_php": "8.3",
+  "runtime_wordpress": "6.8",
+  "schema_version": "empire.jev.wordpress_inventory_crud_runtime_smoke.v1",
+  "status": "REAL_DISPOSABLE_WP_PHP_ADMIN_INVENTORY_CRUD_SMOKE_PASS",
+  "synthetic_vehicle_records_remaining": 0,
+  "vehicle_listing_front_end_tested": false
+}

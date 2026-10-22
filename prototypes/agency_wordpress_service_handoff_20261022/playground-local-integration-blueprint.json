@@ -1,0 +1,25 @@
+{
+  "$schema": "https://playground.wordpress.net/blueprint-schema.json",
+  "preferredVersions": {
+    "php": "8.3",
+    "wp": "6.8"
+  },
+  "landingPage": "/",
+  "features": {
+    "networking": false
+  },
+  "steps": [
+    {
+      "step": "activateTheme",
+      "themeFolderName": "empire-local-services"
+    },
+    {
+      "step": "activatePlugin",
+      "pluginPath": "empire-car-yard-internal/empire-car-yard-internal.php"
+    },
+    {
+      "step": "runPHP",
+      "code": "<?php\nrequire '/wordpress/wp-load.php';\n$pages = array('home'=>'Demo Home','services'=>'Demo Services','about'=>'Demo About','areas'=>'Demo Areas','contact'=>'Demo Contact');\nforeach ($pages as $slug=>$name) {\n $found=get_page_by_path($slug);\n if (!$found) { $id=wp_insert_post(array('post_title'=>$name,'post_name'=>$slug,'post_type'=>'page','post_status'=>'publish','post_content'=>'Fictional WordPress capability demo. No customer services or booking requests accepted.')); }\n else { $id=$found->ID; }\n if ($slug==='home' && is_numeric($id)) { update_option('show_on_front','page');update_option('page_on_front',(int)$id); }\n}\n"
+    }
+  ]
+}
