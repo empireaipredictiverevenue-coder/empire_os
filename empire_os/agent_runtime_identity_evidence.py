@@ -152,9 +152,16 @@ def inspect_existing_worker(
         or cgroup.startswith(f"/system.slice/{binding.unit}/")
     )
     service_active = data.get("ActiveState") == "active"
-    # oneshot unit's MainPID disappears; do not infer a durable principal.
+    # Oneshot ExecStart is genuinely running at activating/start, not
+    # active/running. start-post may run other hooks after MainPID exits;
+    # never grant identity from an old PID or an arbitrary activating phase.
+    main_process_executing = (
+        (service_active and data.get("SubState") in ("running", ""))
+        or (data.get("ActiveState") == "activating"
+            and data.get("SubState") == "start")
+    )
     observed = (
-        service_active and pid > 0
+        main_process_executing and pid > 0
         and data.get("User") == binding.expected_user
         and uid == expected_uid
         and expected_uid >= 0 and valid_cgroup
@@ -162,6 +169,11 @@ def inspect_existing_worker(
     return {
         **asdict(binding),
         "unit_active": service_active,
+        "oneshot_execstart_observed": (
+            data.get("ActiveState") == "activating"
+            and data.get("SubState") == "start" and observed
+        ),
+        "main_process_executing": main_process_executing,
         "main_pid_observed": pid > 0,
         "process_uid_verified": uid == expected_uid and expected_uid >= 0,
         "process_unit_cgroup_verified": valid_cgroup,

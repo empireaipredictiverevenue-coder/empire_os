@@ -10,14 +10,14 @@ from empire_os.agent_runtime_identity_evidence import (
 CODER = MANAGED_WORKERS[0]
 
 
-def simulated(*, unit=None, active="active", pid="2121", user="ubuntu",
-              uid=1000, cgroup=None):
+def simulated(*, unit=None, active="active", substate="running",
+              pid="2121", user="ubuntu", uid=1000, cgroup=None):
     unit = CODER.unit if unit is None else unit
     cgroup = cgroup if cgroup is not None else f"/system.slice/{CODER.unit}"
     return inspect_existing_worker(
         CODER,
         show=lambda _: {
-            "Id": unit, "ActiveState": active,
+            "Id": unit, "ActiveState": active, "SubState": substate,
             "MainPID": pid, "User": user,
         },
         proc=lambda _: (uid, cgroup),
@@ -133,7 +133,7 @@ def test_actual_main_process_and_pinned_role_preflight_with_injected_key():
         credential, agent_id="empire_coder", process_pid=2121,
         show=lambda _: {
             "Id": CODER.unit, "ActiveState": "active",
-            "MainPID": "2121", "User": "ubuntu",
+            "SubState": "running", "MainPID": "2121", "User": "ubuntu",
         },
         proc=lambda _: (1000, f"/system.slice/{CODER.unit}"),
         get_uid=lambda _: 1000,
@@ -163,7 +163,7 @@ def test_other_process_cannot_claim_a_managed_agent_identity(variation):
             process_pid=variation.get("process_pid", 2121),
             show=lambda _: {
                 "Id": unit, "ActiveState": variation.get("active", "active"),
-                "MainPID": "2121", "User": "ubuntu",
+                "SubState": "running", "MainPID": "2121", "User": "ubuntu",
             },
             proc=lambda _: (variation.get("uid", 1000),
                             variation.get("cgroup", f"/system.slice/{unit}")),
@@ -202,3 +202,83 @@ def test_readiness_process_inspection_is_explicit_opt_in(tmp_path, monkeypatch):
     )
     assert selected["managed_runtime_identity_evidence"]["managed_process_evidence_count"] == 1
     assert selected["trusted_agent_credentials_verified"] is False
+
+
+@pytest.mark.parametrize("phase,expected", [
+    (("activating", "start"), True),
+    (("activating", "start-post"), False),
+    (("activating", "start-pre"), False),
+    (("activating", "auto-restart"), False),
+    (("active", "running"), True),
+    (("active", "exited"), False),
+    (("failed", "failed"), False),
+    (("inactive", "dead"), False),
+])
+def test_actual_oneshot_main_process_phase_not_just_active_status(phase, expected):
+    state, substate = phase
+    observed = inspect_existing_worker(
+        CODER,
+        show=lambda _: {
+            "Id": CODER.unit, "ActiveState": state,
+            "SubState": substate, "MainPID": "5501", "User": "ubuntu",
+        },
+        proc=lambda _: (1000, f"/system.slice/{CODER.unit}"),
+        get_uid=lambda _: 1000,
+    )
+    assert observed["managed_process_evidence"] is expected
+    assert observed["oneshot_execstart_observed"] is (
+        expected and state == "activating"
+    )
+
+
+def test_oneshot_actual_main_process_can_pass_attested_signer_check():
+    from empire_os.agent_runtime_identity_evidence import (
+        ManagedWorkerSigningIdentity, preflight_local_managed_binding,
+    )
+    from empire_os.department_collaboration import existing_role_profile
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    profile = existing_role_profile(
+        agent_id="empire_coder", department="engineering", role="coder",
+        capabilities=("empire_coder",),
+    )
+    signed_identity = ManagedWorkerSigningIdentity(
+        profile, Ed25519PrivateKey.generate(),
+    )
+    result = preflight_local_managed_binding(
+        signed_identity,
+        agent_id="empire_coder",
+        process_pid=5501,
+        show=lambda _: {
+            "Id": CODER.unit, "ActiveState": "activating",
+            "SubState": "start", "MainPID": "5501", "User": "ubuntu",
+        },
+        proc=lambda _: (1000, f"/system.slice/{CODER.unit}"),
+        get_uid=lambda _: 1000,
+    )
+    assert result["local_process_scope_attested"] is True
+    assert result["signing_mode"] == "ed25519_private_in_managed_process"
+    assert result["trusted_broker_key_registration_still_required"] is True
+
+
+@pytest.mark.parametrize("substate", ["start-pre", "start-post", "auto-restart"])
+def test_oneshot_phase_other_than_execstart_is_not_signing_authority(substate):
+    from empire_os.agent_runtime_identity_evidence import (
+        ManagedWorkerSigningIdentity, preflight_local_managed_binding,
+    )
+    from empire_os.department_collaboration import existing_role_profile
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    profile = existing_role_profile(
+        agent_id="empire_coder", department="engineering", role="coder",
+        capabilities=("empire_coder",),
+    )
+    identity = ManagedWorkerSigningIdentity(profile, Ed25519PrivateKey.generate())
+    with pytest.raises(ValueError, match="not_attested"):
+        preflight_local_managed_binding(
+            identity, agent_id="empire_coder", process_pid=5501,
+            show=lambda _: {
+                "Id": CODER.unit, "ActiveState": "activating",
+                "SubState": substate, "MainPID": "5501", "User": "ubuntu",
+            },
+            proc=lambda _: (1000, f"/system.slice/{CODER.unit}"),
+            get_uid=lambda _: 1000,
+        )

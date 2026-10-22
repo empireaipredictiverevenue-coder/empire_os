@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import stat
 from pathlib import Path
 import sys
 
@@ -118,8 +119,77 @@ def _print_context_usage(coder: EmpireCoder, job=None) -> None:
         )
 
 
+def _consume_once_identity_probe_marker(
+    marker: Path = Path(
+        "/srv/empire_os/runtime/coder/agent_signing_observe_once_20261022.flag"
+    ),
+) -> bool:
+    """Consume only our exact small, owner-private observe-only marker.
+
+    It cannot enable messaging, open a task, or register a key; the marker
+    only opts in to one transient process signing observation.
+    """
+    expected = b"EMPIRE_CODER_PROCESS_SIGNING_OBSERVE_ONLY_V1" + bytes((10,))
+    try:
+        fd = os.open(marker, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError:
+        return False
+    try:
+        info = os.fstat(fd)
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o600
+            or info.st_size != len(expected)
+            or os.read(fd, len(expected) + 1) != expected
+        ):
+            return False
+        current = marker.stat(follow_symlinks=False)
+        if current.st_ino != info.st_ino or current.st_dev != info.st_dev:
+            return False
+        marker.unlink()
+        return True
+    except OSError:
+        return False
+    finally:
+        os.close(fd)
+
+
+def _observe_existing_worker_signing_identity() -> None:
+    """Optional proof in THIS existing worker's main process only.
+
+    Explicitly disabled unless the service owner enables a read-only
+    observation flag. No persistent key, task, peer message, or new worker.
+    An attested self-issued signature never enrols a trusted agent.
+    """
+    if (
+        os.getenv("EMPIRE_CODER_AGENT_SIGNING_OBSERVE", "").strip() != "1"
+        and not _consume_once_identity_probe_marker()
+    ):
+        return
+    try:
+        from empire_os.managed_agent_signing_probe import (
+            inspect_actual_coder_signing_process,
+        )
+        receipt = inspect_actual_coder_signing_process()
+        # Public key and signed payload only. Never persist private material,
+        # credentials, task contents or model responses.
+        print(
+            "CODER_AGENT_SIGNATURE_OBSERVE "
+            + json.dumps(receipt, sort_keys=True),
+            file=sys.stderr,
+        )
+    except Exception as exc:
+        # Telemetry cannot stop or alter the pre-existing Coder job.
+        print(
+            "CODER_AGENT_SIGNATURE_OBSERVE_HELD_" + type(exc).__name__,
+            file=sys.stderr,
+        )
+
+
 def main(argv: list[str] | None = None) -> int:
     _apply_background_priority()
+    _observe_existing_worker_signing_identity()
     args = parser().parse_args(argv)
     workspace = Path(args.workspace)
     coder = EmpireCoder(workspace, runtime_root=args.runtime_root)

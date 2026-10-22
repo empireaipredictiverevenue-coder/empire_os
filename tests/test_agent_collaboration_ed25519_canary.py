@@ -125,7 +125,7 @@ def test_managed_worker_ed25519_signer_matches_public_registry_without_private_k
         identity, agent_id="empire_coder", process_pid=2727,
         show=lambda _: {
             "Id": "empire-coder-worker.service", "ActiveState": "active",
-            "MainPID": "2727", "User": "ubuntu",
+            "SubState": "running", "MainPID": "2727", "User": "ubuntu",
         },
         proc=lambda _: (1000, "/system.slice/empire-coder-worker.service"),
         get_uid=lambda _: 1000,
