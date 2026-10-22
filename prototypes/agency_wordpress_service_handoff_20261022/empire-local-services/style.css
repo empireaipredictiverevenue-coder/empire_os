@@ -1,0 +1,34 @@
+/*
+Theme Name: Empire Local Services Capability Demo
+Theme URI: https://empire-ai.co.uk/
+Author: EmpireOS Website Engineering
+Description: Research-only WordPress block theme for a fictional 5-page local services company.
+Version: 0.1.0
+Requires at least: 6.5
+Requires PHP: 8.1
+Text Domain: empire-local-services
+*/
+:root{--ink:#12243a;--muted:#506579;--blue:#1554a6;--bg:#f5f8fb;--line:#dbe4ed;--navy:#0a1d35}
+*,*:before,*:after{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:white;font:16px/1.65 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:var(--blue);text-decoration-thickness:1px;text-underline-offset:.15em}
+a:focus-visible{outline:3px solid #ffa32b;outline-offset:3px}
+.wp-site-blocks{overflow-wrap:anywhere}
+.site-shell{width:min(1050px,calc(100% - 2.4rem));margin-inline:auto}
+.site-header{border-bottom:1px solid var(--line);background:white}
+.site-header .site-shell{display:flex;justify-content:space-between;align-items:center;gap:1.3rem;padding-block:1rem}
+.site-header .wp-block-navigation{display:flex;gap:.95rem}
+.page-content{padding-block:clamp(2.3rem,6vw,5rem);min-height:55vh}
+.page-content .site-shell{max-width:800px}
+.hero{padding-block:clamp(3rem,9vw,7rem);background:linear-gradient(130deg,#071b35,#1259a5);color:white}
+.hero .site-shell{max-width:1050px}
+.hero h1{font-size:clamp(2.1rem,5vw,4rem);max-width:18ch;line-height:1.14}
+.hero p{max-width:64ch;color:#dbeaff}
+.hero a{color:white}
+.section{padding-block:clamp(2.5rem,5vw,4.5rem);background:var(--bg)}
+.section h2,.page-content h2{margin-top:1.8rem}
+.site-footer{background:var(--navy);color:#e2eefb;padding-block:2.4rem;font-size:.85rem}
+.site-footer p{max-width:75ch}
+@media(max-width:680px){.site-header .site-shell{align-items:flex-start;flex-wrap:wrap}.site-header .wp-block-navigation{flex-wrap:wrap}.hero{padding-block:3rem}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
