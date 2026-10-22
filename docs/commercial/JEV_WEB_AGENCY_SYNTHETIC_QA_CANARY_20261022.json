@@ -1,0 +1,151 @@
+{
+  "actual_available_accepted_records": 0,
+  "actual_business_records_evaluated": 0,
+  "actual_verified_no_website_or_outdated_website_leads": 0,
+  "commercial_offer_ready": false,
+  "conditional_average_gross_per_accepted_if_all_fifty_accepted_usd": 3,
+  "conditional_gross_full_batch_usd": 150,
+  "current_buyers_or_paid_orders_verified": 0,
+  "customer_delivery_authorized": false,
+  "database_writes": false,
+  "execution_authority": "none",
+  "fictional_qa_decisions": [
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-AA",
+      "live_data_licence_verified": false,
+      "qa_lane": "SYNTHETIC_QA_PATTERN_MATCH_ONLY",
+      "synthetic_workflow_pattern_pass": true
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-BB",
+      "live_data_licence_verified": false,
+      "qa_lane": "DUPLICATE_DOMAIN",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-CC",
+      "live_data_licence_verified": false,
+      "qa_lane": "LISTING_OMISSION_NOT_WEBSITE_ABSENCE",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-DD",
+      "live_data_licence_verified": false,
+      "qa_lane": "SOURCE_RIGHTS_HOLD",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-EE",
+      "live_data_licence_verified": false,
+      "qa_lane": "ORIGINAL_SOURCE_REVIEW_HOLD",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-FF",
+      "live_data_licence_verified": false,
+      "qa_lane": "BUSINESS_IDENTITY_HOLD",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-GG",
+      "live_data_licence_verified": false,
+      "qa_lane": "REVIEWER_DISAGREEMENT_HOLD",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-HH",
+      "live_data_licence_verified": false,
+      "qa_lane": "VALID_WEBSITE_NOT_A_NEED_SIGNAL",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-II",
+      "live_data_licence_verified": false,
+      "qa_lane": "INCONCLUSIVE_WEBSITE_STATUS",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-JJ",
+      "live_data_licence_verified": false,
+      "qa_lane": "PRIMARY_SITE_EXAMINATION_REQUIRED",
+      "synthetic_workflow_pattern_pass": false
+    },
+    {
+      "actual_company_verified": false,
+      "actual_lead_accepted_by_buyer": false,
+      "actual_website_verified": false,
+      "contact_or_delivery_permitted": false,
+      "fixture_key": "SYN-KK",
+      "live_data_licence_verified": false,
+      "qa_lane": "SYNTHETIC_QA_PATTERN_MATCH_ONLY",
+      "synthetic_workflow_pattern_pass": true
+    }
+  ],
+  "independent_source_licence_and_contact_rights_proven": false,
+  "mode": "OBSERVE",
+  "original_website_fetches_performed": 0,
+  "outbound_sent": 0,
+  "partial_batch_payment_terms_confirmed": false,
+  "pinned_read_only_preoffer_sha256": "67c6720024a4e5ebfbba100ce9f9f53b5b51616a6069f98ba4b39c9e37cbdf82",
+  "real_pilot_source_rights_cleared": false,
+  "recipient_names_or_contacts_collected": 0,
+  "requested_full_batch_size": 50,
+  "schema_version": "empire.jev.internal_b2b_website_qa.v1",
+  "status": "SYNTHETIC_INTERNAL_QA_CANARY_NOT_ACTUAL_SUPPLY",
+  "synthetic_distinct_domains": 10,
+  "synthetic_fixture_sha256": "a8fa22e29187be530dc8d1a04f59bcf4e50296d4e9cc17c50a12949b499fc7c1",
+  "synthetic_lane_counts": {
+    "BUSINESS_IDENTITY_HOLD": 1,
+    "DUPLICATE_DOMAIN": 1,
+    "INCONCLUSIVE_WEBSITE_STATUS": 1,
+    "LISTING_OMISSION_NOT_WEBSITE_ABSENCE": 1,
+    "ORIGINAL_SOURCE_REVIEW_HOLD": 1,
+    "PRIMARY_SITE_EXAMINATION_REQUIRED": 1,
+    "REVIEWER_DISAGREEMENT_HOLD": 1,
+    "SOURCE_RIGHTS_HOLD": 1,
+    "SYNTHETIC_QA_PATTERN_MATCH_ONLY": 2,
+    "VALID_WEBSITE_NOT_A_NEED_SIGNAL": 1
+  },
+  "synthetic_qa_pattern_passes": 2,
+  "synthetic_records_checked": 11
+}
