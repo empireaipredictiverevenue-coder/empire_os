@@ -24,6 +24,12 @@ export default function PredictiveRevenueBuyerExplanation() {
       <p className="mt-3 text-sm leading-7 text-white/65">Models can help a team decide what to examine next. They do not replace verification of real organisations, communication preferences, legal terms or authority for binding actions.</p>
       <p className="mt-3 text-sm leading-7 text-white/65">Customer contact, live system changes, contracts and payment actions follow the permissions agreed for a deployment. When evidence is missing, the next step is review—not a declaration that a transaction has completed.</p>
     </article>
+    <article id="forecast-vs-actual" className="rounded-2xl border border-white/10 bg-[#07142f]/70 p-6 md:p-7">
+      <h2 className="text-lg font-semibold text-[#bfdbfe]">How do you test a revenue forecast against actual results?</h2>
+      <p className="mt-3 text-sm leading-7 text-white/65">Keep a dated snapshot of the original forecast, the accounts and opportunities it covered, and the definition of a successful outcome. Otherwise a team can appear accurate by changing the forecast after the result is known or by comparing different customer groups.</p>
+      <p className="mt-3 text-sm leading-7 text-white/65">When the agreed period ends, reconcile each opportunity with documented buyer acceptance, order status, fulfilment and any settled payment. Record cancellations, reversals and unknown outcomes separately; a submitted form or an open invoice is not realised revenue. Only calculate prediction error when the original forecast and actual results are genuinely comparable.</p>
+      <p className="mt-3 text-sm leading-7 text-white/65">During a scoped assessment, ask which system owns each stage, whether source records are current and whether the business has permission to use them. Empire AI does not claim a guaranteed improvement or an independently measured customer result from this illustrative method.</p>
+    </article>
     <article id="scope-enterprise" className="rounded-2xl border border-white/10 bg-[#07142f]/70 p-6 md:p-7">
       <h2 className="text-lg font-semibold text-[#bfdbfe]">What would an enterprise scoping conversation cover?</h2>
       <p className="mt-3 text-sm leading-7 text-white/65">We start with your business objective, the decision you want to improve, the evidence you already hold and how you recognise a real result. Integration boundaries, geographic scope, data permissions and human sign-off are part of that conversation.</p>

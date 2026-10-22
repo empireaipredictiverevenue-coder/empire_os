@@ -55,6 +55,16 @@ const roofing: BuyerEditorial = {
         "Use approved reporting instead of assumed call values or fabricated conversion rates.",
       ],
     },
+    {
+      heading: "How to audit a roofing call from click to settlement",
+      body:
+        "A useful campaign report keeps the events in order: a tracked source visit, a homeowner-initiated enquiry, an attempted call, an independently observed buyer-leg connection, a buyer-accepted event and eventual settlement. These are different counts. A call lasting a given number of seconds is not proof that the accepting contractor connected or agreed to pay.",
+      points: [
+        "For one dated reporting window, preserve source attribution, consent, eligible ZIP and job category without publishing homeowner identities.",
+        "Reconcile attempts, actual buyer connections, exclusions and accepted events against the named buyer's written criteria; mark unavailable evidence as unknown.",
+        "Keep payment, reversals and fulfilment separate from call counts. Do not report a payable rate or revenue until acceptance and settlement records support it.",
+      ],
+    },
   ],
   questions: [
     {

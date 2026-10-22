@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 // Exact route metadata. Parent layout's canonical "/" must not be inherited
 // by these independently indexable first-party commercial landing pages.
 const pageUrl = "https://empire-ai.co.uk/predictive-revenue";
-const pageTitle = "Predictive Revenue AI Solutions for Business | Empire AI";
-const pageDescription = "Explore Empire AI predictive revenue, governed AI operations and enterprise deployment options. Review business outcomes and request a founder-led discussion.";
+const pageTitle = "Predictive Revenue AI for B2B Pipeline Decisions | Empire AI";
+const pageDescription = "Learn how to evaluate B2B opportunity signals, forecast pipeline outcomes and reconcile predictions with verified sales and payments. Request a scoped Empire AI assessment.";
 
 export const metadata: Metadata = {
   title: pageTitle,
