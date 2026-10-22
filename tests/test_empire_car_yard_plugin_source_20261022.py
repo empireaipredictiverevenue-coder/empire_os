@@ -67,6 +67,7 @@ def test_package_is_small_and_contains_only_non_executable_source_files(tmp_path
             'empire-car-yard/empire-car-yard.php',
             'empire-car-yard/includes/class-empire-yard-booking-rules.php',
             'empire-car-yard/includes/class-empire-yard-booking-store.php',
+            'empire-car-yard/includes/class-empire-yard-staff-ui.php',
         }
     assert package(SOURCE, tmp_path / 'second.zip')['sha256'] == manifest['sha256']
 

@@ -22,6 +22,7 @@ final class FakeYardDB {
     public array $events = [];
     public array $slots = [];
     public bool $innodb = true;
+    public bool $unique_index = true;
     public bool $deny_lock = false;
     public bool $fail_audit = false;
     public bool $locked = false;
@@ -40,6 +41,7 @@ final class FakeYardDB {
     }
     public function get_var(string $sql) {
         if (str_contains($sql, 'information_schema.TABLES')) return $this->innodb ? 'InnoDB' : 'MyISAM';
+        if (str_contains($sql, 'information_schema.STATISTICS')) return $this->unique_index ? 'bay,slot_utc' : null;
         if (str_contains($sql, 'GET_LOCK(')) { if ($this->deny_lock || $this->locked) return '0'; $this->locked = true; return '1'; }
         if (str_contains($sql, 'RELEASE_LOCK(')) { $this->locked = false; return '1'; }
         if (str_contains($sql, 'SELECT id FROM')) {
@@ -53,6 +55,13 @@ final class FakeYardDB {
             return null;
         }
         throw new RuntimeException('Unexpected get_var query ' . $sql);
+    }
+    public function get_results(string $sql, $returntype): array {
+        $rows = [];
+        foreach ($this->bookings as $id => $record) {
+            $rows[] = array_merge(['id' => $id], $record);
+        }
+        return array_reverse(array_slice($rows, -50));
     }
     public function get_row(string $sql, $returntype): ?array {
         preg_match('/WHERE id = (\d+)/', $sql, $match);
@@ -118,6 +127,11 @@ rejected(fn() => $store->hold('bay-1', 'invalid', '2026-10-22', '09:00', 60, 'Au
 $db->innodb = false;
 rejected(fn() => $store->hold('bay-1', 'repair', '2026-10-22', '09:00', 60, 'Australia/Sydney', $calendar), 'Transactional engine gate');
 $db->innodb = true;
+$db->unique_index = false;
+verify(!$store->ready(), 'Missing unique index must make staff screen unavailable');
+rejected(fn() => $store->hold('bay-1', 'repair', '2026-10-22', '09:00', 60, 'Australia/Sydney', $calendar), 'Missing unique index');
+$db->unique_index = true;
+verify($store->ready(), 'Configured InnoDB tables and unique slot index ready');
 $db->deny_lock = true;
 rejected(fn() => $store->hold('bay-1', 'repair', '2026-10-22', '09:00', 60, 'Australia/Sydney', $calendar), 'Unavailable advisory lock');
 $db->deny_lock = false;
@@ -125,6 +139,7 @@ $GLOBALS['permit'] = false;
 rejected(fn() => $store->hold('bay-1', 'repair', '2026-10-22', '09:00', 60, 'Australia/Sydney', $calendar), 'Admin permission gate');
 $GLOBALS['permit'] = true;
 $id = $store->hold('bay-1', 'repair', '2026-10-22', '09:00', 60, 'Australia/Sydney', $calendar);
+verify(count($store->recent(30)) === 1, 'Staff-only recent appointments');
 verify($id === 1 && !$db->locked && $db->bookings[1]['status'] === 'held' && count($db->events) === 1 && count($db->slots) === 4, 'Commit booking with audit and slot occupancy');
 rejected(fn() => $store->hold('bay-1', 'repair', '2026-10-22', '09:45', 60, 'Australia/Sydney', $calendar), 'Overlapping booking');
 verify(count($db->bookings) === 1 && !$db->locked, 'Conflict rollback and unlock');

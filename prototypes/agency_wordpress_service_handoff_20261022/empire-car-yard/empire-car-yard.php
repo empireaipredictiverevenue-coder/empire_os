@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Empire Car Yard — Private Capability Demo
  * Description: Admin-only synthetic vehicle inventory and booking-rules prototype. No public bookings or notifications.
- * Version: 0.2.0
+ * Version: 0.3.0
  * Requires at least: 6.5
  * Requires PHP: 8.0
  * License: Proprietary prototype — do not deploy to customer sites
@@ -16,6 +16,14 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/includes/class-empire-yard-booking-rules.php';
 require_once __DIR__ . '/includes/class-empire-yard-booking-store.php';
+
+// Disabled by default. Only an explicitly configured staging site may register
+// the authenticated WordPress administrator workbench and admin-post handlers.
+if (defined('EMPIRE_YARD_STAGING_STAFF_UI_ENABLED') &&
+    EMPIRE_YARD_STAGING_STAFF_UI_ENABLED === true && is_admin()) {
+    require_once __DIR__ . '/includes/class-empire-yard-staff-ui.php';
+}
+
 
 const EMPIRE_YARD_VEHICLE_FIELDS = ['yard_make', 'yard_model', 'yard_year', 'yard_odometer_km', 'yard_fuel', 'yard_status'];
 const EMPIRE_YARD_STATUSES = ['available', 'reserved', 'sold', 'archived'];

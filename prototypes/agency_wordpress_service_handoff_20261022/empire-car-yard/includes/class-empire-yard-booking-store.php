@@ -90,6 +90,42 @@ final class Empire_Yard_Booking_Store {
                 throw new RuntimeException('Verified InnoDB booking tables required');
             }
         }
+        // An incorrect or absent UNIQUE index invalidates the concurrency guarantee.
+        $sql = $this->db->prepare(
+            "SELECT GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX SEPARATOR ',') " .
+            "FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() " .
+            "AND TABLE_NAME = %s AND INDEX_NAME = 'bay_slot' AND NON_UNIQUE = 0",
+            $this->slots()
+        );
+        if ($this->db->get_var($sql) !== 'bay,slot_utc') {
+            throw new RuntimeException('Verified unique bay-slot index required');
+        }
+    }
+
+    /** Read-only state check: does not create schema or bypass staff permissions. */
+    public function ready(): bool {
+        try {
+            $this->assert_staff();
+            $this->assert_innodb();
+            return true;
+        } catch (Throwable $error) {
+            return false;
+        }
+    }
+
+    /** Authorised read-only, bounded list for the private workbench. */
+    public function recent(int $limit = 30): array {
+        $this->assert_staff();
+        $this->assert_innodb();
+        $limit = max(1, min($limit, 50));
+        $rows = $this->db->get_results($this->db->prepare(
+            "SELECT id,bay,service,start_utc,end_utc,status " .
+            "FROM {$this->bookings()} ORDER BY id DESC LIMIT %d", $limit
+        ), ARRAY_A);
+        if (!is_array($rows) || $this->db->last_error !== '') {
+            throw new RuntimeException('Could not read synthetic workshop bookings');
+        }
+        return $rows;
     }
 
     /** Explicit, complete opening-hour/blackout policy; no configured hours means closed. */
