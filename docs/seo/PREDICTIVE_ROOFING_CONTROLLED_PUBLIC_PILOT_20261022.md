@@ -48,4 +48,6 @@ Two nonpublishing checks are available:
 ## Honest measurement
 Record **separate** windows of final GSC *page-dimension* impressions, clicks and CTR for /predictive-revenue and /industries/roofing, noting reporting lag and changes in windows. Search query dimension is a separate measurement, never added to page totals. Track approved first-party enquiry receipts, verified company/customer scope, accepted deals and later economic settlements distinctly. No invented clicks, conversions, ROI or revenue. The historical legacy-404 observations are the *research input*, not the direct baseline for the two live pages.
 
+**Prepublication page-level GSC check (read-only, 22 October):** existing first-party page-only reader returned 32 page rows for 7–19 October 2026, and both `/predictive-revenue` and `/industries/roofing` are `NO_PAGE_IN_RETURNED_GSC_ROWS`. This is **not** a claim that the pages are unindexed, had zero actual views or cannot rank; we have no evidenced page-specific clicks/impressions baseline for that window. Post-publication comparisons must use new matching page-only GSC windows, separately from submitted first-party enquiries and actual commercial acceptance.
+
 The immediate output is a small, tested, original-content **candidate for controlled deployment**, not a live traffic or revenue claim.
