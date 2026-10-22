@@ -24,6 +24,14 @@ def params():
     data={k:json.loads((ROOT/v).read_text()) for k,v in SNAP.items()}
     data["leads_runtime"]["generated_at"]=(NOW-timedelta(minutes=3)).isoformat()
     data["current_markets"]["generated_at"]=(NOW-timedelta(minutes=3)).isoformat()
+    # Market GPS is refreshed concurrently by other agents. The older
+    # recovery-contract test intentionally asserts a synthetic 62-observation
+    # fixture, not a moving production count. Live audits read true snapshots.
+    markets=data["current_markets"].get("markets",[])
+    for market in markets:
+        market["prospect_count"]=0
+    if markets:
+        markets[0]["prospect_count"]=62
     return data
 
 
