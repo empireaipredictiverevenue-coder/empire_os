@@ -28,12 +28,16 @@ cat > "$TMP/bin/empire-predictive-observe" <<'LAUNCHER'
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ "$#" -lt 1 || "$#" -gt 2 ]]; then
-  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU|comparison-astra|comparison-astra-all|trends|trends-template|trends-series FILE}\n' "$0" >&2
+  printf 'Usage: %s {commercial|commercial-template|commercial-example|commercial-intake FILE|commercial-crm|sales-path|catalog|science|science-agent|source-gates|tenant-evidence|tenant-cohort|finance|gaps|cost|cost-sector|measurement|sources|owners|comparison|comparison-all|comparison-gaps|comparison-product SKU|comparison-astra|comparison-astra-all|trends|trends-template|trends-series FILE|crypto|crypto-template|crypto-series FILE}\n' "$0" >&2
   exit 2
 fi
 release="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 command="${1}"
-if [[ "$command" == "trends-series" ]]; then
+if [[ "$command" == "crypto-series" ]]; then
+  if [[ "$#" -ne 2 || ! -f "$2" || -L "$2" ]]; then
+    echo "CRYPTO_RESEARCH_REQUIRES_ORIGINAL_NON_SYMLINK_SERIES" >&2; exit 2
+  fi
+elif [[ "$command" == "trends-series" ]]; then
   if [[ "$#" -ne 2 || ! -f "$2" || -L "$2" ]]; then
     echo "TRENDS_REQUIRES_REAL_NON_SYMLINK_SOURCE_FILE" >&2; exit 2
   fi
@@ -77,6 +81,7 @@ case "$command" in
   owners) module=scripts.review_empire_cross_agent_release_board_20261020 ;;
   comparison|comparison-all|comparison-gaps|comparison-product|comparison-astra|comparison-astra-all) module=scripts.review_predictive_comparison_20261021 ;;
   trends|trends-template|trends-series) module=scripts.review_predictive_trend_horizons_20261022 ;;
+  crypto|crypto-template|crypto-series) module=scripts.review_predictive_crypto_signals_20261022 ;;
   *) echo "UNSUPPORTED_COMMAND: $command" >&2; exit 2 ;;
 esac
 cd "$release"
@@ -123,6 +128,18 @@ fi
 if [[ "$command" == "trends" ]]; then
   exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
     /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --runtime
+fi
+if [[ "$command" == "crypto-template" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --template
+fi
+if [[ "$command" == "crypto-series" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only --series-file "$2"
+fi
+if [[ "$command" == "crypto" ]]; then
+  exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
+    /srv/empire_os/.venv/bin/python -P -B -m "$module" --read-only
 fi
 exec env -u PYTHONSTARTUP PYTHONPATH="$release" \
   /srv/empire_os/.venv/bin/python -B -m "$module" --read-only
@@ -175,6 +192,10 @@ EOF
     empire_os/future_trend_intelligence.py \
     empire_os/predictive_trend_horizon_review.py \
     scripts/review_predictive_trend_horizons_20261022.py \
+    empire_os/predictive_crypto_signal_research.py \
+    empire_os/predictive_crypto_stop_loss_simulator.py \
+    empire_os/predictive_crypto_research_scorecard.py \
+    scripts/review_predictive_crypto_signals_20261022.py \
     empire_os/control_fabric.py \
     empire_os/departments.py \
     scripts/run_predictive_cloud_materializer.py \
@@ -395,6 +416,28 @@ assert x["status"]=="UNFILLED_REAL_SOURCE_REQUIRED"
 assert x["observations"]==[]
 assert x["source_usage_rights_independently_verified"] is False
 assert x["not_a_customer_forecast"] is True
+'
+"$TMP/bin/empire-predictive-observe" crypto | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_intelligence.crypto_regime_risk_signals.v1"
+assert x["algorithm"]=="EMPIRE_REGIME_RISK_SIGNALS_V1"
+assert x["status"]=="PRIVATE_OBSERVE_PAPER_SIGNAL_RESEARCH_AVAILABLE"
+assert x["mandatory_stop_loss"] is True
+assert x["source_data_connected"] is False
+assert x["99_percent_accuracy_promise"] is False
+assert x["live_orders_or_margin_authorized"] is False
+assert x["database_writes"] is False and x["execution_authority"]=="none"
+'
+"$TMP/bin/empire-predictive-observe" crypto-template | \
+  /srv/empire_os/.venv/bin/python -B -c '
+import json,sys
+x=json.load(sys.stdin)
+assert x["schema_version"]=="empire.predictive_intelligence.crypto_completed_candles_intake.v1"
+assert x["candles"]==[]
+assert x["exchange_source_authenticated"] is False
+assert x["customer_investment_advice_authorized"] is False
 '
 # The science adapter MUST preserve unknown forecasts when original product
 # outcomes or forecast registry readback are absent.
