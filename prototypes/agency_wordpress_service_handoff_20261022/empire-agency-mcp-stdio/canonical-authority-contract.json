@@ -1,0 +1,33 @@
+{
+  "schema": "empire.agency.canonical-connector-binding.contract.v1",
+  "status": "PREPARED_NOT_BOUND_TO_LIVE_MEMBERSHIP_OR_VAULT",
+  "tenant_source": "empire_os.tenant_isolation.authorize_tenant_resource",
+  "membership_type": "empire_os.saas_scale.TenantMembership",
+  "required_resource_type": "agency_wordpress_site",
+  "requirements": [
+    "short_lived_signed_agency_specific_ed25519_issuer",
+    "canonical_uuid_tenant_binding",
+    "fresh_active_owner_or_admin_membership",
+    "fresh_site_specific_connector_grant",
+    "trusted_canonical_registry_row",
+    "one_time_jti_replay_check",
+    "read_only_operations",
+    "trusted_credential_reference",
+    "private_mode_checked_credential_file"
+  ],
+  "agency_token_audience": "empire-agency-connector",
+  "crm_token_audience_not_accepted": "empire-revenue-crm",
+  "maximum_authority_lifetime_seconds": 180,
+  "operations": [
+    "capabilities:read",
+    "vehicles:read"
+  ],
+  "credential_transport": "separately_owned_private_file_or_future_systemd_LoadCredential_mount",
+  "legacy_staging_registry_is_authority": false,
+  "live_db_membership_connected": false,
+  "production_secret_vault_connected": false,
+  "mcp_remote_oauth_connected": false,
+  "production_mcp_enabled": false,
+  "production_wordpress_modified": false,
+  "real_crm_or_customer_data_accessed": false
+}
