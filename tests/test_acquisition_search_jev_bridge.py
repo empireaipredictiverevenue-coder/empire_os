@@ -18,3 +18,30 @@ def test_untrusted_promoted_record_rejected():
 
 def test_missing_contract_rejected():
     with pytest.raises(ValueError):summarize_search_jev_acquisition({})
+
+def test_real_gtm_observer_contract():
+    from datetime import datetime, timezone
+    from empire_os.gtm_integration_observer import build_gtm_integration_observation
+    now = datetime(2026,10,23,tzinfo=timezone.utc)
+    radar = {"mode":"OBSERVE", "source_status":{"market_gps":{"available":True}},
+             "candidates":[{"opportunity_key":"market-1",
+                 "source":"market_sweeps_revenue_gps", "offer_key":"roof_quote",
+                 "evidence_refs":["source:1"],"execution_authority":"none"}]}
+    observed = build_gtm_integration_observation(
+        radar, {}, now=now, radar_source_fresh=True, commercial_loop_fresh=False)
+    result = summarize_search_jev_acquisition(observed)
+    assert result["research_handoff_count"] == 1
+    assert result["research_queue"][0]["product_code"] == "roof_quote"
+    assert result["research_queue"][0]["qualification_status"] == "RESEARCH_ONLY"
+    assert not result["outbound_authorized"]
+
+def test_live_shape_rejects_missing_authority():
+    from datetime import datetime, timezone
+    from empire_os.gtm_integration_observer import build_gtm_integration_observation
+    observed = build_gtm_integration_observation(
+        {"mode":"OBSERVE","source_status":{},"candidates":[]}, {},
+        now=datetime(2026,10,23,tzinfo=timezone.utc),
+        radar_source_fresh=False, commercial_loop_fresh=False)
+    observed["authority"]="outbound"
+    with pytest.raises(ValueError):
+        summarize_search_jev_acquisition(observed)
