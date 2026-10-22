@@ -4,9 +4,9 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
   getQuoraResearchReview, getQuoraJevShadowReview, getSeoJevDepartmentReview,
-  getJevRealPilotReceipt, getJevOriginalPageEvidenceSummary, getSeoAiFirstSummary, getJevCaseModelSummary,
+  getJevRealPilotReceipt, getJevOriginalPageEvidenceSummary, getSeoAiFirstSummary, getJevCaseModelSummary, getJevSeoDeploymentSummary,
   type QuoraResearchReview, type QuoraJevShadowReview, type SeoJevDepartmentReview,
-  type JevRealPilotReceipt, type JevOriginalPageEvidenceSummary, type SeoAiFirstSummary, type JevCaseModelSummary,
+  type JevRealPilotReceipt, type JevOriginalPageEvidenceSummary, type SeoAiFirstSummary, type JevCaseModelSummary, type JevSeoDeploymentSummary,
 } from "@/lib/search-api";
 import styles from "../analytics.module.css";
 
@@ -163,6 +163,26 @@ function trustedJevCases(value: JevCaseModelSummary | null):
     && value.execution_authority === "NONE";
 }
 
+function trustedDeployment(value: JevSeoDeploymentSummary | null):
+  value is JevSeoDeploymentSummary {
+  return !!value && value.schema_version === "empire.search.jev_organic_deployment_summary.v1"
+    && value.mode === "RESEARCH_TO_RELEASE_READY" && value.execution_authority === "NONE"
+    && value.original_url_observations === 30 && value.jev_predictions_observed === 30
+    && value.core_topic_research_observations === 15 && value.off_core_urls_retained_404 === 15
+    && value.sample_page_impressions === 44 && value.sample_page_clicks === 0
+    && value.website_changes_live === false && value.first_party_source_content_verified === false
+    && value.seo_traffic_lift_verified === false && value.qualified_leads_verified === false
+    && value.realised_revenue_verified === false && value.model_calls_during_summary === 0
+    && value.personal_data_or_paths_disclosed === false
+    && value.automatic_publishing_or_redirects_authorised === false
+    && value.per_case_urls_exposed === false
+    && value.publication_approval_required === true && value.redirect_approval_required === true
+    && value.new_calls_or_billing_triggered === 0
+    && Array.isArray(value.research_workstreams)
+    && value.research_workstreams.length === 4
+    && value.research_workstreams.reduce((n, x) => n + x.case_count, 0) === 30;
+}
+
 const VERTICALS = [
   {key:"roofing",label:"Roofing and replacement"},
   {key:"hvac",label:"HVAC and heat pumps"},
@@ -197,10 +217,10 @@ export default async function QuoraResearchDepartment() {
       || nonLocalForwarding || proxySignal) {
     notFound();
   }
-  const [response, jevResponse, departmentResponse, pilotResponse, intakeResponse, aiResponse, jevCasesResponse] = await Promise.all([
+  const [response, jevResponse, departmentResponse, pilotResponse, intakeResponse, aiResponse, jevCasesResponse, deployResponse] = await Promise.all([
     getQuoraResearchReview(), getQuoraJevShadowReview(), getSeoJevDepartmentReview(),
     getJevRealPilotReceipt(), getJevOriginalPageEvidenceSummary(), getSeoAiFirstSummary(),
-    getJevCaseModelSummary(),
+    getJevCaseModelSummary(), getJevSeoDeploymentSummary(),
   ]);
   const d = response.ok && trusted(response.data) ? response.data : null;
   const jev = d && jevResponse.ok && trustedJev(jevResponse.data, d.topic_count)
@@ -215,6 +235,8 @@ export default async function QuoraResearchDepartment() {
     ? aiResponse.data : null;
   const jevCases = jevCasesResponse.ok && trustedJevCases(jevCasesResponse.data)
     ? jevCasesResponse.data : null;
+  const deployment = deployResponse.ok && trustedDeployment(deployResponse.data)
+    ? deployResponse.data : null;
   return <main className={styles.analytics}>
     <div className={styles.workspace}>
       <section className={styles.hero}>
@@ -305,6 +327,27 @@ export default async function QuoraResearchDepartment() {
               <p>Total reported inference cost: <strong>${jevCases.reported_cost_usd.toFixed(6)}</strong> · Repeat billing: <strong>Off</strong></p>
               <p>The next AI task is recovering original source and publication-rights evidence. Historical content is not yet verified; no redirects, public changes, buyer outreach or payments were authorised.</p>
             </> : <p className={styles.cardDescription}>Validated Jev provider results for all 30 owned URLs are unavailable. This desk does not invent case assessments.</p>}
+          </div>
+        </section>
+        <section className={styles.analyticsSection} aria-labelledby="jev-seo-deployment">
+          <div className={styles.sectionLead}><div>
+            <span className={styles.overline}>06 / EVIDENCE TO ORGANIC DEPLOYMENT</span>
+            <h2 id="jev-seo-deployment">SEO deployment research queue</h2>
+          </div><span>NOT PUBLISHED · APPROVAL GATED</span></div>
+          <div className={styles.platformCard}>
+            {deployment ? <>
+              <p className={styles.cardDescription}>Jev's {deployment.jev_predictions_observed} source-audit recommendations are consolidated into <strong>{deployment.core_topic_research_observations} core-topic research cases</strong> and <strong>{deployment.off_core_urls_retained_404} unrelated URLs to leave at 404</strong>. The original GSC sample recorded {deployment.sample_page_impressions} impressions and {deployment.sample_page_clicks} clicks—not verified buyers or revenue.</p>
+              <ol className={styles.todoList}>
+                {deployment.research_workstreams.map((work, i) => <li key={work.workstream}>
+                  <span>{String(i+1).padStart(2,"0")}</span><div>
+                    <strong>{work.workstream.replaceAll("_"," ").toLowerCase()}</strong>
+                    <small>{work.case_count} URLs · {work.sample_impressions} sampled impressions</small>
+                    <p>{work.status === "RESEARCH_ONLY" ? "Research genuine content and related existing pages; original source and rights approval required" : "Keep legacy URLs at 404 pending stronger, relevant demand evidence"}</p>
+                  </div>
+                </li>)}
+              </ol>
+              <p>This is a <strong>deployment research shortlist, not a live website release</strong>. No mass redirects, auto-publishing, traffic-lift claims or commercial payouts are enabled.</p>
+            </> : <p className={styles.cardDescription}>Deployment research queue is unavailable or its verified receipt failed validation. No website changes have been assumed.</p>}
           </div>
         </section>
         <section className={styles.analyticsSection} aria-labelledby="seo-jev-portfolio">

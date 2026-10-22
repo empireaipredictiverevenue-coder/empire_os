@@ -32,6 +32,7 @@ from .jev_pilot_receipt import JevReceiptUnavailable, review_jev_private_pilot_r
 from .jev_intake_receipt import JevIntakeReceiptUnavailable, read_verified_original_page_summary
 from .ai_first_receipt import AiFirstReceiptHeld, read_ai_first_summary
 from .jev_case_receipts import JevCaseReceiptHeld, reviewed_case_summary
+from .jev_deployment_receipt import JevDeploymentReceiptHeld, read_deployment_summary
 from .department_snapshot import DepartmentSnapshotUnavailable
 from .rank_history import RankObservation, analyse_rank_history
 from .recommendation_intelligence import (
@@ -349,6 +350,19 @@ def create_search_router(
         except (QuoraEvidenceError, OSError, UnicodeError, ValueError):
             raise HTTPException(
                 status_code=503, detail="quora_review_source_unavailable",
+                headers={"Cache-Control": "no-store"},
+            ) from None
+
+    @router.get("/jev/deployment/summary")
+    def seo_jev_deployment_queue_summary(response: Response):
+        """Pinned revenue-oriented SEO research plans, no traffic/fix claims."""
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        try:
+            return read_deployment_summary()
+        except (JevDeploymentReceiptHeld, OSError, ValueError):
+            raise HTTPException(
+                status_code=503, detail="jev_deployment_queue_unavailable",
                 headers={"Cache-Control": "no-store"},
             ) from None
 

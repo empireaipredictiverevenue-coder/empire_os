@@ -454,3 +454,41 @@ export type JevCaseModelSummary = {
 export function getJevCaseModelSummary() {
   return request<JevCaseModelSummary>("/v1/search/jev/cases/summary");
 }
+
+
+/** Deployment shortlist derived from actual GSC + six pinned Jev receipts. */
+export type JevSeoDeploymentSummary = {
+  schema_version: "empire.search.jev_organic_deployment_summary.v1";
+  mode: "RESEARCH_TO_RELEASE_READY";
+  original_url_observations: 30;
+  jev_predictions_observed: 30;
+  core_topic_research_observations: 15;
+  off_core_urls_retained_404: 15;
+  sample_page_impressions: 44;
+  sample_page_clicks: 0;
+  research_workstreams: Array<{
+    workstream: string;
+    case_count: number;
+    sample_impressions: number;
+    status: "RESEARCH_ONLY" | "RETAIN_404_MONITOR";
+  }>;
+  website_changes_live: false;
+  first_party_source_content_verified: false;
+  seo_traffic_lift_verified: false;
+  qualified_leads_verified: false;
+  realised_revenue_verified: false;
+  model_calls_during_summary: 0;
+  personal_data_or_paths_disclosed: false;
+  automatic_publishing_or_redirects_authorised: false;
+  execution_authority: "NONE";
+  validated_private_receipt_sha256: string;
+  per_case_urls_exposed: false;
+  proposed_deployment_scope: "ORIGINAL_EDUCATIONAL_CONTENT_ONLY";
+  publication_approval_required: true;
+  redirect_approval_required: true;
+  new_calls_or_billing_triggered: 0;
+};
+
+export function getJevSeoDeploymentSummary() {
+  return request<JevSeoDeploymentSummary>("/v1/search/jev/deployment/summary");
+}
