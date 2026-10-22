@@ -1,0 +1,200 @@
+{
+  "audited_at_utc": "2026-10-22T08:31:30.260088+00:00",
+  "buyer_scout_capacity_matches_verified": 0,
+  "consumer_or_personal_contacts_extracted": 0,
+  "contractor_work_procurement_discovery_candidates": [
+    {
+      "allowed_for_auto_outreach": false,
+      "bidding_eligibility_and_deadline_current_verified": false,
+      "buyer_of_empire_leadgen_or_saas_verified": false,
+      "notice_id": "W9127826RA089",
+      "procurement_object": "PUBLIC_CONTRACTOR_WORK_PROCUREMENT",
+      "sector": "general_contractor",
+      "source_class": "SECONDARY_DISCOVERY_ORIGINAL_NOTICE_REVIEW_REQUIRED"
+    },
+    {
+      "allowed_for_auto_outreach": false,
+      "bidding_eligibility_and_deadline_current_verified": false,
+      "buyer_of_empire_leadgen_or_saas_verified": false,
+      "notice_id": "36C25727Q0022",
+      "procurement_object": "PUBLIC_CONTRACTOR_WORK_PROCUREMENT",
+      "sector": "roofing",
+      "source_class": "SECONDARY_DISCOVERY_ORIGINAL_NOTICE_REVIEW_REQUIRED"
+    },
+    {
+      "allowed_for_auto_outreach": false,
+      "bidding_eligibility_and_deadline_current_verified": false,
+      "buyer_of_empire_leadgen_or_saas_verified": false,
+      "notice_id": "140L4326Q0127",
+      "procurement_object": "PUBLIC_CONTRACTOR_WORK_PROCUREMENT",
+      "sector": "hvac",
+      "source_class": "SECONDARY_DISCOVERY_ORIGINAL_NOTICE_REVIEW_REQUIRED"
+    }
+  ],
+  "crm_writes": false,
+  "current_canonical_social_signals_checked": 8,
+  "execution_authority": "none",
+  "existing_owner_source_discovery_briefs": [
+    {
+      "automatic_dispatch_authorized": false,
+      "client_purchase_intent_verified": false,
+      "consumer_data_or_contacts_to_extract": 0,
+      "existing_owner": "research_original_source_and_buyer_scout",
+      "independent_identity_verified": false,
+      "jurisdiction_geography_confirmed": false,
+      "must_reject": [
+        "recruitment_job_post_as_purchase_intent",
+        "vendor_marketing_pitch_as_buyer_need",
+        "public_works_rfp_as_empire_saas_buyer",
+        "historical_permit_as_current_homeowner_request",
+        "opt_out_or_do_not_contact_message"
+      ],
+      "outreach_allowed": false,
+      "owner_review_required": true,
+      "permitted_source_type_review_scope": [
+        "company_site",
+        "reddit",
+        "linkedin",
+        "public_forum",
+        "first_party_intake"
+      ],
+      "required_source_confirmation": "original_authored_company_request_for_lead_generation_sales_conversion_or_software_purchase",
+      "research_queries": [
+        "general contractor owner needs qualified appointment pipeline",
+        "general contractor founder needs consistent commercial project enquiries"
+      ],
+      "sector": "general_contractor"
+    },
+    {
+      "automatic_dispatch_authorized": false,
+      "client_purchase_intent_verified": false,
+      "consumer_data_or_contacts_to_extract": 0,
+      "existing_owner": "research_original_source_and_buyer_scout",
+      "independent_identity_verified": false,
+      "jurisdiction_geography_confirmed": false,
+      "must_reject": [
+        "recruitment_job_post_as_purchase_intent",
+        "vendor_marketing_pitch_as_buyer_need",
+        "public_works_rfp_as_empire_saas_buyer",
+        "historical_permit_as_current_homeowner_request",
+        "opt_out_or_do_not_contact_message"
+      ],
+      "outreach_allowed": false,
+      "owner_review_required": true,
+      "permitted_source_type_review_scope": [
+        "company_site",
+        "reddit",
+        "linkedin",
+        "public_forum",
+        "first_party_intake"
+      ],
+      "required_source_confirmation": "original_authored_company_request_for_lead_generation_sales_conversion_or_software_purchase",
+      "research_queries": [
+        "roofing company owner asking for qualified roofing leads",
+        "roofing contractor seeking help converting estimate requests"
+      ],
+      "sector": "roofing"
+    },
+    {
+      "automatic_dispatch_authorized": false,
+      "client_purchase_intent_verified": false,
+      "consumer_data_or_contacts_to_extract": 0,
+      "existing_owner": "research_original_source_and_buyer_scout",
+      "independent_identity_verified": false,
+      "jurisdiction_geography_confirmed": false,
+      "must_reject": [
+        "recruitment_job_post_as_purchase_intent",
+        "vendor_marketing_pitch_as_buyer_need",
+        "public_works_rfp_as_empire_saas_buyer",
+        "historical_permit_as_current_homeowner_request",
+        "opt_out_or_do_not_contact_message"
+      ],
+      "outreach_allowed": false,
+      "owner_review_required": true,
+      "permitted_source_type_review_scope": [
+        "company_site",
+        "reddit",
+        "linkedin",
+        "public_forum",
+        "first_party_intake"
+      ],
+      "required_source_confirmation": "original_authored_company_request_for_lead_generation_sales_conversion_or_software_purchase",
+      "research_queries": [
+        "hvac service company owner needs qualified service appointments",
+        "heating cooling business seeking help fixing missed inbound calls"
+      ],
+      "sector": "hvac"
+    }
+  ],
+  "external_jev_calls": 0,
+  "history_observations_checked": 22,
+  "individual_prospects_promoted": 0,
+  "mode": "OBSERVE",
+  "original_procurement_notices_verified": 0,
+  "original_social_post_publication_date_verified": false,
+  "outbound_sent": 0,
+  "priority_sectors": [
+    "general_contractor",
+    "roofing",
+    "hvac"
+  ],
+  "public_observations_submitted": 30,
+  "public_pain_lanes": {
+    "EXCLUDE_NONBUYER": 1,
+    "MONITOR_UNVERIFIED": 20
+  },
+  "public_pain_or_topic_observations": 21,
+  "public_source_editorial_admissions": 0,
+  "reviewed_original_notice_body_hashes": 0,
+  "schema_version": "empire.jev.top_sector_demand_gap.v1",
+  "sector_demand_research": [
+    {
+      "actual_b2b_software_or_leadgen_purchase_request_proven": false,
+      "classified_public_pain_observations": 0,
+      "federal_procurement_not_equivalent_to_saas_purchase": true,
+      "historical_prospect_rows": 5726,
+      "next_existing_research_action": "ORIGINAL_FIRST_PARTY_CLIENT_NEED_DISCOVERY_AND_EVIDENCE_REVIEW",
+      "no_solicitation_rows_held": 0,
+      "original_canonical_buyer_identity_verified": false,
+      "recent_acquisition_observations_not_demand": 53,
+      "required_original_contract": "B2B_LEAD_GENERATION_OR_SOFTWARE_NEED",
+      "safe_to_contact": false,
+      "sector": "general_contractor",
+      "unverified_public_pain_review_candidates": 0,
+      "verified_buyer_capacity": false
+    },
+    {
+      "actual_b2b_software_or_leadgen_purchase_request_proven": false,
+      "classified_public_pain_observations": 0,
+      "federal_procurement_not_equivalent_to_saas_purchase": true,
+      "historical_prospect_rows": 3674,
+      "next_existing_research_action": "ORIGINAL_FIRST_PARTY_CLIENT_NEED_DISCOVERY_AND_EVIDENCE_REVIEW",
+      "no_solicitation_rows_held": 0,
+      "original_canonical_buyer_identity_verified": false,
+      "recent_acquisition_observations_not_demand": 9,
+      "required_original_contract": "B2B_LEAD_GENERATION_OR_SOFTWARE_NEED",
+      "safe_to_contact": false,
+      "sector": "roofing",
+      "unverified_public_pain_review_candidates": 0,
+      "verified_buyer_capacity": false
+    },
+    {
+      "actual_b2b_software_or_leadgen_purchase_request_proven": false,
+      "classified_public_pain_observations": 0,
+      "federal_procurement_not_equivalent_to_saas_purchase": true,
+      "historical_prospect_rows": 2340,
+      "next_existing_research_action": "ORIGINAL_FIRST_PARTY_CLIENT_NEED_DISCOVERY_AND_EVIDENCE_REVIEW",
+      "no_solicitation_rows_held": 0,
+      "original_canonical_buyer_identity_verified": false,
+      "recent_acquisition_observations_not_demand": 10,
+      "required_original_contract": "B2B_LEAD_GENERATION_OR_SOFTWARE_NEED",
+      "safe_to_contact": false,
+      "sector": "hvac",
+      "unverified_public_pain_review_candidates": 0,
+      "verified_buyer_capacity": false
+    }
+  ],
+  "sector_priority_original_receipt_sha256": "e7a62f3081903ef339779736baedc0bb3cb750876701a335363636f8cb12bbb3",
+  "software_or_marketing_clients_verified": 0,
+  "status": "TOP_THREE_SECTORS_HAVE_RESEARCH_GAPS_NOT_VERIFIED_BUYERS"
+}
