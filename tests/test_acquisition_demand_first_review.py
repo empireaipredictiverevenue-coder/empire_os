@@ -147,3 +147,57 @@ def test_unknown_search_status_fails_closed():
        research_queue=tasks, provider_state={"last_state":"HEALTHY","circuit_open":False},
        lookup=lambda *a,**kw:{"organic":[]})
     assert r["status"]=="SEARCH_PROVIDER_FAILED_REMAINDER_UNSEARCHED"
+
+
+def test_owned_site_probe_does_not_claim_purchasing_authority():
+    from empire_os.acquisition_demand_first_review import review_original_company_pages
+    tasks=demand_first_tasks([
+        {"company":"Firm","yc_profile":"https://www.ycombinator.com/companies/firm",
+         "website":"https://firm.co.uk", "research_segment":"Services",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"}],excluded_prospect_refs=set())
+    calls=[]
+    def source_probe(url,**kwargs):
+        calls.append(kwargs)
+        return {"ok":True,"final_url":"https://firm.co.uk/",
+                "pages_checked":[{"url":"https://firm.co.uk/procurement",
+                          "visible_text":"Request for proposals from independent agencies for marketing services."}]}
+    result=review_original_company_pages(research_queue=tasks,probe_site=source_probe)
+    assert calls[0]["public_only"] is True
+    assert calls[0]["page_priority"]=="commercial"
+    assert result["company_sites_observed"]==1
+    assert result["original_language_candidates_for_owner_review"]==1
+    evidence=result["records"][0]["original_source_candidates"][0]
+    assert evidence["buyer_request_verified"] is False
+    assert evidence["date_published_verified"] is False
+    assert not result["outbound_authorized"]
+
+
+def test_cross_domain_redirect_cannot_promote_original_company_evidence():
+    from empire_os.acquisition_demand_first_review import review_original_company_pages
+    tasks=demand_first_tasks([
+        {"company":"Firm","yc_profile":"https://www.ycombinator.com/companies/firm",
+         "website":"https://firm.co.uk", "research_segment":"Services",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"}],excluded_prospect_refs=set())
+    r=review_original_company_pages(research_queue=tasks,
+       probe_site=lambda u,**k:{"ok":True,"final_url":"https://unrelated.biz/",
+             "pages_checked":[{"url":"https://unrelated.biz/rfp","visible_text":"Request for proposals"}]})
+    assert r["company_sites_observed"]==0
+    assert r["original_language_candidates_for_owner_review"]==0
+
+
+
+def test_reachable_site_without_pages_is_not_counted_as_reviewed():
+    from empire_os.acquisition_demand_first_review import review_original_company_pages
+    tasks=demand_first_tasks([
+        {"company":"Firm","yc_profile":"https://www.ycombinator.com/companies/firm",
+         "website":"https://firm.co.uk", "research_segment":"Services",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"}],excluded_prospect_refs=set())
+    r=review_original_company_pages(research_queue=tasks,
+       probe_site=lambda u,**k:{"ok":True,"final_url":"https://firm.co.uk/",
+                                       "pages_checked":[]})
+    assert r["company_sites_observed"]==0
+    assert r["total_original_pages_observed"]==0
+    assert r["records"][0]["status"]=="SITE_REACHABLE_WITHOUT_REVIEWED_PAGES"

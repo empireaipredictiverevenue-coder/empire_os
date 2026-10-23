@@ -326,3 +326,96 @@ def discover_original_requirement_candidates(
         "outbound_authorized":False,
         "model_training_authorized":False,
     }
+
+
+def review_original_company_pages(
+    *,
+    research_queue: Mapping,
+    probe_site,
+) -> dict:
+    """Reuse existing public-only Search Fabric site probes for demand evidence.
+
+    No scraped contacts, unauthenticated identity promotion, or claim of
+    purchasing authority may escape this research-only adapter.
+    """
+    if (not isinstance(research_queue, Mapping)
+        or research_queue.get("schema_version") != "empire.acquisition_demand_first_tasks.v1"
+        or research_queue.get("mode") != "OBSERVE"
+        or research_queue.get("outbound_authorized") is not False):
+        raise ValueError("canonical original YC research task contract required")
+    tasks = research_queue.get("next_company_reviews")
+    if not isinstance(tasks, list) or len(tasks) > MAX_BATCH:
+        raise ValueError("bounded first-party tasks required")
+    records=[]
+    for item in tasks:
+        if (not isinstance(item, Mapping) or
+            item.get("status") != "INDEPENDENT_PURCHASING_REQUIREMENT_RESEARCH" or
+            item.get("outbound_authorized") is not False):
+            raise ValueError("untrusted/promoted source task")
+        host=_company_host(item.get("company_website"))
+        if not host:
+            records.append({"prospect_ref":item.get("prospect_ref"),"company":item.get("company"),
+                            "status":"UNVERIFIED_COMPANY_DOMAIN","pages_observed":0,
+                            "original_source_candidates":[]})
+            continue
+        try:
+            site=probe_site(item["company_website"],max_pages=3,
+                request_timeout=4.0,time_budget_seconds=11.0,
+                page_priority="commercial",public_only=True)
+        except Exception:
+            site={}
+        final_host=_company_host(site.get("final_url")) if isinstance(site,Mapping) else ""
+        if site.get("ok") is not True or final_host != host:
+            records.append({"prospect_ref":item.get("prospect_ref"),
+                            "company":item.get("company"),
+                            "status":"SITE_UNAVAILABLE_OR_DOMAIN_CUSTODY_UNVERIFIED",
+                            "pages_observed":0, "original_source_candidates":[]})
+            continue
+        pages=site.get("pages_checked")
+        if not isinstance(pages,list):
+            pages=[]
+        candidates=[]
+        count=0
+        for page in pages[:3]:
+            if not isinstance(page,Mapping) or _company_host(page.get("url"))!=host:
+                continue
+            count+=1
+            body=page.get("visible_text")
+            if not isinstance(body,str) or len(body)>12000:
+                continue
+            if HIRING.search(body[:6000]) or SELLER.search(body[:6000]):
+                continue
+            if not any(pattern.search(body[:6000]) for pattern in REQUEST_TERMS):
+                continue
+            candidates.append({
+                "original_source_url":page.get("url"),
+                "original_text_sha256":sha256(body.encode()).hexdigest(),
+                "status":"ORIGINAL_PAGE_LANGUAGE_REQUIRES_CONTEXT_AND_DATE_REVIEW",
+                "date_published_verified":False,
+                "company_domain_authoritatively_verified":False,
+                "buyer_request_verified":False,
+                "contact_authorized":False,
+            })
+        records.append({
+            "prospect_ref":item.get("prospect_ref"),
+            "company":item.get("company"),
+            "status":("PUBLIC_SITE_SAMPLE_OBSERVED" if count
+                      else "SITE_REACHABLE_WITHOUT_REVIEWED_PAGES"),
+            "pages_observed":count,
+            "original_source_candidates":candidates,
+        })
+    return {
+        "schema_version":"empire.acquisition_original_source_pages.v1",
+        "mode":"OBSERVE",
+        "company_pages_attempted":len(records),
+        "company_sites_observed":sum(r["status"]=="PUBLIC_SITE_SAMPLE_OBSERVED" for r in records),
+        "total_original_pages_observed":sum(r["pages_observed"] for r in records),
+        "original_language_candidates_for_owner_review":sum(
+            len(r["original_source_candidates"]) for r in records),
+        "records":records,
+        "date_published_verified":False,
+        "buyers_verified":0,
+        "crm_writes":False,
+        "outbound_authorized":False,
+        "model_training_authorized":False,
+    }
