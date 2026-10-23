@@ -149,6 +149,11 @@ def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetc
             "monitored_threads": 9,
             "inbound_header_candidate_count": reviewed["inbound_header_candidate_count"],
             "new_inbound_header_candidates": reviewed["new_inbound_header_candidates"],
+            "standalone_inbound_candidate_count": reviewed["standalone_inbound_candidate_count"],
+            "new_standalone_inbound_candidates": reviewed["new_standalone_inbound_candidates"],
+            "standalone_search_coverage_complete": reviewed[
+                "standalone_search_coverage_complete"
+            ],
             "canonical_email_clearance_evidence_missing_count": reviewed[
                 "canonical_email_clearance_evidence_missing_count"
             ],

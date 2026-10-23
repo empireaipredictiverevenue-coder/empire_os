@@ -204,4 +204,13 @@ def collect(service: Any, ledger: Mapping[str, Any], *, now: datetime,
         results[tid] = service.users().threads().get(
             userId="me", id=tid, format="metadata", metadataHeaders=HEADERS
         ).execute()
-    return review_threads(ledger, results, now=now, previous=previous)
+    reviewed = review_threads(ledger, results, now=now, previous=previous)
+    # Same authenticated Workspace identity, same original sender receipts,
+    # additional metadata-only search for replies sent as NEW conversations.
+    from empire_os.founder_acquisition_standalone_inbound import discover
+    extra = discover(service, ledger["anchors"], results, now=now, previous=previous)
+    reviewed["standalone_search_status"] = extra.pop("status")
+    reviewed.update(extra)
+    reviewed["inbound_header_candidate_count"] += extra["standalone_inbound_candidate_count"]
+    reviewed["new_inbound_header_candidates"] += extra["new_standalone_inbound_candidates"]
+    return reviewed

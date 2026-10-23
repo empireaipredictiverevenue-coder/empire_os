@@ -59,10 +59,18 @@ class FakeService:
         return self
     def threads(self):
         return self
+    def messages(self):
+        return self
+    def list(self, **kwargs):
+        self.action = "list"
+        return self
     def get(self, **kwargs):
+        self.action = "get"
         self.selected = kwargs["id"]
         return self
     def execute(self):
+        if self.action == "list":
+            return {"messages": []}
         return self.results[self.selected]
 
 

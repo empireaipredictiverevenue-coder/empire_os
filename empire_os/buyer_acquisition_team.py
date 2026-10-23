@@ -1291,6 +1291,21 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
             "new_inbound_header_candidates": outcome.get(
                 "new_inbound_header_candidates", None
             ),
+            "new_standalone_inbound_candidates": (
+                outcome.get("new_standalone_inbound_candidates")
+                if type(outcome.get("new_standalone_inbound_candidates")) is int
+                and 0 <= outcome["new_standalone_inbound_candidates"] <= 50
+                else None
+            ),
+            "standalone_inbound_candidate_count": (
+                outcome.get("standalone_inbound_candidate_count")
+                if type(outcome.get("standalone_inbound_candidate_count")) is int
+                and 0 <= outcome["standalone_inbound_candidate_count"] <= 50
+                else None
+            ),
+            "standalone_search_coverage_complete": (
+                outcome.get("standalone_search_coverage_complete") is True
+            ),
             "canonical_email_clearance_evidence_missing_count": (
                 outcome.get("canonical_email_clearance_evidence_missing_count")
                 if type(outcome.get("canonical_email_clearance_evidence_missing_count")) is int
@@ -1572,6 +1587,15 @@ def refresh_buyer_acquisition_plan(
         "status": founder_review["status"],
         "new_inbound_header_candidates": founder_review.get(
             "new_inbound_header_candidates"
+        ),
+        "new_standalone_inbound_candidates": founder_review.get(
+            "new_standalone_inbound_candidates"
+        ),
+        "standalone_inbound_candidate_count": founder_review.get(
+            "standalone_inbound_candidate_count"
+        ),
+        "standalone_search_coverage_complete": (
+            founder_review.get("standalone_search_coverage_complete") is True
         ),
         "canonical_email_clearance_status": "NOT_VERIFIED",
         "canonical_email_clearance_evidence_missing_count": founder_review.get(
