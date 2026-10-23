@@ -1310,6 +1310,25 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
                 and 0 <= outcome["unsent_draft_reviews"] <= 500
                 else None
             ),
+            "us_market_status": (
+                outcome.get("us_market_status")
+                if outcome.get("us_market_status") in (
+                    "US_PUBLIC_EVENT_EVIDENCE_REVIEW_ONLY",
+                    "HELD_US_SOURCE_REFRESH",
+                ) else "HELD_US_SOURCE_REFRESH"
+            ),
+            "us_market_account_hypotheses_observed": (
+                outcome.get("us_market_account_hypotheses_observed")
+                if type(outcome.get("us_market_account_hypotheses_observed")) is int
+                and 0 <= outcome["us_market_account_hypotheses_observed"] <= 100
+                else None
+            ),
+            "us_market_distinct_sources_observed": (
+                outcome.get("us_market_distinct_sources_observed")
+                if type(outcome.get("us_market_distinct_sources_observed")) is int
+                and 0 <= outcome["us_market_distinct_sources_observed"] <= 100
+                else None
+            ),
         }
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return {"status": "HELD_PROTECTED_FOUNDER_MAILBOX_REVIEW",
@@ -1553,6 +1572,14 @@ def refresh_buyer_acquisition_plan(
         ),
         "source_profiles_verified": founder_review.get("source_profiles_verified"),
         "unsent_draft_reviews": founder_review.get("unsent_draft_reviews"),
+        "us_market_status": founder_review.get("us_market_status", "HELD_US_SOURCE_REFRESH"),
+        "us_market_account_hypotheses_observed": founder_review.get(
+            "us_market_account_hypotheses_observed"
+        ),
+        "us_market_distinct_sources_observed": founder_review.get(
+            "us_market_distinct_sources_observed"
+        ),
+        "us_market_verified_buyers": 0,
         "outbound_sent": False,
         "crm_writes": False,
         "automatic_send_authorized": False,

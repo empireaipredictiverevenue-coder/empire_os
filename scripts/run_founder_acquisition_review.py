@@ -18,11 +18,13 @@ import tempfile
 
 from empire_os.founder_acquisition_autopilot import EvidenceHeld, collect, load_ledger, SOURCE
 from empire_os.founder_acquisition_source_refresh import refresh_pending
+from empire_os.founder_acquisition_us_market import load_us_inputs, refresh_us_evidence
 from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
 
 DEFAULT_ROOT = Path("/srv/empire_os")
 OUT = Path("runtime/founder_acquisition/founder_reply_review_latest.json")
 PUBLIC_OUT = Path("runtime/founder_acquisition/public_source_review_latest.json")
+US_OUT = Path("runtime/founder_acquisition/us_market_evidence_latest.json")
 
 
 def _read_private_snapshot(output: Path):
@@ -86,7 +88,40 @@ def refresh_unsent_sources(root: Path, *, ledger: dict, now, fetch=None) -> dict
                 "unsent_draft_reviews": None}
 
 
-def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetch=None) -> dict:
+def refresh_us_market(root: Path, *, now=None, fetch=None) -> dict:
+    """Optional US original-source checks, bounded by the existing timer.
+
+    No separate US sender. Each event is a hypothesis for a potential Empire AI
+    intelligence buyer, not an Empire AI customer or buying intent.
+    """
+    from empire_os.founder_acquisition_us_market import fetch_source
+    try:
+        previous = _read_private_snapshot(root / US_OUT)
+        records = load_us_inputs(root)
+        result = refresh_us_evidence(
+            records, previous=previous, now=now or datetime.now(timezone.utc),
+            fetch=fetch or fetch_source, max_fetch=2,
+        )
+        _write_private_snapshot(root / US_OUT, result)
+        return {
+            "us_market_status": result["status"],
+            "us_market_distinct_sources_observed": result["distinct_observed_source_count"],
+            "us_market_account_hypotheses_observed": result["observed_account_hypotheses"],
+            "us_market_sources_waiting": result["sources_awaiting_review"],
+            "us_market_verified_buyers": 0,
+        }
+    except Exception:
+        return {
+            "us_market_status": "HELD_US_SOURCE_REFRESH",
+            "us_market_distinct_sources_observed": None,
+            "us_market_account_hypotheses_observed": None,
+            "us_market_sources_waiting": None,
+            "us_market_verified_buyers": 0,
+        }
+
+
+def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetch=None,
+        us_fetch=None) -> dict:
     status = {
         "schema_version": "empire.founder_acquisition_cycle_status.v1",
         "status": "HELD_NOT_AUTHENTICATED", "outbound_sent": False,
@@ -107,6 +142,7 @@ def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetc
         if write:
             _write_private_snapshot(output, reviewed)
             status.update(refresh_unsent_sources(root, ledger=ledger, now=now, fetch=source_fetch))
+            status.update(refresh_us_market(root, now=now, fetch=us_fetch))
         status.update({
             "status": reviewed["status"],
             "monitored_threads": 7,
