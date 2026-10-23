@@ -1,0 +1,24 @@
+{
+  "schema": "empire.agency.pbr_car_gltf_rights.v1",
+  "upstream_repository": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+  "upstream_model": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept",
+  "upstream_binary_url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CarConcept/glTF-Binary/CarConcept.glb",
+  "upstream_sha256": "c272098089d78c5cd9fd9f24ff50ee8acf8d932c55f2d55fc10adb6c8998966b",
+  "upstream_model_author": "Eric Chadwick, Darmstadt Graphics Group GmbH (2024)",
+  "upstream_license": "Creative Commons Attribution 4.0 International; logos/trademarks excluded",
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "upstream_license_file": "UPSTREAM_LICENSE.md",
+  "modified_derivative": true,
+  "transform": "gltf-transform 4.2.1: remove scene nodes InteriorSteeringEmblem and License Plate; prune unused meshes/materials; preserve Khronos PBR extensions; convert PNG textures to WebP at quality 83 (transmission optimized).",
+  "derivative_file": "car-concept-editorial-webp.glb",
+  "derivative_sha256": "b28b5e697dcbd8d699dad802a1415db1eb0a364d8f05aba004176d776940cdeb",
+  "derivative_bytes": 9338828,
+  "glb_version": 2,
+  "extensions_required": [
+    "EXT_texture_webp"
+  ],
+  "model_nodes": 99,
+  "upstream_markings_caveat": "Original underlying model contains Khronos and glTF trademarks outside CC BY; two logo-bearing meshes removed from scene, but independent trademark/brand/legal review required before any actual client use.",
+  "production_release": "HOLD - internal licensed demonstration only",
+  "brand_representation": "Third-party demonstration model, not an Empire AI original, customer vehicle, manufacturer endorsement or actual stock."
+}

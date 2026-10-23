@@ -1,7 +1,32 @@
-import React, { useMemo, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import React, { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { RoundedBox, ContactShadows, Float } from '@react-three/drei'
 import * as THREE from 'three'
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js'
+
+/** One-time local studio softbox reflections. No HDRI CDN or remote requests. */
+function LocalStudioReflections() {
+  const { gl, scene, invalidate } = useThree()
+  useEffect(() => {
+    const environment = new RoomEnvironment()
+    const generator = new THREE.PMREMGenerator(gl)
+    const renderTarget = generator.fromScene(environment, .04)
+    scene.environment = renderTarget.texture
+    scene.environmentIntensity = 2.0
+    invalidate()
+    return () => {
+      scene.environment = null
+      scene.environmentIntensity = 1
+      renderTarget.dispose()
+      generator.dispose()
+      environment.dispose()
+      invalidate()
+    }
+  }, [gl, scene, invalidate])
+  return null
+}
+
+const StudioPBRVehicle = React.lazy(() => import('./StudioPBRVehicle.jsx'))
 
 // Fictional original GT silhouette. No imported manufacturer model, plate or emblem.
 function Tire({ x, z }) {
@@ -177,30 +202,40 @@ function Vehicle({ motionAllowed, view, paint }) {
 }
 
 export default function ShowroomScene({ motionAllowed = true, view = 'three-quarter',
-  paint = { body: '#1a3d46', roof: '#203c48' } }) {
+  paint = { body: '#1a3d46', roof: '#203c48' }, modelMode = 'concept',
+  modelUrl, onStudioReady }) {
   return <Canvas
       data-testid="showroom-webgl"
-      dpr={[1, 1.5]}
+      dpr={modelMode === 'studio' ? [1, 1] : [1, 1.5]}
+      frameloop={modelMode === 'studio' ? 'demand' : 'always'}
       camera={{ position: [6.4, 3.2, 7.8], fov: 32, near: .1, far: 80 }}
-      gl={{ alpha: true, antialias: true, powerPreference: 'low-power' }}
-      shadows
+      gl={{ alpha: true, antialias: modelMode !== 'studio', powerPreference: 'low-power' }}
+      shadows={modelMode !== 'studio'}
     >
       <color attach="background" args={['#0c202a']} />
-      <fog attach="fog" args={['#0c202a', 13, 28]} />
+      {modelMode !== 'studio' && <fog attach="fog" args={['#0c202a', 13, 28]} />}
       <ambientLight intensity={1.18} color="#d2e3e9" />
+      {modelMode === 'studio' && <LocalStudioReflections />}
       <hemisphereLight args={['#bcd6ec', '#08212b', 1.65]} />
-      <spotLight position={[2, 9, 4]} angle={.53} penumbra={.6} intensity={72} color="#f0dfbd" castShadow shadow-mapSize={[1024, 1024]} />
-      <spotLight position={[-5, 6, -4]} angle={.8} penumbra={.7} intensity={48} color="#72b9cc" />
+      <spotLight position={[2, 9, 4]} angle={.53} penumbra={.6} intensity={modelMode === 'studio' ? 28 : 72} color="#f0dfbd" castShadow={modelMode !== 'studio'} shadow-mapSize={[512, 512]} />
+      <spotLight position={[-5, 6, -4]} angle={.8} penumbra={.7} intensity={modelMode === 'studio' ? 20 : 48} color="#72b9cc" />
       <directionalLight position={[0, 7, -4]} intensity={1.6} color="#e1f4ff" />
-      <Float speed={motionAllowed ? .48 : 0} rotationIntensity={0}
-        floatIntensity={motionAllowed ? .13 : 0}>
-        <Vehicle motionAllowed={motionAllowed} view={view} paint={paint} />
-      </Float>
+      <Suspense fallback={<Vehicle motionAllowed={motionAllowed} view={view} paint={paint} />}>
+        {modelMode === 'studio' && modelUrl
+          ? <StudioPBRVehicle modelUrl={modelUrl} motionAllowed={motionAllowed}
+              view={view} paint={paint} onReady={onStudioReady} />
+          : <Float speed={motionAllowed ? .48 : 0} rotationIntensity={0}
+              floatIntensity={motionAllowed ? .13 : 0}>
+              <Vehicle motionAllowed={motionAllowed} view={view} paint={paint} />
+            </Float>}
+      </Suspense>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.68, 0]} receiveShadow>
         <planeGeometry args={[60, 60]} />
-        <meshStandardMaterial color="#101f29" roughness={.38} metalness={.2} />
+        {modelMode === 'studio'
+          ? <meshBasicMaterial color="#0b1f29" toneMapped={false} />
+          : <meshStandardMaterial color="#101f29" roughness={.38} metalness={.2} />}
       </mesh>
-      <ContactShadows position={[0, -.655, 0]} opacity={.55} scale={12} blur={2.5} far={4.2} />
+      {modelMode !== 'studio' && <ContactShadows position={[0, -.655, 0]} opacity={.55} scale={12} blur={2.5} far={4.2} />}
       <gridHelper args={[20, 28, '#3a5055', '#203941']} position={[0, -.645, 0]} />
     </Canvas>
 }

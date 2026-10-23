@@ -6,6 +6,7 @@ from pathlib import Path
 from zipfile import ZipFile
 import json
 import re
+import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
@@ -14,6 +15,15 @@ RECEIPT=DOC/"EMPIRE_CAR_YARD_EDITORIAL_V6_BROWSER_ACCEPTANCE_20261023.json"
 
 def receipt():
     return json.loads(RECEIPT.read_text())
+
+# Each historic V6 acceptance receipt is fixed to its actual upstream commit,
+# never rewritten to pretend today's theme must still equal yesterday's V6.
+V6_COMMIT="2166bf8fa87221390043e80c6c9cd7d3763baaa9"
+def original_v6(relative_path):
+    return subprocess.run(
+        ["git","show",V6_COMMIT+":"+relative_path],cwd=ROOT,
+        check=True,capture_output=True,
+    ).stdout
 
 def test_real_wp_browser_photography_media_picker_and_existing_business_functions():
     r=receipt()
@@ -72,7 +82,7 @@ def test_immutable_v6_runtime_hashes_and_actual_screenshots():
     r=receipt()
     assert len(r["source_manifest_sha256"])>=20
     for rel,expected in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==expected,rel
+        assert sha256(original_v6(rel)).hexdigest()==expected,rel
     assert len(r["screenshots"])==5
     for name,meta in r["screenshots"].items():
         file=DOC/"car_yard_react_browser_evidence_v6"/name

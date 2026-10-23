@@ -156,6 +156,8 @@ add_action('wp_head', static function (): void {
     $settings['editorial_assets_base'] = trailingslashit(
         get_stylesheet_directory_uri()) . 'assets/editorial/';
     $settings['editorial_media_urls'] = [];
+    $settings['showroom_model_url'] = trailingslashit(
+        get_stylesheet_directory_uri()) . 'assets/models/car-concept-editorial-webp.glb';
     foreach ([1, 2, 3] as $index) {
         $id = (int) $settings['editorial_media_' . $index];
         if ($id > 0 && wp_attachment_is_image($id)) {

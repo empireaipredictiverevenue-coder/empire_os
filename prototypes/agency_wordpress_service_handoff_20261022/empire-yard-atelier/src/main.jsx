@@ -50,7 +50,7 @@ const showroomFinishes = [
   { id: 'silver', name: 'Arctic silver', body: '#7f9aa9', roof: '#9fb1ba', swatch: 'bg-[#7f9aa9]' },
 ]
 
-function Hero3D({ reduce }) {
+function Hero3D({ reduce, modelUrl }) {
   const holder = useRef(null)
   const [inView, setInView] = useState(false)
   const [pageVisible, setPageVisible] = useState(true)
@@ -59,7 +59,11 @@ function Hero3D({ reduce }) {
   const [mobile3DRequested, setMobile3DRequested] = useState(false)
   const [view, setView] = useState('three-quarter')
   const [finish, setFinish] = useState('ocean')
+  const [modelMode, setModelMode] = useState('concept')
+  const [studioReady, setStudioReady] = useState(false)
   const selectedFinish = showroomFinishes.find(item => item.id === finish) || showroomFinishes[0]
+  const studioSelected = modelMode === 'studio'
+  const showStudioReady = () => setStudioReady(true)
   useEffect(() => {
     // Mobile launches WebGL on explicit request: avoid a multi-MB scene
     // download, GPU startup and battery use for visitors who only need stock.
@@ -99,17 +103,34 @@ function Hero3D({ reduce }) {
   }, [inView, pageVisible, reduce, mobileTouch, mobile3DRequested])
   const mobilePreviewOnly = mobileTouch && !mobile3DRequested
   const interactive = supported && inView && pageVisible && !reduce && !mobilePreviewOnly
-  return <div ref={holder} data-showroom-active={interactive ? 'true' : 'false'} className="w-full">
+  return <div ref={holder} data-showroom-active={interactive ? 'true' : 'false'}
+    data-studio-model-ready={studioSelected && studioReady ? 'true' : 'false'}
+    data-selected-model={modelMode} className="w-full">
     <div className="relative isolate h-[300px] w-full overflow-hidden rounded-t-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
-      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
+      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish}
+          modelMode={modelMode} modelUrl={modelUrl} onStudioReady={showStudioReady} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
-        <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">3D Concept Studio</span>
+        <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">{studioSelected ? 'PBR Model Studio' : '3D Concept Studio'}</span>
         <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">{interactive ? 'LIVE / EXPLORE' : 'VISUAL / PREVIEW'}</span>
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-[#07141d] via-[#07141d]/75 to-transparent px-4 pb-4 pt-10 sm:px-7 sm:pb-6">
-        <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200"><ScanLine className="h-4 w-4 text-[#d6b579]" /> Procedural vehicle geometry</span>
-        <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]">No external model</span>
+        <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200"><ScanLine className="h-4 w-4 text-[#d6b579]" /> {studioSelected ? 'Licensed third-party PBR vehicle' : 'Original procedural concept'}</span>
+        <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]">{studioSelected ? (studioReady ? 'DETAIL / READY' : 'DETAIL / LOADING') : 'CONCEPT / READY'}</span>
       </div>
+    </div>
+    <div className="flex flex-wrap items-center justify-between gap-2 border-x border-white/15 bg-[#0c202a] px-4 py-3 sm:px-6" role="group" aria-label="Vehicle model detail">
+      <div className="flex flex-wrap gap-2">
+        <button type="button" data-model-mode="concept" aria-pressed={!studioSelected}
+          onClick={() => setModelMode('concept')}
+          className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ' +
+            (!studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>Original concept</button>
+        <button type="button" data-model-mode="studio" aria-pressed={studioSelected}
+          onClick={() => { setStudioReady(false); setModelMode('studio') }}
+          disabled={!modelUrl || reduce}
+          className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-50 ' +
+            (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>Load Studio PBR · 9 MB</button>
+      </div>
+      <span className="text-[9px] font-semibold text-slate-300">High-detail model loads only on request</span>
     </div>
     <div className="grid gap-4 rounded-b-2xl border border-t-0 border-white/15 bg-[#0c202a] px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
       <div role="group" aria-label="Showroom camera view" className="flex flex-wrap items-center gap-2">
@@ -128,7 +149,11 @@ function Hero3D({ reduce }) {
         </button>)}
       </div>
     </div>
-    <p className="sr-only" role="status">Showroom view: {showroomViews.find(item => item.id === view)?.name}. Concept paint: {selectedFinish.name}.{reduce ? ' Motion reduced.' : ''}</p>
+    {studioSelected && <p className="border-x border-b border-white/15 bg-[#0c202a] px-4 py-3 text-[10px] leading-5 text-slate-300 sm:px-6">
+      Model: Car Concept © 2024 Eric Chadwick / Darmstadt Graphics Group GmbH,
+      adapted from <a className="text-[#dfbd82] underline underline-offset-2" href="https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept" target="_blank" rel="noopener noreferrer">Khronos glTF Sample Assets</a> under <a className="text-[#dfbd82] underline underline-offset-2" href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>; insignia and plate geometry omitted. Sample asset, not client stock or manufacturer endorsement. Trademark review still pending.
+    </p>}
+    <p className="sr-only" role="status">Showroom view: {showroomViews.find(item => item.id === view)?.name}. {studioSelected ? 'Licensed Studio PBR' : 'Procedural concept'} paint: {selectedFinish.name}.{reduce ? ' Motion reduced.' : ''}</p>
   </div>
 }
 
@@ -197,6 +222,13 @@ function getBrandSettings() {
     }
     if (Object.prototype.hasOwnProperty.call(brandPalettes, settings.accent)) {
       brand.accent = settings.accent
+    }
+    if (typeof settings.showroom_model_url === 'string') {
+      const modelAsset = new URL(settings.showroom_model_url, location.href)
+      if (modelAsset.origin === location.origin && !modelAsset.search && !modelAsset.hash &&
+          modelAsset.pathname.endsWith('/assets/models/car-concept-editorial-webp.glb')) {
+        brand.showroomModelUrl = modelAsset.href
+      }
     }
     return brand
   } catch {
@@ -289,7 +321,7 @@ function App() {
             <div className="mt-10 flex flex-wrap items-center gap-5 border-t border-white/15 pt-5 text-[10px] uppercase tracking-[.14em] text-[#aabdc4]"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#dcbc85]"/> React + Three.js</span><span>Mobile-first</span><span>WordPress native</span></div>
           </div>
           <motion.div initial={reveal === false ? false : {opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
-            <Hero3D reduce={reduce}/><p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]">Illustrative 3D geometry — no real manufacturer design</p>
+            <Hero3D reduce={reduce} modelUrl={brand.showroomModelUrl}/><p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]">Illustrative 3D geometry — no real manufacturer design</p>
           </motion.div>
         </div>
         <div className="relative border-t border-white/10 bg-black/20"><div className="mx-auto flex max-w-[1320px] flex-wrap justify-between gap-3 px-5 py-5 text-[10px] font-semibold uppercase tracking-[.18em] text-[#b4c8ce] md:px-10"><span>01 — A digital showroom</span><span>02 — Evidence-led inventory</span><span>03 — Private workshop intelligence</span></div></div>
