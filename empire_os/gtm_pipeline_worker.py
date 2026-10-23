@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import sha256
-import json
+from empire_os.copy_fingerprint import fingerprint_final_email
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
@@ -353,10 +352,7 @@ def build_outbound_payload(
 
     # Fingerprint the exact final proposed wording, after adaptive selection.
     # This is a content identity, never an approval or delivery claim.
-    copy_draft_id = "copy-sha256:" + sha256(json.dumps(
-        {"subject": subject, "body": body}, sort_keys=True,
-        ensure_ascii=False,
-    ).encode("utf-8")).hexdigest()
+    copy_draft_id = fingerprint_final_email(subject=subject, body=body)
 
     return {
         "p_review_id": review_id,

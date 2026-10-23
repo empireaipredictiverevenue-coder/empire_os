@@ -11,8 +11,7 @@ intent, under its own caps, suppression checks and personhood revalidation.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from hashlib import sha256
-import json
+from empire_os.copy_fingerprint import fingerprint_final_email
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
@@ -273,10 +272,7 @@ def run_standing_bridge(
             continue
 
         subject, body = _message(review)
-        copy_draft_id = 'copy-sha256:' + sha256(json.dumps(
-            {'subject': subject, 'body': body}, sort_keys=True,
-            ensure_ascii=False,
-        ).encode('utf-8')).hexdigest()
+        copy_draft_id = fingerprint_final_email(subject=subject, body=body)
         try:
             result = store.propose_outbound_intent({
                     "p_review_id": review_id,
