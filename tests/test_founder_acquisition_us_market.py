@@ -79,7 +79,7 @@ def test_two_us_sources_per_cycle_and_true_deduplication(tmp_path):
     assert one["outbound_sent"] is False
     assert one["automatic_send_authorized"] is False
     again=refresh_us_evidence(rows,previous=one,now=CLOCK+timedelta(minutes=5),fetch=fetch,max_fetch=2)
-    assert len(calls)==4 and again["distinct_observed_source_count"]==3
+    assert len(calls)==4 and again["distinct_observed_source_count"]==4
     assert all("@" not in json.dumps(x) for x in again["sources"])
 
 
@@ -136,3 +136,72 @@ def test_us_runtime_missing_seed_fails_without_outbound(tmp_path):
     result=refresh_us_market(tmp_path,now=CLOCK,fetch=lambda url:None)
     assert result["us_market_status"]=="HELD_US_SOURCE_REFRESH"
     assert result["us_market_verified_buyers"]==0
+
+
+def test_reviewed_html_replacement_preserves_original_pdf_hold(tmp_path):
+    rows=_rows(tmp_path)
+    retired="https://investors.cardinalinfrastructuregroup.com/node/6631/pdf"
+    replacement="https://investors.cardinalinfrastructuregroup.com/news-releases/news-release-details/cardinal-infrastructure-group-awarded-contract-large-scale-data"
+    legacy=[dict(r) for r in rows]
+    cardinal=next(r for r in legacy if r["account"]=="Cardinal Infrastructure Group")
+    cardinal["source_url"]=retired
+    cardinal["source_role"]="PDF_PRIMARY_REPORT"
+    cardinal["anchor_a"]="Cardinal"
+    cardinal["anchor_b"]="project"
+    previous=None
+    for i in range(9):
+        previous=refresh_us_evidence(
+            legacy, previous=previous, now=CLOCK+timedelta(minutes=5*i),
+            fetch=lambda url:_fake(legacy,url),
+        )
+    assert previous["distinct_observed_source_count"]==16
+    assert any(s["source_url"]==retired and s["source_status"]=="HELD_SOURCE_NOT_CORROBORATED"
+               for s in previous["sources"])
+    corrected=refresh_us_evidence(
+        rows, previous=previous, now=CLOCK+timedelta(minutes=45),
+        fetch=lambda url:_fake(rows,url),
+    )
+    assert corrected["distinct_original_source_count"]==17
+    assert corrected["distinct_observed_source_count"]==17
+    assert corrected["observed_account_hypotheses"]==20
+    assert corrected["actual_buyers_verified"]==0
+    assert corrected["outbound_sent"] is False
+    history=corrected["retired_held_source_history"]
+    assert len(history)==1
+    assert history[0]["retired_url"]==retired
+    assert history[0]["replacement_url"]==replacement
+    assert history[0]["prior_source_status"]=="HELD_SOURCE_NOT_CORROBORATED"
+    # No additional request on repeated native cycles and no provenance lost.
+    next_state=refresh_us_evidence(
+        rows, previous=corrected, now=CLOCK+timedelta(minutes=50),
+        fetch=lambda url: (_ for _ in ()).throw(AssertionError("should be cached"))
+    )
+    assert next_state["retired_held_source_history"]==history
+    assert next_state["http_checks_this_cycle"]==0
+
+
+def test_refuse_unreviewed_source_migration_even_if_url_is_valid(tmp_path):
+    rows=_rows(tmp_path)
+    before=refresh_us_evidence(rows,previous=None,now=CLOCK,
+                               fetch=lambda url:_fake(rows,url))
+    before=refresh_us_evidence(rows,previous=before,now=CLOCK+timedelta(minutes=5),
+                               fetch=lambda url:_fake(rows,url))
+    assert any("jacobs.com" in x["source_url"] for x in before["sources"])
+    mutated=[dict(r) for r in rows]
+    mutated[2]["source_url"]="https://www.jacobs.com/newsroom/new-unreviewed-url"
+    with pytest.raises(EvidenceHeld,match="US_PREVIOUS_EVENT_REMOVED"):
+        refresh_us_evidence(
+            mutated,previous=before,now=CLOCK+timedelta(minutes=10),
+            fetch=lambda url:_fake(mutated,url)
+        )
+
+
+def test_never_migrate_original_verified_event_source(tmp_path):
+    rows=_rows(tmp_path)
+    before=refresh_us_evidence(rows,previous=None,now=CLOCK,
+                               fetch=lambda url:_fake(rows,url))
+    before["sources"][0]["source_url"]="https://investors.cardinalinfrastructuregroup.com/node/6631/pdf"
+    before["sources"][0]["source_status"]="PUBLISHED_EVENT_CLAIM_OBSERVED_NOT_BUYER_VERIFIED"
+    with pytest.raises(EvidenceHeld,match="US_PREVIOUS_EVENT_REMOVED"):
+        refresh_us_evidence(rows,previous=before,now=CLOCK+timedelta(minutes=5),
+                            fetch=lambda url:_fake(rows,url))
