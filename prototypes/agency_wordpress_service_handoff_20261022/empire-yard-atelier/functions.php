@@ -14,6 +14,9 @@ function empire_yard_brand_defaults(): array {
         'contact_label' => 'Enquiry info',
         'contact_path' => '/contact/',
         'accent' => 'gold',
+        'editorial_media_1' => 0,
+        'editorial_media_2' => 0,
+        'editorial_media_3' => 0,
     ];
 }
 
@@ -44,6 +47,15 @@ function empire_yard_sanitize_brand($value): array {
     }
     if (isset($value['accent']) && in_array($value['accent'], ['gold', 'ice', 'copper'], true)) {
         $out['accent'] = $value['accent'];
+    }
+    // Only first-party WordPress image attachment IDs can override the
+    // default editorial photos. An external URL can never be stored here.
+    foreach ([1, 2, 3] as $index) {
+        $key = 'editorial_media_' . $index;
+        $id = filter_var($value[$key] ?? 0, FILTER_VALIDATE_INT, [
+            'options' => ['min_range' => 1],
+        ]);
+        $out[$key] = $id && wp_attachment_is_image($id) ? (int) $id : 0;
     }
     return $out;
 }
@@ -97,15 +109,65 @@ function empire_yard_branding_page(): void {
     foreach (['gold' => 'Champagne gold', 'ice' => 'Arctic ice', 'copper' => 'Warm copper'] as $value => $label) {
         echo '<option value="' . esc_attr($value) . '"' . selected($settings['accent'], $value, false) . '>' . esc_html($label) . '</option>';
     }
-    echo '</select></td></tr></tbody></table>';
+    echo '</select></td></tr>';
+    foreach ([1, 2, 3] as $index) {
+        $field = 'editorial_media_' . $index;
+        $id = (int) $settings[$field];
+        $preview = $id ? wp_get_attachment_image($id, 'thumbnail', false, [
+            'style' => 'max-width:150px;height:auto',
+            'alt' => 'Current WordPress editorial selection',
+        ]) : '';
+        echo '<tr><th scope="row"><label for="empire_yard_media_' . $index . '">'
+            . 'Editorial image ' . $index . '</label></th><td>';
+        echo '<input type="hidden" id="empire_yard_media_' . $index
+            . '" name="empire_yard_brand_v1[' . esc_attr($field)
+            . ']" value="' . esc_attr((string) $id) . '" />';
+        echo '<button type="button" class="button empire-yard-choose-media" data-media-index="'
+            . $index . '">Choose WordPress image</button> ';
+        echo '<button type="button" class="button empire-yard-remove-media" data-media-index="'
+            . $index . '">Use default photograph</button>';
+        echo '<div class="empire-yard-media-preview" data-media-preview="' . $index . '">'
+            . wp_kses_post($preview) . '</div>';
+        echo '<p class="description">Use an image you have permission to display. The default photos are editorial inspiration, not stock listings.</p>';
+        echo '</td></tr>';
+    }
+    echo '</tbody></table>';
     submit_button('Save showroom branding');
     echo '</form></div>';
 }
 
+/** WordPress media picker is registered only on the protected theme settings page. */
+add_action('admin_enqueue_scripts', static function ($hook): void {
+    if ($hook !== 'appearance_page_empire-yard-branding'
+        || !current_user_can('edit_theme_options')) { return; }
+    wp_enqueue_media();
+    $js = get_stylesheet_directory() . '/src/brand-media-picker.js';
+    if (is_file($js)) {
+        wp_enqueue_script('empire-yard-brand-media-picker',
+            get_stylesheet_directory_uri() . '/src/brand-media-picker.js',
+            ['media-views'], (string) filemtime($js), true);
+    }
+});
+
 /** JSON data, never executable JS: React renders text safely. */
 add_action('wp_head', static function (): void {
     if (!is_front_page()) { return; }
-    $json = wp_json_encode(empire_yard_brand_settings(),
+    $settings = empire_yard_brand_settings();
+    $settings['editorial_assets_base'] = trailingslashit(
+        get_stylesheet_directory_uri()) . 'assets/editorial/';
+    $settings['editorial_media_urls'] = [];
+    foreach ([1, 2, 3] as $index) {
+        $id = (int) $settings['editorial_media_' . $index];
+        if ($id > 0 && wp_attachment_is_image($id)) {
+            $url = wp_get_attachment_image_url($id, 'large');
+            if (is_string($url) && $url !== ''
+                && wp_parse_url($url, PHP_URL_HOST) ===
+                   wp_parse_url(home_url('/'), PHP_URL_HOST)) {
+                $settings['editorial_media_urls'][$index] = esc_url_raw($url);
+            }
+        }
+    }
+    $json = wp_json_encode($settings,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
     if (!is_string($json)) { return; }
     echo '<script id="empire-yard-brand-settings" type="application/json">' . $json . '</script>' . "\n";

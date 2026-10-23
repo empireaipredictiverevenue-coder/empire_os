@@ -4,6 +4,7 @@ from hashlib import sha256
 from zipfile import ZipFile
 import gzip
 import json
+import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
@@ -13,6 +14,13 @@ BASELINE=DOCS/"EMPIRE_CAR_YARD_SHOWROOM_V5_MOBILE_EAGER_BASELINE_20261023.json"
 
 def result():
     return json.loads(RECEIPT.read_text())
+
+V5_COMMIT="a85ee676c5e05da5b2a9ab828e20fb7aef9a8b3f"
+def historical(path):
+    return subprocess.run(["git","show",V5_COMMIT+":"+path],cwd=ROOT,
+        check=True,capture_output=True).stdout
+def original_theme(path):
+    return historical("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/"+path)
 
 def test_isolated_real_wordpress_browser_with_optional_3d_and_booking_restore():
     r=result()
@@ -97,7 +105,7 @@ def test_exact_v5_source_hashes_and_browser_screenshots():
     r=result()
     assert len(r["source_manifest_sha256"])>=16
     for path,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/path).read_bytes()).hexdigest()==digest,path
+        assert sha256(historical(path)).hexdigest()==digest,path
     assert len(r["screenshots"])==4
     for name,metadata in r["screenshots"].items():
         screen=DOCS/"car_yard_react_browser_evidence_v5"/name
@@ -105,8 +113,8 @@ def test_exact_v5_source_hashes_and_browser_screenshots():
         assert sha256(screen.read_bytes()).hexdigest()==metadata["sha256"]
 
 def test_original_procedural_gt_details_and_opt_in_source():
-    src=(THEME/"src/ShowroomScene.jsx").read_text()
-    main=(THEME/"src/main.jsx").read_text()
+    src=original_theme("src/ShowroomScene.jsx").decode()
+    main=original_theme("src/main.jsx").decode()
     for value in ("function Tire(", "function SideGlass(", "shapeGeometry",
                   "torusGeometry","windshield","Grille","clearcoat","meshPhysicalMaterial",
                   "shadow-mapSize", "paint.body","paint.roof"):
@@ -122,10 +130,10 @@ def test_original_procedural_gt_details_and_opt_in_source():
     assert "http://" not in main and "https://" not in main
     manifest=json.loads((THEME/"package.json").read_text())
     assert "gsap" not in manifest["dependencies"] and "lenis" not in manifest["dependencies"]
-    entry=next(iter((THEME/"dist").glob("yard-main-*.js")))
-    scene=next(iter((THEME/"dist").glob("yard-ShowroomScene-*.js")))
-    assert len(gzip.compress(entry.read_bytes(),mtime=0))<200_000
-    assert len(gzip.compress(scene.read_bytes(),mtime=0))<410_000
+    entry=original_theme("dist/yard-main-Bp51PbJo.js")
+    scene=original_theme("dist/yard-ShowroomScene-BEKSahzV.js")
+    assert len(gzip.compress(entry,mtime=0))<200_000
+    assert len(gzip.compress(scene,mtime=0))<410_000
 
 def test_wordpress_installable_preview_contains_both_chunks_and_native_branding():
     archive=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/dist/empire-yard-atelier-showroom-v5-preview.zip"

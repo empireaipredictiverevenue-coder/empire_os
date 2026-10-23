@@ -1,0 +1,239 @@
+{
+  "backup_site_tar_sha256": "140a49cc3177b8b33e7542d1948e488ea2677c1ca2436b6e6d5393893a117402",
+  "backup_sql_sha256": "e0266da3923df933eb6a7852464856695daeb6da28039bac4e277c993ee6075f",
+  "bootstrap": {
+    "native_wpdb_innodb_ready": true,
+    "pages_created": 6,
+    "php": "8.5.4",
+    "plugin_active": true,
+    "status": "NATIVE_WP_MYSQL_STAGE_BOOTSTRAP_PASS",
+    "synthetic_attachment_id": 11,
+    "synthetic_only": true,
+    "theme": "empire-yard-atelier",
+    "vehicle_id": 10,
+    "wordpress": "6.8.11"
+  },
+  "browser_check_count": 84,
+  "browser_checks": {
+    "3d_chunk_requested_separately": true,
+    "admin_login_success": true,
+    "admin_no_server_5xx": true,
+    "all_external_browser_requests_blocked": true,
+    "all_vehicle_controls_are_real_buttons": true,
+    "brand_script_json_non_executable": true,
+    "branding_admin_page_200": true,
+    "branding_form_registered": true,
+    "configured_3d_controls_still_present": true,
+    "configured_accent_tailwind_applied": true,
+    "configured_brand_name_rendered": true,
+    "configured_brand_strapline_rendered": true,
+    "configured_contact_remains_internal": true,
+    "configured_frontend_home_200": true,
+    "configured_hero_headline_rendered": true,
+    "configured_stock_accent_from_tailwind": true,
+    "configured_stock_contact_link_stays_internal": true,
+    "configured_stock_footer_uses_saved_brand": true,
+    "configured_stock_header_uses_saved_brand": true,
+    "configured_stock_page_200": true,
+    "desktop_hero_present": true,
+    "desktop_home_200": true,
+    "desktop_no_horizontal_overflow": true,
+    "external_contact_path_rejected_on_save": true,
+    "inventory_card_tailwind_styled": true,
+    "inventory_filter_labels_accessible": true,
+    "inventory_image_present": true,
+    "inventory_still_available_after_brand_change": true,
+    "keyboard_focusable_element": true,
+    "login_page_200": true,
+    "login_password_field_present": true,
+    "login_username_field_correct": true,
+    "magic_ui_style_animated_grid": true,
+    "mobile_home_200": true,
+    "mobile_inventory_200": true,
+    "mobile_no_horizontal_overflow": true,
+    "native_wordpress_es_module_loaded": true,
+    "offscreen_scene_unmounted_to_save_gpu": true,
+    "paint_palette_interaction_state": true,
+    "react_root_hydrated": true,
+    "react_three_heading": true,
+    "real_three_js_webgl_canvas_rendered": true,
+    "real_view_and_paint_controls_rendered": true,
+    "returning_to_hero_restores_scene": true,
+    "side_view_interaction_state": true,
+    "staff_cancel_receipt": true,
+    "staff_confirmation_receipt": true,
+    "staff_form_present": true,
+    "staff_hold_listed": true,
+    "staff_hold_receipt": true,
+    "staff_recent_table_present": true,
+    "staff_workbench_200": true,
+    "synthetic_vehicle_visible": true,
+    "tailwind_css_generated": true,
+    "tailwind_inventory_enhancement_loaded": true,
+    "three_js_canvas_or_accessible_fallback": true,
+    "v5_accessibility_ax_tree_no_unnamed_links_buttons": true,
+    "v5_accessibility_buttons_have_names": true,
+    "v5_accessibility_controls_pressed_states": true,
+    "v5_accessibility_hero_contrast_aa": true,
+    "v5_accessibility_links_have_names": true,
+    "v5_accessibility_one_h1_and_main": true,
+    "v5_mobile_3d_chunk_load_recorded_after_opt_in": true,
+    "v5_mobile_emulation_fcp_recorded": true,
+    "v5_mobile_hero_text_not_hidden_by_entrance_animation": true,
+    "v5_mobile_no_overflow": true,
+    "v5_mobile_opt_in_avoids_automatic_3d_download": true,
+    "v5_mobile_preview_and_opt_in_visible_before_screenshot": true,
+    "v5_reduced_motion_no_webgl_canvas": true,
+    "v6_desktop_scene_restored_before_screenshot": true,
+    "v6_hero_real_3d_canvas_visible_when_captured": true,
+    "v6_media_picker_script_enqueued_in_wp_admin": true,
+    "v6_mobile_editorial_photographs_rendered_before_screenshot": true,
+    "v6_native_wordpress_media_modal_opens": true,
+    "v6_photo_alt_text_and_lazy_decode": true,
+    "v6_photo_credits_visible_and_link_to_real_sources": true,
+    "v6_photos_locally_served_in_child_theme": true,
+    "v6_real_editorial_photos_loaded": true,
+    "v6_remaining_fallback_photo_sources_still_local": true,
+    "v6_replaced_media_has_no_false_unsplash_credit": true,
+    "v6_wp_media_picker_controls_rendered": true,
+    "v6_wp_selected_media_replaced_second_photo": true,
+    "webgl_is_active_in_visible_hero": true,
+    "wordpress_admin_branding_saved": true
+  },
+  "browser_version": "Chrome/139.0.7258.66",
+  "customer_bookings_enabled": false,
+  "external_requests_blocked": 10,
+  "loopback_only_http": true,
+  "mariadb_unix_socket_only": true,
+  "mobile_emulation": {
+    "cpu_throttle_factor": 4,
+    "device_scale_factor": 2,
+    "network_latency_ms": 150,
+    "network_throughput_mbps": 1.6,
+    "not_field_core_web_vitals": true,
+    "runs": 1,
+    "viewport_width_px": 390
+  },
+  "mobile_lab_measurement": {
+    "canvas_visible": false,
+    "dom_content_loaded_ms": 4076,
+    "dom_nodes": 346,
+    "fcp_ms": 1272,
+    "horizontal_overflow": false,
+    "js_resources": [
+      {
+        "duration_ms": 3400,
+        "encoded_bytes": 573515,
+        "name": "yard-main-AT08a0b9.js",
+        "transfer_bytes": 573815
+      }
+    ],
+    "lcp_candidate_ms": 4608,
+    "opt_in_button_visible": true,
+    "scene_requested_before_opt_in": false,
+    "ttfb_ms": 31
+  },
+  "mobile_opt_in_3d": {
+    "canvas_visible": true,
+    "scene_chunks": [
+      {
+        "duration_ms": 8149,
+        "encoded_bytes": 1594913,
+        "name": "yard-ShowroomScene-D2g-vJji.js"
+      }
+    ]
+  },
+  "observed_utc": "2026-10-23T15:56:20.513744+00:00",
+  "outbound_or_payments_enabled": false,
+  "php_version": "8.5.4",
+  "production_changes": false,
+  "reduced_motion_measurement": {
+    "fallback": true,
+    "live_canvas": false,
+    "scene_chunk_requests": 0
+  },
+  "responsive": {
+    "desktop": {
+      "document": 1440,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 1440
+    },
+    "mobile": {
+      "document": 390,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 390
+    }
+  },
+  "restore_verified": {
+    "active_theme": "empire-yard-atelier",
+    "attachment_sha256": "8538b217070301eb7cc7f7db1c53149523c1c54fe9783610f746b6e945cdb8e6",
+    "booking_audit_events": 3,
+    "booking_rows": 1,
+    "pages": 7,
+    "production_modified": false,
+    "status": "NATIVE_WP_MYSQL_RESTORE_PASS",
+    "vehicles": 1
+  },
+  "screenshots": {
+    "home-desktop-v6.png": {
+      "bytes": 1316497,
+      "sha256": "adc14705b2faa00fedebe52bf9baae3c50caf9db00357c8b14c67e890bf87686"
+    },
+    "home-hero-desktop-v6.png": {
+      "bytes": 289984,
+      "sha256": "ae086b5e95ec18cb134035ce261637fb7186abc3774176e1327209ac65878dbf"
+    },
+    "home-mobile-v6.png": {
+      "bytes": 853550,
+      "sha256": "f558f7aa669bf5c722f7d298a22a846d1f8f5f17a39ca66a001018912b0d52d4"
+    },
+    "staff-desktop-v6.png": {
+      "bytes": 75250,
+      "sha256": "58e88bf33e157918aed9ff4cc41d130105a7cf2eaed392d8b46d605064deb137"
+    },
+    "stock-mobile-v6.png": {
+      "bytes": 74465,
+      "sha256": "df56e616d00d35a8e55b455207082cbadbee31f2b77a149e0fcd152dd03faff4"
+    }
+  },
+  "source_manifest_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-detail.webp": "1f8029a572d6d25f0ade109d002036c500ace16660c0cbcdffb16e9805c066fb",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-red.webp": "6b0299c25a34a556741abb672194fd58d0902dc7ff5d8c62802779ac11ded62a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-silver.webp": "61100af0cf9ca08c27fc218a0b7275d07b3adc8aa908625b9cfcd6efb1b094a6",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-ShowroomScene-D2g-vJji.js": "ca100fa8d9de2d07f10d31b8217bbaf94c65c8816123886bf14ace87fa095c8e",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-main-AT08a0b9.js": "6ded2e838c33d9b5c88b8a89742a1b203b4e239b92eafbd0997c1dbc37db336a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.css": "b6d486df0842b6e7e127c458afc539d3a671acbaea058c248a7ae322ede081ce",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.js": "39cb824f51595f63a39801fa67397a4d2b2c825656f812329f11bdbc5ca103d2",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/functions.php": "f5b0cdb9dc3db85587b275325be6040a7cea1fc72f5bf11ab09d9fed54241aa2",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/package-lock.json": "e0f6a2df43f04e2ca74eaadb4d943c05cf742e13c375297a64bc0e7f63d218f3",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/footer.html": "f0ac0205e6ad7a51299994da6319c8ec02b2ebe9831527207e1376f55fcb83f5",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/header.html": "26208bbae6471898dfc3c79a0f67b1c7b96764fc7fb2c5cbafb6a3330a987993",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/ShowroomScene.jsx": "58476c4d8adea45b9f766a9fb949910d53c616be3353d56bc1c02ba1c564a806",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/brand-media-picker.js": "d797966201ceb97331192fe6ec654eaac17081e4d633992031ce7113c2cf446c",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/inventory-enhance.js": "3c3b224dee7fe4886bde8981652ce8b8ca75580f3de151efa40ef6c3f79ba22a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx": "70681a6aa276c8385f7e690bd7793ce5c5772f32febe1f28a9245ca4378db274",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/tailwind.css": "d9df88399ebda1268514ac2db52c7be5d85b3161dcbe0fa083274e8dc6d53e4f",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/vite.config.mjs": "e2a0a37afc0f786eaf950bc7ceca9a413557d37e558a6a803a2b0ec669fb6be8",
+    "scripts/premium_wp_v1/bootstrap.php": "eb589438da8753f966611921fd7fdb3898bedb66733047ea10870298ff5c8b21",
+    "scripts/premium_wp_v1/browser_acceptance_v6.cjs": "4bc4ac19afad08e1205134dbac6ea8c13fb6457a98bb5a117b376dbc1f9631c6",
+    "scripts/premium_wp_v1/restore_verify.php": "cae946adb10d5b7bda5b8732f16e17b1374bc0d31b3d865770b93c917e7f231e",
+    "scripts/premium_wp_v1/run_react_wordpress_design_v6.sh": "ad90fb70524ea1bc7af5f5fba56c7c32c17baf9e685942235157f1f728174efc"
+  },
+  "status": "WORDPRESS_REACT_THREE_NATIVE_MYSQL_BROWSER_RESTORE_PASS",
+  "synthetic_data_only": true,
+  "targeted_accessibility": {
+    "h1_count": 1,
+    "hero_highlight_contrast": 12.37,
+    "hero_text_contrast": 17.57,
+    "live_region_count": 1,
+    "main_landmarks": 1,
+    "measured_brand": "ice",
+    "named_buttons": true,
+    "named_links": true,
+    "paint_button_pressed_states": true,
+    "skip_link": true,
+    "unnamed_ax_interactive_nodes": 0
+  },
+  "wordPress_mysql_same_runtime": true,
+  "wordpress_version": "6.8.11"
+}

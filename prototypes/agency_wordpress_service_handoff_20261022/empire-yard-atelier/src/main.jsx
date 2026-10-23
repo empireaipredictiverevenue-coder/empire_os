@@ -166,6 +166,25 @@ function getBrandSettings() {
     const raw = document.getElementById('empire-yard-brand-settings')?.textContent
     const settings = raw ? JSON.parse(raw) : {}
     const brand = { ...brandDefaults }
+    // The image base is supplied only by this WordPress child theme and must
+    // remain on the current installation. Never trust external admin URLs.
+    const assetBase = new URL(settings.editorial_assets_base || '/wp-content/themes/empire-yard-atelier/assets/editorial/', location.href)
+    brand.editorialAssetsBase = (assetBase.origin === location.origin &&
+      assetBase.pathname.endsWith('/assets/editorial/') &&
+      !assetBase.search && !assetBase.hash) ? assetBase.href
+      : '/wp-content/themes/empire-yard-atelier/assets/editorial/'
+    brand.editorialMedia = {}
+    for (const index of [1, 2, 3]) {
+      const proposed = settings.editorial_media_urls?.[index]
+      if (typeof proposed === 'string' && proposed.length < 550) {
+        const url = new URL(proposed, location.href)
+        if (url.origin === location.origin && url.pathname.includes('/wp-content/uploads/') &&
+            !url.search && !url.hash && !url.pathname.includes('..')) {
+          brand.editorialMedia[index] = url.href
+        }
+      }
+    }
+
     for (const key of ['name', 'strapline', 'eyebrow', 'headline', 'highlight',
       'description', 'contact_label']) {
       if (typeof settings[key] === 'string' && settings[key].trim()) {
@@ -180,7 +199,11 @@ function getBrandSettings() {
       brand.accent = settings.accent
     }
     return brand
-  } catch { return brandDefaults }
+  } catch {
+    return { ...brandDefaults, editorialAssetsBase:
+      '/wp-content/themes/empire-yard-atelier/assets/editorial/',
+      editorialMedia: {} }
+  }
 }
 function Button({ children, href, primary = false, palette = brandPalettes.gold }) {
   return <a href={href} className={(primary
@@ -195,10 +218,34 @@ const features = [
   { num: '02', icon: ScanLine, title: 'Details worth exploring.', copy: 'Honest model specifications and image spaces without fabricated availability, reviews or pricing claims.' },
   { num: '03', icon: CalendarDays, title: 'A smarter workshop.', copy: 'The private workbench uses database-backed slot protection. Customer booking remains disabled.' }
 ]
-const concepts = [
-  { num: 'I', name: 'Grand Tourer', colors: 'from-[#2b4c57] via-[#122d39] to-[#061b27]' },
-  { num: 'II', name: 'Urban Explorer', colors: 'from-[#aa9471] via-[#5f655e] to-[#152d34]' },
-  { num: 'III', name: 'Electric Era', colors: 'from-[#436b71] via-[#2b414a] to-[#101a26]' }
+const photographicReferences = [
+  {
+    num: '01', name: 'The art of the silhouette',
+    detail: 'Sculpture, proportion and deliberate light',
+    filename: 'studio-red.webp',
+    alt: 'Real editorial photograph of a red performance coupe in a dark photography studio; not a vehicle offered by this demo',
+    photographer: 'Moses Malik Roldan',
+    source: 'https://unsplash.com/photos/a-red-sports-car-parked-in-a-dark-studio-bZRqT3tvryk',
+    width: 1600, height: 1066,
+  },
+  {
+    num: '02', name: 'Precision in profile',
+    detail: 'A cleaner way to reveal form',
+    filename: 'studio-silver.webp',
+    alt: 'Real editorial photograph of a silver sports coupe in profile against a dark studio backdrop; not current dealership stock',
+    photographer: 'Đào Hiếu',
+    source: 'https://unsplash.com/photos/a-sleek-white-sports-car-against-a-dark-background-S5ogDe0Uzp0',
+    width: 1600, height: 900,
+  },
+  {
+    num: '03', name: 'An eye for detail',
+    detail: 'Materials, texture and finish',
+    filename: 'studio-detail.webp',
+    alt: 'Real editorial close-up photograph of a vintage car grille and headlight; not a car for sale',
+    photographer: 'Serge Kutuzov',
+    source: 'https://unsplash.com/photos/black-car-macro-shot-TNybYN-LqJo',
+    width: 1500, height: 930,
+  },
 ]
 function App() {
   const reduce = !!useReducedMotion()
@@ -265,13 +312,44 @@ function App() {
             <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#916d3b]">The collection</p><h2 className="font-serif text-[clamp(2.9rem,5vw,5rem)] leading-[1.08] tracking-[-.06em]">Explore the possibilities.</h2></div>
             <a href="/demo-stock/" className="inline-flex items-center gap-2 border-b border-[#947a4d] pb-2 text-[11px] font-black uppercase tracking-widest text-[#173b48] no-underline">See demonstrator inventory <ArrowRight className="h-4 w-4"/></a>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">{concepts.map(item=><article key={item.num} className="group overflow-hidden rounded-lg border border-[#d1d9d6] bg-white">
-            <div className={'relative flex h-64 flex-col justify-between overflow-hidden bg-gradient-to-br p-6 '+item.colors}>
-              <AnimatedGrid reduce={reduce}/><span className="relative z-10 text-[10px] font-black uppercase tracking-[.23em] text-[#f1d8a9]">Concept {item.num}</span>
-              <CarFront className="relative z-10 mx-auto h-28 w-28 text-[#dfeaec]/70 drop-shadow-lg transition-transform duration-500 group-hover:scale-110" strokeWidth={.7} aria-hidden="true"/>
-              <span className="relative z-10 text-[10px] font-semibold uppercase tracking-widest text-slate-300">Visual direction only</span>
-            </div><div className="p-7"><h3 className="font-serif text-2xl tracking-tight">{item.name}</h3><p className="mt-2 text-sm text-[#6a787e]">Inventory presentation concept</p><p className="mt-5 inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[.15em] text-[#987545]">No actual vehicle listing <ArrowUpRight className="h-4 w-4"/></p></div>
-          </article>)}</div>
+          <div data-editorial-gallery="true" className="grid gap-4 lg:grid-cols-[1.18fr_.82fr]">
+            {photographicReferences.map((item, idx) => {
+              const selected = brand.editorialMedia?.[idx + 1]
+              const url = selected || brand.editorialAssetsBase + item.filename
+              return <figure key={item.num} data-editorial-photo={item.num}
+                className={'group relative isolate overflow-hidden rounded-xl bg-[#0b2029] shadow-[0_24px_55px_rgba(9,25,35,.16)] ' +
+                  (idx === 0 ? 'min-h-[370px] lg:row-span-2 lg:min-h-[590px]' : 'min-h-[290px] lg:min-h-[287px]')}>
+                <img alt={selected
+                    ? 'Client-selected editorial automotive reference. Media rights and vehicle claims require independent review.'
+                    : item.alt}
+                  src={url} width={item.width} height={item.height}
+                  loading="lazy" decoding="async"
+                  className={'absolute inset-0 h-full w-full object-cover transition-transform duration-700 motion-reduce:transition-none motion-safe:group-hover:scale-[1.035] ' +
+                    (idx === 2 ? 'object-[center_25%]' : 'object-center')} />
+                <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#06151f]/95 via-[#06151f]/15 to-[#06151f]/40" />
+                <figcaption className="relative z-10 flex h-full min-h-[inherit] flex-col justify-between gap-16 p-6 text-white sm:p-8">
+                  <div className="flex flex-wrap items-start justify-between gap-3 text-[10px] font-extrabold uppercase tracking-[.19em] text-[#f1d4a6]">
+                    <span>Frame {item.num} / photographic direction</span>
+                    <span className="rounded-full border border-white/25 bg-black/30 px-3 py-2 text-[9px] text-white/90 backdrop-blur-sm">Editorial only</span>
+                  </div>
+                  <div>
+                    <h3 className={'max-w-[20ch] font-serif leading-[1.1] tracking-[-.04em] ' +
+                      (idx === 0 ? 'text-[clamp(2.2rem,4vw,4rem)]' : 'text-[clamp(2rem,3vw,3rem)]')}>{item.name}</h3>
+                    <p className="mt-2 text-sm text-slate-200">{item.detail}</p>
+                    <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/20 pt-4 text-[10px] text-slate-200">
+                      <span>Photography reference — not a stock listing</span>
+                      {selected ? <span>WordPress Media Library selection</span> :
+                        <a href={item.source} target="_blank" rel="noopener noreferrer"
+                          className="pointer-events-auto text-[#efce97] underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-white">
+                          Photo: {item.photographer} / Unsplash
+                        </a>}
+                    </div>
+                  </div>
+                </figcaption>
+              </figure>
+            })}
+          </div>
+          <p className="mt-6 max-w-[83ch] text-[11px] leading-6 text-[#607178]">These photographs are visual references, not inventory, customer stock, brand partnerships or claims about our fictional GT. Manufacturer names, trademarks and model rights require independent clearance for a real client deployment.</p>
         </div>
       </section>
       <section className="bg-[#102832] px-5 py-20 text-white md:px-10 md:py-28"><div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 rounded-xl border border-[#d4ae75]/35 bg-[radial-gradient(ellipse_at_top_right,#214957_0%,#102832_50%,#091923_100%)] p-8 md:flex-row md:items-center md:p-14">

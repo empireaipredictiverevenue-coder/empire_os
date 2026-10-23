@@ -1,0 +1,42 @@
+{
+  "schema": "empire.agency.editorial_photo_sources.v1",
+  "license": "Unsplash License",
+  "license_url": "https://unsplash.com/license",
+  "verified_on": "2026-10-23",
+  "rights_boundary": "Free contributor copyright license for web design presentation; manufacturer trademark, depicted vehicles, badges and any endorsement/client association remain independently uncleared.",
+  "production_release": "HOLD until original client brand/media rights approval",
+  "presentation": "Editorial visual inspiration only; not actual dealership stock or an offer for sale",
+  "media_creation": "Locally converted from credited Unsplash original photographs to WebP using ffmpeg, no remote runtime image requests",
+  "photos": [
+    {
+      "file": "studio-red.webp",
+      "photographer": "Moses Malik Roldan",
+      "photo_page": "https://unsplash.com/photos/a-red-sports-car-parked-in-a-dark-studio-bZRqT3tvryk",
+      "original_photo_id": "photo-1762314907955-b7c1e11a8782",
+      "width": 1600,
+      "height": 1066,
+      "local_sha256": "6b0299c25a34a556741abb672194fd58d0902dc7ff5d8c62802779ac11ded62a",
+      "local_bytes": 48892
+    },
+    {
+      "file": "studio-silver.webp",
+      "photographer": "Đào Hiếu",
+      "photo_page": "https://unsplash.com/photos/a-sleek-white-sports-car-against-a-dark-background-S5ogDe0Uzp0",
+      "original_photo_id": "photo-1762764727551-50f80373e4fc",
+      "width": 1600,
+      "height": 900,
+      "local_sha256": "61100af0cf9ca08c27fc218a0b7275d07b3adc8aa908625b9cfcd6efb1b094a6",
+      "local_bytes": 42504
+    },
+    {
+      "file": "studio-detail.webp",
+      "photographer": "Serge Kutuzov",
+      "photo_page": "https://unsplash.com/photos/black-car-macro-shot-TNybYN-LqJo",
+      "original_photo_id": "photo-1493031534415-e40b830b1099",
+      "width": 1500,
+      "height": 930,
+      "local_sha256": "1f8029a572d6d25f0ade109d002036c500ace16660c0cbcdffb16e9805c066fb",
+      "local_bytes": 182512
+    }
+  ]
+}
