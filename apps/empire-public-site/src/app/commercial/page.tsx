@@ -11,6 +11,7 @@ import {
 } from "@/lib/commercial-interest-attempt";
 import { selectApprovedProposalOffer } from "@/lib/buyer-proposal-handoff";
 import { claimedEntryForReview } from "@/lib/commercial-entry-review";
+import { commercialOfferCategory } from "@/lib/commercial-offer-category";
 
 type Offer = { product_code: string; name: string; offer_family: string; currency: string; approved_price_cents: number; price_interval: string; implementation_fee_cents?: number };
 type Catalog = { status: string; offers: Offer[] };
@@ -113,7 +114,7 @@ export default function CommercialPage() {
       <section className="pb-9 pt-16">
         <p className="text-xs font-semibold tracking-[.2em] text-cyan-300">FOUNDER-LED COMMERCIAL ENQUIRIES</p>
         <h1 className="mt-5 max-w-5xl text-5xl font-semibold tracking-[-.055em] md:text-7xl">Turn the opportunity into a <span className="text-cyan-300">real proposal.</span></h1>
-        <p className="mt-5 max-w-3xl text-base leading-7 text-slate-400">Empire AI consultancy and Digital Avatar solutions. Discuss outcomes with our founder before agreeing scope, terms, delivery or payment.</p>
+        <p className="mt-5 max-w-3xl text-base leading-7 text-slate-400">Empire AI consultancy, intelligence products and Digital Avatar solutions. Discuss outcomes with our founder before agreeing scope, terms, delivery or payment.</p>
       </section>
       <BrokeragePremiumDiscovery />
       <div className="grid gap-10 pb-20 lg:grid-cols-[1fr_1fr]">
@@ -131,7 +132,7 @@ export default function CommercialPage() {
                 <strong>{offer.name}</strong><strong className="text-cyan-200">{price(offer)}</strong>
               </span>
               <span className="mt-2 block text-xs text-slate-400">
-                {offer.offer_family === "consultancy" ? "Consultancy and advisory" : "Digital Avatar — scoped deployment"}
+                {commercialOfferCategory(offer.offer_family)}
                 {offer.implementation_fee_cents ? " · Setup $" + (offer.implementation_fee_cents / 100).toLocaleString("en-GB") : ""}
               </span>
               <span className="mt-2 block text-xs text-slate-500">Nonbinding proposal enquiry · Delivery verified before contracting</span>
