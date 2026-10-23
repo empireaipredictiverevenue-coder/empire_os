@@ -192,6 +192,12 @@ def test_bridge_reviews_then_proposes_governed_outbound():
     )
     assert "opt out" in proposal["p_body_text"].lower()
     assert proposal["p_metadata"]["automatic_send"] is False
+    import hashlib, json
+    expected = 'copy-sha256:' + hashlib.sha256(json.dumps(
+        {'subject': proposal['p_subject'], 'body': proposal['p_body_text']},
+        sort_keys=True, ensure_ascii=False,
+    ).encode('utf-8')).hexdigest()
+    assert proposal['p_metadata']['copy_draft_id'] == expected
 
 
 def test_bridge_does_not_propose_for_pseudo_person():

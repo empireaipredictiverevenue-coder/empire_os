@@ -11,6 +11,8 @@ intent, under its own caps, suppression checks and personhood revalidation.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 
@@ -271,6 +273,10 @@ def run_standing_bridge(
             continue
 
         subject, body = _message(review)
+        copy_draft_id = 'copy-sha256:' + sha256(json.dumps(
+            {'subject': subject, 'body': body}, sort_keys=True,
+            ensure_ascii=False,
+        ).encode('utf-8')).hexdigest()
         try:
             result = store.propose_outbound_intent({
                     "p_review_id": review_id,
@@ -283,6 +289,7 @@ def run_standing_bridge(
                     "p_proposed_by": PROPOSED_BY,
                     "p_expires_at": expires_at,
                     "p_metadata": {
+                        "copy_draft_id": copy_draft_id,
                         "source": "gtm_standing_bridge_v1",
                         "copy_variant": COPY_VARIANT,
                         "automatic_send": False,
