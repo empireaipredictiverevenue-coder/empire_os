@@ -20,7 +20,7 @@ from bs4 import BeautifulSoup
 
 from empire_os.acquisition_existing_pool_audit import read_only_current_snapshot
 from empire_os.jev_client_pain_discovery import discover_client_pains
-from empire_os.search_fabric.reliable_search import provider_health
+from empire_os.search_fabric.reliable_search import provider_health, search_reliable
 
 MAX_BATCH = 20
 MAX_RESPONSE_BYTES = 800_000
@@ -96,6 +96,7 @@ def sweep_first_party(
     now: datetime,
     fetch: Callable[[str], bytes] = _get_yc,
     search_health: Mapping | None = None,
+    search_lookup: Callable[..., Mapping] | None = None,
 ) -> dict:
     if now.utcoffset() is None or not isinstance(assignments, list) or not 0 < len(assignments) <= MAX_BATCH:
         raise ValueError("bounded timestamped research batch required")
@@ -103,6 +104,14 @@ def sweep_first_party(
     rows = []
     observations = []
     seen = set()
+    # Existing Search Fabric remains the sole search provider. Its protective
+    # cooldown MUST NOT be bypassed by a new search implementation.
+    health = search_health or {}
+    search_available = (search_lookup is not None
+        and health.get("circuit_open") is False
+        and health.get("last_state") not in ("CIRCUIT_OPEN", "DEGRADED"))
+    search_attempts = 0
+    search_result_rows = 0
     for assignment in assignments:
         if assignment.get("status") != "RESEARCH_ONLY" or assignment.get("contact_authorized") is not False:
             raise ValueError("source research-only status required")
@@ -112,6 +121,20 @@ def sweep_first_party(
             raise ValueError("unique canonical assignment reference required")
         seen.add(ref)
         url = src.rstrip("/") + "/jobs"
+        if search_available:
+            # Research discovery only. Neither engine snippets nor cache entries
+            # establish contact authority, current buying need, or company identity.
+            search_attempts += 1
+            try:
+                discovery = search_lookup(
+                    f'"{assignment["company"]}" marketing growth vendor procurement 2026',
+                    num=5,
+                )
+                organic = discovery.get("organic") if isinstance(discovery, Mapping) else None
+                if isinstance(organic, list):
+                    search_result_rows += min(5, len(organic))
+            except Exception:
+                pass
         job_titles, page_digest = [], None
         reason = None
         try:
@@ -161,6 +184,8 @@ def sweep_first_party(
         "mode": "OBSERVE",
         "search_fabric_state": str((search_health or {}).get("last_state") or "UNKNOWN"),
         "search_fabric_not_overridden": True,
+        "search_queries_attempted": search_attempts,
+        "unverified_search_results_observed": search_result_rows,
         "processed": len(rows),
         "source_pages_observed": sum(bool(r["yc_listing_sha256"]) for r in rows),
         "observed_commercial_hiring": sum(bool(r["relevant_job_titles"]) for r in rows),
@@ -186,6 +211,7 @@ def run_current_sweep(repo: Path) -> dict:
     return sweep_first_party(
         assignments=pool["next_research_batch"], catalog=catalog,
         now=now, search_health=provider_health(),
+        search_lookup=search_reliable,
     )
 
 

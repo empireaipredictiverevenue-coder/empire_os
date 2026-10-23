@@ -59,3 +59,29 @@ def test_unapproved_research_assignment_rejected():
     q[0]["status"]="QUALIFIED"
     with pytest.raises(ValueError):
         sweep_first_party(assignments=q,catalog=catalog(),now=NOW,fetch=lambda u:page())
+
+
+def test_search_uses_existing_provider_only_when_healthy():
+    calls = []
+    def search(query, num):
+        calls.append((query, num))
+        return {"organic": [{"url":"https://example.com/unverified"}]}
+    r = sweep_first_party(
+        assignments=a(),catalog=catalog(),now=NOW,fetch=lambda _:page(),
+        search_health={"last_state":"HEALTHY", "circuit_open":False},
+        search_lookup=search)
+    assert len(calls) == 1
+    assert r["search_queries_attempted"] == 1
+    assert r["unverified_search_results_observed"] == 1
+    assert r["independent_buying_triggers"] == 0
+    assert r["qualified_for_commercial_review"] == 0
+
+def test_provider_cooldown_not_bypassed():
+    def forbidden_search(*args, **kwargs):
+        raise AssertionError("Search provider must not be called during cooldown")
+    r = sweep_first_party(
+        assignments=a(),catalog=catalog(),now=NOW,fetch=lambda _:page(),
+        search_health={"last_state":"CIRCUIT_OPEN", "circuit_open":True},
+        search_lookup=forbidden_search)
+    assert r["search_queries_attempted"] == 0
+    assert r["search_fabric_not_overridden"] is True
