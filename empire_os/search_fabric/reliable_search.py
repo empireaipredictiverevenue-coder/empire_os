@@ -571,15 +571,21 @@ def search_reliable(
     # -------------------------------------------
 
     try:
-        raw_rows = (
-            search_public_web(
-                query,
-                num=num,
-            )
-            or []
+        public_response = search_public_web(
+            query,
+            num=num,
         )
     except Exception:
-        raw_rows = []
+        public_response = []
+
+    # A zero-hit *healthy* SERP is not provider failure. The public fallback
+    # emits list-compatible metadata only when a real search response was
+    # structurally confirmed. Old adapters returning bare lists retain the
+    # conservative failure behavior until upgraded.
+    provider_available = getattr(
+        public_response, "provider_available", False
+    ) is True
+    raw_rows = public_response or []
 
     rows = _real_rows(
         raw_rows
@@ -647,7 +653,30 @@ def search_reliable(
         return result
 
     # -------------------------------------------
-    # 4. Failed public attempt.
+    # 4. Healthy provider; query has no qualified matches.
+    # -------------------------------------------
+
+    if provider_available:
+        _record_success()
+        result = {
+            "organic": [],
+            "searchParameters": {
+                "q": query,
+                "num": num,
+                "engine": "public_recovery",
+                "search_state": "NO_RELEVANT_RESULTS",
+                "quality_gate": "lexical_v2",
+                "cache": False,
+                "circuit_open": False,
+            },
+            "search_operational_status": "HEALTHY",
+            "error": None,
+        }
+        _memo_put(query, num, result)
+        return result
+
+    # -------------------------------------------
+    # 5. Failed public attempt.
     # -------------------------------------------
 
     health = _record_failure()

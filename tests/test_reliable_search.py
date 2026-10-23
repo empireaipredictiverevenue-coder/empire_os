@@ -265,3 +265,33 @@ def test_reserved_domains_are_never_search_evidence(
         ]
         == "PROVIDER_DEGRADED"
     )
+
+
+
+def test_healthy_zero_hit_search_does_not_trip_circuit(monkeypatch, tmp_path):
+    module=_module(monkeypatch,tmp_path)
+    from empire_os.search_fabric.public_fallback import PublicSearchRows
+    monkeypatch.setattr(module,"_last_known_good",lambda *a,**k:None)
+    calls=[]
+    def zero(query,num=10):
+        calls.append(query)
+        return PublicSearchRows([],provider_available=True)
+    monkeypatch.setattr(module,"search_public_web",zero)
+    for key in ("missing-company-1","missing-company-2","missing-company-3"):
+        r=module.search_reliable(key,use_cache=False)
+        assert r["search_operational_status"]=="HEALTHY"
+        assert r["searchParameters"]["search_state"]=="NO_RELEVANT_RESULTS"
+        assert r["organic"]==[]
+    assert len(calls)==3
+    assert module.provider_health()["consecutive_failures"]==0
+    assert module.provider_health()["circuit_open"] is False
+
+
+def test_search_shell_without_provider_proof_fails_closed(monkeypatch,tmp_path):
+    module=_module(monkeypatch,tmp_path)
+    from empire_os.search_fabric.public_fallback import PublicSearchRows
+    monkeypatch.setattr(module,"_last_known_good",lambda *a,**k:None)
+    monkeypatch.setattr(module,"search_public_web",lambda *a,**k:
+                        PublicSearchRows([],provider_available=False))
+    r=module.search_reliable("shell-query",use_cache=False)
+    assert r["search_operational_status"]=="DEGRADED"

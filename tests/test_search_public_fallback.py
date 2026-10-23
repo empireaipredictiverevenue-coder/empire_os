@@ -514,3 +514,21 @@ def test_bing_access_shell_does_not_create_fabricated_results(monkeypatch):
                         lambda url, timeout: "<html><body>Search is unavailable</body></html>")
     r=public_fallback.search_public_web("real legal service request",num=2)
     assert r==[]
+
+
+
+def test_bing_no_results_block_is_operational_without_fabricating_rows(monkeypatch):
+    from empire_os.search_fabric import public_fallback
+    page='<html><div id="b_results"><div class="b_no">There are no results for this query.</div></div></html>'
+    monkeypatch.setattr(public_fallback,"_fetch",lambda url,timeout:page if "bing.com/search?" in url else "")
+    result=public_fallback.search_public_web("site:nonindexed-domain.invalid seo",num=2)
+    assert result==[]
+    assert result.provider_available is True
+
+
+def test_access_shell_has_no_healthy_provider_metadata(monkeypatch):
+    from empire_os.search_fabric import public_fallback
+    monkeypatch.setattr(public_fallback,"_fetch",lambda url,timeout:"<html><body>Access denied</body></html>")
+    result=public_fallback.search_public_web("request for proposals",num=2)
+    assert result==[]
+    assert result.provider_available is False

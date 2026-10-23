@@ -468,6 +468,17 @@ def _fetch(
     )
 
 
+class PublicSearchRows(list):
+    """List-compatible provider evidence with operational status.
+
+    Healthy provider response with zero relevant matches is not an outage.
+    Avoid synthesising result rows solely to reset the circuit breaker.
+    """
+    def __init__(self, rows, *, provider_available: bool):
+        super().__init__(rows)
+        self.provider_available = bool(provider_available)
+
+
 def search_public_web(
     query: str,
     *,
@@ -512,6 +523,7 @@ def search_public_web(
     )
 
     rows: list[dict[str, Any]] = []
+    provider_available = False
 
     for provider, url in providers:
         try:
@@ -527,7 +539,7 @@ def search_public_web(
 
         if provider == "bing_html":
             # Single owned parser, not a second scraping implementation.
-            # An access shell without b_algo blocks returns no rows.
+            # An access shell without organic blocks returns no rows.
             from .search import _parse_bing_html
             parsed = _parse_bing_html(page)[:max(20, min(int(num) * 4, 40))]
             parsed = [
@@ -535,6 +547,13 @@ def search_public_web(
                 for row in parsed
                 if isinstance(row, dict)
             ]
+            # Parsed organic rows prove that the search provider responded.
+            # A clearly rendered Bing no-results block is also operational.
+            # An unknown access/help shell is NOT provider evidence.
+            lowered = page.lower()
+            if parsed or ('id="b_results"' in lowered and
+                          ('class="b_no"' in lowered or 'b_no' in lowered)):
+                provider_available = True
         else:
             parsed = parse_public_search_html(
                 page,
@@ -549,6 +568,7 @@ def search_public_web(
             )
 
         if parsed:
+            provider_available = True
             rows.extend(parsed)
             # A usable owned-provider response is enough for one bounded
             # recovery attempt. Avoid unnecessary requests to rate-limited
@@ -571,4 +591,4 @@ def search_public_web(
         seen.add(url)
         unique.append(row)
 
-    return unique
+    return PublicSearchRows(unique, provider_available=provider_available)
