@@ -1292,6 +1292,24 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
                 "new_inbound_header_candidates", None
             ),
             "outbound_sent": False,
+            "public_source_refresh_status": (
+                outcome.get("source_refresh_status")
+                if outcome.get("source_refresh_status") in
+                    ("PUBLIC_SOURCES_REVIEW_ONLY", "HELD_SOURCE_REFRESH")
+                else "HELD_SOURCE_REFRESH"
+            ),
+            "source_profiles_verified": (
+                outcome.get("source_profiles_verified")
+                if type(outcome.get("source_profiles_verified")) is int
+                and 0 <= outcome["source_profiles_verified"] <= 500
+                else None
+            ),
+            "unsent_draft_reviews": (
+                outcome.get("unsent_draft_reviews")
+                if type(outcome.get("unsent_draft_reviews")) is int
+                and 0 <= outcome["unsent_draft_reviews"] <= 500
+                else None
+            ),
         }
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return {"status": "HELD_PROTECTED_FOUNDER_MAILBOX_REVIEW",
@@ -1530,6 +1548,11 @@ def refresh_buyer_acquisition_plan(
         "new_inbound_header_candidates": founder_review.get(
             "new_inbound_header_candidates"
         ),
+        "public_source_refresh_status": founder_review.get(
+            "public_source_refresh_status", "HELD_SOURCE_REFRESH"
+        ),
+        "source_profiles_verified": founder_review.get("source_profiles_verified"),
+        "unsent_draft_reviews": founder_review.get("unsent_draft_reviews"),
         "outbound_sent": False,
         "crm_writes": False,
         "automatic_send_authorized": False,

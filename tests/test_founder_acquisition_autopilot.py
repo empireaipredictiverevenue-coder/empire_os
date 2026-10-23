@@ -168,7 +168,8 @@ def test_existing_snapshot_must_not_lose_inbound(tmp_path):
 def test_runner_writes_private_snapshot_and_no_actions(tmp_path):
     ledger = fixture_ledger(tmp_path)
     provider = FakeProvider(fixture_results(ledger))
-    result = run(tmp_path, provider=provider, now=CLOCK, write=True)
+    result = run(tmp_path, provider=provider, now=CLOCK, write=True,
+                 source_fetch=lambda url: (_ for _ in ()).throw(RuntimeError("offline test")))
     assert result["status"] == "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
     assert result["monitored_threads"] == 7
     assert result["snapshot_written"] is True
@@ -176,7 +177,8 @@ def test_runner_writes_private_snapshot_and_no_actions(tmp_path):
     assert result["database_writes"] is False
     out = tmp_path / "runtime/founder_acquisition/founder_reply_review_latest.json"
     assert out.exists() and out.stat().st_mode & 0o077 == 0
-    assert run(tmp_path, provider=provider, now=CLOCK, write=True)["new_inbound_header_candidates"] == 0
+    assert run(tmp_path, provider=provider, now=CLOCK, write=True,
+               source_fetch=lambda url: (_ for _ in ()).throw(RuntimeError("offline test")))["new_inbound_header_candidates"] == 0
 
 
 def test_runner_blocks_unsafe_previous_snapshot(tmp_path):
