@@ -51,9 +51,23 @@ Existing ownership remains:
   read-only source probe that prints only aggregate counts and status.
   It never reads a live CRM account or ledger, loads credentials, writes
   runtime files, or triggers a scheduler.
+- `empire_os/predictive_revenue_prime_crm.py`: optional, explicitly
+  injected canonical `PostgresRevenueCrmRepository` read only, with the
+  original tenant-matching restricted role and bounded 100-row query.
+  Returns prospect/closer aggregate indicators, **never treats prospects
+  as deals or their probabilities as calibrated outcomes**.
+- `empire_os/predictive_revenue_prime_status.py`: aggregate-only public-source
+  observation renderer with evidence holds and sanitized failure modes.
+- `empire_os/predictive_cloud_status_api.py`: adds
+  `GET /v1/predictive-cloud/prime/status` to the EXISTING
+  Predictive Cloud router, mounted by the original loopback-only private
+  Founder service. No additional process or unauthenticated customer API.
+  This endpoint NEVER accepts a tenant/query to access real customer CRM.
 - Contract tests under
-  `tests/test_predictive_revenue_brain_bridge.py` and
-  `tests/test_predictive_revenue_prime.py`.
+  `tests/test_predictive_revenue_brain_bridge.py`,
+  `tests/test_predictive_revenue_prime.py`,
+  `tests/test_predictive_revenue_prime_crm.py` and
+  `tests/test_predictive_revenue_prime_status.py`.
 
 ## Source probe of canonical live paths
 
@@ -65,8 +79,8 @@ Read from `/srv/empire_os` as of 2026-10-23:
   generated 2026-10-05, **stale** at review time.
 - No CRM deal import or account tenancy claim.
 - No real verified forecast cohort or payment read.
-- No paid traffic, outbound, chain transactions, remote writes, database
-  migrations, systemd changes or production deployment.
+- No paid traffic, outbound, chain transactions, production data writes,
+  database migrations, systemd changes or production deployment.
 
 ### Repeatable read-only check
 
@@ -74,12 +88,13 @@ Read from `/srv/empire_os` as of 2026-10-23:
 cd /home/ubuntu/empire_worktrees/predictive_revenue_brain_bridge_20261023
 PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
   -m scripts.review_predictive_revenue_prime_readonly_20261023 \
-  --source-root /srv/empire_os --tenant-id empire-internal
+  --source-root /srv/empire_os
 ```
 
-This only demonstrates local current input visibility. The tenant flag is
-**not** authorization: the actual read-surface owner must authenticate any
-tenant before exposing these results to a customer or dashboard.
+This only demonstrates local source visibility for the system-owned
+`empire-internal` OBSERVE dataset. It takes no tenant input. The actual
+read-surface owner must authenticate any external tenant through the existing
+signed CRM membership and tenant role chain before returning tenant data.
 
 ## Integration/release gates
 
@@ -129,3 +144,42 @@ change has no DB migrations, external writes or new daemons to roll back.
 Latest tests and live-source read outputs must be read from the branch before
 release. No forecast accuracy, buyer intent, revenue uplift or autonomous AGI
 claim is established by unit tests, simulations or read-only snapshots.
+
+
+## Final integration verification for this release candidate
+
+Executed in the isolated feature worktree against the existing installed
+virtualenv with `PYTHONPATH="$PWD"`:
+
+- Combined targeted and adjacent suite: **141 passed, 1 dependency warning**.
+- The existing `build_founder_dashboard_service()` test app mounted
+  `GET /v1/predictive-cloud/prime/status` with no service-code edit; a
+  FastAPI TestClient HTTP GET returned **200** and
+  `READ_ONLY_EVIDENCE_HOLD`.
+- Read-only original-source check: **95 permit observations**, 0 storm
+  opportunity candidates, STALE 2026-10-05 storm snapshot.
+- No prospect/customer data or identifiers returned by the new founder route.
+  The separately injected canonical CRM adapter is tested against bounded
+  mocked repository responses; it has **not** read the live CRM or proved
+  source completeness.
+- True CRM pipeline, verified outcome cohort, reliable P10/P90 coverage,
+  churn labels, cash flow and finance reconciliation are **not** completed
+  by these tests.
+
+### Owner merge recipe — DO NOT APPLY TO A DIRTY ROOT BLINDLY
+
+1. Preserve and reconcile the original owners' uncommitted modifications.
+2. Inspect the latest feature commit and exact modifications, especially
+   `predictive_cloud_status_api.py`, then merge/cherry-pick only after
+   resolving any conflicts with concurrent website/CRM/core releases.
+3. Re-run all affected test families on the combined source tree.
+4. Confirm founder API network binding, reverse proxy access restrictions,
+   and non-public route exposure. The passing in-process HTTP test is
+   **not** an external access-control audit.
+5. Execute the project's root-owner guarded release with rollback,
+   separately authorised by the original owner. Read the actual running
+   private route after deployment.
+6. Never activate new payout rails, contact campaigns, DB migrations, or
+   autonomous model/agent authority as part of this integration.
+
+No live production runtime has been changed by this feature branch.

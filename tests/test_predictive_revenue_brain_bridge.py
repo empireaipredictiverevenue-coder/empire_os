@@ -20,10 +20,9 @@ def storm_candidate(**updates):
         "evaluated_at": (NOW - timedelta(minutes=30)).isoformat(),
         "evidence_refs": ["noaa:event:1"],
         "execution_authority": "none",
-        # Fake candidate fields must never be promoted downstream.
-        "commercial_ready": True,
-        "revenue_inferred": True,
-        "actual_revenue": True,
+        "commercial_ready": False,
+        "revenue_inferred": False,
+        "actual_revenue": False,
     }
     value.update(updates)
     return value
@@ -165,6 +164,15 @@ def test_mixed_currencies_not_combined():
     ))},
     {"storm_snapshot": storm_snapshot(storm_candidate(
         execution_authority="execute_bounded"
+    ))},
+    {"storm_snapshot": storm_snapshot(storm_candidate(
+        commercial_ready=True
+    ))},
+    {"storm_snapshot": storm_snapshot(storm_candidate(
+        revenue_inferred=True
+    ))},
+    {"storm_snapshot": storm_snapshot(storm_candidate(
+        payment_authority="execute_bounded"
     ))},
 ])
 def test_fail_closed_on_scope_origin_arithmetic_and_authority(kwargs):

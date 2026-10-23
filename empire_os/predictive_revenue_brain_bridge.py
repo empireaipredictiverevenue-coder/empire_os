@@ -20,6 +20,8 @@ from empire_os.predictive_revenue_prime import (
     review_churn_signals,
     simulate_pipeline_scenarios,
 )
+from empire_os.predictive_revenue_prime_crm import review_authenticated_crm_prospects
+from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
 MAX_ITEMS = 100
@@ -131,13 +133,20 @@ def _storm_signals(
     candidates = snapshot.get("candidates")
     if not isinstance(candidates, list) or len(candidates) > MAX_ITEMS:
         raise ValueError("bounded storm candidates required")
+    reported_count = snapshot.get("candidate_count")
+    if reported_count is not None and (type(reported_count) is not int or reported_count != len(candidates)):
+        raise ValueError("storm snapshot candidate count mismatch")
     result = []
     keys = set()
     for row in candidates:
         if not isinstance(row, Mapping) or row.get("tenant_id") != tenant_id:
             raise ValueError("storm candidate tenant mismatch")
-        if row.get("execution_authority") != "none":
-            raise ValueError("storm execution authority unsupported")
+        for forbidden in ("commercial_ready", "revenue_inferred", "actual_revenue", "buyer_intent_inferred", "demand_inferred"):
+            if row.get(forbidden) is True:
+                raise ValueError("storm cannot assert commercial or revenue evidence")
+        for authority in ("execution_authority", "outreach_authority", "commercial_authority", "payment_authority", "revenue_recognition_authority"):
+            if row.get(authority) not in (None, "none"):
+                raise ValueError("storm execution authority unsupported")
         key = _bounded_text(row.get("opportunity_key"), "storm key")
         if key in keys:
             raise ValueError("duplicate storm opportunity identity")
@@ -295,6 +304,7 @@ def build_predictive_revenue_brain_review(
     simulate_pipeline: bool = False,
     simulations: int = 10000,
     simulation_seed: int = 101,
+    authenticated_crm_repository: PostgresRevenueCrmRepository | None = None,
 ) -> dict[str, Any]:
     """Compose existing evidence without inventing forecasts, agents or authority.
 
@@ -305,6 +315,13 @@ def build_predictive_revenue_brain_review(
     now = _stamp(as_of)
     storms = _storm_signals(storm_snapshot, tenant_id=tenant, now=now)
     permits = _permit_signals(permit_integration, tenant_id=tenant, now=now)
+    if authenticated_crm_repository is not None and crm_deals:
+        raise ValueError("do not mix CRM prospect view and hypothetical deal inputs")
+    authenticated_crm = (
+        review_authenticated_crm_prospects(
+            repository=authenticated_crm_repository, tenant_id=tenant,
+        ) if authenticated_crm_repository is not None else None
+    )
     pipeline = _deal_projection(crm_deals, tenant_id=tenant, now=now)
     if type(simulate_pipeline) is not bool:
         raise ValueError("explicit simulation toggle must be boolean")
@@ -330,13 +347,18 @@ def build_predictive_revenue_brain_review(
         "storm_research": storms,
         "permit_research": permits,
         "crm_pipeline": pipeline,
+        "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {
             "storm_snapshot": storm_freshness,
             "permit_sources": (
                 "PUBLIC_SOURCE_PROJECTIONS_UNVERIFIED_BUYER_DEMAND"
                 if permit_integration is not None else "NOT_CONNECTED"
             ),
-            "crm_source": "CALLER_PROJECTION_NOT_INDEPENDENTLY_CONNECTED",
+            "crm_source": (
+                "AUTHENTICATED_TENANT_CRM_VIEW_NOT_DEALS"
+                if authenticated_crm is not None
+                else "CALLER_PROJECTION_NOT_INDEPENDENTLY_CONNECTED"
+            ),
         },
         "prime_scenarios": scenario,
         "prime_churn_review": retention,
