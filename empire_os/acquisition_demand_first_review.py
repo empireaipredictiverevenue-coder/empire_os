@@ -233,9 +233,9 @@ def discover_original_requirement_candidates(
         raise ValueError("bounded existing research task list required")
     if not isinstance(provider_state, Mapping):
         raise ValueError("original Search Fabric health required")
-    healthy = (provider_state.get("circuit_open") is False
-               and provider_state.get("last_state") == "HEALTHY")
-    if not healthy:
+    # Stale last_state can say CIRCUIT_OPEN after cooldown expires.
+    # Let the owning Search Fabric perform exactly one half-open probe.
+    if provider_state.get("circuit_open") is not False:
         return {
             "schema_version":"empire.acquisition_demand_discovery.v1",
             "mode":"OBSERVE",
@@ -251,6 +251,8 @@ def discover_original_requirement_candidates(
         }
     results = []
     searched = 0
+    stopped_for_provider_failure = False
+    stale_discovery = False
     for entry in tasks:
         if (not isinstance(entry, Mapping)
             or entry.get("status") != "INDEPENDENT_PURCHASING_REQUIREMENT_RESEARCH"
@@ -259,22 +261,33 @@ def discover_original_requirement_candidates(
         host = _company_host(entry.get("company_website"))
         if not host:
             continue
-        query = (
-            f'site:{host} '
-            '("request for proposals" OR "seeking external" OR '
-            '"invitation to tender" OR "vendor proposal") '
-            '(marketing OR SEO OR search OR competitor)'
-        )
+        # Short query avoids diluting the canonical lexical quality filter
+        # with OR syntax. Hits still require original-source verification.
+        query = f'site:{host} procurement marketing' 
         searched += 1
         try:
             response = lookup(query, num=5)
         except Exception:
-            continue
+            stopped_for_provider_failure = True
+            break
         if not isinstance(response, Mapping):
-            continue
+            stopped_for_provider_failure = True
+            break
+        operational = response.get("search_operational_status")
+        params = response.get("searchParameters")
+        state = params.get("search_state") if isinstance(params, Mapping) else None
+        if operational in {"CIRCUIT_OPEN", "DEGRADED"}:
+            stopped_for_provider_failure = True
+            break
+        if operational == "DEGRADED_WITH_LAST_KNOWN_GOOD" or state == "STALE_RESULTS":
+            stale_discovery = True
+        elif operational not in {"RECOVERED", "HEALTHY"}:
+            stopped_for_provider_failure = True
+            break
         rows = response.get("organic")
         if not isinstance(rows, list):
-            continue
+            stopped_for_provider_failure = True
+            break
         for row in rows[:5]:
             if not isinstance(row, Mapping):
                 continue
@@ -288,18 +301,26 @@ def discover_original_requirement_candidates(
                 "source_url":url,
                 "status":"SEARCH_DISCOVERY_ONLY_ORIGINAL_SOURCE_NOT_VERIFIED",
                 "posting_date_verified":False,
+                "search_source_stale": stale_discovery,
                 "buyer_request_verified":False,
                 "product_fit_verified":False,
                 "outbound_authorized":False,
             })
+        if stale_discovery:
+            break
     return {
         "schema_version":"empire.acquisition_demand_discovery.v1",
         "mode":"OBSERVE",
-        "status":"DISCOVERY_RESULTS_NOT_PROOF",
+        "status": ("SEARCH_PROVIDER_FAILED_REMAINDER_UNSEARCHED"
+                   if stopped_for_provider_failure else
+                   "STALE_DISCOVERY_ONLY_ORIGINAL_VERIFICATION_REQUIRED"
+                   if stale_discovery else "DISCOVERY_RESULTS_NOT_PROOF"),
         "search_queries_attempted":searched,
         "original_source_candidates":results,
         "searched_companies":searched,
         "unsearched_companies":len(tasks)-searched,
+        "provider_failed_during_batch":stopped_for_provider_failure,
+        "stale_discovery_only":stale_discovery,
         "buyer_requests_verified":0,
         "crm_writes":False,
         "outbound_authorized":False,

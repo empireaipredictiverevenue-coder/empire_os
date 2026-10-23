@@ -83,7 +83,7 @@ def test_search_only_retains_original_company_domain_and_never_promotes():
           "approval_state":"RESEARCH_ONLY"}], excluded_prospect_refs=set())
     r=discover_original_requirement_candidates(
         research_queue=tasks, provider_state={"last_state":"HEALTHY","circuit_open":False},
-        lookup=lambda query, num:{"organic":[
+        lookup=lambda query, num:{"search_operational_status":"RECOVERED","organic":[
             {"link":"https://not-firm.co.uk/seo-rfp"},
             {"link":"https://firm.co.uk/procurement/seo-rfp"}]})
     assert r["searched_companies"]==1
@@ -91,3 +91,59 @@ def test_search_only_retains_original_company_domain_and_never_promotes():
     assert r["original_source_candidates"][0]["source_url"]=="https://firm.co.uk/procurement/seo-rfp"
     assert not r["original_source_candidates"][0]["buyer_request_verified"]
     assert r["buyer_requests_verified"]==0
+
+
+def test_expired_circuit_half_open_gets_one_guarded_probe():
+    from empire_os.acquisition_demand_first_review import discover_original_requirement_candidates
+    tasks=demand_first_tasks([
+        {"company":f"Company{i}", "yc_profile":f"https://www.ycombinator.com/companies/company{i}",
+         "website":f"https://company{i}.co.uk", "research_segment":"Research",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"} for i in range(3)
+    ], excluded_prospect_refs=set())
+    calls=[]
+    def unavailable(query, num):
+        calls.append(query)
+        return {"organic":[], "search_operational_status":"CIRCUIT_OPEN",
+                "searchParameters":{"search_state":"PROVIDER_DEGRADED"}}
+    r=discover_original_requirement_candidates(
+       research_queue=tasks, provider_state={"last_state":"CIRCUIT_OPEN","circuit_open":False},
+       lookup=unavailable)
+    assert len(calls)==1
+    assert r["searched_companies"]==1
+    assert r["unsearched_companies"]==2
+    assert r["status"]=="SEARCH_PROVIDER_FAILED_REMAINDER_UNSEARCHED"
+    assert r["buyer_requests_verified"]==0
+
+
+def test_stale_results_only_one_query_and_never_verified():
+    from empire_os.acquisition_demand_first_review import discover_original_requirement_candidates
+    tasks=demand_first_tasks([
+        {"company":f"Company{i}", "yc_profile":f"https://www.ycombinator.com/companies/company{i}",
+         "website":f"https://company{i}.co.uk", "research_segment":"Research",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"} for i in range(3)
+    ], excluded_prospect_refs=set())
+    def stale(query, num):
+        return {"organic":[{"link":"https://company0.co.uk/old-tender"}],
+                "search_operational_status":"DEGRADED_WITH_LAST_KNOWN_GOOD",
+                "searchParameters":{"search_state":"STALE_RESULTS"}}
+    r=discover_original_requirement_candidates(
+       research_queue=tasks,provider_state={"last_state":"HEALTHY","circuit_open":False},lookup=stale)
+    assert r["search_queries_attempted"]==1
+    assert r["stale_discovery_only"] is True
+    assert all(not item["buyer_request_verified"] for item in r["original_source_candidates"])
+    assert r["status"]=="STALE_DISCOVERY_ONLY_ORIGINAL_VERIFICATION_REQUIRED"
+
+
+def test_unknown_search_status_fails_closed():
+    from empire_os.acquisition_demand_first_review import discover_original_requirement_candidates
+    tasks=demand_first_tasks([
+        {"company":"Test", "yc_profile":"https://www.ycombinator.com/companies/test",
+         "website":"https://test.co.uk", "research_segment":"Research",
+         "verification_status":"public_directory_only","buyer_intent":"UNVERIFIED",
+         "approval_state":"RESEARCH_ONLY"}], excluded_prospect_refs=set())
+    r=discover_original_requirement_candidates(
+       research_queue=tasks, provider_state={"last_state":"HEALTHY","circuit_open":False},
+       lookup=lambda *a,**kw:{"organic":[]})
+    assert r["status"]=="SEARCH_PROVIDER_FAILED_REMAINDER_UNSEARCHED"

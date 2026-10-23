@@ -486,3 +486,31 @@ def test_use_cache_false_never_writes_public_recovery(
         ]["cache"]
         is False
     )
+
+
+def test_recovery_reuses_bing_parser_and_rejects_access_shell(monkeypatch):
+    from empire_os.search_fabric import public_fallback
+    fetched=[]
+    fixture = """
+    <html><li class="b_algo"><h2><a href="https://verified-company.co.uk/tenders/seo">
+    Company SEO tender</a></h2><p>Search procurement work</p></li></html>
+    """
+    def fetch(url, *, timeout):
+        fetched.append(url)
+        if "bing.com/search?" in url:
+            return fixture
+        return "<html><body>Having trouble accessing Google Search</body></html>"
+    monkeypatch.setattr(public_fallback, "_fetch", fetch)
+    result=public_fallback.search_public_web("site:verified-company.co.uk procurement seo", num=3)
+    assert any(row["link"]=="https://verified-company.co.uk/tenders/seo"
+               and row["engine"]=="bing_html" for row in result)
+    assert len([u for u in fetched if "bing.com/search?" in u])==1
+    assert len(fetched)==1
+
+
+def test_bing_access_shell_does_not_create_fabricated_results(monkeypatch):
+    from empire_os.search_fabric import public_fallback
+    monkeypatch.setattr(public_fallback, "_fetch",
+                        lambda url, timeout: "<html><body>Search is unavailable</body></html>")
+    r=public_fallback.search_public_web("real legal service request",num=2)
+    assert r==[]

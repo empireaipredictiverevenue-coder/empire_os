@@ -477,6 +477,17 @@ def search_public_web(
     """Return bounded discovery rows from reachable public search pages."""
 
     providers = (
+        # Reuse the existing Bing HTML parser already shipped by Search Fabric.
+        # Brave currently responds 429 on the server; Bing is a bounded,
+        # no-key public recovery source. One request per provider.
+        (
+            "bing_html",
+            "https://www.bing.com/search?"
+            + urllib.parse.urlencode({
+                "q": query,
+                "count": min(max(int(num), 1), 10),
+            }),
+        ),
         (
             "brave_web",
             "https://search.brave.com/search?"
@@ -514,20 +525,36 @@ def search_public_web(
         if not page:
             continue
 
-        parsed = parse_public_search_html(
-            page,
-            provider=provider,
-            limit=max(
-                20,
-                min(
-                    int(num) * 4,
-                    40,
+        if provider == "bing_html":
+            # Single owned parser, not a second scraping implementation.
+            # An access shell without b_algo blocks returns no rows.
+            from .search import _parse_bing_html
+            parsed = _parse_bing_html(page)[:max(20, min(int(num) * 4, 40))]
+            parsed = [
+                {**row, "engine": "bing_html"}
+                for row in parsed
+                if isinstance(row, dict)
+            ]
+        else:
+            parsed = parse_public_search_html(
+                page,
+                provider=provider,
+                limit=max(
+                    20,
+                    min(
+                        int(num) * 4,
+                        40,
+                    ),
                 ),
-            ),
-        )
+            )
 
         if parsed:
             rows.extend(parsed)
+            # A usable owned-provider response is enough for one bounded
+            # recovery attempt. Avoid unnecessary requests to rate-limited
+            # alternative endpoints.
+            if provider == "bing_html":
+                break
 
     unique: list[dict[str, Any]] = []
     seen: set[str] = set()
