@@ -103,3 +103,24 @@ def test_sanitized_status_requires_review_only_for_positive_candidates(tmp_path,
     assert observed["new_inbound_header_candidates"] == 2
     assert observed["requires_human_reply_review"] is True
     assert observed["automatic_send_authorized"] is False
+
+
+def test_missing_canonical_email_proof_surfaces_on_existing_business_plan(tmp_path, monkeypatch):
+    from empire_os import buyer_acquisition_team
+    monkeypatch.setattr(
+        buyer_acquisition_team, "refresh_founder_acquisition_observer",
+        lambda root: {
+            "status": "NINE_FOUNDER_THREADS_REVIEWED",
+            "new_inbound_header_candidates": 0,
+            "canonical_email_clearance_evidence_missing_count": 9,
+            "outbound_sent": False,
+        },
+    )
+    state = buyer_acquisition_team.refresh_buyer_acquisition_plan(tmp_path)
+    item = state["founder_acquisition_observation"]
+    assert item["canonical_email_clearance_status"] == "NOT_VERIFIED"
+    assert item["canonical_email_clearance_evidence_missing_count"] == 9
+    assert item["canonical_email_clearance_review_required"] is True
+    assert item["governed_outbound_release_eligible"] is False
+    assert item["automatic_send_authorized"] is False
+    assert item["crm_writes"] is False

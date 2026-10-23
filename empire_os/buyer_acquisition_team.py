@@ -1291,6 +1291,12 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
             "new_inbound_header_candidates": outcome.get(
                 "new_inbound_header_candidates", None
             ),
+            "canonical_email_clearance_evidence_missing_count": (
+                outcome.get("canonical_email_clearance_evidence_missing_count")
+                if type(outcome.get("canonical_email_clearance_evidence_missing_count")) is int
+                and 0 <= outcome["canonical_email_clearance_evidence_missing_count"] <= 500
+                else None
+            ),
             "outbound_sent": False,
             "public_source_refresh_status": (
                 outcome.get("source_refresh_status")
@@ -1567,6 +1573,12 @@ def refresh_buyer_acquisition_plan(
         "new_inbound_header_candidates": founder_review.get(
             "new_inbound_header_candidates"
         ),
+        "canonical_email_clearance_status": "NOT_VERIFIED",
+        "canonical_email_clearance_evidence_missing_count": founder_review.get(
+            "canonical_email_clearance_evidence_missing_count"
+        ),
+        "canonical_email_clearance_review_required": True,
+        "governed_outbound_release_eligible": False,
         "public_source_refresh_status": founder_review.get(
             "public_source_refresh_status", "HELD_SOURCE_REFRESH"
         ),

@@ -106,6 +106,9 @@ def test_exact_nine_provider_anchors_are_review_only(tmp_path):
     assert reviewed["outbound_sent"] is False
     assert reviewed["automatic_reply_authorized"] is False
     assert reviewed["canonical_suppression_verified"] is False
+    assert reviewed["canonical_email_clearance_evidence_missing_count"] == 9
+    assert reviewed["canonical_email_clearance_status"] == "NOT_VERIFIED"
+    assert reviewed["governed_outbound_release_eligible"] is False
     assert reviewed["paid_pilot_authorized"] is False
 
 

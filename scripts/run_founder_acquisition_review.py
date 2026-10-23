@@ -149,6 +149,11 @@ def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetc
             "monitored_threads": 9,
             "inbound_header_candidate_count": reviewed["inbound_header_candidate_count"],
             "new_inbound_header_candidates": reviewed["new_inbound_header_candidates"],
+            "canonical_email_clearance_evidence_missing_count": reviewed[
+                "canonical_email_clearance_evidence_missing_count"
+            ],
+            "canonical_email_clearance_status": "NOT_VERIFIED",
+            "governed_outbound_release_eligible": False,
             "next_unsent_candidate_count": len(ledger["pending"]),
             "snapshot_written": write,
         })

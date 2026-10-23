@@ -183,6 +183,13 @@ def review_threads(
         "threads": reviewed,
         "next_unsent_review": ledger["pending"],
         "canonical_suppression_verified": False,
+        # Nine original Gmail SENT receipts exist, but no corresponding
+        # approved EmpireDB outbound intent / email-channel clearance proof is
+        # attached to ANY of those monitoring anchors. This is a missing
+        # evidence count, not a claim that any recipient is suppressed.
+        "canonical_email_clearance_evidence_missing_count": len(reviewed),
+        "canonical_email_clearance_status": "NOT_VERIFIED",
+        "governed_outbound_release_eligible": False,
         "crm_writes": False, "outbound_sent": False,
         "automatic_reply_authorized": False,
         "paid_pilot_authorized": False, "revenue_verified": False,
