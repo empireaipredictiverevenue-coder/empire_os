@@ -72,3 +72,13 @@ measurement. V3 must not be bundled with the approved V2 file set.
 
 No synthetic enquiries, CRM writes, outbound messages, payments or model
 training are authorised by this website-file approval.
+
+## 23 October 2026: root publication lock ownership blocker isolated
+
+The founder's authorised `sudo env PYTHONPATH=/srv/empire_os ... --apply-founder-approved-industry-enquiry-v2` invocation reached the root code path but failed opening `/var/lock/empire-industry-enquiry-v2-release-20261023.lock` with Linux EACCES. This is **not** another founder approval request: manifest and current 653-file live preflight still pass.
+
+Read-only diagnosis: `/var/lock` points to `/run/lock`, a root-owned `1777` sticky directory. The precise existing regular lock file is owned by `ubuntu:ubuntu` (UID/GID 1000), mode `0600`, length zero. `fs.protected_regular = 2`; the publisher opens the lock with `O_CREAT|O_RDWR|O_NOFOLLOW`, so an existing user-owned file in a sticky directory can be refused even to root. The original unprivileged attempted publisher invocation created the file **before** checking effective UID. No active publisher process or unprivileged-visible file holder was found, but authorised root-owner should independently check with `sudo fuser` before touching the lock.
+
+**Permanent code correction**: owner script `scripts/publish_industry_enquiry_v2_20261023.py` now refuses non-root before its lock creation. Two regression tests cover held unprivileged no-lock behaviour and the existing exact one-lock root code path using a no-op publisher. `13 passed` across the website owner publisher tests and existing controlled publisher transaction tests. This does not grant elevated privileges, auto-run publication or widen the approved site release.
+
+**One-time legitimate authorised root-owner remedy**: verify exact pathname and ownership, ensure no live lock holder, then change ownership of *only* the existing zero-length Ubuntu-owned `run/lock` file to root:root while preserving mode 0600. Never delete the lock to skip contention; never lower `fs.protected_regular`, loosen the sticky-directory or lock permissions, add sudoers entries or run parallel publishers. The owner should then re-run the already-approved exact V2 publisher with current normal `sudo` credentials, and verify its protected current 653-file backup, 659-file site and publication receipt. If any preflight fails, hold and inspect. The unprivileged remote assistant did not modify `/run/lock`, create a privileged backup, publish website files or send messages.

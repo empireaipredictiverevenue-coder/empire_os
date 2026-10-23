@@ -297,6 +297,11 @@ def main(argv: list[str] | None = None) -> int:
                 "public_writes_performed": False,
             }, sort_keys=True))
         else:
+            # Refuse non-root calls BEFORE creating a lock in /run/lock.
+            # An unprivileged O_CREAT there can leave a user-owned 0600 file
+            # that Linux fs.protected_regular=2 subsequently denies to root.
+            if os.geteuid() != 0:
+                raise ReleaseHold("ORIGINAL_WEBSITE_ROOT_OWNER_AUTHORITY_REQUIRED")
             fd = os.open(LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
             with os.fdopen(fd, "rb") as lockfile:
                 fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)

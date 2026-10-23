@@ -112,3 +112,39 @@ def test_collision_prevents_any_public_changes(tmp_path):
             replacements=replace, additions=added,
         )
     assert _index(live) == current
+
+
+def test_unprivileged_publish_rejects_before_creating_lock(tmp_path, monkeypatch, capsys):
+    """No ubuntu-owned sticky-directory lock from a held first attempt."""
+    import json
+    import scripts.publish_industry_enquiry_v2_20261023 as publisher
+
+    lock = tmp_path / "v2-release.lock"
+    monkeypatch.setattr(publisher, "LOCK", lock)
+    monkeypatch.setattr(publisher.os, "geteuid", lambda: 1000)
+    exit_code = publisher.main([publisher.APPROVAL])
+
+    result = json.loads(capsys.readouterr().out)
+    assert exit_code == 2
+    assert result["status"] == "INDUSTRY_ENQUIRY_V2_PUBLICATION_HELD"
+    assert result["reason"] == "ORIGINAL_WEBSITE_ROOT_OWNER_AUTHORITY_REQUIRED"
+    assert result["customer_submission"] is False
+    assert result["outbound_sent"] is False
+    assert not lock.exists()
+
+
+def test_authorised_lock_path_uses_single_file_without_real_publication(tmp_path, monkeypatch, capsys):
+    """Exercise the existing locking boundary only with a no-op publisher."""
+    import json
+    import scripts.publish_industry_enquiry_v2_20261023 as publisher
+
+    lock = tmp_path / "v2-release.lock"
+    monkeypatch.setattr(publisher, "LOCK", lock)
+    monkeypatch.setattr(publisher.os, "geteuid", lambda: 0)
+    monkeypatch.setattr(publisher, "publish", lambda: {"status": "PRIVATE_NOOP_TEST"})
+    exit_code = publisher.main([publisher.APPROVAL])
+
+    assert exit_code == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "PRIVATE_NOOP_TEST"
+    assert lock.is_file()
+    assert lock.stat().st_mode & 0o777 == 0o600
