@@ -26,3 +26,11 @@ USD 750 fixed fee for five original-source US B2B account briefs. This is a prop
 The founder's read-only restricted EmpireDB audit showed full table RLS visibility and zero exact/domain suppression hits and zero matching canonical outbound intents for all nine historical Gmail recipients. Historical sends remain external Gmail SENT receipts without original governor intent; do not invent retroactive approval. Other suppression sources, consent and a new recipient's prospective eligibility remain unresolved. Outbound governor disabled, Buyer Acquisition Team active, automatic follow-ups disabled, CRM and payment mutation zero.
 
 In the original Buyer Acquisition Team's existing plan, paid_five_account_pilot.stage is AWAIT_AUTHENTIC_BUYER_RESPONSE only when the original nine-thread and standalone review successfully completes with zero inbound; HUMAN_REVIEW_INBOUND_CANDIDATE for observed headers; HELD_INBOUND_OBSERVABILITY_INCOMPLETE otherwise. All states explicitly deny buyer qualification, quote approval, fulfilment, paid revenue and outbound.
+
+
+## Internal-only five-account source-backed samples (no buyer)
+Existing bounded public-source evidence feeds an on-demand preview, not an outbound agent:
+
+`/srv/empire_os/.venv/bin/python -m scripts.review_founder_five_account_internal_samples_20261023 --repo-root /srv/empire_os --write-private`
+
+It reads only the original four-by-five US seed hypotheses and the private, seven-day source-monitor snapshot. It refuses incomplete, mismatched, held, expired or stale original publisher evidence. The result goes only to `runtime/founder_acquisition/five_account_pilot_internal_latest.json` at mode 0600 in the original mode-0700 private folder; one internally reviewable sample for each original startup. No new timer, new source scraping, prospect address, pricing authority or outbound action. All 20 entries still have buyer-intent and permission-to-contact NOT_VERIFIED. Neither internal pack nor the suggested $750 price constitutes a customer-ready proposal until a real verified buyer requirement and founder approval exist.
