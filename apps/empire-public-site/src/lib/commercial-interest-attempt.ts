@@ -13,6 +13,7 @@ export type CommercialInterestDetails = {
   desired_outcome: string;
   contact_consent: boolean;
   website: string;
+  claimed_entry_page?: string;
 };
 
 export type CommercialInterestAttempt = Readonly<{
@@ -38,6 +39,7 @@ export function reuseCommercialInterestAttempt(
     details.desired_outcome.trim(),
     details.contact_consent,
     details.website,
+    details.claimed_entry_page || "",
   ]);
   if (existing?.fingerprint === fingerprint) return existing;
   const idempotencyKey = newSecureKey();

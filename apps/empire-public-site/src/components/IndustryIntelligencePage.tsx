@@ -12,6 +12,7 @@ import {
 import type { IndustryPage } from "@/lib/industry-pages";
 import { getBuyerEditorial } from "@/lib/industry-buying-editorial";
 import IndustryBuyerEditorialSection from "@/components/IndustryBuyerEditorialSection";
+import { industryCommercialProposalHref } from "@/lib/commercial-entry-review";
 
 function Label({ children }: { children: React.ReactNode }) {
   return (
@@ -80,7 +81,7 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
               Explore intelligence
               <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
             </a>
-            <a href="/commercial" className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-5 text-xs font-extrabold text-white/70">
+            <a href={industryCommercialProposalHref(page.slug)} className="inline-flex min-h-12 items-center gap-2 rounded-full border border-white/10 bg-white/[0.025] px-5 text-xs font-extrabold text-white/70">
               Discuss a scoped proposal
             </a>
           </div>
@@ -238,7 +239,7 @@ export default function IndustryIntelligencePage({ page }: { page: IndustryPage 
           See the market earlier.
           <span className="block bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] bg-clip-text text-transparent">Act with better evidence.</span>
         </h2>
-        <a href="/commercial" className="group mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] px-6 text-xs font-extrabold text-black">
+        <a href={industryCommercialProposalHref(page.slug)} className="group mt-9 inline-flex min-h-12 items-center gap-2 rounded-full bg-gradient-to-r from-[#7CFF00] to-[#00E5FF] px-6 text-xs font-extrabold text-black">
           Request a nonbinding proposal
           <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-1" />
         </a>

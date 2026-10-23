@@ -10,6 +10,7 @@ import {
   type CommercialInterestDetails,
 } from "@/lib/commercial-interest-attempt";
 import { selectApprovedProposalOffer } from "@/lib/buyer-proposal-handoff";
+import { claimedEntryForReview } from "@/lib/commercial-entry-review";
 
 type Offer = { product_code: string; name: string; offer_family: string; currency: string; approved_price_cents: number; price_interval: string; implementation_fee_cents?: number };
 type Catalog = { status: string; offers: Offer[] };
@@ -69,6 +70,7 @@ export default function CommercialPage() {
         product_code: code, business_name: business, email, domain,
         industry, geography: region, desired_outcome: outcome,
         contact_consent: consent, website,
+        claimed_entry_page: claimedEntryForReview(window.location.search),
       };
       const attempt = reuseCommercialInterestAttempt(
         enquiryAttemptRef.current,
