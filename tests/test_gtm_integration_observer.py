@@ -105,3 +105,5 @@ def test_observer_creates_local_observation_without_external_actions(tmp_path):
     assert result["payments_executed"] is False
     assert "extended_product_sources" in result
     assert result["extended_product_sources"]["execution_authority"] == "none"
+    assert result["owner_sales_reconciliation"]["exact_enquiry_lineage_verified"] is False
+    assert result["owner_sales_reconciliation"]["canonical_sales_acquisitions"] is None

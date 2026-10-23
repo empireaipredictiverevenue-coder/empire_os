@@ -149,7 +149,7 @@ def test_aggregate_jev_and_gsc_only_no_source_contact_data(tmp_path):
     dest.write_text(json.dumps(jev()))
     report_dir=tmp_path/"gsc";report_dir.mkdir()
     (report_dir/"weekly_two_page_2026-10-23.json").write_text(json.dumps(gsc()))
-    a=observe_product_sources(tmp_path,now=NOW,gsc_directory=report_dir)
+    a=observe_product_sources(tmp_path,now=datetime.now(timezone.utc),gsc_directory=report_dir)
     assert a["jev"]["pain_theme_review_count"]==1
     assert a["organic_search"]["gsc_page_metrics"][0]["gsc_clicks"]==2
     assert a["first_party_enquiries"]["status"].startswith("HELD")

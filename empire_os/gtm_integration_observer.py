@@ -14,6 +14,7 @@ from typing import Any, Mapping
 from empire_os.gtm_agent import GTM_AGENT_ID, decide_next_gtm_action
 from empire_os.gtm_commercial_source_bridge import observe_product_sources
 from empire_os.gtm_extended_product_sources import observe_extended_products
+from empire_os.gtm_sales_owner_reconciliation import observe_owner_sales
 from empire_os.opportunity_source_custody import source_fresh
 
 RADAR = Path("runtime/opportunity_radar/latest.json")
@@ -152,6 +153,7 @@ def observe_gtm_integration(root: Path, *, now: datetime | None = None) -> dict[
     # aggregate receipts remain separate source classes, not CRM candidates.
     payload["product_sources"] = observe_product_sources(root, now=clock)
     payload["extended_product_sources"] = observe_extended_products(root, now=clock)
+    payload["owner_sales_reconciliation"] = observe_owner_sales(root, now=clock)
     output = root / OUTPUT
     output.parent.mkdir(parents=True, exist_ok=True)
     tmp = output.with_suffix(".json.tmp")
