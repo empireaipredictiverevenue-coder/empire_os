@@ -1,0 +1,76 @@
+{
+  "description": "Single throttled mobile Chromium staging run BEFORE the optional 3D opt-in change; scene was automatically loaded.",
+  "mobile_emulation": {
+    "cpu_throttle_factor": 4,
+    "device_scale_factor": 2,
+    "network_latency_ms": 150,
+    "network_throughput_mbps": 1.6,
+    "not_field_core_web_vitals": true,
+    "runs": 1,
+    "viewport_width_px": 390
+  },
+  "mobile_lab_measurement": {
+    "canvas_visible": true,
+    "dom_content_loaded_ms": 4124,
+    "dom_nodes": 398,
+    "fcp_ms": 1280,
+    "horizontal_overflow": false,
+    "js_resources": [
+      {
+        "duration_ms": 3377,
+        "encoded_bytes": 568216,
+        "name": "yard-main-BDlodCPO.js",
+        "transfer_bytes": 568516
+      },
+      {
+        "duration_ms": 8155,
+        "encoded_bytes": 1594913,
+        "name": "yard-ShowroomScene-DBQJoxOF.js",
+        "transfer_bytes": 1595213
+      }
+    ],
+    "lcp_candidate_ms": 5604,
+    "ttfb_ms": 36
+  },
+  "not_field_core_web_vitals": true,
+  "observed_utc": "2026-10-23T14:38:59.290110+00:00",
+  "production_changes": false,
+  "reduced_motion_measurement": {
+    "fallback": true,
+    "live_canvas": false,
+    "scene_chunk_requests": 0
+  },
+  "schema": "empire.agency.showroom.v5.mobile.eager.baseline.v1",
+  "source_manifest_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-ShowroomScene-DBQJoxOF.js": "9f005153332cd86ef6a0e5e3215ef22a993f03e9d5b76c0cca3e5364766ed6d1",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-main-BDlodCPO.js": "f29fa5c37ae18256b40739906c75b6394b43543e2fbd4ca26b69b1d7532e55af",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.css": "a604835095e3ab8baf18f9a454f2f15065d6ff650f86124dae3f70fe758435cd",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.js": "748e413fe7e231476afd040062c99550aee306ceec5eec2e9f00454465cacfc6",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/functions.php": "b01fb148d830fbdce55c7d87025a8d2529cad127b0b65dff1dd000a2f84e68e6",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/package-lock.json": "e0f6a2df43f04e2ca74eaadb4d943c05cf742e13c375297a64bc0e7f63d218f3",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/footer.html": "f0ac0205e6ad7a51299994da6319c8ec02b2ebe9831527207e1376f55fcb83f5",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/header.html": "26208bbae6471898dfc3c79a0f67b1c7b96764fc7fb2c5cbafb6a3330a987993",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/ShowroomScene.jsx": "58476c4d8adea45b9f766a9fb949910d53c616be3353d56bc1c02ba1c564a806",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/inventory-enhance.js": "3c3b224dee7fe4886bde8981652ce8b8ca75580f3de151efa40ef6c3f79ba22a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx": "3a93701f13123780a9fc6e34dd8ec81a020b09bde4badb9716d9e3058c458544",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/tailwind.css": "d9df88399ebda1268514ac2db52c7be5d85b3161dcbe0fa083274e8dc6d53e4f",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/vite.config.mjs": "e2a0a37afc0f786eaf950bc7ceca9a413557d37e558a6a803a2b0ec669fb6be8",
+    "scripts/premium_wp_v1/bootstrap.php": "eb589438da8753f966611921fd7fdb3898bedb66733047ea10870298ff5c8b21",
+    "scripts/premium_wp_v1/browser_acceptance_v5.cjs": "3b558f208ed20f3cff82c9190f4a6d51755b6a5f4a56b66d2cc408eb658e1aac",
+    "scripts/premium_wp_v1/restore_verify.php": "cae946adb10d5b7bda5b8732f16e17b1374bc0d31b3d865770b93c917e7f231e",
+    "scripts/premium_wp_v1/run_react_wordpress_design_v5.sh": "c25c86b0fc79a1bc0793bc7b27afb986ed5d013cd01095ca0ef60aa31639f4e7"
+  },
+  "targeted_accessibility": {
+    "h1_count": 1,
+    "hero_highlight_contrast": 12.37,
+    "hero_text_contrast": 17.57,
+    "live_region_count": 1,
+    "main_landmarks": 1,
+    "measured_brand": "ice",
+    "named_buttons": true,
+    "named_links": true,
+    "paint_button_pressed_states": true,
+    "skip_link": true,
+    "unnamed_ax_interactive_nodes": 0
+  }
+}

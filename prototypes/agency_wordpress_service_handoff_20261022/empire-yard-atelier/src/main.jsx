@@ -28,10 +28,15 @@ class WebGLErrorBoundary extends Component {
   static getDerivedStateFromError() { return { failed: true } }
   render() { return this.state.failed ? <SceneFallback /> : this.props.children }
 }
-function SceneFallback() {
-  return <div data-3d-fallback="true" className="flex h-full w-full flex-col items-center justify-center gap-7 bg-[radial-gradient(ellipse_at_center,#294b56_0%,#102631_62%,#061823_100%)]">
-    <CarFront className="h-32 w-32 text-[#d2b77d]/90" strokeWidth={.65} aria-hidden="true" />
+function SceneFallback({ launch3D }) {
+  return <div data-3d-fallback="true" className="flex h-full w-full flex-col items-center justify-center gap-5 bg-[radial-gradient(ellipse_at_center,#294b56_0%,#102631_62%,#061823_100%)] px-5">
+    <CarFront className="h-24 w-24 text-[#d2b77d]/90 sm:h-32 sm:w-32" strokeWidth={.65} aria-hidden="true" />
     <span className="text-center text-[10px] font-semibold uppercase tracking-[.29em] text-slate-300">Interactive showroom concept</span>
+    {launch3D && <button type="button" data-launch-3d="true"
+      onClick={launch3D} aria-label="Load interactive 3D vehicle showroom"
+      className="relative z-20 min-h-12 rounded-md border border-[#dfbd82] bg-[#dfbd82] px-6 py-3 text-[11px] font-extrabold uppercase tracking-[.13em] text-[#10232b] transition-colors hover:bg-[#f2d8a9] focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-white">
+      Explore in 3D
+    </button>}
   </div>
 }
 const showroomViews = [
@@ -50,9 +55,20 @@ function Hero3D({ reduce }) {
   const [inView, setInView] = useState(false)
   const [pageVisible, setPageVisible] = useState(true)
   const [supported, setSupported] = useState(false)
+  const [mobileTouch, setMobileTouch] = useState(false)
+  const [mobile3DRequested, setMobile3DRequested] = useState(false)
   const [view, setView] = useState('three-quarter')
   const [finish, setFinish] = useState('ocean')
   const selectedFinish = showroomFinishes.find(item => item.id === finish) || showroomFinishes[0]
+  useEffect(() => {
+    // Mobile launches WebGL on explicit request: avoid a multi-MB scene
+    // download, GPU startup and battery use for visitors who only need stock.
+    const media = window.matchMedia('(max-width: 640px) and (pointer: coarse)')
+    const refresh = () => setMobileTouch(media.matches)
+    refresh()
+    media.addEventListener?.('change', refresh)
+    return () => media.removeEventListener?.('change', refresh)
+  }, [])
   useEffect(() => {
     const node = holder.current
     if (!node) return undefined
@@ -73,18 +89,19 @@ function Hero3D({ reduce }) {
     return () => document.removeEventListener('visibilitychange', visibility)
   }, [])
   useEffect(() => {
-    if (!inView || !pageVisible || reduce) return
+    if (!inView || !pageVisible || reduce || (mobileTouch && !mobile3DRequested)) return
     try {
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
       setSupported(!!gl)
       if (gl) gl.getExtension('WEBGL_lose_context')?.loseContext()
     } catch { setSupported(false) }
-  }, [inView, pageVisible, reduce])
-  const interactive = supported && inView && pageVisible && !reduce
+  }, [inView, pageVisible, reduce, mobileTouch, mobile3DRequested])
+  const mobilePreviewOnly = mobileTouch && !mobile3DRequested
+  const interactive = supported && inView && pageVisible && !reduce && !mobilePreviewOnly
   return <div ref={holder} data-showroom-active={interactive ? 'true' : 'false'} className="w-full">
     <div className="relative isolate h-[300px] w-full overflow-hidden rounded-t-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
-      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish} /></Suspense></WebGLErrorBoundary> : <SceneFallback />}
+      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
         <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">3D Concept Studio</span>
         <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">{interactive ? 'LIVE / EXPLORE' : 'VISUAL / PREVIEW'}</span>
@@ -186,7 +203,10 @@ const concepts = [
 function App() {
   const reduce = !!useReducedMotion()
   const [menu, setMenu] = useState(false)
-  const reveal = reduce ? false : { opacity: 0, y: 22 }
+  // On small screens the hero must never begin visually blank while a slow
+  // device hydrates React. Desktop retains the optional entrance treatment.
+  const reveal = reduce || window.matchMedia('(max-width: 640px)').matches
+    ? false : { opacity: 0, y: 22 }
   const brand = getBrandSettings()
   const palette = brandPalettes[brand.accent] || brandPalettes.gold
   return <div data-react-showroom="true" data-brand-accent={brand.accent} className="min-h-screen bg-[#f5f2eb] font-sans text-[#0b1e28] antialiased">
@@ -221,7 +241,7 @@ function App() {
             <motion.div initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.3}} className="flex flex-wrap gap-3"><Button primary palette={palette} href="/demo-stock/">Explore fictional stock</Button><Button href="#experience">Discover the concept</Button></motion.div>
             <div className="mt-10 flex flex-wrap items-center gap-5 border-t border-white/15 pt-5 text-[10px] uppercase tracking-[.14em] text-[#aabdc4]"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#dcbc85]"/> React + Three.js</span><span>Mobile-first</span><span>WordPress native</span></div>
           </div>
-          <motion.div initial={reduce?false:{opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
+          <motion.div initial={reveal === false ? false : {opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
             <Hero3D reduce={reduce}/><p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]">Illustrative 3D geometry — no real manufacturer design</p>
           </motion.div>
         </div>

@@ -5,6 +5,9 @@ import gzip
 import json
 import re
 from zipfile import ZipFile
+import subprocess
+
+V4_COMMIT="774b539b68709f5e5cd53259988c9b2f6465af09"
 
 ROOT=Path(__file__).resolve().parents[1]
 THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
@@ -13,6 +16,15 @@ RECEIPT=DOCS/"EMPIRE_CAR_YARD_BRANDING_V4_BROWSER_ACCEPTANCE_20261023.json"
 
 def data():
     return json.loads(RECEIPT.read_text())
+
+def v4_original(relative):
+    return subprocess.run(
+        ["git","show",V4_COMMIT+":"+relative],
+        cwd=ROOT,check=True,capture_output=True,
+    ).stdout
+def theme_v4(path):
+    return v4_original(
+        "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/"+path)
 
 def test_admin_save_brand_reaches_home_and_stock_header_footer_in_real_wp():
     r=data()
@@ -50,7 +62,7 @@ def test_exact_v4_source_and_screenshot_receipts():
     r=data()
     assert len(r["source_manifest_sha256"])>=16
     for rel,hash_expected in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==hash_expected,rel
+        assert sha256(v4_original(rel)).hexdigest()==hash_expected,rel
     assert len(r["screenshots"])==4
     for name,metadata in r["screenshots"].items():
         screenshot=DOCS/"car_yard_react_browser_evidence_v4"/name
@@ -59,7 +71,7 @@ def test_exact_v4_source_and_screenshot_receipts():
         assert sha256(screenshot.read_bytes()).hexdigest()==metadata["sha256"]
 
 def test_native_wordpress_admin_registration_and_no_external_contact():
-    php=(THEME/"functions.php").read_text()
+    php=theme_v4("functions.php").decode()
     assert "register_setting('empire_yard_branding', 'empire_yard_brand_v1'" in php
     assert "add_theme_page('Showroom Branding'" in php
     assert "current_user_can('edit_theme_options')" in php
@@ -74,11 +86,11 @@ def test_native_wordpress_admin_registration_and_no_external_contact():
     assert "wp_remote_post(" not in php
     assert "empire_yard_site_nav" in php
     assert "empire_yard_site_footer" in php
-    assert "[empire_yard_site_nav]" in (THEME/"parts/header.html").read_text()
-    assert "[empire_yard_site_footer]" in (THEME/"parts/footer.html").read_text()
+    assert "[empire_yard_site_nav]" in theme_v4("parts/header.html").decode()
+    assert "[empire_yard_site_footer]" in theme_v4("parts/footer.html").decode()
 
 def test_react_brand_sanitization_and_static_tailwind_palettes():
-    source=(THEME/"src/main.jsx").read_text()
+    source=theme_v4("src/main.jsx").decode()
     assert "getBrandSettings()" in source
     assert "brandPalettes" in source
     assert "data-brand-accent" in source
@@ -87,17 +99,17 @@ def test_react_brand_sanitization_and_static_tailwind_palettes():
     assert "document.getElementById('empire-yard-brand-settings')" in source
     for name in ("gold:", "ice:", "copper:"):
         assert name in source
-    css=(THEME/"style.css").read_text()
+    css=theme_v4("style.css").decode()
     assert re.sub(r"/\\*.*?\\*/", "", css, flags=re.DOTALL).strip()==""
-    assert (THEME/"src/tailwind.css").read_text().splitlines()==[
+    assert theme_v4("src/tailwind.css").decode().splitlines()==[
         '@import "tailwindcss";','@source "../templates";',
         '@source "../parts";','@source "../functions.php";',
     ]
-    main=next(iter((THEME/"dist").glob("yard-main-*.js")))
-    scene=next(iter((THEME/"dist").glob("yard-ShowroomScene-*.js")))
-    assert len(gzip.compress(main.read_bytes(),mtime=0))<200000
-    assert b"data-react-showroom" in main.read_bytes()
-    assert b"showroom-webgl" in scene.read_bytes()
+    main=theme_v4("dist/yard-main-CTmQ-F4H.js")
+    scene=theme_v4("dist/yard-ShowroomScene-1n8hcRFt.js")
+    assert len(gzip.compress(main,mtime=0))<200000
+    assert b"data-react-showroom" in main
+    assert b"showroom-webgl" in scene
 
 def test_installable_wordpress_v4_preview_has_modules_and_theme_parts():
     artifact=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/dist/empire-yard-atelier-branding-v4-preview.zip"
