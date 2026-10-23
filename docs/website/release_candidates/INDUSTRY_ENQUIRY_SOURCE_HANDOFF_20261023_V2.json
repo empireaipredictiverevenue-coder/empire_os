@@ -1,0 +1,92 @@
+{
+  "checks": {
+    "compiled_commercial_form_preserves_unverified_source_entry": true,
+    "correct_intelligence_product_label_verified_in_browser": true,
+    "existing_live_immutable_assets_not_changed": true,
+    "isolated_nextjs_production_build_passed": true,
+    "isolated_typescript_passed": true,
+    "live_api_get_only_staging_offer_load_passed": true,
+    "mobile_and_desktop_headless_browser_cta_navigation_passed": true,
+    "mobile_and_desktop_no_horizontal_overflow": true,
+    "referenced_static_assets_all_available": true,
+    "staging_post_intake_is_blocked_http_405": true
+  },
+  "counts": {
+    "immutable_additions": 6,
+    "live_files": 653,
+    "preserved_live_files": 643,
+    "referenced_static_assets": 10,
+    "replacements": 10,
+    "stage_files": 135
+  },
+  "crm_writes": false,
+  "customer_submissions_performed": false,
+  "expected_live_pre_release_sha256": {
+    "commercial.html": "404d87e3c3ee366415662389992c0001eb25e0bcf24e526ef898b1f0e5f2e03e",
+    "commercial.txt": "bf6cab7bafed5c977bdde9aeac24cc83743dbb0734443d6ba440f5e895aa904a",
+    "industries/hvac.html": "711b618f267275131246772d74bb8043c7b4095c2a5c1fc6fbcf54cad106be5d",
+    "industries/hvac.txt": "f32f1e63897b3fc451eca3253059849b2cca350341e3ec3365c0db66e5060171",
+    "industries/property.html": "bcefec88bc7c3160a5b39f9cdc047e28c97b5183f250df7dbca87c87bd623e16",
+    "industries/property.txt": "de0ad4b2facf53599bac59413f772fdb498b398dc7e1f0e4d1cdc8e51cf1c793",
+    "industries/roofing.html": "8124bd1df1829207d45d0cbddd97ea1f26fb12a289690576a8f68f820351d794",
+    "industries/roofing.txt": "b3e46a536989c29bbb078289e498493f0c3b802975f0ea8549369adfbfb1a631",
+    "industries/solar.html": "3178f73b066376f08859195aeda2d8b8cf172ce4850d763411c089abb2e15526",
+    "industries/solar.txt": "495ac67dfcbb52f4250d23a2851cd9b1c6be5b8fec34eb801c398f239d8edb2e"
+  },
+  "founder_or_website_owner_release_approval_received": false,
+  "full_site_deployment_authorized": false,
+  "live_site": "/srv/empire_os/apps/empire-public-site/out",
+  "mode": "OBSERVE",
+  "next_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+  "observed_utc": "2026-10-23T16:06:40.352834+00:00",
+  "outbound_sent": false,
+  "owner_visual_review_completed_by_model": true,
+  "payment_activation": false,
+  "predecessor_manifest": "INDUSTRY_ENQUIRY_SOURCE_HANDOFF_20261023.json",
+  "previous_source_commit": "2fa9213bb",
+  "proposed_immutable_additions_sha256": {
+    "_next/static/FnXuf4peggxPyeQsk5O-c/_buildManifest.js": "9476e0afd3f9da68a64e6ec58631191fd3eaca62c9f5a377e7517fe9a89e59ea",
+    "_next/static/FnXuf4peggxPyeQsk5O-c/_clientMiddlewareManifest.js": "5483e3295dc35dfe29ea932efc85341c916f10ff78ff5b0e965e003710893a4a",
+    "_next/static/FnXuf4peggxPyeQsk5O-c/_ssgManifest.js": "6d06ccc429b812337889f08fcf4e0792b070203e38a72b4af351e6506f914ad4",
+    "_next/static/chunks/0ygl3w5u9kto7.css": "b6f1cbffff927995537d8c6e1e60f352ecf8c7de2ef1de6522bd487a5039b4f7",
+    "_next/static/chunks/1e41cdzeg1p96.js": "7b0f497b019eb58cbc456afdb3b9abe216ffbb15e0af445289e9c220d9d42326",
+    "_next/static/chunks/1x8gsdj9t9o4d.js": "e2227ff514b92387030fb4c37b4b4172117712b550d5ddc6c9b27f0448729e3c"
+  },
+  "proposed_surgical_replacements_sha256": {
+    "commercial.html": "27e888e2e28ece2342b676c88a2f1e8076f1d28c05b1682a307473c07ced941b",
+    "commercial.txt": "d8552ada271c2f9154df6019a37d754154141bd3cf3a2a1ce5bcbe756a5d3d18",
+    "industries/hvac.html": "421a38a7b604962178bf68794ca38df579e005dd0a925cf087e893e8510e2189",
+    "industries/hvac.txt": "61c56bfc336c34cf501557e7daf72aba7ec74fa12a6502856a2cfcba43f68855",
+    "industries/property.html": "f6d80e8dbd0b530873d642a29b21be7bc82f1aa83ecd8143835a04cfbe7e6d3b",
+    "industries/property.txt": "6fb639b08c348d07772f1d48bc41a72a95f14bbc857f56d851afe66b3c76a58a",
+    "industries/roofing.html": "95fcfeed7e0c2648588d9b8cbc50fa8b2dbcc3fe239ceda3bcca82641c3adde6",
+    "industries/roofing.txt": "01dfe71887344907e8cc20c92dfda833123a091a89ff05cb05fd456b213e9eae",
+    "industries/solar.html": "25eccddc8f49d3b43119edead2beb940b814a6370df70f25d0de622029968955",
+    "industries/solar.txt": "f0008505d85ed01a11e9bb0d93a9886b087c4ffb97af02af511d77b67c1ee40d"
+  },
+  "public_site_mutated": false,
+  "referenced_staged_assets_sha256": {
+    "_next/static/chunks/00csqdmn1ppym.js": "34834901ed172c3915e539a3df745fe9c894deaa00030028360ff084513d32bf",
+    "_next/static/chunks/0cz1d0mv5g_q7.js": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+    "_next/static/chunks/0jiyunp5x7m90.js": "9614ebba610e546e11b9c2a51abb43add848bbcfd2b22d2d977f65e8a2013770",
+    "_next/static/chunks/0ygl3w5u9kto7.css": "b6f1cbffff927995537d8c6e1e60f352ecf8c7de2ef1de6522bd487a5039b4f7",
+    "_next/static/chunks/1e41cdzeg1p96.js": "7b0f497b019eb58cbc456afdb3b9abe216ffbb15e0af445289e9c220d9d42326",
+    "_next/static/chunks/1imwq8qchx0y9.js": "84091742ec54cdf3ec79d7f70da52671f0553618162f6c913a3378a34a179e5f",
+    "_next/static/chunks/1z3h-wpd7w46_.css": "a3efa1c9944f97a7c9edea7d4b25d5d984b871daefa3f1a74fb59aaf48b864e8",
+    "_next/static/chunks/2_mjsxmatigr9.js": "e6a6c54d6329d1f0ddc87e8bc2ca6b8713c138099de3dfcc2305315ecf68b0d5",
+    "_next/static/chunks/3kdi8z7f__py4.js": "c20a76719936ef0b49f3a07fea967d30537610acb14e9295bbd76c16b2b45c5d",
+    "_next/static/chunks/turbopack-40jik6rsqbixm.js": "bedafcae164115301771184a4450765283ba328907044f4fa4aaaffcc9490a72"
+  },
+  "schema_version": "empire.website.industry_enquiry_release_candidate.v2",
+  "source_commit": "758a5a31b",
+  "source_sha256": {
+    "apps/empire-public-site/src/app/commercial/page.tsx": "6862df46b2f72bd2cf410bd0fc9b567e2f3793562702d2e01e112bf7819132b7",
+    "apps/empire-public-site/src/components/IndustryIntelligencePage.tsx": "7335ba50f21f05f9264dbc17967c22d31cba917b74549ed95a496f4b1838e73c",
+    "apps/empire-public-site/src/lib/commercial-entry-review.ts": "525f5653024836e27b16237e26e653183330523ce619b933e608a343d679203f",
+    "apps/empire-public-site/src/lib/commercial-interest-attempt.ts": "486a6df36d7a3461248253f0fb7d8f817d877d7557902774588453795f6076c1",
+    "apps/empire-public-site/src/lib/commercial-offer-category.ts": "4ede487c60815ba4e75cf3e29e5cd054819f6aa8250b0c4949e39a43b6914183"
+  },
+  "staging_export": "/home/ubuntu/empire_worktrees/industry_enquiry_release_review_20261023/apps/empire-public-site/out",
+  "status": "STAGED_BYTES_VERIFIED_OWNER_RELEASE_APPROVAL_REQUIRED",
+  "surgical_release_authorized": false
+}

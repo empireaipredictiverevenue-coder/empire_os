@@ -36,3 +36,46 @@ All five currently served public HTML pages match the current live static tree b
 6. Subsequently wait for a **genuine voluntary customer submission**. Only the existing privileged EmpireDB source/consent owner and independently authenticated Smart CRM tenant owner can verify exact lineage and response permission. Do not send a synthetic POST to turn the first-sale count nonzero.
 
 No production website deployment, synthetic contact, CRM write, outreach, payment activation or Economic Memory claim occurred. This is a hash-locked owner handoff, **not** release authorisation.
+
+## V2 visual preflight and release-candidate supersession
+
+The first isolated browser review exposed a misleading commercial offer category:
+`Technical Search Audit` and `Solar Opportunity Map — US` were displayed as
+`Digital Avatar — scoped deployment`. This was presentation logic in the
+existing Commercial page, not a catalog price or product-authority change.
+
+**Fix:** `758a5a31b` explicitly distinguishes `consultancy`,
+`digital_avatar`, and `intelligence_product` in the existing Commercial
+interface. Unknown categories now display a neutral scope-review label.
+Frontend category regression tests and TypeScript passed. The release candidate
+was then rebuilt from this exact commit in the existing isolated worktree.
+
+**V2 manifest — use this one for any subsequent release decision:**
+`docs/website/release_candidates/INDUSTRY_ENQUIRY_SOURCE_HANDOFF_20261023_V2.json`
+
+The original manifest remains immutable historical evidence. It is superseded
+for publication because it does not include the corrected Commercial label.
+
+Read-only browser QA used headless Chrome at 390×844 mobile and 1440×900 desktop,
+with an isolated static-site listener and an explicitly GET-only staging bridge
+for the currently published Commercial offers API. Production enquiry POSTs
+were not made; the staging bridge explicitly rejects POST with HTTP 405.
+
+Verified:
+- Industry CTA is present twice, opens `/commercial?entry=%2Findustries%2Froofing#commercial-enquiry`.
+- Browser preserves the claimed source path and renders offer selector, form
+  fields, specific-response-consent checkbox and submit control on both sizes.
+- No horizontal document overflow at either width.
+- Fresh browser session displays intelligence offers as
+  `Intelligence product — scoped one-time delivery`.
+- The existing `review_native_buyer_proposal_build_20261020` auditor passes
+  on the V2 staged export.
+- V2's same ten route-file replacement paths and six additive immutable assets
+  must be verified against current live SHA-256 before any publication.
+- All 643 other live files remain protected by the pinned allowlist.
+
+**Release authority is still not granted.** The owner must review the actual
+V2 visual assets, confirm no concurrent Website & Growth changes conflict,
+capture the rollback originals, and obtain the explicit founder/owner release
+decision before publishing. Do not treat this document, the passing automated
+tests or the headless browser review as deployment permission.
