@@ -1,0 +1,38 @@
+{
+  "canonical_source": "migrations/empiredb/041_crm_membership_authority.sql",
+  "checks": {
+    "agency_existing_session_revoked_after_pg_update": true,
+    "agency_operator_cannot_inherit_owner_site_scope": true,
+    "agency_secret_not_in_receipt": true,
+    "agency_signed_session_and_real_pg_membership": true,
+    "canonical_041_reader_active_owner": true,
+    "canonical_041_reader_denies_expired_membership": true,
+    "canonical_041_reader_revoked_return_none": true,
+    "cross_tenant_denied_by_approved_scope": true,
+    "dedicated_reader_denied_direct_member_table": true,
+    "owner_reactivated_for_independent_site_guard": true,
+    "separate_registry_approval_still_required": true,
+    "separate_site_grant_still_required": true,
+    "synthetic_owner_inserted_only_in_temp_database": true,
+    "unknown_member_denied": true
+  },
+  "checks_passed": 14,
+  "dedicated_membership_login": "empire_crm_membership_login",
+  "fixture_db": "crm_membership_fixture",
+  "live_empiredb_queried": false,
+  "live_user_revoked": false,
+  "observed_utc": "2026-10-23T08:13:49.886149+00:00",
+  "production_changes": false,
+  "real_client_credentials": false,
+  "real_postgresql_auth_and_membership_reader": true,
+  "source_sha256": {
+    "empire_os/agency_canonical_membership.py": "980d68ca729020637718bc0578afd2f427a058f5a2be7d966247c23a282474bf",
+    "empire_os/agency_connector_authority.py": "e9471b2353a6e1d012ed30d3738e387c1d96e7c4ee0802b7bf2fb828fd9726e3",
+    "empire_os/agency_connector_preflight.py": "68a216b17041ca393bc1ffcb29eb65e77023dd1b2718c298d56aa94658b1f224",
+    "migrations/empiredb/041_crm_membership_authority.sql": "de8124235e411a23607492fb12fe1142a7176f04a2c0b55bb6c6f71a38eec2ab",
+    "scripts/agency_mcp_live_wp_e2e/real_canonical_041_revocation.py": "02198ee5007c64d3eb7533a6032a2b6b016be591637f0055c14e8732e1fb3de3",
+    "scripts/agency_mcp_live_wp_e2e/run_canonical_041_revocation.sh": "51a8538f63c93efd6327427185872485c43516fdd5c7aebb2eb60f765d44d975"
+  },
+  "status": "REAL_POSTGRES_CANONICAL_041_MEMBERSHIP_REVOCATION_FIXTURE_PASS",
+  "synthetic_site_and_registry_fixture": true
+}
