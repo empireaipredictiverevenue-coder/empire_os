@@ -183,3 +183,83 @@ virtualenv with `PYTHONPATH="$PWD"`:
    autonomous model/agent authority as part of this integration.
 
 No live production runtime has been changed by this feature branch.
+
+
+## Additional authenticated CRM route / current reconciliation (2026-10-24)
+
+PRIME is now implemented under the **existing authenticated CRM router** as:
+`GET /v1/revenue-crm/predictive-prime/prospects?limit=100`.
+
+The new endpoint is disabled when the existing `resolve_authenticated_read`
+callback is not configured, rejects callers without a verified tenant
+principal, and delegates solely to the canonical
+`PostgresRevenueCrmRepository` restricted tenant reader. The response
+contains aggregate prospect/closer stage counts, NOT names, account IDs,
+contact identifiers, buyer/individual records, recognised revenue or
+calibrated forecasts. It must never be interpreted as an exhaustive total:
+the source read is limited to 100 rows and only those returned are counted.
+
+Changes are in `empire_os/revenue_crm_api.py` plus
+`tests/test_predictive_revenue_prime_crm_api.py`.
+No new database login, financial table, payment route, customer write surface
+or separate API service was introduced.
+
+### Verification completed
+
+- **205 tests passed** in the PRIME feature branch across the new feature,
+  request-scoped CRM API/signed authentication, original CRM transport,
+  JEV, permit, storm, economic memory, founder status, calibration and
+  scenario optimisation. One upstream dependency deprecation warning.
+- A dedicated **shadow compatibility checkout** used the latest
+  uncommitted `/srv/empire_os/empire_os/revenue_crm_transport.py`
+  stricter CRM login-authority preflight. **76 relevant tests passed**
+  with PRIME, without copying its code back into the feature branch or
+  modifying the other agent's work.
+- Actual `empire-founder-dashboard-api.service` is running from
+  `/home/ubuntu/empire_releases/property_birmingham_private_stage_20261022_v3`
+  via `composite_property_jev_overlay:app` on loopback port 8766,
+  NOT from the PRIME worktree or even directly from the root repository.
+- An unauthenticated loopback request to that **currently running release**
+  for `/v1/predictive-cloud/prime/status` returned **HTTP 404**.
+  This is the expected evidence that PRIME is NOT LIVE. It does not prove
+  whether any future reverse-proxy route would be externally private.
+- Live canonical source review still exposes only **95 read-only permit
+  observations**, **0 storm opportunities on a stale 2026-10-05 snapshot**,
+  and **no authenticated live CRM account read or recognised revenue** for
+  this new PRIME bridge.
+
+### Exact release sequence — retained owner authority
+
+1. Reconcile `/srv/empire_os`'s existing uncommitted files (~241 at latest
+   review) with their respective owners. **DO NOT overwrite** changes to
+   `empire_os/revenue_crm_transport.py` (including the dedicated-login
+   authority preflight), `empire_os/founder_dashboard_service.py`
+   (including current YouTube integration), or deployment scripts.
+2. Review and merge commits in order:
+   - `0a71432d5` — PRIME OBSERVE core, scenarios, permit and storm bridge.
+   - `51d8862fc` — PRIME private source status and restricted CRM adapter.
+   - `a12b90996` — request-authenticated CRM aggregate PRIME endpoint.
+3. Run combined tests using the actual owner-merged source tree (not merely
+   this feature checkout or the isolated shadow simulation).
+4. Build the existing composite Founder release overlay and preserve its
+   current owners/routes and rollback target. Do not point the service
+   at the raw feature worktree; do not activate a second Founder/CRM service.
+5. Independently verify loopback-only service binding, reverse-proxy routing
+   and founder/tenant authentication, and then have Core & Operations approve
+   the exact guarded release and rollback.
+6. Read back live `/v1/predictive-cloud/prime/status` after deployment.
+   The authenticated CRM `/predictive-prime/prospects` route must return
+   401 or 503 for anonymous callers and only bounded aggregate status for
+   separately verified, tenant-bound sessions. No customer data leaves
+   the tenant-safe CRM route.
+7. Only after independent DB and finance source authority exists should
+   true revenue forecasts, churn calibration, MRR and cash velocity be
+   proposed for activation. P10/P50/P90 remain **hypothetical scenarios**.
+
+### Current release decision
+
+**CODE COMPLETE FOR REVIEW / OWNER MERGE AND DEPLOYMENT HELD**.
+
+No production merge, service restart, outbound, CRM data write, payment,
+accounting adjustment, storm refresh, permission escalation or revenue
+recognition occurred as part of this feature work.
