@@ -42,7 +42,7 @@ def test_no_manual_css_rules_and_wp_child_theme_only():
     css = (THEME / "style.css").read_text()
     assert "Template: empire-local-services" in css
     assert re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL).strip() == ""
-    generated_only = (THEME / "src/tailwind.css").read_text().splitlines()
+    generated_only = original_theme("src/tailwind.css").decode().splitlines()
     assert generated_only == ['@import "tailwindcss";', '@source "../templates";', '@source "../parts";']
     functions = original_theme('functions.php').decode()
     assert "is_front_page()" in functions

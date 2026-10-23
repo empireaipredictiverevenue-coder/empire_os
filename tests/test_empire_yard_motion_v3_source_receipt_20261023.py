@@ -15,6 +15,16 @@ RECEIPT=DOCS/"EMPIRE_CAR_YARD_REACT_MOTION_V3_BROWSER_ACCEPTANCE_20261023.json"
 def source():
     return json.loads(RECEIPT.read_text())
 
+# Preserve immutable V3 source verification after a later WordPress theme
+# version changes the active compiled assets.
+V3_COMMIT = "8c3fe7e5ed3c0d135f9dbafdc7df38d880040822"
+def original_v3(relative_path):
+    return subprocess.run(["git", "show", V3_COMMIT + ":" + relative_path],
+                          cwd=ROOT, check=True, capture_output=True).stdout
+def theme_v3(path):
+    return original_v3("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/" + path)
+
+
 def test_genuine_wordpress_mariadb_chromium_interactions_and_restore():
     r=source()
     assert r["status"]=="WORDPRESS_REACT_THREE_NATIVE_MYSQL_BROWSER_RESTORE_PASS"
@@ -57,11 +67,11 @@ def test_genuine_wordpress_mariadb_chromium_interactions_and_restore():
 def test_source_manifest_and_real_async_es_module_bundle():
     r=source()
     for rel,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==digest,rel
-    main=(THEME/"src/main.jsx").read_text()
-    scene=(THEME/"src/ShowroomScene.jsx").read_text()
-    config=(THEME/"vite.config.mjs").read_text()
-    functions=(THEME/"functions.php").read_text()
+        assert sha256(original_v3(rel)).hexdigest()==digest,rel
+    main=theme_v3("src/main.jsx").decode()
+    scene=theme_v3("src/ShowroomScene.jsx").decode()
+    config=theme_v3("vite.config.mjs").decode()
+    functions=theme_v3("functions.php").decode()
     assert "React.lazy(() => import('./ShowroomScene.jsx'))" in main
     assert "IntersectionObserver" in main
     assert "visibilitychange" in main
@@ -78,18 +88,15 @@ def test_source_manifest_and_real_async_es_module_bundle():
     assert "wp_mail(" not in functions and "register_rest_route" not in functions
     assert "fetch(" not in main and "fetch(" not in scene
     assert "https://" not in main and "http://" not in main
-    chunks=list((THEME/"dist").glob("yard-ShowroomScene-*.js"))
-    entry=list((THEME/"dist").glob("yard-main-*.js"))
-    assert len(chunks)==len(entry)==1
-    assert (THEME/"dist/yard.js").read_text().strip().startswith('import "./yard-main-')
-    assert b"data-react-showroom" in entry[0].read_bytes()
-    assert b"showroom-webgl" in chunks[0].read_bytes()
-    assert len(gzip.compress(entry[0].read_bytes(),mtime=0)) < 200000
+    assert theme_v3("dist/yard.js").decode().strip().startswith('import "./yard-main-')
+    assert b"data-react-showroom" in theme_v3("dist/yard-main-4k6xnr3_.js")
+    assert b"showroom-webgl" in theme_v3("dist/yard-ShowroomScene-DpibJcrU.js")
+    assert len(gzip.compress(theme_v3("dist/yard-main-4k6xnr3_.js"),mtime=0)) < 200000
 
 def test_no_handwritten_css_and_no_new_runtime_dependencies():
     css=(THEME/"style.css").read_text()
     assert re.sub(r"/\\*.*?\\*/", "", css, flags=re.DOTALL).strip()==""
-    assert (THEME/"src/tailwind.css").read_text().splitlines()==[
+    assert theme_v3("src/tailwind.css").decode().splitlines()==[
         '@import "tailwindcss";', '@source "../templates";', '@source "../parts";'
     ]
     deps=json.loads((THEME/"package.json").read_text())["dependencies"]

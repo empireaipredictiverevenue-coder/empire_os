@@ -115,9 +115,59 @@ function Hero3D({ reduce }) {
   </div>
 }
 
-function Button({ children, href, primary = false }) {
+const brandDefaults = Object.freeze({
+  name: 'Atelier Motors',
+  strapline: 'Showroom concept',
+  eyebrow: 'The future of the showroom',
+  headline: 'Drive something',
+  highlight: 'extraordinary.',
+  description: 'An immersive WordPress dealership concept with cinematic 3D, refined inventory discovery, and a governed service-workshop foundation.',
+  contact_label: 'Enquiry info',
+  contact_path: '/contact/',
+  accent: 'gold'
+})
+// All palettes are static Tailwind utility names; no generated CSS or style tags.
+const brandPalettes = {
+  gold: {
+    notice: 'bg-[#dfbd82]', logo: 'text-[#dbbc88]', highlight: 'text-[#dcbc85]',
+    eyebrow: 'text-[#dcbc85]', primary: 'bg-[#dfbd82] text-[#11232b] hover:bg-[#f2d8a9]',
+    border: 'border-[#dfbd82]/70', muted: 'text-[#e6c691]',
+  },
+  ice: {
+    notice: 'bg-[#b6ddeb]', logo: 'text-[#b6ddeb]', highlight: 'text-[#b6ddeb]',
+    eyebrow: 'text-[#b6ddeb]', primary: 'bg-[#b6ddeb] text-[#11232b] hover:bg-[#d1eefa]',
+    border: 'border-[#b6ddeb]/70', muted: 'text-[#d1eefa]',
+  },
+  copper: {
+    notice: 'bg-[#dca87c]', logo: 'text-[#dca87c]', highlight: 'text-[#dca87c]',
+    eyebrow: 'text-[#dca87c]', primary: 'bg-[#dca87c] text-[#11232b] hover:bg-[#f1c7a4]',
+    border: 'border-[#dca87c]/70', muted: 'text-[#f1c7a4]',
+  },
+}
+function getBrandSettings() {
+  try {
+    const raw = document.getElementById('empire-yard-brand-settings')?.textContent
+    const settings = raw ? JSON.parse(raw) : {}
+    const brand = { ...brandDefaults }
+    for (const key of ['name', 'strapline', 'eyebrow', 'headline', 'highlight',
+      'description', 'contact_label']) {
+      if (typeof settings[key] === 'string' && settings[key].trim()) {
+        brand[key] = settings[key].slice(0, 320)
+      }
+    }
+    if (typeof settings.contact_path === 'string' &&
+      /^\/(?:[a-z0-9-]+\/){1,4}$/.test(settings.contact_path)) {
+      brand.contact_path = settings.contact_path
+    }
+    if (Object.prototype.hasOwnProperty.call(brandPalettes, settings.accent)) {
+      brand.accent = settings.accent
+    }
+    return brand
+  } catch { return brandDefaults }
+}
+function Button({ children, href, primary = false, palette = brandPalettes.gold }) {
   return <a href={href} className={(primary
-    ? 'bg-[#dfbd82] text-[#11232b] hover:bg-[#f2d8a9]'
+    ? palette.primary
     : 'border border-white/30 bg-white/5 text-white hover:bg-white/10'
   ) + ' inline-flex min-h-12 items-center justify-center gap-3 rounded-md px-6 py-3 text-xs font-extrabold uppercase tracking-[.11em] no-underline transition-colors focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#eecb87]'}>
     {children}<ArrowUpRight aria-hidden="true" className="h-4 w-4" />
@@ -137,23 +187,25 @@ function App() {
   const reduce = !!useReducedMotion()
   const [menu, setMenu] = useState(false)
   const reveal = reduce ? false : { opacity: 0, y: 22 }
-  return <div data-react-showroom="true" className="min-h-screen bg-[#f5f2eb] font-sans text-[#0b1e28] antialiased">
+  const brand = getBrandSettings()
+  const palette = brandPalettes[brand.accent] || brandPalettes.gold
+  return <div data-react-showroom="true" data-brand-accent={brand.accent} className="min-h-screen bg-[#f5f2eb] font-sans text-[#0b1e28] antialiased">
     <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:rounded-md focus:bg-white focus:p-3 focus:text-black">Skip to main content</a>
-    <div className="bg-[#dfbd82] px-4 py-2 text-center text-[9px] font-black uppercase tracking-[.2em] text-[#17303b] sm:text-[10px]">
+    <div className={palette.notice + " px-4 py-2 text-center text-[9px] font-black uppercase tracking-[.2em] text-[#17303b] sm:text-[10px]"}>
       <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Fictional design preview — no live dealership, prices or bookings</span>
     </div>
     <header className="relative z-30 border-b border-white/10 bg-[#091923] text-white">
       <nav aria-label="Primary navigation" className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-4 px-5 py-5 md:px-10 lg:py-6">
-        <a href="/" className="inline-flex items-center gap-3 no-underline" aria-label="Atelier Motors concept home">
+        <a href="/" className="inline-flex items-center gap-3 no-underline" aria-label={brand.name + " concept home"}>
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ddb982]/65 text-[#ddb982]"><CarFront className="h-6 w-6" strokeWidth={1.3}/></span>
-          <span className="text-[15px] font-black tracking-[.18em] text-white">ATELIER <span className="text-[#dbbc88]">MOTORS</span><span className="mt-0.5 block text-[8px] tracking-[.32em] text-[#b6c9cf]">SHOWROOM CONCEPT</span></span>
+          <span className="text-[15px] font-black tracking-[.18em] text-white">{brand.name.toUpperCase()}<span className={"mt-0.5 block text-[8px] tracking-[.32em] " + palette.logo}>{brand.strapline.toUpperCase()}</span></span>
         </a>
         <button aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-expanded={menu} onClick={() => setMenu(!menu)} className="rounded border border-white/30 px-3 py-2 text-[11px] uppercase tracking-widest text-white md:hidden">{menu ? 'Close' : 'Menu'}</button>
         <div className={(menu ? 'flex' : 'hidden') + ' w-full flex-col gap-5 md:flex md:w-auto md:flex-row md:items-center md:gap-9'}>
           {[['The studio','#studio'],['The collection','#collection'],['Experience','#experience'],['Inventory','/demo-stock/']].map(([label,href])=>
             <a key={label} href={href} className="text-[11px] font-bold uppercase tracking-[.14em] text-[#d4e0e3] no-underline hover:text-[#dfbd82]">{label}</a>
           )}
-          <a href="/contact/" className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-[#dfbd82]/70 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] text-[#e6c691] no-underline hover:bg-white/10">Enquiry info <ArrowUpRight className="h-4 w-4" /></a>
+          <a href={brand.contact_path} className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-white/30 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] text-[#e6c691] no-underline hover:bg-white/10">{brand.contact_label} <ArrowUpRight className="h-4 w-4" /></a>
         </div>
       </nav>
     </header>
@@ -163,10 +215,10 @@ function App() {
         <div className="pointer-events-none absolute -left-60 top-[-150px] h-[600px] w-[600px] rounded-full bg-[#22505a]/35 blur-[135px]" />
         <div className="relative mx-auto grid max-w-[1320px] items-center gap-12 px-5 pb-10 pt-16 md:px-10 lg:min-h-[720px] lg:grid-cols-[.91fr_1.09fr] lg:gap-7 lg:pb-20 lg:pt-20">
           <div className="relative z-10 max-w-[610px]">
-            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.05}} className="mb-6 inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[.27em] text-[#dcbc85]"><span className="h-px w-8 bg-[#dcbc85]" /> The future of the showroom</motion.p>
-            <motion.h1 id="studio-title" initial={reveal} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}} className="max-w-[11ch] font-serif text-[clamp(3.4rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]">Drive something <em className="font-normal text-[#dcbc85]">extraordinary.</em></motion.h1>
-            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.22}} className="mb-8 mt-7 max-w-[50ch] text-[15px] leading-[1.85] text-[#bacbd2] sm:text-base">An immersive WordPress dealership concept with cinematic 3D, refined inventory discovery, and a governed service-workshop foundation.</motion.p>
-            <motion.div initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.3}} className="flex flex-wrap gap-3"><Button primary href="/demo-stock/">Explore fictional stock</Button><Button href="#experience">Discover the concept</Button></motion.div>
+            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.05}} className={"mb-6 inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[.27em] " + palette.eyebrow}><span className="h-px w-8 bg-current" /> {brand.eyebrow}</motion.p>
+            <motion.h1 id="studio-title" initial={reveal} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}} className="max-w-[11ch] font-serif text-[clamp(3.4rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]">{brand.headline} <em className={"font-normal " + palette.highlight}>{brand.highlight}</em></motion.h1>
+            <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.22}} className="mb-8 mt-7 max-w-[50ch] text-[15px] leading-[1.85] text-[#bacbd2] sm:text-base">{brand.description}</motion.p>
+            <motion.div initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.3}} className="flex flex-wrap gap-3"><Button primary palette={palette} href="/demo-stock/">Explore fictional stock</Button><Button href="#experience">Discover the concept</Button></motion.div>
             <div className="mt-10 flex flex-wrap items-center gap-5 border-t border-white/15 pt-5 text-[10px] uppercase tracking-[.14em] text-[#aabdc4]"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#dcbc85]"/> React + Three.js</span><span>Mobile-first</span><span>WordPress native</span></div>
           </div>
           <motion.div initial={reduce?false:{opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
@@ -204,11 +256,11 @@ function App() {
       </section>
       <section className="bg-[#102832] px-5 py-20 text-white md:px-10 md:py-28"><div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 rounded-xl border border-[#d4ae75]/35 bg-[radial-gradient(ellipse_at_top_right,#214957_0%,#102832_50%,#091923_100%)] p-8 md:flex-row md:items-center md:p-14">
         <div><p className="mb-4 text-[10px] font-bold uppercase tracking-[.26em] text-[#d6b47d]">A secure commercial foundation</p><h2 className="max-w-[16ch] font-serif text-[clamp(2.7rem,4vw,4.5rem)] leading-[1.1] tracking-[-.05em]">Designed to be extraordinary. Built to be responsible.</h2><p className="mt-5 max-w-[62ch] text-sm leading-[1.9] text-[#b9cbd2]">Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled.</p></div>
-        <Button primary href="/contact/">Enquiry requirements</Button>
+        <Button primary palette={palette} href={brand.contact_path}>{brand.contact_label}</Button>
       </div></section>
     </main>
     <footer className="border-t border-white/10 bg-[#07151f] px-5 py-12 text-[#b9c9ce] md:px-10"><div className="mx-auto flex max-w-[1240px] flex-col justify-between gap-6 md:flex-row">
-      <div><p className="text-sm font-black uppercase tracking-[.2em] text-white">Atelier <span className="text-[#d5b47c]">Motors</span></p><p className="mt-2 max-w-[44ch] text-xs leading-7">Fictional WordPress + React showroom made for internal Empire AI capability testing.</p></div>
+      <div><p className="text-sm font-black uppercase tracking-[.2em] text-white">{brand.name}</p><p className="mt-2 max-w-[44ch] text-xs leading-7">Fictional WordPress + React showroom made for internal Empire AI capability testing.</p></div>
       <div className="text-xs leading-7 md:text-right"><p>No real vehicles, sales offers, reservations or customer data.</p><p>Client identity, privacy and commercial terms remain pending.</p></div>
     </div></footer>
   </div>
