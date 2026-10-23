@@ -1250,6 +1250,54 @@ def _read_runtime_snapshot(path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     }
 
 
+def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any]:
+    """Optional bounded source-verified founder inbox scan on existing cadence.
+
+    The stock Buyer Acquisition Team plan remains canonical even if the
+    mail reader is unavailable. Runs ONLY under the original production root,
+    and only when the protected, committed runner and data exist.
+    """
+    import subprocess
+    import sys
+
+    root = Path(repo_root).resolve()
+    if root != Path("/srv/empire_os"):
+        return {"status": "NOT_PRODUCTION_ROOT", "outbound_sent": False}
+    if not (root / "scripts/run_founder_acquisition_review.py").is_file():
+        return {"status": "RUNNER_NOT_DEPLOYED", "outbound_sent": False}
+    command = [
+        sys.executable, "-B", "-m", "scripts.run_founder_acquisition_review",
+        "--repo-root", str(root), "--write",
+    ]
+    try:
+        completed = subprocess.run(
+            command, cwd=str(root), capture_output=True, text=True,
+            check=False, timeout=35,
+        )
+        if completed.returncode != 0 or len(completed.stdout) > 3000:
+            return {"status": "HELD_PROTECTED_FOUNDER_MAILBOX_REVIEW",
+                    "outbound_sent": False}
+        outcome = json.loads(completed.stdout)
+        if (not isinstance(outcome, dict)
+                or outcome.get("status") != "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
+                or outcome.get("monitored_threads") != 7
+                or outcome.get("snapshot_written") is not True
+                or outcome.get("outbound_sent") is not False
+                or outcome.get("database_writes") is not False):
+            return {"status": "HELD_INCOMPLETE_FOUNDER_MAILBOX_REVIEW",
+                    "outbound_sent": False}
+        return {
+            "status": "SEVEN_FOUNDER_THREADS_REVIEWED",
+            "new_inbound_header_candidates": outcome.get(
+                "new_inbound_header_candidates", None
+            ),
+            "outbound_sent": False,
+        }
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return {"status": "HELD_PROTECTED_FOUNDER_MAILBOX_REVIEW",
+                "outbound_sent": False}
+
+
 def refresh_buyer_acquisition_plan(
     repo_root: str | Path,
 ) -> dict[str, Any]:
@@ -1480,4 +1528,8 @@ def refresh_buyer_acquisition_plan(
         encoding="utf-8",
     )
     tmp.replace(path)
+    # The existing five-minute Buyer Acquisition Team is the sole owner of
+    # this OBSERVE-only founder inbox cycle. It never starts a second timer,
+    # sends mail, grants authority, or alters the main plan on failure.
+    refresh_founder_acquisition_observer(root)
     return payload
