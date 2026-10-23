@@ -211,3 +211,97 @@ def screen_candidates_against_canonical_qualification(
         "crm_writes":False,"outbound_authorized":False,
         "model_training_authorized":False,"verified_revenue":None,
     }
+
+
+def discover_original_requirement_candidates(
+    *,
+    research_queue: Mapping,
+    provider_state: Mapping,
+    lookup,
+) -> dict:
+    """Use the existing Search Fabric discovery contract, never a new crawler.
+
+    Search snippets are not proof. Only candidate first-party links are
+    returned for a later original-source rights/date/intent verification.
+    """
+    if (research_queue.get("schema_version") != "empire.acquisition_demand_first_tasks.v1"
+        or research_queue.get("mode") != "OBSERVE"
+        or research_queue.get("outbound_authorized") is not False):
+        raise ValueError("canonical read-only acquisition research tasks required")
+    tasks = research_queue.get("next_company_reviews")
+    if not isinstance(tasks, list) or len(tasks) > MAX_BATCH:
+        raise ValueError("bounded existing research task list required")
+    if not isinstance(provider_state, Mapping):
+        raise ValueError("original Search Fabric health required")
+    healthy = (provider_state.get("circuit_open") is False
+               and provider_state.get("last_state") == "HEALTHY")
+    if not healthy:
+        return {
+            "schema_version":"empire.acquisition_demand_discovery.v1",
+            "mode":"OBSERVE",
+            "status":"SEARCH_PROVIDER_UNAVAILABLE_NOT_NO_BUYING_DEMAND",
+            "search_queries_attempted":0,
+            "original_source_candidates":[],
+            "searched_companies":0,
+            "unsearched_companies":len(tasks),
+            "buyer_requests_verified":0,
+            "crm_writes":False,
+            "outbound_authorized":False,
+            "model_training_authorized":False,
+        }
+    results = []
+    searched = 0
+    for entry in tasks:
+        if (not isinstance(entry, Mapping)
+            or entry.get("status") != "INDEPENDENT_PURCHASING_REQUIREMENT_RESEARCH"
+            or entry.get("outbound_authorized") is not False):
+            raise ValueError("only unpromoted sourced YC tasks permitted")
+        host = _company_host(entry.get("company_website"))
+        if not host:
+            continue
+        query = (
+            f'site:{host} '
+            '("request for proposals" OR "seeking external" OR '
+            '"invitation to tender" OR "vendor proposal") '
+            '(marketing OR SEO OR search OR competitor)'
+        )
+        searched += 1
+        try:
+            response = lookup(query, num=5)
+        except Exception:
+            continue
+        if not isinstance(response, Mapping):
+            continue
+        rows = response.get("organic")
+        if not isinstance(rows, list):
+            continue
+        for row in rows[:5]:
+            if not isinstance(row, Mapping):
+                continue
+            url = row.get("link") or row.get("url")
+            p = urlsplit(url if isinstance(url, str) else "")
+            if p.scheme != "https" or p.hostname not in (host, "www."+host):
+                continue
+            results.append({
+                "prospect_ref": entry["prospect_ref"],
+                "company":entry["company"],
+                "source_url":url,
+                "status":"SEARCH_DISCOVERY_ONLY_ORIGINAL_SOURCE_NOT_VERIFIED",
+                "posting_date_verified":False,
+                "buyer_request_verified":False,
+                "product_fit_verified":False,
+                "outbound_authorized":False,
+            })
+    return {
+        "schema_version":"empire.acquisition_demand_discovery.v1",
+        "mode":"OBSERVE",
+        "status":"DISCOVERY_RESULTS_NOT_PROOF",
+        "search_queries_attempted":searched,
+        "original_source_candidates":results,
+        "searched_companies":searched,
+        "unsearched_companies":len(tasks)-searched,
+        "buyer_requests_verified":0,
+        "crm_writes":False,
+        "outbound_authorized":False,
+        "model_training_authorized":False,
+    }
