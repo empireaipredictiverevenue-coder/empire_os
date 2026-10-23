@@ -54,6 +54,11 @@ def test_hiring_clues_never_promote_to_purchase():
     assert result["confirmed_procurement_signals"]==0
     assert result["authorized_decision_makers"]==0
     assert result["copy_review_eligible"]==0
+    assert result["contact_review_ready"]==0
+    assert result["canonical_research_hold_count"]==1
+    assert result["canonical_qualification_contract"]=="empire.acquisition_pool_qualification.v1"
+    assert result["records"][0]["canonical_qualification_status"]=="RESEARCH_ONLY"
+    assert "dated_commercial_trigger_verified" in result["records"][0]["canonical_missing_evidence"]
     assert result["records"][0]["potential_product_code"] is None
     assert result["records"][0]["product_match_reason"] == "NO_DEFENSIBLE_PRODUCT_MATCH_YET"
     assert result["records"][0]["job_details"][0]["original_source_url"]==DETAIL_URL
@@ -97,3 +102,14 @@ def test_vertical_gtm_can_suggest_only_catalog_verified_related_product():
     assert r["records"][0]["potential_product_code"]=="competitor_search_gap"
     assert not r["records"][0]["product_fit_verified"]
     assert not r["records"][0]["copy_review_eligible"]
+
+
+def test_search_snippet_and_hiring_cannot_create_copy_authority():
+    r = review_six(source=fixture(), catalog=catalog(), now=NOW,
+                   listing_fetch=lambda _:listing(),detail_fetch=lambda _:detail())
+    item=r["records"][0]
+    assert item["company_identity_source"]=="https://www.ycombinator.com/companies/example"
+    assert item["canonical_qualification_status"]=="RESEARCH_ONLY"
+    assert not item["copy_review_eligible"]
+    assert not item["contact_review_ready"]
+    assert "copy.trigger" in item["canonical_missing_evidence"]

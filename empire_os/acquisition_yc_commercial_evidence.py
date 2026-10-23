@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 
 from empire_os.jev_client_pain_discovery import discover_client_pains
 from empire_os.acquisition_yc_first_party_sweep import _ready_products
+from empire_os.acquisition_pool_qualification import qualify_pool
 
 BASE = "https://www.ycombinator.com"
 MAX_DETAIL = 600_000
@@ -209,6 +210,7 @@ def review_six(
             next_evidence = "Find a dated, company-owned problem or procurement statement and verify external purchase interest before product mapping."
         results.append({
             "prospect_ref": ref, "company": company,
+            "company_identity_source": f"{BASE}/companies/{slug[2]}",
             "niche": row.get("niche"),
             "job_details": details,
             "detail_fetch_failures": failures,
@@ -231,6 +233,38 @@ def review_six(
             "next_evidence": next_evidence,
         })
     jev = discover_client_pains(observations, now=now)
+    # Wire the actual six-company research output into the shared VC acquisition
+    # qualification contract. NEVER derive trusted buyer booleans from job titles,
+    # website snippets, or product hypotheses. Owner-issued buyer evidence must
+    # be separately reconciled by the canonical authority before promotion.
+    assessment_input = [
+        {
+            "prospect_ref": row["prospect_ref"],
+            "company": row["company"],
+            "company_identity_verified": False,
+            "dated_commercial_trigger_verified": False,
+            "product_fit_verified": False,
+            "trigger_independently_verified": False,
+            "offer_approved": False,
+            "offer": "",
+            "trigger": "",
+            "trigger_ref": "",
+            "offer_ref": "",
+            "suppression_checked": False,
+            "contact_permission_cleared": False,
+        }
+        for row in results
+    ]
+    canonical = qualify_pool(lane="vc_portfolio", records=assessment_input)
+    by_ref = {entry["prospect_ref"]: entry for entry in canonical["records"]}
+    for row in results:
+        verification = by_ref[row["prospect_ref"]]
+        row["canonical_qualification_status"] = verification["status"]
+        row["canonical_missing_evidence"] = verification["missing_evidence"]
+        row["copy_review_eligible"] = verification["copy_brief_ready"]
+        row["contact_review_ready"] = verification["contact_review_ready"]
+        if row["copy_review_eligible"] or row["contact_review_ready"]:
+            raise ValueError("research-only YC record unexpectedly promoted")
     return {
         "schema_version":"empire.acquisition_yc_commercial_evidence.v1",
         "mode":"OBSERVE",
@@ -242,7 +276,11 @@ def review_six(
         "jev_review_lanes":jev["review_lane_counts"],
         "confirmed_procurement_signals":0,
         "authorized_decision_makers":0,
-        "copy_review_eligible":0,
+        "copy_review_eligible":canonical["qualified_for_review"],
+        "contact_review_ready":canonical["contact_review_ready"],
+        "canonical_qualification_contract":canonical["schema_version"],
+        "canonical_research_hold_count":sum(
+            r["canonical_qualification_status"] == "RESEARCH_ONLY" for r in results),
         "records":results,
         "crm_writes":False,"outbound_authorized":False,
         "model_training_authorized":False,"verified_revenue":None,
