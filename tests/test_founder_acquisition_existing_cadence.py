@@ -124,3 +124,72 @@ def test_missing_canonical_email_proof_surfaces_on_existing_business_plan(tmp_pa
     assert item["governed_outbound_release_eligible"] is False
     assert item["automatic_send_authorized"] is False
     assert item["crm_writes"] is False
+
+
+
+def test_no_replies_waits_for_authentic_buyer_not_fake_pilot(tmp_path, monkeypatch):
+    from empire_os import buyer_acquisition_team
+    monkeypatch.setattr(
+        buyer_acquisition_team, "refresh_founder_acquisition_observer",
+        lambda root: {
+            "status": "NINE_FOUNDER_THREADS_REVIEWED",
+            "new_inbound_header_candidates": 0,
+            "new_standalone_inbound_candidates": 0,
+            "standalone_search_coverage_complete": True,
+            "outbound_sent": False,
+        },
+    )
+    plan = buyer_acquisition_team.refresh_buyer_acquisition_plan(tmp_path)
+    pilot = plan["founder_acquisition_observation"]["paid_five_account_pilot"]
+    assert pilot["stage"] == "AWAIT_AUTHENTIC_BUYER_RESPONSE"
+    assert pilot["offer"] == "FIVE_ACCOUNT_SOURCE_CHECKED_INTELLIGENCE_PILOT"
+    assert not pilot["pilot_committed"] and not pilot["payment_verified"]
+    assert not pilot["outbound_send_authorized"]
+    assert not pilot["automatic_followups_enabled"]
+
+
+def test_header_candidate_requires_human_not_buyer_or_payment(tmp_path, monkeypatch):
+    from empire_os import buyer_acquisition_team
+    monkeypatch.setattr(
+        buyer_acquisition_team, "refresh_founder_acquisition_observer",
+        lambda root: {
+            "status": "NINE_FOUNDER_THREADS_REVIEWED",
+            "new_inbound_header_candidates": 0,
+            "new_standalone_inbound_candidates": 1,
+            "standalone_search_coverage_complete": True,
+            "outbound_sent": False,
+        },
+    )
+    pilot = buyer_acquisition_team.refresh_buyer_acquisition_plan(tmp_path)[
+        "founder_acquisition_observation"]["paid_five_account_pilot"]
+    assert pilot["stage"] == "HUMAN_REVIEW_INBOUND_CANDIDATE"
+    full_observation = buyer_acquisition_team.refresh_buyer_acquisition_plan(tmp_path)[
+        "founder_acquisition_observation"]
+    assert full_observation["requires_human_reply_review"] is True
+    assert pilot["next_human_action"] == "VERIFY_SENDER_INTENT_REQUIREMENT_AND_BUYER_AUTHORITY"
+    assert pilot["authentic_buyer_response_verified"] is False
+    assert pilot["buyer_requirement_qualified"] is False
+    assert pilot["pilot_terms_approved"] is False
+    assert pilot["fulfilment_authorized"] is False
+
+
+def test_incomplete_or_held_mailbox_never_claims_no_buyer_reply():
+    from empire_os.buyer_acquisition_team import _five_account_pilot_triage
+    for data in (
+        {},
+        {"status":"NINE_FOUNDER_THREADS_REVIEWED",
+         "new_inbound_header_candidates":0,
+         "new_standalone_inbound_candidates":0},
+        {"status":"NINE_FOUNDER_THREADS_REVIEWED",
+         "new_inbound_header_candidates":0,
+         "new_standalone_inbound_candidates":True,
+         "standalone_search_coverage_complete":True},
+        {"status":"NINE_FOUNDER_THREADS_REVIEWED",
+         "new_inbound_header_candidates":0,
+         "new_standalone_inbound_candidates":0,
+         "standalone_search_coverage_complete":False},
+    ):
+        pilot=_five_account_pilot_triage(data)
+        assert pilot["stage"]=="HELD_INBOUND_OBSERVABILITY_INCOMPLETE"
+        assert pilot["outbound_send_authorized"] is False
+        assert pilot["payment_verified"] is False

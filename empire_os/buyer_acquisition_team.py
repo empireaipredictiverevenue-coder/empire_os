@@ -1356,6 +1356,46 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
                 "outbound_sent": False}
 
 
+
+def _five_account_pilot_triage(founder_review: dict) -> dict:
+    """Genuine-reply-first sales triage in the existing native acquisition plan.
+
+    Inbound header candidates are NEVER an authenticated/qualified buyer,
+    accepted offer, or proof of paid revenue. A held/incomplete mailbox cannot
+    silently imply no replies. No operational permissions are created here.
+    """
+    threads = founder_review.get("new_inbound_header_candidates")
+    standalone = founder_review.get("new_standalone_inbound_candidates")
+    complete = founder_review.get("standalone_search_coverage_complete") is True
+    valid_counts = (
+        type(threads) is int and 0 <= threads <= 50
+        and type(standalone) is int and 0 <= standalone <= 50
+    )
+    if (founder_review.get("status") != "NINE_FOUNDER_THREADS_REVIEWED"
+            or not complete or not valid_counts):
+        stage = "HELD_INBOUND_OBSERVABILITY_INCOMPLETE"
+        action = "REPAIR_OR_REVIEW_ORIGINAL_INBOX_EVIDENCE"
+    elif threads or standalone:
+        stage = "HUMAN_REVIEW_INBOUND_CANDIDATE"
+        action = "VERIFY_SENDER_INTENT_REQUIREMENT_AND_BUYER_AUTHORITY"
+    else:
+        stage = "AWAIT_AUTHENTIC_BUYER_RESPONSE"
+        action = "CONTINUE_EXISTING_NINE_THREAD_MONITOR_NO_FOLLOWUPS"
+    return {
+        "stage": stage,
+        "offer": "FIVE_ACCOUNT_SOURCE_CHECKED_INTELLIGENCE_PILOT",
+        "next_human_action": action,
+        "authentic_buyer_response_verified": False,
+        "buyer_requirement_qualified": False,
+        "pilot_terms_approved": False,
+        "pilot_committed": False,
+        "payment_verified": False,
+        "fulfilment_authorized": False,
+        "automatic_followups_enabled": False,
+        "outbound_send_authorized": False,
+        "database_writes": False,
+    }
+
 def refresh_buyer_acquisition_plan(
     repo_root: str | Path,
 ) -> dict[str, Any]:
@@ -1603,6 +1643,7 @@ def refresh_buyer_acquisition_plan(
         ),
         "canonical_email_clearance_review_required": True,
         "governed_outbound_release_eligible": False,
+        "paid_five_account_pilot": _five_account_pilot_triage(founder_review),
         "public_source_refresh_status": founder_review.get(
             "public_source_refresh_status", "HELD_SOURCE_REFRESH"
         ),
@@ -1619,9 +1660,13 @@ def refresh_buyer_acquisition_plan(
         "outbound_sent": False,
         "crm_writes": False,
         "automatic_send_authorized": False,
-        "requires_human_reply_review": (
-            type(founder_review.get("new_inbound_header_candidates")) is int
-            and founder_review["new_inbound_header_candidates"] > 0
+        "requires_human_reply_review": any(
+            type(founder_review.get(key)) is int
+            and 0 < founder_review[key] <= 50
+            for key in (
+                "new_inbound_header_candidates",
+                "new_standalone_inbound_candidates",
+            )
         ),
     }
     path = root / OUTPUT

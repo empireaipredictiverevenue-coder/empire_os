@@ -18,3 +18,9 @@ Read-only script scripts/audit_founder_email_db_visibility_20261023.py verifies 
 The script uses only the existing root-protected outbound.env and existing original founder ledger, and emits neither private email addresses nor secrets. It never calls an outbound sender, never writes DB data, never sends mail and never activates a service.
 
 Even on full visible-count success, the report remains historical_email_clearance NOT_VERIFIED and new_send_authorized false. Any further contact or customer-facing commitments must pass a fresh, prospective, exact bound-intent policy review and the original compliance owners.
+
+
+## Founder-run full RLS audit — 23 October 2026
+The founder supplied JSON output from the committed original read-only audit. Its exact status was CANONICAL_READ_ONLY_COUNTS_OBSERVED_NOT_SEND_CLEARANCE. database_login_verified=true; full_rls_visibility_verified=true; recipient_count=9. Each of the nine historical Gmail recipients had suppression_matches=0 and canonical_intent_matches=0 in the two original EmpireDB tables under the verified restricted role. No records were written or emails sent.
+
+This verifies read visibility and observed zero matches in the two queried tables, **not** past consent, other suppression systems, or retrospective outbound intent approval. The audit explicitly returned historical_email_clearance=NOT_VERIFIED, canonical_intent_authority=NOT_VERIFIED and new_send_authorized=false. The historical Gmail sends must remain differentiated from governed sends, with no backdating or replay. The original outbound governor timer stays disabled. Independent review of external suppressions, prior company contact history and lawful future permission remains with the original owners.
