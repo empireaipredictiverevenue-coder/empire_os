@@ -103,3 +103,5 @@ def test_observer_creates_local_observation_without_external_actions(tmp_path):
     assert json.loads(output.read_text())["agent_id"] == GTM_AGENT_ID
     assert result["internal_research_review_count"] == 1
     assert result["payments_executed"] is False
+    assert "extended_product_sources" in result
+    assert result["extended_product_sources"]["execution_authority"] == "none"
