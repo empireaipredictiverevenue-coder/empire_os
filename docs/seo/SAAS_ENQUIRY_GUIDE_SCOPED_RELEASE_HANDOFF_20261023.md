@@ -37,3 +37,30 @@ Node editorial/retry suite: 11/11 passed; TypeScript checked. The existing publi
 6. Monitor the original weekly Search Console page-only metric owner after a finality lag. Missing returned page rows mean UNKNOWN, not zero. Compare matched post-release windows; confirm any real customer in canonical EmpireDB and same-tenant Smart CRM, with original opt-in and suppression, before proposing a response.
 
 **Release decision: HOLD pending exact founder/website owner approval and fresh root-controlled rollback.** No DNS, root access, website publish, database, CRM, payment, outreach, or unrelated agent execution occurred in this task. The source belongs to original SEO + website publication; original GTM source count remains governed separately.
+
+## Same-day follow-through: independently revalidated recovery and detailed visuals
+
+The current production static tree was re-inventoried after other agents' commits: **653 files, identical to the candidate's original live baseline hashes**. The 656-file private overlay and its original receipt remain valid. The previous two-page publisher was not run again. The candidate does not contain release authorisation and has not been published.
+
+**Private interim baseline copy, explicitly NOT the required root production backup:**
+
+- `/home/ubuntu/empire_releases/seo_saas_20261023_preview_54601ed54/scoped_overlay/LIVE_653_FILE_NONPRIVILEGED_REVIEW_COPY.tar`
+- SHA-256 `93d5f12c7433bc6071319e99cae8496691c69e48f8133007aeaf55447f346035`; **28,395,520 bytes**, mode 0600, Ubuntu-owned and kept under a private directory.
+- Independent archive readback checked each of 653 regular members against the current live SHA inventory, and checked that the source still matched the pinned baseline after the backup. Owner-review receipt: `LIVE_653_FILE_NONPRIVILEGED_REVIEW_COPY.json`, SHA-256 `c7c7aaac4a22ff5bc91a3632515b7f917966876b9b89a35c9f276fb285eae6a5`.
+- This is **not root-owned custody, production release authority, or a substitute for the approved owner's new root-protected prepublication backup**. Do not let its presence bypass that separate gate.
+
+**Exact transaction and rollback exercise without production mutations:**
+
+- Ran the existing `apply_four_pages_and_eight_assets` transaction helper exclusively against full temporary copies of the live tree, supplying exactly the 2 candidate page files and 3 candidate hashed assets.
+- Success simulation produced exactly 656 files, all matching the private candidate full SHA inventory.
+- An intentionally failing final verification after all writes triggered rollback; the temporary tree returned to **all 653 original SHA-matched source files**, with no additional assets remaining.
+- Receipt: `private_scoped_swap_and_rollback_qa.json`, SHA-256 `5a196294c1f56501c53a342987525742741588c2b75389f9ba5d4aee8556b5ba`. Exercise is not a public deployment or proof that an operator has approved execution.
+
+**Detailed original buyer-guide screenshots, review only:**
+
+- `BROWSER_SAAS_GUIDE_SECTION_390.png` and `BROWSER_SAAS_GUIDE_SECTION_1440.png` show both method cards and the existing form links. Detailed capture receipt `BROWSER_SAAS_GUIDE_DETAILED_VISUAL_QA.json`, SHA-256 `287ca73feac60c5c0caa610706433ea0bc25e245fe79e50f03eafe215ce0dd00`; no new external, POST or missing-assets calls.
+- The long stitched mobile capture appeared to have a visible “Skip to content” chip partway down. A separate read-only browser inspection resolved it: the link was **not focused** and its bounding box was above the viewport (`top=-75.2px`, `bottom=-23.2px`) at 390 and 1440 widths, with the expected offscreen CSS transform. This is a screenshot stitching artifact rather than a demonstrated normally visible overlay. Diagnostic receipt `BROWSER_SAAS_SKIP_DIAGNOSTIC_QA.json` retained privately. Do not conceal a real future user-reported focus or overlay defect.
+
+**Commercial truth and decision gate:** The original GTM service is active but its latest canonical source evidence must be checked on each run; a prior zero count does not authorise repeating zero when its owner proof is stale. No actual customer enquiry, identity/consent readback, outreach, payment or SEO-attributed sale has been established here.
+
+**Final HOLD:** Only the real website owner/founder can approve the exact SHA-pinned 2-file/3-asset release, establish the **root-owned** current 653-file rollback with original authority, and run the existing guarded deployment. No public changes were made.
