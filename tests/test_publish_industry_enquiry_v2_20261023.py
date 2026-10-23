@@ -134,13 +134,17 @@ def test_unprivileged_publish_rejects_before_creating_lock(tmp_path, monkeypatch
 
 
 def test_authorised_lock_path_uses_single_file_without_real_publication(tmp_path, monkeypatch, capsys):
-    """Exercise the existing locking boundary only with a no-op publisher."""
+    """Simulate a trusted private owner directory; never touch the real backup."""
     import json
+    import os
     import scripts.publish_industry_enquiry_v2_20261023 as publisher
 
-    lock = tmp_path / "v2-release.lock"
-    monkeypatch.setattr(publisher, "LOCK", lock)
-    monkeypatch.setattr(publisher.os, "geteuid", lambda: 0)
+    private = tmp_path / "root-only"
+    private.mkdir(mode=0o700)
+    lock = private / "v2-release.lock"
+    real_lock = publisher._locked_release
+    monkeypatch.setattr(publisher, "_locked_release",
+        lambda: real_lock(lock, None, expected_uid=os.getuid(), enforce_root=False))
     monkeypatch.setattr(publisher, "publish", lambda: {"status": "PRIVATE_NOOP_TEST"})
     exit_code = publisher.main([publisher.APPROVAL])
 
@@ -148,3 +152,76 @@ def test_authorised_lock_path_uses_single_file_without_real_publication(tmp_path
     assert json.loads(capsys.readouterr().out)["status"] == "PRIVATE_NOOP_TEST"
     assert lock.is_file()
     assert lock.stat().st_mode & 0o777 == 0o600
+
+
+def test_private_owner_lock_preserves_legacy_concurrency_without_mutating_it(tmp_path):
+    import os
+    import fcntl
+    from scripts.publish_industry_enquiry_v2_20261023 import _locked_release
+    private_dir = tmp_path / "protected"
+    private_dir.mkdir(mode=0o700)
+    private = private_dir / "industry.lock"
+    legacy = tmp_path / "old-ubuntu.lock"
+    legacy.write_bytes(b"")
+    legacy.chmod(0o600)
+    before = legacy.stat()
+    with _locked_release(private, legacy, expected_uid=os.geteuid(), enforce_root=False):
+        assert private.is_file()
+        assert private.stat().st_mode & 0o777 == 0o600
+        assert private.stat().st_uid == os.geteuid()
+        with private.open("rb") as competing:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(competing.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with legacy.open("rb") as competing:
+            with pytest.raises(BlockingIOError):
+                fcntl.flock(competing.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    after = legacy.stat()
+    assert (before.st_ino, before.st_uid, before.st_mode, before.st_size) == (
+        after.st_ino, after.st_uid, after.st_mode, after.st_size)
+
+
+def test_private_lock_rejects_insecure_owner_directory(tmp_path):
+    import os
+    from scripts.publish_industry_enquiry_v2_20261023 import _locked_release
+    directory = tmp_path / "insecure"
+    directory.mkdir(mode=0o777)
+    directory.chmod(0o777)
+    with pytest.raises(ReleaseHold, match="ROOT_ONLY_RELEASE_LOCK_DIRECTORY_REQUIRED"):
+        with _locked_release(directory / "lock", None,
+                             expected_uid=os.geteuid(), enforce_root=False):
+            pytest.fail("untrusted lock directory admitted")
+    assert not (directory / "lock").exists()
+
+
+def test_private_lock_refuses_symlink_and_world_readable_file(tmp_path):
+    import os
+    from scripts.publish_industry_enquiry_v2_20261023 import _locked_release
+    directory = tmp_path / "protected"
+    directory.mkdir(mode=0o700)
+    target = tmp_path / "unrelated"
+    target.write_text("must not write")
+    (directory / "lock").symlink_to(target)
+    with pytest.raises(OSError):
+        with _locked_release(directory / "lock", None,
+                             expected_uid=os.geteuid(), enforce_root=False):
+            pytest.fail("symlink lock admitted")
+    (directory / "lock").unlink()
+    (directory / "lock").write_text("")
+    (directory / "lock").chmod(0o644)
+    with pytest.raises(ReleaseHold, match="UNTRUSTED_PRIVATE_RELEASE_LOCK_FILE"):
+        with _locked_release(directory / "lock", None,
+                             expected_uid=os.geteuid(), enforce_root=False):
+            pytest.fail("world-readable owner lock admitted")
+
+
+def test_unprivileged_owner_cannot_run_even_with_private_lock_available(tmp_path):
+    import os
+    from scripts.publish_industry_enquiry_v2_20261023 import _locked_release
+    if os.geteuid() == 0:
+        pytest.skip("only meaningful in an unprivileged test runner")
+    directory = tmp_path / "private"
+    directory.mkdir(mode=0o700)
+    with pytest.raises(ReleaseHold, match="ORIGINAL_WEBSITE_ROOT_OWNER_AUTHORITY_REQUIRED"):
+        with _locked_release(directory / "lock", None):
+            pytest.fail("non-root acquired publication lock")
+    assert not (directory / "lock").exists()

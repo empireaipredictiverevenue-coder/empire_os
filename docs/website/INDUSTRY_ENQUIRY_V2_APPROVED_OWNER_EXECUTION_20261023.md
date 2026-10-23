@@ -82,3 +82,32 @@ Read-only diagnosis: `/var/lock` points to `/run/lock`, a root-owned `1777` stic
 **Permanent code correction**: owner script `scripts/publish_industry_enquiry_v2_20261023.py` now refuses non-root before its lock creation. Two regression tests cover held unprivileged no-lock behaviour and the existing exact one-lock root code path using a no-op publisher. `13 passed` across the website owner publisher tests and existing controlled publisher transaction tests. This does not grant elevated privileges, auto-run publication or widen the approved site release.
 
 **One-time legitimate authorised root-owner remedy**: verify exact pathname and ownership, ensure no live lock holder, then change ownership of *only* the existing zero-length Ubuntu-owned `run/lock` file to root:root while preserving mode 0600. Never delete the lock to skip contention; never lower `fs.protected_regular`, loosen the sticky-directory or lock permissions, add sudoers entries or run parallel publishers. The owner should then re-run the already-approved exact V2 publisher with current normal `sudo` credentials, and verify its protected current 653-file backup, 659-file site and publication receipt. If any preflight fails, hold and inspect. The unprivileged remote assistant did not modify `/run/lock`, create a privileged backup, publish website files or send messages.
+
+## 23 October lock-file recovery amendment
+
+Root publication previously returned
+`[Errno 13] Permission denied: '/var/lock/empire-industry-enquiry-v2-release-20261023.lock'`
+because the initial unprivileged invocation had created the original 0600
+lock as `ubuntu` inside the kernel-protected sticky `/run/lock` directory.
+The kernel has `fs.protected_regular=2`; root opening the existing user-owned
+file with `O_CREAT` is denied. The original legacy file was unheld in the
+read-only inspection and **was not removed or altered**.
+
+The existing owner publisher now uses a **root-owned mode-0700 backup
+directory** for its new private release lock:
+`/var/backups/empire-website/.industry_enquiry_v2_20261023.release.lock`.
+Only the authorised root owner may execute. It validates the directory owner,
+permissions and absence of symlinks; verifies the lock file is root-owned,
+regular, one-link and 0600; and acquires an exclusive nonblocking lock.
+When the original legacy lock exists, it also opens that same inode
+**read-only without O_CREAT**, verifies regular one-link file status and
+takes a second exclusive nonblocking lock. Both locks remain held throughout
+the original guarded publication. This maintains concurrency safety while
+avoiding Linux's protected-regular-file denial; it does not relax system
+security settings, delete or chown the old lock, or bypass root authority.
+
+The guarded live preflight still checks exactly 653 original files, ten
+replacements and six additions. Backup, immutable candidate, rollback,
+consent and outbound policy remain unchanged. The operator still uses the
+identical founder-approved command above; the software itself now handles the
+legacy lock safely.

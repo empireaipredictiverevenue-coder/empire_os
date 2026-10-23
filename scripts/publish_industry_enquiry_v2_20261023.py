@@ -9,6 +9,7 @@ No forms, CRM, messages, payments, timers, or other site routes are changed.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager, ExitStack
 from datetime import datetime, timezone
 import fcntl
 from hashlib import sha256
@@ -33,7 +34,11 @@ SOURCE_COMMIT = "758a5a31b"
 ARCHIVE = Path("/var/backups/empire-website/industry_enquiry_v2_pre_653_20261023.tar")
 BACKUP_RECEIPT = ARCHIVE.with_suffix(".receipt.json")
 RELEASE_RECEIPT = ARCHIVE.with_suffix(".publication.json")
-LOCK = Path("/var/lock/empire-industry-enquiry-v2-release-20261023.lock")
+# Root-owned private directory avoids fs.protected_regular=2 on stale
+# unprivileged O_CREAT locks in /run/lock. Keep the legacy lock as a
+# read-only compatibility lock to detect an older concurrent operator.
+LOCK = ARCHIVE.parent / ".industry_enquiry_v2_20261023.release.lock"
+LEGACY_LOCK = Path("/var/lock/empire-industry-enquiry-v2-release-20261023.lock")
 APPROVAL = "--apply-founder-approved-industry-enquiry-v2"
 ROUTES = (
     "/commercial", "/industries/roofing", "/industries/solar",
@@ -279,6 +284,60 @@ def publish() -> dict[str, Any]:
     return verified["status"]
 
 
+@contextmanager
+def _locked_release(
+    private_lock: Path = LOCK,
+    legacy_lock: Path | None = LEGACY_LOCK,
+    *,
+    expected_uid: int = 0,
+    enforce_root: bool = True,
+):
+    """Hold the private owner lock and any original legacy lock concurrently.
+
+    Only root can publish. The private lock lives in a root-only directory;
+    the old unprivileged lock is *opened without O_CREAT*, preventing kernel
+    fs.protected_regular from denying root and preserving old-operator
+    serialization. Never remove, chown, or truncate the legacy lock.
+    """
+    if enforce_root and os.geteuid() != 0:
+        raise ReleaseHold("ORIGINAL_WEBSITE_ROOT_OWNER_AUTHORITY_REQUIRED")
+    parent = private_lock.parent
+    if parent.is_symlink():
+        raise ReleaseHold("RELEASE_LOCK_DIRECTORY_SYMLINK_HELD")
+    st = parent.lstat()
+    if (not stat.S_ISDIR(st.st_mode)
+        or st.st_uid != expected_uid
+        or stat.S_IMODE(st.st_mode) & 0o077):
+        raise ReleaseHold("ROOT_ONLY_RELEASE_LOCK_DIRECTORY_REQUIRED")
+    with ExitStack() as stack:
+        fd = os.open(private_lock,
+                     os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC,
+                     0o600)
+        owner = stack.enter_context(os.fdopen(fd, "rb"))
+        meta = os.fstat(owner.fileno())
+        if (not stat.S_ISREG(meta.st_mode) or meta.st_uid != expected_uid
+            or stat.S_IMODE(meta.st_mode) != 0o600 or meta.st_nlink != 1):
+            raise ReleaseHold("UNTRUSTED_PRIVATE_RELEASE_LOCK_FILE")
+        try:
+            fcntl.flock(owner.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise ReleaseHold("PRIVATE_RELEASE_OWNER_ALREADY_ACTIVE") from exc
+        if legacy_lock is not None and os.path.lexists(legacy_lock):
+            # This legacy file is known to be ubuntu-owned (0600).
+            # Never pass O_CREAT for an already-existing sticky-dir file.
+            legacy_fd = os.open(legacy_lock,
+                                os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+            legacy = stack.enter_context(os.fdopen(legacy_fd, "rb"))
+            old_meta = os.fstat(legacy.fileno())
+            if not stat.S_ISREG(old_meta.st_mode) or old_meta.st_nlink != 1:
+                raise ReleaseHold("UNTRUSTED_LEGACY_RELEASE_LOCK_FILE")
+            try:
+                fcntl.flock(legacy.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError as exc:
+                raise ReleaseHold("LEGACY_WEBSITE_RELEASE_OWNER_ALREADY_ACTIVE") from exc
+        yield
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     options = parser.add_mutually_exclusive_group(required=True)
@@ -297,14 +356,7 @@ def main(argv: list[str] | None = None) -> int:
                 "public_writes_performed": False,
             }, sort_keys=True))
         else:
-            # Refuse non-root calls BEFORE creating a lock in /run/lock.
-            # An unprivileged O_CREAT there can leave a user-owned 0600 file
-            # that Linux fs.protected_regular=2 subsequently denies to root.
-            if os.geteuid() != 0:
-                raise ReleaseHold("ORIGINAL_WEBSITE_ROOT_OWNER_AUTHORITY_REQUIRED")
-            fd = os.open(LOCK, os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
-            with os.fdopen(fd, "rb") as lockfile:
-                fcntl.flock(lockfile.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with _locked_release():
                 print(json.dumps(publish(), sort_keys=True))
         return 0
     except (OSError, ValueError, tarfile.TarError, subprocess.SubprocessError) as exc:
