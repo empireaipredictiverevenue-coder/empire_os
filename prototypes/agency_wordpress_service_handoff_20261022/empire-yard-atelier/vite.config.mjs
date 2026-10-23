@@ -12,12 +12,16 @@ export default defineConfig({
     lib: {
       entry: 'src/main.jsx',
       name: 'EmpireYardAtelier',
-      formats: ['iife'],
+      formats: ['es'],
       fileName: () => 'yard.js',
       cssFileName: 'yard'
     },
     rollupOptions: {
-      output: { assetFileNames: 'yard.[ext]' }
+      output: {
+        entryFileNames: 'yard.js',
+        chunkFileNames: 'yard-[name]-[hash].js',
+        assetFileNames: 'yard.[ext]'
+      }
     }
   }
 })

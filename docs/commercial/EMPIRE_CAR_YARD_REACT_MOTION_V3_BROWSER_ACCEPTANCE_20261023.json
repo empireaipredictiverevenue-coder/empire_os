@@ -1,0 +1,126 @@
+{
+  "backup_site_tar_sha256": "daf379b3b1aca149fe7c49ddc5cb9d943774ebf107c0d75ee208a7460ae6092f",
+  "backup_sql_sha256": "f7d67b8cb55019cbae4f99bf6753c24abd679f25d2d6d97add42571442ea786c",
+  "bootstrap": {
+    "native_wpdb_innodb_ready": true,
+    "pages_created": 6,
+    "php": "8.5.4",
+    "plugin_active": true,
+    "status": "NATIVE_WP_MYSQL_STAGE_BOOTSTRAP_PASS",
+    "synthetic_attachment_id": 11,
+    "synthetic_only": true,
+    "theme": "empire-yard-atelier",
+    "vehicle_id": 10,
+    "wordpress": "6.8.11"
+  },
+  "browser_check_count": 40,
+  "browser_checks": {
+    "3d_chunk_requested_separately": true,
+    "admin_login_success": true,
+    "admin_no_server_5xx": true,
+    "all_external_browser_requests_blocked": true,
+    "all_vehicle_controls_are_real_buttons": true,
+    "desktop_hero_present": true,
+    "desktop_home_200": true,
+    "desktop_no_horizontal_overflow": true,
+    "inventory_card_tailwind_styled": true,
+    "inventory_filter_labels_accessible": true,
+    "inventory_image_present": true,
+    "keyboard_focusable_element": true,
+    "login_page_200": true,
+    "login_password_field_present": true,
+    "login_username_field_correct": true,
+    "magic_ui_style_animated_grid": true,
+    "mobile_home_200": true,
+    "mobile_inventory_200": true,
+    "mobile_no_horizontal_overflow": true,
+    "native_wordpress_es_module_loaded": true,
+    "offscreen_scene_unmounted_to_save_gpu": true,
+    "paint_palette_interaction_state": true,
+    "react_root_hydrated": true,
+    "react_three_heading": true,
+    "real_three_js_webgl_canvas_rendered": true,
+    "real_view_and_paint_controls_rendered": true,
+    "returning_to_hero_restores_scene": true,
+    "side_view_interaction_state": true,
+    "staff_cancel_receipt": true,
+    "staff_confirmation_receipt": true,
+    "staff_form_present": true,
+    "staff_hold_listed": true,
+    "staff_hold_receipt": true,
+    "staff_recent_table_present": true,
+    "staff_workbench_200": true,
+    "synthetic_vehicle_visible": true,
+    "tailwind_css_generated": true,
+    "tailwind_inventory_enhancement_loaded": true,
+    "three_js_canvas_or_accessible_fallback": true,
+    "webgl_is_active_in_visible_hero": true
+  },
+  "browser_version": "Chrome/139.0.7258.66",
+  "customer_bookings_enabled": false,
+  "external_requests_blocked": 6,
+  "loopback_only_http": true,
+  "mariadb_unix_socket_only": true,
+  "observed_utc": "2026-10-23T13:03:09.445260+00:00",
+  "outbound_or_payments_enabled": false,
+  "php_version": "8.5.4",
+  "production_changes": false,
+  "responsive": {
+    "desktop": {
+      "document": 1440,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 1440
+    },
+    "mobile": {
+      "document": 390,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 390
+    }
+  },
+  "restore_verified": {
+    "active_theme": "empire-yard-atelier",
+    "attachment_sha256": "8538b217070301eb7cc7f7db1c53149523c1c54fe9783610f746b6e945cdb8e6",
+    "booking_audit_events": 3,
+    "booking_rows": 1,
+    "pages": 7,
+    "production_modified": false,
+    "status": "NATIVE_WP_MYSQL_RESTORE_PASS",
+    "vehicles": 1
+  },
+  "screenshots": {
+    "home-desktop-v3.png": {
+      "bytes": 866066,
+      "sha256": "6aa7cff9b457215b037e076eae793c8f4ef16faf9cbc3ba6a8607217cb1d16fe"
+    },
+    "home-mobile-v3.png": {
+      "bytes": 542498,
+      "sha256": "9bdad52d5043c64cdcf235595a4ee8d5a98b307f350a7237a519e0e49a78077f"
+    },
+    "staff-desktop-v3.png": {
+      "bytes": 75250,
+      "sha256": "58e88bf33e157918aed9ff4cc41d130105a7cf2eaed392d8b46d605064deb137"
+    },
+    "stock-mobile-v3.png": {
+      "bytes": 74209,
+      "sha256": "f490ecdb7ebb2912a30cbd380302e8e8e3a022620d87c914a97afabd6563898b"
+    }
+  },
+  "source_manifest_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.css": "c45362decc6320063a8644ba25dfdad1ba60bf1faa75d514856dbc5072ba6b16",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.js": "65a4b3baf3f621d3a6bc15a76313680a65694f194719f93b4ddd74f79a85d616",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/functions.php": "c38277a3409494c55bf9836da437db529c8b2a8bcf810129cf6d50aee986f015",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/package-lock.json": "e0f6a2df43f04e2ca74eaadb4d943c05cf742e13c375297a64bc0e7f63d218f3",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/ShowroomScene.jsx": "7ca83776b191a1d45b00a012b15ba5e75109f5eb96d78c51e60324d06a73b295",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/inventory-enhance.js": "3c3b224dee7fe4886bde8981652ce8b8ca75580f3de151efa40ef6c3f79ba22a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx": "631831e9010f02aa121bdeb01a7f64cb271281dd0929a8033aee7e1292cb7f9c",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/vite.config.mjs": "e2a0a37afc0f786eaf950bc7ceca9a413557d37e558a6a803a2b0ec669fb6be8",
+    "scripts/premium_wp_v1/bootstrap.php": "eb589438da8753f966611921fd7fdb3898bedb66733047ea10870298ff5c8b21",
+    "scripts/premium_wp_v1/browser_acceptance_v3.cjs": "96a9aa416dd04cce83f4dc9ba1c872fb74f6d179133585a8b19807ede4eaa541",
+    "scripts/premium_wp_v1/restore_verify.php": "cae946adb10d5b7bda5b8732f16e17b1374bc0d31b3d865770b93c917e7f231e",
+    "scripts/premium_wp_v1/run_react_wordpress_design_v2.sh": "5dead2e41afeb5c16bad153340008720ee0fc6281bf05548202b9fd70af4e488"
+  },
+  "status": "WORDPRESS_REACT_THREE_NATIVE_MYSQL_BROWSER_RESTORE_PASS",
+  "synthetic_data_only": true,
+  "wordPress_mysql_same_runtime": true,
+  "wordpress_version": "6.8.11"
+}

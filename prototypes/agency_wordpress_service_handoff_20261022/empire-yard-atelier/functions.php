@@ -11,7 +11,11 @@ add_action('wp_enqueue_scripts', static function (): void {
         wp_enqueue_style('empire-yard-tailwind', $url . '/dist/yard.css', [], (string) filemtime($css));
     }
     if (is_front_page() && is_file($js)) {
-        wp_enqueue_script('empire-yard-react-three', $url . '/dist/yard.js', [], (string) filemtime($js), true);
+        // The ES-module entry keeps React and Three.js in separate, cached chunks.
+        // WordPress 6.5+ script modules preserve browser-native import() paths.
+        if (function_exists('wp_enqueue_script_module')) {
+            wp_enqueue_script_module('empire-yard-react-three', $url . '/dist/yard.js', [], (string) filemtime($js));
+        }
     }
     // Tailwind utilities augment read-only demo stock without altering plugin or booking logic.
     $enhance = $dir . '/src/inventory-enhance.js';

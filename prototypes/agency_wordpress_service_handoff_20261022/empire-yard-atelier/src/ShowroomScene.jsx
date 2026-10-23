@@ -23,21 +23,22 @@ function Tire({ x, z }) {
   )
 }
 
-function Vehicle({ motionAllowed }) {
+function Vehicle({ motionAllowed, view, paint }) {
   const car = useRef()
   useFrame(({ clock, pointer }, delta) => {
     if (!car.current || !motionAllowed) return
-    const desired = -.32 + pointer.x * .09
+    const angle = view === 'front' ? -.85 : view === 'side' ? 1.15 : -.32
+    const desired = angle + pointer.x * .045
     car.current.rotation.y = THREE.MathUtils.damp(car.current.rotation.y, desired, 1.4, delta)
     car.current.position.y = Math.sin(clock.elapsedTime * .65) * .022
   })
   return (
     <group ref={car} rotation={[0, -.32, 0]} scale={.83} position={[0, -.18, 0]}>
       <RoundedBox args={[4.7, .88, 2.05]} radius={.28} smoothness={5} position={[0, .97, 0]} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#1a3d46" metalness={.82} roughness={.18} clearcoat={1} clearcoatRoughness={.11} />
+        <meshPhysicalMaterial color={paint.body} metalness={.82} roughness={.18} clearcoat={1} clearcoatRoughness={.11} />
       </RoundedBox>
       <RoundedBox args={[2.55, .85, 1.83]} radius={.27} smoothness={5} position={[-.16, 1.67, 0]} castShadow>
-        <meshPhysicalMaterial color="#203c48" metalness={.78} roughness={.19} clearcoat={1} />
+        <meshPhysicalMaterial color={paint.roof} metalness={.78} roughness={.19} clearcoat={1} />
       </RoundedBox>
       {[-1, 1].map(side => (
         <React.Fragment key={side}>
@@ -86,7 +87,8 @@ function Vehicle({ motionAllowed }) {
   )
 }
 
-export default function ShowroomScene({ motionAllowed = true }) {
+export default function ShowroomScene({ motionAllowed = true, view = 'three-quarter',
+  paint = { body: '#1a3d46', roof: '#203c48' } }) {
   return (
     <Canvas
       data-testid="showroom-webgl"
@@ -103,7 +105,7 @@ export default function ShowroomScene({ motionAllowed = true }) {
       <spotLight position={[-5, 6, -4]} angle={.8} penumbra={.7} intensity={55} color="#72b9cc" />
       <directionalLight position={[0, 7, -4]} intensity={1.9} color="#e1f4ff" />
       <Float speed={motionAllowed ? .55 : 0} rotationIntensity={0} floatIntensity={motionAllowed ? .2 : 0}>
-        <Vehicle motionAllowed={motionAllowed} />
+        <Vehicle motionAllowed={motionAllowed} view={view} paint={paint} />
       </Float>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.68, 0]} receiveShadow>
         <planeGeometry args={[80, 80]} />

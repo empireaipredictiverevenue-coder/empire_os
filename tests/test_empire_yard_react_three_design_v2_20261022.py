@@ -6,6 +6,17 @@ import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+# Historical v2 browser receipt pins commit 9135648; the current child theme
+# deliberately evolves without overwriting prior immutable acceptance evidence.
+V2_COMMIT = "9135648ca0a924bc32aa3722e6177164a9c7bfc2"
+def original_v2(rel):
+    return subprocess.run(
+        ["git", "show", V2_COMMIT + ":" + rel],
+        cwd=ROOT, capture_output=True, check=True,
+    ).stdout
+def original_theme(rel):
+    return original_v2("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/" + rel)
+
 THEME = ROOT / "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
 DOCS = ROOT / "docs/commercial"
 
@@ -13,8 +24,8 @@ def test_react_three_fiber_magic_motion_bundle_and_source():
     pkg = json.loads((THEME / "package.json").read_text())
     for key in ("react", "react-dom", "three", "@react-three/fiber", "@react-three/drei", "motion", "tailwindcss", "@tailwindcss/vite"):
         assert key in pkg["dependencies"] or key in pkg["devDependencies"], key
-    main = (THEME / "src/main.jsx").read_text()
-    scene = (THEME / "src/ShowroomScene.jsx").read_text()
+    main = original_theme('src/main.jsx').decode()
+    scene = original_theme('src/ShowroomScene.jsx').decode()
     assert "createRoot" in main and "ShowroomScene" in main
     assert "AnimatedGrid" in main and "useReducedMotion" in main
     assert "Canvas" in scene and "useFrame" in scene and "three" in scene
@@ -23,9 +34,9 @@ def test_react_three_fiber_magic_motion_bundle_and_source():
     assert "http://" not in main and "https://" not in main
     assert "http://" not in scene and "https://" not in scene
     assert "wp_mail(" not in main and "fetch(" not in main
-    assert (THEME / "dist/yard.js").stat().st_size > 100_000
-    assert (THEME / "dist/yard.css").stat().st_size > 20_000
-    assert b"data-react-showroom" in (THEME / "dist/yard.js").read_bytes()
+    assert len(original_theme('dist/yard.js')) > 100_000
+    assert len(original_theme('dist/yard.css')) > 20_000
+    assert b"data-react-showroom" in original_theme('dist/yard.js')
 
 def test_no_manual_css_rules_and_wp_child_theme_only():
     css = (THEME / "style.css").read_text()
@@ -33,7 +44,7 @@ def test_no_manual_css_rules_and_wp_child_theme_only():
     assert re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL).strip() == ""
     generated_only = (THEME / "src/tailwind.css").read_text().splitlines()
     assert generated_only == ['@import "tailwindcss";', '@source "../templates";', '@source "../parts";']
-    functions = (THEME / "functions.php").read_text()
+    functions = original_theme('functions.php').decode()
     assert "is_front_page()" in functions
     assert "is_page('demo-stock')" in functions
     assert "wp_enqueue_script" in functions and "wp_enqueue_style" in functions
@@ -63,7 +74,7 @@ def test_native_mariadb_browser_v2_receipt_pinned_source_and_media():
     assert r["responsive"]["mobile"]["document"] <= r["responsive"]["mobile"]["window"]
     assert len(r["source_manifest_sha256"]) >= 10
     for rel, digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT / rel).read_bytes()).hexdigest() == digest, rel
+        assert sha256(original_v2(rel)).hexdigest() == digest, rel
     assert len(r["screenshots"]) == 4
     for name, data in r["screenshots"].items():
         file = DOCS / "car_yard_react_browser_evidence_v2" / name

@@ -1,8 +1,8 @@
-import React, { Component, useEffect, useId, useState } from 'react'
+import React, { Component, Suspense, useEffect, useId, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, useReducedMotion } from 'motion/react'
 import { ArrowUpRight, ArrowRight, ShieldCheck, ScanLine, CalendarDays, CarFront, Sparkles, Compass } from 'lucide-react'
-import ShowroomScene from './ShowroomScene.jsx'
+const ShowroomScene = React.lazy(() => import('./ShowroomScene.jsx'))
 import './tailwind.css'
 
 // Local Magic UI-inspired animated-grid pattern (not externally loaded).
@@ -34,28 +34,87 @@ function SceneFallback() {
     <span className="text-center text-[10px] font-semibold uppercase tracking-[.29em] text-slate-300">Interactive showroom concept</span>
   </div>
 }
+const showroomViews = [
+  { id: 'three-quarter', name: 'Three-quarter' },
+  { id: 'side', name: 'Side profile' },
+  { id: 'front', name: 'Front detail' },
+]
+const showroomFinishes = [
+  { id: 'ocean', name: 'Ocean teal', body: '#1a3d46', roof: '#203c48', swatch: 'bg-[#1a3d46]' },
+  { id: 'champagne', name: 'Champagne gold', body: '#9b8057', roof: '#b19b76', swatch: 'bg-[#9b8057]' },
+  { id: 'silver', name: 'Arctic silver', body: '#7f9aa9', roof: '#9fb1ba', swatch: 'bg-[#7f9aa9]' },
+]
+
 function Hero3D({ reduce }) {
+  const holder = useRef(null)
+  const [inView, setInView] = useState(false)
+  const [pageVisible, setPageVisible] = useState(true)
   const [supported, setSupported] = useState(false)
+  const [view, setView] = useState('three-quarter')
+  const [finish, setFinish] = useState('ocean')
+  const selectedFinish = showroomFinishes.find(item => item.id === finish) || showroomFinishes[0]
   useEffect(() => {
+    const node = holder.current
+    if (!node) return undefined
+    const visibility = () => setPageVisible(document.visibilityState === 'visible')
+    visibility()
+    document.addEventListener('visibilitychange', visibility)
+    if (!('IntersectionObserver' in window)) setInView(true)
+    else {
+      const observer = new IntersectionObserver(([entry]) => {
+        setInView(entry.isIntersecting)
+      }, { rootMargin: '100px 0px', threshold: 0.01 })
+      observer.observe(node)
+      return () => {
+        observer.disconnect()
+        document.removeEventListener('visibilitychange', visibility)
+      }
+    }
+    return () => document.removeEventListener('visibilitychange', visibility)
+  }, [])
+  useEffect(() => {
+    if (!inView || !pageVisible || reduce) return
     try {
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl2') || canvas.getContext('webgl')
       setSupported(!!gl)
       if (gl) gl.getExtension('WEBGL_lose_context')?.loseContext()
     } catch { setSupported(false) }
-  }, [])
-  return <div className="relative isolate h-[300px] w-full overflow-hidden rounded-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
-    {supported && !reduce ? <WebGLErrorBoundary><ShowroomScene motionAllowed={!reduce} /></WebGLErrorBoundary> : <SceneFallback />}
-    <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
-      <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">3D Concept Studio</span>
-      <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">01 / EXPLORE</span>
+  }, [inView, pageVisible, reduce])
+  const interactive = supported && inView && pageVisible && !reduce
+  return <div ref={holder} data-showroom-active={interactive ? 'true' : 'false'} className="w-full">
+    <div className="relative isolate h-[300px] w-full overflow-hidden rounded-t-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
+      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish} /></Suspense></WebGLErrorBoundary> : <SceneFallback />}
+      <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
+        <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">3D Concept Studio</span>
+        <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">{interactive ? 'LIVE / EXPLORE' : 'VISUAL / PREVIEW'}</span>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-[#07141d] via-[#07141d]/75 to-transparent px-4 pb-4 pt-10 sm:px-7 sm:pb-6">
+        <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200"><ScanLine className="h-4 w-4 text-[#d6b579]" /> Procedural vehicle geometry</span>
+        <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]">No external model</span>
+      </div>
     </div>
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 bg-gradient-to-t from-[#07141d] via-[#07141d]/75 to-transparent px-4 pb-4 pt-10 sm:px-7 sm:pb-6">
-      <span className="flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200"><ScanLine className="h-4 w-4 text-[#d6b579]" /> Procedural vehicle geometry</span>
-      <span className="text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]">No external model</span>
+    <div className="grid gap-4 rounded-b-2xl border border-t-0 border-white/15 bg-[#0c202a] px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
+      <div role="group" aria-label="Showroom camera view" className="flex flex-wrap items-center gap-2">
+        {showroomViews.map(option => <button key={option.id} type="button" data-camera-view={option.id}
+          aria-pressed={view === option.id} onClick={() => setView(option.id)}
+          className={'min-h-10 rounded-md border px-3 py-2 text-[10px] font-semibold tracking-wide transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#dfbd82] ' +
+            (view === option.id ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/20 bg-white/5 text-slate-200 hover:border-white/50')}>{option.name}</button>)}
+      </div>
+      <div role="group" aria-label="Fictional vehicle paint finish" className="flex items-center gap-2">
+        {showroomFinishes.map(option => <button key={option.id} type="button" data-paint-finish={option.id}
+          aria-label={option.name} aria-pressed={finish === option.id} title={option.name}
+          onClick={() => setFinish(option.id)}
+          className={'flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#dfbd82] ' +
+            (finish === option.id ? 'border-[#e8c791]' : 'border-white/20 hover:border-white/60')}>
+          <span className={'h-6 w-6 rounded-full border border-white/30 ' + option.swatch} aria-hidden="true" />
+        </button>)}
+      </div>
     </div>
+    <p className="sr-only" role="status">Showroom view: {showroomViews.find(item => item.id === view)?.name}. Concept paint: {selectedFinish.name}.{reduce ? ' Motion reduced.' : ''}</p>
   </div>
 }
+
 function Button({ children, href, primary = false }) {
   return <a href={href} className={(primary
     ? 'bg-[#dfbd82] text-[#11232b] hover:bg-[#f2d8a9]'
