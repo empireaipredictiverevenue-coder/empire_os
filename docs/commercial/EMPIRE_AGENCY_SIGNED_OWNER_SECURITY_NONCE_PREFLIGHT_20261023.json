@@ -1,0 +1,33 @@
+{
+  "allowed_operations": [
+    "capabilities:read",
+    "vehicles:read"
+  ],
+  "distributed_nonce_authority_deployed": false,
+  "independent_issuer_keys_required": true,
+  "limitations": "Synthetic separately signed owner and security grants, ephemeral test keys and private local replay receipts only; canonical real customer site ownership, managed secrets, audited service identity and remote production OAuth are still owner-blocked.",
+  "managed_credential_vault_activated": false,
+  "max_site_grant_age_seconds": 86400,
+  "nonce_receipts": "owner_private_single_host_exclusive_create",
+  "observed_utc": "2026-10-23T12:41:26.433802+00:00",
+  "owner_grant_and_security_registry_rechecked_each_operation": true,
+  "owner_site_signature_algorithm": "Ed25519",
+  "production_authority_issued": false,
+  "production_changes": false,
+  "production_empiredb_accessed": false,
+  "production_site_grant_issued": false,
+  "remote_mcp_exposed": false,
+  "schema": "empire.agency.signed_site_owner_security_nonce_preflight.v1",
+  "security_connector_signature_algorithm": "Ed25519",
+  "site_origin_policy": "127.0.0.1_loopback_only",
+  "source_sha256": {
+    "empire_os/agency_canonical_membership.py": "980d68ca729020637718bc0578afd2f427a058f5a2be7d966247c23a282474bf",
+    "empire_os/agency_connector_preflight.py": "68a216b17041ca393bc1ffcb29eb65e77023dd1b2718c298d56aa94658b1f224",
+    "empire_os/agency_owner_gated_connector.py": "f0e49451dea1fade31144cb89d97c4369d08fbc11600dc4311f8394416b4c9eb",
+    "empire_os/agency_private_nonce_store.py": "a9887339020b2fe31ab35929827de427976bb12cb3a998e4a197ae6877d0188a",
+    "empire_os/agency_signed_site_grants.py": "0e11d28317b96fab960f4bacd14172fd7472b4759d3187db96bcb10e785ac39f",
+    "tests/test_agency_private_nonce_store_20261023.py": "724a0a29a46eb61c9679e5dee8bba7073fddd340fb5ea7131e10df209fa48bd3",
+    "tests/test_agency_signed_site_grants_20261023.py": "b748e6a9c1b26f8df80a3809f2d64904cdbb1ef6dbe25a5b6881897eb2876bfc"
+  },
+  "status": "SIGNED_OWNER_SECURITY_AND_PERSISTENT_SINGLE_HOST_REPLAY_PREFLIGHT_PASS"
+}
