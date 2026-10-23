@@ -1,5 +1,6 @@
 "use client";
 import PredictiveRevenueBuyerExplanation from "@/components/PredictiveRevenueBuyerExplanation";
+import SaaSRevenueLeakageGuide from "@/components/SaaSRevenueLeakageGuide";
 
 import {
   ArrowLeft,
@@ -304,6 +305,7 @@ export default function PredictiveRevenuePage() {
 
           <section>
             <form
+              id="deployment-request"
               onSubmit={submit}
               className="sticky top-8 rounded-3xl border border-white/[0.09] bg-[#07142f]/80 p-6 shadow-[0_30px_100px_rgba(0,0,0,.3)] backdrop-blur-xl md:p-8"
             >
@@ -490,6 +492,7 @@ export default function PredictiveRevenuePage() {
           </section>
         </div>
         <PredictiveRevenueBuyerExplanation />
+        <SaaSRevenueLeakageGuide />
       </div>
 
       <style jsx>{`
