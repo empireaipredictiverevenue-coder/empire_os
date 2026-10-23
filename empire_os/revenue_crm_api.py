@@ -14,6 +14,10 @@ from pydantic import BaseModel, Field, ConfigDict
 from empire_os.revenue_crm_transport import (
     PostgresRevenueCrmRepository, RevenueCrmTransportError,
 )
+from empire_os.predictive_revenue_prime_crm import (
+    PrimeCrmReadUnavailable,
+    review_authenticated_crm_prospects,
+)
 from empire_os.revenue_crm_customer_success import (
     route_customer_success_review,
 )
@@ -413,6 +417,34 @@ def create_revenue_crm_router(
         try:
             return read()
         except RevenueCrmTransportError:
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_read_unavailable",
+            ) from None
+
+    @router.get("/predictive-prime/prospects")
+    def authenticated_prime_prospect_review(
+        request: Request,
+        limit: int = Query(default=100, ge=1, le=100),
+    ) -> dict[str, Any]:
+        """Aggregate-only PRIME review via existing authenticated CRM authority.
+
+        Never enabled in the legacy/hub-only router without canonical signed
+        tenant membership and a dedicated, tenant-bound PostgreSQL reader.
+        """
+        if resolve_authenticated_read is None:
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_scope_required",
+            )
+        repo = require_repository(request)
+        if not isinstance(repo, PostgresRevenueCrmRepository):
+            raise HTTPException(
+                status_code=503, detail="authenticated_crm_read_unavailable",
+            )
+        try:
+            return review_authenticated_crm_prospects(
+                repository=repo, tenant_id=repo.tenant_id, limit=limit,
+            )
+        except PrimeCrmReadUnavailable:
             raise HTTPException(
                 status_code=503, detail="authenticated_crm_read_unavailable",
             ) from None
