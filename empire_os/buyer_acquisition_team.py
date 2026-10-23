@@ -1520,6 +1520,24 @@ def refresh_buyer_acquisition_plan(
             or permit_inventory_health["state"] != "OK"
         ),
     }
+    # The existing five-minute Buyer Acquisition Team is the sole owner of
+    # this read-only founder inbox cycle. Its sanitized status also belongs
+    # in the existing acquisition plan, not a duplicate system or UI.
+    # The observer returns only bounded status and counts, never addresses.
+    founder_review = refresh_founder_acquisition_observer(root)
+    payload["founder_acquisition_observation"] = {
+        "status": founder_review["status"],
+        "new_inbound_header_candidates": founder_review.get(
+            "new_inbound_header_candidates"
+        ),
+        "outbound_sent": False,
+        "crm_writes": False,
+        "automatic_send_authorized": False,
+        "requires_human_reply_review": (
+            type(founder_review.get("new_inbound_header_candidates")) is int
+            and founder_review["new_inbound_header_candidates"] > 0
+        ),
+    }
     path = root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
@@ -1528,8 +1546,4 @@ def refresh_buyer_acquisition_plan(
         encoding="utf-8",
     )
     tmp.replace(path)
-    # The existing five-minute Buyer Acquisition Team is the sole owner of
-    # this OBSERVE-only founder inbox cycle. It never starts a second timer,
-    # sends mail, grants authority, or alters the main plan on failure.
-    refresh_founder_acquisition_observer(root)
     return payload

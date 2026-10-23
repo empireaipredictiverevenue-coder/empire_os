@@ -67,3 +67,39 @@ def test_untrusted_worker_claim_never_promotes_buyer_or_send(monkeypatch):
     v = team.refresh_founder_acquisition_observer("/srv/empire_os")
     assert v["status"] == "HELD_INCOMPLETE_FOUNDER_MAILBOX_REVIEW"
     assert v["outbound_sent"] is False
+
+
+def test_plan_contains_sanitized_native_founder_status(tmp_path, monkeypatch):
+    from empire_os.buyer_acquisition_team import refresh_buyer_acquisition_plan
+    import json
+
+    # The normal plan builder is tested independently. This verifies the
+    # persisted status is generated in one original pipeline execution.
+    snapshot = refresh_buyer_acquisition_plan(tmp_path)
+    observed = snapshot["founder_acquisition_observation"]
+    assert observed["status"] == "NOT_PRODUCTION_ROOT"
+    assert observed["outbound_sent"] is False
+    assert observed["crm_writes"] is False
+    assert observed["automatic_send_authorized"] is False
+    assert observed["requires_human_reply_review"] is False
+    saved = json.loads((tmp_path / "runtime/buyer_acquisition/latest.json").read_text())
+    assert saved["founder_acquisition_observation"] == observed
+    assert "@" not in json.dumps(observed)
+
+
+def test_sanitized_status_requires_review_only_for_positive_candidates(tmp_path, monkeypatch):
+    from empire_os import buyer_acquisition_team
+    monkeypatch.setattr(
+        buyer_acquisition_team,
+        "refresh_founder_acquisition_observer",
+        lambda root: {
+            "status": "SEVEN_FOUNDER_THREADS_REVIEWED",
+            "new_inbound_header_candidates": 2,
+            "outbound_sent": False,
+        },
+    )
+    snapshot = buyer_acquisition_team.refresh_buyer_acquisition_plan(tmp_path)
+    observed = snapshot["founder_acquisition_observation"]
+    assert observed["new_inbound_header_candidates"] == 2
+    assert observed["requires_human_reply_review"] is True
+    assert observed["automatic_send_authorized"] is False
