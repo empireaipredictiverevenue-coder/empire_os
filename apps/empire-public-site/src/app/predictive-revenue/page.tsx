@@ -9,7 +9,12 @@ import {
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  reusePredictiveInterestAttempt,
+  type PredictiveInterestAttempt,
+  type PredictiveInterestDetails,
+} from "@/lib/predictive-interest-attempt";
 
 type Product = {
   product_code: string;
@@ -80,6 +85,7 @@ export default function PredictiveRevenuePage() {
   const [website, setWebsite] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<IntakeResult | null>(null);
+  const enquiryAttemptRef = useRef<PredictiveInterestAttempt | null>(null);
 
   useEffect(() => {
     fetch("/v1/checkout/predictive-revenue/products")
@@ -117,50 +123,55 @@ export default function PredictiveRevenuePage() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
-    if (!product || !contactConsent || submitting) return;
+    if (!product || !contactConsent || submitting ||
+        result?.decision === "deployment_interest_recorded") return;
 
     setSubmitting(true);
     setResult(null);
-    const idempotencyKey =
-      globalThis.crypto?.randomUUID?.() ||
-      `predictive-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
     try {
+      const details: PredictiveInterestDetails = {
+        product_code: product.product_code,
+        business_name: businessName,
+        email, domain, industry, geography,
+        annual_revenue_band: revenueBand,
+        desired_outcome: desiredOutcome,
+        systems, contact_consent: contactConsent, website,
+      };
+      const attempt = reusePredictiveInterestAttempt(
+        enquiryAttemptRef.current, details,
+        () => {
+          const key = globalThis.crypto?.randomUUID?.();
+          if (!key) throw new Error("secure_predictive_key_unavailable");
+          return key;
+        },
+      );
+      enquiryAttemptRef.current = attempt;
       const response = await fetch(
         "/v1/checkout/predictive-revenue/interests",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            product_code: product.product_code,
-            business_name: businessName,
-            email,
-            domain,
-            industry,
-            geography,
-            annual_revenue_band: revenueBand,
-            desired_outcome: desiredOutcome,
-            systems,
-            contact_consent: contactConsent,
-            website,
-            idempotency_key: idempotencyKey,
+            ...details,
+            idempotency_key: attempt.idempotencyKey,
           }),
         },
       );
       const body = await response.json();
       setResult(
-        response.ok
+        response.ok && body?.decision === "deployment_interest_recorded" &&
+        typeof body.prospect_id === "string" && body.prospect_id.length > 0
           ? body
           : {
-              detail:
-                body.detail ||
-                body.error ||
-                "Deployment request could not be recorded.",
+              detail: body?.detail || body?.error ||
+                "We could not confirm receipt. You can retry this same request safely. No order was placed.",
             },
       );
-    } catch {
-      setResult({
-        detail: "Predictive Revenue intake is temporarily unavailable.",
+    } catch (error) {
+      setResult({ detail:
+        error instanceof Error && error.message === "secure_predictive_key_unavailable"
+          ? "Secure request identity unavailable. Please reload before retrying."
+          : "We could not confirm receipt. You can retry this same request safely. No order was placed.",
       });
     } finally {
       setSubmitting(false);
@@ -436,7 +447,8 @@ export default function PredictiveRevenuePage() {
                 Before submitting, <a href="/privacy" className="font-semibold text-cyan-200 underline underline-offset-4 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300">read how Empire AI handles this enquiry</a>.
               </p>
               <button
-                disabled={!product || !contactConsent || submitting}
+                disabled={!product || !contactConsent || submitting ||
+                  result?.decision === "deployment_interest_recorded"}
                 className="mt-7 inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-xl bg-[#eaf2ff] px-5 text-xs font-bold tracking-[0.11em] text-[#07132c] transition enabled:hover:-translate-y-0.5 enabled:hover:bg-white disabled:cursor-not-allowed disabled:opacity-35"
               >
                 {submitting ? (
