@@ -26,6 +26,7 @@ function AnimatedGrid({ reduce }) {
 class WebGLErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { failed: false } }
   static getDerivedStateFromError() { return { failed: true } }
+  componentDidCatch() { this.props.onFailure?.() }
   render() { return this.state.failed ? <SceneFallback /> : this.props.children }
 }
 function SceneFallback({ launch3D }) {
@@ -61,9 +62,37 @@ function Hero3D({ reduce, modelUrl }) {
   const [finish, setFinish] = useState('ocean')
   const [modelMode, setModelMode] = useState('concept')
   const [studioReady, setStudioReady] = useState(false)
+  const [largeModelCaution, setLargeModelCaution] = useState('')
+  const [largeModelConfirmed, setLargeModelConfirmed] = useState(false)
+  const [modelError, setModelError] = useState(false)
   const selectedFinish = showroomFinishes.find(item => item.id === finish) || showroomFinishes[0]
   const studioSelected = modelMode === 'studio'
   const showStudioReady = () => setStudioReady(true)
+  const selectStudio = () => {
+    if (!interactive || reduce || !modelUrl) return
+    if (largeModelCaution && !largeModelConfirmed) {
+      setLargeModelConfirmed(true)
+      return
+    }
+    setStudioReady(false)
+    setModelError(false)
+    setModelMode('studio')
+  }
+  const failStudio = () => {
+    // A corrupt/unsupported GLB must never strand the visitor in a blank hero.
+    setModelError(true)
+    setStudioReady(false)
+    setModelMode('concept')
+  }
+  useEffect(() => {
+    const caution = window.navigator.connection?.saveData
+      ? 'Data Saver is on. This model transfers about 9 MB.'
+      : (Number(window.navigator.deviceMemory) > 0 &&
+          Number(window.navigator.deviceMemory) <= 2)
+          ? 'Your device reports limited memory. This model transfers about 9 MB.'
+          : ''
+    setLargeModelCaution(caution)
+  }, [])
   useEffect(() => {
     // Mobile launches WebGL on explicit request: avoid a multi-MB scene
     // download, GPU startup and battery use for visitors who only need stock.
@@ -107,7 +136,7 @@ function Hero3D({ reduce, modelUrl }) {
     data-studio-model-ready={studioSelected && studioReady ? 'true' : 'false'}
     data-selected-model={modelMode} className="w-full">
     <div className="relative isolate h-[300px] w-full overflow-hidden rounded-t-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
-      {interactive ? <WebGLErrorBoundary><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish}
+      {interactive ? <WebGLErrorBoundary key={modelMode} onFailure={studioSelected ? failStudio : undefined}><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish}
           modelMode={modelMode} modelUrl={modelUrl} onStudioReady={showStudioReady} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
         <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">{studioSelected ? 'PBR Model Studio' : '3D Concept Studio'}</span>
@@ -125,12 +154,16 @@ function Hero3D({ reduce, modelUrl }) {
           className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ' +
             (!studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>Original concept</button>
         <button type="button" data-model-mode="studio" aria-pressed={studioSelected}
-          onClick={() => { setStudioReady(false); setModelMode('studio') }}
-          disabled={!modelUrl || reduce}
+          onClick={selectStudio}
+          disabled={!modelUrl || reduce || !interactive}
           className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-50 ' +
-            (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>Load Studio PBR · 9 MB</button>
+            (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>{largeModelConfirmed && !studioSelected ? 'Confirm Studio PBR · 9 MB' : 'Load Studio PBR · 9 MB'}</button>
       </div>
       <span className="text-[9px] font-semibold text-slate-300">High-detail model loads only on request</span>
+      {largeModelCaution && !studioSelected && <p data-device-caution="true" className="w-full text-xs leading-5 text-[#f2d8a9]">
+        {largeModelCaution} {largeModelConfirmed ? 'Click Confirm Studio PBR to proceed.' : 'A second confirmation is required.'}
+      </p>}
+      {modelError && <p data-studio-recovered="true" role="status" className="w-full text-xs leading-5 text-[#f2d8a9]">The high-detail model could not open on this device. The original showroom has been restored.</p>}
     </div>
     <div className="grid gap-4 rounded-b-2xl border border-t-0 border-white/15 bg-[#0c202a] px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
       <div role="group" aria-label="Showroom camera view" className="flex flex-wrap items-center gap-2">

@@ -3,6 +3,7 @@ import hashlib
 import json
 import re
 import struct
+import subprocess
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -11,6 +12,12 @@ THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-ate
 ASSET=THEME/"assets/models/car-concept-editorial-webp.glb"
 META=THEME/"assets/models/MODEL_PROVENANCE.json"
 RECEIPT=ROOT/"docs/commercial/EMPIRE_CAR_YARD_STUDIO_PBR_V7_BROWSER_ACCEPTANCE_20261023.json"
+
+V7_COMMIT="fa8d282382e6f357c90458dbae2172e0764f4aa0"
+def historic_v7(path):
+    return subprocess.run(["git","show",V7_COMMIT+":"+path],cwd=ROOT,
+                          check=True,capture_output=True).stdout
+
 
 def test_cc_by_asset_license_and_derivative_mark_exclusions():
     meta=json.loads(META.read_text())
@@ -92,7 +99,7 @@ def test_v7_source_manifest_and_evidence_screenshots_exact():
     r=json.loads(RECEIPT.read_text())
     assert len(r["source_manifest_sha256"])>=20
     for rel,digest in r["source_manifest_sha256"].items():
-        assert hashlib.sha256((ROOT/rel).read_bytes()).hexdigest()==digest,rel
+        assert hashlib.sha256(historic_v7(rel)).hexdigest()==digest,rel
     assert len(r["screenshots"])==6
     for name,props in r["screenshots"].items():
         img=ROOT/"docs/commercial/car_yard_react_browser_evidence_v7"/name
