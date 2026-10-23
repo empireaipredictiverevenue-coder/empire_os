@@ -1,0 +1,85 @@
+{
+  "all_live_only_pages_and_assets_preserved": true,
+  "checks": {
+    "all_direct_static_references_available": true,
+    "compiled_commercial_form_transmits_claimed_entry_page": true,
+    "isolated_nextjs_build_passed": true,
+    "live_html_matches_origin_at_preflight": true,
+    "no_common_immutable_asset_modified": true,
+    "prior_website_owner_auditor_passed": true,
+    "staged_industry_links_source_claims_valid": true
+  },
+  "counts": {
+    "immutable_additions": 6,
+    "live_files": 653,
+    "preserved_live_files": 643,
+    "referenced_static_assets": 10,
+    "replacements": 10,
+    "stage_files": 135
+  },
+  "crm_writes": false,
+  "customer_submission_performed": false,
+  "expected_live_pre_release_sha256": {
+    "commercial.html": "404d87e3c3ee366415662389992c0001eb25e0bcf24e526ef898b1f0e5f2e03e",
+    "commercial.txt": "bf6cab7bafed5c977bdde9aeac24cc83743dbb0734443d6ba440f5e895aa904a",
+    "industries/hvac.html": "711b618f267275131246772d74bb8043c7b4095c2a5c1fc6fbcf54cad106be5d",
+    "industries/hvac.txt": "f32f1e63897b3fc451eca3253059849b2cca350341e3ec3365c0db66e5060171",
+    "industries/property.html": "bcefec88bc7c3160a5b39f9cdc047e28c97b5183f250df7dbca87c87bd623e16",
+    "industries/property.txt": "de0ad4b2facf53599bac59413f772fdb498b398dc7e1f0e4d1cdc8e51cf1c793",
+    "industries/roofing.html": "8124bd1df1829207d45d0cbddd97ea1f26fb12a289690576a8f68f820351d794",
+    "industries/roofing.txt": "b3e46a536989c29bbb078289e498493f0c3b802975f0ea8549369adfbfb1a631",
+    "industries/solar.html": "3178f73b066376f08859195aeda2d8b8cf172ce4850d763411c089abb2e15526",
+    "industries/solar.txt": "495ac67dfcbb52f4250d23a2851cd9b1c6be5b8fec34eb801c398f239d8edb2e"
+  },
+  "founder_visual_approval_recorded": false,
+  "full_export_replacement_authorized": false,
+  "live_site": "/srv/empire_os/apps/empire-public-site/out",
+  "mode": "OBSERVE",
+  "next_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+  "observed_utc": "2026-10-23T12:34:55.518487+00:00",
+  "outbound_sent": false,
+  "payment_activation": false,
+  "proposed_immutable_additions_sha256": {
+    "_next/static/8Z-WEFSarJil9Dm_1Td77/_buildManifest.js": "9476e0afd3f9da68a64e6ec58631191fd3eaca62c9f5a377e7517fe9a89e59ea",
+    "_next/static/8Z-WEFSarJil9Dm_1Td77/_clientMiddlewareManifest.js": "5483e3295dc35dfe29ea932efc85341c916f10ff78ff5b0e965e003710893a4a",
+    "_next/static/8Z-WEFSarJil9Dm_1Td77/_ssgManifest.js": "6d06ccc429b812337889f08fcf4e0792b070203e38a72b4af351e6506f914ad4",
+    "_next/static/chunks/0qflhf63m7s3q.js": "a03c27aecedd2d0c740e0a3c2d571c1f5789b52bc837ea9432cfa6d3880cd3a2",
+    "_next/static/chunks/118245v_5a4ll.js": "8c908e95616a82d915e603a8ea74b6ac025a8bc641171f61257219d7bf5a2cf7",
+    "_next/static/chunks/3zj_zq-wkfv2b.css": "32e74531817c4dbfcf16b210a1c9565413c5293b9e1876668f54853dfdcdee36"
+  },
+  "proposed_surgical_replacements_sha256": {
+    "commercial.html": "85d49dbb8fdc62381e93851aaf47584dee9b539c008f40fa50bba7f1e1d7eb8a",
+    "commercial.txt": "d4322c6c873b5abd208658621b23813454619e6f48b6fa58bd77b69b12ca6c98",
+    "industries/hvac.html": "0824afb5d7ef3300409cf9437ec966c9133746d279f99892cced91ac717c7bba",
+    "industries/hvac.txt": "97a1ffb68c1fba76fd9a3babcd04538aac26ae5bc76b1e562cc972365663a8f6",
+    "industries/property.html": "9bf6d833e8db1ee41a5eb6c6a8dbb357d4d451a4bd3c1991eaa4cb326d66b754",
+    "industries/property.txt": "ab5723ba7f54c53ae32e71a654d8ece81a1ed8d70469336010010dece394178e",
+    "industries/roofing.html": "e516783a579b26d7cd986828663ffe9b6eff204c972c50dc29baa609018d719e",
+    "industries/roofing.txt": "91d7a05bb4f163b454ad82c13611adb61de1ffdfaef0e001a2f563f04a7d20bd",
+    "industries/solar.html": "66791610c0d3fa741661316c5a8b664dd4660b693aa0d4f153a1156a6f829908",
+    "industries/solar.txt": "fb582aecb4cf18111b6f81e3e1518b50b8ab027cf609cbf6d5930cde1077a089"
+  },
+  "schema_version": "empire.website.industry_enquiry_release_candidate.v1",
+  "source_commit": "2fa9213bb",
+  "source_project": "/home/ubuntu/empire_worktrees/industry_enquiry_release_review_20261023/apps/empire-public-site",
+  "source_sha256": {
+    "apps/empire-public-site/src/app/commercial/page.tsx": "0bd1ebe4d7447ed0bb3afc84f0d449791378ff50b312df345184e56d535d6e28",
+    "apps/empire-public-site/src/components/IndustryIntelligencePage.tsx": "7335ba50f21f05f9264dbc17967c22d31cba917b74549ed95a496f4b1838e73c",
+    "apps/empire-public-site/src/lib/commercial-entry-review.ts": "525f5653024836e27b16237e26e653183330523ce619b933e608a343d679203f",
+    "apps/empire-public-site/src/lib/commercial-interest-attempt.ts": "486a6df36d7a3461248253f0fb7d8f817d877d7557902774588453795f6076c1"
+  },
+  "staged_referenced_static_assets_sha256": {
+    "_next/static/chunks/00csqdmn1ppym.js": "34834901ed172c3915e539a3df745fe9c894deaa00030028360ff084513d32bf",
+    "_next/static/chunks/0cz1d0mv5g_q7.js": "0973c1d64c88adc8e3c950410cb58b288f72118d5965b78049438deb8f2f9683",
+    "_next/static/chunks/0jiyunp5x7m90.js": "9614ebba610e546e11b9c2a51abb43add848bbcfd2b22d2d977f65e8a2013770",
+    "_next/static/chunks/0qflhf63m7s3q.js": "a03c27aecedd2d0c740e0a3c2d571c1f5789b52bc837ea9432cfa6d3880cd3a2",
+    "_next/static/chunks/1imwq8qchx0y9.js": "84091742ec54cdf3ec79d7f70da52671f0553618162f6c913a3378a34a179e5f",
+    "_next/static/chunks/1z3h-wpd7w46_.css": "a3efa1c9944f97a7c9edea7d4b25d5d984b871daefa3f1a74fb59aaf48b864e8",
+    "_next/static/chunks/2_mjsxmatigr9.js": "e6a6c54d6329d1f0ddc87e8bc2ca6b8713c138099de3dfcc2305315ecf68b0d5",
+    "_next/static/chunks/3kdi8z7f__py4.js": "c20a76719936ef0b49f3a07fea967d30537610acb14e9295bbd76c16b2b45c5d",
+    "_next/static/chunks/3zj_zq-wkfv2b.css": "32e74531817c4dbfcf16b210a1c9565413c5293b9e1876668f54853dfdcdee36",
+    "_next/static/chunks/turbopack-40jik6rsqbixm.js": "bedafcae164115301771184a4450765283ba328907044f4fa4aaaffcc9490a72"
+  },
+  "status": "STAGED_BYTES_VERIFIED_OWNER_RELEASE_APPROVAL_REQUIRED",
+  "surgical_release_authorized": false
+}
