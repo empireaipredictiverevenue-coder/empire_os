@@ -37,6 +37,12 @@ def test_build_outbound_payload_is_compliant_and_evidence_safe():
     assert "opt out" in payload["p_body_text"].lower()
     assert "Kihle Roofing" in payload["p_body_text"]
     assert "generic lead pitch" not in payload["p_body_text"]
+    import hashlib, json
+    expected_copy_id = 'copy-sha256:' + hashlib.sha256(json.dumps(
+        {'subject': payload['p_subject'], 'body': payload['p_body_text']},
+        sort_keys=True, ensure_ascii=False,
+    ).encode('utf-8')).hexdigest()
+    assert payload['p_metadata']['copy_draft_id'] == expected_copy_id
     assert payload["p_metadata"]["conversation_quality"] == "v2"
     assert payload["p_metadata"]["message_optimizer_version"] == "v1"
     assert payload["p_metadata"]["subject_variants"]

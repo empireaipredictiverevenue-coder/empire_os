@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from hashlib import sha256
+import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
@@ -349,6 +351,13 @@ def build_outbound_payload(
                 "adaptive outreach variant failed message quality gate"
             )
 
+    # Fingerprint the exact final proposed wording, after adaptive selection.
+    # This is a content identity, never an approval or delivery claim.
+    copy_draft_id = "copy-sha256:" + sha256(json.dumps(
+        {"subject": subject, "body": body}, sort_keys=True,
+        ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
     return {
         "p_review_id": review_id,
         "p_subject": subject,
@@ -360,6 +369,7 @@ def build_outbound_payload(
             now.astimezone(timezone.utc) + timedelta(hours=72)
         ).isoformat(),
         "p_metadata": {
+            "copy_draft_id": copy_draft_id,
             "source": "bounded_gtm_standing_authority",
             "review_id": review_id,
             "business_name": business,
