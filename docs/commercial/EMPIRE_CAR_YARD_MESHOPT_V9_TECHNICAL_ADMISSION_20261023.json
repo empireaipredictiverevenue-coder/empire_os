@@ -1,0 +1,34 @@
+{
+  "author_claim": "Eric Chadwick, Darmstadt Graphics Group GmbH (2024)",
+  "commercial_release_eligible": false,
+  "device_gpu_test_verified": false,
+  "input_bytes": 2825112,
+  "input_sha256": "f690ee5ac4763c656adf3233596a85973d16b134124fb5caf0b1a1e3f2467159",
+  "issues": [],
+  "license_claim": "https://creativecommons.org/licenses/by/4.0/",
+  "model_brand_trademarks_cleared": false,
+  "on_rejection": "retain_existing_wordpress_procedural_vehicle",
+  "production_changes": false,
+  "release_status": "HOLD_CANONICAL_SITE_GRANT_IP_RIGHTS_AND_PHYSICAL_DEVICE_TEST",
+  "required_extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+  ],
+  "rights_owner_verified": false,
+  "schema": "empire.agency.meshopt_glb_admission_review.v9",
+  "site_grant_verified": false,
+  "source": "local_read_only_model_bytes",
+  "status": "TECHNICAL_PREVIEW_REVIEW_ONLY",
+  "structure_counts": {
+    "accessors": 545,
+    "buffers": 2,
+    "images": 14,
+    "materials": 28,
+    "meshes": 95,
+    "nodes": 105,
+    "textures": 14
+  },
+  "technical_check_passed": true,
+  "triangles": 213195
+}

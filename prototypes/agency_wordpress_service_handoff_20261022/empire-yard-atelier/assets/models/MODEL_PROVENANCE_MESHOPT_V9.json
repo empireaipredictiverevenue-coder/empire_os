@@ -1,0 +1,30 @@
+{
+  "brand_representation": "Third-party demonstration model, not an Empire AI original, customer vehicle, manufacturer endorsement or actual stock.",
+  "commercial_release": "HOLD_CLIENT_MODEL_RIGHTS_PHYSICAL_DEVICE_GPU_AND_OWNER",
+  "compression_type": "EXT_meshopt_compression",
+  "derivative_bytes": 2825112,
+  "derivative_file": "car-concept-studio-meshopt.glb",
+  "derivative_sha256": "f690ee5ac4763c656adf3233596a85973d16b134124fb5caf0b1a1e3f2467159",
+  "extensions_required": [
+    "EXT_texture_webp"
+  ],
+  "glb_version": 2,
+  "license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "model_nodes": 99,
+  "modified_derivative": true,
+  "optimization_review": "Automated validator passes geometry checks but warns that validator lacks support for EXT_meshopt_compression; require live Three.js decoder/browser proof before any claim of valid delivery.",
+  "production_release": "HOLD - internal licensed demonstration only",
+  "schema": "empire.agency.pbr_car_gltf_meshopt_delivery.v9",
+  "transform": "Converted from branded-mesh-removed WebP derivative via gltf-transform 4.2.1 meshopt --level high (quantized geometry; EXT_meshopt_compression and KHR_mesh_quantization). Retains embedded WebP textures, material metadata, copyright limitations.",
+  "upstream_binary_url": "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Assets/main/Models/CarConcept/glTF-Binary/CarConcept.glb",
+  "upstream_license": "Creative Commons Attribution 4.0 International; logos/trademarks excluded",
+  "upstream_license_file": "UPSTREAM_LICENSE.md",
+  "upstream_markings_caveat": "Original underlying model contains Khronos and glTF trademarks outside CC BY; two logo-bearing meshes removed from scene, but independent trademark/brand/legal review required before any actual client use.",
+  "upstream_model": "https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/CarConcept",
+  "upstream_model_author": "Eric Chadwick, Darmstadt Graphics Group GmbH (2024)",
+  "upstream_repository": "https://github.com/KhronosGroup/glTF-Sample-Assets",
+  "upstream_sha256": "c272098089d78c5cd9fd9f24ff50ee8acf8d932c55f2d55fc10adb6c8998966b",
+  "v8_source_bytes": 9338828,
+  "v8_source_derivative": "car-concept-editorial-webp.glb",
+  "v8_source_sha256": "b28b5e697dcbd8d699dad802a1415db1eb0a364d8f05aba004176d776940cdeb"
+}

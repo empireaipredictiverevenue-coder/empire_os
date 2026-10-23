@@ -10,7 +10,7 @@ import * as THREE from 'three'
  * This component is lazy-imported ONLY after an explicit Studio PBR click.
  */
 export default function StudioPBRVehicle({ modelUrl, paint, view, motionAllowed, onReady }) {
-  const { scene } = useGLTF(modelUrl)
+  const { scene } = useGLTF(modelUrl, false, true) // disable remote DRACO decoder; use bundled Meshopt
   const { model, scale, center, floor } = useMemo(() => {
     const copy = scene.clone(true)
     const bbox = new THREE.Box3().setFromObject(copy)

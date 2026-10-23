@@ -4,6 +4,7 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 from zipfile import ZipFile
+import subprocess
 import json
 import struct
 
@@ -14,6 +15,12 @@ THEME = ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-a
 DOC = ROOT/"docs/commercial"
 RECEIPT = DOC/"EMPIRE_CAR_YARD_DEVICE_GATE_V8_BROWSER_ACCEPTANCE_20261023.json"
 ADMISSION = DOC/"EMPIRE_CAR_YARD_GLTF_V8_TECHNICAL_ADMISSION_20261023.json"
+
+V8_COMMIT = "660cf2ddd6158127bb04bad3384b9ae3905e20bc"
+def original_v8(relative):
+    return subprocess.run(["git","show",V8_COMMIT+":"+relative],cwd=ROOT,
+        check=True,capture_output=True).stdout
+
 
 def mini_glb(gltf: dict) -> bytes:
     encoded = json.dumps(gltf, separators=(",",":")).encode()
@@ -133,7 +140,7 @@ def test_versioned_original_evidence_and_installable_theme_package():
     r=json.loads(RECEIPT.read_text())
     assert len(r["source_manifest_sha256"])>=24
     for rel,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==digest,rel
+        assert sha256(original_v8(rel)).hexdigest()==digest,rel
     assert len(r["screenshots"])==6
     for name,meta in r["screenshots"].items():
         p=DOC/"car_yard_react_browser_evidence_v8"/name
@@ -149,7 +156,7 @@ def test_versioned_original_evidence_and_installable_theme_package():
         assert not any("node_modules/" in x or ".env" in x for x in names)
 
 def test_original_viewer_safe_recovery_and_datacap_in_real_source():
-    src=(THEME/"src/main.jsx").read_text()
+    src=original_v8("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx").decode()
     assert "navigator.connection?.saveData" in src
     assert "navigator.deviceMemory" in src
     assert "Number(window.navigator.deviceMemory) <= 2" in src

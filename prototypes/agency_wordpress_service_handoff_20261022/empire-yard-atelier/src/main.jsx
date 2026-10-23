@@ -86,10 +86,10 @@ function Hero3D({ reduce, modelUrl }) {
   }
   useEffect(() => {
     const caution = window.navigator.connection?.saveData
-      ? 'Data Saver is on. This model transfers about 9 MB.'
+      ? 'Data Saver is on. This model transfers about 2.8 MB.'
       : (Number(window.navigator.deviceMemory) > 0 &&
           Number(window.navigator.deviceMemory) <= 2)
-          ? 'Your device reports limited memory. This model transfers about 9 MB.'
+          ? 'Your device reports limited memory. This model transfers about 2.8 MB.'
           : ''
     setLargeModelCaution(caution)
   }, [])
@@ -157,9 +157,9 @@ function Hero3D({ reduce, modelUrl }) {
           onClick={selectStudio}
           disabled={!modelUrl || reduce || !interactive}
           className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-50 ' +
-            (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>{largeModelConfirmed && !studioSelected ? 'Confirm Studio PBR · 9 MB' : 'Load Studio PBR · 9 MB'}</button>
+            (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>{largeModelConfirmed && !studioSelected ? 'Confirm Studio PBR · 2.8 MB' : 'Load Studio PBR · 2.8 MB'}</button>
       </div>
-      <span className="text-[9px] font-semibold text-slate-300">High-detail model loads only on request</span>
+      <span className="text-[9px] font-semibold text-slate-300">Compressed high-detail model loads only on request</span>
       {largeModelCaution && !studioSelected && <p data-device-caution="true" className="w-full text-xs leading-5 text-[#f2d8a9]">
         {largeModelCaution} {largeModelConfirmed ? 'Click Confirm Studio PBR to proceed.' : 'A second confirmation is required.'}
       </p>}
@@ -259,7 +259,7 @@ function getBrandSettings() {
     if (typeof settings.showroom_model_url === 'string') {
       const modelAsset = new URL(settings.showroom_model_url, location.href)
       if (modelAsset.origin === location.origin && !modelAsset.search && !modelAsset.hash &&
-          modelAsset.pathname.endsWith('/assets/models/car-concept-editorial-webp.glb')) {
+          modelAsset.pathname.endsWith('/assets/models/car-concept-studio-meshopt.glb')) {
         brand.showroomModelUrl = modelAsset.href
       }
     }

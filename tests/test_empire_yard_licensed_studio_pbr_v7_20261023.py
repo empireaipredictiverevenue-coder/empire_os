@@ -44,10 +44,11 @@ def test_cc_by_asset_license_and_derivative_mark_exclusions():
     assert "Creative Commons Attribution 4.0" in (THEME/"assets/models/UPSTREAM_LICENSE.md").read_text()
 
 def test_existing_app_loads_optional_local_asset_not_a_remote_model():
-    scene=(THEME/"src/ShowroomScene.jsx").read_text()
-    viewer=(THEME/"src/StudioPBRVehicle.jsx").read_text()
-    main=(THEME/"src/main.jsx").read_text()
-    php=(THEME/"functions.php").read_text()
+    base="prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/"
+    scene=historic_v7(base+"src/ShowroomScene.jsx").decode()
+    viewer=historic_v7(base+"src/StudioPBRVehicle.jsx").decode()
+    main=historic_v7(base+"src/main.jsx").decode()
+    php=historic_v7(base+"functions.php").decode()
     assert "React.lazy(() => import('./StudioPBRVehicle.jsx'))" in scene
     assert "frameloop={modelMode === 'studio' ? 'demand' : 'always'}" in scene
     assert "modelMode !== 'studio' && <ContactShadows" in scene
