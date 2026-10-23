@@ -1280,14 +1280,14 @@ def refresh_founder_acquisition_observer(repo_root: str | Path) -> dict[str, Any
         outcome = json.loads(completed.stdout)
         if (not isinstance(outcome, dict)
                 or outcome.get("status") != "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
-                or outcome.get("monitored_threads") != 7
+                or outcome.get("monitored_threads") != 9
                 or outcome.get("snapshot_written") is not True
                 or outcome.get("outbound_sent") is not False
                 or outcome.get("database_writes") is not False):
             return {"status": "HELD_INCOMPLETE_FOUNDER_MAILBOX_REVIEW",
                     "outbound_sent": False}
         return {
-            "status": "SEVEN_FOUNDER_THREADS_REVIEWED",
+            "status": "NINE_FOUNDER_THREADS_REVIEWED",
             "new_inbound_header_candidates": outcome.get(
                 "new_inbound_header_candidates", None
             ),

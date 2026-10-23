@@ -120,3 +120,36 @@ def test_snapshot_persisted_private_no_email_body_or_password(tmp_path):
     assert content["paid_pilot_authorized"] is False
     assert "published_contact" not in out.read_text()
     assert "password" not in out.read_text().lower()
+
+
+def test_two_exact_contacted_public_profiles_are_archived_not_resent():
+    source_rows=ROWS[:2]
+    source_rows=list(source_rows)
+    assert {r['company'] for r in source_rows}=={'LunaBill','ProhostAI'}
+    initial=refresh_pending(source_rows,previous=None,now=CLOCK,
+                            fetch=lambda url:source(next(r for r in source_rows if r['yc_original_source']==url)))
+    assert initial['verified_public_profiles']==2
+    extra=ROWS[2]
+    moved=refresh_pending([extra],previous=initial,
+                          contacted_verified={
+                            'LunaBill':'1a169d6472ef70f1',
+                            'ProhostAI':'1a169d67e9260fe6',
+                          },
+                          now=CLOCK+timedelta(minutes=5),fetch=lambda url:source(extra))
+    assert len(moved['contacted_profile_history'])==2
+    assert len(moved['profiles'])==1
+    assert all(x['company'] not in {'LunaBill','ProhostAI'} for x in moved['unsent_review_drafts'])
+    again=refresh_pending([extra],previous=moved,
+                          now=CLOCK+timedelta(minutes=10),fetch=lambda url:source(extra))
+    assert again['contacted_profile_history']==moved['contacted_profile_history']
+    assert again['source_fetches_this_cycle']==0
+
+
+def test_contacted_profile_migration_cannot_use_unverified_sent_id():
+    originals=ROWS[:2]
+    old=refresh_pending(originals,previous=None,now=CLOCK,
+                        fetch=lambda url:source(next(r for r in originals if r['yc_original_source']==url)))
+    with pytest.raises(EvidenceHeld,match='UNEXPLAINED_SOURCE_PROSPECT_REMOVAL'):
+        refresh_pending([ROWS[2]],previous=old,now=CLOCK+timedelta(minutes=5),
+                        contacted_verified={'LunaBill':'0000000000000000',
+                                            'ProhostAI':'1a169d67e9260fe6'})

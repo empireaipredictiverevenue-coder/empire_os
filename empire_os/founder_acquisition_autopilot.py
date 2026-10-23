@@ -26,7 +26,14 @@ EXPECTED_SENT = {
     "Qlo": ("founders@getqlo.com", "1a168c2b0bbfefd7"),
     "Propaya": ("founders@propaya.com", "1a168c2d096a0dfc"),
     "Andco": ("founders@useandco.com", "1a168d642aa8e0a0"),
+    "LunaBill": ("founders@lunabill.com", "1a169d6472ef70f1"),
+    "ProhostAI": ("bill@prohost.ai", "1a169d67e9260fe6"),
 }
+# Only these original 23-Oct-2026 founder-approved sends may migrate the
+# immutable legacy seven-thread metadata snapshot.
+NEW_TWO_GMAIL_THREAD_IDS = frozenset({
+    "1a169d6472ef70f1", "1a169d67e9260fe6",
+})
 # Alias is verified in the existing Workspace transport, never used to choose a token.
 SENDER = frozenset({"phil@empire-ai.co.uk", "phil@mail.empire-ai.co.uk"})
 HEADERS = ["From", "To", "Subject", "Message-ID", "In-Reply-To", "References"]
@@ -96,18 +103,26 @@ def review_threads(
     if previous is not None:
         if (previous.get("schema_version") != "empire.founder_acquisition_autopilot.v1"
                 or previous.get("status") != "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
-                or len(previous.get("threads", [])) != len(anchors)):
+                or not isinstance(previous.get("threads"), list)
+                or len(previous["threads"]) not in (7, len(anchors))):
             raise EvidenceHeld("UNTRUSTED_PREVIOUS_EVIDENCE")
         for row in previous["threads"]:
-            if (row.get("sent_message_id") not in results
-                    or row.get("company") not in {a[0] for a in anchors}
+            allowed = {mid: company for company, _, mid in anchors}
+            if (row.get("sent_message_id") not in allowed
+                    or row.get("company") != allowed.get(row.get("sent_message_id"))
+                    or row.get("sent_anchor_verified") is not True
                     or row.get("sent_message_id") in prior):
                 raise EvidenceHeld("PREVIOUS_THREAD_ANCHOR_MISMATCH")
             values = row.get("inbound_header_candidates")
             if not isinstance(values, list) or len(values) != len(set(values)):
                 raise EvidenceHeld("INVALID_PREVIOUS_CANDIDATE_IDENTITIES")
             prior[row["sent_message_id"]] = set(values)
-        if set(prior) != set(results):
+        prior_ids = set(prior)
+        current_ids = set(results)
+        old_seven = current_ids - NEW_TWO_GMAIL_THREAD_IDS
+        if not (prior_ids == current_ids or
+                (len(prior_ids) == 7 and prior_ids == old_seven
+                 and len(current_ids) == 9)):
             raise EvidenceHeld("PREVIOUS_THREAD_COVERAGE_CHANGED")
     reviewed = []
     new_count = 0

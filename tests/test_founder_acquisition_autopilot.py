@@ -76,9 +76,9 @@ class FakeProvider:
 
 def test_ledger_exact_sends_and_pending(tmp_path):
     ledger = fixture_ledger(tmp_path)
-    assert len(ledger["anchors"]) == 7
-    assert len(ledger["pending"]) == 10
-    assert len({x[2] for x in ledger["anchors"]}) == 7
+    assert len(ledger["anchors"]) == 9
+    assert len(ledger["pending"]) == 8
+    assert len({x[2] for x in ledger["anchors"]}) == 9
     assert ledger["anchors"][0] == PLENA
 
 
@@ -96,13 +96,13 @@ def test_refuse_tampered_sent_receipt(tmp_path):
         load_ledger(tmp_path)
 
 
-def test_exact_seven_provider_anchors_are_review_only(tmp_path):
+def test_exact_nine_provider_anchors_are_review_only(tmp_path):
     ledger = fixture_ledger(tmp_path)
     reviewed = review_threads(ledger, fixture_results(ledger), now=CLOCK)
     assert reviewed["status"] == "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
-    assert reviewed["sent_anchors_verified"] == 7
+    assert reviewed["sent_anchors_verified"] == 9
     assert reviewed["inbound_header_candidate_count"] == 0
-    assert len(reviewed["next_unsent_review"]) == 10
+    assert len(reviewed["next_unsent_review"]) == 8
     assert reviewed["outbound_sent"] is False
     assert reviewed["automatic_reply_authorized"] is False
     assert reviewed["canonical_suppression_verified"] is False
@@ -171,7 +171,7 @@ def test_runner_writes_private_snapshot_and_no_actions(tmp_path):
     result = run(tmp_path, provider=provider, now=CLOCK, write=True,
                  source_fetch=lambda url: (_ for _ in ()).throw(RuntimeError("offline test")))
     assert result["status"] == "SOURCE_ANCHORS_VERIFIED_REVIEW_ONLY"
-    assert result["monitored_threads"] == 7
+    assert result["monitored_threads"] == 9
     assert result["snapshot_written"] is True
     assert result["outbound_sent"] is False
     assert result["database_writes"] is False
@@ -208,7 +208,7 @@ def test_safe_new_candidate_can_be_appended_without_send_authority(tmp_path):
         writer.writeheader()
         writer.writerows(rows)
     v = load_ledger(tmp_path)
-    assert len(v["pending"]) == 11
+    assert len(v["pending"]) == 9
     extra["outbound_approval"] = "FOUNDER_APPROVED"
     rows[-1] = extra
     with path.open("w", newline="") as f:
@@ -217,3 +217,43 @@ def test_safe_new_candidate_can_be_appended_without_send_authority(tmp_path):
         writer.writerows(rows)
     with pytest.raises(EvidenceHeld, match="UNREVIEWED_CANDIDATE_CANNOT_INHERIT_APPROVAL"):
         load_ledger(tmp_path)
+
+
+def test_original_seven_thread_snapshot_migrates_without_losing_replies(tmp_path):
+    ledger = fixture_ledger(tmp_path)
+    payloads = fixture_results(ledger)
+    older = dict(payloads)
+    for name, addr, tid in ledger['anchors']:
+        if name in ('LunaBill', 'ProhostAI'):
+            older.pop(tid)
+    historic = review_threads(
+        {'anchors': [a for a in ledger['anchors']
+                     if a[0] not in ('LunaBill','ProhostAI')],
+         'pending': []}, older, now=CLOCK)
+    # One earlier seven-cohort candidate stays preserved across expansion.
+    old_company, old_email, old_tid = ledger['anchors'][1]
+    older[old_tid]['messages'].append(inbound_message(old_tid,old_email))
+    historic = review_threads(
+        {'anchors':[a for a in ledger['anchors']
+                    if a[0] not in ('LunaBill','ProhostAI')],
+         'pending': []}, older, now=CLOCK)
+    payloads[old_tid] = older[old_tid]
+    migrated = review_threads(ledger,payloads,now=CLOCK,previous=historic)
+    assert migrated['monitored_threads']==9
+    assert migrated['sent_anchors_verified']==9
+    assert migrated['inbound_header_candidate_count']==1
+    assert migrated['new_inbound_header_candidates']==0
+    assert next(x for x in migrated['threads'] if x['company']==old_company)['inbound_header_candidates']==['bb99999999999999']
+    assert migrated['outbound_sent'] is False
+    assert all(row['buyer_intent_verified'] is False for row in migrated['threads'])
+
+
+def test_reject_seven_history_with_replaced_prior_sent_anchor(tmp_path):
+    ledger=fixture_ledger(tmp_path)
+    all_msgs=fixture_results(ledger)
+    prior=review_threads(ledger,all_msgs,now=CLOCK)
+    prior['threads']=prior['threads'][:6]+[prior['threads'][7]]
+    # This lacks one of the original seven known anchors and includes a new
+    # send; it is not the authorised 7-to-9 migration state.
+    with pytest.raises(EvidenceHeld,match='PREVIOUS_THREAD_COVERAGE_CHANGED'):
+        review_threads(ledger,all_msgs,now=CLOCK,previous=prior)

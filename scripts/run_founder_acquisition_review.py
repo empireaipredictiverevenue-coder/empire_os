@@ -73,6 +73,7 @@ def refresh_unsent_sources(root: Path, *, ledger: dict, now, fetch=None) -> dict
             pending, previous=previous, now=now or datetime.now(timezone.utc),
             fetch=fetch or fetch_profile,
             max_fetch=2,
+            contacted_verified={name: tid for name, _, tid in ledger["anchors"]},
         )
         _write_private_snapshot(output, results)
         return {
@@ -137,7 +138,7 @@ def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetc
         output = root / OUT
         previous = _read_private_snapshot(output) if write else None
         reviewed = collect(provider._service(), ledger, now=now or datetime.now(timezone.utc), previous=previous)
-        if reviewed["sent_anchors_verified"] != 7 or reviewed["outbound_sent"] is not False:
+        if reviewed["sent_anchors_verified"] != 9 or reviewed["outbound_sent"] is not False:
             raise EvidenceHeld("INCOMPLETE_VERIFICATION")
         if write:
             _write_private_snapshot(output, reviewed)
@@ -145,7 +146,7 @@ def run(root: Path, *, provider=None, write: bool = False, now=None, source_fetc
             status.update(refresh_us_market(root, now=now, fetch=us_fetch))
         status.update({
             "status": reviewed["status"],
-            "monitored_threads": 7,
+            "monitored_threads": 9,
             "inbound_header_candidate_count": reviewed["inbound_header_candidate_count"],
             "new_inbound_header_candidates": reviewed["new_inbound_header_candidates"],
             "next_unsent_candidate_count": len(ledger["pending"]),

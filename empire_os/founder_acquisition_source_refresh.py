@@ -15,6 +15,12 @@ from urllib.parse import urlsplit
 from empire_os.workspace_solar_reply_tracking import EvidenceHeld
 
 SCHEMA = "empire.founder_acquisition_public_source_refresh.v1"
+# Migration is restricted to two original, founder-approved Gmail send readbacks.
+# A generic public source must never be able to promote itself to contact status.
+APPROVED_CONTACTED_SOURCE_MOVES = {
+    "LunaBill": "1a169d6472ef70f1",
+    "ProhostAI": "1a169d67e9260fe6",
+}
 MAX_BYTES = 600_000
 URL_PATTERN = re.compile(r"^/companies/[a-z0-9]+(?:-[a-z0-9]+)*$")
 EMAIL_PATTERN = re.compile(r"^[a-z0-9._+%-]+@[a-z0-9.-]+\.[a-z]{2,24}$")
@@ -96,6 +102,7 @@ def refresh_pending(
     now: datetime,
     fetch: Callable[[str], Mapping[str, Any]] = fetch_profile,
     max_fetch: int = 2,
+    contacted_verified: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     if (now.tzinfo is None or now.utcoffset() is None
             or type(max_fetch) is not int or not 1 <= max_fetch <= 2
@@ -103,6 +110,7 @@ def refresh_pending(
         raise EvidenceHeld("INVALID_REFRESH_BOUNDARIES")
     at = now.astimezone(timezone.utc)
     prior: dict[str, dict[str, Any]] = {}
+    contacted_history: list[dict[str, Any]] = []
     if previous is not None:
         if (previous.get("schema_version") != SCHEMA
                 or previous.get("status") != "PUBLIC_SOURCES_REVIEW_ONLY"):
@@ -117,11 +125,39 @@ def refresh_pending(
                         "HELD_SOURCE_NOT_VERIFIED")):
                 raise EvidenceHeld("INVALID_PREVIOUS_SOURCE_ATTESTATION")
             prior[item["company"]] = item
+        historic = previous.get("contacted_profile_history", [])
+        if not isinstance(historic, list) or len(historic) > 2:
+            raise EvidenceHeld("UNTRUSTED_CONTACTED_PROFILE_HISTORY")
+        for item in historic:
+            if (not isinstance(item, dict)
+                    or item.get("company") not in APPROVED_CONTACTED_SOURCE_MOVES
+                    or item.get("sent_message_id") != APPROVED_CONTACTED_SOURCE_MOVES[item["company"]]
+                    or item.get("status") != "SOURCE_MOVED_TO_VERIFIED_SENT_COHORT"
+                    or item.get("company") in {x.get("company") for x in contacted_history}):
+                raise EvidenceHeld("UNAUTHORISED_CONTACTED_SOURCE_HISTORY")
+            contacted_history.append(dict(item))
     names = [str(row.get("company") or "") for row in rows]
     if len(names) != len(set(names)) or any(name in ("", "Plena Health") for name in names):
         raise EvidenceHeld("DUPLICATE_OR_CONTACTED_SOURCE_CANDIDATE")
-    if set(prior) - set(names):
-        raise EvidenceHeld("UNEXPLAINED_SOURCE_PROSPECT_REMOVAL")
+    removed = set(prior) - set(names)
+    historical_names = {x["company"] for x in contacted_history}
+    for moved in sorted(removed):
+        expected = APPROVED_CONTACTED_SOURCE_MOVES.get(moved)
+        if (not expected or not isinstance(contacted_verified, Mapping)
+                or contacted_verified.get(moved) != expected
+                or moved in historical_names
+                or prior[moved]["profile_source_status"]
+                    != "FIRST_PARTY_PROFILE_AND_ADDRESS_OBSERVED"):
+            raise EvidenceHeld("UNEXPLAINED_SOURCE_PROSPECT_REMOVAL")
+        contacted_history.append({
+            "company": moved,
+            "sent_message_id": expected,
+            "status": "SOURCE_MOVED_TO_VERIFIED_SENT_COHORT",
+            "source_profile_before_send": prior[moved],
+        })
+        del prior[moved]
+    if historical_names.intersection(names):
+        raise EvidenceHeld("PREVIOUS_CONTACTED_PROSPECT_REINTRODUCED")
     output = []
     checked = 0
     for row in rows:
@@ -205,6 +241,7 @@ def refresh_pending(
         "verified_public_profiles": verified,
         "source_fetches_this_cycle": checked,
         "profiles": output,
+        "contacted_profile_history": contacted_history,
         "unsent_review_drafts": suggested,
         "prospects_waiting_for_source_check": len(rows) - len(output),
         "crm_writes": False, "outbound_sent": False,
