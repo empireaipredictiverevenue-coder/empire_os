@@ -2,6 +2,18 @@
 from __future__ import annotations
 
 from typing import Any, Callable
+import re
+
+
+def _claimed_copy_fingerprint(claim: dict[str, Any]) -> str | None:
+    """Read only the DB-authorised claim's copy ID; never caller draft metadata."""
+    metadata = claim.get("metadata")
+    value = metadata.get("copy_draft_id") if isinstance(metadata, dict) else None
+    if value is None:
+        return None
+    if not isinstance(value, str) or re.fullmatch(r"copy-sha256:[0-9a-f]{64}", value) is None:
+        raise OutboundGovernorExecutionError("invalid canonical copy draft fingerprint")
+    return value
 
 from empire_os.outbound_email_transport import (
     OutboundEmailTransport,
@@ -80,6 +92,10 @@ def execute_governor_decision(
             "p_actor": actor,
         })
         payload = build_resend_send(claim, sender=sender, reply_to=reply_to)
+        copy_draft_id = _claimed_copy_fingerprint(claim)
+        receipt_metadata = {"provider": provider, "governor": True}
+        if copy_draft_id is not None:
+            receipt_metadata["copy_draft_id"] = copy_draft_id
         try:
             provider_message_id = (
                 transport.send_claim(claim, sender=sender, reply_to=reply_to)
@@ -113,7 +129,7 @@ def execute_governor_decision(
             "p_event_type": "sent",
             "p_actor": actor,
             "p_provider_message_id": provider_message_id,
-            "p_payload": {"provider": provider, "governor": True},
+            "p_payload": receipt_metadata,
         })
         return {
             "decision": "AUTO_SENT",
