@@ -192,3 +192,89 @@ def test_one_scope_hmac_digest_never_returned_to_founder():
     assert a["founder_research_projection"] == b["founder_research_projection"]
     assert "message_fingerprint" not in str(a)
     assert "message_fingerprint" not in str(b)
+
+
+def test_temporal_denominators_and_message_codes_are_not_unique_buyers():
+    report = run()
+    assert report["messages_with_semantic_codes_not_enquiries"] == 2
+    assert report["messages_without_semantic_codes_not_negatives"] == 1
+    assert report["all_message_directions_not_canonical_buyer_authentication"] == {
+        "INBOUND_INBOX": 2,
+        "OUTBOUND_SENT": 1,
+        "EXCLUDED_DRAFT_SPAM_OR_TRASH": 0,
+        "UNCLASSIFIED_DIRECTION": 0,
+    }
+    assert report["semantic_occurrence_age_bands_not_current_demand"] == {
+        "0_7_DAYS": 3, "8_30_DAYS": 0, "31_45_DAYS": 0,
+        "OLDER_THAN_45_DAYS": 0,
+    }
+    assert report["inbound_semantic_occurrence_age_bands_not_verified_enquiries"]["0_7_DAYS"] == 2
+    assert report["outbound_semantic_occurrence_age_bands_not_buyer_replies"]["0_7_DAYS"] == 1
+    founder = report["founder_research_projection"]
+    assert founder["semantic_observations_0_7d_count_band_if_at_least_five"] is None
+    assert founder["inbound_semantic_observations_0_7d_count_band_if_at_least_five"] is None
+    assert founder["fresh_owner_snapshot_does_not_make_old_messages_fresh"] is True
+    assert founder["historical_older_than_7d_observations_are_not_current_demand"] is True
+
+
+def test_fresh_original_poll_with_stale_historical_message_cannot_inflate_fresh_intent():
+    i = index()
+    i["threads"][0]["messages"][1]["date"] = "2026-08-24T11:01:00"
+    r = run(idx=i)
+    assert r["semantic_occurrence_age_bands_not_current_demand"]["OLDER_THAN_45_DAYS"] == 2
+    assert r["semantic_occurrence_age_bands_not_current_demand"]["0_7_DAYS"] == 1
+    assert r["inbound_semantic_occurrence_age_bands_not_verified_enquiries"]["OLDER_THAN_45_DAYS"] == 2
+    assert r["founder_research_projection"]["inbound_semantic_observations_0_7d_count_band_if_at_least_five"] is None
+    assert r["real_buyer_intent_verified"] is False
+
+
+def test_original_owner_snapshot_clock_rejects_post_collection_message_even_without_code():
+    i = index()
+    i["threads"][0]["messages"][2]["date"] = "2026-10-24T12:30:00"
+    with pytest.raises(PrimeIndexHold, match="message_postdates_original_owner_snapshot"):
+        run(idx=i)
+
+
+def test_unclassified_and_excluded_messages_are_not_counted_as_active_inbound_demand():
+    i = index()
+    i["threads"][0]["messages"][2]["labels"] = ["DRAFT"]
+    r = run(idx=i)
+    assert r["all_message_directions_not_canonical_buyer_authentication"]["EXCLUDED_DRAFT_SPAM_OR_TRASH"] == 1
+    assert r["messages_without_semantic_codes_not_negatives"] == 1
+    i["threads"][0]["messages"][2]["labels"] = ["Label_99"]
+    r = run(idx=i)
+    assert r["all_message_directions_not_canonical_buyer_authentication"]["UNCLASSIFIED_DIRECTION"] == 1
+    assert r["inbound_semantic_occurrences_not_buyer_enquiries"] == 2
+
+
+def test_all_original_message_rows_have_valid_clocks_even_when_uncoded():
+    i = index()
+    i["threads"][0]["messages"][2]["date"] = "not-a-valid-original-UTC-clock"
+    with pytest.raises(PrimeIndexHold, match="UTC_wall_clock_contract"):
+        run(idx=i)
+
+
+def test_fresh_five_event_band_does_not_mark_any_event_authenticated():
+    i = index()
+    i["threads"][0]["messages"][0]["recognized_codes"] = [
+        "COMPLETE_BUYER_REQUIREMENTS_SENT",
+        "PILOT_TECHNICAL_REQUIREMENTS_SENT",
+    ]
+    # Two outbound codes + two inbound codes; add one legitimate extra
+    # inbound code on the same original provider message.
+    i["threads"][0]["messages"][1]["recognized_codes"].append(
+        "RECORDING_ENABLED_REPORTED"
+    )
+    r = run(idx=i)
+    founder = r["founder_research_projection"]
+    assert founder["semantic_observations_0_7d_count_band_if_at_least_five"] == "5-9"
+    assert founder["inbound_semantic_observations_0_7d_count_band_if_at_least_five"] is None
+    assert founder["buyer_enquiries_independently_verified"] is False
+    assert r["signed_owner_receipts_admitted"] is False
+
+
+def test_duplicate_message_labels_fail_closed_before_any_aggregation():
+    i = index()
+    i["threads"][0]["messages"][2]["labels"] = ["INBOX", "INBOX"]
+    with pytest.raises(PrimeIndexHold, match="malformed_original_owner_message_labels"):
+        run(idx=i)

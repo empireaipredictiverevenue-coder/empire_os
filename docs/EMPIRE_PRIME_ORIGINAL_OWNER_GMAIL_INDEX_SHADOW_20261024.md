@@ -50,3 +50,42 @@ This is real original owner **metadata observation**, not original source-owner 
 - Original classifier tests still prohibit inferred buying, outbound and financial authority. **557 scoped regression tests passed with one inherited Starlette deprecation warning**, including original PRIME, buyer-source, Conversation OS, CRM signed auth, Quant, and original Data Cloud source custody. This is **not** a complete repository regression claim. The feature grants no authority.
 
 **One EmpireOS. One original EmpireDB. One Smart CRM. One Predictive Cloud / PRIME.**
+
+## 24 October continuation — temporal denominator and freshness hardening
+
+The existing prime_original_partner_index_adapter.py was upgraded IN PLACE. No additional service, database, or authority role.
+
+- Differentiates a fresh metadata index poll from message event dates: a newly collected index must not revive old commercial evidence.
+- Reconciles all indexed message-direction denominators: original INBOX, SENT, excluded DRAFT/SPAM/TRASH, and unclassified. These are owner-provided labels, NOT independent provider authentication.
+- Separately counts messages with recognised codes and individual code occurrences. A message with no semantic code is UNKNOWN, not a verified negative or nonbuyer.
+- Four mutually exclusive event age cohorts: 0_7_DAYS, 8_30_DAYS, 31_45_DAYS and OLDER_THAN_45_DAYS, split into inbound versus outbound, and cross-checked for exact reconciliation.
+- Rejects post-collection messages by more than five minutes, even if uncoded; rejects malformed original UTC wall-clock timestamps, future observation dates and duplicate message labels.
+- Founder output suppresses small recent signal cells (null if below five). Historical signals do not imply current buyer demand. The internal owner diagnostic contains more detailed aggregates and must not be exposed as a public API.
+
+### Observed existing protected original source, read-only
+
+| Aggregate | Count |
+|---|---:|
+| Indexed source messages | 93 |
+| Messages carrying one or more semantic codes | 23 |
+| Uncoded messages, unknown not negatives | 70 |
+| Original SENT messages | 54 |
+| Original INBOX messages | 37 |
+| Excluded drafts/spam/trash | 2 |
+| Total semantic-code occurrences | 28 |
+| Inbound code occurrences | 9 |
+| Outbound code occurrences | 19 |
+| Code occurrences 0–7 days old | 3 |
+| Code occurrences 8–30 days old | 23 |
+| Code occurrences 31–45 days old | 2 |
+| Older than 45 days | 0 |
+
+Of the three last-seven-day code occurrences, two were recorded in inbound messages and one in outbound messages. None is authenticated as direct buying intent by this review. All amounts are source-owner metadata observations, not uniquely verified people, buyers, lawful processing rights, settled orders, or revenue.
+
+### Validation and security boundary
+
+New tests check denominators and multi-code messages, stale messages in fresh polls, post-collection time paradoxes, missing or unrecognised labels, draft/spam exclusion, invalid time on uncoded records, small Founder group suppression, and unchanged no-buyer/no-outbound authority.
+
+564 scoped regression tests passed, with one inherited Starlette deprecation warning. This is not a full repository test claim. No external emails, trade or payment executed, source credentials read, production schema altered, or production process restarted.
+
+Original Buyer Acquisition / Conversation OS + Security + original EmpireDB owners still control genuine provider-to-contact/tenant readback, source licence/purpose and deletion rules, signing custody, atomic durable replay protections, and release. Until those are independently authorised and observed, original PRIME buyer intent remains on HOLD.

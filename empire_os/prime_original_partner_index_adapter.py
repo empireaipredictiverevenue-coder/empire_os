@@ -8,6 +8,7 @@ is established by this adapter. Not a buyer-intent/paid-order classifier.
 """
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Mapping
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
@@ -116,6 +117,24 @@ def _index_link(
     return rows, verified_labels
 
 
+def _observation_age_band(observed: datetime, *, now: datetime) -> str:
+    age = now - observed
+    if age < -timedelta(minutes=5):
+        raise PrimeIndexHold("future_original_message_not_observation")
+    if age <= timedelta(days=7):
+        return "0_7_DAYS"
+    if age <= timedelta(days=30):
+        return "8_30_DAYS"
+    if age <= timedelta(days=45):
+        return "31_45_DAYS"
+    return "OLDER_THAN_45_DAYS"
+
+
+def _privacy_band(count: int) -> str | None:
+    # Suppress small temporal groups from Founder-facing projections.
+    return f"{(count // 5) * 5}-{(count // 5) * 5 + 4}" if count >= 5 else None
+
+
 def review_original_partner_index(
     *,
     original: Mapping[str, Any],
@@ -145,6 +164,11 @@ def review_original_partner_index(
     seen_messages = set()
     observations = []
     inbound = outbound = 0
+    all_message_directions: Counter[str] = Counter()
+    event_age_bands: Counter[str] = Counter()
+    inbound_event_age_bands: Counter[str] = Counter()
+    outbound_event_age_bands: Counter[str] = Counter()
+    messages_with_codes = 0
     for thread in rows:
         if type(thread) is not dict or thread.get("truncated") is not False:
             raise PrimeIndexHold("original_owner_complete_thread_required")
@@ -163,6 +187,27 @@ def review_original_partner_index(
             if msg in seen_messages:
                 raise PrimeIndexHold("duplicate_original_provider_message")
             seen_messages.add(msg)
+            # Check every indexed row, including uncoded messages, so the
+            # denominator cannot be laundered by a fresh collection time.
+            observed = _utc_gmail_wall_clock(row.get("date"))
+            occurred = _utc(observed)
+            if occurred > collected + timedelta(minutes=5):
+                raise PrimeIndexHold("message_postdates_original_owner_snapshot")
+            _observation_age_band(occurred, now=now)
+            flags = row.get("labels")
+            if (type(flags) is not list
+                or any(type(flag) is not str for flag in flags)
+                or len(flags) != len(set(flags))):
+                raise PrimeIndexHold("malformed_original_owner_message_labels")
+            excluded = any(flag in flags for flag in ("DRAFT", "SPAM", "TRASH"))
+            if excluded:
+                all_message_directions["EXCLUDED_DRAFT_SPAM_OR_TRASH"] += 1
+            elif "SENT" in flags and "INBOX" not in flags:
+                all_message_directions["OUTBOUND_SENT"] += 1
+            elif "INBOX" in flags and "SENT" not in flags:
+                all_message_directions["INBOUND_INBOX"] += 1
+            else:
+                all_message_directions["UNCLASSIFIED_DIRECTION"] += 1
             codes = row.get("recognized_codes", [])
             if (type(codes) is not list or len(codes) > len(TAXONOMY)
                 or any(type(code) is not str or code not in EVENT_CODES for code in codes)
@@ -170,14 +215,11 @@ def review_original_partner_index(
                 raise PrimeIndexHold("untrusted_original_owner_semantic_codes")
             if not codes:
                 continue
-            flags = row.get("labels")
-            if (type(flags) is not list
-                or any(type(flag) is not str for flag in flags)
-                or any(flag in flags for flag in ("DRAFT", "SPAM", "TRASH"))
-                or ("SENT" in flags) == ("INBOX" in flags)):
+            if excluded or ("SENT" in flags) == ("INBOX" in flags):
                 raise PrimeIndexHold("noncanonical_original_message_direction")
+            messages_with_codes += 1
             direction = "outbound" if "SENT" in flags else "inbound"
-            observed = _utc_gmail_wall_clock(row.get("date"))
+            event_age_band = _observation_age_band(occurred, now=now)
             fingerprint = hmac.new(
                 ephemeral_hmac_key,
                 b"empire-prime-temporary-partner-message-v1:" +
@@ -193,16 +235,42 @@ def review_original_partner_index(
                     "observed_at": observed,
                     "message_fingerprint": fingerprint,
                 })
+                event_age_bands[event_age_band] += 1
                 if direction == "inbound":
                     inbound += 1
+                    inbound_event_age_bands[event_age_band] += 1
                 else:
                     outbound += 1
+                    outbound_event_age_bands[event_age_band] += 1
     if set(labels) != seen_threads:
         raise PrimeIndexHold("incomplete_original_known_thread_snapshot")
     internal = review_partner_signal_codes(
         source=index["source"], observations=observations, as_of=now,
     )
     founder = founder_partner_signal_status(internal)
+    temporal_names = (
+        "0_7_DAYS", "8_30_DAYS", "31_45_DAYS", "OLDER_THAN_45_DAYS",
+    )
+    age_counts = {k: event_age_bands[k] for k in temporal_names}
+    inbound_ages = {k: inbound_event_age_bands[k] for k in temporal_names}
+    outbound_ages = {k: outbound_event_age_bands[k] for k in temporal_names}
+    if (sum(age_counts.values()) != inbound + outbound
+        or any(age_counts[k] != inbound_ages[k] + outbound_ages[k]
+               for k in temporal_names)
+        or sum(all_message_directions.values()) != len(seen_messages)
+        or messages_with_codes > len(seen_messages)):
+        raise PrimeIndexHold("original_owner_temporal_and_direction_counts_disagree")
+    founder = {
+        **founder,
+        "semantic_observations_0_7d_count_band_if_at_least_five": _privacy_band(
+            age_counts["0_7_DAYS"]
+        ),
+        "inbound_semantic_observations_0_7d_count_band_if_at_least_five": _privacy_band(
+            inbound_ages["0_7_DAYS"]
+        ),
+        "historical_older_than_7d_observations_are_not_current_demand": True,
+        "fresh_owner_snapshot_does_not_make_old_messages_fresh": True,
+    }
     return {
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
@@ -211,6 +279,18 @@ def review_original_partner_index(
         "monitored_thread_count_not_verified_buyers": len(rows),
         "indexed_message_count_not_verified_buyer_replies": len(seen_messages),
         "semantic_occurrences_not_enquiries": len(observations),
+        "messages_with_semantic_codes_not_enquiries": messages_with_codes,
+        "messages_without_semantic_codes_not_negatives": len(seen_messages) - messages_with_codes,
+        "all_message_directions_not_canonical_buyer_authentication": {
+            k: all_message_directions[k] for k in (
+                "INBOUND_INBOX", "OUTBOUND_SENT",
+                "EXCLUDED_DRAFT_SPAM_OR_TRASH", "UNCLASSIFIED_DIRECTION",
+            )
+        },
+        "semantic_occurrence_age_bands_not_current_demand": age_counts,
+        "inbound_semantic_occurrence_age_bands_not_verified_enquiries": inbound_ages,
+        "outbound_semantic_occurrence_age_bands_not_buyer_replies": outbound_ages,
+        "source_poll_freshness_distinct_from_message_age": True,
         "inbound_semantic_occurrences_not_buyer_enquiries": inbound,
         "outbound_semantic_occurrences_not_buyer_enquiries": outbound,
         "founder_research_projection": founder,
