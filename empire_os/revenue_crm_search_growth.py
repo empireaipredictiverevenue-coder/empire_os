@@ -148,4 +148,3 @@ def build_crm_search_growth_brief(
         evidence_count=len(evidence_refs),
         evidence_refs=evidence_refs,
     )
-
