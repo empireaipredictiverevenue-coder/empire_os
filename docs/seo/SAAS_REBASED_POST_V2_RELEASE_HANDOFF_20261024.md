@@ -33,3 +33,22 @@ Ran two full isolated site-copy transactional rehearsals using the existing exac
 4. Independently verify receipt, exact served page bytes, assets, canonical, consent, `/commercial` and `/privacy` after the owner's release. Only authentic visitor submissions with specific consent and canonical EmpireDB/Smart CRM receipt can become qualified enquiries. No simulated submissions or inferred SEO-derived revenue.
 
 **Production status:** Industry Enquiry V2 is live and independently validated. The new SaaS guide remains **private, tested, not approved for public release**. No live site changes occurred during this re-stage. The latest observed original GTM snapshot (2026-10-24T10:36:17.878585+00:00) recorded zero canonical first-party sales enquiries, with no outbound or payment.
+
+## 24 October: original website release operator prepared, NOT activated
+
+Created a one-shot **guarded command inside the existing Website & Growth release workflow**: `scripts/publish_saas_guide_after_v2_20261024.py`. This is not a new application, DB, agent or publishing scheduler. It imports and reuses the original website root-protected backup, owner-lock and exact atomic/rollback helpers. Existing V2 source and release receipts remain untouched.
+
+Read-only invocation:
+
+```bash
+cd /srv/empire_os
+/srv/empire_os/.venv/bin/python -B -m scripts.publish_saas_guide_after_v2_20261024 --preflight
+```
+
+Observed status: `SAAS_659_TO_662_PREFLIGHT_PASS_PUBLICATION_NOT_APPROVED`. The command independently SHA-256 verifies all 659 current live files, all 662 private candidate files, the exact two page payload replacements and three immutable additions. It checks the existing commercial and predictive one-form/one-consent semantics, first-party CTA anchors, all hashed references, public GET hashes for protected V2 routes and exact pinned Chromium and private rollback evidence receipts. It fails closed on any source change, asset collision, prior release/backup receipt, altered QA, new external script or missing consent.
+
+The publisher has a **distinct, immutable, exact founder-approval record** gate (`docs/website/release_candidates/SAAS_GUIDE_RELEASE_APPROVAL_20261024.json`) requiring the source-approved SHA-256 to be pinned in the operator. That record has **not been issued**, and `APPROVAL_SHA256` deliberately remains `None`. The previous industry V2 founder approval does NOT authorise this SaaS guide, and a command-line apply flag alone cannot give approval. Both unprivileged attempts and a simulated-root-but-unapproved attempt were confirmed to HOLD without acquiring the owner lock or making an archive.
+
+When the founder separately approves the exact 659→662 scope, the existing release owner—not this read-only build—may prepare the specifically approved, SHA-pinned record and complete final owner review. The authorised root owner will then use the *same* private website lock (including the existing compatibility lock), create a fresh protected **659-file** archive at `/var/backups/empire-website/saas_guide_post_v2_pre_659_20261024.tar`, check every restored hash, apply only the two Predictive Revenue payloads and three new assets, verify the 662-file tree and served `GET` bytes, and write the distinct protected publication receipt. Any post-write failure triggers the existing narrow atomic rollback. No root access workarounds, sudoers changes, full-site export sync, automated outbound or financial actions are part of this scope.
+
+Validation: `26 passed` across `tests/test_publish_saas_guide_after_v2_20261024.py`, `tests/test_publish_industry_enquiry_v2_20261023.py` and `tests/test_release_predictive_roofing_two_page_20261022.py`; Python compile passed. **Live site remains 659 files unchanged.**
