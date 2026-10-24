@@ -328,4 +328,9 @@ echo 'SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true'
 # consented PostgreSQL fixture only, never real user permission.
 PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
   scripts/rehearse_prime_consent_revocation_race_20261024.py
+# Opt-in ONLY: add held 061 to same disposable fixture AFTER original
+# 057-060 regressions, never to production or generic migration bootstrap.
+if [[ "${EMPIRE_REHEARSE_HELD_CONSENT_061:-}" == "disposable_only" ]]; then
+  bash scripts/rehearse_prime_consent_gate_061_20261024.sh
+fi
 echo "SIGNED_GATEWAY_060_RESTRICTED_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0"
