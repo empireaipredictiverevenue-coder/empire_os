@@ -62,6 +62,65 @@ def _read_source(path: Path) -> dict:
     return payload
 
 
+def verify_clueso_official_sources(*, get=None) -> dict:
+    """Optional bounded GET of two exact first-party pages; no contact capture.
+
+    Verifies source availability, NOT buying intent or permission to send.
+    """
+    from hashlib import sha256
+    from urllib.request import Request, urlopen
+
+    pages = (
+        ("founding_ae", "https://www.clueso.io/careers/founding-ae",
+         ("Neel Balar", "PLG signups", "Oct 13, 2026")),
+        ("contact_routes", "https://www.clueso.io/contact",
+         ("Partnerships and referrals", "Privacy and data requests")),
+    )
+    def real_get(url: str) -> tuple[str, int, bytes]:
+        req = Request(
+            url, method="GET",
+            headers={"User-Agent": "EmpireOS-SaaS-Official-Source-GET-Only/1"})
+        with urlopen(req, timeout=10) as response:
+            return response.geturl(), response.status, response.read(250_001)
+
+    getter = get or real_get
+    checks = []
+    for label, url, markers in pages:
+        try:
+            final_url, status, data = getter(url)
+            parsed = urlsplit(final_url)
+            valid = (
+                status == 200 and len(data) <= 250_000 and
+                parsed.scheme == "https" and
+                parsed.netloc == "www.clueso.io" and
+                parsed.path == urlsplit(url).path and
+                all(marker in data.decode("utf8", "replace") for marker in markers)
+            )
+            checks.append({
+                "source": label, "official_url": url,
+                "verified": valid,
+                "content_sha256_if_verified": sha256(data).hexdigest() if valid else None,
+            })
+        except (OSError, ValueError, TypeError):
+            checks.append({
+                "source": label, "official_url": url,
+                "verified": False, "content_sha256_if_verified": None,
+            })
+    success = len(checks) == 2 and all(c["verified"] for c in checks)
+    return {
+        "schema_version": "empire.saas.clueso_first_party_source_check.v1",
+        "status": ("OFFICIAL_CLUESO_PAGES_GET_VERIFIED"
+                   if success else "OFFICIAL_CLUESO_PAGES_HELD"),
+        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "source_checks": checks,
+        "independent_external_procurement_verified": False,
+        "linkedin_outreach_authorized": False,
+        "email_outreach_authorized": False,
+        "sender_or_company_contact_data_collected": False,
+        "customer_records_written": False,
+    }
+
+
 def commercial_truth(
     observer: dict | None, buyer_queue: dict | None, *,
     now: datetime | None = None,

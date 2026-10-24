@@ -8,6 +8,7 @@ from pathlib import Path
 
 from empire_os.predictive_revenue_saas_build_stage import (
     OUTPUT_REL, SOURCE_REL, SourceHold, _read_source, build, write_private,
+    verify_clueso_official_sources,
 )
 
 
@@ -28,6 +29,8 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-private", action="store_true",
                         help="Update only the existing private GTM research read model")
+    parser.add_argument("--verify-clueso-official", action="store_true",
+                        help="GET two exact official Clueso pages; no message, login or tracking")
     parser.add_argument("--repo-root", default="/srv/empire_os")
     args = parser.parse_args(argv)
     root = Path(args.repo_root)
@@ -42,6 +45,15 @@ def main(argv: list[str] | None = None) -> int:
             buyer_queue=_existing_readonly_snapshot(
                 root, "runtime/buyer_network_intelligence/candidate_queue_latest.json"),
         )
+        source_check = (verify_clueso_official_sources()
+                        if args.verify_clueso_official else None)
+        report["clueso_first_party_get_evidence"] = source_check
+        for action in report["next_review_actions"]:
+            if action["source_id"] == "clueso_founding_ae_20261024":
+                action["first_party_source_status"] = (
+                    source_check["status"] if source_check is not None
+                    else "NO_FRESH_FIRST_PARTY_GET_THIS_RUN")
+                action["contact_channel_authorized"] = False
         if args.write_private:
             write_private(root / OUTPUT_REL, report)
         print(json.dumps({
@@ -62,6 +74,9 @@ def main(argv: list[str] | None = None) -> int:
                 "original_commercial_truth"]["original_buyer_network_gmail_snapshot_fresh"],
             "top_review_action": report["next_review_actions"][0]["action"],
             "top_review_source_id": report["next_review_actions"][0]["source_id"],
+            "clueso_official_source_status": (
+                source_check["status"] if source_check is not None
+                else "NO_FRESH_FIRST_PARTY_GET_THIS_RUN"),
             "outbound_send_authorized": False, "emails_sent": 0,
             "private_read_model_written": args.write_private,
             "customer_rows_written": 0, "site_mutated": False,

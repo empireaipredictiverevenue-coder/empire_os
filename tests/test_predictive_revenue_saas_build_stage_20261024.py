@@ -252,3 +252,48 @@ def test_snapshot_reader_rejects_symlink_and_malformed(tmp_path):
     assert _existing_readonly_snapshot(tmp_path, "other.json") is None
     (tmp_path / "bad.json").write_text("{not-json")
     assert _existing_readonly_snapshot(tmp_path, "bad.json") is None
+
+
+def test_clueso_official_verified_is_never_contact_permission():
+    def official_get(url):
+        if url.endswith("/careers/founding-ae"):
+            return url, 200, b"Neel Balar / PLG signups / Oct 13, 2026"
+        return url, 200, b"Partnerships and referrals / Privacy and data requests"
+    p = b.verify_clueso_official_sources(get=official_get)
+    assert p["status"] == "OFFICIAL_CLUESO_PAGES_GET_VERIFIED"
+    assert all(row["verified"] for row in p["source_checks"])
+    assert p["independent_external_procurement_verified"] is False
+    assert p["linkedin_outreach_authorized"] is False
+    assert p["email_outreach_authorized"] is False
+    assert p["customer_records_written"] is False
+
+
+@pytest.mark.parametrize("tamper", [
+    "redirect", "missing_slogan", "oversize", "wrong_status",
+])
+def test_clueso_official_fails_closed_for_uncertain_source(tamper):
+    def official_get(url):
+        text = (b"Neel Balar / PLG signups / Oct 13, 2026" if "founding-ae" in url
+                else b"Partnerships and referrals / Privacy and data requests")
+        if tamper == "redirect":
+            return "https://evil.example/careers", 200, text
+        if tamper == "missing_slogan":
+            return url, 200, b"Founding Account Executive"
+        if tamper == "oversize":
+            return url, 200, b"x" * 250_001
+        return url, 503, text
+    p = b.verify_clueso_official_sources(get=official_get)
+    assert p["status"] == "OFFICIAL_CLUESO_PAGES_HELD"
+    assert p["email_outreach_authorized"] is False
+    assert p["linkedin_outreach_authorized"] is False
+
+
+def test_clueso_official_partial_source_never_promotes_buyer():
+    def official_get(url):
+        if url.endswith("/contact"):
+            raise OSError("network unavailable")
+        return url, 200, b"Neel Balar / PLG signups / Oct 13, 2026"
+    p = b.verify_clueso_official_sources(get=official_get)
+    assert p["status"] == "OFFICIAL_CLUESO_PAGES_HELD"
+    assert any(not row["verified"] for row in p["source_checks"])
+    assert p["independent_external_procurement_verified"] is False
