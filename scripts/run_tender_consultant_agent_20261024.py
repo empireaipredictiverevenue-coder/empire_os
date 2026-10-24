@@ -24,6 +24,8 @@ def main() -> int:
                         help="Generate CA18567 source-linked private research demonstrator; no investment clearance")
     parser.add_argument("--official-gis-snapshot",action="store_true",
                         help="Fetch bounded official NI/ROI GIS samples into private research; no site qualification")
+    parser.add_argument("--commercial-readiness",action="store_true",
+                        help="Private CA18567 sent-receipt/RFQ/illustrative-economics gate; no bid authority")
     args=parser.parse_args()
     result=review(Path(args.repo_root))
     if result["status"]==READY and args.review_supplier_content:
@@ -52,6 +54,28 @@ def main() -> int:
         }
     if result["status"]==READY and args.shadow_local:
         result["local_shadow_questions"]=local_shadow_advice(result)
+    if result["status"]==READY and args.commercial_readiness:
+        commercial_status="HELD_PRIVATE_WRITE_REQUIRED"
+        sent_count=0
+        if args.write_private:
+            try:
+                from empire_os.tender_commercial_readiness_20261024 import assess,save_private as save_commercial
+                commercial=assess(Path(args.repo_root))
+                save_commercial(Path(args.repo_root),commercial)
+                commercial_status=commercial["status"]
+                sent_count=commercial["approved_emails_sent_provider_count"]
+            except (OSError,ValueError):
+                commercial_status="HELD_UNSAFE_OR_MISSING_PRIVATE_COMMERCIAL_EVIDENCE"
+        result["ca18567_commercial_readiness"]={
+            "status":commercial_status,
+            "provider_confirmed_sent_count":sent_count,
+            "supplier_replies_at_original_send_receipt":0,
+            "current_partner_reply_count":None,
+            "live_gmail_checked_by_commercial_gate":False,
+            "supplier_quotes_independently_verified":0,
+            "authenticated_rfq_verified":False,
+            "bid_authorized":False,
+        }
     if result["status"]==READY and args.official_gis_snapshot:
         gis_status="HELD_PRIVATE_WRITE_REQUIRED"
         gis_layers_observed=0
