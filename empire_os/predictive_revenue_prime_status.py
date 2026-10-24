@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from empire_os.permit_product_integration import build_permit_product_runtime
 from empire_os.predictive_revenue_brain_bridge import build_predictive_revenue_brain_review
@@ -21,6 +21,7 @@ def read_prime_founder_status(
     *, repo_root: Path,
     as_of: datetime | None = None,
     tenant_id: str = "empire-internal",
+    official_nws_source_review: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Read existing internal sources and render only safe aggregate metadata.
 
@@ -37,6 +38,10 @@ def read_prime_founder_status(
         "storm_snapshot_freshness": "NOT_CONNECTED",
         "storm_opportunity_count": None,
         "permit_observation_count": None,
+        "official_nws_review_status": "NOT_CONNECTED",
+        "official_nws_source_reference_count": None,
+        "official_nws_source_freshness": "UNKNOWN",
+        "official_nws_is_commercial_opportunity": False,
         "permit_source_blockers": ["SOURCE_REVIEW_UNAVAILABLE"],
         "crm_status": "NOT_CONNECTED_NOT_A_VERIFIED_ZERO",
         "prime_simulation_status": "NOT_RUN_NO_VERIFIED_CRM_INPUT",
@@ -65,9 +70,13 @@ def read_prime_founder_status(
             storm_snapshot=storm,
             permit_integration=permit,
             crm_deals=(), churn_signals=(), simulate_pipeline=False,
+            official_nws_source_review=official_nws_source_review,
         )
         safe.update({
             "storm_snapshot_available": storm is not None,
+            "official_nws_review_status": review["official_source_observatory"]["status"],
+            "official_nws_source_reference_count": review["official_source_observatory"]["source_references_reviewed"],
+            "official_nws_source_freshness": review["official_source_observatory"]["freshness"],
             "storm_snapshot_freshness": review["source_freshness"]["storm_snapshot"],
             "storm_opportunity_count": len(review["storm_research"]),
             "permit_observation_count": len(review["permit_research"]),
