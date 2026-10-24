@@ -149,6 +149,37 @@ export default async function PrimeTwinCockpit({ searchParams }: { searchParams:
             </div>
           </section>
         </div>
+        <section className="mt-6 rounded-2xl border border-sky-400/20 bg-sky-400/[0.025] p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+            Original PRIME situation and capability map
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold">What the assistant knows it cannot yet do</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Capability registry membership is a policy definition, not a working integration.
+            All listed real-world actions remain unavailable from this research cockpit.
+            Voice, reminders, calendar, devices, media and communications need separately
+            verified providers, explicit permissions and original owner approval.
+          </p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {(data.assistant_capability_map ?? []).map(item =>
+              <div key={item.request_code}
+                className="rounded-xl border border-white/10 bg-[#0a1427] px-4 py-3">
+                <p className="text-sm font-semibold text-slate-100">
+                  {label(item.request_code)}
+                </p>
+                <p className="mt-2 text-xs text-slate-400">
+                  {item.original_agi_capability_registered
+                    ? "Existing policy registry · NOT a live feature"
+                    : "Integration not registered/verified"}
+                </p>
+              </div>)}
+          </div>
+          <p className="mt-5 text-xs leading-6 text-amber-200">
+            Current situational review: {label(data.situational_awareness.status)}.
+            No claim of subjective consciousness, universal situational knowledge
+            or independent source authentication.
+          </p>
+        </section>
         <footer className="mt-7 rounded-xl border border-amber-400/20 p-5 text-sm text-slate-400">
           Local-model self-play: {label(data.local_model_selfplay.status)}.
           The existing llama.cpp runtime responded to health checks but the manual

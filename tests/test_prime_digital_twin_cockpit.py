@@ -87,3 +87,35 @@ def test_original_read_cockpit_does_not_invoke_local_model(monkeypatch):
     monkeypatch.setattr(LlamaCppProvider, "chat", forbidden)
     result = build_prime_digital_twin_cockpit(fractal_depth=2)
     assert result["all_synthetic_baseline"]["fractal_nodes_at_depth_two"] == 112
+
+
+def test_founder_cockpit_maps_alexa_like_capability_gaps_without_fake_implementation():
+    packet = build_prime_digital_twin_cockpit()
+    readiness = packet["situational_awareness"]
+    assert readiness["status"] == "REQUIRES_REAL_SOURCE_AND_OWNER_GATES"
+    assert readiness["consciousness_claim"] is False
+    assert readiness["real_world_capability_live"] is False
+    assert readiness["execution_authority"] == "none"
+    features = {row["request_code"]: row for row in packet["assistant_capability_map"]}
+    assert "SIMULATE_SCENARIO" in features
+    assert "TIMER_OR_ALARM" in features
+    assert "VOICE_DIALOGUE" in features
+    assert "SMART_HOME_CONTROL" in features
+    assert "PAYMENT_REQUEST" in features
+    assert features["SIMULATE_SCENARIO"]["original_agi_capability_registered"] is True
+    assert features["SMART_HOME_CONTROL"]["original_agi_capability_registered"] is False
+    assert all(item["feature_live"] is False and item["execution_authority"] == "none"
+               for item in features.values())
+    assert packet["real_messages_sent"] is False
+
+
+def test_original_founder_api_cannot_start_real_assistant_action_when_rendering_map(monkeypatch):
+    from empire_os.coder.llama_cpp_provider import LlamaCppProvider
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Capability map must not access real AI inference")
+    monkeypatch.setattr(LlamaCppProvider, "chat", forbidden)
+    with TestClient(build_founder_dashboard_service()) as client:
+        response = client.get("/v1/founder-dashboard/prime-digital-twin")
+        assert response.status_code == 200
+        assert response.json()["situational_awareness"]["execution_authority"] == "none"
+        assert response.json()["real_messages_sent"] is False

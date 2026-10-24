@@ -1029,6 +1029,22 @@ export type PrimeDigitalTwinCockpit = {
     unresolved_loop_stalls: number;
   };
   local_model_selfplay: { status: string; inference_calls: number | null };
+  situational_awareness: {
+    mode: "OBSERVE";
+    status: string;
+    request_code: string;
+    original_capability_registered: boolean;
+    missing_information_or_authority: string[];
+    consciousness_claim: boolean;
+    real_world_capability_live: boolean;
+    execution_authority: "none";
+  };
+  assistant_capability_map: Array<{
+    request_code: string;
+    original_agi_capability_registered: boolean;
+    feature_live: boolean;
+    execution_authority: "none";
+  }>;
   local_model_active_in_this_read_only_request: boolean;
   local_model_inference_observed_as_success: boolean;
   real_world_predictive_accuracy: number | null;

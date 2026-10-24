@@ -7,6 +7,10 @@ external transport, sender, actual buyer or learned weight.
 from __future__ import annotations
 
 from typing import Any
+from datetime import datetime, timezone
+from empire_os.prime_situation_awareness_shadow import (
+    REQUEST_CAPABILITY, review_prime_situation, founder_situation_status,
+)
 
 from empire_os.digital_twin_conversation_rehearsal import (
     rehearse_conversation, run_conversation_twin_gauntlet,
@@ -40,6 +44,12 @@ def build_prime_digital_twin_cockpit(
     summary = founder_conversation_twin_status(overall)
     branch_summary = founder_fractal_physics_status(branch)
     universe_summary = founder_fractal_physics_status(universe)
+    # Exposes a capability COVERAGE PLAN, not a connected assistant or source.
+    situation = review_prime_situation(
+        situation_key="fictional_prime_cockpit",
+        request_code="SIMULATE_SCENARIO",
+        observations=None, as_of=datetime.now(timezone.utc),
+    )
     paths = []
     for item in branch["nodes"]:
         paths.append({
@@ -87,6 +97,16 @@ def build_prime_digital_twin_cockpit(
             "unresolved_loop_stalls": universe_summary["synthetic_loop_stalls"],
         },
         "local_model_selfplay": cockpit_selfplay_shadow(None),
+        "situational_awareness": founder_situation_status(situation),
+        "assistant_capability_map": [
+            {
+                "request_code": key,
+                "original_agi_capability_registered": capability is not None,
+                "feature_live": False,
+                "execution_authority": "none",
+            }
+            for key, capability in sorted(REQUEST_CAPABILITY.items())
+        ],
         "local_model_active_in_this_read_only_request": False,
         "local_model_inference_observed_as_success": False,
         "authorization_gate": "ORIGINAL_FOUNDER_CONSOLE_OWNER_AND_PRIVATE_INGRESS_REVIEW",
