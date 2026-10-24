@@ -105,6 +105,12 @@ def test_real_pg060_restricted_writer_records_verified_fictional_callbacks_only_
     assert "SCRAM_LOGIN_DIRECT_TABLE_SELECT_DENIED=true" in run.stdout
     assert "INDEPENDENT_SCRAM_TENANT_SCOPED_READER_AUTHENTICATED=true" in run.stdout
     assert "INDEPENDENT_READER_TENANT_RLS_AND_NO_WRITES=PASS" in run.stdout
+    assert '"status": "TWO_REAL_POSTGRESQL_REVOCATION_ORDERINGS_PASS"' in run.stdout
+    assert '"observed_revocation_first_reader_blocked": true' in run.stdout
+    assert '"revocation_first_callback_admitted": false' in run.stdout
+    assert '"observed_callback_first_revoker_blocked": true' in run.stdout
+    assert '"callback_first_receipt_rows_before_revocation": 1' in run.stdout
+    assert '"real_device_alerts": 0' in run.stdout
     assert "SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true" in run.stdout
     assert "Dropping cluster 18/regress" in run.stdout+run.stderr
 

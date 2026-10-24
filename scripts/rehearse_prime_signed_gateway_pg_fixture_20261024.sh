@@ -323,4 +323,9 @@ grep -Fq 'TIMER059_ILLEGAL_OR_REPLAYED_RECEIPT_TRANSITION' "$tmp/second.log"
 }
 echo 'SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true'
 
+# Two lock orderings: revoke FIRST must block callback; callback FIRST
+# may finish custody before revocation commits. This is fictionally
+# consented PostgreSQL fixture only, never real user permission.
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
+  scripts/rehearse_prime_consent_revocation_race_20261024.py
 echo "SIGNED_GATEWAY_060_RESTRICTED_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0"
