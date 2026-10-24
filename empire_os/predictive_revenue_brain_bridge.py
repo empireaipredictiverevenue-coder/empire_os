@@ -34,6 +34,9 @@ from empire_os.prime_universal_evidence_fusion import (
 )
 from empire_os.prime_signed_owner_evidence_gateway import PrimeOwnerSignatureVerifier
 from empire_os.prime_original_buyer_intent_preflight import PrimeOriginalBuyerIntentVerifier
+from empire_os.prime_buyer_partner_signal_shadow import (
+    review_partner_signal_codes, founder_partner_signal_status,
+)
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
@@ -325,6 +328,7 @@ def build_predictive_revenue_brain_review(
     original_owner_signature_verifier: PrimeOwnerSignatureVerifier | None = None,
     original_single_buyer_enquiry_verifier: PrimeOriginalBuyerIntentVerifier | None = None,
     original_buyer_source_health: Mapping[str, Any] | None = None,
+    original_partner_signal_codes: Sequence[Mapping[str, Any]] | None = None,
     original_forward_journal_predictions: Sequence[Mapping[str, Any]] | None = None,
     original_forward_journal_owner_outcomes: Sequence[Mapping[str, Any]] | None = None,
     signed_forward_first_write_attestations: Sequence[Mapping[str, Any]] | None = None,
@@ -383,6 +387,12 @@ def build_predictive_revenue_brain_review(
         if original_buyer_source_health is not None:
             raise ValueError("buyer_capacity_snapshot_cannot_authenticate_a_buyer_enquiry")
         buyer_enquiry_preflight = None
+    original_partner_signal_shadow = founder_partner_signal_status(
+        review_partner_signal_codes(
+            source="empire_gmail_api_readonly",
+            observations=original_partner_signal_codes, as_of=now,
+        )
+    )
     if signed_forward_first_write_attestations is not None:
         if (type(original_first_write_verifier) is not PrimeOriginalFirstWriteVerifier
             or original_forward_journal_predictions is None):
@@ -457,6 +467,7 @@ def build_predictive_revenue_brain_review(
             else "NOT_CONNECTED"
         ),
         "prime_first_buyer_intent_independently_verified": False,
+        "prime_buyer_partner_signal_shadow": original_partner_signal_shadow,
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {

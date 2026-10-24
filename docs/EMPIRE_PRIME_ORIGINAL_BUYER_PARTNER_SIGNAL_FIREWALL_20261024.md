@@ -29,9 +29,13 @@ No names, email addresses, raw bodies, snippets, message IDs, private source dig
 
 ## Engineering tests and limits
 
-Local pure-module regression: 14 tests passed on fictional records, including original code mapping, positive/negative/pending separation, duplicate inflation, unknown/reversed codes, private-field rejection, stale/future time, privacy suppression and buyer-promotion protection. Tests committed at tests/test_prime_buyer_partner_signal_shadow.py.
+October 24 continuation: synchronised the GitHub research branch into the original clean PRIME feature worktree, connected the strict semantic-code classifier to the original predictive_revenue_brain_bridge.py as optional original_partner_signal_codes, and added a privacy-reduced prime_buyer_partner_signal_shadow output. The semantic taxonomy now fails closed if the original Buyer Acquisition EVENT_CODES vocabulary changes. Explicit owner-signed first-buyer-enquiry preflight remains entirely separate; semantic messages cannot promote verified buyer intent, orders, revenue, outbound, trading or model weights.
 
-This GitHub feature branch was not rerun against the complete EmpireOS repository in this session because remote command execution was unavailable. Earlier 516 scoped tests belong to the preceding commit, not this code. The current semantic-code module is standalone research; it is not automatically wired into production PRIME, original EmpireDB, CRM or email.
+534 scoped regression tests passed, one inherited Starlette deprecation warning, covering the original PRIME, Buyer Acquisition, Conversation OS, tenant/source custody, CRM auth, Quant and economic source interfaces. This is NOT the full repository test suite. Local runtime execution is available again. No new real owner credential, provider query, canonical tenant record, source licence, persistent nonce reader or immutable first-write store was connected or deployed. The earlier 516-test pass belongs to the preceding research commit. No production changes, call admission, model training or payments.
+
+Feature does not ingest real Gmail autonomously. Partner metadata still requires original provider, purpose, tenant, consent and deletion-rights verification before admissible original-owner read-only use. Never fingerprint guessable personal IDs using unsalted SHA256: real source owners must supply purpose-keyed pseudonyms. A 5-thread index or 28 semantic-code observations must never be mistaken for 28 buyers.
+
+New test cases also ensure that absent source remains unknown, attempted private raw-field injection fails, source-owner vocabulary drift is held, duplicate messages do not inflate evidence, and Founder output suppresses rare cells; the original PRIME bridge surfaces only those suppressed status fields.
 
 ## Original-owner release order
 

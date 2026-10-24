@@ -13,6 +13,8 @@ from datetime import datetime, timedelta, timezone
 import re
 from typing import Any
 
+from empire_os.buyer_mail_semantics import EVENT_CODES
+
 SCHEMA = "empire.prime.buyer_partner_signal_shadow.v1"
 ALLOWED_SOURCE = frozenset({"empire_gmail_api_readonly", "connected_gmail_connector_read_only"})
 # Exactly the original buyer_mail_semantics.EVENT_CODES as inspected on 2026-10-24.
@@ -56,6 +58,8 @@ def review_partner_signal_codes(
     A message may have multiple DIFFERENT codes. Repeated same message/code
     or mismatched direction fails closed instead of multiplying evidence.
     """
+    if frozenset(TAXONOMY) != EVENT_CODES:
+        raise ValueError("original_owner_semantic_taxonomy_changed_review_required")
     if type(source) is not str or source not in ALLOWED_SOURCE:
         raise ValueError("original_owner_gmail_metadata_source_required")
     if not isinstance(as_of, datetime) or as_of.utcoffset() is None:

@@ -115,3 +115,67 @@ def test_stale_observations_are_historical_not_fresh_signal():
     ])
     assert x["stale_observation_count"] == 1
     assert x["source_owner_authentication_verified"] is False
+
+
+def test_original_predictive_bridge_accepts_codes_as_research_only():
+    from empire_os.predictive_revenue_brain_bridge import build_predictive_revenue_brain_review
+    tenant = "tenant-prime-partner-test"
+    source = [
+        e("ROUTE_OR_NUMBER_LIVE_REPORTED", 1),
+        e("PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED", 2),
+        e("BUYER_INTERNAL_DECISION_PENDING_REPORTED", 3),
+        e("COMPLETE_BUYER_REQUIREMENTS_SENT", 4),
+    ]
+    review = build_predictive_revenue_brain_review(
+        tenant_id=tenant, as_of=NOW, original_partner_signal_codes=source,
+    )
+    founder = review["prime_buyer_partner_signal_shadow"]
+    assert founder["observed_reported_event_count_band"] == "0-4"
+    assert founder["category_count_band_when_at_least_five"] == {}
+    assert founder["owner_source_live_authenticated"] is False
+    assert founder["buyer_enquiries_independently_verified"] is False
+    assert founder["revenue_recognized"] is False
+    assert founder["negative_and_pending_partner_evidence_preserved"] is True
+    assert review["prime_first_buyer_intent_independently_verified"] is False
+    assert review["prime_original_single_buyer_enquiry_preflight_status"] == "NOT_CONNECTED"
+    assert review["prime_signed_owner_replay_protection_verified"] is False
+    assert review["recognized_revenue_cents"] is None
+    assert review["astra_dispatch_executed"] is False
+    assert review["outbound_sent"] is False
+    assert review["database_writes"] is False
+    assert tenant not in str(founder)
+    assert "message_fingerprint" not in str(founder)
+
+
+def test_default_original_predictive_bridge_reports_unknown_source_not_zero():
+    from empire_os.predictive_revenue_brain_bridge import build_predictive_revenue_brain_review
+    result = build_predictive_revenue_brain_review(
+        tenant_id="tenant-prime-partner-test", as_of=NOW,
+    )
+    assert result["prime_buyer_partner_signal_shadow"]["observed_reported_event_count_band"] is None
+    assert result["prime_buyer_partner_signal_shadow"]["buyer_enquiries_independently_verified"] is False
+    assert result["revenue_verified"] is False
+
+
+def test_bridge_fails_closed_for_untrusted_semantic_code_and_body():
+    from empire_os.predictive_revenue_brain_bridge import build_predictive_revenue_brain_review
+    for injected in (
+        e("ROUTE_OR_NUMBER_LIVE_REPORTED", body="PRIVATE PROVIDER TEXT"),
+        e("ROUTE_OR_NUMBER_LIVE_REPORTED", direction="outbound"),
+        e("ROUTE_OR_NUMBER_LIVE_REPORTED", event_code="PAYMENT_RECEIVED"),
+    ):
+        with pytest.raises(ValueError):
+            build_predictive_revenue_brain_review(
+                tenant_id="tenant-prime-partner-test",
+                as_of=NOW,
+                original_partner_signal_codes=[injected],
+            )
+
+
+def test_source_owner_taxonomy_changes_fail_closed_without_original_review(monkeypatch):
+    from empire_os import prime_buyer_partner_signal_shadow as module
+    from empire_os.buyer_mail_semantics import EVENT_CODES
+    assert frozenset(module.TAXONOMY) == EVENT_CODES
+    monkeypatch.setattr(module, "EVENT_CODES", EVENT_CODES | {"NEW_POTENTIAL_BUYER"})
+    with pytest.raises(ValueError, match="taxonomy_changed_review_required"):
+        review([])
