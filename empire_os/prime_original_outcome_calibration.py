@@ -18,7 +18,7 @@ from uuid import UUID
 from empire_os.commercial_verified_learning_review import (
     review_verified_learning_candidate,
 )
-from empire_os.quant_brain import brier_score
+from empire_os.prime_prediction_quality import evaluate_prime_prediction_quality
 
 SCHEMA = "empire.prime.original_outcome_calibration_gate.v1"
 MIN_SHADOW_SAMPLE_REVIEW_THRESHOLD = 30
@@ -55,6 +55,7 @@ def _base() -> dict[str, Any]:
         "observed_outcome_wins_in_owner_supplied_samples": None,
         "shadow_brier_score": None,
         "shadow_signed_probability_bias": None,
+        "shadow_prediction_quality": None,
         "calibration_cohort_sufficient": False,
         "shadow_minimum_sample_threshold_met": False,
         "statistical_model_calibration_verified": False,
@@ -160,10 +161,11 @@ def review_prime_outcome_calibration(
     result["owner_reviewed_terminal_outcome_count"] = len(order_ids)
     result["shadow_prediction_pair_count"] = len(predictions)
     if predictions:
-        scored = brier_score(predictions, binary_outcomes)
-        if not scored["available"] or scored["sample_count"] != len(predictions):
-            raise ValueError("original Quant Brier scoring failed")
-        result["shadow_brier_score"] = scored["brier_score"]
+        quality = evaluate_prime_prediction_quality(predictions, binary_outcomes)
+        if quality["sample_count"] != len(predictions) or quality["execution_authority"] != "none":
+            raise ValueError("original Quant prediction quality contract mismatch")
+        result["shadow_prediction_quality"] = quality
+        result["shadow_brier_score"] = quality["brier_score"]
         result["shadow_signed_probability_bias"] = round(
             sum(outcome - prediction for outcome, prediction in zip(
                 binary_outcomes, predictions
