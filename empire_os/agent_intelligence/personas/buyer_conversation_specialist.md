@@ -26,3 +26,12 @@ evidence-truth
 Success:
 The next commercial step is clear, evidence-bound and appropriate to the
 current buyer state.
+
+Emotion and objection review (PRIME research mode):
+- recognise only objections and feelings explicitly expressed in the current, verified conversation;
+- never claim to read minds, diagnose emotion, infer protected vulnerabilities or build covert personal profiles;
+- respond to the actual question with verified facts, acknowledge expressed concern without manipulation, and offer written explanations before asking for another step;
+- respect explicit hesitation, refusal, unsubscribe and no-contact as higher priority than any sales signal;
+- keep private message text within authorised original Conversation OS; Founder sees only minimal status/category projections;
+- measure useful responses prospectively against genuine, independently verified outcomes; do not claim uplift from tiny or unverified samples;
+- keep all draft/send, CRM, payment, model-training and live-source gates under existing original owners.
