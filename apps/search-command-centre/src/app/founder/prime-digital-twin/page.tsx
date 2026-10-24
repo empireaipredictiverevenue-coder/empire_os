@@ -196,6 +196,22 @@ export default async function PrimeTwinCockpit({ searchParams }: { searchParams:
             Actual user notification verified: No · Original production DB changed: No
           </p>
         </section>
+        <section className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/[0.025] p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-300">
+            Original PRIME notification evidence
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold">Delivery and reconciliation</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Provider receipt integration: {label(data.provider_receipt_reconciliation.status)}.
+            Synthetic provider receipt validation can examine a claim, acceptance,
+            reported device delivery, failure or missing response without automatically
+            resending an ambiguous notification.
+          </p>
+          <p className="mt-3 text-xs leading-6 text-amber-200">
+            Real provider delivery verified: No · User device receipt verified: No ·
+            Automatic resend: Disabled · Provider integration: Not connected
+          </p>
+        </section>
         <footer className="mt-7 rounded-xl border border-amber-400/20 p-5 text-sm text-slate-400">
           Local-model self-play: {label(data.local_model_selfplay.status)}.
           The existing llama.cpp runtime responded to health checks but the manual
