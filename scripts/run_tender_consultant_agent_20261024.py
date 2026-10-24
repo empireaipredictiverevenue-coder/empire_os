@@ -20,6 +20,8 @@ def main() -> int:
                         help="Ask original loopback LLM for strictly unverified questions")
     parser.add_argument("--review-supplier-content",action="store_true",
                         help="Privately preview staged CA18567 DOCX text; PDFs remain unextracted")
+    parser.add_argument("--land-intelligence-demo",action="store_true",
+                        help="Generate CA18567 source-linked private research demonstrator; no investment clearance")
     args=parser.parse_args()
     result=review(Path(args.repo_root))
     if result["status"]==READY and args.review_supplier_content:
@@ -48,6 +50,26 @@ def main() -> int:
         }
     if result["status"]==READY and args.shadow_local:
         result["local_shadow_questions"]=local_shadow_advice(result)
+    if result["status"]==READY and args.land_intelligence_demo:
+        demo_status="HELD_PRIVATE_WRITE_REQUIRED"
+        example_count=0
+        if args.write_private:
+            try:
+                from empire_os.tender_land_intelligence_demonstrator import write_private_demo
+                demo=write_private_demo(Path(args.repo_root))
+                demo_status=demo["status"]
+                example_count=len(demo["published_examples"])
+            except (OSError,ValueError):
+                demo_status="HELD_PRIVATE_LAND_DEMO_WRITE"
+        result["land_intelligence_demo"]={
+            "status":demo_status,
+            "published_examples":example_count,
+            "investment_ready_sites":0,
+            "professional_review_verified":False,
+            "supplier_eligibility_verified":False,
+            "rfq_fully_reviewed":False,
+            "bid_authorized":False,
+        }
     saved=False
     if result["status"]==READY and args.write_private:
         try:
