@@ -202,7 +202,7 @@ def build_report(now: datetime | None = None) -> dict:
     }
 
 
-def render_html(report: dict) -> str:
+def render_html(report: dict, gis_snapshot: dict | None = None) -> str:
     sites = report["published_examples"]
     def e(value: object) -> str:
         return escape(str(value), quote=True)
@@ -233,6 +233,33 @@ def render_html(report: dict) -> str:
         e(item["publisher"]) + ' ↗</a> — ' + e(item["purpose"]) + ' (' + e(item["reuse_status"]) + ')</li>'
         for item in report["source_registry"]
     )
+    gis_content = '<p>No official GIS samples attached yet. Screening requires a separately authorised geometry and specialist assessment.</p>'
+    if isinstance(gis_snapshot, dict) and gis_snapshot.get("schema_version") == "empire.tender_ca18567_official_gis_evidence.v1":
+        gis_rows = []
+        from empire_os.tender_land_gis_evidence import SOURCES
+        for layer in gis_snapshot.get("layers", [])[:2]:
+            if not isinstance(layer, dict):
+                continue
+            official = SOURCES.get(layer.get("source_id"))
+            if (official is None or layer.get("catalogue") != official["catalogue"]
+                or layer.get("licence") != official["licence"]
+                or layer.get("status") != "OFFICIAL_GIS_SAMPLE_OBSERVED_NOT_PARCEL_SCREENING"
+                or not isinstance(layer.get("feature_count"), int)
+                or not 0 <= layer["feature_count"] <= 3):
+                continue
+            gis_rows.append(
+                '<article class="site"><div class="meta"><span>BOUNDED OFFICIAL GIS SAMPLE</span></div>'
+                '<h3>' + e(layer.get("label", "Unknown source")) + '</h3>'
+                '<p><strong>' + e(layer.get("feature_count", 0)) + '</strong> bounded example polygons observed. '
+                'Dataset not exhaustively downloaded. No site intersection, land ownership or planning clearance established.</p>'
+                '<div class="evidence"><strong>Source catalogue:</strong> <a target="_blank" rel="noopener noreferrer" href="'
+                + e(layer.get("catalogue", "#")) + '">Official publisher ↗</a></div>'
+                '<div class="evidence"><strong>Licence:</strong> ' + e(layer.get("licence", "NOT VERIFIED")) + '</div>'
+                '<div class="evidence"><strong>Attribution:</strong> ' + e(layer.get("attribution", "")) + '</div>'
+                '<div class="risk">' + e(layer.get("warning", "Independent professional review required")) + '</div></article>'
+            )
+        if gis_rows:
+            gis_content = '<div class="cards">' + "".join(gis_rows) + '</div><p class="foot">Official sample receipt: ' + e(gis_snapshot.get("observed_at_utc", "not supplied")) + '. Sample status is not a completed parcel review.</p>'
     return """<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
@@ -284,6 +311,7 @@ details{margin-top:14px;color:#ccd8e6}summary{cursor:pointer;color:#c3d9f4}li{li
 <p><strong>Publication gate:</strong> licence confirmation for every map/dataset, reviewer-signed source register, landowner/promoter authority where required, site-specific planning and title review, and qualified independent professional sign-off.</p>
 <ol><li>Retrieve complete issuer RFQ and exact site scope.</li><li>Contract qualified land/planning and GIS specialists under permitted arrangement.</li><li>Screen and verify individually identified parcels; do not infer ownership or current availability.</li><li>Deliver evidence-backed investor narrative with reviewed map rights and dates.</li></ol>
 </section>
+<h2>Live official geospatial evidence</h2>""" + gis_content + """
 <h2>Source and licensing register</h2><section class="panel"><ul>""" + links + """</ul></section>
 <p class="foot">Generated locally in EmpireOS from manually reviewed publicly available publisher pages (review date 24 October 2026). No live supplier portal, new scraping, database operations, outbound, public deployment or payment activity. All dimensions and opportunity statements refer to the publisher's claims at review, not independent verification.</p>
 </main><script>
@@ -304,5 +332,15 @@ def write_private_demo(root: Path, now: datetime | None = None) -> dict:
     folder = _private_directory(root)
     report = build_report(now=now)
     _atomic_private(folder / JSON_NAME, json.dumps(report, indent=2, sort_keys=True) + "\n")
-    _atomic_private(folder / HTML_NAME, render_html(report))
+    gis = None
+    snapshot_file = folder / "ca18567_official_gis_snapshot_latest.json"
+    if snapshot_file.exists() and not snapshot_file.is_symlink():
+        st = snapshot_file.stat()
+        if (stat.S_ISREG(st.st_mode) and st.st_uid == os.geteuid()
+            and stat.S_IMODE(st.st_mode) == 0o600 and st.st_size <= 200000):
+            try:
+                gis = json.loads(snapshot_file.read_text(encoding="utf-8"))
+            except (UnicodeError,ValueError):
+                gis = None
+    _atomic_private(folder / HTML_NAME, render_html(report, gis_snapshot=gis))
     return report

@@ -22,6 +22,8 @@ def main() -> int:
                         help="Privately preview staged CA18567 DOCX text; PDFs remain unextracted")
     parser.add_argument("--land-intelligence-demo",action="store_true",
                         help="Generate CA18567 source-linked private research demonstrator; no investment clearance")
+    parser.add_argument("--official-gis-snapshot",action="store_true",
+                        help="Fetch bounded official NI/ROI GIS samples into private research; no site qualification")
     args=parser.parse_args()
     result=review(Path(args.repo_root))
     if result["status"]==READY and args.review_supplier_content:
@@ -50,6 +52,24 @@ def main() -> int:
         }
     if result["status"]==READY and args.shadow_local:
         result["local_shadow_questions"]=local_shadow_advice(result)
+    if result["status"]==READY and args.official_gis_snapshot:
+        gis_status="HELD_PRIVATE_WRITE_REQUIRED"
+        gis_layers_observed=0
+        if args.write_private:
+            try:
+                from empire_os.tender_land_gis_evidence import snapshot_official_layers
+                gis=snapshot_official_layers(Path(args.repo_root))
+                gis_status=gis["status"]
+                gis_layers_observed=gis["layer_count"]
+            except (OSError,ValueError):
+                gis_status="HELD_OFFICIAL_GIS_SNAPSHOT"
+        result["official_gis_snapshot"]={
+            "status":gis_status,
+            "source_layers_observed":gis_layers_observed,
+            "site_geometry_legally_verified":False,
+            "planning_clearance_granted":False,
+            "bid_authorized":False,
+        }
     if result["status"]==READY and args.land_intelligence_demo:
         demo_status="HELD_PRIVATE_WRITE_REQUIRED"
         example_count=0

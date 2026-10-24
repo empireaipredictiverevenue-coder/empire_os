@@ -57,6 +57,31 @@ def test_private_outputs_and_safe_html(tmp_path:Path):
     assert "No parcel title verified" in html
     assert "rel=\"noopener noreferrer\"" in html
 
+def test_official_gis_sample_display_preserves_rights_and_rejects_spoofing():
+    from empire_os.tender_land_intelligence_demonstrator import render_html
+    from empire_os.tender_land_gis_evidence import SOURCES
+    report=build_report(NOW)
+    sample={
+        "schema_version":"empire.tender_ca18567_official_gis_evidence.v1",
+        "observed_at_utc":"2026-10-24T15:00:00+00:00",
+        "layers":[{
+            "source_id":"ROI_GZT","catalogue":SOURCES["ROI_GZT"]["catalogue"],
+            "licence":"CC-BY-4.0","status":"OFFICIAL_GIS_SAMPLE_OBSERVED_NOT_PARCEL_SCREENING",
+            "feature_count":3,"label":"Louth official zoning",
+            "attribution":SOURCES["ROI_GZT"]["attribution"],
+            "warning":SOURCES["ROI_GZT"]["warning"],
+        }]
+    }
+    html=render_html(report,sample)
+    assert "BOUNDED OFFICIAL GIS SAMPLE" in html
+    assert "Louth official zoning" in html
+    assert "CC-BY-4.0" in html
+    sample["layers"][0]["catalogue"]="javascript:alert(1)"
+    spoofed=render_html(report,sample)
+    assert "BOUNDED OFFICIAL GIS SAMPLE" not in spoofed
+    assert "javascript:alert(1)" not in spoofed
+
+
 def test_insecure_directory_rejected(tmp_path:Path):
     folder=tmp_path/"runtime"/"acquisition_research"
     folder.mkdir(parents=True)
