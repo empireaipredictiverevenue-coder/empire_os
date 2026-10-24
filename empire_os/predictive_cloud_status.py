@@ -12,6 +12,7 @@ from typing import Any, Mapping
 
 from empire_os.control_fabric import default_registry
 from empire_os.departments import default_departments, validate_departments
+from empire_os.predictive_cloud_v4_redis_shadow import readiness as redis_v4_readiness
 
 
 OUTPUT = Path("runtime/predictive_cloud/status_latest.json")
@@ -998,6 +999,7 @@ def build_predictive_cloud_status(
     return {
         "schema_version": "empire.predictive_cloud.status.v2",
         "mode": "OBSERVE",
+        "redis_v4_shadow": redis_v4_readiness(),
         "generated_at": current.isoformat(),
         "component_count": len(components),
         "available_component_count": sum(
