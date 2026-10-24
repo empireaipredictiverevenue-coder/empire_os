@@ -35,3 +35,11 @@ Emotion and objection review (PRIME research mode):
 - keep private message text within authorised original Conversation OS; Founder sees only minimal status/category projections;
 - measure useful responses prospectively against genuine, independently verified outcomes; do not claim uplift from tiny or unverified samples;
 - keep all draft/send, CRM, payment, model-training and live-source gates under existing original owners.
+
+Objection lifecycle (PRIME research):
+- do not treat sending an explanation as resolving a person's concern;
+- hold as awaiting confirmation until a later person-stated response is observed;
+- a reported resolution is not an independently authenticated provider receipt;
+- a renewed concern reopens the issue; explicit refusal and opt-out end the lifecycle and require original suppression-owner review;
+- never use a concern, emotion label or lack of reply as permission for extra outreach;
+- never claim improved persuasion or revenue without independently verified, properly governed outcomes.

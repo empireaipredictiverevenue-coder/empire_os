@@ -36,6 +36,7 @@ from empire_os.prime_signed_owner_evidence_gateway import PrimeOwnerSignatureVer
 from empire_os.prime_original_buyer_intent_preflight import PrimeOriginalBuyerIntentVerifier
 from empire_os.prime_conversation_objection_shadow import founder_conversation_cue_shadow
 from empire_os.prime_conversation_response_learning_shadow import review_objection_response_outcomes
+from empire_os.prime_objection_lifecycle_shadow import founder_objection_lifecycle_status
 from empire_os.prime_buyer_partner_signal_shadow import (
     review_partner_signal_codes, founder_partner_signal_status,
 )
@@ -333,6 +334,7 @@ def build_predictive_revenue_brain_review(
     original_partner_signal_codes: Sequence[Mapping[str, Any]] | None = None,
     original_expressed_conversation_shadow: Mapping[str, Any] | None = None,
     original_conversation_response_feedback_rows: Sequence[Mapping[str, Any]] | None = None,
+    original_objection_lifecycle_shadow: Mapping[str, Any] | None = None,
     original_forward_journal_predictions: Sequence[Mapping[str, Any]] | None = None,
     original_forward_journal_owner_outcomes: Sequence[Mapping[str, Any]] | None = None,
     signed_forward_first_write_attestations: Sequence[Mapping[str, Any]] | None = None,
@@ -478,6 +480,9 @@ def build_predictive_revenue_brain_review(
         "prime_conversation_response_learning_shadow": review_objection_response_outcomes(
             original_owner_rows=original_conversation_response_feedback_rows,
             as_of=now,
+        ),
+        "prime_objection_lifecycle_shadow": founder_objection_lifecycle_status(
+            original_objection_lifecycle_shadow,
         ),
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
