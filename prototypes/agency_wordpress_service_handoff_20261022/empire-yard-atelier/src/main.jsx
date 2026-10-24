@@ -65,13 +65,20 @@ function Hero3D({ reduce, modelUrl }) {
   const [largeModelCaution, setLargeModelCaution] = useState('')
   const [largeModelConfirmed, setLargeModelConfirmed] = useState(false)
   const [modelError, setModelError] = useState(false)
+  const [contextLost, setContextLost] = useState(false)
   const selectedFinish = showroomFinishes.find(item => item.id === finish) || showroomFinishes[0]
   const studioSelected = modelMode === 'studio'
   const showStudioReady = () => setStudioReady(true)
+  const handleRendererLost = () => {
+    setContextLost(true)
+    setSupported(false)
+    setModelMode('concept')
+    setStudioReady(false)
+  }
   const selectStudio = () => {
     // A failed model or unsupported Meshopt decoder must not restart a
     // failed fetch loop until a new page load or an owner-approved fix.
-    if (!interactive || reduce || !modelUrl || modelError) return
+    if (!interactive || reduce || !modelUrl || modelError || contextLost) return
     if (largeModelCaution && !largeModelConfirmed) {
       setLargeModelConfirmed(true)
       return
@@ -133,13 +140,14 @@ function Hero3D({ reduce, modelUrl }) {
     } catch { setSupported(false) }
   }, [inView, pageVisible, reduce, mobileTouch, mobile3DRequested])
   const mobilePreviewOnly = mobileTouch && !mobile3DRequested
-  const interactive = supported && inView && pageVisible && !reduce && !mobilePreviewOnly
+  const interactive = supported && inView && pageVisible && !reduce && !mobilePreviewOnly && !contextLost
   return <div ref={holder} data-showroom-active={interactive ? 'true' : 'false'}
     data-studio-model-ready={studioSelected && studioReady ? 'true' : 'false'}
-    data-selected-model={modelMode} className="w-full">
+    data-selected-model={modelMode} data-renderer-lost={contextLost ? 'true' : 'false'} className="w-full">
     <div className="relative isolate h-[300px] w-full overflow-hidden rounded-t-2xl border border-white/10 bg-[#102630] shadow-[0_28px_90px_rgba(0,0,0,.45)] sm:h-[400px] lg:h-[510px]">
       {interactive ? <WebGLErrorBoundary key={modelMode} onFailure={studioSelected ? failStudio : undefined}><Suspense fallback={<SceneFallback />}><ShowroomScene motionAllowed={interactive} view={view} paint={selectedFinish}
-          modelMode={modelMode} modelUrl={modelUrl} onStudioReady={showStudioReady} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
+          modelMode={modelMode} modelUrl={modelUrl} onStudioReady={showStudioReady}
+          onRendererLost={handleRendererLost} /></Suspense></WebGLErrorBoundary> : <SceneFallback launch3D={mobilePreviewOnly && !reduce ? () => setMobile3DRequested(true) : undefined} />}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-3 p-4 sm:p-7">
         <span className="rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md">{studioSelected ? 'PBR Model Studio' : '3D Concept Studio'}</span>
         <span className="rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md">{interactive ? 'LIVE / EXPLORE' : 'VISUAL / PREVIEW'}</span>
@@ -157,7 +165,7 @@ function Hero3D({ reduce, modelUrl }) {
             (!studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>Original concept</button>
         <button type="button" data-model-mode="studio" aria-pressed={studioSelected}
           onClick={selectStudio}
-          disabled={!modelUrl || reduce || !interactive || modelError}
+          disabled={!modelUrl || reduce || !interactive || modelError || contextLost}
           className={'min-h-10 rounded-md border px-4 py-2 text-[10px] font-bold tracking-wide focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:opacity-50 ' +
             (studioSelected ? 'border-[#d6b579] bg-[#d6b579] text-[#0b1e28]' : 'border-white/25 text-slate-200 hover:border-white/60')}>{modelError ? 'Studio unavailable — reload to retry' : largeModelConfirmed && !studioSelected ? 'Confirm Studio PBR · 2.8 MB' : 'Load Studio PBR · 2.8 MB'}</button>
       </div>
@@ -166,6 +174,9 @@ function Hero3D({ reduce, modelUrl }) {
         {largeModelCaution} {largeModelConfirmed ? 'Click Confirm Studio PBR to proceed.' : 'A second confirmation is required.'}
       </p>}
       {modelError && <p data-studio-recovered="true" role="status" className="w-full text-xs leading-5 text-[#f2d8a9]">The high-detail model could not open on this device. The original showroom has been restored.</p>}
+      {contextLost && <p data-renderer-recovered="true" role="status" className="w-full text-xs leading-5 text-[#f2d8a9]">
+        This device lost its 3D graphics context. The static showroom remains available. Reload to retry 3D.
+      </p>}
     </div>
     <div className="grid gap-4 rounded-b-2xl border border-t-0 border-white/15 bg-[#0c202a] px-4 py-4 sm:grid-cols-[1fr_auto] sm:items-center sm:px-6">
       <div role="group" aria-label="Showroom camera view" className="flex flex-wrap items-center gap-2">
@@ -348,14 +359,14 @@ function App() {
         <AnimatedGrid reduce={reduce}/>
         <div className="pointer-events-none absolute -left-60 top-[-150px] h-[600px] w-[600px] rounded-full bg-[#22505a]/35 blur-[135px]" />
         <div className="relative mx-auto grid max-w-[1320px] items-center gap-12 px-5 pb-10 pt-16 md:px-10 lg:min-h-[720px] lg:grid-cols-[.91fr_1.09fr] lg:gap-7 lg:pb-20 lg:pt-20">
-          <div className="relative z-10 max-w-[610px]">
+          <div className="relative z-10 min-w-0 max-w-[610px]">
             <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.05}} className={"mb-6 inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[.27em] " + palette.eyebrow}><span className="h-px w-8 bg-current" /> {brand.eyebrow}</motion.p>
-            <motion.h1 id="studio-title" initial={reveal} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}} className="max-w-[11ch] font-serif text-[clamp(3.4rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]">{brand.headline} <em className={"font-normal " + palette.highlight}>{brand.highlight}</em></motion.h1>
+            <motion.h1 id="studio-title" initial={reveal} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.12}} className="max-w-[11ch] break-words font-serif text-[clamp(3rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]">{brand.headline} <em className={"font-normal " + palette.highlight}>{brand.highlight}</em></motion.h1>
             <motion.p initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.22}} className="mb-8 mt-7 max-w-[50ch] text-[15px] leading-[1.85] text-[#bacbd2] sm:text-base">{brand.description}</motion.p>
             <motion.div initial={reveal} animate={{opacity:1,y:0}} transition={{delay:.3}} className="flex flex-wrap gap-3"><Button primary palette={palette} href="/demo-stock/">Explore fictional stock</Button><Button href="#experience">Discover the concept</Button></motion.div>
             <div className="mt-10 flex flex-wrap items-center gap-5 border-t border-white/15 pt-5 text-[10px] uppercase tracking-[.14em] text-[#aabdc4]"><span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-[#dcbc85]"/> React + Three.js</span><span>Mobile-first</span><span>WordPress native</span></div>
           </div>
-          <motion.div initial={reveal === false ? false : {opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10">
+          <motion.div initial={reveal === false ? false : {opacity:0,x:28}} animate={{opacity:1,x:0}} transition={{duration:.9,delay:.1}} className="relative z-10 min-w-0">
             <Hero3D reduce={reduce} modelUrl={brand.showroomModelUrl}/><p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]">Illustrative 3D geometry — no real manufacturer design</p>
           </motion.div>
         </div>
@@ -420,7 +431,7 @@ function App() {
         </div>
       </section>
       <section className="bg-[#102832] px-5 py-20 text-white md:px-10 md:py-28"><div className="mx-auto flex max-w-[1240px] flex-col items-start justify-between gap-10 rounded-xl border border-[#d4ae75]/35 bg-[radial-gradient(ellipse_at_top_right,#214957_0%,#102832_50%,#091923_100%)] p-8 md:flex-row md:items-center md:p-14">
-        <div><p className="mb-4 text-[10px] font-bold uppercase tracking-[.26em] text-[#d6b47d]">A secure commercial foundation</p><h2 className="max-w-[16ch] font-serif text-[clamp(2.7rem,4vw,4.5rem)] leading-[1.1] tracking-[-.05em]">Designed to be extraordinary. Built to be responsible.</h2><p className="mt-5 max-w-[62ch] text-sm leading-[1.9] text-[#b9cbd2]">Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled.</p></div>
+        <div className="min-w-0 w-full break-words"><p className="mb-4 text-[10px] font-bold uppercase tracking-[.26em] text-[#d6b47d]">A secure commercial foundation</p><h2 className="max-w-[16ch] break-words font-serif text-[clamp(2.2rem,4vw,4.5rem)] leading-[1.1] tracking-[-.05em]">Designed to be extraordinary. Built to be responsible.</h2><p className="mt-5 max-w-[62ch] text-sm leading-[1.9] text-[#b9cbd2]">Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled.</p></div>
         <Button primary palette={palette} href={brand.contact_path}>{brand.contact_label}</Button>
       </div></section>
     </main>

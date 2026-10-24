@@ -3,11 +3,18 @@ from hashlib import sha256
 from pathlib import Path
 from zipfile import ZipFile
 import json
+import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
 DOC=ROOT/"docs/commercial"
 PROOF=DOC/"EMPIRE_CAR_YARD_FAILURE_A11Y_V10_BROWSER_ACCEPTANCE_20261024.json"
+
+V10_COMMIT="98c99b21d1846a5984ff4a3c086c881af4c02644"
+def original_v10(path):
+    return subprocess.run(["git","show",V10_COMMIT+":"+path],cwd=ROOT,
+                          check=True,capture_output=True).stdout
+
 
 def data():
     return json.loads(PROOF.read_text())
@@ -60,7 +67,7 @@ def test_original_source_hashes_and_real_browser_screenshots():
     r=data()
     assert len(r["source_manifest_sha256"])>=25
     for rel,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==digest,rel
+        assert sha256(original_v10(rel)).hexdigest()==digest,rel
     assert len(r["screenshots"])==6
     for name,props in r["screenshots"].items():
         screen=DOC/"car_yard_react_browser_evidence_v10"/name
@@ -68,7 +75,8 @@ def test_original_source_hashes_and_real_browser_screenshots():
         assert sha256(screen.read_bytes()).hexdigest()==props["sha256"]
 
 def test_react_failure_recovery_and_test_only_axe_injection():
-    main=(THEME/"src/main.jsx").read_text()
+    main=original_v10(
+        "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx").decode()
     assert "componentDidCatch()" in main
     assert "this.props.onFailure?.()" in main
     assert "data-studio-recovered" in main

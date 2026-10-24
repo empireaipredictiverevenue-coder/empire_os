@@ -28,6 +28,25 @@ function LocalStudioReflections() {
 
 const StudioPBRVehicle = React.lazy(() => import('./StudioPBRVehicle.jsx'))
 
+/**
+ * A real lost WebGL context is different from a failing async GLB.
+ * Do not rebuild the GPU scene automatically or loop context restoration.
+ */
+function RenderContextMonitor({ onRendererLost }) {
+  const { gl } = useThree()
+  useEffect(() => {
+    const canvas = gl.domElement
+    const lost = event => {
+      event.preventDefault()
+      onRendererLost?.()
+    }
+    canvas.addEventListener('webglcontextlost', lost)
+    return () => canvas.removeEventListener('webglcontextlost', lost)
+  }, [gl, onRendererLost])
+  return null
+}
+
+
 // Fictional original GT silhouette. No imported manufacturer model, plate or emblem.
 function Tire({ x, z }) {
   const outer = z > 0 ? 1 : -1
@@ -203,7 +222,7 @@ function Vehicle({ motionAllowed, view, paint }) {
 
 export default function ShowroomScene({ motionAllowed = true, view = 'three-quarter',
   paint = { body: '#1a3d46', roof: '#203c48' }, modelMode = 'concept',
-  modelUrl, onStudioReady }) {
+  modelUrl, onStudioReady, onRendererLost }) {
   return <Canvas
       data-testid="showroom-webgl"
       dpr={modelMode === 'studio' ? [1, 1] : [1, 1.5]}
@@ -212,6 +231,7 @@ export default function ShowroomScene({ motionAllowed = true, view = 'three-quar
       gl={{ alpha: true, antialias: modelMode !== 'studio', powerPreference: 'low-power' }}
       shadows={modelMode !== 'studio'}
     >
+      <RenderContextMonitor onRendererLost={onRendererLost} />
       <color attach="background" args={['#0c202a']} />
       {modelMode !== 'studio' && <fog attach="fog" args={['#0c202a', 13, 28]} />}
       <ambientLight intensity={1.18} color="#d2e3e9" />
