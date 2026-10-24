@@ -12,6 +12,9 @@ from empire_os.prime_flagship_voice_task_rehearsal import founder_voice_task_sta
 from empire_os.prime_flagship_timer_recovery_shadow import founder_timer_recovery_status
 from empire_os.prime_flagship_provider_reconciliation_shadow import founder_provider_receipt_reconciliation
 from empire_os.prime_flagship_notification_gateway_shadow import founder_notification_gateway_shadow
+from empire_os.prime_original_notification_identity_source_audit import (
+    review_original_reminder_identity_source, founder_reminder_identity_source_audit,
+)
 from empire_os.prime_flagship_assistant_readiness import (
     review_flagship_assistant_readiness, founder_flagship_readiness_status,
 )
@@ -108,6 +111,9 @@ def build_prime_digital_twin_cockpit(
         "original_timer_recovery": founder_timer_recovery_status(None),
         "provider_receipt_reconciliation": founder_provider_receipt_reconciliation(None),
         "original_notification_gateway": founder_notification_gateway_shadow(None),
+        "original_reminder_identity_source": founder_reminder_identity_source_audit(
+            review_original_reminder_identity_source(),
+        ),
         "situational_awareness": founder_situation_status(situation),
         "flagship_release_readiness": founder_flagship_readiness_status(
             review_flagship_assistant_readiness(),

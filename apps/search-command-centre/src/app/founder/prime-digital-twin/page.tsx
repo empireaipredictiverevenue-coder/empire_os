@@ -228,6 +228,20 @@ export default async function PrimeTwinCockpit({ searchParams }: { searchParams:
             Disabled · Notification sent: No · Real device delivery: Unverified
           </p>
         </section>
+        <section className="mt-6 rounded-2xl border border-slate-300/20 p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-slate-300">
+            Original Identity and consent source
+          </p>
+          <h2 className="mt-2 text-xl font-semibold">Device reminder authority</h2>
+          <p className="mt-3 text-sm text-slate-400">
+            Source status: {label(data.original_reminder_identity_source.status)}.
+            Prospect opt-in and CRM membership are not verified permission
+            to notify a particular device.
+          </p>
+          <p className="mt-3 text-xs text-amber-200">
+            Device consent: Unverified · Real provider: Not connected · Sending: Off
+          </p>
+        </section>
         <footer className="mt-7 rounded-xl border border-amber-400/20 p-5 text-sm text-slate-400">
           Local-model self-play: {label(data.local_model_selfplay.status)}.
           The existing llama.cpp runtime responded to health checks but the manual

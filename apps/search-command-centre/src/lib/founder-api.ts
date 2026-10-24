@@ -1053,6 +1053,14 @@ export type PrimeDigitalTwinCockpit = {
     real_device_delivery_verified: false;
     execution_authority: "none";
   };
+  original_reminder_identity_source: {
+    mode: "SOURCE_READ_ONLY";
+    status: string;
+    prospect_consent_is_not_device_permission: true;
+    real_device_consent_verified: false;
+    real_provider_connected: false;
+    execution_authority: "none";
+  };
   flagship_release_readiness: {
     status: string;
     mode: "OBSERVE";
