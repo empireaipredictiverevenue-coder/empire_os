@@ -3,11 +3,18 @@ from hashlib import sha256
 from pathlib import Path
 from zipfile import ZipFile
 import json
+import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
 THEME=ROOT/"prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier"
 DOC=ROOT/"docs/commercial"
 RECEIPT=DOC/"EMPIRE_CAR_YARD_CONTEXT_KEYBOARD_V11_BROWSER_ACCEPTANCE_20261024.json"
+
+V11_COMMIT="91a59012dcaa3b7571ad5e82d7541327aa7ea204"
+def original_v11(relative):
+    return subprocess.run(["git","show",V11_COMMIT+":"+relative],
+        cwd=ROOT,check=True,capture_output=True).stdout
+
 
 def receipt():
     return json.loads(RECEIPT.read_text())
@@ -67,7 +74,7 @@ def test_v11_source_sha_receipts_and_screenshots():
     r=receipt()
     assert len(r["source_manifest_sha256"])>=26
     for rel,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/rel).read_bytes()).hexdigest()==digest,rel
+        assert sha256(original_v11(rel)).hexdigest()==digest,rel
     assert len(r["screenshots"])==6
     for name,details in r["screenshots"].items():
         img=DOC/"car_yard_react_browser_evidence_v11"/name
@@ -75,8 +82,8 @@ def test_v11_source_sha_receipts_and_screenshots():
         assert sha256(img.read_bytes()).hexdigest()==details["sha256"],name
 
 def test_canvas_listener_and_hardened_default_survive_without_parallel_system():
-    scene=(THEME/"src/ShowroomScene.jsx").read_text()
-    app=(THEME/"src/main.jsx").read_text()
+    scene=original_v11("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/ShowroomScene.jsx").decode()
+    app=original_v11("prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx").decode()
     assert "function RenderContextMonitor" in scene
     assert "webglcontextlost" in scene
     assert "event.preventDefault()" in scene

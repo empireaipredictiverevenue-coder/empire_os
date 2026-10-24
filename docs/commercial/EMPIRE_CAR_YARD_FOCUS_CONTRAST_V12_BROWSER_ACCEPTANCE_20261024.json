@@ -1,0 +1,2279 @@
+{
+  "axe_wcag_audit": {
+    "assessed_rules": 27,
+    "automated_only": true,
+    "browser_external_request_attempts": 1,
+    "browser_external_request_urls": [
+      "https://secure.gravatar.com/avatar/852e7b941ea2052143c1b0a0f7b007a06c49c056312aac64e2649dc35d13f994?s=26&d=mm&r=g"
+    ],
+    "browser_external_requests_blocked": 1,
+    "engine": "axe-core 4.10.3",
+    "incomplete": [
+      {
+        "affected_nodes": 38,
+        "id": "color-contrast",
+        "impact": "serious"
+      }
+    ],
+    "manual_contrast_review": [
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 302,
+          "x": 20,
+          "y": 310
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(182, 221, 235)",
+        "font_size_px": "10px",
+        "font_weight": "900",
+        "html": "<p class=\"mb-6 inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-[.27em] text-[#b6ddeb]\" style=\"opacity: 1; transform: none;\"><span class=\"h-px w-8 bg-current\"></span> The future of the showroom</p>",
+        "target": [
+          ".mb-6"
+        ],
+        "text": "The future of the showroom"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h1"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 88,
+          "width": 336,
+          "x": 20,
+          "y": 350
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 253, 247)",
+        "font_size_px": "48px",
+        "font_weight": "400",
+        "html": "<h1 id=\"studio-title\" class=\"max-w-[11ch] break-words font-serif text-[clamp(3rem,6vw,5.6rem)] leading-[.92] tracking-[-.068em] text-[#fffdf7]\" style=\"opacity: 1; transform: none;\">Discover the next <em class=\"font-normal text-[#b6ddeb]\">chapter.</em",
+        "target": [
+          "#studio-title"
+        ],
+        "text": "Discover the next chapter."
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "em"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h1"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          }
+        ],
+        "box": {
+          "height": 56,
+          "width": 172,
+          "x": 125,
+          "y": 389
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(182, 221, 235)",
+        "font_size_px": "48px",
+        "font_weight": "400",
+        "html": "<em class=\"font-normal text-[#b6ddeb]\">chapter.</em>",
+        "target": [
+          ".font-normal"
+        ],
+        "text": "chapter."
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 56,
+          "width": 350,
+          "x": 20,
+          "y": 467
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(186, 203, 210)",
+        "font_size_px": "15px",
+        "font_weight": "400",
+        "html": "<p class=\"mb-8 mt-7 max-w-[50ch] text-[15px] leading-[1.85] text-[#bacbd2] sm:text-base\" style=\"opacity: 1; transform: none;\">Fictional premium studio experience with configurable presentation.</p>",
+        "target": [
+          ".mb-8"
+        ],
+        "text": "Fictional premium studio experience with configurable presentation."
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.05)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "a"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          }
+        ],
+        "box": {
+          "height": 48,
+          "width": 271,
+          "x": 20,
+          "y": 614
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 255, 255)",
+        "font_size_px": "12px",
+        "font_weight": "800",
+        "html": "<a href=\"#experience\" class=\"border border-white/30 bg-white/5 text-white hover:bg-white/10 inline-flex min-h-12 min-w-0 max-w-full flex-wrap items-center justify-center gap-3 break-words rounded-md px-6 py-3 text-center text-xs font-extrabold upperc",
+        "target": [
+          ".hover\\:bg-white\\/10.bg-white\\/5[href$=\"#experience\"]"
+        ],
+        "text": "Discover the concept"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 140,
+          "x": 20,
+          "y": 723
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(170, 189, 196)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span class=\"inline-flex items-center gap-2\">",
+        "target": [
+          ".pt-5 > .gap-2.inline-flex.items-center"
+        ],
+        "text": "React + Three.js"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 87,
+          "x": 180,
+          "y": 723
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(170, 189, 196)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>Mobile-first</span>",
+        "target": [
+          ".pt-5 > span:nth-child(2)"
+        ],
+        "text": "Mobile-first"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 126,
+          "x": 20,
+          "y": 760
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(170, 189, 196)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>WordPress native</span>",
+        "target": [
+          ".pt-5 > span:nth-child(3)"
+        ],
+        "text": "WordPress native"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "radial-gradient(rgb(41, 75, 86), rgb(16, 38, 49) 62%, rgb(6, 24, 35))",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 38, 48)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 284,
+          "x": 53,
+          "y": 1024
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.869 0.022 252.894)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<span class=\"text-center text-[10px] font-semibold uppercase tracking-[.29em] text-slate-300\">Interactive showroom concept</span>",
+        "target": [
+          ".tracking-\\[\\.29em\\]"
+        ],
+        "text": "Interactive showroom concept"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(16, 38, 48, 0.8)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 38, 48)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 167,
+          "x": 37,
+          "y": 841
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(226, 204, 154)",
+        "font_size_px": "9px",
+        "font_weight": "700",
+        "html": "<span class=\"rounded-full border border-white/25 bg-[#102630]/80 px-3 py-2 text-[9px] font-bold uppercase tracking-[.23em] text-[#e2cc9a] backdrop-blur-md\">3D Concept Studio</span>",
+        "target": [
+          ".bg-\\[\\#102630\\]\\/80"
+        ],
+        "text": "3D Concept Studio"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "oklab(0 0 0 / 0.25)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 38, 48)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 135,
+          "x": 218,
+          "y": 841
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.869 0.022 252.894)",
+        "font_size_px": "9px",
+        "font_weight": "600",
+        "html": "<span class=\"rounded-full border border-white/15 bg-black/25 px-3 py-2 text-[9px] font-semibold tracking-[.12em] text-slate-300 backdrop-blur-md\">VISUAL / PREVIEW</span>",
+        "target": [
+          ".bg-black\\/25"
+        ],
+        "text": "VISUAL / PREVIEW"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "linear-gradient(to top, rgb(7, 20, 29) 0%, oklab(0.184074 -0.0132284 -0.0228069 / 0.75) 50%, rgba(0, 0, 0, 0) 100%)",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 38, 48)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 203,
+          "x": 37,
+          "y": 1074
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<span class=\"flex items-center gap-2 text-[10px] font-semibold tracking-[.13em] text-slate-200\">",
+        "target": [
+          ".tracking-\\[\\.13em\\]"
+        ],
+        "text": "Original procedural concept"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "linear-gradient(to top, rgb(7, 20, 29) 0%, oklab(0.184074 -0.0132284 -0.0228069 / 0.75) 50%, rgba(0, 0, 0, 0) 100%)",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 38, 48)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 30,
+          "width": 105,
+          "x": 248,
+          "y": 1076
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(182, 197, 202)",
+        "font_size_px": "9px",
+        "font_weight": "700",
+        "html": "<span class=\"text-[9px] font-bold uppercase tracking-[.16em] text-[#b6c5ca]\">CONCEPT / READY</span>",
+        "target": [
+          ".tracking-\\[\\.16em\\]"
+        ],
+        "text": "CONCEPT / READY"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 350,
+          "x": 20,
+          "y": 1400
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(137, 157, 165)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<p class=\"mt-3 text-center text-[10px] font-semibold uppercase tracking-[.15em] text-[#899da5]\">Illustrative 3D geometry \u2014 no real manufacturer design</p>",
+        "target": [
+          ".tracking-\\[\\.15em\\]"
+        ],
+        "text": "Illustrative 3D geometry \u2014 no real manufacturer design"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "oklab(0 0 0 / 0.2)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 201,
+          "x": 20,
+          "y": 1494
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(180, 200, 206)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<span>01 \u2014 A digital showroom</span>",
+        "target": [
+          ".text-\\[\\#b4c8ce\\] > span:nth-child(1)"
+        ],
+        "text": "01 \u2014 A digital showroom"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "oklab(0 0 0 / 0.2)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 229,
+          "x": 20,
+          "y": 1523
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(180, 200, 206)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<span>02 \u2014 Evidence-led inventory</span>",
+        "target": [
+          ".text-\\[\\#b4c8ce\\] > span:nth-child(2)"
+        ],
+        "text": "02 \u2014 Evidence-led inventory"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "oklab(0 0 0 / 0.2)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(9, 25, 35)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 292,
+          "x": 20,
+          "y": 1551
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(180, 200, 206)",
+        "font_size_px": "10px",
+        "font_weight": "600",
+        "html": "<span>03 \u2014 Private workshop intelligence</span>",
+        "target": [
+          ".text-\\[\\#b4c8ce\\] > span:nth-child(3)"
+        ],
+        "text": "03 \u2014 Private workshop intelligence"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 284,
+          "x": 44,
+          "y": 3338
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(241, 212, 166)",
+        "font_size_px": "10px",
+        "font_weight": "800",
+        "html": "<span>Frame 01 / photographic direction</span>",
+        "target": [
+          ".min-h-\\[370px\\] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > span:nth-child(1)"
+        ],
+        "text": "Frame 01 / photographic direction"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "oklab(0 0 0 / 0.3)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 136,
+          "x": 44,
+          "y": 3367
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.9)",
+        "font_size_px": "9px",
+        "font_weight": "800",
+        "html": "<span class=\"rounded-full border border-white/25 bg-black/30 px-3 py-2 text-[9px] text-white/90 backdrop-blur-sm\">Editorial only</span>",
+        "target": [
+          ".min-h-\\[370px\\] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > .bg-black\\/30.text-white\\/90.backdrop-blur-sm"
+        ],
+        "text": "Editorial only"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h3"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 77,
+          "width": 302,
+          "x": 44,
+          "y": 3473
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 255, 255)",
+        "font_size_px": "35.2px",
+        "font_weight": "400",
+        "html": "<h3 class=\"max-w-[20ch] font-serif leading-[1.1] tracking-[-.04em] text-[clamp(2.2rem,4vw,4rem)]\">The art of the silhouette</h3>",
+        "target": [
+          ".text-\\[clamp\\(2\\.2rem\\,4vw\\,4rem\\)\\]"
+        ],
+        "text": "The art of the silhouette"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 20,
+          "width": 302,
+          "x": 44,
+          "y": 3558
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "14px",
+        "font_weight": "400",
+        "html": "<p class=\"mt-2 text-sm text-slate-200\">Sculpture, proportion and deliberate light</p>",
+        "target": [
+          ".min-h-\\[370px\\] > figcaption > div:nth-child(2) > .mt-2.text-sm.text-slate-200"
+        ],
+        "text": "Sculpture, proportion and deliberate light"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 220,
+          "x": 44,
+          "y": 3615
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>Photography reference \u2014 not a stock listing</span>",
+        "target": [
+          ".min-h-\\[370px\\] > figcaption > div:nth-child(2) > .pt-4.mt-5.border-t > span"
+        ],
+        "text": "Photography reference \u2014 not a stock listing"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "a"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 188,
+          "x": 44,
+          "y": 3644
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(239, 206, 151)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<a href=\"https://unsplash.com/photos/a-red-sports-car-parked-in-a-dark-studio-bZRqT3tvryk\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"pointer-events-auto text-[#efce97] underline underline-offset-4 hover:text-white focus-visible:outline-2 focus",
+        "target": [
+          ".min-h-\\[370px\\] > figcaption > div:nth-child(2) > .pt-4.mt-5.border-t > .pointer-events-auto.text-\\[\\#efce97\\].underline"
+        ],
+        "text": "Photo: Moses Malik Roldan / Unsplash"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 284,
+          "x": 44,
+          "y": 3740
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(241, 212, 166)",
+        "font_size_px": "10px",
+        "font_weight": "800",
+        "html": "<span>Frame 02 / photographic direction</span>",
+        "target": [
+          "figure[data-editorial-photo=\"02\"] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > span:nth-child(1)"
+        ],
+        "text": "Frame 02 / photographic direction"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "oklab(0 0 0 / 0.3)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 136,
+          "x": 44,
+          "y": 3769
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.9)",
+        "font_size_px": "9px",
+        "font_weight": "800",
+        "html": "<span class=\"rounded-full border border-white/25 bg-black/30 px-3 py-2 text-[9px] text-white/90 backdrop-blur-sm\">Editorial only</span>",
+        "target": [
+          "figure[data-editorial-photo=\"02\"] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > .bg-black\\/30.text-white\\/90.backdrop-blur-sm"
+        ],
+        "text": "Editorial only"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h3"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 35,
+          "width": 302,
+          "x": 44,
+          "y": 3865
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 255, 255)",
+        "font_size_px": "32px",
+        "font_weight": "400",
+        "html": "<h3 class=\"max-w-[20ch] font-serif leading-[1.1] tracking-[-.04em] text-[clamp(2rem,3vw,3rem)]\">Precision in profile</h3>",
+        "target": [
+          "figure[data-editorial-photo=\"02\"] > figcaption > div:nth-child(2) > .text-\\[clamp\\(2rem\\,3vw\\,3rem\\)\\].max-w-\\[20ch\\].tracking-\\[-\\.04em\\]"
+        ],
+        "text": "Precision in profile"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 20,
+          "width": 302,
+          "x": 44,
+          "y": 3909
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "14px",
+        "font_weight": "400",
+        "html": "<p class=\"mt-2 text-sm text-slate-200\">A cleaner way to reveal form</p>",
+        "target": [
+          "figure[data-editorial-photo=\"02\"] > figcaption > div:nth-child(2) > .mt-2.text-sm.text-slate-200"
+        ],
+        "text": "A cleaner way to reveal form"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 220,
+          "x": 44,
+          "y": 3966
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>Photography reference \u2014 not a stock listing</span>",
+        "target": [
+          "figure[data-editorial-photo=\"02\"] > figcaption > div:nth-child(2) > .pt-4.mt-5.border-t > span:nth-child(1)"
+        ],
+        "text": "Photography reference \u2014 not a stock listing"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 172,
+          "x": 44,
+          "y": 3994
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>WordPress Media Library selection</span>",
+        "target": [
+          ".pt-4.mt-5.border-t > span:nth-child(2)"
+        ],
+        "text": "WordPress Media Library selection"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 284,
+          "x": 44,
+          "y": 4091
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(241, 212, 166)",
+        "font_size_px": "10px",
+        "font_weight": "800",
+        "html": "<span>Frame 03 / photographic direction</span>",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > span:nth-child(1)"
+        ],
+        "text": "Frame 03 / photographic direction"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "oklab(0 0 0 / 0.3)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 136,
+          "x": 44,
+          "y": 4119
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklab(0.999994 0.0000455678 0.0000200868 / 0.9)",
+        "font_size_px": "9px",
+        "font_weight": "800",
+        "html": "<span class=\"rounded-full border border-white/25 bg-black/30 px-3 py-2 text-[9px] text-white/90 backdrop-blur-sm\">Editorial only</span>",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > .tracking-\\[\\.19em\\].text-\\[\\#f1d4a6\\].items-start > .bg-black\\/30.text-white\\/90.backdrop-blur-sm"
+        ],
+        "text": "Editorial only"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h3"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 35,
+          "width": 302,
+          "x": 44,
+          "y": 4216
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 255, 255)",
+        "font_size_px": "32px",
+        "font_weight": "400",
+        "html": "<h3 class=\"max-w-[20ch] font-serif leading-[1.1] tracking-[-.04em] text-[clamp(2rem,3vw,3rem)]\">An eye for detail</h3>",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > div:nth-child(2) > .text-\\[clamp\\(2rem\\,3vw\\,3rem\\)\\].max-w-\\[20ch\\].tracking-\\[-\\.04em\\]"
+        ],
+        "text": "An eye for detail"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          }
+        ],
+        "box": {
+          "height": 20,
+          "width": 302,
+          "x": 44,
+          "y": 4259
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "14px",
+        "font_weight": "400",
+        "html": "<p class=\"mt-2 text-sm text-slate-200\">Materials, texture and finish</p>",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > div:nth-child(2) > .mt-2.text-sm.text-slate-200"
+        ],
+        "text": "Materials, texture and finish"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "span"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 220,
+          "x": 44,
+          "y": 4316
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "oklch(0.929 0.013 255.508)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<span>Photography reference \u2014 not a stock listing</span>",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > div:nth-child(2) > .pt-4.mt-5.border-t > span"
+        ],
+        "text": "Photography reference \u2014 not a stock listing"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "a"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figcaption"
+          },
+          {
+            "background_color": "rgb(11, 32, 41)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "figure"
+          }
+        ],
+        "box": {
+          "height": 17,
+          "width": 163,
+          "x": 44,
+          "y": 4345
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(239, 206, 151)",
+        "font_size_px": "10px",
+        "font_weight": "400",
+        "html": "<a href=\"https://unsplash.com/photos/black-car-macro-shot-TNybYN-LqJo\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"pointer-events-auto text-[#efce97] underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-whi",
+        "target": [
+          "figure[data-editorial-photo=\"03\"] > figcaption > div:nth-child(2) > .pt-4.mt-5.border-t > .pointer-events-auto.text-\\[\\#efce97\\].underline"
+        ],
+        "text": "Photo: Serge Kutuzov / Unsplash"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "radial-gradient(at 100% 0px, rgb(33, 73, 87), rgb(16, 40, 50), rgb(9, 25, 35))",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 40, 50)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 33,
+          "width": 284,
+          "x": 53,
+          "y": 4714
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(214, 180, 125)",
+        "font_size_px": "10px",
+        "font_weight": "700",
+        "html": "<p class=\"mb-4 text-[10px] font-bold uppercase tracking-[.26em] text-[#d6b47d]\">A secure commercial foundation</p>",
+        "target": [
+          ".mb-4"
+        ],
+        "text": "A secure commercial foundation"
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "h2"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "radial-gradient(at 100% 0px, rgb(33, 73, 87), rgb(16, 40, 50), rgb(9, 25, 35))",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 40, 50)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 155,
+          "width": 284,
+          "x": 53,
+          "y": 4763
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(255, 255, 255)",
+        "font_size_px": "35.2px",
+        "font_weight": "400",
+        "html": "<h2 class=\"max-w-[16ch] break-words font-serif text-[clamp(2.2rem,4vw,4.5rem)] leading-[1.1] tracking-[-.05em]\">Designed to be extraordinary. Built to be responsible.</h2>",
+        "target": [
+          ".max-w-\\[16ch\\]"
+        ],
+        "text": "Designed to be extraordinary. Built to be responsible."
+      },
+      {
+        "ancestor_layers": [
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "p"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "radial-gradient(at 100% 0px, rgb(33, 73, 87), rgb(16, 40, 50), rgb(9, 25, 35))",
+            "opacity": "1",
+            "tag": "div"
+          },
+          {
+            "background_color": "rgb(16, 40, 50)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "section"
+          },
+          {
+            "background_color": "rgba(0, 0, 0, 0)",
+            "background_image": "none",
+            "opacity": "1",
+            "tag": "main"
+          }
+        ],
+        "box": {
+          "height": 106,
+          "width": 284,
+          "x": 53,
+          "y": 4938
+        },
+        "clearance": "MANUAL_REVIEW_NOT_GRANTED",
+        "color": "rgb(185, 203, 210)",
+        "font_size_px": "14px",
+        "font_weight": "400",
+        "html": "<p class=\"mt-5 max-w-[62ch] text-sm leading-[1.9] text-[#b9cbd2]\">Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled.</p>",
+        "target": [
+          ".max-w-\\[62ch\\]"
+        ],
+        "text": "Private bookings are verified in WordPress and MariaDB staging. Public booking, payments and customer enquiries remain disabled."
+      }
+    ],
+    "passes": 26,
+    "scope": "synthetic WordPress mobile homepage 390px reduced-motion",
+    "violations": []
+  },
+  "backup_site_tar_sha256": "96c200de898fe7d9f132083f5ed529d4449dd7fa0bf1f5be738b2c0e1cb77111",
+  "backup_sql_sha256": "9ac7f5f6460a7c47464d805b6ad3c93c8fcc3122e939ac595b3f2a06d6a29211",
+  "bootstrap": {
+    "native_wpdb_innodb_ready": true,
+    "pages_created": 6,
+    "php": "8.5.4",
+    "plugin_active": true,
+    "status": "NATIVE_WP_MYSQL_STAGE_BOOTSTRAP_PASS",
+    "synthetic_attachment_id": 11,
+    "synthetic_only": true,
+    "theme": "empire-yard-atelier",
+    "vehicle_id": 10,
+    "wordpress": "6.8.11"
+  },
+  "browser_check_count": 125,
+  "browser_checks": {
+    "3d_chunk_requested_separately": true,
+    "admin_login_success": true,
+    "admin_no_server_5xx": true,
+    "all_external_browser_requests_blocked": true,
+    "all_vehicle_controls_are_real_buttons": true,
+    "brand_script_json_non_executable": true,
+    "branding_admin_page_200": true,
+    "branding_form_registered": true,
+    "configured_3d_controls_still_present": true,
+    "configured_accent_tailwind_applied": true,
+    "configured_brand_name_rendered": true,
+    "configured_brand_strapline_rendered": true,
+    "configured_contact_remains_internal": true,
+    "configured_frontend_home_200": true,
+    "configured_hero_headline_rendered": true,
+    "configured_stock_accent_from_tailwind": true,
+    "configured_stock_contact_link_stays_internal": true,
+    "configured_stock_footer_uses_saved_brand": true,
+    "configured_stock_header_uses_saved_brand": true,
+    "configured_stock_page_200": true,
+    "desktop_hero_present": true,
+    "desktop_home_200": true,
+    "desktop_no_horizontal_overflow": true,
+    "external_contact_path_rejected_on_save": true,
+    "inventory_card_tailwind_styled": true,
+    "inventory_filter_labels_accessible": true,
+    "inventory_image_present": true,
+    "inventory_still_available_after_brand_change": true,
+    "keyboard_focusable_element": true,
+    "login_page_200": true,
+    "login_password_field_present": true,
+    "login_username_field_correct": true,
+    "magic_ui_style_animated_grid": true,
+    "mobile_home_200": true,
+    "mobile_inventory_200": true,
+    "mobile_no_horizontal_overflow": true,
+    "native_wordpress_es_module_loaded": true,
+    "offscreen_scene_unmounted_to_save_gpu": true,
+    "paint_palette_interaction_state": true,
+    "react_root_hydrated": true,
+    "react_three_heading": true,
+    "real_three_js_webgl_canvas_rendered": true,
+    "real_view_and_paint_controls_rendered": true,
+    "returning_to_hero_restores_scene": true,
+    "side_view_interaction_state": true,
+    "staff_cancel_receipt": true,
+    "staff_confirmation_receipt": true,
+    "staff_form_present": true,
+    "staff_hold_listed": true,
+    "staff_hold_receipt": true,
+    "staff_recent_table_present": true,
+    "staff_workbench_200": true,
+    "synthetic_vehicle_visible": true,
+    "tailwind_css_generated": true,
+    "tailwind_inventory_enhancement_loaded": true,
+    "three_js_canvas_or_accessible_fallback": true,
+    "v10_axe_external_requests_blocked": true,
+    "v10_axe_wcag_no_automated_violations": true,
+    "v10_bad_glb_only_requested_once": true,
+    "v10_bad_glb_retries_disabled_after_failure": true,
+    "v10_external_requests_blocked_during_failure": true,
+    "v10_real_axe_core_wcag_rules_executed": true,
+    "v10_real_glb_failure_recovers_original_concept": true,
+    "v11_320px_browser_outside_requests_blocked": true,
+    "v11_320px_mobile_reflow_no_horizontal_scroll": true,
+    "v11_320px_reduced_motion_avoids_model_request": true,
+    "v11_context_loss_accessible_notice_and_no_retry": true,
+    "v11_context_loss_browser_outbound_blocked": true,
+    "v11_keyboard_enter_changes_paint_and_aria_pressed": true,
+    "v11_keyboard_skip_link_visible_and_main_targeted": true,
+    "v11_keyboard_space_changes_camera_and_aria_pressed": true,
+    "v11_real_browser_webgl_loss_extension_invoked": true,
+    "v11_webgl_context_loss_switches_to_static_preview": true,
+    "v12_enlarged_root_text_reflow_no_horizontal_scroll": true,
+    "v12_enlarged_text_editorial_photographs_loaded": true,
+    "v12_escape_collapses_mobile_menu_and_restores_focus": true,
+    "v12_incomplete_contrast_nodes_are_not_auto_approved": true,
+    "v12_keyboard_mobile_menu_open_by_space": true,
+    "v12_keyboard_nav_activates_collection_and_closes_menu": true,
+    "v12_mobile_keyboard_nav_no_outbound": true,
+    "v12_mobile_menu_first_link_reachable_by_tab": true,
+    "v12_real_chromium_responsive_viewport_sweep": true,
+    "v12_responsive_sweep_external_requests_blocked": true,
+    "v5_accessibility_ax_tree_no_unnamed_links_buttons": true,
+    "v5_accessibility_buttons_have_names": true,
+    "v5_accessibility_controls_pressed_states": true,
+    "v5_accessibility_hero_contrast_aa": true,
+    "v5_accessibility_links_have_names": true,
+    "v5_accessibility_one_h1_and_main": true,
+    "v5_mobile_3d_chunk_load_recorded_after_opt_in": true,
+    "v5_mobile_emulation_fcp_recorded": true,
+    "v5_mobile_hero_text_not_hidden_by_entrance_animation": true,
+    "v5_mobile_no_overflow": true,
+    "v5_mobile_opt_in_avoids_automatic_3d_download": true,
+    "v5_mobile_preview_and_opt_in_visible_before_screenshot": true,
+    "v5_reduced_motion_no_webgl_canvas": true,
+    "v6_desktop_scene_restored_before_screenshot": true,
+    "v6_hero_real_3d_canvas_visible_when_captured": true,
+    "v6_media_picker_script_enqueued_in_wp_admin": true,
+    "v6_mobile_editorial_photographs_rendered_before_screenshot": true,
+    "v6_native_wordpress_media_modal_opens": true,
+    "v6_photo_alt_text_and_lazy_decode": true,
+    "v6_photo_credits_visible_and_link_to_real_sources": true,
+    "v6_photos_locally_served_in_child_theme": true,
+    "v6_real_editorial_photos_loaded": true,
+    "v6_remaining_fallback_photo_sources_still_local": true,
+    "v6_replaced_media_has_no_false_unsplash_credit": true,
+    "v6_wp_media_picker_controls_rendered": true,
+    "v6_wp_selected_media_replaced_second_photo": true,
+    "v7_high_detail_glb_not_downloaded_before_opt_in": true,
+    "v7_mobile_pbr_model_not_requested_initially": true,
+    "v7_studio_can_return_to_lightweight_concept": true,
+    "v7_studio_pbr_camera_view_switch": true,
+    "v7_studio_pbr_canvas_visible": true,
+    "v7_studio_pbr_controls_registered": true,
+    "v7_studio_pbr_material_finish_switch": true,
+    "v7_studio_pbr_model_loaded_from_local_wordpress_glb": true,
+    "v7_studio_pbr_status_and_attribution": true,
+    "v8_data_saver_requires_second_confirmation": true,
+    "v8_mobile_model_control_is_disabled_before_webgl_opt_in": true,
+    "v8_real_stage_frame_intervals_measured": true,
+    "v9_data_saver_shows_compressed_size": true,
+    "v9_meshopt_optimized_glb_only_loads_after_explicit_opt_in": true,
+    "webgl_is_active_in_visible_hero": true,
+    "wordpress_admin_branding_saved": true
+  },
+  "browser_version": "Chrome/139.0.7258.66",
+  "context_loss_diagnostic": {
+    "lost": true,
+    "supported": true
+  },
+  "customer_bookings_enabled": false,
+  "enlarged_root_text": {
+    "document_scroll_px": 390,
+    "method": "root font-size 32px text-scaling scenario, not browser zoom",
+    "no_auto_glb_fetched": true,
+    "no_horizontal_scroll": true,
+    "requested_size_px": 32,
+    "root_font_size": "32px",
+    "skip_focus_visible": true,
+    "viewport_css_px": 390
+  },
+  "external_requests_blocked": 10,
+  "loopback_only_http": true,
+  "mariadb_unix_socket_only": true,
+  "mobile_emulation": {
+    "cpu_throttle_factor": 4,
+    "device_scale_factor": 2,
+    "network_latency_ms": 150,
+    "network_throughput_mbps": 1.6,
+    "not_field_core_web_vitals": true,
+    "runs": 1,
+    "viewport_width_px": 390
+  },
+  "mobile_lab_measurement": {
+    "canvas_visible": false,
+    "dom_content_loaded_ms": 4393,
+    "dom_nodes": 348,
+    "fcp_ms": 1300,
+    "horizontal_overflow": false,
+    "js_resources": [
+      {
+        "duration_ms": 3453,
+        "encoded_bytes": 580574,
+        "name": "yard-main-DIsdTkVc.js",
+        "transfer_bytes": 580874
+      }
+    ],
+    "lcp_candidate_ms": 5520,
+    "opt_in_button_visible": true,
+    "scene_requested_before_opt_in": false,
+    "ttfb_ms": 30
+  },
+  "mobile_nav_external_blocked": true,
+  "mobile_opt_in_3d": {
+    "canvas_visible": true,
+    "scene_chunks": [
+      {
+        "duration_ms": 8193,
+        "encoded_bytes": 1603870,
+        "name": "yard-ShowroomScene-A8nsoVgB.js"
+      }
+    ]
+  },
+  "model_failure_injection": {
+    "outside": 1,
+    "outsideBlocked": 1,
+    "outsideUrls": [
+      "https://secure.gravatar.com/avatar/852e7b941ea2052143c1b0a0f7b007a06c49c056312aac64e2649dc35d13f994?s=26&d=mm&r=g"
+    ],
+    "requests": 1
+  },
+  "model_frame_lab": {
+    "backend_class": "software_swiftshader",
+    "device_memory_gb": 8,
+    "field_core_web_vitals": false,
+    "glb_encoded_bytes": 2825112,
+    "glb_transfer_ms": 35,
+    "inferred_fps": 60,
+    "mean_interval_ms": 16.67,
+    "method": "requestAnimationFrame_interval_lab_not_gpu_frame_query",
+    "p50_interval_ms": 16.7,
+    "p95_interval_ms": 16.7,
+    "physical_device_measurement": false,
+    "sampled_frame_intervals": 45,
+    "webgl_limits": {
+      "max_renderbuffer_size": 8192,
+      "max_texture_size": 8192,
+      "max_vertex_texture_units": 32
+    }
+  },
+  "observed_utc": "2026-10-24T13:29:16.374656+00:00",
+  "outbound_or_payments_enabled": false,
+  "php_version": "8.5.4",
+  "production_changes": false,
+  "reduced_motion_measurement": {
+    "fallback": true,
+    "live_canvas": false,
+    "scene_chunk_requests": 0
+  },
+  "responsive": {
+    "desktop": {
+      "document": 1440,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 1440
+    },
+    "mobile": {
+      "document": 390,
+      "title": "Synthetic Vehicle Workshop",
+      "window": 390
+    }
+  },
+  "responsive_viewport_sweep": [
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 320,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 320
+    },
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 360,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 360
+    },
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 390,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 390
+    },
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 640,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 640
+    },
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 768,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 768
+    },
+    {
+      "auto_glb_fetched": false,
+      "document_scroll_px": 1024,
+      "has_main": true,
+      "no_horizontal_scroll": true,
+      "viewport_css_px": 1024
+    }
+  ],
+  "restore_verified": {
+    "active_theme": "empire-yard-atelier",
+    "attachment_sha256": "8538b217070301eb7cc7f7db1c53149523c1c54fe9783610f746b6e945cdb8e6",
+    "booking_audit_events": 3,
+    "booking_rows": 1,
+    "pages": 7,
+    "production_modified": false,
+    "status": "NATIVE_WP_MYSQL_RESTORE_PASS",
+    "vehicles": 1
+  },
+  "screenshots": {
+    "home-200pct-root-text-v12.png": {
+      "bytes": 1451978,
+      "sha256": "768cefdbb471ed605ce6870d81bbc705e03ea2955e258c1332a0705131d1629a"
+    },
+    "home-desktop-v12.png": {
+      "bytes": 758211,
+      "sha256": "f391461cf829c01766368a9759a6dbee66bb3fb5551e2c210836927e79914d6f"
+    },
+    "home-hero-desktop-v12.png": {
+      "bytes": 306417,
+      "sha256": "0802d6acea3bc0de624a56068747a521cb8c8616f6feba794c9895c52448f167"
+    },
+    "home-manual-contrast-v12.png": {
+      "bytes": 515465,
+      "sha256": "6ab18f5928ece88e9c25b6f47afa779aeb101b5fc8126fa124655161a70a0ad2"
+    },
+    "home-mobile-v12.png": {
+      "bytes": 834008,
+      "sha256": "3680940ecebf798e759e64f448acaffd18689c513013d6950e45c7bd661073cd"
+    },
+    "home-pbr-model-desktop-v12.png": {
+      "bytes": 252172,
+      "sha256": "fd843f529c9f63e6c92e2d1bc9bd3e3e96b97e3d28bdc4855ead6f8eb68e2f63"
+    },
+    "staff-desktop-v12.png": {
+      "bytes": 75275,
+      "sha256": "5fe6a02e6f72363628a8550cf8bae26e33c5480d984764fd3e3e2c6ca8388894"
+    },
+    "stock-mobile-v12.png": {
+      "bytes": 74465,
+      "sha256": "df56e616d00d35a8e55b455207082cbadbee31f2b77a149e0fcd152dd03faff4"
+    }
+  },
+  "small_screen_reflow": {
+    "graphic_fallback_present": true,
+    "h1_count": 1,
+    "main_exists": true,
+    "model_not_auto_loaded": true,
+    "no_horizontal_overflow": true,
+    "page_scroll_width": 320,
+    "skip_link_visible_on_focus": true,
+    "width": 320
+  },
+  "source_manifest_sha256": {
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-detail.webp": "1f8029a572d6d25f0ade109d002036c500ace16660c0cbcdffb16e9805c066fb",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-red.webp": "6b0299c25a34a556741abb672194fd58d0902dc7ff5d8c62802779ac11ded62a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/editorial/studio-silver.webp": "61100af0cf9ca08c27fc218a0b7275d07b3adc8aa908625b9cfcd6efb1b094a6",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/models/MODEL_PROVENANCE.json": "7be745bc8b5841899691e05b3c585b7e5913e3f7876c30eaad509307bc9c8bca",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/models/MODEL_PROVENANCE_MESHOPT_V9.json": "b424b5794d4f9d5718f5522bf834008ce3c905924d1d4288f4dbc456bb1c3c8f",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/models/car-concept-editorial-webp.glb": "b28b5e697dcbd8d699dad802a1415db1eb0a364d8f05aba004176d776940cdeb",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/assets/models/car-concept-studio-meshopt.glb": "f690ee5ac4763c656adf3233596a85973d16b134124fb5caf0b1a1e3f2467159",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-ShowroomScene-A8nsoVgB.js": "6587a4467324c13756121542211bdb43412a2a6b1262bb782b0da87578526f6e",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-StudioPBRVehicle-C6EeywCW.js": "0144ad72015d26ce157fb6b5b90f59f22017b0248aee1c9406429065ead61426",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard-main-DIsdTkVc.js": "a7778792d3c27e465cd4fc11ee3199f860686fedbd3e80c86c2868f149d48438",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.css": "e7fca74ade88a725eb0070c898397f7a6a48426f3f6c6ea167df775f4d63bba9",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/dist/yard.js": "c5f8f872ef560f3d9a3453893898a9a7a09345d4df46d15c0f7063c76de51a56",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/functions.php": "ad14e40eb7161b13c51107ff0f93e07458dbb1aaa9321c2f0c18038401abad8d",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/package-lock.json": "e0f6a2df43f04e2ca74eaadb4d943c05cf742e13c375297a64bc0e7f63d218f3",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/footer.html": "f0ac0205e6ad7a51299994da6319c8ec02b2ebe9831527207e1376f55fcb83f5",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/parts/header.html": "26208bbae6471898dfc3c79a0f67b1c7b96764fc7fb2c5cbafb6a3330a987993",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/ShowroomScene.jsx": "a1c8dabab51fe0acfa4bfa752a9f97915eaeedf7dadac4e53a7f241a81ffa5c5",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/StudioPBRVehicle.jsx": "c72caca9ca1ef3ea914cd9a27e64a574e161e5573f1045da5d1fd4e56bc3a086",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/brand-media-picker.js": "d797966201ceb97331192fe6ec654eaac17081e4d633992031ce7113c2cf446c",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/inventory-enhance.js": "3c3b224dee7fe4886bde8981652ce8b8ca75580f3de151efa40ef6c3f79ba22a",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/main.jsx": "d84f8c97f2c6a0a62e044c4e8be43ff71f42e05aff722cae930034c759f78459",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/src/tailwind.css": "d9df88399ebda1268514ac2db52c7be5d85b3161dcbe0fa083274e8dc6d53e4f",
+    "prototypes/agency_wordpress_service_handoff_20261022/empire-yard-atelier/vite.config.mjs": "e2a0a37afc0f786eaf950bc7ceca9a413557d37e558a6a803a2b0ec669fb6be8",
+    "scripts/premium_wp_v1/bootstrap.php": "eb589438da8753f966611921fd7fdb3898bedb66733047ea10870298ff5c8b21",
+    "scripts/premium_wp_v1/browser_acceptance_v12.cjs": "40eacc8ad7c345573fe9ff11c9a8047610509cfee54004122c4b65b3726764f2",
+    "scripts/premium_wp_v1/restore_verify.php": "cae946adb10d5b7bda5b8732f16e17b1374bc0d31b3d865770b93c917e7f231e",
+    "scripts/premium_wp_v1/run_react_wordpress_design_v12.sh": "55b1cd960017953e25bcf98d5cc0b051b69846aa33d52c3188be27778f9cb8f0",
+    "scripts/premium_wp_v1/vendor/axe-core-4.10.3.min.js": "880970c081707360e64f34cea25ff91892f5bc95675b0776925b9709dd8a68bb"
+  },
+  "status": "WORDPRESS_REACT_THREE_NATIVE_MYSQL_BROWSER_RESTORE_PASS",
+  "synthetic_data_only": true,
+  "targeted_accessibility": {
+    "h1_count": 1,
+    "hero_highlight_contrast": 12.37,
+    "hero_text_contrast": 17.57,
+    "live_region_count": 1,
+    "main_landmarks": 1,
+    "measured_brand": "ice",
+    "named_buttons": true,
+    "named_links": true,
+    "paint_button_pressed_states": true,
+    "skip_link": true,
+    "unnamed_ax_interactive_nodes": 0
+  },
+  "wordPress_mysql_same_runtime": true,
+  "wordpress_version": "6.8.11"
+}

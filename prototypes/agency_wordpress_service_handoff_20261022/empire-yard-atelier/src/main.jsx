@@ -287,7 +287,7 @@ function Button({ children, href, primary = false, palette = brandPalettes.gold 
   return <a href={href} className={(primary
     ? palette.primary
     : 'border border-white/30 bg-white/5 text-white hover:bg-white/10'
-  ) + ' inline-flex min-h-12 items-center justify-center gap-3 rounded-md px-6 py-3 text-xs font-extrabold uppercase tracking-[.11em] no-underline transition-colors focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#eecb87]'}>
+  ) + ' inline-flex min-h-12 min-w-0 max-w-full flex-wrap items-center justify-center gap-3 break-words rounded-md px-6 py-3 text-center text-xs font-extrabold uppercase tracking-[.11em] no-underline transition-colors focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-[#eecb87]'}>
     {children}<ArrowUpRight aria-hidden="true" className="h-4 w-4" />
   </a>
 }
@@ -328,6 +328,15 @@ const photographicReferences = [
 function App() {
   const reduce = !!useReducedMotion()
   const [menu, setMenu] = useState(false)
+  const mobileMenuTrigger = useRef(null)
+  const closeMobileMenu = () => setMenu(false)
+  const handleMenuEscape = event => {
+    if (event.key === 'Escape' && menu) {
+      event.preventDefault()
+      setMenu(false)
+      mobileMenuTrigger.current?.focus()
+    }
+  }
   // On small screens the hero must never begin visually blank while a slow
   // device hydrates React. Desktop retains the optional entrance treatment.
   const reveal = reduce || window.matchMedia('(max-width: 640px)').matches
@@ -340,17 +349,20 @@ function App() {
     <div className={palette.notice + " px-4 py-2 text-center text-[9px] font-black uppercase tracking-[.2em] text-[#17303b] sm:text-[10px]"}>
       <span className="inline-flex items-center gap-2"><ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" /> Fictional design preview — no live dealership, prices or bookings</span>
     </div>
-      <nav aria-label="Primary navigation" className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-4 px-5 py-5 md:px-10 lg:py-6">
-        <a href="/" className="inline-flex items-center gap-3 no-underline" aria-label={brand.name + " concept home"}>
+      <nav aria-label="Primary navigation" onKeyDown={handleMenuEscape} className="mx-auto flex max-w-[1320px] flex-wrap items-center justify-between gap-4 px-5 py-5 md:px-10 lg:py-6">
+        <a href="/" className="inline-flex min-h-11 items-center gap-3 rounded-sm no-underline focus-visible:outline-3 focus-visible:outline-offset-3 focus-visible:outline-[#dfbd82]" aria-label={brand.name + " concept home"}>
           <span className="flex h-10 w-10 items-center justify-center rounded-full border border-[#ddb982]/65 text-[#ddb982]"><CarFront className="h-6 w-6" strokeWidth={1.3}/></span>
           <span className="text-[15px] font-black tracking-[.18em] text-white">{brand.name.toUpperCase()}<span className={"mt-0.5 block text-[8px] tracking-[.32em] " + palette.logo}>{brand.strapline.toUpperCase()}</span></span>
         </a>
-        <button aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-expanded={menu} onClick={() => setMenu(!menu)} className="rounded border border-white/30 px-3 py-2 text-[11px] uppercase tracking-widest text-white md:hidden">{menu ? 'Close' : 'Menu'}</button>
-        <div className={(menu ? 'flex' : 'hidden') + ' w-full flex-col gap-5 md:flex md:w-auto md:flex-row md:items-center md:gap-9'}>
+        <button ref={mobileMenuTrigger} type="button" aria-label={menu ? 'Close navigation' : 'Open navigation'} aria-controls="agency-navigation-links"
+          aria-expanded={menu} onClick={() => setMenu(!menu)}
+          className="min-h-11 rounded border border-white/30 px-4 py-2 text-[11px] uppercase tracking-widest text-white focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#dfbd82] md:hidden">{menu ? 'Close' : 'Menu'}</button>
+        <div id="agency-navigation-links" className={(menu ? 'flex' : 'hidden') + ' w-full flex-col gap-5 md:flex md:w-auto md:flex-row md:items-center md:gap-9'}>
           {[['The studio','#studio'],['The collection','#collection'],['Experience','#experience'],['Inventory','/demo-stock/']].map(([label,href])=>
-            <a key={label} href={href} className="text-[11px] font-bold uppercase tracking-[.14em] text-[#d4e0e3] no-underline hover:text-[#dfbd82]">{label}</a>
+            <a key={label} href={href} onClick={closeMobileMenu}
+              className="inline-flex min-h-11 items-center rounded-sm text-[11px] font-bold uppercase tracking-[.14em] text-[#d4e0e3] no-underline hover:text-[#dfbd82] focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#dfbd82]">{label}</a>
           )}
-          <a href={brand.contact_path} className="inline-flex min-h-10 items-center justify-center gap-2 rounded border border-white/30 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] text-[#e6c691] no-underline hover:bg-white/10">{brand.contact_label} <ArrowUpRight className="h-4 w-4" /></a>
+          <a href={brand.contact_path} onClick={closeMobileMenu} className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-white/30 px-4 py-2 text-[10px] font-black uppercase tracking-[.12em] text-[#e6c691] no-underline hover:bg-white/10 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-[#dfbd82]">{brand.contact_label} <ArrowUpRight className="h-4 w-4" /></a>
         </div>
       </nav>
     </header>
@@ -374,20 +386,20 @@ function App() {
       </section>
       <section id="experience" className="bg-[#f5f2eb] px-5 py-20 md:px-10 md:py-28">
         <div className="mx-auto max-w-[1240px]">
-          <div className="mb-12 grid items-end gap-7 lg:grid-cols-[1.05fr_.95fr]">
-            <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#725022]">Luxury in every interaction</p><h2 className="max-w-[15ch] font-serif text-[clamp(2.9rem,5vw,5.1rem)] leading-[1.08] tracking-[-.06em]">Built to make an <em>impression.</em></h2></div>
-            <p className="max-w-[55ch] text-base leading-[1.9] text-[#596a71]">A dealership website should feel as considered as the vehicles it presents. This demo connects visual polish to practical administration without pretending a customer has gone live.</p>
+          <div className="mb-12 grid min-w-0 items-end gap-7 lg:grid-cols-[1.05fr_.95fr]">
+            <div className="min-w-0 break-words"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#725022]">Luxury in every interaction</p><h2 className="max-w-[15ch] break-words font-serif text-[clamp(2.1rem,5vw,5.1rem)] leading-[1.08] tracking-[-.06em]">Built to make an <em>impression.</em></h2></div>
+            <p className="min-w-0 max-w-[55ch] break-words text-base leading-[1.9] text-[#596a71]">A dealership website should feel as considered as the vehicles it presents. This demo connects visual polish to practical administration without pretending a customer has gone live.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">{features.map(({num,icon:Icon,title,copy})=><motion.article key={num} whileHover={reduce?undefined:{y:-5}} className="flex min-h-[310px] flex-col rounded-lg border border-[#dce2df] bg-white p-7 shadow-[0_22px_55px_rgba(8,25,35,.035)] sm:p-9">
+          <div className="grid min-w-0 gap-4 md:grid-cols-3">{features.map(({num,icon:Icon,title,copy})=><motion.article key={num} whileHover={reduce?undefined:{y:-5}} className="flex min-h-[310px] min-w-0 flex-col break-words rounded-lg border border-[#dce2df] bg-white p-7 shadow-[0_22px_55px_rgba(8,25,35,.035)] sm:p-9">
             <div className="mb-auto flex items-start justify-between"><span className="text-xs font-extrabold tracking-[.24em] text-[#79552c]">{num}</span><Icon className="h-8 w-8 text-[#294f5b]" strokeWidth={1.3}/></div>
-            <h3 className="mt-10 font-serif text-3xl tracking-tight">{title}</h3><p className="mt-3 text-sm leading-[1.8] text-[#64757b]">{copy}</p>
+            <h3 className="mt-10 break-words font-serif text-3xl tracking-tight">{title}</h3><p className="mt-3 text-sm leading-[1.8] text-[#64757b]">{copy}</p>
           </motion.article>)}</div>
         </div>
       </section>
       <section id="collection" className="bg-[#edece6] px-5 py-20 md:px-10 md:py-28">
         <div className="mx-auto max-w-[1240px]">
-          <div className="mb-10 flex flex-wrap items-end justify-between gap-6">
-            <div><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#725022]">The collection</p><h2 className="font-serif text-[clamp(2.9rem,5vw,5rem)] leading-[1.08] tracking-[-.06em]">Explore the possibilities.</h2></div>
+          <div className="mb-10 flex min-w-0 flex-wrap items-end justify-between gap-6">
+            <div className="min-w-0 break-words"><p className="mb-3 text-[11px] font-extrabold uppercase tracking-[.22em] text-[#725022]">The collection</p><h2 className="break-words font-serif text-[clamp(2.1rem,5vw,5rem)] leading-[1.08] tracking-[-.06em]">Explore the possibilities.</h2></div>
             <a href="/demo-stock/" className="inline-flex items-center gap-2 border-b border-[#947a4d] pb-2 text-[11px] font-black uppercase tracking-widest text-[#173b48] no-underline">See demonstrator inventory <ArrowRight className="h-4 w-4"/></a>
           </div>
           <div data-editorial-gallery="true" className="grid gap-4 lg:grid-cols-[1.18fr_.82fr]">
