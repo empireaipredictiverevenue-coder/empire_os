@@ -1029,6 +1029,12 @@ export type PrimeDigitalTwinCockpit = {
     unresolved_loop_stalls: number;
   };
   local_model_selfplay: { status: string; inference_calls: number | null };
+  flagship_voice_task_rehearsal: {
+    mode: "SIMULATION";
+    status: string;
+    actual_timer_scheduled: false;
+    execution_authority: "none";
+  };
   flagship_release_readiness: {
     status: string;
     mode: "OBSERVE";

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 from datetime import datetime, timezone
+from empire_os.prime_flagship_voice_task_rehearsal import founder_voice_task_status
 from empire_os.prime_flagship_assistant_readiness import (
     review_flagship_assistant_readiness, founder_flagship_readiness_status,
 )
@@ -100,6 +101,7 @@ def build_prime_digital_twin_cockpit(
             "unresolved_loop_stalls": universe_summary["synthetic_loop_stalls"],
         },
         "local_model_selfplay": cockpit_selfplay_shadow(None),
+        "flagship_voice_task_rehearsal": founder_voice_task_status(None),
         "situational_awareness": founder_situation_status(situation),
         "flagship_release_readiness": founder_flagship_readiness_status(
             review_flagship_assistant_readiness(),
