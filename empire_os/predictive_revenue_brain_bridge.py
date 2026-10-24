@@ -33,6 +33,7 @@ from empire_os.prime_universal_evidence_fusion import (
     review_prime_universal_evidence, summarize_prime_founder_evidence,
 )
 from empire_os.prime_signed_owner_evidence_gateway import PrimeOwnerSignatureVerifier
+from empire_os.prime_original_buyer_intent_preflight import PrimeOriginalBuyerIntentVerifier
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
@@ -322,6 +323,8 @@ def build_predictive_revenue_brain_review(
     original_owner_evidence_summaries: Sequence[Mapping[str, Any]] | None = None,
     signed_owner_evidence_envelopes: Sequence[Mapping[str, Any]] | None = None,
     original_owner_signature_verifier: PrimeOwnerSignatureVerifier | None = None,
+    original_single_buyer_enquiry_verifier: PrimeOriginalBuyerIntentVerifier | None = None,
+    original_buyer_source_health: Mapping[str, Any] | None = None,
     original_forward_journal_predictions: Sequence[Mapping[str, Any]] | None = None,
     original_forward_journal_owner_outcomes: Sequence[Mapping[str, Any]] | None = None,
     signed_forward_first_write_attestations: Sequence[Mapping[str, Any]] | None = None,
@@ -362,6 +365,24 @@ def build_predictive_revenue_brain_review(
         original_universal_evidence_founder = summarize_prime_founder_evidence(
             original_universal_evidence,
         )
+    if original_single_buyer_enquiry_verifier is not None:
+        if (type(original_single_buyer_enquiry_verifier) is not PrimeOriginalBuyerIntentVerifier
+            or signed_owner_evidence_envelopes is None
+            or len(signed_owner_evidence_envelopes) != 1
+            or original_owner_signature_verifier is None
+            or not original_single_buyer_enquiry_verifier.uses_signed_owner_gateway(
+                original_owner_signature_verifier
+            )):
+            raise ValueError("exact_original_signed_buyer_owner_gate_required")
+        buyer_enquiry_preflight = original_single_buyer_enquiry_verifier.review(
+            tenant_id=tenant, as_of=now,
+            signed_envelope=signed_owner_evidence_envelopes[0],
+            buyer_source_health=original_buyer_source_health,
+        )
+    else:
+        if original_buyer_source_health is not None:
+            raise ValueError("buyer_capacity_snapshot_cannot_authenticate_a_buyer_enquiry")
+        buyer_enquiry_preflight = None
     if signed_forward_first_write_attestations is not None:
         if (type(original_first_write_verifier) is not PrimeOriginalFirstWriteVerifier
             or original_forward_journal_predictions is None):
@@ -431,6 +452,11 @@ def build_predictive_revenue_brain_review(
             else "NOT_CONNECTED"
         ),
         "prime_signed_owner_replay_protection_verified": False,
+        "prime_original_single_buyer_enquiry_preflight_status": (
+            buyer_enquiry_preflight["status"] if buyer_enquiry_preflight is not None
+            else "NOT_CONNECTED"
+        ),
+        "prime_first_buyer_intent_independently_verified": False,
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {
