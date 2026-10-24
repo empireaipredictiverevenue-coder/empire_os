@@ -42,8 +42,10 @@ def main() -> int:
     parser.add_argument("--write-private",action="store_true")
     parser.add_argument("--official-snapshot",action="store_true")
     parser.add_argument("--screen-staged-polygon",action="store_true")
+    parser.add_argument("--platform-source-handoff",action="store_true",
+                        help="Validate existing private samples into original Source Intelligence contract; no canonical writes")
     args=parser.parse_args()
-    if not args.write_private or args.official_snapshot == args.screen_staged_polygon:
+    if not args.write_private or sum((args.official_snapshot,args.screen_staged_polygon,args.platform_source_handoff))!=1:
         print(json.dumps({"status":"HELD_EXPLICIT_EXACTLY_ONE_PRIVATE_GIS_OPERATION","bid_authorized":False}))
         return 2
     root=Path(args.repo_root)
@@ -57,6 +59,17 @@ def main() -> int:
             "bid_authorized":False,
         },sort_keys=True))
         return 0 if result["layer_count"]==3 else 2
+    if args.platform_source_handoff:
+        from empire_os.tender_land_platform_handoff_20261024 import write_private_handoff
+        report=write_private_handoff(root)
+        print(json.dumps({
+            "status":report["handoff_kind"],
+            "canonical_empiredb_ingestion_performed":False,
+            "source_contract_count":len(report["source_contracts"]),
+            "sample_record_count":report["sample_record_count"],
+            "approved_for_customer_distribution":False,
+        },sort_keys=True))
+        return 0
     source=_read_private_input(root)
     result=screen_unverified_parcel_geometry(root,**source)
     print(json.dumps({
