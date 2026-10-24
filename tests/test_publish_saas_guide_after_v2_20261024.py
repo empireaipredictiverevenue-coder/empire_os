@@ -109,3 +109,27 @@ def test_approval_receipt_must_be_separately_pinned():
     assert not owner.APPROVAL.exists()
     with pytest.raises(owner.ReleaseHold, match="SEPARATE_SAAS_FOUNDER_APPROVAL_NOT_YET_RECORDED"):
         owner.require_separate_founder_approval()
+
+
+def test_candidate_requires_exact_browser_cta_evidence(monkeypatch):
+    original = owner._read_pinned
+    def tamper(path):
+        value = original(path)
+        if path == owner.CTA_QA:
+            value["checks"][0]["form"]["requiredConsentIsUnchecked"] = False
+        return value
+    monkeypatch.setattr(owner, "_read_pinned", tamper)
+    with pytest.raises(owner.ReleaseHold, match="PRIVATE_FIRST_PARTY_CTA_BROWSER_QA_FAILED"):
+        owner.preflight()
+
+
+def test_candidate_requires_both_genuine_form_destinations(monkeypatch):
+    original = owner._read_pinned
+    def tamper(path):
+        value = original(path)
+        if path == owner.CTA_QA:
+            value["checks"][1]["landed_path"] = "/buy"
+        return value
+    monkeypatch.setattr(owner, "_read_pinned", tamper)
+    with pytest.raises(owner.ReleaseHold, match="PRIVATE_FIRST_PARTY_CTA_BROWSER_QA_FAILED"):
+        owner.preflight()

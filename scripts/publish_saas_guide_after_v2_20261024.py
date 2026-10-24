@@ -30,10 +30,12 @@ PRIVATE = Path("/home/ubuntu/empire_releases/seo_saas_20261024_after_v2")
 CANDIDATE = PRIVATE / "REBASED_CANDIDATE_RECEIPT.json"
 BROWSER = PRIVATE / "BROWSER_SAAS_AFTER_V2_QA.json"
 ROLLBACK_QA = PRIVATE / "SAAS_AFTER_V2_PRIVATE_ROLLBACK_QA.json"
+CTA_QA = PRIVATE / "BROWSER_SAAS_FIRST_PARTY_CTA_20261024.json"
 PINNED = {
     CANDIDATE: "f8d377850a508f0ecef2d1a15c43f70bc25b1c8fe40e2c34c2ea4996509b84a0",
     BROWSER: "e96b3d46da57233fd9988970f6b9cdbc1a7875ace066cf52999fb76a72d9bc09",
     ROLLBACK_QA: "2940a21d4edc68b52b2e4e2b634faaa26a1a93853607a18bd2f8a4d1bac56a3a",
+    CTA_QA: "9819d069f9b259aa2dc920bba8580e18d522d67e8dacff7beac0fe21480abcdf",
 }
 ARCHIVE = Path("/var/backups/empire-website/saas_guide_post_v2_pre_659_20261024.tar")
 BACKUP_RECEIPT = ARCHIVE.with_suffix(".receipt.json")
@@ -87,6 +89,7 @@ def preflight(*, live: Path = LIVE) -> dict[str, Any]:
     p = _read_pinned(CANDIDATE)
     b = _read_pinned(BROWSER)
     q = _read_pinned(ROLLBACK_QA)
+    cta = _read_pinned(CTA_QA)
     if (p.get("status") != "PRIVATE_659_TO_662_SAAS_SCOPED_OVERLAY_REBASED_NOT_PUBLISHED"
         or p.get("source_guide_commit") != "54601ed54"
         or p.get("live_v2_release_source_commit") != "758a5a31b"
@@ -117,6 +120,37 @@ def preflight(*, live: Path = LIVE) -> dict[str, Any]:
         or any(not s.get("all_hashes_verified") for s in q["scenarios"])
         or {s.get("file_count") for s in q["scenarios"]} != {659, 662}):
         raise ReleaseHold("PRIVATE_POST_V2_ROLLBACK_QA_FAILED")
+    expected_cta = {
+        (390, "#deployment-request", "/predictive-revenue"),
+        (390, "/commercial#commercial-enquiry", "/commercial"),
+        (1440, "#deployment-request", "/predictive-revenue"),
+        (1440, "/commercial#commercial-enquiry", "/commercial"),
+    }
+    cta_checks = cta.get("checks", [])
+    if (cta.get("schema_version") != "empire.website.saas_first_party_cta_private_browser.v1"
+        or cta.get("status") != "PRIVATE_SAAS_FIRST_PARTY_CTA_NAVIGATION_PASS"
+        or cta.get("source_commit") != "54601ed54"
+        or len(cta_checks) != 4
+        or {(row.get("width"), row.get("clicked"), row.get("landed_path"))
+            for row in cta_checks} != expected_cta
+        or any(row.get("passed") is not True
+            or row.get("source") != "/predictive-revenue#saas-revenue-diagnosis"
+            or row.get("landed_anchor") !=
+                ("#deployment-request" if row.get("landed_path") == "/predictive-revenue"
+                 else "#commercial-enquiry")
+            or any(row.get("form", {}).get(k) is not True for k in (
+                "sectionExists", "formExists", "requiredConsentExists",
+                "requiredConsentIsUnchecked", "requiredEmailExists",
+                "siteContentExists",
+            ))
+            or row.get("form", {}).get("formCount") != 1 for row in cta_checks)
+        or cta.get("page_errors") != []
+        or cta.get("missing_local_assets") != []
+        or any(cta.get(k) != 0 for k in (
+            "rejected_non_get", "rejected_external", "form_submissions"))
+        or cta.get("public_files_modified") is not False
+        or cta.get("authority") != "NONE"):
+        raise ReleaseHold("PRIVATE_FIRST_PARTY_CTA_BROWSER_QA_FAILED")
     root = Path(p["candidate_root"])
     if (root != PRIVATE / "out" or root.is_symlink() or not root.is_dir()
         or PRIVATE.is_symlink()):

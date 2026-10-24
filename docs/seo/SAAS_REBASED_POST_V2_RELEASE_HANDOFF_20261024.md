@@ -52,3 +52,19 @@ The publisher has a **distinct, immutable, exact founder-approval record** gate 
 When the founder separately approves the exact 659→662 scope, the existing release owner—not this read-only build—may prepare the specifically approved, SHA-pinned record and complete final owner review. The authorised root owner will then use the *same* private website lock (including the existing compatibility lock), create a fresh protected **659-file** archive at `/var/backups/empire-website/saas_guide_post_v2_pre_659_20261024.tar`, check every restored hash, apply only the two Predictive Revenue payloads and three new assets, verify the 662-file tree and served `GET` bytes, and write the distinct protected publication receipt. Any post-write failure triggers the existing narrow atomic rollback. No root access workarounds, sudoers changes, full-site export sync, automated outbound or financial actions are part of this scope.
 
 Validation: `26 passed` across `tests/test_publish_saas_guide_after_v2_20261024.py`, `tests/test_publish_industry_enquiry_v2_20261023.py` and `tests/test_release_predictive_roofing_two_page_20261022.py`; Python compile passed. **Live site remains 659 files unchanged.**
+
+## 24 October follow-through: verified actual first-party guide CTA navigation
+
+The original SaaS guide's links were checked as **actual clicks in GET-only Chromium** on the existing 662-file private candidate; no form was submitted and no buyer identity, traffic, outreach or payment was invented.
+
+- Private browser evidence: `/home/ubuntu/empire_releases/seo_saas_20261024_after_v2/BROWSER_SAAS_FIRST_PARTY_CTA_20261024.json`.
+- Pinned SHA-256: `9819d069f9b259aa2dc920bba8580e18d522d67e8dacff7beac0fe21480abcdf`.
+- At 390px mobile and 1440px desktop, both CTAs were clicked from the guide: `#deployment-request` stays on `/predictive-revenue` and lands on its existing form, while `/commercial#commercial-enquiry` loads the V2 `/commercial` route and lands on its original proposal form.
+- Four of four checks passed: one form at each destination, mandatory work email input, one required but initially **unchecked** contact-consent checkbox, valid visible content. Zero browser errors, missing local static assets, external browser requests, non-GET requests and form submissions.
+- The exact private evidence hash is now a fourth independent mandatory pin in `scripts/publish_saas_guide_after_v2_20261024.py`. A changed destination, missing/selected consent or corrupt receipt holds the original Website & Growth publisher rather than permitting release. New regression tests verify the fail-closed behavior.
+
+Targeted website-owner and transaction suite: **28 passed**. Updated read-only SaaS preflight again reports `SAAS_659_TO_662_PREFLIGHT_PASS_PUBLICATION_NOT_APPROVED`; it does not issue permission, a root backup or publication.
+
+Commercial attribution boundary: clicking a link or arriving at an anchor does **not** establish organic-search source identity or buyer consent. The original GTM/EmpireDB owner must verify the original buyer-submitted record and correct tenant-bound Smart CRM receipt. Do not infer SEO attribution from a navigation test, claimed entry value or a Search Console impression.
+
+**Release remains held for founder's distinct exact five-file approval and new 659-file root-protected site backup.**
