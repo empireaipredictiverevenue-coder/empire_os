@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from typing import Any
 from datetime import datetime, timezone
+from empire_os.prime_flagship_assistant_readiness import (
+    review_flagship_assistant_readiness, founder_flagship_readiness_status,
+)
 from empire_os.prime_situation_awareness_shadow import (
     REQUEST_CAPABILITY, review_prime_situation, founder_situation_status,
 )
@@ -98,6 +101,9 @@ def build_prime_digital_twin_cockpit(
         },
         "local_model_selfplay": cockpit_selfplay_shadow(None),
         "situational_awareness": founder_situation_status(situation),
+        "flagship_release_readiness": founder_flagship_readiness_status(
+            review_flagship_assistant_readiness(),
+        ),
         "assistant_capability_map": [
             {
                 "request_code": key,

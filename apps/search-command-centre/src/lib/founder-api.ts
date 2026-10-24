@@ -1029,6 +1029,14 @@ export type PrimeDigitalTwinCockpit = {
     unresolved_loop_stalls: number;
   };
   local_model_selfplay: { status: string; inference_calls: number | null };
+  flagship_release_readiness: {
+    status: string;
+    mode: "OBSERVE";
+    launch_approved: boolean;
+    readiness_blockers: string[];
+    readiness_is_not_market_valuation: boolean;
+    execution_authority: "none";
+  };
   situational_awareness: {
     mode: "OBSERVE";
     status: string;
