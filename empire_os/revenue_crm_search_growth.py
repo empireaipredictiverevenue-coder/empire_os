@@ -41,6 +41,7 @@ class CrmSearchGrowthBrief:
     publishing_execution: bool = False
     link_building_execution: bool = False
     outreach_execution: bool = False
+    evidence_refs: tuple[str, ...] = ()
 
     def as_dict(self) -> dict[str, Any]:
         data = asdict(self)
@@ -118,11 +119,22 @@ def build_crm_search_growth_brief(
     if gap is not None and gap.citation_gap_observed is True:
         opportunities.append("competitor_citation_gap")
 
-    evidence_count = (
-        backlink_analysis.evidence_count
-        + visibility.evidence_count
-        + (gap.evidence_count if gap is not None else 0)
+    # Both citation analyses consume the same observations. Count distinct
+    # provenance references, not repeated uses of evidence by an analysis.
+    # These are supplied references, not independently verified source IDs.
+    matching_evidence = (
+        *(item for item in backlinks
+          if item.target_domain.removeprefix("www.") == normalized_domain),
+        *(item for item in citations
+          if item.query == query and item.engine == engine),
     )
+    refs: set[str] = set()
+    for item in matching_evidence:
+        for ref in item.provenance:
+            if not isinstance(ref, str) or not ref.strip():
+                raise ValueError("evidence reference must be a non-empty string")
+            refs.add(ref.strip())
+    evidence_refs = tuple(sorted(refs))
 
     return CrmSearchGrowthBrief(
         prospect_id=pid,
@@ -133,5 +145,7 @@ def build_crm_search_growth_brief(
         ai_visibility=visibility,
         citation_gap=gap,
         opportunities=tuple(dict.fromkeys(opportunities)),
-        evidence_count=evidence_count,
+        evidence_count=len(evidence_refs),
+        evidence_refs=evidence_refs,
     )
+
