@@ -476,3 +476,64 @@ def test_duplicate_observation_stream_messages_are_not_exactly_once():
     assert first["redis_delivery_guaranteed"] is False
     assert second["durable_ledger_committed"] is False
     assert first["treasury_execution"] is False
+
+
+# V4.2 replay/failure evidence: Redis is a lossy, advisory hot projection.
+# These tests intentionally do NOT promote the research adapter to production.
+def test_expired_revision_watermark_cannot_protect_against_older_replay():
+    cache=FakeRedis()
+    latest=example()
+    latest["revision"]=13
+    record_fixture_feature(cache,latest,now=NOW,ttl_seconds=1,fixture_authorised=True)
+    key=feature_key(tenant_scope_digest=latest["tenant_scope_digest"],
+                    sector=latest["sector"],entity_digest=latest["entity_digest"])
+    # Redis evicts the Hash AND its only revision fence on TTL expiry.
+    # Actual TTL behaviour was verified separately against isolated Redis 8.
+    cache._data.pop(key)
+    cache._ttl.pop(key)
+    old=example()
+    old["revision"]=12
+    accepted=record_fixture_feature(cache,old,now=NOW,ttl_seconds=15,
+                                    fixture_authorised=True)
+    assert accepted["status"]=="DISPOSABLE_FEATURE_HASH_WRITTEN"
+    observed=read_fixture_feature(
+        cache,tenant_scope_digest=old["tenant_scope_digest"],
+        sector=old["sector"],entity_digest=old["entity_digest"],
+        now=NOW,fixture_authorised=True)
+    assert observed["revision"]==12
+    assert observed["eligible_for_real_routing"] is False
+    assert observed["realised_net_profit_cents"] is None
+    assert observed["empiredb_authority"]=="not_verified"
+    # Fix must be a canonical durable source revision/withdrawal gate,
+    # NOT a promise that a short-lived cache key is a global ledger.
+
+
+def test_incomplete_pipeline_cannot_return_partial_qualified_results():
+    class PartialRedis(FakeRedis):
+        def pipeline(self,*,transaction=False):
+            parent=super().pipeline(transaction=transaction)
+            parent.execute=lambda: []
+            return parent
+    rec=example()
+    with pytest.raises(RedisV4Hold,match="pipeline_incomplete_results"):
+        read_fixture_features_batch(
+            PartialRedis(),tenant_scope_digest=rec["tenant_scope_digest"],
+            references=[(rec["sector"],rec["entity_digest"])],
+            now=NOW,fixture_authorised=True)
+
+
+def test_disconnected_redis_does_not_fabricate_successful_read_or_write():
+    class DisconnectedRedis(FakeRedis):
+        def eval(self,*args,**kwargs):
+            raise ConnectionError("disposable_socket_disconnected")
+        def hgetall(self,*args,**kwargs):
+            raise ConnectionError("disposable_socket_disconnected")
+    rec=example()
+    fixture=DisconnectedRedis()
+    with pytest.raises(ConnectionError,match="disposable_socket_disconnected"):
+        record_fixture_feature(fixture,rec,now=NOW,fixture_authorised=True)
+    with pytest.raises(ConnectionError,match="disposable_socket_disconnected"):
+        read_fixture_feature(
+            fixture,tenant_scope_digest=rec["tenant_scope_digest"],
+            sector=rec["sector"],entity_digest=rec["entity_digest"],
+            now=NOW,fixture_authorised=True)
