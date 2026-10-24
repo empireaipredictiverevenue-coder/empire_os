@@ -5,7 +5,6 @@ No cloud, network, service setup, prod DB or treasury execution.
 """
 from __future__ import annotations
 
-from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
@@ -434,3 +433,46 @@ def test_fenced_revision_is_single_shard_only_not_multiregion_money_authority():
     assert "unpack(ARGV, 3)" in FEATURE_REVISION_FENCE_LUA
     assert "redis.call('XADD'" not in FEATURE_REVISION_FENCE_LUA
     assert readiness()["real_multi_region_active_active_verified"] is False
+
+
+def test_redis_v4_readiness_uses_original_predictive_cloud_http_status(tmp_path):
+    import json
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from empire_os.predictive_cloud_status import build_predictive_cloud_status
+    from empire_os.predictive_cloud_status_api import create_predictive_cloud_status_router
+
+    snapshot=tmp_path/"v4_original_status.json"
+    snapshot.write_text(json.dumps(build_predictive_cloud_status(tmp_path,now=NOW)))
+    app=FastAPI()
+    app.include_router(create_predictive_cloud_status_router(snapshot))
+    with TestClient(app) as client:
+        r=client.get("/v1/predictive-cloud/status")
+        assert r.status_code==200
+        original=r.json()
+        assert original["schema_version"]=="empire.predictive_cloud.status.v2"
+        assert original["redis_v4_shadow"]["status"]=="REDIS_CLOUD_NOT_CONNECTED"
+        assert original["redis_v4_shadow"]["real_latency_benchmark_ms"] is None
+        assert original["redis_v4_shadow"]["canonical_financial_ledger"]=="EmpireDB_PostgreSQL"
+        assert original["execution_authority"]=="none"
+        assert client.post("/v1/predictive-cloud/status").status_code==405
+
+
+def test_duplicate_observation_stream_messages_are_not_exactly_once():
+    fixture=FakeRedis()
+    payload=example()
+    settings=dict(
+        tenant_scope_digest=payload["tenant_scope_digest"],
+        event_digest=h("replayed-identical-synthetic-event"),
+        signal="CAPACITY_OBSERVED",
+        source_evidence_digest=payload["source_evidence_digest"],
+        now=NOW,fixture_authorised=True,
+    )
+    first=emit_fixture_swarm_observation(fixture,**settings)
+    second=emit_fixture_swarm_observation(fixture,**settings)
+    assert first["stream"]==second["stream"]
+    assert first["stream_id"]!=second["stream_id"]
+    assert len(fixture._streams[first["stream"]])==2
+    assert first["redis_delivery_guaranteed"] is False
+    assert second["durable_ledger_committed"] is False
+    assert first["treasury_execution"] is False
