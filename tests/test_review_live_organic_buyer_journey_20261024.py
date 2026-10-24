@@ -125,3 +125,52 @@ def test_explicit_buyer_url_allowlist_only():
         "/other", "/commerciality",
         "//hostile.invalid/commercial",
     ]) == {"/commercial", "/predictive-revenue"}
+
+
+def test_bounded_internal_graph_finds_indirect_buyer_path():
+    graph = {
+        "/research/roof": {"/industries/roofing"},
+        "/industries/roofing": {"/commercial"},
+        "/commercial": {"/predictive-revenue"},
+        "/predictive-revenue": set(),
+    }
+    assert audit._shortest_buyer_path("/research/roof", graph) == [
+        "/research/roof", "/industries/roofing", "/commercial"]
+    assert audit._shortest_buyer_path("/research/roof", graph, max_clicks=1) is None
+    assert audit._shortest_buyer_path("/missing", graph) is None
+
+
+def test_indirect_link_is_not_reported_as_disconnected_enterprise_page(first_party):
+    original, _ = first_party
+    def links_to_industry(path):
+        status, headers, body = original(path)
+        if path == "/research/sample":
+            body = body.replace(b'href="/about"', b'href="/industries/roofing"')
+        return status, headers, body
+    r = audit.review(links_to_industry, zero_snapshot())
+    assert "/research/sample" in r["direct_buyer_link_review_candidates"]
+    assert "/research/sample" in r["indirect_buyer_form_path_pages"]
+    assert "/research/sample" not in r["enterprise_pages_with_no_bounded_buyer_path"]
+    row = next(x for x in r["routes"] if x["route"] == "/research/sample")
+    assert row["buyer_form_link_path"] == [
+        "/research/sample", "/industries/roofing", "/commercial"]
+    assert row["buyer_form_link_hops"] == 2
+    assert r["buyer_paths_proven_as_actual_visits"] is False
+
+
+def test_explicit_homeowner_lane_is_not_an_enterprise_cta_gap():
+    assert audit._intent_lane("/roofing") == "HOMEOWNER_SERVICE_NOT_ENTERPRISE_B2B"
+    assert audit._intent_lane("/industries/roofing") == "GENERAL_OR_COMMERCIAL_SITE"
+    assert audit._intent_lane("/aeo/roofing/DFW/") == "AEO_INFORMATIONAL"
+    assert audit._intent_lane("/research/sample") == "RESEARCH_INFORMATIONAL"
+    assert audit._shortest_buyer_path("/roofing", {"/roofing": set(),
+         "/commercial": set()}) is None
+
+
+def test_link_graph_does_not_follow_external_and_fake_same_host_urls():
+    assert audit._first_party_route("/industries/hvac#signals") == "/industries/hvac"
+    assert audit._first_party_route("https://empire-ai.co.uk") == "/"
+    assert audit._first_party_route("https://empire-ai.co.uk/commercial?entry=1") == "/commercial"
+    assert audit._first_party_route("//hostile.invalid/commercial") is None
+    assert audit._first_party_route("https://empire-ai.co.uk.evil.test/commercial") is None
+    assert audit._first_party_route("mailto:a@example.test") is None

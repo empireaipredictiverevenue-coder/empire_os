@@ -25,3 +25,15 @@ A same-host, bounded, 100% GET-only website audit checked the existing `https://
 - Priority 4: wait for finalised Search Console rows and reconcile the first **authentic** opted-in enquiry through canonical EmpireDB and tenant-bound Smart CRM. Browser clicks and page impressions are not consent, customer conversations or realised revenue.
 
 No paid advertising, editorial spend, site or sitemap changes, automated outreach, CRM rows, payments or production scheduling were authorised or performed.
+
+## 24 October follow-through: intent-aware internal paths and a private HVAC candidate
+
+The original nine no-direct-B2B-link observations do NOT establish nine missing buyer journeys. The bounded SEO observer now follows only first-party anchors among the 22 already-checked sitemap pages, for at most three clicks. Live results: 8 research/AEO pages already have a route to the existing Commercial form in two clicks; the remaining /roofing page is a separately governed homeowner ZIP guidance page, not a B2B offer. No enterprise-oriented sitemap page lacks a bounded path. These are possible links, NOT proven visits or intent.
+
+New owner-only graph receipt: /home/ubuntu/empire_releases/seo_live_organic_buyer_audit_20261024/SITE_ORGANIC_BUYER_GRAPH_20261024.json; SHA-256 070f4912e1715e783f0a9cdde8339cedcbc4f547f8a67611de88edc12a8742ab. The original immutable snapshot remains unchanged. The newest GTM canonical source is HELD_CANONICAL_ACQUISITION_OWNER_OPS_RECEIPT_REQUIRED: count UNKNOWN, not zero.
+
+One owner-scoped HVAC improvement was staged PRIVATE ONLY from the existing AEO source scripts/_aeo_pages/hvac/DFW/index.html. Source and served live SHA-256 both 0d92d609dfec44ea53405a60ecb99716acd5d53b65af3c7879192ac3cfe0ddce. Candidate adds exactly one secondary link, Explore HVAC demand intelligence, targeting the already live /industries/hvac explanation. All existing links, original home link and canonical remain unchanged. Private candidate /home/ubuntu/empire_releases/aeo_hvac_dfw_vertical_bridge_20261024/index.html. Proposal receipt SHA-256 ee4dfe445c8236a3d1209c1b2eadd602c5f2535ad70dddece918336f79ed3ce3.
+
+Private GET-only Chromium confirmed at 390px and 1440px that users CAN navigate /aeo/hvac/DFW/ -> /industries/hvac -> the existing /commercial#commercial-enquiry form, with a required unchecked consent box and required email field. No form submissions, external requests, asset errors or public mutation. Private browser QA SHA-256 f530f32ba09a81277b86f3ceb719ed34b6c9cc4a88aeb32dac8190197c7415ee.
+
+This AEO candidate is NOT published or approved. The original AEO owner must independently review scope, audience, performance evidence, source rights and route-level rollback before its own separate founder approval/release. Do not bundle it into the existing SaaS 659->662 held five-file release. Existing homeowner call-admission restrictions remain untouched. Combined original website and SEO tests: 38 passed.

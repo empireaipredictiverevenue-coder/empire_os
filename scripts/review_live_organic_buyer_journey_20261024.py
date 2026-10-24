@@ -6,7 +6,7 @@ Never confuse indexability/discovery with verified Google indexing or paid conve
 from __future__ import annotations
 
 import argparse
-from collections import Counter
+from collections import deque
 from datetime import datetime, timezone
 from html.parser import HTMLParser
 import json
@@ -87,6 +87,54 @@ def _links_to_buyers(links: list[str]) -> set[str]:
     return out
 
 
+def _first_party_route(link: str) -> str | None:
+    """Accept only explicit local paths or the exact current HTTPS host."""
+    parsed = urlsplit(link)
+    if (parsed.scheme or parsed.netloc) and (
+        parsed.scheme != "https" or parsed.netloc != HOST
+    ):
+        return None
+    if link.startswith("//") or not isinstance(parsed.path, str):
+        return None
+    if not parsed.path:
+        return "/" if parsed.scheme == "https" and parsed.netloc == HOST else None
+    if not parsed.path.startswith("/") or parsed.path.startswith("//"):
+        return None
+    return parsed.path
+
+
+def _shortest_buyer_path(
+    start: str, graph: dict[str, set[str]], *, max_clicks: int = 3,
+) -> list[str] | None:
+    """Compute bounded reachable HTML-link path; never claim actual visits."""
+    if start not in graph:
+        return None
+    queue: deque[list[str]] = deque([[start]])
+    visited = {start}
+    while queue:
+        chain = queue.popleft()
+        if chain[-1] in ROUTES_TO_FORMS:
+            return chain
+        if len(chain) - 1 >= max_clicks:
+            continue
+        for next_route in sorted(graph.get(chain[-1], ())):
+            if next_route not in visited and next_route in graph:
+                visited.add(next_route)
+                queue.append(chain + [next_route])
+    return None
+
+
+def _intent_lane(route: str) -> str:
+    # Only explicit route ownership, not inferred personal/buyer intent.
+    if route == "/roofing":
+        return "HOMEOWNER_SERVICE_NOT_ENTERPRISE_B2B"
+    if route.startswith("/research/"):
+        return "RESEARCH_INFORMATIONAL"
+    if route.startswith("/aeo/"):
+        return "AEO_INFORMATIONAL"
+    return "GENERAL_OR_COMMERCIAL_SITE"
+
+
 def _gtm_summary(snapshot: dict) -> dict:
     source = snapshot.get("canonical_sales_source_ops") or {}
     status = source.get("status", "SOURCE_UNAVAILABLE")
@@ -152,12 +200,28 @@ def review(
         if "noindex" in headers.get("X-Robots-Tag", headers.get("x-robots-tag", "")).lower():
             issues.append("HEADER_NOINDEX")
         direct = _links_to_buyers(tags.links)
+        internal = {
+            resolved for link in tags.links
+            if (resolved := _first_party_route(link)) in expected
+        }
         rows.append({
             "route": route, "http_status": status, "canonical_self": got == [expected_canonical],
             "direct_buyer_destinations": sorted(direct),
+            "sitemap_internal_html_links": sorted(internal),
+            "route_ownership_lane": _intent_lane(route),
             "priority_commercial_route": route in PRIORITY,
             "issues": issues,
         })
+    # Only already fetched sitemap pages form graph nodes. No extra crawler.
+    # These paths are possible HTML clicks, NOT evidence of real buyer visits.
+    graph = {row["route"]: set(row["sitemap_internal_html_links"]) for row in rows}
+    for row in rows:
+        path = _shortest_buyer_path(row["route"], graph)
+        row["buyer_form_link_path"] = path
+        row["buyer_form_link_hops"] = len(path) - 1 if path else None
+        row["direct_link_intentionally_separate"] = (
+            row["route_ownership_lane"] == "HOMEOWNER_SERVICE_NOT_ENTERPRISE_B2B"
+        )
     catalogues = {}
     for route, field in (
         ("/v1/checkout/commercial/offers", "offers"),
@@ -176,6 +240,15 @@ def review(
         blocking.append("EXISTING_READONLY_CATALOGUE_API")
     gaps = [x["route"] for x in rows if not x["direct_buyer_destinations"]
             and x["route"] not in ROUTES_TO_FORMS]
+    indirect = [x["route"] for x in rows
+                if not x["direct_buyer_destinations"]
+                and x["buyer_form_link_hops"] is not None
+                and x["buyer_form_link_hops"] >= 2]
+    intentionally_separate = [x["route"] for x in rows
+                              if x["direct_link_intentionally_separate"]]
+    disconnected_enterprise = [x["route"] for x in rows
+                               if x["route_ownership_lane"] != "HOMEOWNER_SERVICE_NOT_ENTERPRISE_B2B"
+                               and x["buyer_form_link_path"] is None]
     return {
         "schema_version": "empire.search.live_organic_to_buyer_observer.v1",
         "status": "GET_ONLY_PUBLIC_DISCOVERY_AUDIT",
@@ -185,6 +258,11 @@ def review(
         "priority_buyer_routes_checked": len(PRIORITY),
         "direct_buyer_link_review_candidates": gaps,
         "direct_buyer_link_review_count": len(gaps),
+        "indirect_buyer_form_path_pages": indirect,
+        "indirect_buyer_form_path_count": len(indirect),
+        "non_b2b_homeowner_pages_kept_separate": intentionally_separate,
+        "enterprise_pages_with_no_bounded_buyer_path": disconnected_enterprise,
+        "buyer_paths_proven_as_actual_visits": False,
         "catalogues": catalogues,
         "gtm_snapshot": _gtm_summary(gtm_snapshot),
         "routes": rows,
