@@ -253,6 +253,15 @@ def default_worker_registry() -> tuple[WorkerSpec, ...]:
             isolation="loopback_onnx_sidecar",
             preferred_for=("reply_negative_unsubscribe_shadow",),
         ),
+        WorkerSpec(
+            key="tender_consultant",
+            name="EmpireOS Tender Consultant Specialist",
+            kind="specialist",
+            capabilities=("tender_bid_consultation",),
+            max_authority="observe",
+            isolation="original_private_procurement_research",
+            preferred_for=("tender_bid_consultation",),
+        ),
     )
     for worker in workers:
         worker.validate()

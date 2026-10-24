@@ -135,3 +135,30 @@ def test_parallel_backend_routes_to_pi():
     )
     assert decision.eligible is True
     assert decision.worker_key == "pi"
+
+
+
+def test_tender_consultant_routes_only_observe_research():
+    decision=route_execution_job(ExecutionJob(
+        job_id="tender-consultant-test",
+        capability="tender_bid_consultation",
+        department="commercial_procurement",
+        authority="observe",
+    ))
+    assert decision.worker_key=="tender_consultant"
+    assert decision.eligible is True
+    assert decision.execution_authority=="none"
+    assert decision.requires_mutation_lease is False
+    worker=next(x for x in default_worker_registry() if x.key=="tender_consultant")
+    assert worker.max_authority=="observe"
+    assert worker.sends_external is False
+    assert worker.moves_funds is False
+    assert worker.mutates_canonical_data is False
+    assert worker.production_deploy is False
+    denied=route_execution_job(ExecutionJob(
+        job_id="tender-write-not-allowed",
+        capability="tender_bid_consultation",
+        department="commercial_procurement",
+        authority="internal_write",
+    ))
+    assert denied.eligible is False
