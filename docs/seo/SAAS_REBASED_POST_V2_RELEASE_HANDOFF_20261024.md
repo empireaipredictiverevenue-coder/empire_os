@@ -68,3 +68,37 @@ Targeted website-owner and transaction suite: **28 passed**. Updated read-only S
 Commercial attribution boundary: clicking a link or arriving at an anchor does **not** establish organic-search source identity or buyer consent. The original GTM/EmpireDB owner must verify the original buyer-submitted record and correct tenant-bound Smart CRM receipt. Do not infer SEO attribution from a navigation test, claimed entry value or a Search Console impression.
 
 **Release remains held for founder's distinct exact five-file approval and new 659-file root-protected site backup.**
+## 24 October 2026: founder EXPLICITLY approved the exact post-V2 SaaS release
+
+The founder answered **'yes i approve'** to this precisely stated approval question: publish the existing verified **659-to-662-file** SaaS guide candidate, limited to two Predictive Revenue existing file payloads and three new hashed static assets, subject to a **fresh fully verified root-owned 659-file backup** and the original guarded owner release checks. This is separate from V2 approval and separate from the pending AEO HVAC candidate. No wider website or financial authority is implied.
+
+The immutable approval record is `docs/website/release_candidates/SAAS_GUIDE_RELEASE_APPROVAL_20261024.json`, SHA-256 `92f241fa47a6844ad1df718a3ed2ce81c4bb201c8831a213d74031857d3c2083`. It is bound to the exact private candidate SHA-256 `f8d377850a508f0ecef2d1a15c43f70bc25b1c8fe40e2c34c2ea4996509b84a0` and the following **five** approved file paths:
+
+1. `predictive-revenue.html`
+2. `predictive-revenue.txt`
+3. `_next/static/chunks/app/layout-35080f83a6c7396a.js`
+4. `_next/static/chunks/app/predictive-revenue/page-8a641c1798fea86e.js`
+5. `_next/static/css/1e15dd81fb46e134.css`
+
+The original operator `scripts/publish_saas_guide_after_v2_20261024.py` now pins the approval record SHA and validates its full exact scope plus disallow flags for DB migrations, customer submissions, CRM writes, outbound, payments, full-site sync and unrelated AEO release. Read-only preflight now returns `SAAS_659_TO_662_FOUNDER_APPROVED_FRESH_ROOT_BACKUP_REQUIRED` with `separate_founder_approval_recorded: true`, `verified_root_backup_exists: false`, and `public_site_mutated: false`. The private candidate's historical fields remain explicitly NOT PUBLISHED/NOT LIVE by design; an independent approved record is the source of founder release authority.
+
+**Owner action:** from the founder's existing authorised root-capable website operator terminal (not the constrained Remote Desktop integration), run:
+
+```bash
+cd /srv/empire_os
+sudo env PYTHONPATH=/srv/empire_os \
+  /srv/empire_os/.venv/bin/python -B \
+  -m scripts.publish_saas_guide_after_v2_20261024 \
+  --apply-founder-approved-saas-guide-after-v2
+```
+
+The publisher must hold the original root-private lock and legacy compatibility lock, check every pinned existing source and staged byte, create the fresh current **659-file** protected rollback archive, read back each archived member, perform only the five approved file changes, compare full 662-file live inventory, GET-verify updated `/predictive-revenue`, all new static assets and all protected routes, and write a versioned publication receipt. On any post-write verification failure, the existing narrow atomic transaction rolls back. This is a one-off, never a recurring task. **Do not rerun the already-completed V2 publisher**, manually copy assets, weaken permissions, or execute the stale 653-file SaaS overlay.
+
+After root-owner execution, independently verify the exact receipt status `FOUNDER_APPROVED_SAAS_GUIDE_659_TO_662_PUBLISHED_AND_GET_VERIFIED`, corresponding backup checksum and fresh 659-to-662 file counts. A successful publisher output is necessary before saying the SaaS guide is public. The read-only command is still available:
+
+```bash
+cd /srv/empire_os
+/srv/empire_os/.venv/bin/python -B -m scripts.publish_saas_guide_after_v2_20261024 --preflight
+```
+
+Targeted original website release, rollback and SEO observer suite **45 tests passed**. At the time of this founder approval record, production remains **659 files** and the AEO page remains unchanged; no customer sent a submission, no CRM rows or payments were created and no new outbound was authorised.

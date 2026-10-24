@@ -7,9 +7,10 @@ import pytest
 from scripts import publish_saas_guide_after_v2_20261024 as owner
 
 
-def test_real_pinned_post_v2_preflight_is_readonly_and_unapproved():
+def test_real_pinned_post_v2_preflight_is_readonly_and_explicitly_approved():
     p = owner.preflight()
-    assert p["status"] == "SAAS_659_TO_662_PREFLIGHT_PASS_PUBLICATION_NOT_APPROVED"
+    assert p["status"] == "SAAS_659_TO_662_FOUNDER_APPROVED_FRESH_ROOT_BACKUP_REQUIRED"
+    assert p["separate_founder_approval_recorded"] is True
     assert p["original_file_count"] == 659
     assert p["candidate_file_count"] == 662
     assert p["existing_page_replacements"] == 2
@@ -104,11 +105,17 @@ def test_candidate_fails_if_consent_is_omitted(monkeypatch):
         owner.preflight()
 
 
-def test_approval_receipt_must_be_separately_pinned():
-    assert owner.APPROVAL_SHA256 is None
-    assert not owner.APPROVAL.exists()
-    with pytest.raises(owner.ReleaseHold, match="SEPARATE_SAAS_FOUNDER_APPROVAL_NOT_YET_RECORDED"):
-        owner.require_separate_founder_approval()
+def test_approval_receipt_is_pinned_to_exact_five_files():
+    assert owner.APPROVAL.exists()
+    record = owner.require_separate_founder_approval()
+    assert owner.APPROVAL_SHA256 == "92f241fa47a6844ad1df718a3ed2ce81c4bb201c8831a213d74031857d3c2083"
+    assert record["approval_source"] == "FOUNDER_EXPLICIT_CHAT_APPROVAL_20261024"
+    assert record["scope"] == list(owner.PAGE_FILES) + sorted(
+        owner._read_pinned(owner.CANDIDATE)["new_hashed_assets"])
+    assert record["original_website_owner_root_backup_required"] is True
+    assert record["full_site_sync_approved"] is False
+    assert record["other_aeo_release_approved"] is False
+    assert record["release_completed"] is False
 
 
 def test_candidate_requires_exact_browser_cta_evidence(monkeypatch):
@@ -133,3 +140,38 @@ def test_candidate_requires_both_genuine_form_destinations(monkeypatch):
     monkeypatch.setattr(owner, "_read_pinned", tamper)
     with pytest.raises(owner.ReleaseHold, match="PRIVATE_FIRST_PARTY_CTA_BROWSER_QA_FAILED"):
         owner.preflight()
+
+
+def test_approval_digest_tampering_holds_without_root_or_backup(monkeypatch):
+    monkeypatch.setattr(owner, "APPROVAL_SHA256", "0" * 64)
+    with pytest.raises(owner.ReleaseHold, match="SAAS_APPROVAL_RECEIPT_SHA_DRIFT"):
+        owner.require_separate_founder_approval()
+
+
+@pytest.mark.parametrize("change", [
+    {"scope": ["predictive-revenue.html"]},
+    {"full_site_sync_approved": True},
+    {"other_aeo_release_approved": True},
+    {"original_website_owner_root_backup_required": False},
+    {"approval_source": "FOUNDER_APPROVED_SOME_OTHER_RELEASE"},
+])
+def test_wrong_scope_or_extra_permissions_fail_closed(tmp_path, monkeypatch, change):
+    from hashlib import sha256
+    forged = json.loads(owner.APPROVAL.read_text())
+    forged.update(change)
+    trial = tmp_path / "wrong_release_approval.json"
+    trial.write_text(json.dumps(forged, sort_keys=True) + "\n")
+    monkeypatch.setattr(owner, "APPROVAL", trial)
+    monkeypatch.setattr(owner, "APPROVAL_SHA256", sha256(trial.read_bytes()).hexdigest())
+    with pytest.raises(owner.ReleaseHold, match="SAAS_FOUNDER_APPROVAL_WRONG_SCOPE"):
+        owner.require_separate_founder_approval()
+
+
+def test_publication_flag_not_implied_by_founder_approval(capsys):
+    code = owner.main(["--preflight"])
+    out = json.loads(capsys.readouterr().out)
+    assert code == 0
+    assert out["separate_founder_approval_recorded"] is True
+    assert out["verified_root_backup_exists"] is False
+    assert out["public_site_mutated"] is False
+    assert "FRESH_ROOT_BACKUP_REQUIRED" in out["status"]

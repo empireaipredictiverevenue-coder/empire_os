@@ -1,0 +1,28 @@
+{
+  "approval_date": "2026-10-24",
+  "approval_source": "FOUNDER_EXPLICIT_CHAT_APPROVAL_20261024",
+  "approved_baseline_file_count": 659,
+  "approved_candidate_file_count": 662,
+  "crm_writes_approved": false,
+  "customer_submission_approved": false,
+  "exact_live_page_get_and_asset_verification_required": true,
+  "founder_approved_specific_request": "Publish the exact five-file SaaS guide update, subject to a fresh verified root-owned 659-file backup and existing guarded website release checks.",
+  "founder_explicit_approval": true,
+  "full_site_sync_approved": false,
+  "original_guarded_website_release_required": true,
+  "original_website_owner_root_backup_required": true,
+  "other_aeo_release_approved": false,
+  "outbound_approved": false,
+  "payment_activation_approved": false,
+  "production_db_migration_approved": false,
+  "release_completed": false,
+  "schema_version": "empire.website.saas_guide_founder_release_approval.v1",
+  "scope": [
+    "predictive-revenue.html",
+    "predictive-revenue.txt",
+    "_next/static/chunks/app/layout-35080f83a6c7396a.js",
+    "_next/static/chunks/app/predictive-revenue/page-8a641c1798fea86e.js",
+    "_next/static/css/1e15dd81fb46e134.css"
+  ],
+  "target_candidate_receipt_sha256": "f8d377850a508f0ecef2d1a15c43f70bc25b1c8fe40e2c34c2ea4996509b84a0"
+}

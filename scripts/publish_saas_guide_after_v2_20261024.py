@@ -41,9 +41,9 @@ ARCHIVE = Path("/var/backups/empire-website/saas_guide_post_v2_pre_659_20261024.
 BACKUP_RECEIPT = ARCHIVE.with_suffix(".receipt.json")
 RELEASE_RECEIPT = ARCHIVE.with_suffix(".publication.json")
 APPROVAL = ROOT / "docs/website/release_candidates/SAAS_GUIDE_RELEASE_APPROVAL_20261024.json"
-# Unset deliberately. A separate, exact founder approval must precede
-# an owner-issued code change pinning its immutable approval receipt digest.
-APPROVAL_SHA256: str | None = None
+# Exact user approval on 24 October 2026, distinct from the earlier V2 release.
+# The five-file receipt is pinned; original owner backup+lock are still mandatory.
+APPROVAL_SHA256: str | None = "92f241fa47a6844ad1df718a3ed2ce81c4bb201c8831a213d74031857d3c2083"
 EXACT_APPLY = "--apply-founder-approved-saas-guide-after-v2"
 PAGE_FILES = ("predictive-revenue.html", "predictive-revenue.txt")
 PROTECT = ("/", "/commercial", "/buy", "/privacy",
@@ -200,8 +200,9 @@ def preflight(*, live: Path = LIVE) -> dict[str, Any]:
         name = "index.html" if route == "/" else route.lstrip("/") + ".html"
         if name in original and digest != original[name]:
             raise ReleaseHold("SERVED_BASELINE_CHANGED_" + route)
+    require_separate_founder_approval()
     return {
-        "status": "SAAS_659_TO_662_PREFLIGHT_PASS_PUBLICATION_NOT_APPROVED",
+        "status": "SAAS_659_TO_662_FOUNDER_APPROVED_FRESH_ROOT_BACKUP_REQUIRED",
         "live_before_sha256": original, "candidate_sha256": candidate,
         "original_page_hashes": baseline,
         "new_page_hashes": replacements,
@@ -209,6 +210,7 @@ def preflight(*, live: Path = LIVE) -> dict[str, Any]:
         "staged_root": root, "protected_http_sha256": previous_http,
         "original_file_count": 659, "candidate_file_count": 662,
         "existing_page_replacements": 2, "new_asset_count": 3,
+        "separate_founder_approval_recorded": True,
         "website_publication_authorized": False,
         "verified_root_backup_exists": False, "writes_performed": False,
     }
@@ -228,6 +230,15 @@ def require_separate_founder_approval() -> dict[str, Any]:
         or a.get("target_candidate_receipt_sha256") != PINNED[CANDIDATE]
         or a.get("approved_baseline_file_count") != 659
         or a.get("approved_candidate_file_count") != 662
+        or a.get("approval_source") != "FOUNDER_EXPLICIT_CHAT_APPROVAL_20261024"
+        or a.get("original_website_owner_root_backup_required") is not True
+        or a.get("original_guarded_website_release_required") is not True
+        or a.get("exact_live_page_get_and_asset_verification_required") is not True
+        or a.get("release_completed") is not False
+        or any(a.get(k) is not False for k in (
+            "production_db_migration_approved", "customer_submission_approved",
+            "crm_writes_approved", "outbound_approved", "payment_activation_approved",
+            "full_site_sync_approved", "other_aeo_release_approved"))
         or a.get("scope") != list(PAGE_FILES) +
                 sorted(json.loads(CANDIDATE.read_text())["new_hashed_assets"])):
         raise ReleaseHold("SAAS_FOUNDER_APPROVAL_WRONG_SCOPE")
@@ -324,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
                 "staged_file_count": p["candidate_file_count"],
                 "page_payload_replacements": p["existing_page_replacements"],
                 "new_assets": p["new_asset_count"],
-                "separate_founder_approval_recorded": False,
+                "separate_founder_approval_recorded": p["separate_founder_approval_recorded"],
                 "verified_root_backup_exists": False,
                 "public_site_mutated": False,
             }, sort_keys=True))
