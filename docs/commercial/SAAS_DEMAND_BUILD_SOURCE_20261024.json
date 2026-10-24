@@ -1,0 +1,81 @@
+{
+  "schema_version": "empire.saas_demand_build_source.v1",
+  "as_of": "2026-10-24",
+  "records": [
+    {
+      "id": "revops_hubspot_20261024",
+      "display_name": "Anonymous B2B company — HubSpot RevOps request",
+      "source_kind": "MARKETPLACE_EXTERNAL_SERVICE_REQUEST",
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Consultant-Needed-Revenue-Operations-Setup-for-B2B-Sales-Team_~022113313008957668345/",
+      "observed_at": "2026-10-24",
+      "source_observation": "Requests MQL/SQL alignment, stage definitions, lead routing and attribution with $70-$110/hr buyer-posted range.",
+      "buyer_request_observed": true,
+      "company_identity_verified": false,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "PLATFORM_APPLICATION_ONLY",
+      "sample_path": "docs/commercial/REVOPS_BUYER_REQUEST_FREE_EVIDENCE_SAMPLE_20261024.md",
+      "claim_stage": "PUBLIC_REQUEST_NOT_VERIFIED_BUYER",
+      "external_procurement_scope": "HUBSPOT_IMPLEMENTATION_MANDATORY"
+    },
+    {
+      "id": "revops_saas_salesprocess_20261024",
+      "display_name": "Anonymous B2B SaaS — repeatable sales process request",
+      "source_kind": "MARKETPLACE_EXTERNAL_SERVICE_REQUEST",
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/Help-build-repeatable-sales-process_~022104538811599436445/",
+      "observed_at": "2026-10-24",
+      "source_observation": "Buyer describes demos, trials and lost/won deals; wants stages, account ownership, followups, conversion dashboards and call intelligence.",
+      "buyer_request_observed": true,
+      "company_identity_verified": false,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "PLATFORM_APPLICATION_ONLY",
+      "sample_path": "docs/commercial/REVOPS_BUYER_REQUEST_FREE_EVIDENCE_SAMPLE_20261024.md",
+      "claim_stage": "PUBLIC_REQUEST_NOT_VERIFIED_BUYER",
+      "external_procurement_scope": "SALES_PROCESS_BUILD"
+    },
+    {
+      "id": "clueso_founding_ae_20261024",
+      "display_name": "Clueso — video/documentation SaaS",
+      "source_kind": "COMPANY_OFFICIAL_HIRING",
+      "source_url": "https://www.clueso.io/careers/founding-ae",
+      "observed_at": "2026-10-24",
+      "source_observation": "Founding AE role describes PLG/inbound and a goal for outbound-sourced pipeline; recruitment is not outside buying intent.",
+      "buyer_request_observed": false,
+      "company_identity_verified": true,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "FOUNDER_PROFESSIONAL_INTRO_REVIEW",
+      "sample_path": "docs/commercial/CLUESO_PUBLIC_PREDICTIVE_REVENUE_SAMPLE_20261024.md",
+      "claim_stage": "PUBLIC_HIRING_FIT_HYPOTHESIS",
+      "external_procurement_scope": "NONE"
+    },
+    {
+      "id": "paragon_ae_20261024",
+      "display_name": "Paragon — embedded integration platform",
+      "source_kind": "COMPANY_OFFICIAL_HIRING",
+      "source_url": "https://jobs.ashbyhq.com/Paragon/a2a3f73c-9672-435f-aa7f-0f9c3aa0275a",
+      "observed_at": "2026-10-24",
+      "source_observation": "Technical sales AE role discusses forecasting, CRM hygiene and complex evaluation; recruitment is not outside buying intent.",
+      "buyer_request_observed": false,
+      "company_identity_verified": true,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "COMMERCIAL_CONTACT_UNVERIFIED",
+      "sample_path": "docs/commercial/PARAGON_PUBLIC_REVENUE_DIAGNOSTIC_FREE_SAMPLE_20261024.md",
+      "claim_stage": "PUBLIC_HIRING_FIT_HYPOTHESIS",
+      "external_procurement_scope": "NONE"
+    },
+    {
+      "id": "credal_gtm_20261024",
+      "display_name": "Credal.ai — enterprise agent governance",
+      "source_kind": "COMPANY_OFFICIAL_HIRING",
+      "source_url": "https://credal.ai/careers",
+      "observed_at": "2026-10-24",
+      "source_observation": "Published business development and deployment roles; no external purchasing requirement verified.",
+      "buyer_request_observed": false,
+      "company_identity_verified": true,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "COMMERCIAL_CONTACT_UNVERIFIED",
+      "sample_path": null,
+      "claim_stage": "PUBLIC_HIRING_FIT_HYPOTHESIS",
+      "external_procurement_scope": "NONE"
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# EmpireOS Predictive Revenue — SaaS Demand Build Stage (24 October 2026)
+
+Owner: original Predictive Revenue + acquisition department. **One EmpireOS, one EmpireDB, one Smart CRM.** This release is a private build-stage capability, not a new public product, mailing system, CRM, external marketplace application, priced quote or live customer acquisition.
+
+## What actually moved into BUILD
+
+- Existing product: `predictive_revenue_diagnostic` from `empire_os.predictive_revenue_products`, existing founder-approved diagnostic price policy retained. **No new catalogue tier or scope/price promise.**
+- New small pure qualification/composition module: `empire_os/predictive_revenue_saas_build_stage.py`. Only reads curated, bounded public source evidence and existing public evidence sample files. No network, no PII, no DB access and no emails.
+- Existing owner runner: `scripts/build_predictive_revenue_saas_demand_stage_20261024.py`. Default read-only output; `--write-private` updates exactly one private research read model in the existing acquisition-research runtime directory (`0600`). No new timer or recurring task.
+- Input: `docs/commercial/SAAS_DEMAND_BUILD_SOURCE_20261024.json`. Immutable-ish dated curated source batch (five claims, URLs, intent types). Evidence expires after seven days until manually refreshed from official public sources.
+- Private generated receipt: `runtime/acquisition_research/saas_demand_build_stage_latest.json`. Exact build status `SAAS_DEMAND_PRIVATE_BUILD_STAGE_PASS`; separate commercial release gates remain unchanged.
+
+## First measured build results
+
+| Public claim category | Observations | Sample state | Real buyer/contact state |
+|---|---:|---|---|
+| Anonymous HubSpot RevOps B2B buyer request | 1 | Public first-pass diagnostic exists | Buyer legal identity missing, HubSpot project delivery proof not established, Upwork application/KYC/Connects not cleared |
+| Anonymous B2B SaaS sales-process request | 1 | Public first-pass diagnostic exists | Buyer identity missing and implementation scope/capability unconfirmed; platform-only application |
+| Clueso published commercial hiring | 1 | Company-specific public sample exists | No external procurement request, public recruiting email not a vendor channel |
+| Paragon published AE hiring | 1 | Company-specific public sample exists | No external procurement request; legal-notice email must not be used for unsolicited vendor sales |
+| Credal published GTM hiring | 1 | Research observation only | No proven buying interest, consented recipient or sample built |
+
+**Totals at release:** 5 public signals; 2 external requests; 3 hiring-fit hypotheses; **4 free public-evidence samples ready**; **0** verified paying buyers, **0** verified Empire AI buyer replies, **0** executed outreach, **0** CRM promotions. Internal `PUBLIC_EVIDENCE_SAMPLE_BUILT` is *not* the same as customer diagnostic delivery.
+
+## Build and commercial release decision
+
+1. **Build-stage complete (private):** evidence reader + existing product mapping + sample presence/readback + signal classification + deterministic contact/eligibility holds + owner read model. Run `cd /srv/empire_os && .venv/bin/python -B -m scripts.build_predictive_revenue_saas_demand_stage_20261024 --write-private` after refreshing source pack within seven days.
+2. **Deliverable scope to refine next:** a measurement-only diagnostic over prospect → MQL → SQL → qualified evaluation → signed booking → realised revenue, with immutable definitions, deduplication and independent source lineage. Do not claim past client HubSpot implementations or operate client HubSpot without permission and an approved qualified implementation partner.
+3. **Acquisition owner review:** the buyer listings are genuinely requests for service, but anonymously posted to Upwork. Upwork must be the application channel and the founder's payment identity/eligibility and Connects expenditure must be resolved first. Do not contact the anonymised buyer off-platform.
+4. **Clueso and Paragon:** existing company hiring evidence still supports value-first research. Validate an appropriate commercial decision-maker channel (e.g., a genuine founder-to-founder professional connection) and exact suppression before any first-touch. Do not use legal/privacy/recruitment addresses for a sales pitch. A separate, professional mailbox Gmail search showing no matched threads does **not** clear original EmpireOS provider/suppression authority. Existing server-side Gmail readonly OAuth refresh held; keep Gmail repair in its own owner thread.
+5. **When interest is genuine:** then ask a buyer what decision matters, offer a free evidence sample, agree data rights and scope, and only then seek an accepted proposal and EmpireDB/Smart CRM receipt. No fabricated customer data, forecasts or realised revenue.
+
+## Tests and provenance
+
+28 targeted tests passed in `tests/test_predictive_revenue_saas_build_stage_20261024.py` plus `tests/test_predictive_revenue_enterprise_acquisition.py`. Test guards reject forged buying intent, altered anonymous identity, unsafe/duplicate source URLs, stale source packs, missing samples, leaked runtime-file permissions and any accidental send eligibility. A single original source and a sample filename cannot become execution authority.
+
+Upwork buyer listings: https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Consultant-Needed-Revenue-Operations-Setup-for-B2B-Sales-Team_~022113313008957668345/ and https://www.upwork.com/freelance-jobs/apply/Help-build-repeatable-sales-process_~022104538811599436445/ . Company hiring: https://www.clueso.io/careers/founding-ae , https://jobs.ashbyhq.com/Paragon/a2a3f73c-9672-435f-aa7f-0f9c3aa0275a , https://credal.ai/careers . 24 October research observation is not an independent provider API guarantee of continued marketplace availability.
+
+**Production unchanged:** one existing public SaaS guide is already live, still governed by original 659-backup/662-file release proof. This private stage does NOT modify website, DB, finance, checkout, sender, Gmail provider, Search Console or any buyer reply watch.
