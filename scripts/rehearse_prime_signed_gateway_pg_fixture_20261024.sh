@@ -333,4 +333,10 @@ PYTHONPATH=. /srv/empire_os/.venv/bin/python -B \
 if [[ "${EMPIRE_REHEARSE_HELD_CONSENT_061:-}" == "disposable_only" ]]; then
   bash scripts/rehearse_prime_consent_gate_061_20261024.sh
 fi
+# Research-only extension: 062 device binding contract runs AFTER 061 in
+# the same verified disposable PostgreSQL; never on canonical EmpireDB.
+if [[ "${EMPIRE_REHEARSE_HELD_DEVICE_062:-}" == "disposable_only" ]]; then
+  [[ "${EMPIRE_REHEARSE_HELD_CONSENT_061:-}" == "disposable_only" ]] || exit 9
+  bash scripts/rehearse_prime_device_binding_062_20261024.sh
+fi
 echo "SIGNED_GATEWAY_060_RESTRICTED_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0"
