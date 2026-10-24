@@ -180,6 +180,22 @@ export default async function PrimeTwinCockpit({ searchParams }: { searchParams:
             or independent source authentication.
           </p>
         </section>
+        <section className="mt-6 rounded-2xl border border-sky-400/15 bg-sky-400/[0.025] p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+            Original EmpireDB timer recovery
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold">Durable scheduling evidence gate</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Recovery state: {label(data.original_timer_recovery.status)}.
+            Event ordering, cancellation, crash reconciliation and reported delivery
+            have a tested synthetic contract. The candidate EmpireDB schema is held,
+            no live scheduler or notification service is connected, and a provider
+            acceptance must never be displayed as a delivered reminder.
+          </p>
+          <p className="mt-3 text-xs text-amber-200">
+            Actual user notification verified: No · Original production DB changed: No
+          </p>
+        </section>
         <footer className="mt-7 rounded-xl border border-amber-400/20 p-5 text-sm text-slate-400">
           Local-model self-play: {label(data.local_model_selfplay.status)}.
           The existing llama.cpp runtime responded to health checks but the manual

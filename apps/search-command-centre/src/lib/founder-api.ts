@@ -1035,6 +1035,12 @@ export type PrimeDigitalTwinCockpit = {
     actual_timer_scheduled: false;
     execution_authority: "none";
   };
+  original_timer_recovery: {
+    mode: "SIMULATION";
+    status: string;
+    real_notification_delivery_verified: false;
+    execution_authority: "none";
+  };
   flagship_release_readiness: {
     status: string;
     mode: "OBSERVE";
