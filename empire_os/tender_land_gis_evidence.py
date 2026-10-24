@@ -38,6 +38,19 @@ SOURCES = {
         "warning": "Generalised zoning complements rather than replaces statutory local development plans; coverage may be incomplete.",
         "jurisdiction_bbox": (-10.8, 51.3, -5.3, 55.5),
     },
+    "ROI_PLANNING_SITES": {
+        "jurisdiction": "ROI",
+        "label": "Irish National Planning Application Sites - Louth sample",
+        "service": "https://services.arcgis.com/NzlPQPKn5QF9v2US/arcgis/rest/services/IrishPlanningApplications/FeatureServer/1",
+        "catalogue": "https://data.gov.ie/dataset/national-planning-applications",
+        "licence_url": "https://creativecommons.org/licenses/by/4.0/",
+        "licence": "CC-BY-4.0",
+        "attribution": "Department of Housing, Local Government and Heritage / participating Irish local authorities; National Planning Applications",
+        "fixed_where": "PlanningAuthority = 'Louth County Council'",
+        "fields": "OBJECTID,PlanningAuthority,ApplicationNumber,ApplicationStatus,Decision,ReceivedDate,DecisionDate,GrantDate",
+        "warning": "Planning-application polygons are not cadastral parcels, proof of permission for a proposed development, or proof of ownership; independently verify decision and currency with the local authority.",
+        "jurisdiction_bbox": (-10.8, 51.3, -5.3, 55.5),
+    },
     "NI_HED_SCHEDULED": {
         "jurisdiction": "NI",
         "label": "Northern Ireland Historic Environment Division Scheduled Zones - County Down sample",
@@ -52,7 +65,7 @@ SOURCES = {
         "jurisdiction_bbox": (-8.3, 54.0, -5.2, 55.5),
     },
 }
-SOURCE_IDS = ("ROI_GZT", "NI_HED_SCHEDULED")
+SOURCE_IDS = ("ROI_GZT", "ROI_PLANNING_SITES", "NI_HED_SCHEDULED")
 MAX_HTTP_BYTES = 300_000
 MAX_FEATURES = 3
 MAX_SCREEN_HITS = 25
@@ -172,7 +185,7 @@ def _checked_features(document: dict[str, Any], *, max_items: int, require_geome
 
 
 def snapshot_official_layers(root: Path, *, now: datetime | None = None) -> dict[str, Any]:
-    """Fetch *samples*, not complete coverage, of two rights-labelled GIS layers."""
+    """Fetch bounded samples, not complete coverage, of three rights-labelled GIS layers."""
     dt = now or datetime.now(timezone.utc)
     if dt.tzinfo is None:
         raise ValueError("AWARE_TIME_REQUIRED")
@@ -214,7 +227,7 @@ def snapshot_official_layers(root: Path, *, now: datetime | None = None) -> dict
             row["failure_code"] = str(exc)[:80]
         report["layers"].append(row)
     if report["layer_count"] == len(SOURCE_IDS):
-        report["status"] = "TWO_OFFICIAL_GIS_LAYER_SAMPLES_OBSERVED_REVIEW_ONLY"
+        report["status"] = "THREE_OFFICIAL_GIS_LAYER_SAMPLES_OBSERVED_REVIEW_ONLY"
     _save(root, SAMPLE_OUTPUT, report)
     return report
 
@@ -283,8 +296,8 @@ def screen_unverified_parcel_geometry(
     if not isinstance(geometry_source, str) or not 5 <= len(geometry_source) <= 300:
         raise ValueError("GEOMETRY_SOURCE_DESCRIPTION_REQUIRED")
     ring = _validated_ring(geometry, jurisdiction)
-    source_id = "ROI_GZT" if jurisdiction == "ROI" else "NI_HED_SCHEDULED"
-    source = SOURCES[source_id]
+    relevant_source_ids = ("ROI_GZT", "ROI_PLANNING_SITES") if jurisdiction == "ROI" else ("NI_HED_SCHEDULED",)
+    source = SOURCES[relevant_source_ids[0]]
     result = {
         **_base(), "status": "UNVERIFIED_GEOMETRY_SOURCE_NOT_SPATIAL_CLEARANCE",
         "observed_at_utc": dt.astimezone(timezone.utc).isoformat(),
@@ -299,32 +312,60 @@ def screen_unverified_parcel_geometry(
         "source_catalogue": source["catalogue"],
         "source_warning": source["warning"],
         "intersections": [],
+        "checked_source_ids": list(relevant_source_ids),
+        "sources_observed_successfully": 0,
+        "source_results": [],
         "intersections_are_only_screening_flags": True,
         "a_zero_hit_result_is_not_planning_clearance": True,
     }
-    try:
-        doc, digest = _fetch_json(source["service"], {
-            "f": "geojson",
-            "where": source["fixed_where"],
-            "geometry": json.dumps({"rings": [ring], "spatialReference": {"wkid": 4326}}, separators=(",", ":")),
-            "geometryType": "esriGeometryPolygon",
-            "inSR": 4326,
-            "spatialRel": "esriSpatialRelIntersects",
-            "outFields": source["fields"], "returnGeometry": "false",
-            "resultRecordCount": MAX_SCREEN_HITS, "orderByFields": "OBJECTID ASC",
-        })
-        features = _checked_features(doc, max_items=MAX_SCREEN_HITS, require_geometry=False)
-        result["intersections"] = [x["properties"] for x in features]
-        result["source_response_sha256"] = digest
-        result["source_service"] = source["service"]
-        result["result_limit_reached"] = bool(doc.get("properties", {}).get("exceededTransferLimit", False))
-        result["status"] = (
-            "POTENTIAL_SPATIAL_CONFLICTS_PARTIAL_RESULT_HUMAN_REVIEW"
-            if result["result_limit_reached"]
-            else "GIS_INTERSECTION_RESULT_NOT_LAND_OR_PLANNING_CLEARANCE"
-        )
-    except (ValueError, OSError, TypeError, KeyError) as exc:
-        result["status"] = "GIS_LAYER_UNAVAILABLE_DO_NOT_INFER_CLEARANCE"
-        result["failure_code"] = str(exc)[:80]
+    truncation = False
+    source_failures = 0
+    for source_id in relevant_source_ids:
+        layer = SOURCES[source_id]
+        layer_result = {
+            "source_id": source_id,
+            "catalogue": layer["catalogue"],
+            "licence": layer["licence"],
+            "attribution": layer["attribution"],
+            "status": "UNAVAILABLE_NOT_CLEAR",
+            "feature_count": 0,
+        }
+        try:
+            doc, digest = _fetch_json(layer["service"], {
+                "f": "geojson",
+                "where": layer["fixed_where"],
+                "geometry": json.dumps({"rings": [ring], "spatialReference": {"wkid": 4326}}, separators=(",", ":")),
+                "geometryType": "esriGeometryPolygon",
+                "inSR": 4326,
+                "spatialRel": "esriSpatialRelIntersects",
+                "outFields": layer["fields"], "returnGeometry": "false",
+                "resultRecordCount": MAX_SCREEN_HITS, "orderByFields": "OBJECTID ASC",
+            })
+            features = _checked_features(doc, max_items=MAX_SCREEN_HITS, require_geometry=False)
+            layer_result["status"] = "SOURCE_QUERIED_RESULT_NOT_CLEARANCE"
+            layer_result["feature_count"] = len(features)
+            layer_result["response_sha256"] = digest
+            layer_result["source_service"] = layer["service"]
+            layer_result["result_limit_reached"] = bool(doc.get("properties", {}).get("exceededTransferLimit", False))
+            truncation = truncation or layer_result["result_limit_reached"]
+            result["sources_observed_successfully"] += 1
+            result["intersections"].extend([
+                {"source_id": source_id, "attributes": item["properties"]}
+                for item in features
+            ])
+        except (ValueError, OSError, TypeError, KeyError) as exc:
+            source_failures += 1
+            layer_result["failure_code"] = str(exc)[:80]
+        result["source_results"].append(layer_result)
+    result["result_limit_reached"] = truncation
+    result["status"] = (
+        "GIS_LAYER_UNAVAILABLE_DO_NOT_INFER_CLEARANCE"
+        if source_failures == len(relevant_source_ids) else
+        "PARTIAL_GIS_SOURCES_UNAVAILABLE_DO_NOT_INFER_CLEARANCE"
+        if source_failures else
+        "POTENTIAL_SPATIAL_CONFLICTS_PARTIAL_RESULT_HUMAN_REVIEW"
+        if truncation else
+        "GIS_INTERSECTION_RESULT_NOT_LAND_OR_PLANNING_CLEARANCE"
+    )
     _save(root, SCREEN_OUTPUT, result)
     return result

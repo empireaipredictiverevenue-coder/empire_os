@@ -56,7 +56,7 @@ def main() -> int:
             "full_parcel_screening":False,
             "bid_authorized":False,
         },sort_keys=True))
-        return 0 if result["layer_count"]==2 else 2
+        return 0 if result["layer_count"]==3 else 2
     source=_read_private_input(root)
     result=screen_unverified_parcel_geometry(root,**source)
     print(json.dumps({

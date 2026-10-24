@@ -237,7 +237,7 @@ def render_html(report: dict, gis_snapshot: dict | None = None) -> str:
     if isinstance(gis_snapshot, dict) and gis_snapshot.get("schema_version") == "empire.tender_ca18567_official_gis_evidence.v1":
         gis_rows = []
         from empire_os.tender_land_gis_evidence import SOURCES
-        for layer in gis_snapshot.get("layers", [])[:2]:
+        for layer in gis_snapshot.get("layers", [])[:3]:
             if not isinstance(layer, dict):
                 continue
             official = SOURCES.get(layer.get("source_id"))

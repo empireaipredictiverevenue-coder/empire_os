@@ -28,7 +28,8 @@ def root(tmp_path:Path) -> Path:
 
 
 def test_fixed_sources_licences():
-    assert set(m.SOURCES)=={"ROI_GZT","NI_HED_SCHEDULED"}
+    assert set(m.SOURCES)=={"ROI_GZT","ROI_PLANNING_SITES","NI_HED_SCHEDULED"}
+    assert m.SOURCES["ROI_PLANNING_SITES"]["licence"]=="CC-BY-4.0"
     assert m.SOURCES["ROI_GZT"]["licence"]=="CC-BY-4.0"
     assert m.SOURCES["NI_HED_SCHEDULED"]["licence"]=="UK-OGL-v3"
     assert all(x["catalogue"].startswith("https://") for x in m.SOURCES.values())
@@ -50,14 +51,15 @@ def test_sample_not_full_cover(root,monkeypatch):
         ],"properties":{"exceededTransferLimit":True}},"a"*64
     monkeypatch.setattr(m,"_fetch_json",fetch)
     result=m.snapshot_official_layers(root,now=NOW)
-    assert result["status"]=="TWO_OFFICIAL_GIS_LAYER_SAMPLES_OBSERVED_REVIEW_ONLY"
-    assert result["layer_count"]==2
+    assert result["status"]=="THREE_OFFICIAL_GIS_LAYER_SAMPLES_OBSERVED_REVIEW_ONLY"
+    assert result["layer_count"]==3
     assert result["site_intersections_performed"] is False
     assert result["bid_authorized"] is False
     assert result["db_writes"] is False
     assert all(x["source_truncated"] is True for x in result["layers"])
     assert requested[0][1]["where"]=="LA_NAME = 'Louth' AND CURRENT_PLAN = 1"
-    assert requested[1][1]["where"]=="COUNTY = 'DOW'"
+    assert requested[1][1]["where"]=="PlanningAuthority = 'Louth County Council'"
+    assert requested[2][1]["where"]=="COUNTY = 'DOW'"
     path=root/m.BASE/m.SAMPLE_OUTPUT
     assert stat.S_IMODE(path.stat().st_mode)==0o600
     persisted=json.loads(path.read_text())
@@ -84,14 +86,44 @@ def test_roi_polygon_intersection_is_not_legal_clearance(root,monkeypatch):
     r=m.screen_unverified_parcel_geometry(root,reference="LOUTH-SYNTH-TEST",
         jurisdiction="ROI",geometry=ROI,geometry_source="SYNTHETIC UNIT TEST ONLY",now=NOW)
     assert r["status"]=="GIS_INTERSECTION_RESULT_NOT_LAND_OR_PLANNING_CLEARANCE"
-    assert len(r["intersections"])==1
+    assert len(r["intersections"])==2
+    assert {x["source_id"] for x in r["intersections"]}=={"ROI_GZT","ROI_PLANNING_SITES"}
+    assert r["sources_observed_successfully"]==2
     assert r["parcel_boundary_legally_verified"] is False
     assert r["title_is_not_inferred_from_geometry"] is True
     assert r["land_currently_available_verified"] is False
     assert r["bid_authorized"] is False
     assert called[0]["spatialRel"]=="esriSpatialRelIntersects"
     assert called[0]["where"]=="LA_NAME = 'Louth' AND CURRENT_PLAN = 1"
+    assert called[1]["where"]=="PlanningAuthority = 'Louth County Council'"
     assert stat.S_IMODE((root/m.BASE/m.SCREEN_OUTPUT).stat().st_mode)==0o600
+
+
+def test_partial_roi_source_failure_cannot_be_reported_as_clear(root,monkeypatch):
+    def half_fail(url,params):
+        if "IrishPlanningApplications" in url:
+            raise ValueError("GIS_NETWORK_OR_TRANSPORT_ERROR")
+        return {"type":"FeatureCollection","features":[],"properties":{"exceededTransferLimit":False}},"c"*64
+    monkeypatch.setattr(m,"_fetch_json",half_fail)
+    r=m.screen_unverified_parcel_geometry(
+        root,reference="LOUTH-SYNTH-FAIL",
+        jurisdiction="ROI",geometry=ROI,
+        geometry_source="SYNTHETIC NEGATIVE CONTROL ONLY",now=NOW
+    )
+    assert r["status"]=="PARTIAL_GIS_SOURCES_UNAVAILABLE_DO_NOT_INFER_CLEARANCE"
+    assert r["sources_observed_successfully"]==1
+    assert r["intersections"]==[]
+    assert r["a_zero_hit_result_is_not_planning_clearance"] is True
+    assert r["bid_authorized"] is False
+
+
+def test_roi_planning_source_minimises_personal_data():
+    source=m.SOURCES["ROI_PLANNING_SITES"]
+    assert source["fixed_where"]=="PlanningAuthority = 'Louth County Council'"
+    assert "ApplicationNumber" in source["fields"]
+    assert "Applicant" not in source["fields"]
+    assert "DevelopmentAddress" not in source["fields"]
+    assert "DevelopmentDescription" not in source["fields"]
 
 
 def test_ni_source_holds_on_service_error(root,monkeypatch):
