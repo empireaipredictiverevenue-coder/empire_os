@@ -113,17 +113,50 @@ def _actual_fixture_login() -> psycopg.Connection:
     return writer
 
 
+def _actual_fixture_identity_reader()->psycopg.Connection:
+    """SCRAM authenticated independent read-only, synthetic one-tenant scope.
+
+    Never inherits the writer, migrator, or fixture admin session. No production
+    Identity/consent authority is created by this test login.
+    """
+    port=os.environ.get("PGPORT","")
+    secret=os.environ.get("EMPIRE_FIXTURE_READER_PASSWORD","")
+    if (not port.isdigit() or int(port)<5433
+        or os.environ.get("PGDATABASE")!="empire_timer_fixture"
+        or os.environ.get("EMPIRE_SIGNED_GATEWAY_FIXTURE_CHECKED")!="ephemeral"
+        or len(secret)<32):
+        raise RuntimeError("REFUSED_UNAUTHORISED_FIXTURE_IDENTITY_READER")
+    conn=psycopg.connect(
+        host="127.0.0.1",port=int(port),dbname="empire_timer_fixture",
+        user="timer_fixture_identity_reader_login",password=secret,
+        connect_timeout=3,
+    )
+    row=conn.execute("""SELECT session_user,current_user,current_database(),
+        inet_server_port()""").fetchone()
+    current=[x.decode("ascii") if isinstance(x,bytes) else x for x in row]
+    if current!=["timer_fixture_identity_reader_login",
+                 "timer_fixture_identity_reader_login","empire_timer_fixture",int(port)]:
+        conn.close()
+        raise RuntimeError("REFUSED_UNEXPECTED_ACTUAL_FIXTURE_READER_IDENTITY")
+    rights=conn.execute("""SELECT
+       has_table_privilege(current_user,
+         'public.empire_prime_timer_provider_receipts','INSERT'),
+       has_table_privilege(current_user,
+         'public.empire_prime_timer_provider_receipts','UPDATE'),
+       has_function_privilege(current_user,
+         'public.empire_prime_timer_receipt_record_held(uuid,text,text,text,text,text,text,text,text,timestamptz)',
+         'EXECUTE')""").fetchone()
+    if tuple(rights)!=(False,False,False):
+        conn.close()
+        raise RuntimeError("REFUSED_FIXTURE_READER_WRITE_OR_EXECUTE_PRIVILEGE")
+    return conn
+
+
 def main()->int:
     with _safe_connection() as db:
         with db.cursor() as cur:
             # The fixture's synthetic authorization source, separate from
             # real EmpireDB or real original Identity/Privacy owners.
-            cur.execute("""CREATE TABLE fixture_authorised_device (
-                tenant_id uuid NOT NULL, timer_digest text NOT NULL,
-                actor_digest text NOT NULL, device_digest text NOT NULL,
-                consent_digest text NOT NULL, active boolean NOT NULL,
-                PRIMARY KEY (tenant_id,timer_digest)
-            )""")
             now=datetime.now(timezone.utc)
             created=now-timedelta(seconds=15)
             timer=dg("timer");claim=dg("claimed-event");source=dg("source")
@@ -156,30 +189,30 @@ def main()->int:
     provider_private=Ed25519PrivateKey.generate()
     consent_private=Ed25519PrivateKey.generate()
     def authority_reader_scope(tenant_id,timer_digest,device_digest,at):
-        with _safe_connection() as db:
+        with _actual_fixture_identity_reader() as db:
             row=db.execute("""SELECT 1 FROM fixture_authorised_device
                 WHERE tenant_id=%s AND timer_digest=%s AND device_digest=%s AND active""",
                 (tenant_id,timer_digest,device_digest)).fetchone()
             return row is not None
     def authority_reader_consent(tenant_id,actor_digest,device_digest,consent_digest,at):
-        with _safe_connection() as db:
+        with _actual_fixture_identity_reader() as db:
             return db.execute("""SELECT 1 FROM fixture_authorised_device
                 WHERE tenant_id=%s AND actor_digest=%s AND device_digest=%s
                   AND consent_digest=%s AND active""",
                 (tenant_id,actor_digest,device_digest,consent_digest)).fetchone() is not None
     def authority_reader_claim(tenant_id,timer_digest,claim_digest,at):
-        with _safe_connection() as db:
+        with _actual_fixture_identity_reader() as db:
             return db.execute("""SELECT 1 FROM public.empire_prime_voice_timer_events
                 WHERE tenant_id=%s AND timer_digest=%s AND seq=2
                   AND event_kind='DISPATCH_CLAIMED' AND event_digest=%s""",
                 (tenant_id,timer_digest,claim_digest)).fetchone() is not None
     def authority_reader_nonce(provider_code,nonce_digest,at):
-        with _safe_connection() as db:
+        with _actual_fixture_identity_reader() as db:
             return db.execute("""SELECT 1 FROM public.empire_prime_timer_provider_receipts
                 WHERE provider_code=%s AND callback_nonce_digest=%s""",
                 (provider_code,nonce_digest)).fetchone() is None
     def authority_reader_prior(tenant_id,timer_digest,reference_digest,at):
-        with _safe_connection() as db:
+        with _actual_fixture_identity_reader() as db:
             return db.execute("""SELECT 1 FROM public.empire_prime_timer_provider_receipts
                 WHERE tenant_id=%s AND timer_digest=%s AND callback_seq=1
                   AND callback_stage='ACCEPTED' AND delivery_reference_digest=%s""",
@@ -246,17 +279,19 @@ def main()->int:
         # never accept a separate caller-supplied record after verification.
         payload=envelope["payload"]
         owner_payload=owner["payload"]
-        with _safe_connection() as db:
-            # The disposable fixture has a local test-only consent table.
+        with _actual_fixture_identity_reader() as db:
+            # This separate SCRAM login can read only its tenant's bounded
+            # original timer metadata and synthetic consent fields via RLS.
             # Recheck and lock the CURRENT row in this same transaction,
             # closing the window between a preflight lookup and the INSERT.
-            consent_row=db.execute("""SELECT 1 FROM fixture_authorised_device
-                WHERE tenant_id=%s AND timer_digest=%s AND actor_digest=%s
-                  AND device_digest=%s AND consent_digest=%s AND active
-                FOR SHARE""",(TENANT,payload["timer_digest"],
+            # No SELECT FOR SHARE directly: that requires excessive table
+            # privilege. Narrow fixture-only definer checks session_user,
+            # tenant and active consent before locking its fake consent row.
+            consent_row=db.execute("""SELECT public.fixture_lock_current_test_consent(
+                %s,%s,%s,%s,%s)""",(TENANT,payload["timer_digest"],
                 owner_payload["actor_digest"],payload["device_digest"],
                 owner_payload["consent_evidence_digest"])).fetchone()
-            if consent_row is None:
+            if consent_row is None or consent_row[0] is not True:
                 raise NotificationGatewayHold(
                     "SYNTHETIC_IN_TRANSACTION_CONSENT_REVOKED"
                 )

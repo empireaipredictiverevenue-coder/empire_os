@@ -33,6 +33,7 @@ done
 # The password exists only in this disposable shell process and the ephemeral
 # PG cluster; it is never echoed, committed or passed to provider services.
 export EMPIRE_FIXTURE_LOGIN_PASSWORD="$(python3 -c 'import secrets;print(secrets.token_urlsafe(36))')"
+export EMPIRE_FIXTURE_READER_PASSWORD="$(python3 -c 'import secrets;print(secrets.token_urlsafe(36))')"
 # The temporary secret is sent via SQL stdin, never embedded in psql's
 # process command-line arguments or printed to output.
 psql -X -q -v ON_ERROR_STOP=1 -d empire_timer_fixture <<FIXTURE_SQL
@@ -41,6 +42,65 @@ CREATE ROLE timer_fixture_gateway_login LOGIN PASSWORD '$EMPIRE_FIXTURE_LOGIN_PA
 GRANT CONNECT ON DATABASE empire_timer_fixture TO timer_fixture_gateway_login;
 GRANT USAGE ON SCHEMA public TO timer_fixture_gateway_login;
 GRANT EXECUTE ON FUNCTION public.empire_prime_timer_receipt_record_held(uuid,text,text,text,text,text,text,text,text,timestamptz) TO timer_fixture_gateway_login;
+-- A distinct, non-writer, tenant-scoped read identity (disposable only).
+CREATE ROLE timer_fixture_identity_reader_login LOGIN PASSWORD '$EMPIRE_FIXTURE_READER_PASSWORD'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT NOBYPASSRLS;
+GRANT CONNECT ON DATABASE empire_timer_fixture TO timer_fixture_identity_reader_login;
+GRANT USAGE ON SCHEMA public TO timer_fixture_identity_reader_login;
+-- Column-select permissions strictly limited to fixture consent + lookup.
+GRANT SELECT (tenant_id,timer_digest,source_attestation_digest)
+  ON public.empire_prime_voice_timer_requests TO timer_fixture_identity_reader_login;
+GRANT SELECT (tenant_id,timer_digest,seq,event_kind,event_digest)
+  ON public.empire_prime_voice_timer_events TO timer_fixture_identity_reader_login;
+GRANT SELECT (tenant_id,timer_digest,provider_code,callback_nonce_digest,
+  callback_seq,callback_stage,delivery_reference_digest)
+  ON public.empire_prime_timer_provider_receipts TO timer_fixture_identity_reader_login;
+CREATE POLICY timer_fixture_reader_request_held ON public.empire_prime_voice_timer_requests
+  FOR SELECT TO timer_fixture_identity_reader_login
+  USING (tenant_id='123e4567-e89b-42d3-a456-426614174000'::uuid);
+CREATE POLICY timer_fixture_reader_event_held ON public.empire_prime_voice_timer_events
+  FOR SELECT TO timer_fixture_identity_reader_login
+  USING (tenant_id='123e4567-e89b-42d3-a456-426614174000'::uuid);
+CREATE POLICY timer_fixture_reader_receipt_held ON public.empire_prime_timer_provider_receipts
+  FOR SELECT TO timer_fixture_identity_reader_login
+  USING (tenant_id='123e4567-e89b-42d3-a456-426614174000'::uuid);
+CREATE TABLE public.fixture_authorised_device (
+  tenant_id uuid NOT NULL,timer_digest text NOT NULL,actor_digest text NOT NULL,
+  device_digest text NOT NULL,consent_digest text NOT NULL,active boolean NOT NULL,
+  PRIMARY KEY (tenant_id,timer_digest));
+ALTER TABLE public.fixture_authorised_device ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.fixture_authorised_device FORCE ROW LEVEL SECURITY;
+CREATE POLICY timer_fixture_reader_consent_held ON public.fixture_authorised_device
+  FOR SELECT TO timer_fixture_identity_reader_login
+  USING (tenant_id='123e4567-e89b-42d3-a456-426614174000'::uuid);
+GRANT SELECT (tenant_id,timer_digest,actor_digest,device_digest,consent_digest,active)
+  ON public.fixture_authorised_device TO timer_fixture_identity_reader_login;
+-- Disposable ONLY: the reader has NO UPDATE privilege. This narrowly
+-- scoped fixture authority locks the active consent row under its owner,
+-- for the CURRENT authenticated login and ONE fictional fixed tenant.
+-- It cannot become production Identity authority and has no write path.
+CREATE FUNCTION public.fixture_lock_current_test_consent(
+  p_tenant uuid,p_timer text,p_actor text,p_device text,p_consent text
+) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER
+SET search_path='' SET row_security=on
+AS \$fixture_consent_lock\$
+DECLARE v_found boolean;
+BEGIN
+  IF session_user<>'timer_fixture_identity_reader_login' OR
+     p_tenant IS DISTINCT FROM '123e4567-e89b-42d3-a456-426614174000'::uuid THEN
+    RETURN false;
+  END IF;
+  SELECT TRUE INTO v_found FROM public.fixture_authorised_device a
+  WHERE a.tenant_id=p_tenant AND a.timer_digest=p_timer
+    AND a.actor_digest=p_actor AND a.device_digest=p_device
+    AND a.consent_digest=p_consent AND a.active IS TRUE
+  FOR SHARE;
+  RETURN COALESCE(v_found,false);
+END;
+\$fixture_consent_lock\$;
+REVOKE ALL ON FUNCTION public.fixture_lock_current_test_consent(uuid,text,text,text,text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fixture_lock_current_test_consent(uuid,text,text,text,text)
+  TO timer_fixture_identity_reader_login;
 FIXTURE_SQL
 # This exact SCRAM authentication rule is inserted only into temporary PG18.
 # It must appear before pg_virtualenv's broad fixture trust rules.
@@ -56,7 +116,11 @@ s=p.read_text()
 rule=('host empire_timer_fixture timer_fixture_gateway_login 127.0.0.1/32 scram-sha-256\n'
       'host all timer_fixture_gateway_login 127.0.0.1/32 reject\n'
       'host all timer_fixture_gateway_login ::1/128 reject\n'
-      'local all timer_fixture_gateway_login reject\n')
+      'local all timer_fixture_gateway_login reject\n'
+      'host empire_timer_fixture timer_fixture_identity_reader_login 127.0.0.1/32 scram-sha-256\n'
+      'host all timer_fixture_identity_reader_login 127.0.0.1/32 reject\n'
+      'host all timer_fixture_identity_reader_login ::1/128 reject\n'
+      'local all timer_fixture_identity_reader_login reject\n')
 assert rule not in s
 p.write_text(rule+s)
 PYPGHBA
@@ -99,6 +163,24 @@ if PGPASSWORD="$EMPIRE_FIXTURE_LOGIN_PASSWORD" psql -X -w \
   echo 'SCRAM_CROSS_DATABASE_ACCESS_WRONGLY_ACCEPTED'; exit 6
 fi
 echo SCRAM_OTHER_DATABASES_REJECTED=true
+# Reader must authenticate with its own distinct secret and role, never writer's.
+if PGPASSWORD="$EMPIRE_FIXTURE_LOGIN_PASSWORD" psql -X -w -h 127.0.0.1 \
+  -p "$PGPORT" -U timer_fixture_identity_reader_login -d empire_timer_fixture \
+  -Atq -c 'SELECT 1' >/dev/null 2>&1; then
+  echo 'WRITER_PASSWORD_IMPERSONATED_READER'; exit 6
+fi
+PGPASSWORD="$EMPIRE_FIXTURE_READER_PASSWORD" psql -X -w -h 127.0.0.1 \
+  -p "$PGPORT" -U timer_fixture_identity_reader_login -d empire_timer_fixture \
+  -Atq -v ON_ERROR_STOP=1 -c 'SELECT session_user,current_user' \
+  | grep -Fxq 'timer_fixture_identity_reader_login|timer_fixture_identity_reader_login' || {
+    echo 'INDEPENDENT_READER_SCRAM_LOGIN_HOLD'; exit 6
+  }
+if PGPASSWORD="$EMPIRE_FIXTURE_READER_PASSWORD" psql -X -w -h 127.0.0.1 \
+  -p "$PGPORT" -U timer_fixture_identity_reader_login -d postgres \
+  -Atq -c 'SELECT 1' >/dev/null 2>&1; then
+  echo 'READER_CROSS_DATABASE_ACCESS_WRONGLY_ACCEPTED'; exit 6
+fi
+echo INDEPENDENT_SCRAM_TENANT_SCOPED_READER_AUTHENTICATED=true
 echo EPHEMERAL_SCRAM_LOGIN_AUTHENTICATED=true
 # Prove the fixture role has only the one specific function, no direct table access.
 psql -X -Atq -v ON_ERROR_STOP=1 -d empire_timer_fixture -c "
@@ -123,6 +205,72 @@ fi
 grep -Fq 'permission denied for table empire_prime_timer_provider_receipts'   /tmp/empire_timer_060_denied_$$.log || { cat /tmp/empire_timer_060_denied_$$.log; exit 6; }
 rm -f /tmp/empire_timer_060_denied_$$.log
 echo 'SCRAM_LOGIN_DIRECT_TABLE_SELECT_DENIED=true'
+# Add an entirely fictional second tenant. Original RLS must conceal it
+# from the independent reader even though the login has SELECT on columns.
+psql -X -q -v ON_ERROR_STOP=1 -d empire_timer_fixture <<'ISOLATION_FIXTURE_SQL'
+INSERT INTO public.empire_prime_voice_timer_requests(
+ tenant_id,timer_digest,actor_digest,source_attestation_digest,
+ consent_evidence_digest,policy_revision,duration_seconds,created_at,due_at)
+VALUES ('123e4567-e89b-42d3-a456-426614174001',
+        repeat('b',64),repeat('a',64),repeat('c',64),repeat('d',64),
+        'pilot.v1',3,'2026-10-24 14:00:00+00','2026-10-24 14:00:03+00');
+INSERT INTO public.fixture_authorised_device(
+ tenant_id,timer_digest,actor_digest,device_digest,consent_digest,active)
+VALUES ('123e4567-e89b-42d3-a456-426614174001',
+        repeat('b',64),repeat('a',64),repeat('e',64),repeat('f',64),true);
+INSERT INTO public.empire_prime_voice_timer_events(
+ tenant_id,timer_digest,seq,event_digest,event_kind,occurred_at,source_attestation_digest)
+VALUES ('123e4567-e89b-42d3-a456-426614174001',repeat('b',64),1,
+        repeat('e',64),'TIMER_CREATED','2026-10-24 14:00:00+00',repeat('c',64));
+SELECT seq FROM public.empire_prime_voice_timer_transition_held(
+ '123e4567-e89b-42d3-a456-426614174001',repeat('b',64),
+ 'DISPATCH_CLAIMED',repeat('d',64),repeat('c',64));
+INSERT INTO public.empire_prime_timer_provider_receipts(
+ tenant_id,timer_digest,provider_code,callback_nonce_digest,receipt_digest,
+ claim_event_digest,delivery_reference_digest,source_attestation_digest,
+ callback_stage,callback_seq,provider_reported_at)
+VALUES ('123e4567-e89b-42d3-a456-426614174001',repeat('b',64),
+ 'synthetic_local_receipt_fixture',repeat('5',64),repeat('6',64),
+ repeat('d',64),repeat('7',64),repeat('c',64),
+ 'ACCEPTED',1,clock_timestamp());
+ISOLATION_FIXTURE_SQL
+reader_psql(){
+ PGPASSWORD="$EMPIRE_FIXTURE_READER_PASSWORD" psql -X -w -h 127.0.0.1 \
+   -p "$PGPORT" -U timer_fixture_identity_reader_login \
+   -d empire_timer_fixture -Atq -v ON_ERROR_STOP=1 -c "$1"
+}
+reader_psql "SELECT count(tenant_id) FROM public.empire_prime_voice_timer_requests
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174001'" \
+  | grep -Fxq 0 || { echo READER_RLS_CROSS_TENANT_REQUEST_LEAK; exit 6; }
+reader_psql "SELECT count(tenant_id) FROM public.fixture_authorised_device
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174001'" \
+  | grep -Fxq 0 || { echo READER_RLS_CROSS_TENANT_CONSENT_LEAK; exit 6; }
+reader_psql "SELECT count(tenant_id) FROM public.empire_prime_voice_timer_events
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174001'" \
+  | grep -Fxq 0 || { echo READER_RLS_CROSS_TENANT_CLAIM_LEAK; exit 6; }
+reader_psql "SELECT count(tenant_id) FROM public.empire_prime_timer_provider_receipts
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174001'" \
+  | grep -Fxq 0 || { echo READER_RLS_CROSS_TENANT_RECEIPT_LEAK; exit 6; }
+reader_psql "SELECT count(tenant_id) FROM public.empire_prime_timer_provider_receipts
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174000'" \
+  | grep -Fxq 2 || { echo READER_RLS_OWN_RECEIPT_READ_FAILED; exit 6; }
+reader_psql "SELECT count(tenant_id) FROM public.empire_prime_voice_timer_requests
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174000'" \
+  | grep -Fxq 1 || { echo READER_RLS_OWN_TENANT_READ_FAILED; exit 6; }
+reader_psql "SELECT public.fixture_lock_current_test_consent(
+ '123e4567-e89b-42d3-a456-426614174001',repeat('b',64),repeat('a',64),
+ repeat('e',64),repeat('f',64))" \
+  | grep -Fxq f || { echo READER_LOCK_CROSSTENANT_AUTHORITY_LEAK; exit 6; }
+# The separate reader does not get INSERT/UPDATE/DELETE or the 060 writer.
+if reader_psql "UPDATE public.fixture_authorised_device SET active=false
+ WHERE tenant_id='123e4567-e89b-42d3-a456-426614174000'" \
+  >/dev/null 2>&1; then echo READER_CONSENT_UPDATE_WRONGLY_ACCEPTED; exit 6; fi
+if reader_psql "SELECT public.empire_prime_timer_receipt_record_held(
+ '123e4567-e89b-42d3-a456-426614174000', repeat('a',64),
+ 'synthetic_local_receipt_fixture', repeat('2',64),repeat('3',64),
+ repeat('4',64),repeat('5',64),repeat('6',64),'ACCEPTED',clock_timestamp())" \
+  >/dev/null 2>&1; then echo READER_WRITER_EXECUTE_WRONGLY_ACCEPTED; exit 6; fi
+echo INDEPENDENT_READER_TENANT_RLS_AND_NO_WRITES=PASS
 # Concurrency test: two independent sessions use only the restricted
 # function for the SAME timer. One claim wins; one loses after row lock.
 t='123e4567-e89b-42d3-a456-426614174000'

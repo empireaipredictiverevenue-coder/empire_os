@@ -50,7 +50,9 @@ def test_bridge_uses_only_verified_signed_payload_and_locks_fixture_consent():
     text=PYTHON.read_text()
     assert 'payload=envelope["payload"]' in text
     assert 'owner_payload=owner["payload"]' in text
-    assert "FOR SHARE" in text
+    assert "fixture_lock_current_test_consent" in text
+    assert "_actual_fixture_identity_reader()" in text
+    assert "FOR SHARE" in SHELL.read_text()
     assert "SYNTHETIC_IN_TRANSACTION_CONSENT_REVOKED" in text
     assert "REFUSED_NON_TEMPORARY_SIGNED_GATEWAY_DB_CLUSTER" in text
     assert "source_attestation_digest" in text
@@ -101,5 +103,33 @@ def test_real_pg060_restricted_writer_records_verified_fictional_callbacks_only_
     assert "SCRAM_OTHER_DATABASES_REJECTED=true" in run.stdout
     assert "REAL_SCRAM_LOGIN_NO_TABLE_PERMISSIONS=true" in run.stdout
     assert "SCRAM_LOGIN_DIRECT_TABLE_SELECT_DENIED=true" in run.stdout
+    assert "INDEPENDENT_SCRAM_TENANT_SCOPED_READER_AUTHENTICATED=true" in run.stdout
+    assert "INDEPENDENT_READER_TENANT_RLS_AND_NO_WRITES=PASS" in run.stdout
     assert "SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true" in run.stdout
     assert "Dropping cluster 18/regress" in run.stdout+run.stderr
+
+
+def test_reader_is_separate_from_writer_and_cannot_obtain_table_mutation_rights():
+    source=PYTHON.read_text()
+    fixture=SHELL.read_text()
+    assert 'user="timer_fixture_identity_reader_login"' in source
+    assert 'user="timer_fixture_gateway_login"' in source
+    assert 'password=secret' in source
+    assert 'REFUSED_FIXTURE_READER_WRITE_OR_EXECUTE_PRIVILEGE' in source
+    assert 'fixture_lock_current_test_consent' in source
+    assert 'timer_fixture_reader_request_held' in fixture
+    assert 'timer_fixture_reader_event_held' in fixture
+    assert 'timer_fixture_reader_receipt_held' in fixture
+    assert 'timer_fixture_reader_consent_held' in fixture
+    assert 'CREATE ROLE timer_fixture_identity_reader_login LOGIN PASSWORD' in fixture
+    assert 'NOINHERIT NOBYPASSRLS' in fixture
+    assert 'READER_RLS_CROSS_TENANT_REQUEST_LEAK' in fixture
+    assert 'READER_RLS_CROSS_TENANT_CONSENT_LEAK' in fixture
+    assert 'READER_RLS_CROSS_TENANT_CLAIM_LEAK' in fixture
+    assert 'READER_RLS_CROSS_TENANT_RECEIPT_LEAK' in fixture
+    assert 'READER_RLS_OWN_RECEIPT_READ_FAILED' in fixture
+    assert 'READER_CONSENT_UPDATE_WRONGLY_ACCEPTED' in fixture
+    assert 'READER_WRITER_EXECUTE_WRONGLY_ACCEPTED' in fixture
+    assert 'READER_LOCK_CROSSTENANT_AUTHORITY_LEAK' in fixture
+    assert 'INDEPENDENT_READER_TENANT_RLS_AND_NO_WRITES=PASS' in fixture
+    assert 'REVOKE ALL ON FUNCTION public.fixture_lock_current_test_consent' in fixture
