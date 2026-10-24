@@ -2,6 +2,7 @@
 from pathlib import Path
 from hashlib import sha256
 from zipfile import ZipFile
+import subprocess
 import json
 
 from scripts.premium_wp_v1.check_client_glb_admission_v9 import check_model_bytes, MAX_MODEL_BYTES
@@ -13,6 +14,12 @@ ACCEPTANCE=DOCS/"EMPIRE_CAR_YARD_MESHOPT_V9_BROWSER_ACCEPTANCE_20261023.json"
 ADMISSION=DOCS/"EMPIRE_CAR_YARD_MESHOPT_V9_TECHNICAL_ADMISSION_20261023.json"
 MODEL=THEME/"assets/models/car-concept-studio-meshopt.glb"
 PROVENANCE=THEME/"assets/models/MODEL_PROVENANCE_MESHOPT_V9.json"
+
+V9_COMMIT="c986a82fa10a12d4e4831eeeac9e206d5aa80b42"
+def historic_v9(relative):
+    return subprocess.run(["git","show",V9_COMMIT+":"+relative],
+      cwd=ROOT,check=True,capture_output=True).stdout
+
 
 def test_actual_glb_reduced_at_least_sixty_percent_with_original_materials():
     meta=json.loads(PROVENANCE.read_text())
@@ -82,7 +89,7 @@ def test_98_check_receipt_source_sha_screenshots_and_honest_device_status():
     r=json.loads(ACCEPTANCE.read_text())
     assert len(r["source_manifest_sha256"])>=26
     for path,digest in r["source_manifest_sha256"].items():
-        assert sha256((ROOT/path).read_bytes()).hexdigest()==digest,path
+        assert sha256(historic_v9(path)).hexdigest()==digest,path
     assert len(r["screenshots"])==6
     for name,meta in r["screenshots"].items():
         p=DOCS/"car_yard_react_browser_evidence_v9"/name

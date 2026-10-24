@@ -3,6 +3,20 @@
 declare(strict_types=1);
 if (!defined('ABSPATH')) { exit; }
 
+/**
+ * The React homepage supplies an equivalent, keyboard-visible skip link in
+ * its header landmark. Avoid a second WordPress block-template skip link
+ * rendered outside that landmark on this page alone. Interior WordPress
+ * templates retain WordPress's standard accessible skip-link behavior.
+ */
+add_action('wp', static function (): void {
+    if (is_front_page()) {
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_block_template_skip_link');
+        remove_action('wp_footer', 'the_block_template_skip_link');
+    }
+});
+
+
 function empire_yard_brand_defaults(): array {
     return [
         'name' => 'Atelier Motors',
