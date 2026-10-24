@@ -22,6 +22,7 @@ from empire_os.predictive_revenue_prime import (
 )
 from empire_os.predictive_revenue_prime_crm import review_authenticated_crm_prospects
 from empire_os.predictive_cloud_official_source_bridge import review_official_source_for_prime
+from empire_os.prime_original_outcome_calibration import review_prime_outcome_calibration
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
@@ -307,6 +308,7 @@ def build_predictive_revenue_brain_review(
     simulation_seed: int = 101,
     authenticated_crm_repository: PostgresRevenueCrmRepository | None = None,
     official_nws_source_review: Mapping[str, Any] | None = None,
+    original_owner_calibration_rows: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose existing evidence without inventing forecasts, agents or authority.
 
@@ -317,6 +319,10 @@ def build_predictive_revenue_brain_review(
     now = _stamp(as_of)
     official_source = review_official_source_for_prime(
         nws_review=official_nws_source_review, as_of=now,
+    )
+    original_outcome_calibration = review_prime_outcome_calibration(
+        owner_outcome_rows=original_owner_calibration_rows,
+        tenant_id=tenant, as_of=now,
     )
     storms = _storm_signals(storm_snapshot, tenant_id=tenant, now=now)
     permits = _permit_signals(permit_integration, tenant_id=tenant, now=now)
@@ -352,6 +358,7 @@ def build_predictive_revenue_brain_review(
         "storm_research": storms,
         "permit_research": permits,
         "official_source_observatory": official_source,
+        "original_outcome_calibration_shadow": original_outcome_calibration,
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {
@@ -370,6 +377,7 @@ def build_predictive_revenue_brain_review(
         "prime_scenarios": scenario,
         "prime_churn_review": retention,
         "prime_scenarios_are_hypotheses_only": True,
+        "prime_calibration_never_promotes_model_weights": True,
         "prime_interventions_executed": False,
         "opportunity_count": len(storms) + len(permits),
         "official_source_records_are_not_opportunities": True,
