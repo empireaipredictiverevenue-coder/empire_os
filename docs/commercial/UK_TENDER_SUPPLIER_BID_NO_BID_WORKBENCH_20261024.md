@@ -43,3 +43,16 @@ The included `hypothetical_margin()` is a pure, tested internal cash contributio
 - No emails, bids, CRM writes, payment activation, automation or governor activation.
 - Existing outbound governor remains inactive.
 - Next action for the original tender owner: independently review the 26 Oct GDPR tender’s actual attachments and supplier specifications first; if specialist capabilities and evidence cannot be assembled before the closing deadline, mark NO-BID instead of inventing qualifications.
+
+## Latest official issuer-document inventory — 24 October 2026
+The existing original official Contracts Finder OCDS GET pipeline was re-queried. Its Cabinet Office bulk release packages directly expose the latest Ryde Town Council GDPR amendment (21 October) and original 7 October release, plus the Dublin–Belfast Investment Land Guide 14 October notice. This is the source metadata of the official issuer and cannot substitute for the contents of a PDF, DOCX or locked supplier portal.
+
+A separate per-notice OCDS record endpoint responded HTTP 404 and original document attachment GETs returned HTTP 403 from the authorised public check. The owner MUST NOT bypass those restrictions, claim attachment inspection or act as an eligible supplier based on inferred conditions.
+
+The new `scripts/review_official_tender_issuer_documents_20261024.py` runs in read-only research mode with the existing bounded official OCDS source and latest 24-hour original private deadline triage. It retrieves only public release metadata, does NOT download individual attachment files, and records their exact issuer URLs, types, dates/versions and mandatory missing-document flags.
+
+Live receipt: `ORIGINAL_ISSUER_DOCUMENT_REFERENCES_OBSERVED_NOT_VERIFIED`, 2 original notices, 9 current document references, 1 amendment record observed. Ryde's 8 current references comprise 1 tender notice, 3 bidding-document references, 2 clarification references, and 2 technical specification references (sample output and staff structure). The corridor land guide has only its notice URL in the official release and refers suppliers to the MultiQuote portal for the competition documents. Any price ceiling, estimated contract value, exact delivery requirement, accreditation or expected costs remain UNVERIFIED by this document-inventory check.
+
+The private mode-0600 manifest is `runtime/acquisition_research/official_tender_issuer_document_index_latest.json` in original mode-0700 research folder. No new timers, attachments copied, third-party logins, customer records, bid submissions or financial actions.
+
+Next original procurement owner step: obtain legitimate access to each issuer document through normal supplier channels, review contents and clarification changes, then establish qualification, legal obligations, delivery cost and final date. Without that evidence by the closing deadline, label NO-BID.
