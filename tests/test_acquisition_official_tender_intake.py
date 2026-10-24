@@ -125,3 +125,44 @@ def test_manual_read_only_owner_review_without_writes(tmp_path):
     assert report.exists()
     assert report.stat().st_mode & 0o777 == 0o600
     assert len(request_urls)==2
+
+
+
+def test_official_land_guide_advert_estimate_and_sme_flag_not_bid_authority():
+    from copy import deepcopy
+    notice=example_notice(
+        title="CA18567 - RFQ 2026/43 - Development of a Dublin Belfast Economic Corridor Investment Land Guide",
+        deadline="2026-10-30T12:00:00Z",
+    )
+    notice["tender"]["value"]={"amount":25000,"currency":"GBP"}
+    notice["tender"]["suitability"]={"sme":True}
+    notice["tender"]["contractPeriod"]={
+        "startDate":"2026-11-30T00:00:00Z",
+        "endDate":"2027-03-31T23:59:59+01:00",
+    }
+    result=review_official_releases(source="contracts_finder",
+        package=pack(notice),catalog=CATA,now=NOW)
+    original=result["records"][0]
+    assert original["published_estimated_value_gbp"]=="25000.00"
+    assert original["published_value_source"]=="OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING"
+    assert original["published_sme_suitable"] is True
+    assert original["published_contract_start_at"]=="2026-11-30T00:00:00+00:00"
+    assert original["published_contract_end_at"]=="2027-03-31T22:59:59+00:00"
+    assert original["candidate_product_code"] is None
+    assert original["bid_eligibility_verified"] is False
+    assert result["outbound_authorized"] is False
+
+
+@pytest.mark.parametrize("amount,currency",[
+    (True,"GBP"), ("NaN","GBP"), ("Infinity","GBP"),
+    ("-12","GBP"), ("12.345","GBP"), (25000,"USD"),
+    (None,"GBP"), ("bad","GBP"),
+])
+def test_bad_or_non_gbp_original_tender_values_never_count_as_estimates(amount,currency):
+    notice=example_notice(title="GDPR Data Audit")
+    notice["tender"]["value"]={"amount":amount,"currency":currency}
+    result=review_official_releases(source="contracts_finder",
+        package=pack(notice),catalog=CATA,now=NOW)
+    assert result["records"][0]["published_estimated_value_gbp"] is None
+    assert result["records"][0]["bid_eligibility_verified"] is False
+    assert result["outbound_authorized"] is False

@@ -88,3 +88,20 @@ The former Contracts Finder attachment endpoint returned HTTP 403, but Ryde Town
 **Decision until owner's evidence:** `HOLD_SUPPLIER_COMPETENCE_AND_DELIVERY_SCOPE` (not supplier eligible). No named data-protection auditor qualification, comparable public-sector audit experience, £5m certificates, ICO registration, independent audit status, legal contractual capacity, onsite availability or contract cost basis has been independently proven *for Empire AI*. Any absent mandatory item means NO-BID unless demonstrably remedied before the actual issuer-confirmed submission deadline. A speculative intermediary partnership or guessed subcontractor does not establish compliance. Ryde is unsuitable for an unsupervised software-only delivery.
 
 **Revenue discipline:** Tender research, a completed pricing template, an optional quote draft and an authority's published payment schedule are none of: accepted offer, signed contract, performed deliverable, invoice settled or recognised revenue. Continue the same original EmpireOS and one EmpireDB.
+
+## 24 October — Land Guide original source commercial evidence / existing bid workbench
+An additional read-only recheck of the *original Cabinet Office Contracts Finder OCDS release* `ocds-b5fd17-4321ebe7-2ddb-47fa-81f9-fa095553b41b` confirmed the published tender metadata, independently of commercial tender aggregators:
+- Buyer: Newry, Mourne and Down District Council (NMD).
+- Buyer reference: CA18567 / RFQ 2026/43.
+- Advertised `tender.value.amount`: **25,000 GBP**. This is an official published *estimate*, not a binding contract price, accepted quote, actual margin or revenue.
+- Tender closes per OCDS release: 30 Oct 2026, 12:00 UTC.
+- Scheduled contract start 30 Nov 2026; scheduled end 31 Mar 2027.
+- Original OCDS `suitability.sme`: true. SME suitability is not proof of Empire AI's supplier credentials.
+- Competition instructions in notice direct suppliers to MultiQuote with reference `CA18567`. The full original RFQ documents still require legitimate portal access and review before any bid. Any 26 Oct clarification date stated on downstream procurement listing is not treated as verified by the original release because its public `enquiryPeriod` is absent.
+- Bid delivery scope / buyer scoring rubric, binding terms, actual delivery cost, licensed data rights and full supplier competency continue **NOT VERIFIED**. No external bid was sent.
+
+Rather than creating a new service, the original `empire_os/acquisition_official_tender_intake.py` now persists bounded, strictly type-checked `published_estimated_value_gbp`, `published_sme_suitable`, and the announced contract period from official OCDS releases only. The original deadline review and private bid/no-bid workbench carry these same fields but never convert them to `binding_contract_value_gbp`, `proposed_net_price_gbp`, `verified_delivery_cost_gbp`, `verified_profit_or_margin` or a qualified buyer. Non-GBP, invalid, negative, non-finite, unbounded and excessive-precision numbers are rejected. The current live research receipt reports `25000.00` GBP under `OFFICIAL_OCDS_ADVERT_ESTIMATE_NOT_A_QUOTE`, `published_sme_suitable=true`, all true commercial gating fields absent and bid submission false.
+
+The existing 21-day bounded government feed was refreshed on 24 Oct 2026 12:54:52 UTC: 278 OCDS releases, 6 current service notices matched the existing narrow scope, zero product hypotheses and zero independently bid-qualified Empire AI buyers. This is a limited research sample, NOT comprehensive UK public tender coverage. A separate broader title-only inspection of the same bounded pages did not identify an unambiguous independently qualified original Empire AI product tender; expanding keywords into unrelated supplier categories would create false demand signals.
+
+Prioritise genuine access to full Land Guide supplier documents, verify delivery capability and hard costs, then judge against the published £25,000 estimate. No quote, bid, registration, issuer contact or money movement is approved through this change. The original outbound governor remains disabled.

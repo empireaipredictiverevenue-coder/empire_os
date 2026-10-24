@@ -230,3 +230,44 @@ def test_invalid_ryde_primary_source_overlay_never_promotes_any_bid(tmp_path):
     assert result["bid_ready_count"]==0
     p.chmod(0o644)
     assert _join_original_ryde_issuer_proof(tmp_path,decide(triage(row)),now=NOW)["bid_ready_count"]==0
+
+
+
+def test_advertised_land_guide_estimate_preserved_but_no_actual_profit():
+    land=item(
+        title="CA18567 - RFQ 2026/43 - Development of a Dublin Belfast Economic Corridor Investment Land Guide",
+        ocid="ocds-b5fd17-4321ebe7-2ddb-47fa-81f9-fa095553b41b",
+        decision="HOLD_CUSTOM_SCOPE_OR_SUPPLIER_FIT",
+    )
+    land["official_notice_url"]="https://www.contractsfinder.service.gov.uk/Notice/cab39ee0-c192-4fb2-9253-472214e58ca7"
+    land["published_estimated_value_gbp"]="25000.00"
+    land["published_value_source"]="OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING"
+    land["published_sme_suitable"]=True
+    land["published_contract_start_at"]="2026-11-30T00:00:00+00:00"
+    land["published_contract_end_at"]="2027-03-31T22:59:59+00:00"
+    report=decide(triage(land))
+    assert report["status"]==STATUS_READY
+    row=report["founder_review_items"][0]
+    assert row["published_estimated_value_gbp"]=="25000.00"
+    assert row["published_sme_suitable"] is True
+    assert row["estimated_value_receipt_status"]=="OFFICIAL_OCDS_ADVERT_ESTIMATE_NOT_A_QUOTE"
+    assert row["binding_contract_value_gbp"] is None
+    assert row["proposed_net_price_gbp"] is None
+    assert row["verified_delivery_cost_gbp"] is None
+    assert row["verified_profit_or_margin"] is None
+    assert row["bid_submission_authorized"] is False
+    assert report["actual_bid_economics_verified_count"]==0
+    assert report["realised_revenue"] is None
+
+
+def test_tampered_estimate_cannot_become_approved_price_or_margin():
+    for value in ("NaN","Infinity","-100","25000.099","1000000001",True):
+        land=item()
+        land["published_estimated_value_gbp"]=value
+        land["published_value_source"]="OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING"
+        result=decide(triage(land))
+        row=result["founder_review_items"][0]
+        assert row["published_estimated_value_gbp"] is None
+        assert row["estimated_value_receipt_status"]=="NOT_VERIFIED"
+        assert row["binding_contract_value_gbp"] is None
+        assert row["bid_submission_authorized"] is False

@@ -174,6 +174,11 @@ def decide(triage: Mapping[str, Any]) -> dict[str, Any]:
             "capability_and_references": UNVERIFIED,
             "issuer_documents_checked": False,
             "binding_contract_value_gbp": None,
+            "published_estimated_value_gbp": None,
+            "estimated_value_receipt_status": "NOT_VERIFIED",
+            "published_sme_suitable": None,
+            "advertised_contract_period_start": None,
+            "advertised_contract_period_end": None,
             "proposed_net_price_gbp": None,
             "verified_delivery_cost_gbp": None,
             "verified_profit_or_margin": None,
@@ -184,6 +189,29 @@ def decide(triage: Mapping[str, Any]) -> dict[str, Any]:
             "outreach_authorized": False,
             "payment_authorized": False,
         }
+        v=notice.get("published_estimated_value_gbp")
+        claimed=notice.get("published_value_source")
+        if type(v) is str and claimed == "OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING":
+            try:
+                source_price=Decimal(v)
+                if (source_price.is_finite() and Decimal(0)<source_price<=Decimal("1000000000")
+                    and source_price.as_tuple().exponent >= -2):
+                    fields["published_estimated_value_gbp"]=str(source_price.quantize(Decimal("0.01")))
+                    fields["estimated_value_receipt_status"]="OFFICIAL_OCDS_ADVERT_ESTIMATE_NOT_A_QUOTE"
+            except (InvalidOperation,ValueError):
+                pass
+        if type(notice.get("published_sme_suitable")) is bool:
+            fields["published_sme_suitable"]=notice["published_sme_suitable"]
+        start=notice.get("published_contract_start_at")
+        end=notice.get("published_contract_end_at")
+        if isinstance(start,str) and isinstance(end,str):
+            try:
+                st=datetime.fromisoformat(start);en=datetime.fromisoformat(end)
+                if st.tzinfo and en.tzinfo and en>=st:
+                    fields["advertised_contract_period_start"]=st.isoformat()
+                    fields["advertised_contract_period_end"]=en.isoformat()
+            except ValueError:
+                pass
         entries.append(fields)
     entries.sort(key=lambda item: (item["tender_closes_at_utc"],item["ocid"]))
     return {

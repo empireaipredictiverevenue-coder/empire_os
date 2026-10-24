@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone, timedelta
+from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from pathlib import Path
 import json
@@ -69,6 +70,24 @@ def _url_for_notice(source: str, release: Mapping, tender: Mapping) -> str | Non
         if p.scheme=="https" and p.hostname=="www.contractsfinder.service.gov.uk" and CF_NOTICE.fullmatch(p.path.removeprefix("/Notice/")) and p.path.startswith("/Notice/"):
             return u
     return None
+
+
+def _public_gbp_estimate(tender: Mapping) -> str | None:
+    """OCDS advertised estimate, never a final price or expected revenue."""
+    value=tender.get("value")
+    if not isinstance(value,Mapping) or value.get("currency")!="GBP":
+        return None
+    amount=value.get("amount")
+    if type(amount) not in (int,float,str,Decimal):
+        return None
+    try:
+        money=Decimal(str(amount))
+        if (not money.is_finite() or not Decimal(0)<money<=Decimal("1000000000")
+            or money.as_tuple().exponent < -2):
+            return None
+        return str(money.quantize(Decimal("0.01")))
+    except (ValueError, InvalidOperation):
+        return None
 
 
 def review_official_releases(
@@ -143,6 +162,21 @@ def review_official_releases(
             "notice_url":url,
             "notice_release_at":stamp.isoformat(),
             "tender_closes_at":deadline.isoformat(),
+            "published_estimated_value_gbp": _public_gbp_estimate(tender),
+            "published_value_source": "OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING",
+            "published_sme_suitable":(
+                (tender.get("suitability") or {}).get("sme")
+                if type((tender.get("suitability") or {}).get("sme")) is bool
+                else None
+            ),
+            "published_contract_start_at": (
+                _time((tender.get("contractPeriod") or {}).get("startDate"))
+                or None
+            ).isoformat() if _time((tender.get("contractPeriod") or {}).get("startDate")) else None,
+            "published_contract_end_at": (
+                _time((tender.get("contractPeriod") or {}).get("endDate"))
+                or None
+            ).isoformat() if _time((tender.get("contractPeriod") or {}).get("endDate")) else None,
             "request_status":"PUBLIC_TENDER_OPEN_AS_OF_OBSERVATION",
             "review_status":status,
             "candidate_product_code":product,
