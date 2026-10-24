@@ -271,3 +271,69 @@ def test_tampered_estimate_cannot_become_approved_price_or_margin():
         assert row["estimated_value_receipt_status"]=="NOT_VERIFIED"
         assert row["binding_contract_value_gbp"] is None
         assert row["bid_submission_authorized"] is False
+
+
+def test_land_guide_second_government_notice_overlay_never_approves_bid(tmp_path):
+    from scripts.review_official_tender_bid_no_bid_20261024 import _join_land_guide_public_award_evidence
+    from scripts.reconcile_land_guide_public_official_notice_20261024 import (
+        SOURCE_URL, OUTPUT, SCHEMA, READY, CF_OCID, CF_NOTICE,
+        FTS_OCID, REF, EXPECTED_TITLE,
+    )
+    land=item(title="CA18567 - "+EXPECTED_TITLE,ocid=CF_OCID)
+    land["official_notice_url"]=CF_NOTICE
+    land["tender_closes_at_utc"]="2026-10-30T12:00:00+00:00"
+    land["published_estimated_value_gbp"]="25000.00"
+    land["published_value_source"]="OFFICIAL_OCDS_TENDER_VALUE_NOT_BINDING"
+    original=decide(triage(land))
+    proof={
+        "schema_version":SCHEMA,"status":READY,
+        "issuer_reviewed_at_utc":NOW.isoformat(),
+        "contracts_finder_ocid":CF_OCID,
+        "contracts_finder_notice_url":CF_NOTICE,
+        "public_sell2wales_ocid":FTS_OCID,
+        "primary_sell2wales_notice_url":SOURCE_URL,
+        "procurement_reference":REF,
+        "procurement_title":EXPECTED_TITLE,
+        "official_full_notice_submit_at_utc":"2026-10-30T12:00:00+00:00",
+        "official_full_notice_questions_until_utc":"2026-10-26T12:00:00+00:00",
+        "published_value_estimate_gbp":"25000.00",
+        "published_quality_weight_pct":80,
+        "published_price_weight_pct":20,
+        "summary_and_full_notice_deadline_disagree":True,
+        "public_summary_displays_different_deadline":"2026-10-31",
+        "submit_date_authoritatively_reconciled_with_portal":False,
+        "supplier_eligibility_verified":False,
+        "full_supplier_rfq_verified":False,
+        "bid_or_price_authorised":False,
+        "bid_submitted":False,
+        "buyer_contacted":False,
+        "primary_sell2wales_public_page_sha256":"a"*64,
+    }
+    path=tmp_path/OUTPUT
+    path.parent.mkdir(parents=True)
+    path.write_text(json.dumps(proof))
+    path.chmod(0o600)
+    result=_join_land_guide_public_award_evidence(tmp_path,original,now=NOW)
+    assert result["second_government_public_notice_crosschecked_count"]==1
+    assert result["public_notice_summary_discrepancies_unresolved_count"]==1
+    row=result["founder_review_items"][0]
+    assert row["published_quality_weight_percent"]==80
+    assert row["published_price_weight_percent"]==20
+    assert row["public_page_displays_different_deadline"] is True
+    assert row["portal_submission_deadline_confirmed"] is False
+    assert row["full_supplier_rfq_documents_reviewed"] is False
+    assert row["binding_contract_value_gbp"] is None
+    assert row["verified_profit_or_margin"] is None
+    assert row["bid_submission_authorized"] is False
+    assert result["bid_ready_count"]==0
+    assert result["realised_revenue"] is None
+    for key,bad in (("bid_submitted",True),
+                    ("published_quality_weight_pct",50),
+                    ("primary_sell2wales_notice_url","https://example.test"),
+                    ("official_full_notice_submit_at_utc","2026-10-31T12:00:00+00:00")):
+        corrupt=dict(proof)
+        corrupt[key]=bad
+        path.write_text(json.dumps(corrupt))
+        held=_join_land_guide_public_award_evidence(tmp_path,decide(triage(land)),now=NOW)
+        assert held["founder_review_items"][0]["second_government_notice_reconciliation"]=="PUBLIC_CORROBORATION_NOT_CURRENT"
+        assert held["bid_ready_count"]==0

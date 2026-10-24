@@ -300,10 +300,90 @@ def _join_original_ryde_issuer_proof(root: Path, report: dict[str, Any],
     return report
 
 
+def _join_land_guide_public_award_evidence(root: Path, report: dict[str,Any],
+                                            *, now: datetime) -> dict[str,Any]:
+    """Read-only official independent corroboration; never a supplier approval."""
+    if report.get("status")!=STATUS_READY:
+        return report
+    from scripts.reconcile_land_guide_public_official_notice_20261024 import (
+        OUTPUT as SOURCE, SCHEMA as SOURCE_SCHEMA, READY as SOURCE_READY,
+        CF_OCID, FTS_OCID, CF_NOTICE, REF, EXPECTED_TITLE, SOURCE_URL,
+    )
+    target=next((x for x in report["founder_review_items"] if x["ocid"]==CF_OCID),None)
+    if target is None:
+        return report
+    target["second_government_notice_reconciliation"]="PUBLIC_CORROBORATION_NOT_CURRENT"
+    p=root/SOURCE
+    try:
+        if (p.is_symlink() or p.parent.is_symlink() or not p.is_file()
+            or stat.S_IMODE(p.stat().st_mode)!=0o600
+            or not 0<p.stat().st_size<14000):
+            return report
+        obj=json.loads(p.read_text(encoding="utf-8"))
+        stamp=datetime.fromisoformat(obj["issuer_reviewed_at_utc"])
+        if (stamp.tzinfo is None
+            or not timedelta(0)<=now.astimezone(timezone.utc)-stamp.astimezone(timezone.utc)<=timedelta(hours=24)
+            or obj.get("schema_version")!=SOURCE_SCHEMA
+            or obj.get("status")!=SOURCE_READY
+            or obj.get("contracts_finder_ocid")!=CF_OCID
+            or obj.get("contracts_finder_notice_url")!=CF_NOTICE
+            or obj.get("public_sell2wales_ocid")!=FTS_OCID
+            or obj.get("primary_sell2wales_notice_url")!=SOURCE_URL
+            or obj.get("procurement_reference")!=REF
+            or obj.get("procurement_title")!=EXPECTED_TITLE
+            or target.get("official_notice_url")!=CF_NOTICE
+            or target.get("title")!="CA18567 - "+EXPECTED_TITLE
+            or target.get("tender_closes_at_utc")!=obj.get("official_full_notice_submit_at_utc")
+            or target.get("published_estimated_value_gbp")!=obj.get("published_value_estimate_gbp")
+            or obj.get("published_quality_weight_pct")!=80
+            or obj.get("published_price_weight_pct")!=20
+            or obj.get("summary_and_full_notice_deadline_disagree") is not True
+            or obj.get("submit_date_authoritatively_reconciled_with_portal") is not False
+            or obj.get("public_summary_displays_different_deadline")!="2026-10-31"
+            or obj.get("official_full_notice_questions_until_utc")!="2026-10-26T12:00:00+00:00"
+            or obj.get("supplier_eligibility_verified") is not False
+            or obj.get("full_supplier_rfq_verified") is not False
+            or obj.get("bid_or_price_authorised") is not False
+            or obj.get("bid_submitted") is not False
+            or obj.get("buyer_contacted") is not False
+            or not isinstance(obj.get("primary_sell2wales_public_page_sha256"),str)
+            or len(obj["primary_sell2wales_public_page_sha256"])!=64
+            or any(c not in "0123456789abcdef"
+                   for c in obj["primary_sell2wales_public_page_sha256"])):
+            return report
+    except (ValueError,OSError,KeyError,TypeError,OverflowError):
+        return report
+    target.update({
+        "second_government_notice_reconciliation":"PUBLISHED_AWARD_WEIGHTS_CORROBORATED_SUPPLIER_RFQ_STILL_HELD",
+        "second_government_notice_url":SOURCE_URL,
+        "second_government_ocid":FTS_OCID,
+        "published_quality_weight_percent":80,
+        "published_price_weight_percent":20,
+        "full_rfq_criteria_reconciled":False,
+        "official_questions_deadline_utc":"2026-10-26T12:00:00+00:00",
+        "second_government_page_summary_deadline_date":"2026-10-31",
+        "public_page_displays_different_deadline":True,
+        "portal_submission_deadline_confirmed":False,
+        "portal_registration_performed":False,
+        "full_supplier_rfq_documents_reviewed":False,
+        "supplier_eligibility":UNVERIFIED,
+        "binding_contract_value_gbp":None,
+        "verified_profit_or_margin":None,
+        "bid_submission_authorized":False,
+        "required_next_action":"REVIEW_AUTHORISED_MULTIQUOTE_RFQ_TERMS_AND_SUPPLIER_CAPABILITY",
+    })
+    report["second_government_public_notice_crosschecked_count"]=1
+    report["public_notice_summary_discrepancies_unresolved_count"]=1
+    return report
+
+
 def review_live(root: Path, *, now: datetime | None = None) -> dict[str, Any]:
     current = now or datetime.now(timezone.utc)
     existing=review_existing_report(root,now=current)
-    return _join_original_ryde_issuer_proof(root,decide(existing),now=current)
+    return _join_land_guide_public_award_evidence(
+        root, _join_original_ryde_issuer_proof(root,decide(existing),now=current),
+        now=current,
+    )
 
 
 def write_private(root: Path, report: Mapping[str, Any]) -> Path:
