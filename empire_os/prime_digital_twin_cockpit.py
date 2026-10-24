@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from empire_os.prime_flagship_voice_task_rehearsal import founder_voice_task_status
 from empire_os.prime_flagship_timer_recovery_shadow import founder_timer_recovery_status
 from empire_os.prime_flagship_provider_reconciliation_shadow import founder_provider_receipt_reconciliation
+from empire_os.prime_flagship_notification_gateway_shadow import founder_notification_gateway_shadow
 from empire_os.prime_flagship_assistant_readiness import (
     review_flagship_assistant_readiness, founder_flagship_readiness_status,
 )
@@ -106,6 +107,7 @@ def build_prime_digital_twin_cockpit(
         "flagship_voice_task_rehearsal": founder_voice_task_status(None),
         "original_timer_recovery": founder_timer_recovery_status(None),
         "provider_receipt_reconciliation": founder_provider_receipt_reconciliation(None),
+        "original_notification_gateway": founder_notification_gateway_shadow(None),
         "situational_awareness": founder_situation_status(situation),
         "flagship_release_readiness": founder_flagship_readiness_status(
             review_flagship_assistant_readiness(),

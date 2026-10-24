@@ -212,6 +212,22 @@ export default async function PrimeTwinCockpit({ searchParams }: { searchParams:
             Automatic resend: Disabled · Provider integration: Not connected
           </p>
         </section>
+        <section className="mt-6 rounded-2xl border border-sky-400/20 bg-sky-400/[0.025] p-6">
+          <p className="text-xs font-semibold uppercase tracking-widest text-sky-300">
+            Original ASTRA signed notification preflight
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold">Provider and consent authority</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-400">
+            Gateway status: {label(data.original_notification_gateway.status)}.
+            Research now checks separate provider and identity-owner signatures,
+            time-limited consent, original claim ownership and callback nonce scope.
+            Real provider and device integrations are not connected.
+          </p>
+          <p className="mt-3 text-xs text-amber-200">
+            Original-owner credentials: Not provisioned · Live callback endpoint:
+            Disabled · Notification sent: No · Real device delivery: Unverified
+          </p>
+        </section>
         <footer className="mt-7 rounded-xl border border-amber-400/20 p-5 text-sm text-slate-400">
           Local-model self-play: {label(data.local_model_selfplay.status)}.
           The existing llama.cpp runtime responded to health checks but the manual

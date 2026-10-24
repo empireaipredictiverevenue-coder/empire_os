@@ -1047,6 +1047,12 @@ export type PrimeDigitalTwinCockpit = {
     verified_real_provider_delivery: false;
     execution_authority: "none";
   };
+  original_notification_gateway: {
+    mode: "OBSERVE";
+    status: string;
+    real_device_delivery_verified: false;
+    execution_authority: "none";
+  };
   flagship_release_readiness: {
     status: string;
     mode: "OBSERVE";
