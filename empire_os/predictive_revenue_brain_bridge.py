@@ -23,6 +23,7 @@ from empire_os.predictive_revenue_prime import (
 from empire_os.predictive_revenue_prime_crm import review_authenticated_crm_prospects
 from empire_os.predictive_cloud_official_source_bridge import review_official_source_for_prime
 from empire_os.prime_original_outcome_calibration import review_prime_outcome_calibration
+from empire_os.prime_universal_evidence_fusion import review_prime_universal_evidence
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
@@ -309,6 +310,7 @@ def build_predictive_revenue_brain_review(
     authenticated_crm_repository: PostgresRevenueCrmRepository | None = None,
     official_nws_source_review: Mapping[str, Any] | None = None,
     original_owner_calibration_rows: Sequence[Mapping[str, Any]] | None = None,
+    original_owner_evidence_summaries: Sequence[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Compose existing evidence without inventing forecasts, agents or authority.
 
@@ -323,6 +325,10 @@ def build_predictive_revenue_brain_review(
     original_outcome_calibration = review_prime_outcome_calibration(
         owner_outcome_rows=original_owner_calibration_rows,
         tenant_id=tenant, as_of=now,
+    )
+    original_universal_evidence = review_prime_universal_evidence(
+        tenant_id=tenant, as_of=now,
+        original_owner_summaries=original_owner_evidence_summaries,
     )
     storms = _storm_signals(storm_snapshot, tenant_id=tenant, now=now)
     permits = _permit_signals(permit_integration, tenant_id=tenant, now=now)
@@ -359,6 +365,7 @@ def build_predictive_revenue_brain_review(
         "permit_research": permits,
         "official_source_observatory": official_source,
         "original_outcome_calibration_shadow": original_outcome_calibration,
+        "prime_universal_evidence_shadow": original_universal_evidence,
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {
