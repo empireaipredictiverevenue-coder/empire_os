@@ -73,6 +73,46 @@ def _safe_connection()->psycopg.Connection:
     return db
 
 
+def _actual_fixture_login() -> psycopg.Connection:
+    """Connect using a distinct disposable SCRAM-authenticated DB identity.
+
+    No SET ROLE or privileged connection can be used for custody writes.
+    Cluster/datadir verification is performed by _safe_connection() before
+    this is reachable; port and DB are independently constrained here.
+    """
+    port=os.environ.get("PGPORT","")
+    secret=os.environ.get("EMPIRE_FIXTURE_LOGIN_PASSWORD","")
+    if (not port.isdigit() or int(port)<5433
+        or os.environ.get("EMPIRE_SIGNED_GATEWAY_FIXTURE_CHECKED")!="ephemeral"
+        or os.environ.get("PGDATABASE")!="empire_timer_fixture"
+        or len(secret)<32):
+        raise RuntimeError("REFUSED_UNAUTHORISED_FIXTURE_LOGIN")
+    writer=psycopg.connect(
+        host="127.0.0.1",port=int(port),dbname="empire_timer_fixture",
+        user="timer_fixture_gateway_login",password=secret,
+        connect_timeout=3,
+    )
+    row=writer.execute("""SELECT session_user,current_user,
+        current_database(),inet_server_port()""").fetchone()
+    names=[x.decode("ascii") if isinstance(x,bytes) else x for x in row]
+    if names!=["timer_fixture_gateway_login",
+               "timer_fixture_gateway_login","empire_timer_fixture",int(port)]:
+        writer.close()
+        raise RuntimeError("REFUSED_UNEXPECTED_ACTUAL_FIXTURE_LOGIN_IDENTITY")
+    privileges=writer.execute("""SELECT
+        has_table_privilege(current_user,
+          'public.empire_prime_timer_provider_receipts','SELECT'),
+        has_table_privilege(current_user,
+          'public.empire_prime_timer_provider_receipts','INSERT'),
+        has_function_privilege(current_user,
+          'public.empire_prime_timer_receipt_record_held(uuid,text,text,text,text,text,text,text,text,timestamptz)',
+          'EXECUTE')""").fetchone()
+    if tuple(privileges)!=(False,False,True):
+        writer.close()
+        raise RuntimeError("REFUSED_UNEXPECTED_FIXTURE_WRITER_PRIVILEGES")
+    return writer
+
+
 def main()->int:
     with _safe_connection() as db:
         with db.cursor() as cur:
@@ -235,12 +275,13 @@ def main()->int:
                           else source_db[0])
             if not isinstance(source_value,str) or len(source_value)!=64:
                 raise RuntimeError("SYNTHETIC_SOURCE_DIGEST_FORMAT_INVALID")
-            # Actual storage is performed while running only as a dedicated
-            # test role with EXECUTE on one guarded function; NO INSERT/SELECT
-            # on 059 tables. The fixture superuser opens this connection,
-            # but the database operation itself is SET LOCAL ROLE-constrained.
-            db.execute("SET LOCAL ROLE timer_fixture_gateway_exec")
-            stored=db.execute("""SELECT held_receipt_seq,held_status FROM
+            # The independent fixture connection authenticates via SCRAM
+            # as its OWN LOGIN with no elevated privileges. The separate
+            # identity/consent SELECT FOR SHARE lock remains held during the
+            # restricted writer's complete transaction; this is still only
+            # a fictional fixture Identity reader, not production authority.
+            with _actual_fixture_login() as writer:
+                stored=writer.execute("""SELECT held_receipt_seq,held_status FROM
                 public.empire_prime_timer_receipt_record_held(
                    %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (TENANT,payload["timer_digest"],payload["provider_code"],

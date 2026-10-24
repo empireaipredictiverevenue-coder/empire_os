@@ -31,11 +31,18 @@ def test_original_060_no_public_or_service_execution_rights_installed():
     assert "NO runtime" in contents
 
 
-def test_060_explicit_grant_is_disposable_test_only():
+def test_060_independent_scram_login_grant_is_disposable_test_only():
     fixture=SHELL.read_text()
     assert "GRANT EXECUTE ON FUNCTION public.empire_prime_timer_receipt_record_held" in fixture
-    assert "CREATE ROLE timer_fixture_gateway_exec NOLOGIN" in fixture
-    assert "RESTRICTED_GATEWAY_FIXTURE_ROLE_NO_TABLE_PERMISSIONS=true" in fixture
-    assert "RESTRICTED_060_DIRECT_TABLE_SELECT_DENIED=true" in fixture
-    assert "RESTRICTED_060_TWO_WORKERS_ONE_CALLBACK=true" in fixture
+    assert "CREATE ROLE timer_fixture_gateway_login LOGIN PASSWORD" in fixture
+    assert "NOINHERIT NOBYPASSRLS" in fixture
+    assert "scram-sha-256" in fixture
+    assert "pg_reload_conf()" in fixture
+    assert "SCRAM_WRONG_PASSWORD_AND_HIGH_PRIVILEGES_DENIED=true" in fixture
+    assert "SCRAM_OTHER_DATABASES_REJECTED=true" in fixture
+    assert "<<FIXTURE_SQL" in fixture
+    assert "REAL_SCRAM_LOGIN_NO_TABLE_PERMISSIONS=true" in fixture
+    assert "SCRAM_LOGIN_DIRECT_TABLE_SELECT_DENIED=true" in fixture
+    assert "SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true" in fixture
     assert "060_flagship_timer_receipt_restricted_writer_held" in fixture
+    assert "SET ROLE timer_fixture_gateway_exec" not in fixture

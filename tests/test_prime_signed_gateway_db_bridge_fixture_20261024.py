@@ -1,4 +1,4 @@
-"""Original ASTRA synthetic signed callback -> held restricted EmpireDB 060.
+"""Original ASTRA synthetic signed callback -> SCRAM-login held EmpireDB 060.
 
 An integrated, isolated PostgreSQL fixture. This NEVER opens production DB,
 a real provider, a webhook, a sender, actual user consent or external devices.
@@ -56,7 +56,10 @@ def test_bridge_uses_only_verified_signed_payload_and_locks_fixture_consent():
     assert "source_attestation_digest" in text
     assert "callback_nonce_digest" in text
     assert "fixture_authorised_device" in text
-    assert "SET LOCAL ROLE timer_fixture_gateway_exec" in text
+    assert "_actual_fixture_login()" in text
+    assert "timer_fixture_gateway_login" in text
+    assert "password=secret" in text
+    assert "SET LOCAL ROLE timer_fixture_gateway_exec" not in text
     assert "public.empire_prime_timer_receipt_record_held(" in text
     assert "INSERT INTO public.empire_prime_timer_provider_receipts" not in text
     assert "original_empiredb_writes" not in text or "production_empiredb_writes" in text
@@ -93,7 +96,10 @@ def test_real_pg060_restricted_writer_records_verified_fictional_callbacks_only_
     assert receipt["production_empiredb_writes"] is False
     assert receipt["execution_authority"]=="fixture_only"
     assert "SIGNED_GATEWAY_060_RESTRICTED_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0" in run.stdout
-    assert "RESTRICTED_GATEWAY_FIXTURE_ROLE_NO_TABLE_PERMISSIONS=true" in run.stdout
-    assert "RESTRICTED_060_DIRECT_TABLE_SELECT_DENIED=true" in run.stdout
-    assert "RESTRICTED_060_TWO_WORKERS_ONE_CALLBACK=true" in run.stdout
+    assert "EPHEMERAL_SCRAM_LOGIN_AUTHENTICATED=true" in run.stdout
+    assert "SCRAM_WRONG_PASSWORD_AND_HIGH_PRIVILEGES_DENIED=true" in run.stdout
+    assert "SCRAM_OTHER_DATABASES_REJECTED=true" in run.stdout
+    assert "REAL_SCRAM_LOGIN_NO_TABLE_PERMISSIONS=true" in run.stdout
+    assert "SCRAM_LOGIN_DIRECT_TABLE_SELECT_DENIED=true" in run.stdout
+    assert "SCRAM_LOGIN_TWO_WORKERS_ONE_CALLBACK=true" in run.stdout
     assert "Dropping cluster 18/regress" in run.stdout+run.stderr
