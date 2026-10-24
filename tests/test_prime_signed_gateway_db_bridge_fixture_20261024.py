@@ -1,4 +1,4 @@
-"""Original ASTRA synthetic signed callback -> actual disposable EmpireDB 059.
+"""Original ASTRA synthetic signed callback -> held restricted EmpireDB 060.
 
 An integrated, isolated PostgreSQL fixture. This NEVER opens production DB,
 a real provider, a webhook, a sender, actual user consent or external devices.
@@ -56,12 +56,15 @@ def test_bridge_uses_only_verified_signed_payload_and_locks_fixture_consent():
     assert "source_attestation_digest" in text
     assert "callback_nonce_digest" in text
     assert "fixture_authorised_device" in text
+    assert "SET LOCAL ROLE timer_fixture_gateway_exec" in text
+    assert "public.empire_prime_timer_receipt_record_held(" in text
+    assert "INSERT INTO public.empire_prime_timer_provider_receipts" not in text
     assert "original_empiredb_writes" not in text or "production_empiredb_writes" in text
 
 
 @pytest.mark.skipif(shutil.which("pg_virtualenv") is None,
                     reason="disposable PostgreSQL fixture utility missing")
-def test_real_pg059_receives_verified_synthetic_signed_callback_only_once():
+def test_real_pg060_restricted_writer_records_verified_fictional_callbacks_only_once():
     run=subprocess.run(
         ["pg_virtualenv","-t","bash",str(SHELL)],
         cwd=ROOT,capture_output=True,text=True,timeout=90,
@@ -89,5 +92,8 @@ def test_real_pg059_receives_verified_synthetic_signed_callback_only_once():
     assert receipt["live_sender_activated"] is False
     assert receipt["production_empiredb_writes"] is False
     assert receipt["execution_authority"]=="fixture_only"
-    assert "SIGNED_GATEWAY_059_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0" in run.stdout
+    assert "SIGNED_GATEWAY_060_RESTRICTED_PG_FIXTURE_FINISHED production_touched=false provider_network_calls=0" in run.stdout
+    assert "RESTRICTED_GATEWAY_FIXTURE_ROLE_NO_TABLE_PERMISSIONS=true" in run.stdout
+    assert "RESTRICTED_060_DIRECT_TABLE_SELECT_DENIED=true" in run.stdout
+    assert "RESTRICTED_060_TWO_WORKERS_ONE_CALLBACK=true" in run.stdout
     assert "Dropping cluster 18/regress" in run.stdout+run.stderr

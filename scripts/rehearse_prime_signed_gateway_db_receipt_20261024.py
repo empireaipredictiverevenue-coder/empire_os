@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One-shot ORIGINAL ASTRA signed gateway -> 059 Postgres custody, synthetic only.
+"""One-shot ORIGINAL ASTRA signed gateway -> 060 restricted DB custody, synthetic only.
 
 Executes ONLY with pg_virtualenv's ephemeral PostgreSQL socket/port and
 empire_timer_fixture database. Uses ephemeral Ed25519 keys, entirely
@@ -220,7 +220,7 @@ def main()->int:
                 raise NotificationGatewayHold(
                     "SYNTHETIC_IN_TRANSACTION_CONSENT_REVOKED"
                 )
-            # Atomic INSERT is ultimately arbitrated by 059 unique keys and
+            # Atomic writer is ultimately arbitrated by 059 unique keys and
             # source/claim/order triggers, not just nonce reader preflight.
             source_db=db.execute("""SELECT source_attestation_digest FROM
                 public.empire_prime_voice_timer_requests
@@ -235,21 +235,25 @@ def main()->int:
                           else source_db[0])
             if not isinstance(source_value,str) or len(source_value)!=64:
                 raise RuntimeError("SYNTHETIC_SOURCE_DIGEST_FORMAT_INVALID")
-            previous=db.execute("""SELECT count(*) FROM
-                public.empire_prime_timer_provider_receipts
-                WHERE tenant_id=%s AND timer_digest=%s""",
-                (TENANT,payload["timer_digest"])).fetchone()[0]
-            seq=previous+1
-            db.execute("""INSERT INTO public.empire_prime_timer_provider_receipts
-                (tenant_id,timer_digest,provider_code,callback_nonce_digest,
-                receipt_digest,claim_event_digest,delivery_reference_digest,
-                source_attestation_digest,callback_stage,callback_seq,provider_reported_at)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+            # Actual storage is performed while running only as a dedicated
+            # test role with EXECUTE on one guarded function; NO INSERT/SELECT
+            # on 059 tables. The fixture superuser opens this connection,
+            # but the database operation itself is SET LOCAL ROLE-constrained.
+            db.execute("SET LOCAL ROLE timer_fixture_gateway_exec")
+            stored=db.execute("""SELECT held_receipt_seq,held_status FROM
+                public.empire_prime_timer_receipt_record_held(
+                   %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
                 (TENANT,payload["timer_digest"],payload["provider_code"],
                  payload["callback_nonce_digest"],payload["receipt_digest"],
                  payload["claim_event_digest"],payload["delivery_reference_digest"],
-                 source_value,payload["callback_stage"],seq,
-                 datetime.fromisoformat(payload["provider_reported_at"])))
+                 source_value,payload["callback_stage"],
+                 datetime.fromisoformat(payload["provider_reported_at"]))).fetchone()
+            if stored is None or stored[0] not in (1,2):
+                raise RuntimeError("RESTRICTED_FIXTURE_RECEIPT_WRITER_DID_NOT_COMMIT")
+            status=(stored[1].decode("ascii") if isinstance(stored[1],bytes)
+                    else stored[1])
+            if status!="HELD_METADATA_RECORDED_NOT_AUTHENTICATED_OR_DELIVERED":
+                raise RuntimeError("RESTRICTED_FIXTURE_RECEIPT_STATUS_UNEXPECTED")
         return True
 
     p1,e1,o1=callback("ACCEPTED",1)
