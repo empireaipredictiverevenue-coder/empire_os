@@ -62,8 +62,129 @@ def _read_source(path: Path) -> dict:
     return payload
 
 
+def commercial_truth(
+    observer: dict | None, buyer_queue: dict | None, *,
+    now: datetime | None = None,
+) -> dict:
+    """Conservative aggregate projection of existing owner read models only.
+
+    Never infer a CRM row, genuine buyer identity or signed sale from a count.
+    HELD, stale, malformed and missing canonical observations remain UNKNOWN.
+    """
+    when = now or datetime.now(timezone.utc)
+    if when.tzinfo is None or when.utcoffset() is None:
+        raise SourceHold("SOURCE_REVIEW_TIME_MUST_BE_AWARE")
+    source_status = "OWNER_SOURCE_NOT_AVAILABLE"
+    observed_at = None
+    observed_count = None
+    status = "CANONICAL_SOURCE_UNKNOWN"
+    if isinstance(observer, dict) and observer.get("schema_version") == (
+        "empire.gtm.integration_observer.v1"
+    ):
+        raw = observer.get("canonical_sales_source_ops")
+        if isinstance(raw, dict):
+            source_status = str(raw.get("status") or "OWNER_SOURCE_NOT_AVAILABLE")[:125]
+            observed_at = observer.get("generated_at")
+            try:
+                snapshot_at = datetime.fromisoformat(observed_at.replace("Z", "+00:00"))
+                age = (when - snapshot_at).total_seconds()
+            except (ValueError, AttributeError, TypeError):
+                age = float("inf")
+            if (
+                0 <= age <= 3600
+                and source_status == "CANONICAL_COMMERCIAL_SALES_INTAKE_ZERO_OBSERVED"
+                and raw.get("source_count_verified") is True
+                and all(
+                    type(raw.get(k)) is int and raw[k] == 0
+                    for k in ("canonical_sales_acquisitions",
+                              "canonical_commercial_enquiries",
+                              "canonical_predictive_revenue_enquiries")
+                )
+            ):
+                observed_count = 0
+                status = "RECENT_CANONICAL_SOURCE_ZERO_OBSERVED"
+    queue_timestamp_fresh = False
+    if isinstance(buyer_queue, dict):
+        try:
+            queue_date = datetime.fromisoformat(
+                buyer_queue["generated_at"].replace("Z", "+00:00"))
+            age = (when - queue_date).total_seconds()
+            queue_timestamp_fresh = 0 <= age <= 3600
+        except (KeyError, ValueError, TypeError, AttributeError):
+            pass
+    snapshot_fresh = (
+        queue_timestamp_fresh and isinstance(buyer_queue, dict)
+        and buyer_queue.get("schema_version") == "buyer-network-candidate-queue-v1"
+        and buyer_queue.get("gmail_snapshot_fresh") is True
+    )
+    return {
+        "status": status, "original_gtm_source_status": source_status,
+        "gtm_observed_at": observed_at,
+        "canonical_sales_acquisitions_if_verified": observed_count,
+        "original_buyer_network_gmail_snapshot_fresh": snapshot_fresh,
+        "named_real_buyer_identity_verified": False,
+        "source_to_tenant_crm_lineage_verified": False,
+        "accepted_sale_verified": False,
+        "payments_verified": False,
+        "outbound_authority": False,
+    }
+
+
+def priority_action(row: dict) -> dict:
+    """Actionable *review* order only, never an outbound/CRM execution decision."""
+    rid = row["source_id"]
+    sample = row["sample_path"]
+    request = row["external_request_observed"]
+    route = row["contact_channel_type"]
+    if request:
+        return {
+            "source_id": rid, "review_rank": 2 if "hubspot" in rid else 3,
+            "owner": "EXISTING_COMMERCIAL_ACQUISITION_OWNER",
+            "action": "RECHECK_PLATFORM_REQUEST_AND_ELIGIBILITY",
+            "deliverable": "Evidence of active client request, legitimate platform"
+                           " application eligibility, qualified delivery owner and"
+                           " honest matched scope",
+            "free_sample_available": bool(sample),
+            "reason_not_send_ready": "ANONYMOUS_MARKETPLACE_BUYER_AND_DELIVERY_GATES",
+            "channel": "ORIGINAL_MARKETPLACE_ONLY",
+            "ready_for_email": False,
+            "ready_for_application": False,
+        }
+    if route == "FOUNDER_PROFESSIONAL_INTRO_REVIEW":
+        rank, action, reason = (
+            1, "VERIFY_FOUNDER_NETWORK_CHANNEL_AND_CANONICAL_SUPPRESSION",
+            "NO_VERIFIED_BUYER_INTENT_OR_APPROVED_INTRO"
+        )
+    elif sample:
+        rank, action, reason = (
+            4, "VERIFY_APPROPRIATE_COMMERCIAL_PERSON_AND_CHANNEL",
+            "PUBLIC_HIRING_ROLE_NOT_EXTERNAL_PROCUREMENT"
+        )
+    else:
+        rank, action, reason = (
+            5, "BUILD_COMPANY_RELEVANT_PUBLIC_VALUE_SAMPLE",
+            "NO_SAMPLE_NO_BUYING_INTENT_NO_CONTACT_AUTHORITY"
+        )
+    return {
+        "source_id": rid, "review_rank": rank,
+        "owner": "EXISTING_COMMERCIAL_ACQUISITION_OWNER",
+        "action": action,
+        "deliverable": ("One company-specific public source review, confirmed"
+                        " business purpose, exact contact-history and suppression"
+                        " receipt before individually reviewed outreach"
+                        if sample else "One-page attributable, public-only diagnostic"
+                        " example with source date and no private claims"),
+        "free_sample_available": bool(sample),
+        "reason_not_send_ready": reason,
+        "channel": route,
+        "ready_for_email": False, "ready_for_application": False,
+    }
+
+
 def build(root: Path, source: dict, *, now: date | None = None,
-          suppression_fresh: bool = False) -> dict:
+          suppression_fresh: bool = False,
+          intake_observer: dict | None = None,
+          buyer_queue: dict | None = None) -> dict:
     root = Path(root)
     product = predictive_revenue_product(PRODUCT_CODE)
     if product.product_code != PRODUCT_CODE:
@@ -186,6 +307,10 @@ def build(root: Path, source: dict, *, now: date | None = None,
         0 if r["external_request_observed"] else 1,
         0 if r["sample_path"] else 1, r["source_id"]))
     counts = Counter(r["stage"] for r in results)
+    review_actions = sorted((priority_action(row) for row in results),
+                            key=lambda action: (action["review_rank"],
+                                                action["source_id"]))
+    commercial_observation = commercial_truth(intake_observer, buyer_queue)
     return {
         "schema_version": "empire.predictive_revenue.saas_demand_build_stage.v1",
         "mode": "BUILD_STAGE_PRIVATE_RESEARCH",
@@ -212,6 +337,11 @@ def build(root: Path, source: dict, *, now: date | None = None,
         "production_site_mutated": False, "new_product_created": False,
         "new_crm_created": False, "new_scheduler_created": False,
         "realised_revenue_verified": False, "build_queue": results,
+        "original_commercial_truth": commercial_observation,
+        "next_review_actions": review_actions,
+        "review_order_is_not_expected_revenue": True,
+        "marketplace_submission_authorized": False,
+        "founder_linkedin_outreach_authorized": False,
     }
 
 

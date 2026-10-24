@@ -11,6 +11,19 @@ from empire_os.predictive_revenue_saas_build_stage import (
 )
 
 
+def _existing_readonly_snapshot(root: Path, relative: str) -> dict | None:
+    """Optional bounded owner snapshot; never read customer rows or tokens."""
+    path = root / relative
+    try:
+        if (path.is_symlink() or not path.is_file()
+                or path.stat().st_size > 500_000):
+            return None
+        payload = json.loads(path.read_text(encoding="utf8"))
+        return payload if isinstance(payload, dict) else None
+    except (OSError, UnicodeError, ValueError, TypeError):
+        return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--write-private", action="store_true",
@@ -21,8 +34,14 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if not root.is_dir() or root.is_symlink():
             raise SourceHold("EXISTING_EMPIREOS_ROOT_NOT_AVAILABLE")
-        report = build(root, _read_source(root / SOURCE_REL),
-                       suppression_fresh=False)
+        report = build(
+            root, _read_source(root / SOURCE_REL),
+            suppression_fresh=False,
+            intake_observer=_existing_readonly_snapshot(
+                root, "runtime/gtm_pipeline/integration_observer_latest.json"),
+            buyer_queue=_existing_readonly_snapshot(
+                root, "runtime/buyer_network_intelligence/candidate_queue_latest.json"),
+        )
         if args.write_private:
             write_private(root / OUTPUT_REL, report)
         print(json.dumps({
@@ -36,6 +55,13 @@ def main(argv: list[str] | None = None) -> int:
             "private_public_evidence_samples_built":
                 report["private_public_evidence_samples_built"],
             "active_verified_buyers": report["real_buyer_conversations_verified"],
+            "commercial_observation": report["original_commercial_truth"]["status"],
+            "canonical_count_if_verified": report[
+                "original_commercial_truth"]["canonical_sales_acquisitions_if_verified"],
+            "server_gmail_evidence_fresh": report[
+                "original_commercial_truth"]["original_buyer_network_gmail_snapshot_fresh"],
+            "top_review_action": report["next_review_actions"][0]["action"],
+            "top_review_source_id": report["next_review_actions"][0]["source_id"],
             "outbound_send_authorized": False, "emails_sent": 0,
             "private_read_model_written": args.write_private,
             "customer_rows_written": 0, "site_mutated": False,

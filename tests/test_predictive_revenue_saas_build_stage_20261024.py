@@ -28,7 +28,7 @@ def test_existing_public_source_pack_is_real_build_stage(source):
     assert report["public_signal_count"] == 5
     assert report["external_service_requests_observed"] == 2
     assert report["company_hiring_fit_hypotheses"] == 3
-    assert report["private_public_evidence_samples_built"] == 4
+    assert report["private_public_evidence_samples_built"] == 5
     assert report["paid_customer_count_verified"] == 0
     assert report["customer_rows_written"] == 0
     assert report["outbound_send_authorized"] is False
@@ -155,3 +155,100 @@ def test_cli_is_readonly_by_default(capsys):
     assert report["private_read_model_written"] is False
     assert report["status"] == "SAAS_DEMAND_PRIVATE_BUILD_STAGE_PASS"
     assert report["emails_sent"] == 0
+
+
+# Canonical source/next-action safeguards added after initial private build.
+from datetime import datetime, timezone
+
+
+def _gtm_snapshot(status="CANONICAL_COMMERCIAL_SALES_INTAKE_ZERO_OBSERVED",
+                  verified=True, count=0, timestamp="2026-10-24T22:22:35+00:00"):
+    return {"schema_version": "empire.gtm.integration_observer.v1",
+            "generated_at": timestamp,
+            "canonical_sales_source_ops": {
+                "status": status, "source_count_verified": verified,
+                "canonical_sales_acquisitions": count,
+                "canonical_commercial_enquiries": count,
+                "canonical_predictive_revenue_enquiries": count}}
+
+
+def _queue_snapshot(fresh=False, timestamp="2026-10-24T22:23:00+00:00"):
+    return {"schema_version": "buyer-network-candidate-queue-v1",
+            "generated_at": timestamp, "gmail_snapshot_fresh": fresh}
+
+
+def test_canonical_hold_is_unknown_not_fake_zero():
+    s = b.commercial_truth(
+        _gtm_snapshot(status="HELD_CANONICAL_ACQUISITION_OWNER_OPS_RECEIPT_REQUIRED",
+                      verified=False, count=None), _queue_snapshot(),
+        now=datetime(2026, 10, 24, 22, 25, tzinfo=timezone.utc))
+    assert s["status"] == "CANONICAL_SOURCE_UNKNOWN"
+    assert s["canonical_sales_acquisitions_if_verified"] is None
+    assert s["source_to_tenant_crm_lineage_verified"] is False
+    assert s["accepted_sale_verified"] is False
+
+
+def test_exact_recent_verified_zero_never_means_paid_or_named_buyer():
+    s = b.commercial_truth(
+        _gtm_snapshot(), _queue_snapshot(),
+        now=datetime(2026, 10, 24, 22, 25, tzinfo=timezone.utc))
+    assert s["status"] == "RECENT_CANONICAL_SOURCE_ZERO_OBSERVED"
+    assert s["canonical_sales_acquisitions_if_verified"] == 0
+    assert s["named_real_buyer_identity_verified"] is False
+    assert s["payments_verified"] is False
+    assert s["outbound_authority"] is False
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"count": 2}, {"verified": False},
+    {"timestamp": "2026-10-20T22:22:35+00:00"},
+    {"timestamp": "tomorrow"},
+    {"timestamp": "2026-10-24T23:22:35+00:00"},
+])
+def test_untrusted_partial_or_stale_canonical_status_holds(kwargs):
+    s = b.commercial_truth(
+        _gtm_snapshot(**kwargs), _queue_snapshot(),
+        now=datetime(2026, 10, 24, 22, 25, tzinfo=timezone.utc))
+    assert s["status"] == "CANONICAL_SOURCE_UNKNOWN"
+    assert s["canonical_sales_acquisitions_if_verified"] is None
+
+
+def test_untrusted_gmail_freshness_cannot_grant_outbound_authority(source):
+    snap = _queue_snapshot(fresh=True)
+    now = datetime(2026, 10, 24, 22, 25, tzinfo=timezone.utc)
+    obs = b.commercial_truth(_gtm_snapshot(), snap, now=now)
+    assert obs["original_buyer_network_gmail_snapshot_fresh"] is True
+    assert obs["outbound_authority"] is False
+    stale = _queue_snapshot(fresh=True, timestamp="2026-10-22T22:23:00+00:00")
+    assert b.commercial_truth(_gtm_snapshot(), stale, now=now)[
+        "original_buyer_network_gmail_snapshot_fresh"] is False
+    result = b.build(ROOT, source, now=date(2026, 10, 24),
+                     intake_observer=_gtm_snapshot(), buyer_queue=snap)
+    assert result["outbound_send_authorized"] is False
+    assert not any(a["ready_for_email"] for a in result["next_review_actions"])
+
+
+def test_action_order_prioritizes_low_spend_founder_review_not_expected_revenue(source):
+    r = b.build(ROOT, source, now=date(2026, 10, 24))
+    actions = r["next_review_actions"]
+    assert [a["review_rank"] for a in actions] == sorted(
+        a["review_rank"] for a in actions)
+    assert actions[0]["source_id"] == "clueso_founding_ae_20261024"
+    assert actions[0]["action"] == "VERIFY_FOUNDER_NETWORK_CHANNEL_AND_CANONICAL_SUPPRESSION"
+    assert actions[0]["ready_for_email"] is False
+    assert r["review_order_is_not_expected_revenue"] is True
+    assert r["marketplace_submission_authorized"] is False
+    assert all(a["owner"] == "EXISTING_COMMERCIAL_ACQUISITION_OWNER" for a in actions)
+
+
+def test_snapshot_reader_rejects_symlink_and_malformed(tmp_path):
+    from scripts.build_predictive_revenue_saas_demand_stage_20261024 import (
+        _existing_readonly_snapshot,
+    )
+    (tmp_path / "owner.json").write_text('{"schema_version":"example"}')
+    assert _existing_readonly_snapshot(tmp_path, "owner.json") == {
+        "schema_version": "example"}
+    (tmp_path / "other.json").symlink_to(tmp_path / "owner.json")
+    assert _existing_readonly_snapshot(tmp_path, "other.json") is None
+    (tmp_path / "bad.json").write_text("{not-json")
+    assert _existing_readonly_snapshot(tmp_path, "bad.json") is None

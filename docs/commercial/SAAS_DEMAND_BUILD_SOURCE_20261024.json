@@ -68,12 +68,12 @@
       "source_kind": "COMPANY_OFFICIAL_HIRING",
       "source_url": "https://credal.ai/careers",
       "observed_at": "2026-10-24",
-      "source_observation": "Published business development and deployment roles; no external purchasing requirement verified.",
+      "source_observation": "Official careers lists BDR and founding GTM deployment strategist roles. No external buying intent verified; free stage-evidence sample prepared from public sources.",
       "buyer_request_observed": false,
       "company_identity_verified": true,
       "technical_delivery_credentials_verified": false,
       "route_type": "COMMERCIAL_CONTACT_UNVERIFIED",
-      "sample_path": null,
+      "sample_path": "docs/commercial/CREDAL_PUBLIC_GTM_DEPLOYMENT_EVIDENCE_SAMPLE_20261024.md",
       "claim_stage": "PUBLIC_HIRING_FIT_HYPOTHESIS",
       "external_procurement_scope": "NONE"
     }
