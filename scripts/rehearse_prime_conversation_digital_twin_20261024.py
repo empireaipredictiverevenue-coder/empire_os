@@ -115,7 +115,8 @@ def main() -> int:
         "original_provider_contact_tenant_connected": False,
         "simulated_sales_are_not_economic_revenue": True,
     }, indent=2, sort_keys=True))
-    return 0 if report["all_scenario_contracts_passed"] else 1
+    return 0 if (report["all_scenario_contracts_passed"]
+                 and fractal["all_original_scenario_contracts_passed"]) else 1
 
 
 if __name__ == "__main__":
