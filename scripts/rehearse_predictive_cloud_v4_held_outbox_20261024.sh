@@ -82,6 +82,33 @@ wait "$a_pid" || true
 wait "$b_pid" || true
 rm -f /tmp/empire_v4_064_concurrency_a.$$ /tmp/empire_v4_064_concurrency_b.$$
 [[ "$(query "SELECT latest_revision FROM public.empire_predictive_v4_watermarks_held WHERE tenant_id='$other'")" == 5 ]]
+# Exact owner-scope read-only snapshot, from the real temporary PG engine.
+# This is NOT a production authorised tenant/source reader.
+rejected 'permission denied for table empire_predictive_v4_outbox_held' \
+ psql -Xq -v ON_ERROR_STOP=1 -d empire_v4_outbox_fixture -c \
+ "SET ROLE empire_v4_unprivileged;SELECT count(*) FROM public.empire_predictive_v4_outbox_held"
+payload="$(query "SET ROLE empiredb_migrator;
+ BEGIN READ ONLY;
+ SELECT jsonb_build_object('requested_tenant_id','$tenant',
+ 'rows',COALESCE(jsonb_agg(to_jsonb(x)),'[]'::jsonb))
+ FROM (
+   SELECT o.event_digest,o.tenant_id::text AS tenant_id,o.sector,
+    o.entity_digest,o.source_evidence_digest,o.revision,o.event_kind,
+    o.delivery_state,o.execution_authority,w.latest_revision,w.withdrawn,
+    w.source_review_state,w.source_evidence_digest AS watermark_source_digest
+   FROM public.empire_predictive_v4_outbox_held AS o
+   JOIN public.empire_predictive_v4_watermarks_held AS w
+     USING (tenant_id,sector,entity_digest)
+   WHERE o.tenant_id='$tenant'::uuid
+   ORDER BY o.revision,o.event_digest LIMIT 33
+ ) AS x; COMMIT;")"
+result="$(printf '%s' "$payload" | PYTHONPATH=. \
+  /srv/empire_os/.venv/bin/python -B -m empire_os.predictive_cloud_v4_outbox_hold_reader)"
+[[ "$result" == *'"reviewed_count":3'* ]]
+[[ "$result" == *'"redis_publish_authorized":false'* ]]
+[[ "$result" == *'"WITHDRAWN_SOURCE_HELD"'* ]]
+[[ "$result" == *'"source_authority_verified":false'* ]]
+echo 'V4_064_HELD_READER_SNAPSHOT=PASS'
 echo 'V4_064_ATOMIC_REVISION_AND_TOMBSTONE_FIXTURE=PASS'
 echo 'V4_064_OUTBOX_UNIQUE_RLS_OWNER_HELD=PASS'
 echo 'V4_064_DISPOSABLE_ONLY production_empiredb_writes=false redis_published=false money_moved=false'
