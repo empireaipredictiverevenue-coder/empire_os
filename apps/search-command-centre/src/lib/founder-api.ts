@@ -984,3 +984,71 @@ export function getPredictiveRevenueDemo() {
     "/v1/predictive-revenue/demo",
   );
 }
+
+
+export type PrimeDigitalTwinCockpit = {
+  schema_version: string;
+  mode: "SIMULATION";
+  environment: string;
+  selected_scenario_id: string;
+  selected_scenario: {
+    fictional: boolean;
+    original_objection_code: string | null;
+    outcome_state_not_provider_verified: string;
+    simulated_dialogue: Array<{
+      actor: string; text: string; simulated: boolean; real_person: boolean;
+    }>;
+    synthetic_turn_count: number;
+    loop_guard: { status: string; stalled_needs_review: boolean };
+    logic_contract_passed: boolean;
+  };
+  scenario_options: Array<{id: string; name: string}>;
+  fractal_depth: number;
+  selected_fractal: {
+    total_nodes: number;
+    safety_or_causal_holds: number;
+    loop_stalls: number;
+    branches: Array<{
+      path: string;
+      stress: string;
+      depth: number;
+      simulated_state: string;
+      latency_ms: number;
+      latency_budget_ms: number;
+      dropped_messages: number;
+      loop_guard: string;
+      hold_reasons: string[];
+      scenario_expected_logic_matched: boolean;
+    }>;
+  };
+  all_synthetic_baseline: {
+    scripted_scenarios: number;
+    scripted_contract_passes: number;
+    fractal_nodes_at_depth_two: number;
+    expected_safety_holds: number;
+    unresolved_loop_stalls: number;
+  };
+  local_model_selfplay: { status: string; inference_calls: number | null };
+  local_model_active_in_this_read_only_request: boolean;
+  local_model_inference_observed_as_success: boolean;
+  real_world_predictive_accuracy: number | null;
+  real_buyer_intent_verified: boolean;
+  recognized_revenue_cents: number | null;
+  real_messages_sent: boolean;
+  execution_authority: "none";
+};
+
+export function getPrimeDigitalTwinCockpit(
+  scenario = "pricing_resolution", depth = 2,
+): Promise<FounderReadResult<PrimeDigitalTwinCockpit>> {
+  if (!/^[a-z][a-z0-9_-]{1,55}$/.test(scenario)
+      || !Number.isInteger(depth) || depth < 0 || depth > 2) {
+    return Promise.resolve({
+      ok: false, status: null, data: null, reason: "invalid_fictional_scenario",
+    });
+  }
+  return getFounderRead<PrimeDigitalTwinCockpit>(
+    "/v1/founder-dashboard/prime-digital-twin?scenario=" +
+      encodeURIComponent(scenario) + "&depth=" + String(depth),
+  );
+}

@@ -133,6 +133,12 @@ export default async function FounderPage() {
                 >
                   Predictive Revenue live demo →
                 </Link>
+                <Link
+                  href="/founder/prime-digital-twin"
+                  className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-300 hover:text-amber-200"
+                >
+                  PRIME Digital Twin (simulation) →
+                </Link>
               </div>
               <p className="eyebrow mt-6">Empire AI · Founder operating view</p>
               <h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white md:text-5xl">
