@@ -77,6 +77,7 @@ def simulate_conversation_channel(
     if type(path) is not str or len(path) > MAX_DEPTH or any(c not in BRANCHES for c in path):
         raise ValueError("valid_fractal_variation_path_required")
     review = rehearse_conversation(scenario, show_dialogue=True)
+    loop_guard = review["synthetic_loop_guard"]
     messages = review["simulated_dialogue"]
     n = len(messages)
     if not 1 <= n <= MAX_DIALOGUE_TURNS:
@@ -95,12 +96,14 @@ def simulate_conversation_channel(
     # verified answer, commercial order, commitment or conversation outcome.
     timeout = elapsed > envelope.timeout_budget_ms
     channel_lost = bool(drops)
-    complete = not timeout and not channel_lost
+    complete = not timeout and not channel_lost and not loop_guard["stalled_needs_review"]
     blockers = []
     if timeout:
         blockers.append("synthetic_transport_time_budget_exceeded")
     if channel_lost:
         blockers.append("synthetic_message_loss_breaks_causal_conversation")
+    if loop_guard["stalled_needs_review"]:
+        blockers.append("synthetic_conversation_loop_stalled_needs_review")
     if review["simulated_final_state"] == "SELLER_RESPONSE_POLICY_HELD":
         blockers.append("seller_policy_refused_unapproved_claim")
     # Fictional stop/optout may not be reinterpreted as permission to send.
@@ -125,7 +128,9 @@ def simulate_conversation_channel(
         "simulated_dropped_utterance_count": len(drops),
         "synthetic_latency_budget_ms": envelope.timeout_budget_ms,
         "synthetic_aggregate_latency_ms": elapsed,
-        "synthetic_event_timing_causal": not timeout and not channel_lost,
+        "synthetic_event_timing_causal": not timeout and not channel_lost and not loop_guard["stalled_needs_review"],
+        "synthetic_loop_guard_status": loop_guard["status"],
+        "no_repeated_inference_authorized": True,
         "simulated_original_lifecycle_state_not_real_customer": review["simulated_final_state"],
         "simulation_status": (
             "TRANSPORT_AND_POLICY_HOLD" if blockers else
@@ -242,6 +247,11 @@ def run_fractal_physics_gauntlet(
         "simulated_total_nodes": len(nodes),
         "expected_recursive_nodes": len(roots) * expected_per_root,
         "original_scenario_logic_failure_count": scenario_logic_fails,
+        "synthetic_loop_stall_count": sum(n["synthetic_loop_guard_status"] in (
+            "REPEATED_TURN_STALLED_NEEDS_REVIEW", "TURN_BUDGET_EXCEEDED_HOLD",
+            "POST_STOP_MESSAGE_HOLD", "UNTRUSTED_SYNTHETIC_TURN_HOLD",
+            "EMPTY_CURRENT_UTTERANCE_HOLD",
+        ) for n in nodes),
         "causal_or_policy_held_node_count": causal_blocks,
         "unexpected_channel_hold_count": unexpected,
         "all_original_scenario_contracts_passed": scenario_logic_fails == 0,
@@ -312,14 +322,22 @@ def founder_fractal_physics_status(
                or v.get("verified_buyer_conversion_count") is not None
                or v.get("real_world_predictive_accuracy") is not None
                or v.get("execution_authority") != "none"
+               or v.get("no_repeated_inference_authorized") is not True
+               or type(v.get("synthetic_loop_guard_status")) is not str
                or type(v.get("original_scenario_contract_pass")) is not bool
                or type(v.get("hold_reasons")) is not list
                for v in nodes)):
         raise ValueError("original_fractal_physics_child_receipt_tamper")
     logic_fails = sum(not v["original_scenario_contract_pass"] for v in nodes)
     holds = sum(bool(v["hold_reasons"]) for v in nodes)
+    stalls = sum(v["synthetic_loop_guard_status"] in (
+        "REPEATED_TURN_STALLED_NEEDS_REVIEW", "TURN_BUDGET_EXCEEDED_HOLD",
+        "POST_STOP_MESSAGE_HOLD", "UNTRUSTED_SYNTHETIC_TURN_HOLD",
+        "EMPTY_CURRENT_UTTERANCE_HOLD",
+    ) for v in nodes)
     if (packet.get("original_scenario_logic_failure_count") != logic_fails
         or packet.get("causal_or_policy_held_node_count") != holds
+        or packet.get("synthetic_loop_stall_count") != stalls
         or packet.get("all_original_scenario_contracts_passed") is not
             (logic_fails == 0)):
         raise ValueError("original_fractal_physics_aggregate_inconsistent")
@@ -331,6 +349,7 @@ def founder_fractal_physics_status(
         "synthetic_cases_executed": count,
         "expected_causal_or_policy_holds": holds,
         "synthetic_contract_failures": logic_fails,
+        "synthetic_loop_stalls": stalls,
         "real_world_predictive_accuracy": None,
         "actual_revenue": False,
         "execution_authority": "none",

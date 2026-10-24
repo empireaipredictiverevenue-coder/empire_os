@@ -8,6 +8,7 @@ simulated buyer's scripted confirmation is NOT evidence of customer success.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Sequence as SequenceABC
 import re
 from typing import Any, Mapping, Sequence
 
@@ -23,6 +24,80 @@ SCHEMA = "empire.digital_twin.conversation_rehearsal.v1"
 SUMMARY_SCHEMA = "empire.prime.conversation_twin_synthetic_status.v1"
 MAX_SCENARIOS = 24
 MAX_DIALOGUE_TURNS = 5
+
+
+def review_synthetic_conversation_loop(
+    dialogue: Sequence[Mapping[str, Any]], *, max_turns: int = MAX_DIALOGUE_TURNS,
+) -> dict[str, Any]:
+    """Fail-closed watchdog for current original Digital Twin scripted/self-play turns.
+
+    Call after every candidate synthetic turn BEFORE proposing another. Repeated
+    utterances, post-STOP messages, invalid actors, and turn-budget exhaustion
+    cannot be rewarded as a completed sale or continue to another inference.
+    No transcript, person ID or text returned; does not issue any actual reply.
+    """
+    if (type(max_turns) is not int or not 1 <= max_turns <= MAX_DIALOGUE_TURNS
+        or type(dialogue) not in (tuple, list)):
+        raise ValueError("bounded_original_synthetic_watchdog_contract_required")
+    if not dialogue:
+        status = "NO_SYNTHETIC_TURNS"
+        n = 0
+    else:
+        n = len(dialogue)
+        seen: set[tuple[str, str]] = set()
+        stop_index: int | None = None
+        status = "NO_LOOP_OBSERVED_IN_BOUNDED_PREFIX"
+        for idx, step in enumerate(dialogue):
+            if (type(step) is not dict
+                or set(step) != {"actor", "text", "real_person", "simulated"}
+                or step.get("actor") not in ("FICTIONAL_BUYER_TWIN", "FICTIONAL_SELLER_TWIN")
+                or step.get("real_person") is not False
+                or step.get("simulated") is not True
+                or type(step.get("text")) is not str
+                or not 1 <= len(step["text"]) <= 600):
+                status = "UNTRUSTED_SYNTHETIC_TURN_HOLD"
+                break
+            if idx >= max_turns:
+                status = "TURN_BUDGET_EXCEEDED_HOLD"
+                break
+            if stop_index is not None:
+                status = "POST_STOP_MESSAGE_HOLD"
+                break
+            current = _buyer_text(step["text"])
+            # Only the current unquoted utterance is evaluated, not history.
+            compact = re.sub(r"[^a-z0-9]+", " ", current.casefold()).strip()
+            if not compact:
+                status = "EMPTY_CURRENT_UTTERANCE_HOLD"
+                break
+            signature = (step["actor"], compact)
+            if signature in seen:
+                status = "REPEATED_TURN_STALLED_NEEDS_REVIEW"
+                break
+            seen.add(signature)
+            if step["actor"] == "FICTIONAL_BUYER_TWIN" and (
+                NO_CONTACT.search(current) or REFUSAL.search(current)
+            ):
+                stop_index = idx
+                status = "SIMULATED_STOP_NO_FOLLOWUP"
+    return {
+        "schema_version": "empire.digital_twin.conversation_loop_guard.v1",
+        "mode": "SIMULATION",
+        "status": status,
+        "inspected_synthetic_turn_count": n,
+        "max_synthetic_turns": max_turns,
+        "stalled_needs_review": status in (
+            "REPEATED_TURN_STALLED_NEEDS_REVIEW", "TURN_BUDGET_EXCEEDED_HOLD",
+            "POST_STOP_MESSAGE_HOLD", "UNTRUSTED_SYNTHETIC_TURN_HOLD",
+            "EMPTY_CURRENT_UTTERANCE_HOLD",
+        ),
+        "no_autonomous_continuation_authorized": True,
+        "fictional_only": True,
+        "real_world_predictive_accuracy": None,
+        "real_messages_sent": False,
+        "model_weight_mutation": False,
+        "execution_authority": "none",
+    }
+
 REACTIONS = frozenset({
     "CONFIRM_RESOLVED", "STILL_CONCERNED", "REOPEN_AFTER_CONFIRM",
     "SILENCE", "DECLINE", "OPT_OUT",
@@ -186,10 +261,12 @@ def rehearse_conversation(
     if type(show_dialogue) is not bool:
         raise ValueError("synthetic_transcript_view_boolean_required")
     dialogue, detected, actual_state, blockers, seller_acted = _synthetic_dialogue(scenario)
+    loop_guard = review_synthetic_conversation_loop(dialogue)
     pass_contract = (
         detected == scenario.expected_first_objection_code
         and actual_state == scenario.expected_final_state
         and (actual_state != "SELLER_RESPONSE_POLICY_HELD" or not seller_acted)
+        and not loop_guard["stalled_needs_review"]
     )
     return {
         "schema_version": SCHEMA,
@@ -199,6 +276,7 @@ def rehearse_conversation(
         "seller_twin": "EXISTING_PRIME_OBJECTION_RULE_POLICY",
         "scripted_not_generatively_autonomous": True,
         "scenario_contract_pass": pass_contract,
+        "synthetic_loop_guard": loop_guard,
         "detected_original_objection_code": detected,
         "simulated_final_state": actual_state,
         "simulated_seller_reply_generated": seller_acted,

@@ -64,3 +64,21 @@ All original CLI output is source-marked SIMULATION. A five-turn conversation is
 **874 original Digital Twin / PRIME affected-contract scoped regression tests passed** on the research worktree, with one inherited Starlette/anyio deprecation warning. The cross-sector 5-scenario CLI and the combined 16-scenario CLI were run independently with depth-2 outputs 35 and 112 respectively, with zero scripted logic-contract mismatches. This is NOT a whole-repository suite, not autonomous self-play, not real-world validation, and not an original source-owner production release approval.
 
 One EmpireOS. One original EmpireDB. One Smart CRM. One existing Digital Twin and Predictive Cloud/PRIME.
+
+
+## 24 October — Explicit anti-loop release guard, finished before next build
+
+The original `digital_twin_conversation_rehearsal.py` now owns `review_synthetic_conversation_loop()` and calls it in every synthetic conversation. It is **not** another service or AI agent.
+
+- Five-turn cap (smaller caller budgets allowed). Overbudget continuation returns `TURN_BUDGET_EXCEEDED_HOLD` and is not scored as an acceptable scenario.
+- Repetition guard compares bounded, normalized **current** synthetic utterances, role by role, while excluding quoted historical content. Repeated fictional buyer questions or fictional seller pitches produce `REPEATED_TURN_STALLED_NEEDS_REVIEW`; no indefinite conversational cycling.
+- Fictional STOP, unsubscribe or clear refusal means no further model-generated/seller response. Any message after STOP produces `POST_STOP_MESSAGE_HOLD`. STOP itself is terminal, not a request to overcome an objection.
+- Non-synthetic actor/provenance flags, extra private fields, empty/current-invalid turns and malformed budgets fail closed. The watchdog returns **codes, not transcript text**. It never grants access to source messages or sends any email.
+- The existing `digital_twin_conversation_fractal_physics.py` now directly inherits the watchdog: a stalled conversation adds a hold reason, cannot be treated as a causally complete delivered conversation, and exposes only an aggregate stall count through the existing PRIME Founder bridge. Parent/child output tampering and forged stall totals are rejected.
+- This only guards the **existing deterministic scripted simulator**. There are no ongoing autonomous model calls yet. An independently approved future local-model adapter must additionally enforce timeout, maximum *inference calls*, maximum output tokens and explicit stopping after `STALLED_NEEDS_REVIEW`; the present code must not claim to have tested an unbuilt autonomous model.
+
+Verification: **900 scoped original Digital Twin, PRIME, Conversation OS, Quant, CRM and signed-owner contract tests passed**, with one inherited Starlette/anyio deprecation warning (not a full repository gauntlet). Existing 16 fictional scenarios still expand to **112** bounded fractal/physics nodes, reporting **zero stalled turns** and **zero predefined script-contract mismatches**. Separate adversarial tests deliberately generate STOP, repetition and overbudget failures and verify mandatory holds.
+
+**Stop/exit criterion for this engineering milestone:** watchdog implemented, failure modes adversarially tested, original 112-node simulation preserved, code committed to the isolated research branch. Do **not** reopen endless synthetic self-reassurance tests. Resume the founder's original Digital Twin/physics objective: budgeted, purely fictional local-model buyer/seller self-play with independent expected-outcome evaluation before any permitted real-world shadow validation.
+
+No production checkout, original EmpireDB, Smart CRM, mail transport, real buyer, money or inference-model weights modified.

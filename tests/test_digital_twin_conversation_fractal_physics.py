@@ -253,3 +253,30 @@ def test_original_brain_fractal_source_absent_is_not_an_implicit_run():
         as_of=datetime(2026, 10, 24, tzinfo=timezone.utc),
     )
     assert review["prime_original_fractal_physics_conversation_simulation"]["status"] == "NOT_RUN"
+
+
+def test_fractal_physics_inherits_the_original_no_loop_watchdog():
+    packet = run_fractal_physics_gauntlet(ROOTS, max_depth=2)
+    founder = founder_fractal_physics_status(packet)
+    assert packet["synthetic_loop_stall_count"] == 0
+    assert founder["synthetic_loop_stalls"] == 0
+    assert all(node["no_repeated_inference_authorized"] is True
+               for node in packet["nodes"])
+    assert all(node["synthetic_loop_guard_status"] in (
+        "NO_LOOP_OBSERVED_IN_BOUNDED_PREFIX", "SIMULATED_STOP_NO_FOLLOWUP",
+    ) for node in packet["nodes"])
+    assert packet["real_world_predictive_accuracy"] is None
+
+
+def test_founder_rejects_forged_fractal_loop_stall_totals():
+    packet = run_fractal_physics_gauntlet(ROOTS[:1], max_depth=1)
+    packet["synthetic_loop_stall_count"] = 99
+    with pytest.raises(ValueError, match="original_fractal_physics_aggregate_inconsistent"):
+        founder_fractal_physics_status(packet)
+
+
+def test_fractal_child_cannot_erase_repeat_inference_hold():
+    packet = run_fractal_physics_gauntlet(ROOTS[:1], max_depth=1)
+    packet["nodes"][0]["no_repeated_inference_authorized"] = False
+    with pytest.raises(ValueError, match="child_receipt_tamper"):
+        founder_fractal_physics_status(packet)
