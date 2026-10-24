@@ -165,3 +165,68 @@ def test_source_absence_does_not_generate_unverified_bid(tmp_path):
     result=review_live(tmp_path,now=NOW)
     assert result["status"]==STATUS_HELD
     assert result["bid_ready_count"]==0
+
+
+
+def test_original_ryde_source_overlay_preserves_discrepant_deadline_and_no_bid(tmp_path):
+    import json
+    from scripts.review_official_tender_bid_no_bid_20261024 import _join_original_ryde_issuer_proof
+    from scripts.reconcile_ryde_original_issuer_documents_20261024 import (
+        OCID, NOTICE, PAGE, SCHEMA, READY, OUTPUT, FILES,
+    )
+    row=item(ocid=OCID)
+    row["official_notice_url"]=NOTICE
+    row["tender_closes_at_utc"]="2026-10-26T12:00:00+00:00"
+    original=decide(triage(row))
+    source={
+        "schema_version":SCHEMA,"status":READY,"ocid":OCID,
+        "official_contracts_finder_notice":NOTICE,
+        "issuer_transparency_page":PAGE,
+        "source_review_verified_at_utc":NOW.isoformat(),
+        "source_deadline_conflict":True,
+        "buyer_closing_date_authoritatively_reconciled":False,
+        "bid_authorized":False,"bid_eligibility_verified":False,
+        "contact_authorized":False,"verified_contract_value_gbp":None,
+        "verified_profit_margin":None,"issuer_document_count":4,
+        "feed_closing_datetime":"2026-10-26T12:00:00+00:00",
+        "quotation_deadline_from_issuer_document":"2026-11-02T12:00:00+00:00",
+        "clarification_deadline_from_issuer_document":"2026-10-26",
+        "published_requirements":["Original qualified specialist evidence "+str(i) for i in range(11)],
+        "payment_terms_as_stated_percent":[20,20,30,30],
+        "documents":[{"content_sha256":digest} for _name,_mime,digest in FILES.values()],
+    }
+    path=tmp_path/OUTPUT
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(json.dumps(source))
+    path.chmod(0o600)
+    result=_join_original_ryde_issuer_proof(tmp_path,original,now=NOW)
+    assert result["original_issuer_documents_reconciled_count"]==1
+    assert result["unresolved_issuer_deadline_conflict_count"]==1
+    item_out=result["founder_review_items"][0]
+    assert item_out["issuer_deadline_discrepancy"] is True
+    assert item_out["tender_closes_at_utc"]=="2026-10-26T12:00:00+00:00"
+    assert item_out["issuer_quotation_datetime_unconfirmed"]=="2026-11-02T12:00:00+00:00"
+    assert item_out["bid_submission_authorized"] is False
+    assert item_out["verified_profit_or_margin"] is None
+    assert result["bid_ready_count"]==0
+    assert result["supplier_eligible_count"]==0
+    assert result["realised_revenue"] is None
+
+
+def test_invalid_ryde_primary_source_overlay_never_promotes_any_bid(tmp_path):
+    import json
+    from scripts.review_official_tender_bid_no_bid_20261024 import _join_original_ryde_issuer_proof
+    from scripts.reconcile_ryde_original_issuer_documents_20261024 import OCID,NOTICE,OUTPUT
+    row=item(ocid=OCID)
+    row["official_notice_url"]=NOTICE
+    report=decide(triage(row))
+    p=tmp_path/OUTPUT
+    p.parent.mkdir(parents=True,exist_ok=True)
+    p.write_text('{"status":"fabricated_customer_approved","bid_authorized":true}')
+    p.chmod(0o600)
+    result=_join_original_ryde_issuer_proof(tmp_path,report,now=NOW)
+    assert result["founder_review_items"][0]["issuer_primary_source_reconciliation"]=="SOURCE_PROOF_NOT_CURRENT"
+    assert result["founder_review_items"][0]["bid_submission_authorized"] is False
+    assert result["bid_ready_count"]==0
+    p.chmod(0o644)
+    assert _join_original_ryde_issuer_proof(tmp_path,decide(triage(row)),now=NOW)["bid_ready_count"]==0

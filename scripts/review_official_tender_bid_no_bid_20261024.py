@@ -6,7 +6,7 @@ Costs are mathematical *internal hypothetical scenarios*, not actual bid prices.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 import json
 import os
@@ -199,9 +199,83 @@ def decide(triage: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _join_original_ryde_issuer_proof(root: Path, report: dict[str, Any],
+                                    *, now: datetime) -> dict[str, Any]:
+    """Trusted read-only source overlay; never changes the underlying bid hold."""
+    if report.get("status") != STATUS_READY:
+        return report
+    from scripts.reconcile_ryde_original_issuer_documents_20261024 import (
+        OUTPUT as SOURCE_FILE, SCHEMA as SOURCE_SCHEMA, READY as SOURCE_READY,
+        OCID as RYDE_OCID, FILES as REVIEWED_FILES, PAGE as ISSUER_PAGE,
+    )
+    target = next((x for x in report["founder_review_items"]
+                   if x["ocid"] == RYDE_OCID), None)
+    if target is None:
+        return report
+    target["issuer_primary_source_reconciliation"] = "SOURCE_PROOF_NOT_CURRENT"
+    path = root / SOURCE_FILE
+    try:
+        if (path.is_symlink() or path.parent.is_symlink()
+            or not path.is_file()
+            or stat.S_IMODE(path.stat().st_mode) != 0o600
+            or path.stat().st_size > 30000):
+            return report
+        source = json.loads(path.read_text(encoding="utf-8"))
+        reviewed = datetime.fromisoformat(source["source_review_verified_at_utc"])
+        if (reviewed.tzinfo is None
+            or not timedelta(0) <= now.astimezone(timezone.utc)-reviewed.astimezone(timezone.utc) <= timedelta(hours=24)
+            or source.get("schema_version") != SOURCE_SCHEMA
+            or source.get("status") != SOURCE_READY
+            or source.get("ocid") != RYDE_OCID
+            or target.get("official_notice_url") != source.get("official_contracts_finder_notice")
+            or target.get("tender_closes_at_utc") != source.get("feed_closing_datetime")
+            or source.get("issuer_transparency_page") != ISSUER_PAGE
+            or source.get("source_deadline_conflict") is not True
+            or source.get("buyer_closing_date_authoritatively_reconciled") is not False
+            or source.get("bid_authorized") is not False
+            or source.get("bid_eligibility_verified") is not False
+            or source.get("contact_authorized") is not False
+            or source.get("verified_contract_value_gbp") is not None
+            or source.get("verified_profit_margin") is not None
+            or source.get("issuer_document_count") != 4
+            or not isinstance(source.get("documents"),list)
+            or not isinstance(source.get("published_requirements"),list)
+            or len(source["published_requirements"]) < 10
+            or not all(isinstance(text,str) and 10 <= len(text) <= 300
+                       for text in source["published_requirements"])
+            or {x.get("content_sha256") for x in source["documents"]}
+            != {entry[2] for entry in REVIEWED_FILES.values()}):
+            return report
+    except (OSError,ValueError,TypeError,KeyError,OverflowError):
+        return report
+    # The aggregation may still say 26 Oct; issuer PDF asks for quotes by
+    # 2 Nov. This discrepancy is NEVER resolved by a single source.
+    target.update({
+        "issuer_primary_source_reconciliation": "VERIFIED_PUBLIC_ISSUER_DOCUMENTS_WITH_UNRESOLVED_DEADLINE_CONFLICT",
+        "issuer_document_page": source["issuer_transparency_page"],
+        "issuer_quotation_datetime_unconfirmed": source["quotation_deadline_from_issuer_document"],
+        "issuer_clarification_date": source["clarification_deadline_from_issuer_document"],
+        "aggregated_feed_deadline": source["feed_closing_datetime"],
+        "issuer_deadline_discrepancy": True,
+        "issuer_required_qualifications": list(source["published_requirements"]),
+        "issuer_supplier_capability_evidence": "NOT_VERIFIED",
+        "issuer_payment_terms_percent_unaccepted": list(source["payment_terms_as_stated_percent"]),
+        "issuer_original_document_reviewed_at_utc": source["source_review_verified_at_utc"],
+        "required_next_action": "REQUEST_OWNER_CONFIRMATION_OF_COMPETING_DEADLINES_AND_SUPPLIER_REQUIREMENTS",
+        "cost_economics": "NOT_CALCULABLE_WITHOUT_CONFIRMED_SCOPE_AND_COSTS",
+        "verified_profit_or_margin": None,
+        "bid_submission_authorized": False,
+        "quote_approved": False,
+    })
+    report["original_issuer_documents_reconciled_count"] = 1
+    report["unresolved_issuer_deadline_conflict_count"] = 1
+    return report
+
+
 def review_live(root: Path, *, now: datetime | None = None) -> dict[str, Any]:
-    existing=review_existing_report(root,now=now or datetime.now(timezone.utc))
-    return decide(existing)
+    current = now or datetime.now(timezone.utc)
+    existing=review_existing_report(root,now=current)
+    return _join_original_ryde_issuer_proof(root,decide(existing),now=current)
 
 
 def write_private(root: Path, report: Mapping[str, Any]) -> Path:

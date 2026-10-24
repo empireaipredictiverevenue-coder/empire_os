@@ -56,3 +56,35 @@ Live receipt: `ORIGINAL_ISSUER_DOCUMENT_REFERENCES_OBSERVED_NOT_VERIFIED`, 2 ori
 The private mode-0600 manifest is `runtime/acquisition_research/official_tender_issuer_document_index_latest.json` in original mode-0700 research folder. No new timers, attachments copied, third-party logins, customer records, bid submissions or financial actions.
 
 Next original procurement owner step: obtain legitimate access to each issuer document through normal supplier channels, review contents and clarification changes, then establish qualification, legal obligations, delivery cost and final date. Without that evidence by the closing deadline, label NO-BID.
+
+## 24 October — PRIMARY COUNCIL PDF AND DOCX DOCUMENTS VERIFIED
+
+The former Contracts Finder attachment endpoint returned HTTP 403, but Ryde Town Council independently publishes the tender's original documents at its official `https://rydetowncouncil.gov.uk/transparency/` page. No bypass of the Contracts Finder attachment controls was attempted. The four independently issuer-published files were directly retrieved over HTTPS, byte-checked, pinned to reviewed SHA-256 digests, and the request-to-quote PDF and supplier due-diligence PDF were read/visually checked. The two DOCX supplier forms were parsed to verify they are the expected pricing and references templates. This does NOT mean the original Contracts Finder attachment set was downloaded or that all follow-up clarifications have been reviewed.
+
+**Exact original publisher sources, owner inspection scope:**
+- https://rydetowncouncil.gov.uk/wp-content/uploads/2026/10/Request-to-Quote-Data-Audit-1.pdf
+- https://rydetowncouncil.gov.uk/wp-content/uploads/2026/10/Due-Dilligence-Check-Sheet-Summary-1.pdf
+- https://rydetowncouncil.gov.uk/wp-content/uploads/2026/10/Pricing-Shedule-Data-Audit-1.docx
+- https://rydetowncouncil.gov.uk/wp-content/uploads/2026/10/References-1.docx
+
+**Genuine issuer deadline conflict:**
+- Contracts Finder OCDS bulk release metadata reports `2026-10-26T12:00:00Z` as the procurement tender end date.
+- Council Request to Quote PDF schedule says 26 October 2026 is the deadline for *clarification questions*, while **2 November 2026 at noon** is the deadline for *quotation submission*, repeated again on the final PDF page.
+- This discrepancy MUST remain open until the issuer explicitly confirms which deadline governs. Never silently change an original release field or assert that the bid is open until 2 November.
+
+**Actual mandatory specialist requirements in original Request to Quote (not inferred):**
+- Named auditors with recognised data-protection qualification such as BCS Practitioner Certificate, PC.dp, CIPP/E or equivalent; demonstrable comparable local authority/public-sector audits.
+- Professional indemnity insurance **at least £5,000,000** and public liability insurance **at least £5,000,000**.
+- ICO registration as a data controller, own documented privacy/security arrangements, declaration of independence and conflicts, and **two references for comparable work within three years**.
+- At least some fieldwork **on site** at the council in Ryde, including interviews, document review and systems/working-practices observation.
+- Deliverables include inception plan, draft evidence-backed RAG audit report, prioritised action plan, Article 30 ROPA, information asset register and data-flow map, final plain-English audit report, and presentation to councillors. Edited electronic copies belong to Ryde Town Council.
+- Work covers UK GDPR, Data Protection Act 2018, Data (Use and Access) Act 2025, PECR, ICO guidance and relevant information governance.
+- Separate due-diligence form asks for supplier identity, relevant accounts/tax-return evidence, insurance certificates and health/safety declarations. The references DOCX asks for organisation details, completion dates and contract values.
+- The council's **pricing schedule is an unfilled supplier template**, NOT confirmation of a £0 contract or a verified project value.
+- The *stated* bank-transfer payment milestones are **20% on appointment, 20% before fieldwork, 30% on draft report, 30% on final report and presentation**. This is procurement text, NOT accepted payment terms, invoicing or money received.
+
+**Original EmpireOS integration:** `scripts/reconcile_ryde_original_issuer_documents_20261024.py` downloads only the four exact allowlisted public files with no redirects, hashes, size/MIME/format checks, and fails closed on changed content. It atomically stores a mode-0600 review receipt under the existing mode-0700 private tender runtime at `runtime/acquisition_research/ryde_gdpr_issuer_requirements_latest.json`. The existing original `scripts/review_official_tender_bid_no_bid_20261024.py` joins the restricted receipt *only if* matching original OCID, notice, old source deadline, four pinned hashes and a fresh timestamp pass validation. It shows both deadlines and all hard supplier gates, while retaining original tender closure metadata and no-bid authority. It does not send clarification email, submit quotes, fill forms, grant access, activate payment or operate the CRM. No database writes or new timers/services.
+
+**Decision until owner's evidence:** `HOLD_SUPPLIER_COMPETENCE_AND_DELIVERY_SCOPE` (not supplier eligible). No named data-protection auditor qualification, comparable public-sector audit experience, £5m certificates, ICO registration, independent audit status, legal contractual capacity, onsite availability or contract cost basis has been independently proven *for Empire AI*. Any absent mandatory item means NO-BID unless demonstrably remedied before the actual issuer-confirmed submission deadline. A speculative intermediary partnership or guessed subcontractor does not establish compliance. Ryde is unsuitable for an unsupervised software-only delivery.
+
+**Revenue discipline:** Tender research, a completed pricing template, an optional quote draft and an authority's published payment schedule are none of: accepted offer, signed contract, performed deliverable, invoice settled or recognised revenue. Continue the same original EmpireOS and one EmpireDB.
