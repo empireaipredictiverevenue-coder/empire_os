@@ -292,8 +292,25 @@ def read_original_private_source(root: Path) -> dict[str,Any] | None:
 
 
 def review(root: Path, *, now: datetime|None=None) -> dict[str,Any]:
+    current=now or datetime.now(timezone.utc)
     src=read_original_private_source(root)
-    return consult(src,now=now or datetime.now(timezone.utc))
+    report=consult(src,now=current)
+    if report["status"]==READY:
+        from empire_os.tender_supplier_evidence_intake import inventory
+        stage=inventory(root,now=current)
+        # File custody is ONLY a status signal. Never promote a locally
+        # staged attachment into verified issuer terms or supplier capacity.
+        report["ca18567_supplier_document_intake"]={
+            "status":stage["status"],
+            "documents_observed":stage["document_count"],
+            "provenance_status":stage["provenance_status"],
+            "full_rfq_reviewed":False,
+            "scored_quality_criteria_verified":False,
+            "supplier_eligibility_verified":False,
+            "bid_authorized":False,
+            "human_review_required":True,
+        }
+    return report
 
 
 def save_private(root: Path, report: Mapping[str,Any]) -> Path:

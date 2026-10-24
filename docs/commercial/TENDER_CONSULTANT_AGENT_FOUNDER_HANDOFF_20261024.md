@@ -54,3 +54,31 @@ This capability is an internal decision-support agent. To become a bidder it wou
 
 ## Next original tender build
 Attach legitimate supplier RFQ content after original owner access, verify detailed criteria and special conditions with human consultant, map evidence-backed project staffing and site research resources, and generate a quote draft for explicit founder review **only after** verified costs and scope. Integrate source-reviewed consultant plans to Chief of Staff's existing internal review queue only after confirming the original queue schema and approval. Do not register new schedulers or contact buyers from a research task.
+
+## 24 October — guarded CA18567 supplier-RFQ documentary intake (no portal access)
+
+The founder executed the original native consultant entrypoint successfully on 24 October at 13:26:14 UTC: `CONSULTANT_BRIEF_PREPARED_REVIEW_ONLY`, two original public tenders, 11 proposed owner-review actions, zero bids/customers/contracts/CRM writes, and no outbound. The founder's run is accurate; no unsupported supplier validation should be inferred from it.
+
+The next source dependency is real: the **full original CA18567 RFQ is not yet available** in EmpireOS. Public government notices establish the £25,000 estimated contract budget, 80% quality / 20% price overall weighting, the 26 October clarification cutoff and the full-notice 30 October submission deadline (public summary anomalously says 31 October), but the actual detailed scoring questions, contract conditions, supply criteria and legal rights are behind the original MultiQuote supplier portal. No portal authentication, account registration, private file acquisition or binding acceptance was performed.
+
+**Original private intake created:**
+`/srv/empire_os/runtime/acquisition_research/tender_supplier_documents/CA18567/` — mode **0700**, existing EmpireOS research tree only. No source documents are present yet.
+
+**Source-custody commands (optional, authorised private research):**
+```bash
+cd /srv/empire_os
+.venv/bin/python -B -m scripts.prepare_tender_supplier_evidence_intake_20261024 \
+  --repo-root /srv/empire_os --prepare-private-drop --write-private
+.venv/bin/python -B -m scripts.run_tender_consultant_agent_20261024 \
+  --repo-root /srv/empire_os --write-private
+```
+
+Output mode **0600**: `runtime/acquisition_research/land_guide_supplier_documents_inventory_latest.json`. Current live status: `AWAIT_AUTHORISED_MULTIQUOTE_RFQ_FILES`, 0 files, issuer-provenance `NOT_AUTHENTICATED_BY_ISSUER`.
+
+Original owner ONLY, once explicitly and lawfully downloaded from the real MultiQuote opportunity, can place allowed `PDF`/`DOCX` supplier files in the private drop (file mode 0600, original directory mode 0700). The fixed allowlist accepts up to eight simple-named files, up to 12 MB each / 28 MB total. The code rejects symlinks, hardlinks, wrong magic, malformed archives, unexpected permissions, future timestamps and unbounded decompression metadata. No uploaded file instructions are executed; files are never sent to an LLM or external API. A received hash is evidence of *local file custody only*, not document publisher authentication, human review, professional qualification, current amendment status or permission to subcontract.
+
+The consultant's original Founder receipt now carries `ca18567_supplier_document_intake`. It reports `AWAIT_AUTHORISED_MULTIQUOTE_RFQ_FILES`, `SUPPLIER_FILES_OBSERVED_NOT_AUTHENTICATED_OR_REVIEWED` or a strict `HELD` for unsafe files. **All states** retain `full_rfq_reviewed=false`, `scored_quality_criteria_verified=false`, `supplier_eligibility_verified=false`, `bid_authorized=false`. A subsequent qualified human consultant must review the original RFQ and provenance against the lawful publisher portal before any commercial gate can be considered.
+
+No other tenant, external sales agent, production cron, file library, database schema, outbound governor, messaging service, legal declarations, payments or bid submissions were modified. The restricted original on-demand specialist remains under `tender_consultant` in the existing `agent_execution_plane`.
+
+**Next milestone:** acquire actual RFQ documents by authorised human supplier access, inspect the scoring breakdown and specialist land-investment requirements, source staff and GIS/data rights/cost evidence, and deliver a defensible founder bid/no-bid memo. If these cannot be proven before the real closing deadline, the original owner should decline instead of inventing eligibility.

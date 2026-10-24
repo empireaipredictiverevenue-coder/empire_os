@@ -238,3 +238,31 @@ def test_shadow_malicious_or_offline_response_remains_held():
     )
     assert offline["status"]=="SHADOW_ADVICE_HELD_NO_NEW_CLAIMS"
     assert module.local_shadow_advice({},call=lambda _:None)["status"]=="SHADOW_ADVICE_HELD_NO_NEW_CLAIMS"
+
+
+def test_consultant_reports_rfq_drop_without_promoting_issuer_or_seller(tmp_path):
+    import os
+    from empire_os import tender_supplier_evidence_intake as intake
+    packet=source()
+    private=tmp_path/module.INPUT
+    private.parent.mkdir(parents=True)
+    private.parent.chmod(0o700)
+    private.write_text(json.dumps(packet))
+    private.chmod(0o600)
+    intake.ensure_private_drop(tmp_path)
+    no_files=module.review(tmp_path,now=NOW)
+    assert no_files["status"]==module.READY
+    assert no_files["ca18567_supplier_document_intake"]["status"]==intake.AWAIT
+    doc=tmp_path/intake.DROP/"CA18567_RFQ.pdf"
+    doc.write_bytes(b"%PDF-1.7\n"+b"a"*1100+b"\n%%EOF")
+    doc.chmod(0o600)
+    os.utime(doc,(NOW.timestamp()-10,NOW.timestamp()-10))
+    seen=module.review(tmp_path,now=NOW)
+    assert seen["status"]==module.READY
+    assert seen["ca18567_supplier_document_intake"]["status"]==intake.OBSERVED
+    assert seen["ca18567_supplier_document_intake"]["documents_observed"]==1
+    assert seen["ca18567_supplier_document_intake"]["provenance_status"]=="NOT_AUTHENTICATED_BY_ISSUER"
+    assert seen["ca18567_supplier_document_intake"]["full_rfq_reviewed"] is False
+    assert seen["ca18567_supplier_document_intake"]["bid_authorized"] is False
+    assert seen["bid_ready_count"]==0
+    assert seen["verified_revenue"] is None

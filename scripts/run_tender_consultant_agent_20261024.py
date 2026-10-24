@@ -36,6 +36,8 @@ def main() -> int:
         "total_human_actions":sum(len(x.get("consultant_owner_tasks",[]))
                                  for x in result.get("briefs",[])),
         "original_tender_system_preserved":True,
+        "supplier_documents_status":result.get("ca18567_supplier_document_intake",{}).get("status","NOT_CHECKED"),
+        "supplier_documents_observed":result.get("ca18567_supplier_document_intake",{}).get("documents_observed",0),
         "local_shadow_status":result.get("local_shadow_questions",{}).get("status","NOT_REQUESTED"),
     })
     print(json.dumps(overview,sort_keys=True))
