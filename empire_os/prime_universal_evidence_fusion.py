@@ -19,6 +19,7 @@ SCHEMA = "empire.prime.universal_evidence_fusion.v1"
 RECEIPT_SCHEMA = "empire.prime.original_owner_evidence_summary.v1"
 MAX_RECEIPTS = 100
 MAX_LINKS = 16
+FOUNDER_SMALL_CELL_THRESHOLD = 5
 # Existing organisational owners; this does not register new agents/readers.
 OWNER_CLASSES = {
     "buyer_acquisition": {"GENERAL_INTEREST", "EXPLICIT_ENQUIRY"},
@@ -104,6 +105,12 @@ def _links(value: Any, field: str) -> tuple[str, ...]:
     return items
 
 
+def _revocations(value: Any, field: str) -> frozenset[str]:
+    if type(value) not in (list, tuple) or len(value) > MAX_RECEIPTS:
+        raise PrimeFusionHold(field + "_bounded_revocation_register_required")
+    return frozenset(_hashref(x, field) for x in value)
+
+
 def _validated(
     row: Mapping[str, Any], *, tenant_digest: str, as_of: datetime,
 ) -> dict[str, Any]:
@@ -134,7 +141,7 @@ def _validated(
     received = _time(row["received_at"], "received_at")
     if observed > received or received > as_of:
         raise PrimeFusionHold("future_or_noncausal_receipt_clock")
-    if as_of - received > MAX_AGE[owner]:
+    if as_of - received > MAX_AGE[owner] or as_of - observed > MAX_AGE[owner]:
         raise PrimeFusionHold("stale_original_owner_observation")
     prediction_as_of = row["prediction_as_of"]
     if prediction_as_of is not None:
@@ -155,6 +162,8 @@ def _validated(
 def review_prime_universal_evidence(
     *, tenant_id: str, as_of: datetime,
     original_owner_summaries: Sequence[Mapping[str, Any]] | None,
+    revoked_origin_sha256: Sequence[str] = (),
+    revoked_event_sha256: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Shadow cross-domain research; never claims genuine calibrated accuracy.
 
@@ -173,7 +182,10 @@ def review_prime_universal_evidence(
     ):
         raise PrimeFusionHold("bounded_original_owner_summary_sequence_required")
 
+    revoked_origins = _revocations(revoked_origin_sha256, "revoked_origins")
+    revoked_events = _revocations(revoked_event_sha256, "revoked_events")
     accepted: dict[str, dict[str, Any]] = {}
+    revocation_excluded_count = 0
     rejected = Counter()
     conflicted = set()
     tenant_digest = _digest(tenant_id)
@@ -182,6 +194,9 @@ def review_prime_universal_evidence(
             item = _validated(row, tenant_digest=tenant_digest, as_of=now)
         except PrimeFusionHold as exc:
             rejected[str(exc)] += 1
+            continue
+        if item["origin_sha256"] in revoked_origins or item["event_sha256"] in revoked_events:
+            revocation_excluded_count += 1
             continue
         identity = item["event_sha256"]
         previous = accepted.get(identity)
@@ -200,6 +215,8 @@ def review_prime_universal_evidence(
     contradictory = set()
     unresolved_links = 0
     invalid_cross_entity_links = 0
+    temporal_link_violation_count = 0
+    unresolved_lineage_entities: set[str] = set()
     corroborating_links: dict[str, set[tuple[str, str]]] = defaultdict(set)
     contradiction_links: dict[str, set[tuple[str, str]]] = defaultdict(set)
     for row in records:
@@ -207,10 +224,16 @@ def review_prime_universal_evidence(
             other = accepted.get(key)
             if other is None:
                 unresolved_links += 1
+                unresolved_lineage_entities.add(row["entity_sha256"])
                 continue
             if (other["entity_sha256"] != row["entity_sha256"]
-                or other["tenant_scope_sha256"] != row["tenant_scope_sha256"]):
+                or other["tenant_scope_sha256"] != row["tenant_scope_sha256"]
+                or other["tenant_binding_sha256"] != row["tenant_binding_sha256"]):
                 invalid_cross_entity_links += 1
+                contradictory.add(row["entity_sha256"])
+                continue
+            if _time(other["received_at"], "received_at") > _time(row["received_at"], "received_at"):
+                temporal_link_violation_count += 1
                 contradictory.add(row["entity_sha256"])
                 continue
             if key in row["contradicts_sha256"]:
@@ -227,15 +250,18 @@ def review_prime_universal_evidence(
     for row in records:
         grouped[row["entity_sha256"]].append(row)
 
-    # Never surface raw or hashed tenant/entity/source/event identifiers in a
-    # Founder status payload. Per-group aliases are local ordinals only.
+    # INTERNAL research-only detail. Even ordinal groups can permit small-cell
+    # inference; never pass this raw result to a Founder-facing route. Use
+    # summarize_prime_founder_evidence on the Predictive Revenue bridge.
     reviews = []
     for index, entity_key in enumerate(sorted(grouped), start=1):
         entries = grouped[entity_key]
         origins = {x["origin_sha256"] for x in entries}
         categories = sorted({x["evidence_class"] for x in entries})
         owners = sorted({x["owner"] for x in entries})
-        contradiction = entity_key in contradictory
+        binding_conflict = len({x["tenant_binding_sha256"] for x in entries}) > 1
+        contradiction = entity_key in contradictory or binding_conflict
+        unresolved = entity_key in unresolved_lineage_entities
         max_level = max(
             (CLASS_LEVEL[x["evidence_class"]] or 0) for x in entries
         )
@@ -250,12 +276,15 @@ def review_prime_universal_evidence(
             "linked_contradictory_event_pair_count": len(contradiction_links[entity_key]),
             "highest_owner_asserted_commercial_evidence_level": max_level or None,
             "contradiction_or_invalid_link_present": contradiction,
+            "tenant_binding_conflict_hold": binding_conflict,
+            "unresolved_lineage_hold": unresolved,
             "buyer_intent_independently_verified": False,
             "owner_claims_do_not_prove_causality": True,
             "confidence_or_probability": None,
             "forecast_or_model_promotion": False,
             "review_status": (
                 "CONTRADICTION_REVIEW_HOLD" if contradiction
+                else "UNRESOLVED_LINEAGE_REVIEW_HOLD" if unresolved
                 else "UNVERIFIED_OWNER_CUSTODY_RESEARCH_ONLY"
             ),
         })
@@ -272,6 +301,9 @@ def review_prime_universal_evidence(
         "conflicting_event_count": len(conflicted),
         "unresolved_evidence_link_count": unresolved_links,
         "cross_entity_link_violation_count": invalid_cross_entity_links,
+        "temporal_link_violation_count": temporal_link_violation_count,
+        "revocation_excluded_record_count": revocation_excluded_count,
+        "revocation_registry_independently_authenticated": False,
         "evidence_class_counts": dict(sorted(Counter(x["evidence_class"] for x in records).items())),
         "source_family_counts": dict(sorted(Counter(x["owner"] for x in records).items())),
         "group_reviews": reviews,
@@ -287,7 +319,8 @@ def review_prime_universal_evidence(
         "revenue_recognized_cents": None,
         "prediction_accuracy_proven": False,
         "independent_scientific_validation_status": "HOLD_NO_VALIDATED_FORWARD_COHORT",
-        "founder_summary_safe_aggregates_only": True,
+        "founder_summary_safe_aggregates_only": False,
+        "contains_internal_entity_level_group_reviews": True,
         "existing_economic_signal_fabric_unmodified": True,
         "original_crm_and_buyer_acquisition_unmodified": True,
         "astra_dispatched": False,
@@ -299,8 +332,98 @@ def review_prime_universal_evidence(
         "blockers": [
             "AUTHENTICATED_ORIGINAL_OWNER_SOURCE_ADAPTERS_NOT_CONNECTED",
             "OWNER_ASSERTIONS_NOT_INDEPENDENT_PROVENANCE_OR_RIGHTS",
+            "SOURCE_REVOCATION_REGISTRY_AUTHORITY_NOT_VERIFIED",
             "TENANT_BINDING_NOT_AUTHENTICATED_BY_PURE_FUSION",
             "INDEPENDENT_FORWARD_OUTCOME_CALIBRATION_REQUIRED",
             "NO_AUTOMATIC_BUYER_INTENT_OR_REVENUE_PROMOTION",
         ],
+    }
+
+
+def _count_band(value: Any) -> str:
+    """Coarsened count bands prevent exact singleton statistics in summaries."""
+    if type(value) is not int or value < 0 or value > MAX_RECEIPTS * 2:
+        raise PrimeFusionHold("bounded_nonnegative_aggregate_required")
+    lower = (value // FOUNDER_SMALL_CELL_THRESHOLD) * FOUNDER_SMALL_CELL_THRESHOLD
+    return f"{lower}-{lower + FOUNDER_SMALL_CELL_THRESHOLD - 1}"
+
+
+def summarize_prime_founder_evidence(internal_review: Mapping[str, Any]) -> dict[str, Any]:
+    """Explicit privacy-minimised Founder projection, not the internal packet.
+
+    Produces no event/entity/source/tenant digests, individual entity reviews,
+    exact small-cell counts, or claims of authenticated buyer revenue.
+    Aggregate bands are a safety reduction, not a formal privacy guarantee.
+    """
+    if (type(internal_review) is not dict
+        or internal_review.get("status") not in (
+            "NOT_CONNECTED_NOT_VERIFIED_ZERO",
+            "OWNER_INPUT_EMPTY_NOT_VERIFIED_ZERO",
+            "PRIVATE_OWNER_SUPPLIED_SHADOW_REVIEW_ONLY",
+        )
+        or internal_review.get("schema_version") != SCHEMA
+        or internal_review.get("mode") != "OBSERVE"
+        or internal_review.get("execution_authority") != "none"
+        or internal_review.get("founder_summary_safe_aggregates_only") is not False
+        or internal_review.get("contains_internal_entity_level_group_reviews") is not True
+        or internal_review.get("buyer_enquiries_independently_verified") is not False
+        or internal_review.get("settled_revenue_independently_verified") is not False
+        or internal_review.get("prediction_accuracy_proven") is not False):
+        raise PrimeFusionHold("original_internal_review_with_holds_required")
+    counts = internal_review.get("evidence_class_counts")
+    families = internal_review.get("source_family_counts")
+    groups = internal_review.get("group_reviews")
+    if (type(counts) is not dict or type(families) is not dict or type(groups) is not list
+        or not set(counts).issubset(CLASS_LEVEL)
+        or not set(families).issubset(OWNER_CLASSES)
+        or len(groups) > MAX_RECEIPTS):
+        raise PrimeFusionHold("bounded_original_review_aggregates_required")
+    for key, values in ((counts, CLASS_LEVEL), (families, OWNER_CLASSES)):
+        if any(type(v) is not int or v < 1 or v > MAX_RECEIPTS for v in key.values()):
+            raise PrimeFusionHold("invalid_owner_aggregate_count")
+    accepted_count = internal_review.get("record_count_owner_supplied")
+    if accepted_count is not None and (
+        type(accepted_count) is not int or not 0 <= accepted_count <= MAX_RECEIPTS
+    ):
+        raise PrimeFusionHold("invalid_internal_cohort_size")
+    if accepted_count is not None and sum(counts.values()) != accepted_count:
+        raise PrimeFusionHold("inconsistent_original_cohort_count")
+    if accepted_count is not None and sum(families.values()) != accepted_count:
+        raise PrimeFusionHold("inconsistent_original_family_count")
+    if (accepted_count is not None and len(groups) > accepted_count
+        or accepted_count is None and groups):
+        raise PrimeFusionHold("invalid_internal_group_count")
+    return {
+        "schema_version": "empire.prime.founder_evidence_aggregate.v1",
+        "mode": "OBSERVE",
+        "status": internal_review["status"],
+        "source_connection_status": (
+            "NOT_CONNECTED" if accepted_count is None else "OWNER_INPUT_UNAUTHENTICATED"
+        ),
+        "accepted_record_count_band": (
+            _count_band(accepted_count) if accepted_count is not None else None
+        ),
+        "internal_entity_group_count_band": (
+            _count_band(len(groups)) if accepted_count is not None else None
+        ),
+        "evidence_class_count_bands_at_least_k": {
+            k: _count_band(v) for k, v in sorted(counts.items())
+            if v >= FOUNDER_SMALL_CELL_THRESHOLD
+        },
+        "source_family_count_bands_at_least_k": {
+            k: _count_band(v) for k, v in sorted(families.items())
+            if v >= FOUNDER_SMALL_CELL_THRESHOLD
+        },
+        "small_cells_suppressed": True,
+        "small_cell_threshold": FOUNDER_SMALL_CELL_THRESHOLD,
+        "this_is_not_anonymity_or_rights_proof": True,
+        "source_owner_independently_authenticated": False,
+        "commercial_buyer_intent_verified": False,
+        "revenue_verified": False,
+        "calibrated_prediction_accuracy_verified": False,
+        "original_scientific_and_risk_holds_preserved": True,
+        "model_promotion_authorized": False,
+        "astra_dispatch_executed": False,
+        "database_writes": False,
+        "execution_authority": "none",
     }

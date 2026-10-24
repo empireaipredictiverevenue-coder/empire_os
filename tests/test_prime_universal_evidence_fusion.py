@@ -8,7 +8,7 @@ import pytest
 
 from empire_os.prime_universal_evidence_fusion import (
     APPROVED_PURPOSE, RECEIPT_SCHEMA, OWNER_CLASSES, PrimeFusionHold,
-    review_prime_universal_evidence,
+    review_prime_universal_evidence, summarize_prime_founder_evidence,
 )
 from empire_os.predictive_revenue_brain_bridge import (
     build_predictive_revenue_brain_review,
@@ -66,7 +66,7 @@ def test_not_connected_is_not_zero_and_bridge_reuses_original():
     bridged = build_predictive_revenue_brain_review(
         tenant_id=TENANT, as_of=NOW,
     )
-    assert bridged["prime_universal_evidence_shadow"] == r
+    assert bridged["prime_universal_evidence_shadow"] == summarize_prime_founder_evidence(r)
     assert bridged["astra_dispatch_executed"] is False
     assert bridged["database_writes"] is False
     assert bridged["recognized_revenue_cents"] is None
@@ -92,7 +92,7 @@ def test_all_original_source_families_are_bounded_and_owner_only():
     bridge = build_predictive_revenue_brain_review(
         tenant_id=TENANT, as_of=NOW, original_owner_evidence_summaries=rows,
     )
-    assert bridge["prime_universal_evidence_shadow"] == result
+    assert bridge["prime_universal_evidence_shadow"] == summarize_prime_founder_evidence(result)
     assert bridge["prime_scenarios"] is None
 
 
@@ -217,7 +217,8 @@ def test_no_private_tenant_or_source_identifiers_in_founder_aggregates():
                     sha("secret-provider"), row["event_sha256"],
                     row["source_sha256"], row["tenant_binding_sha256"]):
         assert private not in encoded
-    assert r["founder_summary_safe_aggregates_only"] is True
+    assert r["founder_summary_safe_aggregates_only"] is False
+    assert summarize_prime_founder_evidence(r)["small_cells_suppressed"] is True
 
 
 def test_bounds_unknown_inputs_and_bad_clocks_fail_closed():
@@ -253,3 +254,138 @@ def test_empty_owner_input_cannot_be_reported_as_a_true_zero():
     assert r["record_count_owner_supplied"] == 0
     assert r["predictions_evaluated"] is False
     assert r["independent_scientific_validation_status"] == "HOLD_NO_VALIDATED_FORWARD_COHORT"
+
+
+def test_old_event_cannot_be_repackaged_as_fresh_receipt():
+    old = entry(
+        "old-permit", owner="permits", klass="ACTIVITY",
+        observed_at=(NOW - timedelta(days=40)).isoformat(),
+        received_at=(NOW - timedelta(seconds=30)).isoformat(),
+    )
+    result = review(old)
+    assert result["rejected_count"] == 1
+    assert "stale_original_owner_observation" in result["rejected_reasons_aggregate"]
+
+
+def test_corroboration_cannot_use_future_received_source_event():
+    early = entry("early", owner="permits", klass="ACTIVITY")
+    later = entry(
+        "later", owner="buyer_acquisition", klass="EXPLICIT_ENQUIRY",
+        observed_at=(NOW - timedelta(minutes=3)).isoformat(),
+        received_at=(NOW - timedelta(minutes=2)).isoformat(),
+    )
+    early["supports_sha256"] = [later["event_sha256"]]
+    result = review(early, later)
+    assert result["temporal_link_violation_count"] == 1
+    group = result["group_reviews"][0]
+    assert group["linked_independent_origin_support_count"] == 0
+    assert group["contradiction_or_invalid_link_present"] is True
+    assert group["review_status"] == "CONTRADICTION_REVIEW_HOLD"
+
+
+def test_cross_owner_corroboration_requires_same_canonical_tenant_binding():
+    a = entry("a")
+    b = entry("b", tenant_binding_sha256=sha("another-scope"),
+              supports_sha256=[a["event_sha256"]])
+    r = review(a, b)
+    group = r["group_reviews"][0]
+    assert r["cross_entity_link_violation_count"] == 1
+    assert group["tenant_binding_conflict_hold"] is True
+    assert group["linked_independent_origin_support_count"] == 0
+    assert group["review_status"] == "CONTRADICTION_REVIEW_HOLD"
+
+
+def test_security_revocation_excludes_origin_and_event_references():
+    source = entry("original", owner="permits", klass="ACTIVITY", origin="revoked-origin")
+    derivative = entry("copy", owner="media_os", klass="GENERAL_INTEREST",
+                       origin="revoked-origin")
+    independent = entry("other", owner="buyer_acquisition", klass="EXPLICIT_ENQUIRY",
+                        supports_sha256=[source["event_sha256"]])
+    r = review_prime_universal_evidence(
+        tenant_id=TENANT, as_of=NOW, original_owner_summaries=[
+            source, derivative, independent,
+        ],
+        revoked_origin_sha256=[sha("revoked-origin")],
+    )
+    assert r["revocation_excluded_record_count"] == 2
+    assert r["record_count_owner_supplied"] == 1
+    assert r["unresolved_evidence_link_count"] == 1
+    assert r["revocation_registry_independently_authenticated"] is False
+    r2 = review_prime_universal_evidence(
+        tenant_id=TENANT, as_of=NOW, original_owner_summaries=[independent],
+        revoked_event_sha256=[independent["event_sha256"]],
+    )
+    assert r2["record_count_owner_supplied"] == 0
+    assert r2["revocation_excluded_record_count"] == 1
+
+
+def test_malformed_or_excessive_revocation_input_fails_closed():
+    with pytest.raises(PrimeFusionHold, match="revoked_origins"):
+        review_prime_universal_evidence(
+            tenant_id=TENANT, as_of=NOW, original_owner_summaries=[],
+            revoked_origin_sha256=["invalid-plain-text"],
+        )
+
+
+def test_founder_summary_omits_entire_entity_drilldown_and_masks_small_cells():
+    user_row = entry("customer-1", owner="buyer_acquisition", klass="EXPLICIT_ENQUIRY",
+                     entity="SINGLETON-PERSON")
+    internal = review(user_row)
+    safe = summarize_prime_founder_evidence(internal)
+    assert internal["contains_internal_entity_level_group_reviews"] is True
+    assert internal["founder_summary_safe_aggregates_only"] is False
+    assert safe["accepted_record_count_band"] == "0-4"
+    assert safe["internal_entity_group_count_band"] == "0-4"
+    assert safe["evidence_class_count_bands_at_least_k"] == {}
+    assert safe["source_family_count_bands_at_least_k"] == {}
+    assert "group_reviews" not in safe
+    encoded = str(safe)
+    for value in (TENANT, sha(TENANT), sha("SINGLETON-PERSON"),
+                  user_row["event_sha256"], user_row["source_sha256"]):
+        assert value not in encoded
+    bridge = build_predictive_revenue_brain_review(
+        tenant_id=TENANT, as_of=NOW, original_owner_evidence_summaries=[user_row],
+    )
+    assert bridge["prime_universal_evidence_shadow"] == safe
+    assert "group_reviews" not in str(bridge["prime_universal_evidence_shadow"])
+
+
+def test_founder_summary_coarsens_moderate_counts_and_leaves_science_held():
+    batch = [entry(f"row-{i}", owner="permits", klass="ACTIVITY", entity=f"company-{i}")
+             for i in range(9)]
+    safe = summarize_prime_founder_evidence(review(*batch))
+    assert safe["accepted_record_count_band"] == "5-9"
+    assert safe["internal_entity_group_count_band"] == "5-9"
+    assert safe["evidence_class_count_bands_at_least_k"] == {"ACTIVITY": "5-9"}
+    assert safe["source_family_count_bands_at_least_k"] == {"permits": "5-9"}
+    assert safe["commercial_buyer_intent_verified"] is False
+    assert safe["revenue_verified"] is False
+    assert safe["calibrated_prediction_accuracy_verified"] is False
+    assert safe["model_promotion_authorized"] is False
+    assert safe["execution_authority"] == "none"
+
+
+def test_founder_summary_rejects_pretend_verified_revenue_claim():
+    r = review(entry("source"))
+    r["settled_revenue_independently_verified"] = True
+    with pytest.raises(PrimeFusionHold, match="holds"):
+        summarize_prime_founder_evidence(r)
+
+
+def test_unresolved_lineage_causes_explicit_hold_not_successful_support():
+    unresolved = entry("unresolved", supports_sha256=[sha("missing-source")])
+    r = review(unresolved)
+    assert r["unresolved_evidence_link_count"] == 1
+    assert r["group_reviews"][0]["unresolved_lineage_hold"] is True
+    assert r["group_reviews"][0]["review_status"] == "UNRESOLVED_LINEAGE_REVIEW_HOLD"
+
+
+def test_revocation_register_accepts_more_than_single_event_link_limit():
+    candidates = [sha("revoked-origin-" + str(i)) for i in range(24)]
+    r = review_prime_universal_evidence(
+        tenant_id=TENANT, as_of=NOW,
+        original_owner_summaries=[entry("unaffected")],
+        revoked_origin_sha256=candidates,
+    )
+    assert r["record_count_owner_supplied"] == 1
+    assert r["revocation_excluded_record_count"] == 0
