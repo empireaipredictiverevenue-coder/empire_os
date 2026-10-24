@@ -74,6 +74,47 @@ def _time(value: Any, *, as_of: datetime) -> datetime:
     return moment
 
 
+def advance_objection_state(
+    states: Mapping[str, str], *, kind: str, concern: str,
+) -> dict[str, str]:
+    """Pure shared lifecycle transition for original review and synthetic twin.
+
+    This function checks *sequence semantics* only. It never authenticates
+    a person, original message, source owner, consent or commercial event.
+    """
+    if type(states) is not dict or any(
+        type(k) is not str or k not in CATEGORIES
+        or v not in (
+            "OPEN", "REOPENED", "ANSWERED_AWAITING_CONFIRMATION",
+            "PERSON_REPORTED_RESOLVED_NOT_PROVIDER_VERIFIED",
+        ) for k, v in states.items()
+    ):
+        raise ObjectionLifecycleHold("original_objection_state_contract_required")
+    if type(concern) is not str or concern not in CATEGORIES:
+        raise ObjectionLifecycleHold("existing_original_objection_category_required")
+    next_states = dict(states)
+    current = next_states.get(concern)
+    if kind == "PERSON_STATED_CONCERN":
+        if current in ("OPEN", "ANSWERED_AWAITING_CONFIRMATION", "REOPENED"):
+            raise ObjectionLifecycleHold("repeated_open_objection_without_new_evidence")
+        next_states[concern] = "OPEN" if current is None else "REOPENED"
+    elif kind == "HUMAN_EXPLANATION_SENT":
+        if current not in ("OPEN", "REOPENED"):
+            raise ObjectionLifecycleHold("reply_cannot_resolve_or_create_objection")
+        next_states[concern] = "ANSWERED_AWAITING_CONFIRMATION"
+    elif kind == "PERSON_STILL_CONCERNED":
+        if current is None:
+            raise ObjectionLifecycleHold("followup_without_initial_person_concern")
+        next_states[concern] = "REOPENED"
+    elif kind == "PERSON_EXPLICITLY_CONFIRMED_RESOLVED":
+        if current not in ("OPEN", "ANSWERED_AWAITING_CONFIRMATION", "REOPENED"):
+            raise ObjectionLifecycleHold("resolution_without_open_original_objection")
+        next_states[concern] = "PERSON_REPORTED_RESOLVED_NOT_PROVIDER_VERIFIED"
+    else:
+        raise ObjectionLifecycleHold("unrecognised_original_conversation_transition")
+    return next_states
+
+
 def review_objection_lifecycle(
     *,
     case_digest: str,
@@ -131,25 +172,7 @@ def review_objection_lifecycle(
             continue
         if type(concern) is not str or concern not in CATEGORIES:
             raise ObjectionLifecycleHold("existing_original_objection_category_required")
-        current = states.get(concern)
-        if kind == "PERSON_STATED_CONCERN":
-            if current in ("OPEN", "ANSWERED_AWAITING_CONFIRMATION", "REOPENED"):
-                raise ObjectionLifecycleHold("repeated_open_objection_without_new_evidence")
-            states[concern] = "OPEN" if current is None else "REOPENED"
-        elif kind == "HUMAN_EXPLANATION_SENT":
-            if current not in ("OPEN", "REOPENED"):
-                raise ObjectionLifecycleHold("reply_cannot_resolve_or_create_objection")
-            states[concern] = "ANSWERED_AWAITING_CONFIRMATION"
-        elif kind == "PERSON_STILL_CONCERNED":
-            if current is None:
-                raise ObjectionLifecycleHold("followup_without_initial_person_concern")
-            states[concern] = "REOPENED"
-        elif kind == "PERSON_EXPLICITLY_CONFIRMED_RESOLVED":
-            if current not in (
-                "OPEN", "ANSWERED_AWAITING_CONFIRMATION", "REOPENED",
-            ):
-                raise ObjectionLifecycleHold("resolution_without_open_original_objection")
-            states[concern] = "PERSON_REPORTED_RESOLVED_NOT_PROVIDER_VERIFIED"
+        states = advance_objection_state(states, kind=kind, concern=concern)
     n_open = sum(s in ("OPEN", "REOPENED") for s in states.values())
     n_awaiting = sum(s == "ANSWERED_AWAITING_CONFIRMATION" for s in states.values())
     n_reported = sum(s == "PERSON_REPORTED_RESOLVED_NOT_PROVIDER_VERIFIED" for s in states.values())
