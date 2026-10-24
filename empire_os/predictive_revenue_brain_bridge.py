@@ -26,6 +26,9 @@ from empire_os.prime_original_outcome_calibration import review_prime_outcome_ca
 from empire_os.prime_forward_prediction_journal import (
     review_prime_forward_journal, summarize_prime_forward_founder,
 )
+from empire_os.prime_first_write_attestation_preflight import (
+    PrimeOriginalFirstWriteVerifier,
+)
 from empire_os.prime_universal_evidence_fusion import (
     review_prime_universal_evidence, summarize_prime_founder_evidence,
 )
@@ -321,6 +324,8 @@ def build_predictive_revenue_brain_review(
     original_owner_signature_verifier: PrimeOwnerSignatureVerifier | None = None,
     original_forward_journal_predictions: Sequence[Mapping[str, Any]] | None = None,
     original_forward_journal_owner_outcomes: Sequence[Mapping[str, Any]] | None = None,
+    signed_forward_first_write_attestations: Sequence[Mapping[str, Any]] | None = None,
+    original_first_write_verifier: PrimeOriginalFirstWriteVerifier | None = None,
 ) -> dict[str, Any]:
     """Compose existing evidence without inventing forecasts, agents or authority.
 
@@ -357,6 +362,19 @@ def build_predictive_revenue_brain_review(
         original_universal_evidence_founder = summarize_prime_founder_evidence(
             original_universal_evidence,
         )
+    if signed_forward_first_write_attestations is not None:
+        if (type(original_first_write_verifier) is not PrimeOriginalFirstWriteVerifier
+            or original_forward_journal_predictions is None):
+            raise ValueError("original_owner_first_write_verifier_and_predictions_required")
+        first_write_preflight = original_first_write_verifier.review(
+            tenant_id=tenant, as_of=now,
+            original_predictions=original_forward_journal_predictions,
+            signed_attestations=signed_forward_first_write_attestations,
+        )
+    else:
+        if original_first_write_verifier is not None:
+            raise ValueError("original_first_write_attestations_required")
+        first_write_preflight = None
     original_forward_journal = review_prime_forward_journal(
         tenant_id=tenant, as_of=now,
         original_predictions=original_forward_journal_predictions,
@@ -402,6 +420,12 @@ def build_predictive_revenue_brain_review(
         "original_outcome_calibration_shadow": original_outcome_calibration,
         "prime_universal_evidence_shadow": original_universal_evidence_founder,
         "prime_forward_prediction_journal_shadow": original_forward_founder,
+        "prime_first_write_attestation_preflight_status": (
+            first_write_preflight["status"] if first_write_preflight is not None
+            else "NOT_CONNECTED"
+        ),
+        "prime_first_write_production_authenticity_verified": False,
+        "prime_durable_replay_reservation_verified": False,
         "prime_signed_owner_preflight_status": (
             signed_owner_preflight["status"] if signed_owner_preflight
             else "NOT_CONNECTED"
