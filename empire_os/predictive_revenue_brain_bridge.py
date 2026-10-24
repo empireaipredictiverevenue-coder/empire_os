@@ -26,6 +26,7 @@ from empire_os.prime_original_outcome_calibration import review_prime_outcome_ca
 from empire_os.prime_universal_evidence_fusion import (
     review_prime_universal_evidence, summarize_prime_founder_evidence,
 )
+from empire_os.prime_signed_owner_evidence_gateway import PrimeOwnerSignatureVerifier
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
 SCHEMA = "empire.predictive_revenue.brain_bridge.v1"
@@ -313,6 +314,8 @@ def build_predictive_revenue_brain_review(
     official_nws_source_review: Mapping[str, Any] | None = None,
     original_owner_calibration_rows: Sequence[Mapping[str, Any]] | None = None,
     original_owner_evidence_summaries: Sequence[Mapping[str, Any]] | None = None,
+    signed_owner_evidence_envelopes: Sequence[Mapping[str, Any]] | None = None,
+    original_owner_signature_verifier: PrimeOwnerSignatureVerifier | None = None,
 ) -> dict[str, Any]:
     """Compose existing evidence without inventing forecasts, agents or authority.
 
@@ -328,10 +331,27 @@ def build_predictive_revenue_brain_review(
         owner_outcome_rows=original_owner_calibration_rows,
         tenant_id=tenant, as_of=now,
     )
-    original_universal_evidence = review_prime_universal_evidence(
-        tenant_id=tenant, as_of=now,
-        original_owner_summaries=original_owner_evidence_summaries,
-    )
+    if signed_owner_evidence_envelopes is not None:
+        if original_owner_evidence_summaries is not None:
+            raise ValueError("mixed_original_signed_and_unsigned_owner_input_refused")
+        if type(original_owner_signature_verifier) is not PrimeOwnerSignatureVerifier:
+            raise ValueError("trusted_original_owner_signature_verifier_required")
+        signed_owner_preflight = original_owner_signature_verifier.review(
+            signed_envelopes=signed_owner_evidence_envelopes,
+            tenant_id=tenant, as_of=now,
+        )
+        original_universal_evidence_founder = signed_owner_preflight["founder_aggregate"]
+    else:
+        if original_owner_signature_verifier is not None:
+            raise ValueError("signed_gateway_without_signed_receipts_refused")
+        signed_owner_preflight = None
+        original_universal_evidence = review_prime_universal_evidence(
+            tenant_id=tenant, as_of=now,
+            original_owner_summaries=original_owner_evidence_summaries,
+        )
+        original_universal_evidence_founder = summarize_prime_founder_evidence(
+            original_universal_evidence,
+        )
     storms = _storm_signals(storm_snapshot, tenant_id=tenant, now=now)
     permits = _permit_signals(permit_integration, tenant_id=tenant, now=now)
     if authenticated_crm_repository is not None and crm_deals:
@@ -367,9 +387,12 @@ def build_predictive_revenue_brain_review(
         "permit_research": permits,
         "official_source_observatory": official_source,
         "original_outcome_calibration_shadow": original_outcome_calibration,
-        "prime_universal_evidence_shadow": summarize_prime_founder_evidence(
-            original_universal_evidence,
+        "prime_universal_evidence_shadow": original_universal_evidence_founder,
+        "prime_signed_owner_preflight_status": (
+            signed_owner_preflight["status"] if signed_owner_preflight
+            else "NOT_CONNECTED"
         ),
+        "prime_signed_owner_replay_protection_verified": False,
         "crm_pipeline": pipeline,
         "authenticated_crm_prospect_review": authenticated_crm,
         "source_freshness": {
