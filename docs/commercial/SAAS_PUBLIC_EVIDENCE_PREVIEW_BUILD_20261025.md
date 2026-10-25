@@ -4,11 +4,11 @@
 ## Why this upgrade
 The existing site already has a live guarded first-party Predictive Revenue catalogue and consent-based deployment-interest form. The original GET-only organic buyer journey observed 22 sitemap routes, **no blocking canonical/indexability issues**, two healthy commercial product/offer catalogues, and no enterprise route without a bounded path to a buyer form. The original Ops evidence observed **0 canonical first-party acquisitions** in one source-verified snapshot; this is not evidence that the internet has no interested buyers, nor proof of end-to-end CRM delivery.
 
-The next honest improvement is to show a useful, public-data-free methodology preview *before requesting an enterprise deployment*.
+The next honest improvement is to offer a discoverable free, public-only methodology example **without forcing the buyer to scroll through a long sample before reaching the existing deployment form**.
 
 ## Implemented in the existing site source (staged, not published)
 - **New** `apps/empire-public-site/src/components/SaaSRevenueEvidencePreview.tsx`.
-- **Integrated** once after the Predictive Revenue hero in existing `apps/empire-public-site/src/app/predictive-revenue/page.tsx`.
+- **Integrated** once after the existing product catalogue/deployment form in `apps/empire-public-site/src/app/predictive-revenue/page.tsx`, with a separate prominent hero anchor to the free example. Desktop and mobile keep the original contact form earlier on the page.
 - Interactive, keyboard-accessible `aria-pressed` selection between **Lead to demo**, **Trial to contract**, and **Deal to cash**.
 - Each scenario defines three named stage evidence checkpoints, explicit *not proved* distinctions, and one business decision worth investigating. It has **no speculative percentages or customer figures**.
 - The sample is openly marked *illustrative only; no customer data*. The CTA goes only to the same existing `#deployment-request` form already governed by the same specific contact consent, idempotent submission, webhook routing, product catalogue and no-binding-terms policy. No new form, cookies, analytics endpoint, pricing, automation, prospect store or external outbound.
@@ -21,6 +21,6 @@ The next honest improvement is to show a useful, public-data-free methodology pr
 - `pytest -q tests/test_review_live_organic_buyer_journey_20261024.py tests/test_public_predictive_interest_admission.py` passed. This protects existing same-origin first-party intake admission and organic buyer-path reporting.
 
 ## Release boundary
-Changes are **source-staged only**. Do not claim visitors see the preview yet. The original public-site owner should perform the normal independent preview, render/mobile accessibility review, approved static build and hash manifest, and production release sign-off before deploying. Avoid running a Next build against the live out directory or replacing existing approved static files in this workstream.
+Changes are **source-staged only**. Do not claim visitors see the preview yet. The original public-site owner must independently review the isolated rendered candidate, brand/legal/route compatibility, exact asset union and rollback, and obtain explicit release sign-off before deploying. This workstream ran a Next build **only in an isolated detached worktree** and verified that the existing live out directory remained byte-for-byte unchanged. Never replace the mixed-generation live tree with the smaller isolated export.
 
 No customer data was read or created, no new canonical enquiry/CRM row/payment, no message sent, and zero new revenue was verified. Treat free sample visibility as a way to begin a first authentic buyer conversation, not as a measured conversion improvement.

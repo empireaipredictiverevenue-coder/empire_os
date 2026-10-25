@@ -220,9 +220,14 @@ export default function PredictiveRevenuePage() {
             likely, what is at risk, where opportunity is emerging and what the
             real outcome taught the system.
           </p>
+          <a
+            href="#free-evidence-sample"
+            className="mt-6 inline-flex items-center gap-2 rounded-full border border-cyan-200/30 bg-cyan-300/[0.07] px-5 py-3 text-xs font-semibold text-cyan-100 transition hover:border-cyan-200/65 hover:bg-cyan-300/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-200"
+          >
+            <Sparkles className="size-4" aria-hidden="true" />
+            Explore a free revenue-evidence example
+          </a>
         </section>
-
-        <SaaSRevenueEvidencePreview />
 
         <div className="grid gap-10 xl:grid-cols-[1.15fr_.85fr]">
           <section>
@@ -494,6 +499,7 @@ export default function PredictiveRevenuePage() {
             </form>
           </section>
         </div>
+        <SaaSRevenueEvidencePreview />
         <PredictiveRevenueBuyerExplanation />
         <SaaSRevenueLeakageGuide />
       </div>

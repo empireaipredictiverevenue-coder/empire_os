@@ -20,6 +20,9 @@ test("original first party deployment contract and consent remain untouched", ()
   assert.match(page, /type="checkbox" required checked=\{contactConsent\}/);
   assert.match(page, /result\?\.decision === "deployment_interest_recorded"/);
   assert.match(page, /<SaaSRevenueEvidencePreview \/>/);
+  assert.match(page, /href="#free-evidence-sample"/);
+  assert.ok(page.indexOf('id="deployment-request"') < page.indexOf("<SaaSRevenueEvidencePreview />"));
+  assert.match(page, /Explore a free revenue-evidence example/);
   assert.match(page, /<PredictiveRevenueBuyerExplanation \/>/);
   assert.match(page, /<SaaSRevenueLeakageGuide \/>/);
 });
