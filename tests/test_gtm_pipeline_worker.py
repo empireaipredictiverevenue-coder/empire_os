@@ -25,13 +25,23 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
             "outreach_ready": True,
             "rating": 4.8,
             "review_count": 116,
+            "why_now":{
+                "summary":"a roofing permit was publicly issued in Wichita",
+                "evidence_ref":"official-permit:wichita:20260920",
+                "observed_at":"2026-09-20T12:00:00Z",
+                "observed_inferred":"observed",
+            },
         },
     }
 
 
 def test_build_outbound_payload_is_compliant_and_evidence_safe():
     payload = build_outbound_payload(review(), now=NOW)
-    assert payload["p_subject"] == "Kihle customer signals"
+    assert payload["p_subject"]
+    assert payload["p_metadata"]["final_message_stage"]=="RAPPORT_VALUE_NO_BUYER_SIGNAL"
+    assert payload["p_metadata"]["final_message_gate"]["approved_for_cold_content_review"] is True
+    assert "?" not in payload["p_body_text"]
+    assert "$" not in payload["p_body_text"]
     assert POSTAL_ADDRESS in payload["p_body_text"]
     assert "opt out" in payload["p_body_text"].lower()
     assert "Kihle Roofing" in payload["p_body_text"]
@@ -164,6 +174,11 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
             "outreach_ready": True,
             "rating": 4.8,
             "review_count": 116,
+            "why_now":{
+                "summary":"issued plumbing development permits in San Antonio",
+                "evidence_ref":"city-permits:sa:20260920",
+                "observed_at":"2026-09-20T12:00:00Z",
+            },
         },
     }
 
@@ -201,7 +216,7 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
         for method, path, payload in calls
         if path.endswith("propose_reviewed_outbound_intent")
     )
-    assert proposal["p_subject"] == "SewerTV customer signals"
+    assert proposal["p_subject"] == "SewerTV permit signals"
     assert "SewerTV Hydro Jetting and Plumbing" in proposal["p_body_text"]
     assert "4.9★ across 87 reviews" in proposal["p_body_text"]
     assert "your team" not in proposal["p_body_text"]
@@ -274,6 +289,7 @@ def test_missing_specific_proof_is_deferred_not_service_error():
     no_proof = review("00000000-0000-0000-0000-000000000051")
     no_proof["evidence"].pop("rating", None)
     no_proof["evidence"].pop("review_count", None)
+    no_proof["evidence"].pop("why_now", None)
 
     def request(method, path, payload=None, **_kwargs):
         if method == "GET" and path.startswith(

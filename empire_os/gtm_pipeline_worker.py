@@ -7,10 +7,11 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlencode
 
 from empire_os.conversation_value import build_first_touch_copy
+from empire_os.rapport_value_final_boundary import compose_verified_value_first
 from empire_os.buyer_discovery import looks_like_person_name
 from empire_os.locale_intelligence import contact_window_status, resolve_locale
 
-POSTAL_ADDRESS = "31 St Thomas St, Bolton, BL1 2QR, UK"
+from empire_os.business_contact_identity import POSTAL_ADDRESS
 
 
 @dataclass(frozen=True)
@@ -143,7 +144,10 @@ def build_outbound_payload(
 
     copy = build_first_touch_copy(review, now=now)
     subject = copy.subject
-    body = copy.body
+    body, final_gate = compose_verified_value_first(
+        first_name=first,business=business,niche=niche,metro=metro,
+        evidence=evidence,now=now,subject=subject,
+    )
     review_id = str(review.get("id") or "").strip()
     if not review_id:
         raise ValueError("review id required")
@@ -163,6 +167,9 @@ def build_outbound_payload(
             "business_name": business,
             "conversation_quality": "v2",
             "conversation_quality_tier": copy.quality_tier,
+            "final_message_stage": "RAPPORT_VALUE_NO_BUYER_SIGNAL",
+            "final_message_gate": final_gate,
+            "optimizer_quality_is_pre_final_gate": True,
             "message_optimizer_version": "v1",
             "subject_variants": list(copy.subject_variants),
             "message_quality_review": (
@@ -296,6 +303,10 @@ def run_gtm_pipeline(
             message = str(exc)
             if (
                 "specific outreach evidence required" in message
+                or "FRESH_SOURCE_BACKED_VALUE_REQUIRED" in message
+                or "OBSERVED_NOT_INFERRED_SOURCE_REQUIRED" in message
+                or "FIRST_TOUCH_COMMERCIAL_GATE_BLOCKED" in message
+                or "SOURCE_SUMMARY_CONTAINS_COMMERCIAL_ASK" in message
                 or "verified person contact required" in message
                 or "outbound personalization evidence missing" in message
                 or "recipient outreach language unresolved" in message
