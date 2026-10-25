@@ -128,6 +128,12 @@ export default async function FounderEarnedMediaPage() {
                         <p className="mt-2 text-xs text-slate-400">
                           Free sample concept: {lead.value_first_free_sample_outline}
                         </p>
+                        <Link
+                          href={`/founder/earned-media/sample/${encodeURIComponent(lead.opportunity_id)}`}
+                          className="mt-3 inline-block text-xs font-semibold text-cyan-200 hover:text-cyan-100"
+                        >
+                          Preview original value-first sample →
+                        </Link>
                         <p className="mt-2 text-xs text-slate-500">
                           Blockers: {lead.blockers.length}
                           {lead.existing_canonical_prospect_id

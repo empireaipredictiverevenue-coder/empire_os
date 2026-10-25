@@ -94,3 +94,39 @@ The three founder-approved consultancy list prices are a **policy**, not quotes 
 - **Attribution:** PR accepted third-party placement or an original published website page must have real URL evidence; record independently measured site traffic, opted-in enquiries, accepted proposal, settlement and delivery separately. Link first-party source identifiers into existing SEO/GSC and CRM only once verified, never manufacture backlinks/AI citations.
 
 **Prohibited shortcuts:** no paid traffic/editorial, mass unsolicited email, duplicate PR pitches, silent data transfer to outside parties, unverifiable delivery claims, implicit CRM import, settlement guesses or automatic contracting. Mode remains OBSERVE. No production deployment or public route enablement.
+
+
+## Stage 4: founder value-first sales assets and usable review CLI (25 October 2026)
+
+The original 23 observations remain 23 research items, **not 23 qualified leads**. Two Upwork indexed scopes are stronger *external demand signal* examples for validation, but are not currently supported as executable bids: founder account eligibility, possible paid Connects, original listing availability, true buyer identity, competing bidders and demonstrable HubSpot implementation experience must all be checked independently. The engine has not accessed those buyer accounts or messaged anyone.
+
+**Implemented:**
+
+- `empire_os/earned_media_value_first.py`: deterministic read-only previews from exact existing lead opportunity IDs. Three source-specific original samples cover lifecycle forecasting, ERP-to-CRM lineage and generic KPI dashboard questions. Research companies receive a hypothesis-only short brief and an explicit original-source fact-check. No templates contain invented buyer pain, case studies, outcomes, ROI, personal email or platform implementation claims.
+- `GET /v1/founder-earned-media/lead-opportunity/{opportunity_id}/sample` on the **existing** Founder read service; mounted, disabled by default, with no POST/PUT/DELETE routes. Unknown/ambiguous IDs return 404; held source returns 503. No new agent, database, scheduled task, external SaaS or public campaign.
+- `/founder/earned-media/sample/[opportunityId]` staged Next.js page, linked from founder research cards, still requiring both `EMPIRE_EARNED_MEDIA_FOUNDER_UI_ENABLED` and `EMPIRE_FOUNDER_CONSOLE_PRIVATE_AUTH_VERIFIED`. Flags are NOT authentication, and **must not be enabled or deployed before the founder ingress/session and tenancy have been verified**.
+- CLI `--summary` presents brief source health, original PR sent/not reply-verified count, lane counts, lead counts, top-five founder actions and no-sales truth, instead of the full multi-thousand-line JSON packet. CLI `--sample-opportunity-id <leadreview_...>` outputs one original sample packet. A held upstream research source returns exit 2 instead of reporting successful readiness. The default output remains unchanged.
+
+**Compact founder review:**
+
+```bash
+cd /home/ubuntu/empire_worktrees/earned_media_advisory_bridge_20261025
+PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_earned_media_advisory_bridge_20261025 \
+  --review-only --with-leadgen --summary \
+  --pr-root /home/ubuntu/empire_agents/empire_pr_consultancy_20261011 \
+  --distribution-root /srv/empire_os
+```
+
+**Preview the strongest direct external service-request sample, without submitting a bid:**
+
+```bash
+PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_earned_media_advisory_bridge_20261025 \
+  --review-only --with-leadgen \
+  --sample-opportunity-id leadreview_bc38f53c69a3b9cfabdead8e \
+  --pr-root /home/ubuntu/empire_agents/empire_pr_consultancy_20261011 \
+  --distribution-root /srv/empire_os
+```
+
+All sample previews are internal drafts; sending, publishing, quoting, committing to vendor terms, CRM updates, finance, KYC and production activation remain gated. Underlying source observations are historical and their existence does not establish fresh marketplace eligibility or source credibility. The next source-of-truth milestones are current independent buyer need, real contact permission / portal eligibility, deliverable scoping and qualified inbound replies, with payments and realised revenue recorded only through existing EmpireDB settlement evidence.

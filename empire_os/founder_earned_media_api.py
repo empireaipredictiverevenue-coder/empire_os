@@ -55,4 +55,25 @@ def create_founder_earned_media_router(
             "private_access_verification_required": True,
         }
 
+    @router.get("/lead-opportunity/{opportunity_id}/sample")
+    def get_lead_sample(opportunity_id: str):
+        if not active:
+            raise HTTPException(status_code=404, detail="not_enabled")
+        # Re-read the same bounded source-of-truth review. Never accept a
+        # caller-supplied raw company, recipient, body or CRM identifier.
+        from empire_os.earned_media_leadgen_review import review_lead_generation
+        from empire_os.earned_media_value_first import preview_value_first_sample
+        try:
+            packet = review(root, pr_root=press, distribution_root=distribution)
+            leadgen = review_lead_generation(
+                packet, repo_root=root, distribution_root=distribution,
+            )
+            return preview_value_first_sample(
+                leadgen, opportunity_id=opportunity_id,
+            )
+        except LookupError:
+            raise HTTPException(status_code=404, detail="sample_not_found")
+        except (OSError, ValueError, TypeError):
+            raise HTTPException(status_code=503, detail="source_review_held")
+
     return router

@@ -1049,3 +1049,31 @@ export function getFounderEarnedMedia() {
     "/v1/founder-earned-media/review",
   );
 }
+
+export type FounderLeadSamplePreview = {
+  schema_version: string;
+  mode: "OBSERVE";
+  execution_authority: "none";
+  sample_type: "ORIGINAL_ILLUSTRATIVE_VALUE_FIRST_SAMPLE_NOT_CLIENT_WORK";
+  lead_id: string;
+  label?: string | null;
+  title: string;
+  lead_stage: string;
+  source_document?: string | null;
+  source_observed_on?: string | null;
+  safe_introduction: string;
+  sections: Array<{ heading: string; review_text: string }>;
+  necessary_human_gates: string[];
+  message_sent: false;
+  quote_issued: false;
+  proposal_authorized: false;
+  crm_write_authorized: false;
+  revenue_verified: false;
+};
+
+export function getFounderLeadSamplePreview(opportunityId: string) {
+  return getFounderRead<FounderLeadSamplePreview>(
+    "/v1/founder-earned-media/lead-opportunity/" +
+      encodeURIComponent(opportunityId) + "/sample",
+  );
+}
