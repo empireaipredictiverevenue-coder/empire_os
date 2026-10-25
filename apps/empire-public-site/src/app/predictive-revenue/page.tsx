@@ -1,6 +1,7 @@
 "use client";
 import PredictiveRevenueBuyerExplanation from "@/components/PredictiveRevenueBuyerExplanation";
 import SaaSRevenueLeakageGuide from "@/components/SaaSRevenueLeakageGuide";
+import SaaSRevenueEvidencePreview from "@/components/SaaSRevenueEvidencePreview";
 
 import {
   ArrowLeft,
@@ -220,6 +221,8 @@ export default function PredictiveRevenuePage() {
             real outcome taught the system.
           </p>
         </section>
+
+        <SaaSRevenueEvidencePreview />
 
         <div className="grid gap-10 xl:grid-cols-[1.15fr_.85fr]">
           <section>
