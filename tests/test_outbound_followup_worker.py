@@ -21,19 +21,25 @@ def row(step=1, metro="Wichita"):
             "business_name": "Kihle Roofing",
             "niche": "roofing",
             "metro": metro,
+            "why_now":{
+                "summary":"an issued roofing permit is documented in Wichita",
+                "observed_at":MONDAY.isoformat(),
+                "evidence_ref":"permit:wichita:dated-001",
+            },
         },
+        "prior_evidence_refs":["permit:previous:001"],
     }
 
 
 def test_copy_preserves_compliance_and_is_step_specific():
-    subject, first = build_followup_copy(row(1))
-    _, final = build_followup_copy(row(2))
+    subject, first = build_followup_copy(row(1),now=MONDAY)
+    _, final = build_followup_copy(row(2),now=MONDAY)
     assert subject.startswith("Re:")
     assert "Kihle Roofing" in first
-    assert "The three checks are:" in first
-    assert "Competitor Search Gap" in first
-    assert "reply “gap”" in first
-    assert "Closing the loop" in final
+    assert "permit:wichita:dated-001" in first
+    assert "separate, newer" in final
+    assert all(x not in first for x in ("Competitor Search Gap", "$199", "$1,500"))
+    assert all(x not in final for x in ("Reply", "$199", "$1,500"))
     assert POSTAL_ADDRESS in first
     assert "opt out" in first.lower()
     assert POSTAL_ADDRESS in final
@@ -41,7 +47,7 @@ def test_copy_preserves_compliance_and_is_step_specific():
 
 
 def test_copy_does_not_infer_a_person_name():
-    _, body = build_followup_copy(row(1))
+    _, body = build_followup_copy(row(1),now=MONDAY)
     assert body.startswith("Hi,")
     assert "Hi Clay" not in body
 
