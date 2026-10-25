@@ -1,0 +1,13 @@
+{
+  "status": "MIXED_GENERATION_NAVIGATION_ACCEPTANCE_PASS",
+  "started_at": "http://127.0.0.1:28741/commercial.html",
+  "finished_at": "http://127.0.0.1:28741/predictive-revenue",
+  "new_example_rendered": true,
+  "original_form_preserved": true,
+  "new_rsc_payload_standalone_http_200": true,
+  "rsc_routes_fetched_by_browser": 0,
+  "browser_http_errors": [],
+  "browser_js_exceptions": [],
+  "post_requests": 0,
+  "production_touched": false
+}

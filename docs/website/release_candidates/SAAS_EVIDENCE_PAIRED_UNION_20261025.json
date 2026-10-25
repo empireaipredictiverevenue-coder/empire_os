@@ -1,0 +1,72 @@
+{
+  "added_static_asset_count": 10,
+  "added_static_assets": [
+    {
+      "path": "_next/static/XKsP71b15ZUYVeL5BCH58/_buildManifest.js",
+      "sha256": "30a7124443cbcb849813358902c7dc5c5f85865595b86ad936e1a97370c2c740"
+    },
+    {
+      "path": "_next/static/XKsP71b15ZUYVeL5BCH58/_ssgManifest.js",
+      "sha256": "6d06ccc429b812337889f08fcf4e0792b070203e38a72b4af351e6506f914ad4"
+    },
+    {
+      "path": "_next/static/chunks/498-e4574631acc0bda1.js",
+      "sha256": "f09e05744da43ea1e357f5a2fa73f6b81591261bec66d20d099590b200e6c0ee"
+    },
+    {
+      "path": "_next/static/chunks/app/buy/page-b4fdc23f61a6d89d.js",
+      "sha256": "1b775125e8f5591809efe7399655f449942eebf3078b97ffcae4a2fc38592b82"
+    },
+    {
+      "path": "_next/static/chunks/app/commercial/page-ab32cee8a1d7f085.js",
+      "sha256": "0eb71208cb5cf405c4991d77597abf3d7187ff4034cdf3e340f1d3c041314650"
+    },
+    {
+      "path": "_next/static/chunks/app/layout-d1b917db2319c0d4.js",
+      "sha256": "4adc242616df37ddde03d07180c30c27c24ed3c02e816052699a0d361aa7ebc2"
+    },
+    {
+      "path": "_next/static/chunks/app/page-7bea2589dc6d9774.js",
+      "sha256": "378b0cdb493d396ecfd52c46d21fe07265981d57333012a8ce2fd62aa7177136"
+    },
+    {
+      "path": "_next/static/chunks/app/predictive-revenue/page-119dcf00a0b5a51e.js",
+      "sha256": "50888f25220afd7bab3347b6fed2a7ffb1969326bf996c3f03e75f5893a01786"
+    },
+    {
+      "path": "_next/static/chunks/app/roofing/page-782f35ebdc9ba548.js",
+      "sha256": "0e2bf8c2524e391b8ef2acc22bbc2691c90059ee44a0bcae0139634c88c0a408"
+    },
+    {
+      "path": "_next/static/css/2280003f88962364.css",
+      "sha256": "e2fee51f7f7c9d4efafd5cb1f29b35b5b13ac09929694abdd107ecdc3e32b132"
+    }
+  ],
+  "approved_live_file_count": 662,
+  "approved_live_inventory_sha256": "5c2f45191679ea354ea8513915f88749fb62689c487ebd3563cccc6c51a86e0a",
+  "approved_live_unmodified_after_union": true,
+  "candidate_file_count": 672,
+  "candidate_html_sha256": "1eaaa66e633967d553b18ebe3ed5180af36a555778c2efce4235679e1fc31053",
+  "candidate_inventory_sha256": "75b4818543fc3cea0545458fa2fee7c11e1b57bcd32637ddc2cbd3112da15c94",
+  "candidate_rsc_sha256": "9ec0c0306c41b0b8c3311027d662abe9334033d46a8fba1b660a98857c988563",
+  "changed_old_files_count": 2,
+  "changed_other_old_files": 0,
+  "checked_at_utc": "2026-10-25T19:17:05.909975+00:00",
+  "live_site_mutated": false,
+  "money_or_outbound_touched": false,
+  "original_rsc_sha256": "6d730f3f9c34a0052c944e05bbddfcaa940fcbdd5056d7dc61afb1ef6c9d9f43",
+  "previously_retained_stale_rsc_corrected": true,
+  "prior_html_sha256": "7144c99317d5a38d2f44e94bdd992bb26a6544a1626a0cab8973d25b9e0c9e9a",
+  "public_catalogue_fixture_in_candidate": false,
+  "release_owner_approved": false,
+  "replacement_route": "predictive-revenue.html",
+  "replacement_routes": [
+    "predictive-revenue.html",
+    "predictive-revenue.txt"
+  ],
+  "schema_version": "empire.saas.offline_single_route_union.v1",
+  "site_published": false,
+  "status": "OFFLINE_PAIRED_HTML_RSC_UNION_CANDIDATE_PREPARED_NOT_PUBLISHED",
+  "unrelated_live_files_identical_count": 660,
+  "unresolved_local_asset_refs": []
+}
