@@ -1,0 +1,44 @@
+{
+  "automatic_astra_department_dispatch_submitted": false,
+  "candidate_file_count": 672,
+  "founder_exact_candidate_approval_verified": true,
+  "is_an_auto_executable_department_task": false,
+  "next_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+  "original_live_file_count": 662,
+  "owner_handoff": "docs/website/SAAS_EVIDENCE_PREVIEW_ASTRA_RELEASE_HANDOFF_20261025.md",
+  "owner_readonly_preflight": "scripts.owner_publish_saas_evidence_20261025 --preflight",
+  "pinned_evidence": {
+    "browser_navigation": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_NAVIGATION_QA_20261025.json",
+      "sha256": "6fe03b4e9a3d9e0a03968f02004103939cab5c14e716739dbb57491b74ecd0e5"
+    },
+    "founder_approval": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_FOUNDER_APPROVAL_20261025.json",
+      "sha256": "306b05734ed20361fb15dd3556fba2e35f0ebac2b4d161685539c92a9674de51"
+    },
+    "full_size_rehearsal": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_FULL_SIZE_REHEARSAL_20261025.json",
+      "sha256": "8775d2abc58be793a09f548ea58581053232afd84200706cb8f309419ed260a6"
+    },
+    "manifest": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_PAIRED_UNION_20261025.json",
+      "sha256": "bed1fd6497822b34a7a31adc52a3b6993aeda0c5db937eee64fffd463d40ed13"
+    }
+  },
+  "priority": "REVIEW_EXISTING_WEBSITE_RELEASE_NOT_NEW_SAAS_SYSTEM",
+  "publication_authorized_now": false,
+  "publication_performed": false,
+  "root_backup_and_owner_approval_verified": false,
+  "root_only_action_requires_independent_astra_approval": true,
+  "schema_version": "empire.website.astra_saas_evidence_owner_pickup.v1",
+  "scope": {
+    "new_hashed_assets": 10,
+    "replacements": [
+      "predictive-revenue.html",
+      "predictive-revenue.txt"
+    ],
+    "unchanged_original_files": 660
+  },
+  "status": "FOUNDER_APPROVED_OWNER_INDEPENDENT_VISUAL_REVIEW_AND_ROOT_CUSTODY_REQUIRED",
+  "work_key": "predictive_revenue_evidence_preview_exact_paired_route_20261025"
+}
