@@ -1,0 +1,12 @@
+diff --git a/empire_os/revenue_crm_api.py b/empire_os/revenue_crm_api.py
+index 742ae9ef5..db57089fe 100644
+--- a/empire_os/revenue_crm_api.py
++++ b/empire_os/revenue_crm_api.py
+@@ -451,1 +451,7 @@
++    if resolve_authenticated_read is not None:
++        from empire_os.revenue_crm_search_evidence_api import install_crm_search_evidence_route
++        install_crm_search_evidence_route(
++            router, require_authenticated_repository=require_repository,
++        )
++
+     @router.post("/search-growth/preview")

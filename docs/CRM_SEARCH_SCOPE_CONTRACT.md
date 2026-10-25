@@ -1,7 +1,8 @@
 # CRM search evidence connection — implementation checkpoint
 
-Status: scope validation and candidate database reader implemented;
-HTTP integration and production activation pending.
+Status: scope validation, candidate database reader and HTTP adapter implemented.
+HTTP mount tested on isolated authenticated CRM source; branch reconciliation
+and production activation pending.
 Production activation: not authorised by this document.
 
 ## Observed boundary
@@ -79,9 +80,23 @@ private Unix socket and is stopped and removed after testing. Fixture schema
 is deliberately minimal; this does not establish compatibility with every
 live policy, grant or source-table constraint.
 
-Next: wire integration against an isolated copy of the authenticated CRM source.
-Reuse existing login authority checks, apply sanitized unavailable semantics,
-and run HTTP authentication and cross-account tests. Reconcile the candidate
+The HTTP adapter now reuses the request-scoped CRM repository and its existing
+_fetch_all login/tenant checks. It validates the result envelope before passing
+stored observations to the existing growth brief builder. It adds no DSN,
+global repository, authentication system or caller-supplied evidence endpoint.
+The exact mount is docs/patches/crm_search_authenticated_mount.patch, tested on
+server commit 68a1aafbe89c19566821c66e8d12b9ef8abe3b8f in isolated worktree
+/home/ubuntu/empire_worktrees/crm_search_http_20261025. Eight HTTP tests pass
+with test-double database responses; the ten real PostgreSQL reader tests run
+separately. A combined HTTP-to-real-database test remains required.
+
+The GitHub base inspected at 3ca194c051906780e66029c23758f7492a964fd9 still lacks
+the authenticated CRM API. Do not apply the mount there or replace its API with
+the newer server file wholesale. The integration tests explicitly skip on that
+old base; skipped CI tests are not acceptance evidence. Reconcile with the
+authenticated CRM owner branch and require the tests to actually execute.
+
+Next: reconcile the candidate
 with the current live catalog, owner privileges, RLS policies and migration
 sequence before requesting production activation. The rollback refuses to
 drop provisioned bindings; recovery with real binding history needs review.
