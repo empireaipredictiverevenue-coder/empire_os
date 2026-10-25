@@ -358,3 +358,44 @@ def test_report_loader_rejects_symlink(tmp_path):
     link.symlink_to(receipt)
     with pytest.raises(b.SourceHold):
         b.load_founder_clueso_first_touch(link)
+
+
+def test_four_person_saas_public_sample_replaces_generic_hubspot_diagnostic(source):
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
+    rows = {row["source_id"]: row for row in report["build_queue"]}
+    assert rows["revops_saas_salesprocess_20261024"]["sample_path"] == (
+        "docs/commercial/FOUR_PERSON_SAAS_SALES_PROCESS_PUBLIC_SAMPLE_20261025.md")
+    assert rows["revops_hubspot_20261024"]["sample_path"] == (
+        "docs/commercial/REVOPS_BUYER_REQUEST_FREE_EVIDENCE_SAMPLE_20261024.md")
+    assert rows["revops_saas_salesprocess_20261024"]["sample_sha256"]
+    assert report["private_public_evidence_samples_built"] == 5
+    actions = {r["source_id"]:r for r in report["next_review_actions"]}
+    assert actions["revops_saas_salesprocess_20261024"]["review_rank"] == 2
+    assert actions["revops_hubspot_20261024"]["review_rank"] == 3
+    assert "FOUR_PERSON" in actions["revops_saas_salesprocess_20261024"][
+        "review_priority_basis"]
+    assert actions["revops_saas_salesprocess_20261024"]["ready_for_application"] is False
+    assert report["outbound_send_authorized"] is False
+
+
+def test_original_no_repeat_survives_four_person_priority_update(source):
+    receipt = b.load_founder_clueso_first_touch(ROOT / b.FOUNDER_CLUESO_REPORT_REL)
+    report = b.apply_founder_clueso_first_touch(
+        b.build(ROOT, source, now=date(2026, 10, 25)), receipt,
+        now=date(2026, 10, 25))
+    assert report["next_review_actions"][0]["source_id"] == (
+        "revops_saas_salesprocess_20261024")
+    clueso = next(x for x in report["next_review_actions"]
+                  if x["source_id"]=="clueso_founding_ae_20261024")
+    assert clueso["first_touch_no_repeat"] is True
+    assert clueso["approved_followup"] is False
+    assert report["founder_reported_first_touch"]["platform_send_or_delivery_verified"] is False
+
+
+def test_marketplace_public_sample_does_not_enable_send_when_suppression_passed(source):
+    report = b.build(ROOT, source, now=date(2026, 10, 25),
+                     suppression_fresh=True)
+    for r in report["next_review_actions"]:
+        assert r["ready_for_email"] is False
+        assert r["ready_for_application"] is False
+    assert report["marketplace_submission_authorized"] is False

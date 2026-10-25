@@ -197,9 +197,14 @@ def priority_action(row: dict) -> dict:
     route = row["contact_channel_type"]
     if request:
         return {
-            "source_id": rid, "review_rank": 2 if "hubspot" in rid else 3,
+            "source_id": rid, "review_rank": 3 if "hubspot" in rid else 2,
             "owner": "EXISTING_COMMERCIAL_ACQUISITION_OWNER",
             "action": "RECHECK_PLATFORM_REQUEST_AND_ELIGIBILITY",
+            "review_priority_basis": (
+                "STRICT_HUBSPOT_DELIVERY_CASE_STUDY_UNVERIFIED"
+                if "hubspot" in rid else
+                "LIGHTWEIGHT_FOUR_PERSON_SALES_PROCESS_FITS_DOCUMENTED_SAMPLE"
+            ),
             "deliverable": "Evidence of active client request, legitimate platform"
                            " application eligibility, qualified delivery owner and"
                            " honest matched scope",
@@ -314,7 +319,7 @@ def build(root: Path, source: dict, *, now: date | None = None,
         sample_sha256 = None
         if sample is not None:
             sample = _string(sample, max_length=175)
-            if (not re.fullmatch(r"docs/commercial/[A-Z0-9_]+_20261024\.md", sample)):
+            if (not re.fullmatch(r"docs/commercial/[A-Z0-9_]+_2026102[45]\.md", sample)):
                 raise SourceHold("SAMPLE_NOT_ORIGINAL_COMMERCIAL_DOCUMENT")
             dest = root / sample
             if (dest.is_symlink() or not dest.is_file() or
