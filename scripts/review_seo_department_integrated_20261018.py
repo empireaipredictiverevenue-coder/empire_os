@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from datetime import date
 import json
+from pathlib import Path
 
 from empire_os.search_intelligence.department_integration_review import (
     SCHEMA, IntegrationEvidenceHeld, run,
@@ -24,6 +25,12 @@ def main(argv: list[str] | None = None) -> int:
                         help="First date of bounded final GSC page window")
     parser.add_argument("--end-date", type=date.fromisoformat,
                         help="Last date of bounded final GSC page window")
+    parser.add_argument("--earned-media-advisory", action="store_true",
+                        help="Include evidence-only PR/editorial/consultancy review; no outbound")
+    parser.add_argument("--earned-media-pr-root", type=Path,
+                        help="Existing isolated PR/consultancy worktree")
+    parser.add_argument("--earned-media-distribution-root", type=Path,
+                        help="Canonical existing Revenue Distribution evidence root")
     args = parser.parse_args(argv)
     if bool(args.start_date) != bool(args.end_date):
         parser.error("both start-date and end-date must be specified together")
@@ -51,6 +58,13 @@ def main(argv: list[str] | None = None) -> int:
             "buyer_conversions_verified": False,
             "execution_authority": "NONE",
         }
+    if args.earned_media_advisory:
+        from empire_os.earned_media_advisory_bridge import review as review_earned_media
+        result["earned_media_advisory"] = review_earned_media(
+            Path(__file__).resolve().parents[1],
+            pr_root=args.earned_media_pr_root,
+            distribution_root=args.earned_media_distribution_root,
+        )
     print(json.dumps(result,sort_keys=True))
     return 2 if result["status"].startswith("HELD") else 0
 
