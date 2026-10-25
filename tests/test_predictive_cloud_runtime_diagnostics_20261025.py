@@ -1,5 +1,6 @@
 """Deterministic diagnostics tests; no live services or business records."""
 from datetime import datetime, timedelta, timezone
+import json
 from pathlib import Path
 
 import pytest
@@ -11,7 +12,9 @@ from empire_os.predictive_cloud_runtime_diagnostics import (
 NOW = datetime(2026, 10, 25, 23, 20, tzinfo=timezone.utc)
 SHOW = ("Result=success\nExecMainStatus=0\n"
         "ExecMainStartTimestamp=Sun 2026-10-25 23:17:48 UTC\n"
-        "ExecMainExitTimestamp=Sun 2026-10-25 23:17:49 UTC\n")
+        "ExecMainExitTimestamp=Sun 2026-10-25 23:17:49 UTC\n"
+        "ExecMainStartTimestampMonotonic=3510000000000\n"
+        "ExecMainExitTimestampMonotonic=3510001000000\n")
 MEM = "MemTotal:       100000 kB\nMemAvailable:    40000 kB\n"
 DISK = {"total": 1000, "used": 300, "free": 650}
 SOURCES = {
@@ -51,6 +54,7 @@ def test_current_service_and_host_pressure_are_observations_only():
     assert report["payment_authorized"] is False
     assert report["model_training_authorized"] is False
     assert report["historical_run_counts"] is None
+    assert report["materializer_journal_24h"] is None
     assert "inference_request_latency" in UNKNOWN_METRICS
 
 
@@ -69,6 +73,27 @@ def test_forged_duplicate_systemd_properties_fail_closed():
     report = inspect(systemd_show=SHOW + "Result=success\n")
     assert report["materializer_last_run"]["status"] == "UNKNOWN"
     assert report["materializer_last_run"]["duration_ms"] is None
+
+
+def test_missing_monotonic_duration_does_not_fabricate_zero():
+    raw = SHOW.replace("ExecMainStartTimestampMonotonic=3510000000000\n", "").replace(
+        "ExecMainExitTimestampMonotonic=3510001000000\n", "")
+    report = inspect(systemd_show=raw)
+    assert report["materializer_last_run"]["status"] == "LAST_RUN_SUCCESS"
+    assert report["materializer_last_run"]["duration_ms"] is None
+
+
+def test_broken_monotonic_counter_rejected_without_hiding_last_result():
+    raw = SHOW.replace("3510001000000", "3509999999999")
+    report = inspect(systemd_show=raw)
+    assert report["materializer_last_run"]["status"] == "LAST_RUN_SUCCESS"
+    assert report["materializer_last_run"]["duration_ms"] is None
+
+
+def test_subsecond_monotonic_duration():
+    raw = SHOW.replace("3510001000000", "3510000368486")
+    report = inspect(systemd_show=raw)
+    assert report["materializer_last_run"]["duration_ms"] == 368.486
 
 
 def test_future_exit_timestamp_rejected():
@@ -143,3 +168,72 @@ def test_cli_does_not_probe_host_without_explicit_read_only(capsys, monkeypatch)
     output = capsys.readouterr().out
     assert code == 2
     assert "EXPLICIT_READ_ONLY_REQUIRED" in output
+
+
+def _journal_event(message: str, *, pid: str = "1",
+                   minutes_ago: int = 5) -> str:
+    timestamp = NOW - timedelta(minutes=minutes_ago)
+    return json.dumps({
+        "_PID": pid, "_COMM": "systemd",
+        "UNIT": "empire-predictive-cloud-materializer.service",
+        "_BOOT_ID": "f" * 32,
+        "__REALTIME_TIMESTAMP": str(int(timestamp.timestamp() * 1_000_000)),
+        "MESSAGE": message,
+    })
+
+
+def test_visible_journal_completion_counts_not_historical_totals():
+    success = "empire-predictive-cloud-materializer.service: Deactivated successfully."
+    failure = ("empire-predictive-cloud-materializer.service: "
+               "Failed with result 'exit-code'.")
+    data = "\n".join((_journal_event(success), _journal_event(success),
+                      _journal_event(failure)))
+    report = inspect(journal_jsonl=data)
+    assert report["materializer_journal_24h"] == {
+        "scope": "VISIBLE_JOURNAL_COMPLETIONS_ONLY",
+        "window_hours": 24,
+        "success_messages_seen": 2,
+        "failure_messages_seen": 1,
+        "visible_completion_messages": 3,
+        "sample_limit_reached": False,
+        "full_history_verified": False,
+    }
+    assert report["historical_run_counts"] is None
+    assert report["model_training_authorized"] is False
+
+
+def test_missing_journal_is_unknown_and_empty_journal_is_zero_visible_only():
+    assert inspect(journal_jsonl=None)["materializer_journal_24h"] is None
+    value = inspect(journal_jsonl="")["materializer_journal_24h"]
+    assert value["visible_completion_messages"] == 0
+    assert value["full_history_verified"] is False
+
+
+@pytest.mark.parametrize("raw", [
+    "not json",
+    _journal_event(
+        "empire-predictive-cloud-materializer.service: Deactivated successfully.",
+        pid="999"
+    ),
+    _journal_event(
+        "empire-predictive-cloud-materializer.service: Deactivated successfully.",
+        minutes_ago=25*60
+    ),
+    ("{}\n" * 1025),
+])
+def test_untrusted_or_truncated_journal_does_not_prove_health(raw):
+    assert inspect(journal_jsonl=raw)["materializer_journal_24h"] is None
+
+
+def test_unrelated_journal_message_cannot_inflate_counts():
+    report = inspect(journal_jsonl=_journal_event("A random log entry"))
+    assert report["materializer_journal_24h"]["visible_completion_messages"] == 0
+
+
+def test_maximum_journal_window_discloses_sampling_limit():
+    success = "empire-predictive-cloud-materializer.service: Deactivated successfully."
+    raw = "\n".join(_journal_event(success) for _ in range(1024))
+    result = inspect(journal_jsonl=raw)["materializer_journal_24h"]
+    assert result["visible_completion_messages"] == 1024
+    assert result["sample_limit_reached"] is True
+    assert result["full_history_verified"] is False
