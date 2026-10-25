@@ -107,19 +107,38 @@ def test_placeholder_context_fails_closed():
         )
 
 
-def test_followup_is_value_led_and_closes_after_step_two():
-    row = {
-        "root_subject": "Clay — one thing I noticed in Wichita",
-        "candidate_evidence": {
-            "business_name": "Kihle Roofing",
-            "niche": "roofing",
-            "metro": "Wichita",
+def test_rapport_followup_never_priced_by_prospect_score():
+    evidence={
+        "business_name":"Kihle Roofing","niche":"roofing","metro":"Wichita",
+        "rating":5,"review_count":1200,"buy_signal_score":100,
+        "why_now":{
+            "summary":"public permits show a newly issued project in Wichita",
+            "observed_at":"2026-09-20T12:00:00Z",
+            "evidence_ref":"permit:wichita:001",
         },
     }
-    first = build_followup_copy(row, step=1, now=NOW)
-    final = build_followup_copy(row, step=2, now=NOW)
-    assert "The three checks are:" in first.body
-    assert "Competitor Search Gap" in first.body
-    assert "reply “gap”" in first.body
-    assert "Closing the loop on Kihle Roofing" in final.body
-    assert "no need to start with a large engagement" in final.body
+    row={"root_subject":"Clay — one thing I noticed in Wichita",
+         "company_score":99,"candidate_evidence":evidence}
+    first=build_followup_copy(row,step=1,now=NOW)
+    assert "public permits show" in first.body
+    assert "permit:wichita:001" in first.body
+    for forbidden in ("$199","$249","$1,500","Reply “gap”",
+                      "book a call","pricing","reply “pilot”"):
+        assert forbidden.lower() not in first.body.lower()
+    assert first.quality_tier=="source_backed_nurture_no_commercial_cta"
+    with pytest.raises(ValueError,match="SECOND_TOUCH_NEW_SOURCE_EVIDENCE_REQUIRED"):
+        build_followup_copy(row,step=2,now=NOW)
+    row["prior_evidence_refs"]=["permit:other:prior-001"]
+    second=build_followup_copy(row,step=2,now=NOW)
+    assert "separate, newer source-backed" in second.body.lower()
+    assert "$" not in second.body
+    assert "opt out" in second.body.lower()
+
+
+def test_rapport_followup_refuses_generic_prospect_only_rows():
+    row={"candidate_evidence":{
+        "business_name":"Kihle Roofing","niche":"roofing",
+        "metro":"Wichita","review_count":1500,"buy_signal_score":100,
+    }}
+    with pytest.raises(ValueError,match="FRESH_SOURCE_BACKED_VALUE_REQUIRED"):
+        build_followup_copy(row,step=1,now=NOW)

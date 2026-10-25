@@ -262,53 +262,52 @@ def build_followup_copy(
     step: int,
     now: datetime,
 ) -> ConversationCopy:
+    """No-reply NURTURE. Never promote scores into a price, offer or CTA.
+
+    Only the separate original authenticated-buyer-reply intent gate can
+    suggest a human-reviewed CTA. This worker has NO authenticated reply
+    context and therefore NO commercial offer authority.
+    """
     if now.tzinfo is None:
         raise ValueError("now must include timezone")
+    if step not in (1, 2):
+        raise ValueError("follow-up step must be 1 or 2")
     evidence = row.get("candidate_evidence")
     evidence = evidence if isinstance(evidence, Mapping) else {}
     business, niche, metro = _context(evidence)
     trigger = _fresh_why_now(evidence, now=now)
-    proof = _specific_public_proof(evidence)
+    # A rating, a prospect score, an ad flag or an unevidenced 'opportunity'
+    # is not a sufficiently fresh new insight to justify another cold touch.
+    if trigger is None:
+        raise ValueError("FRESH_SOURCE_BACKED_VALUE_REQUIRED_BEFORE_NURTURE")
+    ref = trigger["evidence_ref"]
+    if step == 2:
+        prior = row.get("prior_evidence_refs")
+        if (not isinstance(prior, (list, tuple)) or not prior
+                or not all(isinstance(item, str) and item.strip() for item in prior)
+                or ref in prior):
+            raise ValueError("SECOND_TOUCH_NEW_SOURCE_EVIDENCE_REQUIRED")
     root_subject = _usable(row.get("root_subject"))
-    subject = f"Re: {root_subject}" if root_subject else f"{business} — quick follow-up"
-
-    offer = _entry_offer_for_followup(row, evidence)
-
+    subject = f"Re: {root_subject}" if root_subject else f"{business} — observed update"
+    observed = trigger["summary"]
     if step == 1:
-        useful_detail = (
-            f"The trigger I mentioned is still the useful part: {trigger['summary']}"
-            if trigger is not None
-            else (
-                f"I pulled the first practical angles I’d pressure-test for "
-                f"{business} in {metro}."
-            )
-        )
         message = (
             "Hi,\n\n"
-            f"{useful_detail}\n\n"
-            "The three checks are:\n"
-            f"1) demand capture — where high-intent {metro} {niche} searches may "
-            "not be fully covered;\n"
-            "2) competitor position — which local operators are winning the "
-            "highest-value visibility and how they frame the offer;\n"
-            "3) follow-up leakage — where enquiry speed or stale-lead reactivation "
-            "is worth pressure-testing.\n\n"
-            f"For a lower-friction first step, the matching option is the "
-            f"{offer['name']} at {offer['price_text']}. No long retainer. "
-            f"If useful, reply “{offer['cta']}” and I’ll send the exact scope.\n\n"
-        )
-    elif step == 2:
-        message = (
-            "Hi,\n\n"
-            f"Closing the loop on {business}. The lowest-friction next step I’d "
-            f"use here is the {offer['name']} at {offer['price_text']}. "
-            "If the evidence is useful, we can stop there or expand later — "
-            "there’s no need to start with a large engagement.\n\n"
-            f"Reply “{offer['cta']}” if you want the scope.\n\n"
+            f"One source-backed observation relevant to {business}: {observed}.\n"
+            f"Source reference: {ref}.\n\n"
+            f"For {niche} in {metro}, this is worth checking against the "
+            "published coverage and service details before drawing conclusions. "
+            "It's not evidence that your business needs a service or has a "
+            "particular commercial problem.\n\n"
         )
     else:
-        raise ValueError("follow-up step must be 1 or 2")
-
+        message = (
+            "Hi,\n\n"
+            f"A separate, newer source-backed observation relevant to "
+            f"{business}: {observed}.\nSource reference: {ref}.\n\n"
+            "This is an update to the earlier research, not a sales "
+            "assessment or an assumption about your buying plans.\n\n"
+        )
     body = (
         message
         + "Best,\nPhil\nFounder, Empire AI\nempire-ai.co.uk\n\n"
@@ -318,8 +317,8 @@ def build_followup_copy(
     return ConversationCopy(
         subject=subject,
         body=body,
-        quality_tier="trigger_followup" if trigger else "value_followup",
-        why_now_summary=(trigger["summary"] if trigger else None),
-        why_now_evidence_ref=(trigger["evidence_ref"] if trigger else None),
-        specific_proof=proof,
+        quality_tier="source_backed_nurture_no_commercial_cta",
+        why_now_summary=trigger["summary"],
+        why_now_evidence_ref=ref,
+        specific_proof=_specific_public_proof(evidence),
     )
