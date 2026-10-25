@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.buyer_deferred_enrichment import _parked_without_new_evidence
+from empire_os.cross_system_cohesion import build_cohesion_snapshot
 
 ROOT = Path("/srv/empire_os")
 DEFAULT_TAM_RUNTIME = ROOT / "runtime/coder_tam_lane"
@@ -684,6 +685,7 @@ def build_snapshot() -> dict[str, Any]:
         ),
         "buyers": buyers,
         "revenue_stream_portfolio": stream_portfolio_status(),
+        "cross_system_cohesion": build_cohesion_snapshot(ROOT),
         "next_action": next_action,
         "blockers": blockers,
         "outbound_sent": False,
