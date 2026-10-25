@@ -166,14 +166,12 @@ def test_learning_dimensions_use_only_supplied_context():
     assert segment_key(offer_key="map", niche="roofing", decision_role="owner", dimensions={"trigger_class": "hiring"}) == base + "|trigger_class=hiring"
 
 
-def test_followups_propose_checks_without_fabricating_completed_work_or_proof():
+def test_followups_require_new_source_backed_value_and_never_sell_on_scores():
     row = dict(candidate_evidence={k: EVIDENCE[k] for k in ("business_name", "niche", "metro")})
-    first = build_followup_copy(row, step=1, now=NOW)
-    final = build_followup_copy(row, step=2, now=NOW)
-    assert first.specific_proof is first.why_now_summary is None
-    assert "I pulled" not in first.body
-    assert "propose checking" in first.body
-    assert first.body != final.body and "Closing the loop" in final.body
+    with pytest.raises(ValueError, match="FRESH_SOURCE_BACKED_VALUE_REQUIRED"):
+        build_followup_copy(row, step=1, now=NOW)
+    with pytest.raises(ValueError, match="FRESH_SOURCE_BACKED_VALUE_REQUIRED"):
+        build_followup_copy(row, step=2, now=NOW)
     with pytest.raises(ValueError, match="conversation context missing"):
         build_followup_copy({"candidate_evidence": {}}, step=1, now=NOW)
     recovery = build_conversation_recovery([dict(id="i", prospect_id="p", status="delivered", metadata={})],
