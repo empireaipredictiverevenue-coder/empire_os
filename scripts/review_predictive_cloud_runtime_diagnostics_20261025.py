@@ -16,7 +16,8 @@ from empire_os.predictive_cloud_runtime_diagnostics import inspect_runtime_diagn
 ROOT = Path("/srv/empire_os")
 UNIT = "empire-predictive-cloud-materializer.service"
 PROPERTIES = ("Result", "ExecMainStatus", "ExecMainStartTimestamp",
-              "ExecMainExitTimestamp")
+              "ExecMainExitTimestamp", "ExecMainStartTimestampMonotonic",
+              "ExecMainExitTimestampMonotonic")
 
 
 def _service_show() -> str:
@@ -29,6 +30,23 @@ def _service_show() -> str:
         return response.stdout[:8192] if response.returncode == 0 else ""
     except (OSError, subprocess.TimeoutExpired):
         return ""
+
+
+def _journal() -> str | None:
+    """Bounded visible messages, not a claim of complete historical records."""
+    try:
+        response = subprocess.run(
+            ["journalctl", "-u", UNIT, "--since=24 hours ago",
+             "--no-pager", "--output=json",
+             "--grep=Deactivated successfully|Failed with result",
+             "-n", "1024"],
+            check=False, capture_output=True, text=True, timeout=3,
+        )
+        if response.returncode != 0 or len(response.stdout) > 1_048_576:
+            return None
+        return response.stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return None
 
 
 def main(argv=None, *, root: Path = ROOT) -> int:
@@ -57,6 +75,7 @@ def main(argv=None, *, root: Path = ROOT) -> int:
         now=datetime.now(timezone.utc), systemd_show=_service_show(),
         meminfo=meminfo, disk=disk, snapshots=snapshots,
         load_one=load, cpu_count=os.cpu_count(),
+        journal_jsonl=_journal(),
     )
     print(json.dumps(report, sort_keys=True, allow_nan=False))
     return 0
