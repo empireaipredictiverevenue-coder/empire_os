@@ -23,6 +23,10 @@
     "manifest": {
       "path": "docs/website/release_candidates/SAAS_EVIDENCE_PAIRED_UNION_20261025.json",
       "sha256": "bed1fd6497822b34a7a31adc52a3b6993aeda0c5db937eee64fffd463d40ed13"
+    },
+    "synthetic_browser_form": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_SYNTHETIC_FORM_ACCEPTANCE_20261025.json",
+      "sha256": "0464e02676f8cba28a5473bf2b34c89be4b9c504d1db70927cac28f521f0b5c3"
     }
   },
   "priority": "REVIEW_EXISTING_WEBSITE_RELEASE_NOT_NEW_SAAS_SYSTEM",
