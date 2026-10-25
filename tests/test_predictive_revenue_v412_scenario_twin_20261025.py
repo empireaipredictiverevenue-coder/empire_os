@@ -101,7 +101,7 @@ def scenario(**overrides):
         cohort_opportunities=120, prior_observed_opportunities=45,
         prior_observed_wins=4,
         deal_value_cents=350000, fulfilment_cost_per_win_cents=150000,
-        research_overhead_cents=15000,
+        currency_code="GBP", research_overhead_cents=15000,
         median_days_to_cash=42.0, cash_lag_log_sigma=.6,
         iterations=2000, seed=42,
     )
@@ -129,6 +129,8 @@ def test_v412_2000_simulations_30_60_90_cash_non_decreasing_and_reproducible():
     second = simulate_revenue_twin_held(scenario(), **c)
     assert first == second
     assert first["source_rights_decision"] == "CANDIDATE_REVIEW_HELD"
+    assert first["currency_code"] == "GBP"
+    assert first["scenario_assumptions"]["currency_code"] == "GBP"
     assert first["mode"] == "SIMULATION"
     assert first["scenario_assumptions"]["channel"] == "ORGANIC_ONLY"
     assert first["scenario_assumptions"]["iterations"] == 2000
@@ -148,6 +150,14 @@ def test_v412_2000_simulations_30_60_90_cash_non_decreasing_and_reproducible():
                  "buyer_outreach_authorized", "lead_delivery_authorized",
                  "economic_memory_write_authorized", "redis_publish_authorized"):
         assert first[flag] is False
+
+
+@pytest.mark.parametrize("currency", ["GBP", "USD", "EUR"])
+def test_v412_explicit_currency_carried_unchanged_without_fx_conversion(currency):
+    rec = simulate_revenue_twin_held(scenario(currency_code=currency), **fixture_credentials())
+    assert rec["currency_code"] == currency
+    assert rec["scenario_assumptions"]["currency_code"] == currency
+    assert rec["approved_commercial_forecast"] is False
 
 
 def test_v412_zero_opportunities_cannot_manufacture_a_buyer():
@@ -200,6 +210,9 @@ def test_v412_missing_or_revoked_source_still_simulation_only():
     ("seed", -1),
     ("acquisition_channel", "PAID"),
     ("paid_media_budget_cents", 1),
+    ("currency_code", "usd"),
+    ("currency_code", "BTC"),
+    ("currency_code", ""),
 ])
 def test_v412_invalid_scenario_assumption_rejected(field, value):
     with pytest.raises(ValueError):
