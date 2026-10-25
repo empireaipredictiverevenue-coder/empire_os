@@ -1,0 +1,60 @@
+{
+  "crm_writes": false,
+  "external_post_requests": 0,
+  "payment_actions": false,
+  "postpublication_requires_both_public_byte_and_browser_checks": true,
+  "public_chrome_navigation_acceptance": {
+    "catalog_text_present": true,
+    "errors_4xx_5xx": [],
+    "from": "https://empire-ai.co.uk/commercial",
+    "html_and_form_work": true,
+    "javascript_exceptions": [],
+    "navigation_fetches": [
+      {
+        "method": "GET",
+        "url": "https://empire-ai.co.uk/predictive-revenue"
+      },
+      {
+        "method": "GET",
+        "url": "https://empire-ai.co.uk/_next/static/chunks/app/predictive-revenue/page-8a641c1798fea86e.js"
+      },
+      {
+        "method": "GET",
+        "url": "https://empire-ai.co.uk/v1/checkout/predictive-revenue/products"
+      }
+    ],
+    "post_requests": 0,
+    "preview_visible": false,
+    "publication_performed": false,
+    "real_customer_submission_performed": false,
+    "status": "PUBLIC_EXISTING_SITE_GET_ONLY_NAV_OBSERVED",
+    "to": "https://empire-ai.co.uk/predictive-revenue",
+    "validation_mode": "before"
+  },
+  "public_direct_rsc_txt_known_unmapped_in_existing_gateway": true,
+  "public_get_acceptance": {
+    "database_writes": false,
+    "independent_website_owner_root_receipt_verified": false,
+    "local_paired_rsc_inventory_verified": false,
+    "mode": "before",
+    "new_hashed_static_assets_get_verified": 0,
+    "outbound_sent": false,
+    "payment_action": false,
+    "prospect_created": false,
+    "public_html_byte_exact": true,
+    "public_html_sha256": "7144c99317d5a38d2f44e94bdd992bb26a6544a1626a0cab8973d25b9e0c9e9a",
+    "public_preview_visible": false,
+    "public_privacy_get_healthy": true,
+    "public_product_catalogue_count": 5,
+    "public_rsc_txt_endpoint_verified": false,
+    "publication_authorized_by_this_check": false,
+    "schema_version": "empire.website.public_saas_release_get_acceptance.v1",
+    "separate_real_browser_navigation_check_required": true,
+    "status": "EXISTING_PUBLIC_PAGE_VERIFIED_NEW_PREVIEW_NOT_LIVE"
+  },
+  "recorded_at_utc": "2026-10-25T20:42:47.582026+00:00",
+  "root_owner_approval_or_publication_performed": false,
+  "schema_version": "empire.website.saas_public_prepublication_readonly.v1",
+  "source_candidate_inventory_sha256": "75b4818543fc3cea0545458fa2fee7c11e1b57bcd32637ddc2cbd3112da15c94",
+  "status": "PUBLIC_BASELINE_AND_REAL_BROWSER_NAV_PASS_NEW_SAAS_NOT_LIVE"
+}

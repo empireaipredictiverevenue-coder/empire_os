@@ -63,3 +63,20 @@ No change to the release scope, immutable candidate hashes, founder approval, pr
 ## 25 October — tracked original-owner review issue
 
 GitHub issue **#103**, `https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103`, was created in the original `empireaipredictiverevenue-coder/empire_os` repository. This is a *review request* for ASTRA with exact two-route/ten-asset release scope, reviewed source lineage, founder approval, existing rollback simulations, protected backup and independent approval requirements, and post-publication buyer/canonical CRM validation. The existing owner pickup record links to the issue. An issue being created does **not** prove that ASTRA saw it, that anyone accepted it, or that publication authority was granted. The protected original website owner and root custody gates are unchanged; the live page remains on the approved 662-file baseline.
+
+
+## 25 October — public origin byte/read-only browser acceptance (new)
+
+The original first-party gateway (`empire_os.public_gateway`) exposes `/predictive-revenue` as the finite HTML route and `/_next` as static hashed assets. It does **not** expose `/predictive-revenue.txt` as a direct HTTP route; this returned 404 on the existing live baseline, as do `/commercial.txt` and `/buy.txt`. **Do not misrepresent the pre-existing RSC direct URL 404 as a defect caused by the staged page or require an unreviewed gateway addition under the already approved 12-file release.**
+
+A real public Chrome GET-only navigation from `/commercial` to `/predictive-revenue` fetched the old HTML route, versioned page JS and the existing 5-product catalogue. It finished with the consent-based form intact, **zero HTTP 4xx/5xx, zero JS exceptions, zero POSTs**; no `.txt` request was observed for this navigation. This tests *the observed direct navigation path*, not every possible SPA/prefetch path. Do not claim universal RSC compatibility without an owner-approved broader test.
+
+New repeatable public acceptance tooling in the same repo:
+- `/srv/empire_os/.venv/bin/python -B -m scripts.verify_public_saas_preview_release_20261025 --before` — requires exact old HTML SHA-256, original form/consent, five governed products and public privacy GET. Expected **`EXISTING_PUBLIC_PAGE_VERIFIED_NEW_PREVIEW_NOT_LIVE`**.
+- `node scripts/review_live_saas_navigation_get_20261025.mjs` — without args, requires old public HTML navigation, matching old page chunk, original consent form and no HTTP/JS errors or POSTs. It is GET-only.
+- **Only after authorised publication:** `/srv/empire_os/.venv/bin/python -B -m scripts.verify_public_saas_preview_release_20261025 --after` — requires exact new public HTML SHA-256, all **10 new static assets** serving byte-for-byte correct hashes, catalogue/privacy, and the local published **672-file** inventory with its matching staged RSC SHA-256. Fails closed before publication or upon mismatched asset/consent.
+- **Only after authorised publication:** `node scripts/review_live_saas_navigation_get_20261025.mjs --expect-preview` — requires a real click from Commercial into the **new** interactive SaaS preview, original consent form, correct compiled page JS, zero HTTP/JS exceptions and zero POSTs.
+
+These two *after* checks, the original owner's independent root receipt and controlled rollback are **separate mandatory proofs**. Passing file GETs never alone authorises or proves publication. The new functions perform no POSTs, DB/CRM writes, checkout, money actions or outbound.
+
+Machine-readable initial live GET/browser proof: `docs/website/release_candidates/SAAS_EVIDENCE_PUBLIC_PRELAUNCH_BROWSER_GET_20261025.json`. The current public HTML still matches the prior pinned source and the new example is **not yet live**. Focus post-release buyer tracking on authentic first-party consent events; the zero-acquisition current observation does not prove demand is absent.
