@@ -1,6 +1,7 @@
 // Original Empire AI buyer education, separate from the immutable SEO
 // Director release component. Editorial candidate only until website sign-off.
 // Research concepts: ChartMogul NRR methodology and Amplitude funnel guide.
+import { ownedRevenueGuideProposalHref } from "@/lib/commercial-entry-review";
 // Jev public pain observations are hypotheses, NOT identified customers.
 export default function SaaSRevenueLeakageGuide() {
   return (
@@ -92,7 +93,7 @@ export default function SaaSRevenueLeakageGuide() {
             className="inline-flex text-sm font-semibold text-cyan-200 underline underline-offset-4 hover:text-white">
             Request a Predictive Revenue review
           </a>
-          <a href="/commercial#commercial-enquiry"
+          <a href={ownedRevenueGuideProposalHref()}
             className="inline-flex text-sm font-semibold text-cyan-200 underline underline-offset-4 hover:text-white">
             Request a commercial proposal
           </a>

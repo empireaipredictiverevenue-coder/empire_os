@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
   industryCommercialProposalHref, claimedEntryForReview,
+  ownedRevenueGuideProposalHref,
 } from "../apps/empire-public-site/src/lib/commercial-entry-review.ts";
 import {reuseCommercialInterestAttempt} from "../apps/empire-public-site/src/lib/commercial-interest-attempt.ts";
 
@@ -59,4 +60,20 @@ test("same consented submission reuses key but changed hint gets new key",()=>{
   assert.equal(reuseCommercialInterestAttempt(a,{...base},next),a);
   assert.notEqual(reuseCommercialInterestAttempt(a,{...base,claimed_entry_page:"/industries/solar"},next).idempotencyKey,a.idempotencyKey);
   assert.equal(i,2);
+});
+
+
+test("original SaaS guide uses an existing, bounded, unverified entry hint",()=>{
+  const guide=fs.readFileSync(new URL(
+    "../apps/empire-public-site/src/components/SaaSRevenueLeakageGuide.tsx",
+    import.meta.url),"utf8");
+  const entry=ownedRevenueGuideProposalHref();
+  assert.equal(entry,
+    "/commercial?entry=%2Fpredictive-revenue#commercial-enquiry");
+  assert.equal(claimedEntryForReview(new URL(entry,"https://empire-ai.co.uk").search),
+    "/predictive-revenue");
+  assert.ok(guide.includes("href={ownedRevenueGuideProposalHref()}"));
+  assert.doesNotMatch(guide,/localStorage|sessionStorage|document.referrer/);
+  assert.equal(claimedEntryForReview("?entry=%2Finsights%2Frevenue-opportunity-assessment"),
+    undefined,"unimplemented landing routes cannot be submitted as original page source");
 });

@@ -43,7 +43,6 @@ REVIEWED_ENTRY_PATHS = frozenset({
     "/industries/solar",
     "/industries/hvac",
     "/industries/property",
-    "/insights/revenue-opportunity-assessment",
 })
 
 

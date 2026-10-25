@@ -1056,6 +1056,20 @@ export type FounderEarnedMediaReview = {
       eligible_for_individual_quote: false;
     }>;
   };
+  first_party_conversion?: {
+    state: string;
+    reason_code?: string;
+    reviewed_entry_page?: string | null;
+    proposed_cta?: string | null;
+    owned_guide_state: string;
+    article_publication_state: string;
+    source_code_readiness: boolean;
+    source_click_verified: false;
+    consented_enquiry_verified: false;
+    founder_site_release_authorized: false;
+    realised_revenue_verified: false;
+    review_step?: string;
+  };
   deployment_authorized: false;
   new_outbound_authorized: false;
   smart_crm_writes: false;

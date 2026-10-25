@@ -153,3 +153,42 @@ All sample previews are internal drafts; sending, publishing, quoting, committin
 **Operator:** run the previously documented `--review-only --with-leadgen --summary` command. Look for `sales_actionability_counts`, `eligible_for_contact=0`, `eligible_for_proposal=0` and the source-observation state. The next commercial action is to independently confirm an actual buyer problem and contact eligibility or to receive an opted-in first-party enquiry, then reconcile current suppression, tenant authority and capacity; any individual proposal or funds remain separately authorised.
 
 **Deploy:** isolated worktree only. Do not turn on private Founder route flags or merge into production without verified private ingress and explicit release approval.
+
+
+## Stage 6 — Original owned guide to existing consented enquiry (25 Oct 2026)
+
+**Objective:** Improve the actual conversion connection without creating a second funnel, database, tracking pixel, paid editorial distribution, or unverifiable buyer records.
+
+### Implemented only in `agent/earned-media-advisory-bridge-20261025` (NOT PRODUCTION)
+
+- Existing original `SaaSRevenueLeakageGuide` attached to `/predictive-revenue` now calls `ownedRevenueGuideProposalHref()`. The exact staged link is `/commercial?entry=%2Fpredictive-revenue#commercial-enquiry`. The buyer stays on the **existing consent-specific commercial form**, with existing dynamic catalog verification and idempotent retry identity. No cookies or visitor analytics were introduced.
+- The `entry` parameter is accepted only as an exact, bounded browser-claimed source, never as a verified Google click, publisher conversion, opted-in buyer, or revenue. Existing `record_founder_led_interest` records the hint only when a real visitor specifically consents to an enquiry; nothing has been submitted by this worktree.
+- The unimplemented `/insights/revenue-opportunity-assessment` path was present in the frontend/backend entry allowlists, but no matching Next.js page exists. It is removed from **both** allowlists in this staging branch, avoiding phantom source attribution. The original GROWTH-001 AI readiness article remains only a separate draft, not a public new route or a published editorial claim.
+- Added `empire_os/earned_media_first_party_conversion.py` which compares the reviewed original article digest, draft-only brief, existing public guide/CTA, real route source, frontend/backend exact allowlist, and first-party form consent, no-autosend and unverified attribution semantics. It catches symlink/tamper, source authority drift, missing consent, missing artifacts and invalid source text.
+- Existing `--review-only --with-leadgen --summary` and disabled-by-default Founder review now expose `owned_content_conversion_state`. This output is **source-code readiness only**; the real guide URL still needs verified production website-owner ingress/release, visits, attributable enquiries, accepted terms and bank-settled receipts before making revenue claims.
+- Public site edits are **staged only**, requiring independent ASTRA/site-owner code review and a founder release decision. No deployed website, indexation submission, third-party editorial pitch or publisher placement was changed.
+- The original `GROWTH_001_AI_READINESS_ARTICLE_BRIEF_20261016.json` explicitly has publication and new-page proposal authorization set to false; this release respects those holds.
+
+### Verification sequence before deployment
+
+1. Independent ASTRA review of this **existing page** CTA modification and contact-consent parity; verify exact website public ingress and private Founder session authentication before any merge/flag change.
+2. Retest production `/predictive-revenue`, `/commercial`, offers GET and existing idempotent intake **without making a fabricated POST**.
+3. After approved release, measure actual privacy-respecting page visits with approved first-party analytics, and reconcile any genuine, separately consented enquiry to existing EmpireDB prospect identity. A visitor-submitted entry hint remains a claim unless independently validated.
+4. Human qualify requested scope and delivery, approve the exact proposal/terms separately; log verification of settlement and fulfilment in existing economic memory. Do not infer results or conversion rates from source code.
+
+### Current proof and limitations
+
+No real measured traffic, campaign buyer response, opt-in enquiry, company-qualified buyer, paid contract, bank settlement or ROI was verified during this change. This stage strengthens the **path that a willing buyer may follow**, not the count of buyers.
+
+### Command
+
+```bash
+cd /home/ubuntu/empire_worktrees/earned_media_advisory_bridge_20261025
+PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_earned_media_advisory_bridge_20261025 \
+  --review-only --with-leadgen --summary \
+  --pr-root /home/ubuntu/empire_agents/empire_pr_consultancy_20261011 \
+  --distribution-root /srv/empire_os
+```
+
+Expected staging-only state: `owned_content_conversion_state=STAGED_EXISTING_GUIDE_TO_EXISTING_INTAKE_NOT_LIVE_VERIFIED`. Source clicks and real consented enquiries remain false or unknown.

@@ -8,7 +8,7 @@ const INDUSTRY_ENTRY_SLUGS = ["roofing", "solar", "hvac", "property"] as const;
 const REVIEWED_ENTRY_PATHS = new Set([
   "/", "/commercial", "/predictive-revenue",
   "/industries/roofing", "/industries/solar", "/industries/hvac",
-  "/industries/property", "/insights/revenue-opportunity-assessment",
+  "/industries/property",
 ]);
 
 export function industryCommercialProposalHref(slug: string): string {
@@ -16,6 +16,16 @@ export function industryCommercialProposalHref(slug: string): string {
     return "/commercial#commercial-enquiry";
   }
   const path = "/industries/" + slug;
+  return "/commercial?entry=" + encodeURIComponent(path) + "#commercial-enquiry";
+}
+
+/**
+ * Existing original buyer guide -> already-built consented commercial intake.
+ * This is an unverified, browser-claimed source hint, NOT measured SEO traffic.
+ * Do not create an unpublished /insights/ route or store anything on click.
+ */
+export function ownedRevenueGuideProposalHref(): string {
+  const path = "/predictive-revenue";
   return "/commercial?entry=" + encodeURIComponent(path) + "#commercial-enquiry";
 }
 

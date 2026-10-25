@@ -39,6 +39,14 @@ def _compact_founder_summary(packet: dict) -> dict:
         "eligible_for_contact": sales.get("ready_for_contact", 0) if isinstance(sales, dict) else 0,
         "eligible_for_proposal": sales.get("ready_for_proposal", 0) if isinstance(sales, dict) else 0,
         "public_source_observation_state": sales.get("source_probe_state") if isinstance(sales, dict) else "NOT_QUERIED",
+        "owned_content_conversion_state": (
+            packet.get("first_party_conversion", {}).get("state", "NOT_REQUESTED")
+        ),
+        "owned_content_entry_page": (
+            packet.get("first_party_conversion", {}).get("reviewed_entry_page")
+        ),
+        "source_visits_verified": False,
+        "real_consent_enquiries_from_this_source_verified": False,
         "mode": "OBSERVE",
         "bridge_state": packet.get("status"),
         "leadgen_state": lead.get("status") if isinstance(lead, dict) else "NOT_REQUESTED",
@@ -97,6 +105,10 @@ def main(argv: list[str] | None = None) -> int:
         packet["sales_actionability"] = review_sales_from_source_file(
             packet["lead_generation"], repo_root=args.repo_root,
             as_of=datetime.now(timezone.utc),
+        )
+        from empire_os.earned_media_first_party_conversion import review_owned_guide_enquiry
+        packet["first_party_conversion"] = review_owned_guide_enquiry(
+            packet, repo_root=args.repo_root,
         )
     held = (packet["status"].endswith("SOURCE_GAPS")
             or (args.with_leadgen

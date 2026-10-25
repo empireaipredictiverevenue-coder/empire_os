@@ -186,6 +186,33 @@ export default async function FounderEarnedMediaPage() {
                 </p>
               )}
             </section>
+            <section className="mt-7 rounded-2xl border border-cyan-300/15 bg-[#0b1225] p-5">
+              <p className="text-xs uppercase tracking-[0.17em] text-cyan-200">
+                Original content → First-party commercial enquiry
+              </p>
+              <h2 className="mt-2 text-xl font-semibold">Revenue leakage guide source review</h2>
+              <p className="mt-3 text-sm text-slate-300">
+                {packet.first_party_conversion?.state
+                  ? humanState(packet.first_party_conversion.state)
+                  : "Source bridge has not been reviewed"}
+              </p>
+              {packet.first_party_conversion?.source_code_readiness && (
+                <p className="mt-2 text-sm text-slate-300">
+                  First-party entry: {packet.first_party_conversion.reviewed_entry_page}.
+                  Existing consented form link is staged for website-owner review.
+                </p>
+              )}
+              <p className="mt-3 text-xs leading-6 text-amber-200">
+                Separate AI readiness article: {humanState(
+                  packet.first_party_conversion?.article_publication_state ?? "not verified"
+                )}. No published PR placement, attributable click, opted-in buyer,
+                signed scope or settled revenue is proved here.
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                {packet.first_party_conversion?.review_step ??
+                  "Founder and ASTRA review required before website release."}
+              </p>
+            </section>
             {LANES.map((lane) => {
               const rows = items.filter((item) => item.lane === lane.key);
               return (
