@@ -2,6 +2,15 @@
   "automatic_astra_department_dispatch_submitted": false,
   "candidate_file_count": 672,
   "founder_exact_candidate_approval_verified": true,
+  "founder_reaffirmation_on_owner_issue": {
+    "applies_to_existing_exact_candidate_only": true,
+    "extra_founder_approval_required_for_unchanged_candidate": false,
+    "independent_owner_approval_verified": false,
+    "issue_comment_id": 6402813517,
+    "issue_url": "https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103",
+    "production_publication_authorized": false,
+    "source": "FOUNDER_EXPLICIT_I_APPROVE_CHAT_20261025"
+  },
   "github_issue_created": true,
   "github_owner_review_issue_number": 103,
   "github_owner_review_issue_url": "https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103",
