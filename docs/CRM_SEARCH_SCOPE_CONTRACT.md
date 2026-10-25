@@ -1,6 +1,7 @@
 # CRM search evidence connection — implementation checkpoint
 
-Status: scope validation implemented; database and HTTP integration pending.
+Status: scope validation and candidate database reader implemented;
+HTTP integration and production activation pending.
 Production activation: not authorised by this document.
 
 ## Observed boundary
@@ -63,12 +64,27 @@ Scope unit tests cover cross-tenant/prospect/entity/site rejection, duplicate
 current bindings, revocation, expiry, future validity, malformed provenance and
 timezones. Eight local cases pass. These tests do not prove PostgreSQL isolation.
 
-Next: prepare SQL and integration against an isolated copy of the authenticated
-CRM source. Run real ephemeral PostgreSQL login tests for tenants A/B, unbound
-login, forged tenant settings, forbidden raw-table access, revocation between
-requests, site identity changes, empty observations and failed reads. Reuse the
-existing CRM login tests and restricted role checks. Verify migration rollback
-and current live catalog/policies before requesting production activation.
+Candidate SQL now lives in migrations/empiredb/proposals; no production
+migration number is reserved. It creates an empty, inactive-by-default explicit
+binding table and a restricted reader, owned by the existing migrator role.
+It pins the approved base URL and search tenant key and checks current CRM
+scope within the database statement. Runtime callers receive EXECUTE only.
+The function sets row_security=off to raise if RLS would silently filter its
+owner's read; this does not grant BYPASSRLS. Missing privileges remain errors.
+
+The candidate has been exercised in a temporary PostgreSQL 18 cluster with
+real tenant A/B and unbound login sessions. Fixtures are isolated synthetic
+test records, never production observations. The cluster listens only on its
+private Unix socket and is stopped and removed after testing. Fixture schema
+is deliberately minimal; this does not establish compatibility with every
+live policy, grant or source-table constraint.
+
+Next: wire integration against an isolated copy of the authenticated CRM source.
+Reuse existing login authority checks, apply sanitized unavailable semantics,
+and run HTTP authentication and cross-account tests. Reconcile the candidate
+with the current live catalog, owner privileges, RLS policies and migration
+sequence before requesting production activation. The rollback refuses to
+drop provisioned bindings; recovery with real binding history needs review.
 
 Shared /srv/empire_os has concurrent edits including CRM transport; do not
 overwrite them. This checkpoint is a separate draft scope-validation slice,
