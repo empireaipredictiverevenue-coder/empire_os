@@ -23,6 +23,7 @@ from empire_os.founder_objectives_api import create_founder_objectives_router
 from empire_os.founder_ops_api import create_founder_ops_router
 from empire_os.founder_operational_truth_api import create_founder_operational_truth_router
 from empire_os.founder_mailbox_api import create_founder_mailbox_router
+from empire_os.founder_earned_media_api import create_founder_earned_media_router
 from empire_os.founder_source_intelligence_api import create_founder_source_intelligence_router
 from empire_os.founder_vertical_intelligence_api import create_founder_vertical_intelligence_router
 from empire_os.revenue_pulse_api import create_revenue_pulse_router
@@ -52,6 +53,7 @@ READ_ONLY_ROUTER_FACTORIES: tuple[RouterFactory, ...] = (
     create_founder_ops_router,
     create_founder_operational_truth_router,
     create_founder_mailbox_router,
+    create_founder_earned_media_router,
     create_founder_source_intelligence_router,
     create_founder_vertical_intelligence_router,
 )

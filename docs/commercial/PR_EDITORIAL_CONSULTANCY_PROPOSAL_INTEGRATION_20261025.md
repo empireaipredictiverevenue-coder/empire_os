@@ -44,3 +44,10 @@ The existing `scripts/review_seo_department_integrated_20261018.py` now accepts 
 A fresh read of the two exact original Gmail threads on 25 October found one SENT message in each and no reply in either thread. This is not a full mailbox search, delivery confirmation, or proof an editor saw the message. Two other PR outlets remain research candidates, not approved next sends.
 
 QA: 67 relevant bridge/SEO/editorial regression tests passed. Isolated branch integration is source-staged and has not been merged into `/srv/empire_os`; active production continues without a new runtime, schedule or endpoint. Existing founder authentication and canonical CRM matching are separate gates for an approved future private console release.
+
+## Stage 2: internal Founder API and CRM match preview
+
+- New router `empire_os/founder_earned_media_api.py` is mounted in the existing loopback Founder service under GET `/v1/founder-earned-media/review`, with `EMPIRE_EARNED_MEDIA_FOUNDER_READ_ENABLED` disabled by default. No canonical reads or writes, outbound or publication.
+- Staged founder UI at `apps/search-command-centre/src/app/founder/earned-media/page.tsx` is 404 unless `EMPIRE_EARNED_MEDIA_FOUNDER_UI_ENABLED=1` and `EMPIRE_FOUNDER_CONSOLE_PRIVATE_AUTH_VERIFIED=1`. Those flags are **not authentication**; they must not be enabled or the change deployed until existing founder ingress/session authority is independently proven. There is no new public main-site link.
+- `empire_os/earned_media_crm_match_preview.py` is an in-memory exact-join classifier, with no EmpireDB driver. It accepts separately owner-validated canonical tenant/company/prospect/opportunity identifiers and a reconciled original Gmail thread. Mismatched tenants, partial proofs, unknown sources or conflicting matches remain held. Even one apparent match is only a candidate requiring owner review, not permission to write Smart CRM.
+- Two original press threads remain historical receipts, not fresh Gmail observations. No automatic follow-ups, scheduler, new agents, sales pipeline writes, revenue attribution or deployment.

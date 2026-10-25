@@ -508,6 +508,10 @@ export default async function FounderPage() {
                   <Drill href="/evidence" title="Evidence timeline" />
                   <Drill href="/founder/solar" title="UK Solar Intelligence" />
                   <Drill href="/founder/mail" title="Empire Mail" />
+                  {process.env.EMPIRE_EARNED_MEDIA_FOUNDER_UI_ENABLED === "1" &&
+                    process.env.EMPIRE_FOUNDER_CONSOLE_PRIVATE_AUTH_VERIFIED === "1" && (
+                      <Drill href="/founder/earned-media" title="PR · Editorial · Consultancy" />
+                    )}
                 </div>
               </section>
             </div>

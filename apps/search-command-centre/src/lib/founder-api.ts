@@ -984,3 +984,42 @@ export function getPredictiveRevenueDemo() {
     "/v1/predictive-revenue/demo",
   );
 }
+
+/** Read-only evidence review; never a CRM write or release-action API. */
+export type EarnedMediaReviewItem = {
+  item_id: string;
+  lane: "pr" | "editorial" | "consultancy" | "proposal";
+  label: string;
+  state: string;
+  next_review: string;
+  evidence_reference: string;
+  amount_minor?: number | null;
+  billing_model?: string | null;
+  source_provider_thread?: string | null;
+  crm_linkage?: {
+    state?: string;
+    canonical_company_id?: string | null;
+    canonical_prospect_id?: string | null;
+    canonical_opportunity_id?: string | null;
+  };
+};
+export type FounderEarnedMediaReview = {
+  schema_version: string;
+  mode: string;
+  status: string;
+  execution_authority: "none";
+  read_only: true;
+  lane_counts?: Record<EarnedMediaReviewItem["lane"], number>;
+  items: EarnedMediaReviewItem[];
+  sources?: Record<string, { state: string; sha256?: string; reference: string }>;
+  crm_reconciliation_state?: string;
+  deployment_authorized: false;
+  new_outbound_authorized: false;
+  smart_crm_writes: false;
+};
+
+export function getFounderEarnedMedia() {
+  return getFounderRead<FounderEarnedMediaReview>(
+    "/v1/founder-earned-media/review",
+  );
+}
