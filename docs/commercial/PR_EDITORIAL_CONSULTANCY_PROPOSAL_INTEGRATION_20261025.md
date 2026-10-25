@@ -130,3 +130,26 @@ PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
 ```
 
 All sample previews are internal drafts; sending, publishing, quoting, committing to vendor terms, CRM updates, finance, KYC and production activation remain gated. Underlying source observations are historical and their existence does not establish fresh marketplace eligibility or source credibility. The next source-of-truth milestones are current independent buyer need, real contact permission / portal eligibility, deliverable scoping and qualified inbound replies, with payments and realised revenue recorded only through existing EmpireDB settlement evidence.
+
+
+## Stage 5: independent sales-actionability barrier (25 October 2026)
+
+**Problem addressed:** a research priority of 70/100 never meant an actual sale could be pursued. Previously, the operator could still confuse discoverable public requirements, researched company identities and a ready-to-send CRM lead. The new component `empire_os/earned_media_sales_actionability.py` classifies each source observation into a **held commercial readiness lane** and lists evidence required before independent founder actions.
+
+**Real source review (public web, 25 October 2026):** Exact original Upwork pages for both RevOps/HubSpot external consultancy requests were discoverable in web search. The first also appeared in the platform's HubSpot-category index. Both displayed 50+ proposals. Search-index presence proves neither authenticated application availability nor UK founder account eligibility, free Connects, buyer identity, sufficient professional qualifications, project fit, or any willingness to buy a narrower £2,500 consultancy audit. The public observations are recorded as a **dated, degradable research artefact** in `docs/commercial/PR_CONSULTANCY_MARKETPLACE_PUBLIC_OBSERVATION_20261025.json`. They cannot be elevated to a live buyer check, and become STALE after the conservative source window; invalid, duplicated, future-dated, or attempted self-authorising records are downgraded/held.
+
+**Executed read-only count:** 23 historical observations, partitioned into:
+- **2** marketplace consultancy demand signals: `HOLD_MARKETPLACE_ELIGIBILITY_AND_DELIVERY`.
+- **1** brokered dashboard listing: `HOLD_BROKERED_BUYER_ORIGINAL_SOURCE`.
+- **8** existing canonical research prospects: `RESEARCH_ONLY_CANONICAL_ID_NOT_BUYER_INTENT`.
+- **12** unbound researched companies: `RESEARCH_ONLY_COMPANY_IDENTITY_UNBOUND`.
+
+**Zero** independently qualified buyers, permitted new contacts, approved proposals, accepted clients, verified settlements, or realised revenue. The staged Founder Console and `--summary` now display these counts and the exact next evidence step. Two PR sends remain historical, reply unverified.
+
+**Controlled upgrade:** The source reader attaches evidence provenance (digest, historical date and freshness), executes no live network or CRM query, does not unlock a sales action even if the search result is fresh, checks exact URL-ID pairing, and refuses any record claiming unsupported commercial authority. If upstream source reconciliation is held, actionability holds too. No additional bot, messaging integration, scheduling process or transaction path has been created.
+
+**First-party alternative already built elsewhere in EmpireOS:** `/predictive-revenue` contains the Revenue Leakage Guide and nonbinding interest intake; `/commercial#commercial-enquiry` contains a consent-specific enquiry form. Reuse these, not a parallel lead-capture database or a duplicate sales funnel. PR/editorial can attract organic, unpaid attention, but publication or distribution is a separate governed action and a published article is not proof of measured enquiry.
+
+**Operator:** run the previously documented `--review-only --with-leadgen --summary` command. Look for `sales_actionability_counts`, `eligible_for_contact=0`, `eligible_for_proposal=0` and the source-observation state. The next commercial action is to independently confirm an actual buyer problem and contact eligibility or to receive an opted-in first-party enquiry, then reconcile current suppression, tenant authority and capacity; any individual proposal or funds remain separately authorised.
+
+**Deploy:** isolated worktree only. Do not turn on private Founder route flags or merge into production without verified private ingress and explicit release approval.

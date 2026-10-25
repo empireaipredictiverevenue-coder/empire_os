@@ -1039,6 +1039,23 @@ export type FounderEarnedMediaReview = {
     outbound_authorized?: false;
     recognised_revenue_state?: string;
   };
+  sales_actionability?: {
+    status: string;
+    source_probe_state: string;
+    actionability_counts: Record<string, number>;
+    ready_for_contact: number;
+    ready_for_proposal: number;
+    verified_buyer_conversations: number;
+    records: Array<{
+      opportunity_id: string;
+      actionability: string;
+      source_index_check: string;
+      next_evidence_step: string;
+      required_before_sale: string[];
+      eligible_for_outreach: false;
+      eligible_for_individual_quote: false;
+    }>;
+  };
   deployment_authorized: false;
   new_outbound_authorized: false;
   smart_crm_writes: false;

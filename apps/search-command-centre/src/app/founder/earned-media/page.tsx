@@ -111,6 +111,25 @@ export default async function FounderEarnedMediaPage() {
                       <p className="mt-1 text-xs text-amber-200">No send or quote authority</p>
                     </div>
                   </div>
+                  {packet.sales_actionability?.status ===
+                  "REVIEW_PRIORITIES_NOT_EXECUTABLE_SALES_PIPELINE" && (
+                    <div className="mt-5 rounded-xl border border-amber-400/25 p-4">
+                      <h3 className="text-sm font-semibold text-amber-200">Commercial actionability gates</h3>
+                      <p className="mt-2 text-xs text-slate-300">
+                        Source discovery is not a qualified buyer. Contact ready:
+                        {" "}{packet.sales_actionability.ready_for_contact}. Proposal ready:
+                        {" "}{packet.sales_actionability.ready_for_proposal}.
+                      </p>
+                      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                        {Object.entries(packet.sales_actionability.actionability_counts).map(([reason, count]) => (
+                          <div key={reason} className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
+                            <span className="text-lg font-semibold">{count}</span>
+                            <span className="ml-2 text-xs text-slate-400">{humanState(reason)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className="mt-5 grid gap-3 md:grid-cols-2">
                     {(packet.lead_generation.opportunities ?? []).slice(0, 8).map((lead) => (
                       <article key={lead.opportunity_id}
@@ -125,6 +144,19 @@ export default async function FounderEarnedMediaPage() {
                           {humanState(lead.lead_stage)}
                         </p>
                         <p className="mt-3 text-sm text-slate-300">{lead.next_action}</p>
+                        {packet.sales_actionability?.records
+                          ?.filter((record) => record.opportunity_id === lead.opportunity_id)
+                          .map((gate) => (
+                            <div key={gate.opportunity_id} className="mt-3 border-t border-amber-300/15 pt-3">
+                              <p className="text-xs font-semibold text-amber-200">
+                                {humanState(gate.actionability)}
+                              </p>
+                              <p className="mt-1 text-xs text-slate-300">{gate.next_evidence_step}</p>
+                              <p className="mt-1 text-xs text-slate-500">
+                                Public source: {humanState(gate.source_index_check)}
+                              </p>
+                            </div>
+                          ))}
                         <p className="mt-2 text-xs text-slate-400">
                           Free sample concept: {lead.value_first_free_sample_outline}
                         </p>

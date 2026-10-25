@@ -1,0 +1,41 @@
+{
+  "schema_version": "empire.earned_media.public_request_observation.v1",
+  "mode": "OBSERVE",
+  "execution_authority": "none",
+  "method": "PUBLIC_WEB_SEARCH_OBSERVATION_NOT_AUTHENTICATED_UPWORK_SESSION",
+  "observed_date": "2026-10-25",
+  "limitations": [
+    "Search indexing does not attest open applications or user eligibility",
+    "Posting relative timestamps can be stale or inconsistent across crawls",
+    "Cannot establish buyer identity, actual buyer response, professional credentials or right to contact",
+    "Do not use website or platform outside its application terms; no paid Connects authorised"
+  ],
+  "observations": [
+    {
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Consultant-Needed-Revenue-Operations-Setup-for-B2B-Sales-Team_~022113313008957668345/",
+      "observed_date": "2026-10-25",
+      "discovery_channel": "PUBLIC_SEARCH_RESULT",
+      "source_channel_detail": "Direct Upwork listing plus Upwork HubSpot category search page",
+      "publicly_indexed": true,
+      "public_source_requirements": "External consultant expected to show actual delivered HubSpot RevOps project",
+      "proposal_count_publicly_displayed": "50+",
+      "authenticated_listing_available": false,
+      "identified_buying_organisation": false,
+      "supplier_eligibility_verified": false,
+      "outreach_authorized": false
+    },
+    {
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Grow-Automation-Specialist_~022097530147436142669/",
+      "observed_date": "2026-10-25",
+      "discovery_channel": "PUBLIC_SEARCH_RESULT",
+      "source_channel_detail": "Upwork indexed page; crawl recency may be older than observation",
+      "publicly_indexed": true,
+      "public_source_requirements": "Demonstrable Grow.com/HubSpot/P21 ERP automation and BI integration experience",
+      "proposal_count_publicly_displayed": "50+",
+      "authenticated_listing_available": false,
+      "identified_buying_organisation": false,
+      "supplier_eligibility_verified": false,
+      "outreach_authorized": false
+    }
+  ]
+}

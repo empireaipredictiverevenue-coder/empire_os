@@ -45,9 +45,15 @@ def create_founder_earned_media_router(
         leadgen = review_lead_generation(
             packet, repo_root=root, distribution_root=distribution,
         )
+        from datetime import datetime, timezone
+        from empire_os.earned_media_sales_actionability import review_sales_from_source_file
+        actionability = review_sales_from_source_file(
+            leadgen, repo_root=root, as_of=datetime.now(timezone.utc),
+        )
         return {
             **packet,
             "lead_generation": leadgen,
+            "sales_actionability": actionability,
             "read_only": True,
             "crm_reconciliation_state": "NOT_STARTED_NO_CANONICAL_TENANT_OR_COMPANY_EVIDENCE",
             "mailbox_freshness": "HISTORICAL_SENT_RECEIPTS_NOT_LIVE_GMAIL",

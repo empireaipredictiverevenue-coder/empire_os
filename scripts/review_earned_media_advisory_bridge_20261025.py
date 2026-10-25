@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+from datetime import datetime, timezone
 
 from empire_os.earned_media_advisory_bridge import review
 
@@ -30,8 +31,14 @@ def _compact_founder_summary(packet: dict) -> dict:
         }
         for x in opportunities[:5] if isinstance(x, dict)
     ]
+    sales = packet.get("sales_actionability")
     return {
         "schema_version": "empire.earned_media.founder_summary.v1",
+        "sales_actionability_state": sales.get("status") if isinstance(sales, dict) else "NOT_REQUESTED",
+        "sales_actionability_counts": sales.get("actionability_counts", {}) if isinstance(sales, dict) else {},
+        "eligible_for_contact": sales.get("ready_for_contact", 0) if isinstance(sales, dict) else 0,
+        "eligible_for_proposal": sales.get("ready_for_proposal", 0) if isinstance(sales, dict) else 0,
+        "public_source_observation_state": sales.get("source_probe_state") if isinstance(sales, dict) else "NOT_QUERIED",
         "mode": "OBSERVE",
         "bridge_state": packet.get("status"),
         "leadgen_state": lead.get("status") if isinstance(lead, dict) else "NOT_REQUESTED",
@@ -85,6 +92,11 @@ def main(argv: list[str] | None = None) -> int:
         packet["lead_generation"] = review_lead_generation(
             packet, repo_root=args.repo_root,
             distribution_root=args.distribution_root or args.repo_root,
+        )
+        from empire_os.earned_media_sales_actionability import review_sales_from_source_file
+        packet["sales_actionability"] = review_sales_from_source_file(
+            packet["lead_generation"], repo_root=args.repo_root,
+            as_of=datetime.now(timezone.utc),
         )
     held = (packet["status"].endswith("SOURCE_GAPS")
             or (args.with_leadgen
