@@ -41,8 +41,13 @@ def create_founder_earned_media_router(
         except (OSError, ValueError, TypeError):
             # Avoid leaking private paths, file bodies or server internals.
             raise HTTPException(status_code=503, detail="source_review_held")
+        from empire_os.earned_media_leadgen_review import review_lead_generation
+        leadgen = review_lead_generation(
+            packet, repo_root=root, distribution_root=distribution,
+        )
         return {
             **packet,
+            "lead_generation": leadgen,
             "read_only": True,
             "crm_reconciliation_state": "NOT_STARTED_NO_CANONICAL_TENANT_OR_COMPANY_EVIDENCE",
             "mailbox_freshness": "HISTORICAL_SENT_RECEIPTS_NOT_LIVE_GMAIL",

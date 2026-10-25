@@ -74,6 +74,80 @@ export default async function FounderEarnedMediaPage() {
               CRM: {humanState(packet.crm_reconciliation_state ?? "unverified")}.
               No client deal or realised revenue is proved by these files.
             </div>
+            <section className="mt-7 rounded-3xl border border-white/10 bg-[#0b1225] p-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+                Lead intelligence · multi-sector · read-only
+              </p>
+              <h2 className="mt-2 text-2xl font-semibold">Commercial prospect research</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Existing company research and documented external service requests.
+                Scores rank evidence review effort, not likelihood of buying.
+              </p>
+              {packet.lead_generation?.status ===
+              "RESEARCH_PRIORITY_QUEUE_NOT_BUYER_PIPELINE" ? (
+                <>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-white/10 p-4">
+                      <p className="text-xs text-slate-400">Public service-demand signals</p>
+                      <p className="mt-1 text-2xl font-semibold">
+                        {packet.lead_generation.counts?.source_signal ?? 0}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/10 p-4">
+                      <p className="text-xs text-slate-400">Researched accounts</p>
+                      <p className="mt-1 text-2xl font-semibold">
+                        {packet.lead_generation.counts?.researched_account ?? 0}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-200">
+                        {packet.lead_generation.counts?.unbound_researched_account ?? 0}
+                        {" "}without canonical prospect ID
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-amber-400/20 p-4">
+                      <p className="text-xs text-slate-400">Verified purchasing buyers</p>
+                      <p className="mt-1 text-2xl font-semibold">
+                        {packet.lead_generation.counts?.qualified_buyer ?? 0}
+                      </p>
+                      <p className="mt-1 text-xs text-amber-200">No send or quote authority</p>
+                    </div>
+                  </div>
+                  <div className="mt-5 grid gap-3 md:grid-cols-2">
+                    {(packet.lead_generation.opportunities ?? []).slice(0, 8).map((lead) => (
+                      <article key={lead.opportunity_id}
+                        className="rounded-xl border border-white/10 bg-white/[0.025] p-4">
+                        <div className="flex justify-between gap-3">
+                          <h3 className="text-sm font-semibold">{lead.label}</h3>
+                          <span className="shrink-0 text-xs text-cyan-200">
+                            Review {lead.priority_score}/100
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-amber-200">
+                          {humanState(lead.lead_stage)}
+                        </p>
+                        <p className="mt-3 text-sm text-slate-300">{lead.next_action}</p>
+                        <p className="mt-2 text-xs text-slate-400">
+                          Free sample concept: {lead.value_first_free_sample_outline}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          Blockers: {lead.blockers.length}
+                          {lead.existing_canonical_prospect_id
+                            ? " · historical prospect ID exists"
+                            : " · no canonical prospect match"}
+                        </p>
+                      </article>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-xs text-slate-500">
+                    Original source snapshots may be stale. No current job availability,
+                    editor placement, qualified buyer, accepted proposal or revenue verified.
+                  </p>
+                </>
+              ) : (
+                <p className="mt-4 text-sm text-amber-200">
+                  Lead generation source checks held. No prospect claims inferred.
+                </p>
+              )}
+            </section>
             {LANES.map((lane) => {
               const rows = items.filter((item) => item.lane === lane.key);
               return (

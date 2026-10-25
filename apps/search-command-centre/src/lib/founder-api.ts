@@ -1013,6 +1013,32 @@ export type FounderEarnedMediaReview = {
   items: EarnedMediaReviewItem[];
   sources?: Record<string, { state: string; sha256?: string; reference: string }>;
   crm_reconciliation_state?: string;
+  lead_generation?: {
+    status: string;
+    counts?: {
+      source_signal: number;
+      researched_account: number;
+      canonical_researched_account?: number;
+      unbound_researched_account?: number;
+      qualified_buyer: number;
+      total: number;
+    };
+    opportunities?: Array<{
+      opportunity_id: string;
+      lead_stage: string;
+      channel: string;
+      label: string;
+      priority_score: number;
+      next_action: string;
+      recommended_offer_code?: string | null;
+      value_first_free_sample_outline: string;
+      existing_canonical_prospect_id?: string | null;
+      blockers: string[];
+    }>;
+    crm_writes?: false;
+    outbound_authorized?: false;
+    recognised_revenue_state?: string;
+  };
   deployment_authorized: false;
   new_outbound_authorized: false;
   smart_crm_writes: false;
