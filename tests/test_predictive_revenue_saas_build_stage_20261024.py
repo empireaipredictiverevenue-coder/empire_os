@@ -20,15 +20,15 @@ def source():
 
 
 def test_existing_public_source_pack_is_real_build_stage(source):
-    report = b.build(ROOT, source, now=date(2026, 10, 24))
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
     assert report["existing_catalog_product_code"] == "predictive_revenue_diagnostic"
     assert report["existing_os"] == "EmpireOS"
     assert report["existing_database"] == "EmpireDB"
     assert report["existing_crm"] == "Smart CRM"
-    assert report["public_signal_count"] == 5
-    assert report["external_service_requests_observed"] == 2
+    assert report["public_signal_count"] == 6
+    assert report["external_service_requests_observed"] == 3
     assert report["company_hiring_fit_hypotheses"] == 3
-    assert report["private_public_evidence_samples_built"] == 5
+    assert report["private_public_evidence_samples_built"] == 6
     assert report["paid_customer_count_verified"] == 0
     assert report["customer_rows_written"] == 0
     assert report["outbound_send_authorized"] is False
@@ -38,9 +38,9 @@ def test_existing_public_source_pack_is_real_build_stage(source):
 
 
 def test_marketplace_request_is_not_named_buyer(source):
-    report = b.build(ROOT, source, now=date(2026, 10, 24))
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
     requests = [x for x in report["build_queue"] if x["external_request_observed"]]
-    assert len(requests) == 2
+    assert len(requests) == 3
     for row in requests:
         assert row["verified_company_identity"] is False
         assert "ANONYMOUS_BUYER_COMPANY_IDENTITY" in row["gate_blocks"]
@@ -62,7 +62,7 @@ def test_job_ad_cannot_be_promoted_to_buying_request(source, field, value):
                if x["source_kind"] == "COMPANY_OFFICIAL_HIRING")
     row[field] = value
     with pytest.raises(b.SourceHold):
-        b.build(ROOT, candidate, now=date(2026, 10, 24))
+        b.build(ROOT, candidate, now=date(2026, 10, 25))
 
 
 @pytest.mark.parametrize("field,value", [
@@ -77,7 +77,7 @@ def test_marketplace_request_cannot_be_certified_into_crm(source, field, value):
     row = candidate["records"][0]
     row[field] = value
     with pytest.raises(b.SourceHold):
-        b.build(ROOT, candidate, now=date(2026, 10, 24))
+        b.build(ROOT, candidate, now=date(2026, 10, 25))
 
 
 @pytest.mark.parametrize("url", [
@@ -92,14 +92,14 @@ def test_source_urls_reject_unsafe_or_unreviewed_destinations(source, url):
     candidate = deepcopy(source)
     candidate["records"][0]["source_url"] = url
     with pytest.raises(b.SourceHold):
-        b.build(ROOT, candidate, now=date(2026, 10, 24))
+        b.build(ROOT, candidate, now=date(2026, 10, 25))
 
 
 def test_duplicate_sources_hold(source):
     candidate = deepcopy(source)
     candidate["records"][1]["source_url"] = candidate["records"][0]["source_url"]
     with pytest.raises(b.SourceHold, match="DUPLICATE"):
-        b.build(ROOT, candidate, now=date(2026, 10, 24))
+        b.build(ROOT, candidate, now=date(2026, 10, 25))
 
 
 def test_missing_sample_or_symlink_fails_closed(source):
@@ -108,7 +108,7 @@ def test_missing_sample_or_symlink_fails_closed(source):
         "docs/commercial/THIS_DOES_NOT_EXIST_20261024.md"
     )
     with pytest.raises(b.SourceHold, match="SAMPLE"):
-        b.build(ROOT, candidate, now=date(2026, 10, 24))
+        b.build(ROOT, candidate, now=date(2026, 10, 25))
 
 
 def test_stale_or_future_pack_holds(source):
@@ -119,7 +119,7 @@ def test_stale_or_future_pack_holds(source):
 
 
 def test_forged_suppression_status_never_activates_send(source):
-    report = b.build(ROOT, source, now=date(2026, 10, 24),
+    report = b.build(ROOT, source, now=date(2026, 10, 25),
                      suppression_fresh=True)
     assert report["outbound_send_authorized"] is False
     assert all(x["outbound_ready"] is False and
@@ -127,17 +127,17 @@ def test_forged_suppression_status_never_activates_send(source):
 
 
 def test_writer_is_private_and_only_writes_existing_research_folder(source, tmp_path):
-    report = b.build(ROOT, source, now=date(2026, 10, 24))
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
     target = tmp_path / "saas_demand_build_stage_latest.json"
     b.write_private(target, report)
     assert target.stat().st_mode & 0o077 == 0
     assert json.loads(target.read_text())["customer_rows_written"] == 0
     b.write_private(target, report)
-    assert json.loads(target.read_text())["public_signal_count"] == 5
+    assert json.loads(target.read_text())["public_signal_count"] == 6
 
 
 def test_write_private_refuses_symlink_or_exposed_file(source, tmp_path):
-    report = b.build(ROOT, source, now=date(2026, 10, 24))
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
     target = tmp_path / "private.json"
     target.symlink_to(tmp_path / "missing.json")
     with pytest.raises(b.SourceHold):
@@ -222,14 +222,14 @@ def test_untrusted_gmail_freshness_cannot_grant_outbound_authority(source):
     stale = _queue_snapshot(fresh=True, timestamp="2026-10-22T22:23:00+00:00")
     assert b.commercial_truth(_gtm_snapshot(), stale, now=now)[
         "original_buyer_network_gmail_snapshot_fresh"] is False
-    result = b.build(ROOT, source, now=date(2026, 10, 24),
+    result = b.build(ROOT, source, now=date(2026, 10, 25),
                      intake_observer=_gtm_snapshot(), buyer_queue=snap)
     assert result["outbound_send_authorized"] is False
     assert not any(a["ready_for_email"] for a in result["next_review_actions"])
 
 
 def test_action_order_prioritizes_low_spend_founder_review_not_expected_revenue(source):
-    r = b.build(ROOT, source, now=date(2026, 10, 24))
+    r = b.build(ROOT, source, now=date(2026, 10, 25))
     actions = r["next_review_actions"]
     assert [a["review_rank"] for a in actions] == sorted(
         a["review_rank"] for a in actions)
@@ -368,7 +368,7 @@ def test_four_person_saas_public_sample_replaces_generic_hubspot_diagnostic(sour
     assert rows["revops_hubspot_20261024"]["sample_path"] == (
         "docs/commercial/REVOPS_BUYER_REQUEST_FREE_EVIDENCE_SAMPLE_20261024.md")
     assert rows["revops_saas_salesprocess_20261024"]["sample_sha256"]
-    assert report["private_public_evidence_samples_built"] == 5
+    assert report["private_public_evidence_samples_built"] == 6
     actions = {r["source_id"]:r for r in report["next_review_actions"]}
     assert actions["revops_saas_salesprocess_20261024"]["review_rank"] == 2
     assert actions["revops_hubspot_20261024"]["review_rank"] == 3
@@ -399,3 +399,59 @@ def test_marketplace_public_sample_does_not_enable_send_when_suppression_passed(
         assert r["ready_for_email"] is False
         assert r["ready_for_application"] is False
     assert report["marketplace_submission_authorized"] is False
+
+
+def test_xorlab_public_request_is_named_but_not_authenticated_buyer(source):
+    """Marketplace self-identification never creates a person/company binding."""
+    rows=[r for r in source["records"]
+          if r["id"]=="xorlab_enterprise_revops_20261025"]
+    assert len(rows)==1
+    raw=rows[0]
+    assert "xorlab" in raw["display_name"].lower()
+    assert raw["buyer_request_observed"] is True
+    assert raw["company_identity_verified"] is False
+    assert raw["technical_delivery_credentials_verified"] is False
+    assert raw["route_type"]=="PLATFORM_APPLICATION_ONLY"
+    assert raw["external_procurement_scope"]=="HUBSPOT_IMPLEMENTATION_MANDATORY"
+    report=b.build(ROOT,source,now=date(2026,10,25))
+    row=next(item for item in report["build_queue"]
+             if item["source_id"]=="xorlab_enterprise_revops_20261025")
+    assert row["stage"]=="PUBLIC_EVIDENCE_SAMPLE_BUILT"
+    assert row["sample_path"]==(
+        "docs/commercial/XORLAB_ENTERPRISE_REVENUE_STAGE_PUBLIC_SAMPLE_20261025.md")
+    assert row["buyer_interest_in_empire_verified"] is False
+    assert row["verified_company_identity"] is False
+    assert row["crm_promotion_authorized"] is False
+    assert row["outbound_authorized"] is False
+    assert row["buyer_quote_authorized"] is False
+    assert "ANONYMOUS_BUYER_COMPANY_IDENTITY" in row["gate_blocks"]
+    assert "FREELANCER_PLATFORM_ELIGIBILITY_UNVERIFIED" in row["gate_blocks"]
+    assert "BUYER_REQUIRED_TECHNICAL_DELIVERY_PROOF_MISSING" in row["gate_blocks"]
+    action=next(x for x in report["next_review_actions"]
+                if x["source_id"]=="xorlab_enterprise_revops_20261025")
+    assert action["review_rank"]==4
+    assert action["channel"]=="ORIGINAL_MARKETPLACE_ONLY"
+    assert "CLIENT_REFERENCES" in action["review_priority_basis"]
+    assert action["ready_for_application"] is False
+    assert action["ready_for_email"] is False
+    assert report["public_signal_count"]==6
+    assert report["external_service_requests_observed"]==3
+    assert report["company_hiring_fit_hypotheses"]==3
+    assert report["real_buyer_conversations_verified"]==0
+    assert report["customer_rows_written"]==0
+    assert report["new_emails_sent"]==0
+
+
+def test_xorlab_marketing_claim_cannot_promote_marketplace_identity(source):
+    for key,value in [
+        ("company_identity_verified",True),
+        ("buyer_request_observed",False),
+        ("route_type","FOUNDER_PROFESSIONAL_INTRO_REVIEW"),
+        ("claim_stage","PURCHASE_ORDER"),
+    ]:
+        attempt=deepcopy(source)
+        row=next(r for r in attempt["records"]
+                 if r["id"]=="xorlab_enterprise_revops_20261025")
+        row[key]=value
+        with pytest.raises(b.SourceHold):
+            b.build(ROOT,attempt,now=date(2026,10,25))

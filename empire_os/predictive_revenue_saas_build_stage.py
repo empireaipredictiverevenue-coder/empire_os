@@ -196,15 +196,20 @@ def priority_action(row: dict) -> dict:
     request = row["external_request_observed"]
     route = row["contact_channel_type"]
     if request:
+        rank = (4 if rid == "xorlab_enterprise_revops_20261025"
+                else 3 if "hubspot" in rid else 2)
+        basis = (
+            "PUBLIC_REQUEST_SELF_IDENTIFIES_XORLAB_BUT_CLIENT_REFERENCES_AND_HUBSPOT_DELIVERY_UNVERIFIED"
+            if rid == "xorlab_enterprise_revops_20261025"
+            else "STRICT_HUBSPOT_DELIVERY_CASE_STUDY_UNVERIFIED"
+            if "hubspot" in rid
+            else "LIGHTWEIGHT_FOUR_PERSON_SALES_PROCESS_FITS_DOCUMENTED_SAMPLE"
+        )
         return {
-            "source_id": rid, "review_rank": 3 if "hubspot" in rid else 2,
+            "source_id": rid, "review_rank": rank,
             "owner": "EXISTING_COMMERCIAL_ACQUISITION_OWNER",
             "action": "RECHECK_PLATFORM_REQUEST_AND_ELIGIBILITY",
-            "review_priority_basis": (
-                "STRICT_HUBSPOT_DELIVERY_CASE_STUDY_UNVERIFIED"
-                if "hubspot" in rid else
-                "LIGHTWEIGHT_FOUR_PERSON_SALES_PROCESS_FITS_DOCUMENTED_SAMPLE"
-            ),
+            "review_priority_basis": basis,
             "deliverable": "Evidence of active client request, legitimate platform"
                            " application eligibility, qualified delivery owner and"
                            " honest matched scope",

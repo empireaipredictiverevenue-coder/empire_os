@@ -1,6 +1,6 @@
 {
   "schema_version": "empire.saas_demand_build_source.v1",
-  "as_of": "2026-10-24",
+  "as_of": "2026-10-25",
   "records": [
     {
       "id": "revops_hubspot_20261024",
@@ -76,6 +76,21 @@
       "sample_path": "docs/commercial/CREDAL_PUBLIC_GTM_DEPLOYMENT_EVIDENCE_SAMPLE_20261024.md",
       "claim_stage": "PUBLIC_HIRING_FIT_HYPOTHESIS",
       "external_procurement_scope": "NONE"
+    },
+    {
+      "id": "xorlab_enterprise_revops_20261025",
+      "display_name": "xorlab (self-named in public Upwork RevOps request; account identity unverified)",
+      "source_kind": "MARKETPLACE_EXTERNAL_SERVICE_REQUEST",
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/Sales-Ops-RevOps-HubSpot-Expert_~022098357117058360925/",
+      "observed_at": "2026-10-25",
+      "source_observation": "A public Upwork account self-identifies as xorlab and requests enterprise HubSpot RevOps implementation, gated MEDDPICC, long-cycle forecasting and round-robin routing. Official xorlab website independently exists; account-to-company authority, open status, requested named case references, delivery ability and platform eligibility remain unverified.",
+      "buyer_request_observed": true,
+      "company_identity_verified": false,
+      "technical_delivery_credentials_verified": false,
+      "route_type": "PLATFORM_APPLICATION_ONLY",
+      "sample_path": "docs/commercial/XORLAB_ENTERPRISE_REVENUE_STAGE_PUBLIC_SAMPLE_20261025.md",
+      "claim_stage": "PUBLIC_REQUEST_NOT_VERIFIED_BUYER",
+      "external_procurement_scope": "HUBSPOT_IMPLEMENTATION_MANDATORY"
     }
   ]
 }
