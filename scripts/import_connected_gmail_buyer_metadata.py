@@ -273,6 +273,11 @@ def refreshed_summary(
                     raise RelationshipEvidenceError("INVALID_DISCOVERED_EVENT_PROVENANCE")
                 event_keys.add((e_mid,e_code))
                 events.append(dict(event))
+            last_reply_signals = sorted(set(
+                e['event_code'] for e in events
+                if e['direction'] == 'inbound' and e['message_id'] == reply_id
+                and e['event_code'].startswith('PUBLISHER_')
+            ))
             known_identity=anchored.get(domain)
             if known_identity and item.get("entity_key")==known_identity[0] and item.get("company")==known_identity[1]:
                 linked_capacity=sum(
@@ -299,6 +304,7 @@ def refreshed_summary(
                         "thread_id":tid, "domain":domain,
                         "last_buyer_reply_id":reply_id,
                         "status":"REVIEW_MONITORING_CAP_NO_SEND",
+                        "last_reply_signals":last_reply_signals,
                         "source":"EXACT_TWO_WAY_DMARC_ALIGNED_EMAIL_REPORTED",
                         "outbound_authorized":False,"execution_authority":"NONE",
                     })
@@ -310,6 +316,7 @@ def refreshed_summary(
                 new_unlinked.append({
                     "thread_id":tid, "domain":domain,
                     "last_buyer_reply_id":reply_id,
+                    "last_reply_signals":last_reply_signals,
                     "status":(
                         "HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT" if paid_only
                         else "REVIEW_IDENTITY_NO_SEND"
