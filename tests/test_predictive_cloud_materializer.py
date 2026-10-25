@@ -133,11 +133,13 @@ def test_available_economics_do_not_become_actual_revenue(
 
     assert result["future_trend"][
         "prediction_ready"
-    ] is True
+    ] is False
 
     assert result["predictive_cloud_formula"][
         "prediction_ready"
-    ] is True
+    ] is False
+    assert result["source_admission_state"] == "UNVERIFIED_LOCAL_SNAPSHOT_ONLY"
+    assert result["prediction_ready_component_count"] == 0
 
     assert result["future_trend"][
         "actual_revenue"
