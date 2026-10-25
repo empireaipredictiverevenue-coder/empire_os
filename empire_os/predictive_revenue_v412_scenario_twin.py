@@ -33,6 +33,7 @@ class RevenueResearchScenario:
     prior_observed_wins: int
     deal_value_cents: int
     fulfilment_cost_per_win_cents: int
+    currency_code: str
     median_days_to_cash: float
     cash_lag_log_sigma: float = 0.65
     research_overhead_cents: int = 0
@@ -49,6 +50,8 @@ class RevenueResearchScenario:
             raise ValueError("V412_SOURCE_DIGEST_INVALID")
         if not isinstance(self.sector, str) or not 1 <= len(self.sector) <= 64 or not self.sector.replace("_", "").isalnum():
             raise ValueError("V412_SECTOR_INVALID")
+        if type(self.currency_code) is not str or self.currency_code not in {"GBP", "USD", "EUR"}:
+            raise ValueError("V412_EXPLICIT_SUPPORTED_CURRENCY_REQUIRED")
         for value in (
             self.intent_velocity_score, self.economic_capacity_score,
             self.observed_need_score, self.timing_alignment_score,
@@ -182,6 +185,7 @@ def simulate_revenue_twin_held(
         "status": "SYNTHETIC_ORGANIC_REVENUE_TWIN_HELD",
         "simulation_only": True,
         "canonical_database": "EmpireDB_PostgreSQL",
+        "currency_code": scenario.currency_code,
         "canonical_tenant_id": source_review["canonical_tenant_id"],
         "source_evidence_digest": scenario.source_evidence_digest,
         "source_rights_decision": source_review["rights_decision"],
@@ -192,6 +196,7 @@ def simulate_revenue_twin_held(
         "confidence_intervals_empirically_validated": False,
         "scenario_assumptions": {
             "sector": scenario.sector,
+            "currency_code": scenario.currency_code,
             "channel": scenario.acquisition_channel,
             "day_zero_opportunity_cohort": scenario.cohort_opportunities,
             "research_observed_opportunities_unverified": scenario.prior_observed_opportunities,
