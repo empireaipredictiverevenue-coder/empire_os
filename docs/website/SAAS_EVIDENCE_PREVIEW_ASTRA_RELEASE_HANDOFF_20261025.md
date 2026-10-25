@@ -59,3 +59,7 @@ Evidence receipt: `docs/website/release_candidates/SAAS_EVIDENCE_SYNTHETIC_FORM_
 The latest (19:59 UTC) GTM canonical snapshot shows **0 verified first-party commercial sales acquisitions**. The separate least-privilege founder Smart CRM aggregate shows **0 tenant-visible Predictive Revenue prospects**. Both read-only observations are limited to their original scoped source. Do not manufacture a test lead in the live database; real source-to-tenant reconciliation remains unproven until a genuine consented buyer event.
 
 No change to the release scope, immutable candidate hashes, founder approval, protected root custody or independently required ASTRA owner sign-off. This preview remains **NOT LIVE**.
+
+## 25 October — tracked original-owner review issue
+
+GitHub issue **#103**, `https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103`, was created in the original `empireaipredictiverevenue-coder/empire_os` repository. This is a *review request* for ASTRA with exact two-route/ten-asset release scope, reviewed source lineage, founder approval, existing rollback simulations, protected backup and independent approval requirements, and post-publication buyer/canonical CRM validation. The existing owner pickup record links to the issue. An issue being created does **not** prove that ASTRA saw it, that anyone accepted it, or that publication authority was granted. The protected original website owner and root custody gates are unchanged; the live page remains on the approved 662-file baseline.
