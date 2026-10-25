@@ -22,3 +22,12 @@ PYTHONPATH=. .venv/bin/python -B -m pytest -q -p no:cacheprovider tests/test_pre
 ```
 
 Future work must connect historical run counts, backlog, inference latency, true ingestion lag, source failure rates and evaluation throughput to trustworthy owned telemetry before declaring those metrics available.
+
+
+## Source-bounded run diagnostics extension
+
+The existing on-demand `--read-only` command also reads microsecond-resolution systemd monotonic start/exit timestamps. `materializer_last_run.duration_ms` is now based on that clock, and stays `null` when the exact duration is unavailable instead of reporting a misleading zero.
+
+The `materializer_journal_24h` section counts **visible** verified-looking systemd closeout messages from `journalctl` over a rolling 24-hour window. The inspection accepts only bounded JSON lines attributed to PID 1 / systemd / this original unit. It has a maximum sample of 1,024 journal entries and explicitly flags when that sample limit is reached. This is **not** a complete historical service SLA, an independently authenticated business outcome or evidence of model quality. Historical success/failure totals stay uninstrumented.
+
+A missing, malformed, inaccessible or excessive journal sample produces `null`, not invented zeroes. No unit, timer, database or inference worker is changed. The script does not install itself as a timer or activate any execution authority.
