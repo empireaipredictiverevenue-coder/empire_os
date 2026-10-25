@@ -13,6 +13,7 @@ from empire_os.adaptive_outreach_optimizer import (
     select_message_arms,
 )
 from empire_os.conversation_value import build_first_touch_copy
+from empire_os.rapport_value_final_boundary import compose_verified_value_first
 from empire_os.buyer_discovery import looks_like_person_name
 from empire_os.locale_intelligence import contact_window_status, resolve_locale
 from empire_os.outreach_message_optimizer import review_message
@@ -215,6 +216,18 @@ def build_outbound_payload(
             f"{timing.get('next_eligible_utc')}"
         )
 
+    # Reject unsafe or unevidenced source BEFORE optimizer model arms run;
+    # the same review repeats AFTER selection on the actual final payload.
+    compose_verified_value_first(
+        first_name=first,business=business,niche=niche,metro=metro,
+        evidence=evidence,now=now,subject="Public market observation",
+    )
+    # Source proof must pass before the adaptive optimizer is invoked,
+    # then the final selected body is separately validated after optimization.
+    compose_verified_value_first(
+        first_name=first,business=business,niche=niche,metro=metro,
+        evidence=evidence,now=now,subject="Public market observation",
+    )
     copy = build_first_touch_copy(review, now=now)
     subject = copy.subject
     body = copy.body
@@ -350,6 +363,16 @@ def build_outbound_payload(
                 "adaptive outreach variant failed message quality gate"
             )
 
+    # Final policy applies to both ordinary and adaptive selected messages.
+    # Never use a score, selected arm, or caller-set 'ready' flag as buyer intent.
+    body, final_gate = compose_verified_value_first(
+        first_name=first,business=business,niche=niche,metro=metro,
+        evidence=evidence,now=now,subject=subject,
+    )
+    selected_quality = dict(selected_quality or {})
+    selected_quality["pre_boundary_optimizer_review_only"] = True
+    selected_quality["final_rapport_policy_review"] = final_gate
+
     # Fingerprint the exact final proposed wording, after adaptive selection.
     # This is a content identity, never an approval or delivery claim.
     copy_draft_id = fingerprint_final_email(subject=subject, body=body)
@@ -371,6 +394,9 @@ def build_outbound_payload(
             "business_name": business,
             "conversation_quality": "v2",
             "conversation_quality_tier": copy.quality_tier,
+            "final_message_stage":"RAPPORT_VALUE_NO_BUYER_SIGNAL",
+            "final_message_gate": final_gate,
+            "optimizer_quality_is_pre_final_gate": True,
             "message_optimizer_version": (
                 "adaptive_v1"
                 if adaptive_selection is not None
@@ -652,6 +678,14 @@ def run_gtm_pipeline(
             message = str(exc)
             if (
                 "specific outreach evidence required" in message
+                or "FRESH_SOURCE_BACKED_VALUE_REQUIRED" in message
+                or "OBSERVED_NOT_INFERRED_SOURCE_REQUIRED" in message
+                or "SOURCE_SUMMARY_CONTAINS_COMMERCIAL_ASK" in message
+                or "FIRST_TOUCH_COMMERCIAL_GATE_BLOCKED" in message
+                or "FRESH_SOURCE_BACKED_VALUE_REQUIRED" in message
+                or "OBSERVED_NOT_INFERRED_SOURCE_REQUIRED" in message
+                or "SOURCE_SUMMARY_CONTAINS_COMMERCIAL_ASK" in message
+                or "FIRST_TOUCH_COMMERCIAL_GATE_BLOCKED" in message
                 or "verified person contact required" in message
                 or "outbound personalization evidence missing" in message
                 or "recipient outreach language unresolved" in message

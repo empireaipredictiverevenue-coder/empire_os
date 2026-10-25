@@ -25,6 +25,12 @@ def review(review_id="00000000-0000-0000-0000-000000000001"):
             "outreach_ready": True,
             "rating": 4.8,
             "review_count": 116,
+            "why_now":{
+                "summary":"a roof repair permit was recorded in Wichita",
+                "evidence_ref":"city-permit:wichita:20260920",
+                "observed_at":"2026-09-20T12:00:00Z",
+                "observed_inferred":"observed",
+            },
         },
     }
 
@@ -183,6 +189,12 @@ def test_pipeline_hydrates_missing_context_from_canonical_prospect():
             "outreach_ready": True,
             "rating": 4.8,
             "review_count": 116,
+            "why_now":{
+                "summary":"documented issued plumbing permits in San Antonio",
+                "evidence_ref":"city-permit:sa:20260920",
+                "observed_at":"2026-09-20T12:00:00Z",
+                "observed_inferred":"observed",
+            },
         },
     }
 
@@ -305,6 +317,7 @@ def test_missing_specific_proof_is_deferred_not_service_error():
     no_proof = review("00000000-0000-0000-0000-000000000051")
     no_proof["evidence"].pop("rating", None)
     no_proof["evidence"].pop("review_count", None)
+    no_proof["evidence"].pop("why_now", None)
 
     def request(method, path, payload=None, **_kwargs):
         if method == "GET" and path.startswith(
@@ -325,7 +338,7 @@ def test_missing_specific_proof_is_deferred_not_service_error():
     assert result.intents_proposed == 0
     assert result.outreach_deferred == 1
     assert result.proposal_errors == ()
-    assert "specific outreach evidence required" in result.deferred_reasons[0]
+    assert "FRESH_SOURCE_BACKED_VALUE_REQUIRED" in result.deferred_reasons[0]
 
 
 
