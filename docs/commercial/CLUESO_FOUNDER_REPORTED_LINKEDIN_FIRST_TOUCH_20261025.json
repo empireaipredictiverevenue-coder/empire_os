@@ -1,0 +1,23 @@
+{
+  "schema_version": "empire.saas.founder_reported_first_touch.v1",
+  "prospect_source_id": "clueso_founding_ae_20261024",
+  "company": "Clueso",
+  "recipient_public_profile": "https://www.linkedin.com/in/neelbalar7",
+  "channel": "LINKEDIN_MANUAL",
+  "report_source": "FOUNDER_DIRECT_CONFIRMATION_IN_CHAT",
+  "reported_date_utc": "2026-10-25",
+  "founder_reported_sent": true,
+  "provider_message_id": null,
+  "provider_delivered_verified": false,
+  "actual_send_timestamp_verified": false,
+  "actual_message_body_independently_verified": false,
+  "positive_reply_verified": false,
+  "buying_intent_verified": false,
+  "suppression_provider_reconciled": false,
+  "authorizes_repeat_first_touch": false,
+  "authorizes_followup": false,
+  "crm_promotion_authorized": false,
+  "payment_authorized": false,
+  "next_action": "AWAIT_AUTHENTIC_REPLY_NO_DUPLICATE_INTRO",
+  "approved_draft_reference": "docs/commercial/CLUESO_FOUNDER_INTRO_SOURCE_VERIFIED_20261024.md"
+}

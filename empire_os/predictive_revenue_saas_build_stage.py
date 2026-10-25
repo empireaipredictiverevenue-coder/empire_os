@@ -404,6 +404,121 @@ def build(root: Path, source: dict, *, now: date | None = None,
     }
 
 
+FOUNDER_CLUESO_REPORT_REL = Path(
+    "docs/commercial/CLUESO_FOUNDER_REPORTED_LINKEDIN_FIRST_TOUCH_20261025.json"
+)
+
+
+def load_founder_clueso_first_touch(path: Path) -> dict | None:
+    """Exact owner statement, not independently verified LinkedIn telemetry."""
+    if not path.exists():
+        return None
+    if path.is_symlink() or not path.is_file() or path.stat().st_size > 10_000:
+        raise SourceHold("FOUNDER_FIRST_TOUCH_SOURCE_UNSAFE")
+    try:
+        receipt = json.loads(path.read_text(encoding="utf8"))
+    except (OSError, UnicodeError, ValueError, TypeError):
+        raise SourceHold("FOUNDER_FIRST_TOUCH_SOURCE_INVALID") from None
+    if not isinstance(receipt, dict):
+        raise SourceHold("FOUNDER_FIRST_TOUCH_SOURCE_NOT_OBJECT")
+    return receipt
+
+
+def apply_founder_clueso_first_touch(report: dict, receipt: dict, *,
+                                     now: date | None = None) -> dict:
+    """Mark a founder-*reported* LinkedIn first touch as no-repeat/await reply.
+
+    A user statement is evidence of what the user says they did, not platform
+    delivery, a reply, verified buyer interest, authorisation to follow up or
+    a CRM/economic receipt. Keep all prior external gates unchanged.
+    """
+    from copy import deepcopy
+
+    expected = {
+        "schema_version": "empire.saas.founder_reported_first_touch.v1",
+        "prospect_source_id": "clueso_founding_ae_20261024",
+        "company": "Clueso",
+        "recipient_public_profile": "https://www.linkedin.com/in/neelbalar7",
+        "channel": "LINKEDIN_MANUAL",
+        "report_source": "FOUNDER_DIRECT_CONFIRMATION_IN_CHAT",
+        "founder_reported_sent": True,
+        "provider_message_id": None,
+        "provider_delivered_verified": False,
+        "actual_send_timestamp_verified": False,
+        "actual_message_body_independently_verified": False,
+        "positive_reply_verified": False,
+        "buying_intent_verified": False,
+        "suppression_provider_reconciled": False,
+        "authorizes_repeat_first_touch": False,
+        "authorizes_followup": False,
+        "crm_promotion_authorized": False,
+        "payment_authorized": False,
+        "next_action": "AWAIT_AUTHENTIC_REPLY_NO_DUPLICATE_INTRO",
+        "approved_draft_reference":
+            "docs/commercial/CLUESO_FOUNDER_INTRO_SOURCE_VERIFIED_20261024.md",
+    }
+    if not isinstance(receipt, dict) or any(
+        receipt.get(key) != value or type(receipt.get(key)) is not type(value)
+        for key, value in expected.items()
+    ):
+        raise SourceHold("FOUNDER_FIRST_TOUCH_ATTESTATION_CONTRACT_INVALID")
+    try:
+        reported = date.fromisoformat(receipt["reported_date_utc"])
+    except (KeyError, ValueError, TypeError):
+        raise SourceHold("FOUNDER_FIRST_TOUCH_REPORT_DATE_INVALID") from None
+    today = now or datetime.now(timezone.utc).date()
+    if reported > today:
+        raise SourceHold("FOUNDER_FIRST_TOUCH_REPORT_DATE_IN_FUTURE")
+    # Historic no-repeat receipts do not expire: a stale source does not
+    # restore permission to repeat an introduction.
+    updated = deepcopy(report)
+    target = "clueso_founding_ae_20261024"
+    matching_rows = [row for row in updated.get("build_queue", [])
+                     if row.get("source_id") == target]
+    matching_actions = [item for item in updated.get("next_review_actions", [])
+                        if item.get("source_id") == target]
+    if len(matching_rows) != 1 or len(matching_actions) != 1:
+        raise SourceHold("FOUNDER_FIRST_TOUCH_TARGET_NOT_IN_EXISTING_QUEUE")
+    row = matching_rows[0]
+    row.update({
+        "founder_reported_contact_status":
+            "FOUNDER_REPORTED_LINKEDIN_SENT_PROVIDER_UNVERIFIED",
+        "founder_reported_sent_on": reported.isoformat(),
+        "sender_platform_message_id_verified": False,
+        "first_touch_no_repeat": True,
+        "reply_verified": False, "accepted_customer_scope": False,
+        "buyer_interest_in_empire_verified": False,
+        "outbound_ready": False, "outbound_authorized": False,
+        "crm_promotion_authorized": False,
+    })
+    action = matching_actions[0]
+    action.update({
+        "review_rank": 6,
+        "action": "AWAIT_AUTHENTIC_LINKEDIN_REPLY_NO_DUPLICATE_INTRO",
+        "deliverable": "Wait for a genuine LinkedIn reply; if supplied, "
+                       "verify exact sender/thread and offer existing free "
+                       "Clueso sample only upon positive buyer interest.",
+        "reason_not_send_ready": "FOUNDER_REPORTED_FIRST_TOUCH_NO_DUPLICATE",
+        "contact_status": "FOUNDER_REPORTED_SENT_PLATFORM_UNVERIFIED",
+        "first_touch_no_repeat": True,
+        "ready_for_email": False, "ready_for_application": False,
+        "approved_followup": False,
+    })
+    updated["next_review_actions"].sort(
+        key=lambda item: (item["review_rank"], item["source_id"]))
+    updated["founder_reported_linkedin_manual_first_touch_count"] = 1
+    updated["founder_reported_first_touch"] = {
+        "source_id": target,
+        "channel": "LINKEDIN_MANUAL",
+        "report_source": "FOUNDER_DIRECT_CONFIRMATION_IN_CHAT",
+        "reported_date_utc": reported.isoformat(),
+        "platform_send_or_delivery_verified": False,
+        "reply_verified": False, "first_touch_no_repeat": True,
+        "followup_authorized": False,
+    }
+    return updated
+
+
 def write_private(path: Path, report: dict) -> None:
     # Writes one private READ MODEL in the existing acquisition-research folder;
     # never a prospect or CRM record, and never a live-site file.

@@ -8,7 +8,8 @@ from pathlib import Path
 
 from empire_os.predictive_revenue_saas_build_stage import (
     OUTPUT_REL, SOURCE_REL, SourceHold, _read_source, build, write_private,
-    verify_clueso_official_sources,
+    verify_clueso_official_sources, FOUNDER_CLUESO_REPORT_REL,
+    load_founder_clueso_first_touch, apply_founder_clueso_first_touch,
 )
 
 
@@ -54,6 +55,10 @@ def main(argv: list[str] | None = None) -> int:
                     source_check["status"] if source_check is not None
                     else "NO_FRESH_FIRST_PARTY_GET_THIS_RUN")
                 action["contact_channel_authorized"] = False
+        founder_report = load_founder_clueso_first_touch(
+            root / FOUNDER_CLUESO_REPORT_REL)
+        if founder_report is not None:
+            report = apply_founder_clueso_first_touch(report, founder_report)
         if args.write_private:
             write_private(root / OUTPUT_REL, report)
         print(json.dumps({
@@ -67,6 +72,11 @@ def main(argv: list[str] | None = None) -> int:
             "private_public_evidence_samples_built":
                 report["private_public_evidence_samples_built"],
             "active_verified_buyers": report["real_buyer_conversations_verified"],
+            "founder_reported_linkedin_manual_first_touches": report.get(
+                "founder_reported_linkedin_manual_first_touch_count", 0),
+            "clueso_first_touch_status": (
+                "FOUNDER_REPORTED_SENT_PLATFORM_UNVERIFIED"
+                if founder_report is not None else "NO_FOUNDER_SEND_REPORT"),
             "commercial_observation": report["original_commercial_truth"]["status"],
             "canonical_count_if_verified": report[
                 "original_commercial_truth"]["canonical_sales_acquisitions_if_verified"],

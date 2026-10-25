@@ -297,3 +297,64 @@ def test_clueso_official_partial_source_never_promotes_buyer():
     assert p["status"] == "OFFICIAL_CLUESO_PAGES_HELD"
     assert any(not row["verified"] for row in p["source_checks"])
     assert p["independent_external_procurement_verified"] is False
+
+
+def test_founder_reported_clueso_send_no_repeat_and_no_false_delivery(source):
+    receipt = b.load_founder_clueso_first_touch(ROOT / b.FOUNDER_CLUESO_REPORT_REL)
+    assert receipt["founder_reported_sent"] is True
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
+    updated = b.apply_founder_clueso_first_touch(
+        report, receipt, now=date(2026, 10, 25))
+    assert updated["founder_reported_linkedin_manual_first_touch_count"] == 1
+    assert updated["real_buyer_conversations_verified"] == 0
+    assert updated["new_emails_sent"] == 0
+    assert updated["customer_rows_written"] == 0
+    assert updated["outbound_send_authorized"] is False
+    assert updated["founder_reported_first_touch"]["platform_send_or_delivery_verified"] is False
+    row = next(x for x in updated["build_queue"]
+               if x["source_id"] == "clueso_founding_ae_20261024")
+    assert row["first_touch_no_repeat"] is True
+    assert row["reply_verified"] is False
+    assert row["buyer_interest_in_empire_verified"] is False
+    action = next(x for x in updated["next_review_actions"]
+                  if x["source_id"] == "clueso_founding_ae_20261024")
+    assert action["action"] == "AWAIT_AUTHENTIC_LINKEDIN_REPLY_NO_DUPLICATE_INTRO"
+    assert action["ready_for_email"] is False
+    assert action["approved_followup"] is False
+    assert updated["next_review_actions"][0]["source_id"] != "clueso_founding_ae_20261024"
+
+
+@pytest.mark.parametrize("key,value", [
+    ("provider_delivered_verified", True),
+    ("positive_reply_verified", True),
+    ("crm_promotion_authorized", True),
+    ("authorizes_followup", True),
+    ("prospect_source_id", "other_prospect"),
+    ("channel", "EMAIL"),
+])
+def test_founder_confirmation_cannot_be_spoofed_into_commercial_authority(
+    source, key, value
+):
+    receipt = b.load_founder_clueso_first_touch(ROOT / b.FOUNDER_CLUESO_REPORT_REL)
+    edited = dict(receipt, **{key: value})
+    with pytest.raises(b.SourceHold):
+        b.apply_founder_clueso_first_touch(
+            b.build(ROOT, source, now=date(2026, 10, 25)),
+            edited, now=date(2026, 10, 25))
+
+
+def test_historical_self_report_no_repeat_never_expires(source):
+    receipt = b.load_founder_clueso_first_touch(ROOT / b.FOUNDER_CLUESO_REPORT_REL)
+    report = b.build(ROOT, source, now=date(2026, 10, 25))
+    updated = b.apply_founder_clueso_first_touch(
+        report, receipt, now=date(2027, 10, 25))
+    assert updated["founder_reported_first_touch"]["first_touch_no_repeat"] is True
+
+
+def test_report_loader_rejects_symlink(tmp_path):
+    receipt = tmp_path / "founder.json"
+    receipt.write_text("{}")
+    link = tmp_path / "alias.json"
+    link.symlink_to(receipt)
+    with pytest.raises(b.SourceHold):
+        b.load_founder_clueso_first_touch(link)
