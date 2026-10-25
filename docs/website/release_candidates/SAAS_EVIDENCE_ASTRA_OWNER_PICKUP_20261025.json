@@ -1,4 +1,5 @@
 {
+  "additional_gateway_route_not_approved_in_pinned_release": true,
   "automatic_astra_department_dispatch_submitted": false,
   "candidate_file_count": 672,
   "founder_exact_candidate_approval_verified": true,
@@ -38,14 +39,20 @@
       "path": "docs/website/release_candidates/SAAS_EVIDENCE_PAIRED_UNION_20261025.json",
       "sha256": "bed1fd6497822b34a7a31adc52a3b6993aeda0c5db937eee64fffd463d40ed13"
     },
+    "public_browser_before": {
+      "path": "docs/website/release_candidates/SAAS_EVIDENCE_PUBLIC_PRELAUNCH_BROWSER_GET_20261025.json",
+      "sha256": "a641cab8ce10759c306a3be4d6561b1fb6d2ad1693bb4a2d11e58b0c1406ee5b"
+    },
     "synthetic_browser_form": {
       "path": "docs/website/release_candidates/SAAS_EVIDENCE_SYNTHETIC_FORM_ACCEPTANCE_20261025.json",
       "sha256": "0464e02676f8cba28a5473bf2b34c89be4b9c504d1db70927cac28f521f0b5c3"
     }
   },
   "priority": "REVIEW_EXISTING_WEBSITE_RELEASE_NOT_NEW_SAAS_SYSTEM",
+  "public_rsc_txt_direct_route_preexisting_404": true,
   "publication_authorized_now": false,
   "publication_performed": false,
+  "real_browser_navigation_did_not_fetch_rsc_txt_in_observed_path": true,
   "root_backup_and_owner_approval_verified": false,
   "root_custody_backup_verified": false,
   "root_only_action_requires_independent_astra_approval": true,
@@ -59,5 +66,9 @@
     "unchanged_original_files": 660
   },
   "status": "FOUNDER_APPROVED_OWNER_INDEPENDENT_VISUAL_REVIEW_AND_ROOT_CUSTODY_REQUIRED",
+  "website_owner_publication_acceptance_commands": [
+    "/srv/empire_os/.venv/bin/python -B -m scripts.verify_public_saas_preview_release_20261025 --after",
+    "node scripts/review_live_saas_navigation_get_20261025.mjs --expect-preview"
+  ],
   "work_key": "predictive_revenue_evidence_preview_exact_paired_route_20261025"
 }
