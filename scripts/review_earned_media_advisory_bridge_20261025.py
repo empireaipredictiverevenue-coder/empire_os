@@ -47,6 +47,17 @@ def _compact_founder_summary(packet: dict) -> dict:
         ),
         "source_visits_verified": False,
         "real_consent_enquiries_from_this_source_verified": False,
+        "live_release_preflight": (
+            {
+                "status": packet["live_release_preflight"]["status"],
+                "source_code_review_ready": packet["live_release_preflight"]["source_code_review_ready"],
+                "public_original_enquiry_gets_verified": packet["live_release_preflight"]["public_original_enquiry_gets_verified"],
+                "private_crm_anonymous_denial_verified": packet["live_release_preflight"]["private_crm_anonymous_denial_verified"],
+                "private_founder_console_ingress_verified": packet["live_release_preflight"]["private_founder_console_ingress_verified"],
+                "new_staged_cta_deployed_verified": packet["live_release_preflight"]["new_staged_cta_deployed_verified"],
+                "release_hold_reasons": packet["live_release_preflight"]["release_hold_reasons"],
+            } if "live_release_preflight" in packet else None
+        ),
         "mode": "OBSERVE",
         "bridge_state": packet.get("status"),
         "leadgen_state": lead.get("status") if isinstance(lead, dict) else "NOT_REQUESTED",
@@ -88,11 +99,17 @@ def main(argv: list[str] | None = None) -> int:
                         help="Print compact executive review instead of the full source packet")
     parser.add_argument("--sample-opportunity-id", type=str,
                         help="Print original read-only sample for an exact opportunity ID")
+    parser.add_argument("--live-release-preflight", action="store_true",
+                        help="Opt-in GET-only existing public enquiry/anonymous CRM checks; never authorises release")
     args = parser.parse_args(argv)
     if args.summary and args.sample_opportunity_id:
         parser.error("--summary cannot be combined with --sample-opportunity-id")
     if args.sample_opportunity_id and not args.with_leadgen:
         parser.error("--sample-opportunity-id requires --with-leadgen")
+    if args.live_release_preflight and not args.with_leadgen:
+        parser.error("--live-release-preflight requires --with-leadgen")
+    if args.live_release_preflight and args.sample_opportunity_id:
+        parser.error("--live-release-preflight cannot combine with --sample-opportunity-id")
     packet = review(args.repo_root, pr_root=args.pr_root,
                     distribution_root=args.distribution_root)
     if args.with_leadgen:
@@ -110,9 +127,16 @@ def main(argv: list[str] | None = None) -> int:
         packet["first_party_conversion"] = review_owned_guide_enquiry(
             packet, repo_root=args.repo_root,
         )
+        if args.live_release_preflight:
+            from empire_os.earned_media_live_release_preflight import inspect_live_release
+            packet["live_release_preflight"] = inspect_live_release(
+                packet["first_party_conversion"]
+            )
     held = (packet["status"].endswith("SOURCE_GAPS")
             or (args.with_leadgen
-                and packet["lead_generation"]["status"] == "HELD_SOURCE_OR_PACKET_INTEGRITY"))
+                and packet["lead_generation"]["status"] == "HELD_SOURCE_OR_PACKET_INTEGRITY")
+            or (args.live_release_preflight
+                and packet["live_release_preflight"]["launch_approval"] is not True))
     if args.sample_opportunity_id:
         from empire_os.earned_media_value_first import preview_value_first_sample
         if held:

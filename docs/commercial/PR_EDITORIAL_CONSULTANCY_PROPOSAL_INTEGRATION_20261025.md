@@ -192,3 +192,33 @@ PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
 ```
 
 Expected staging-only state: `owned_content_conversion_state=STAGED_EXISTING_GUIDE_TO_EXISTING_INTAKE_NOT_LIVE_VERIFIED`. Source clicks and real consented enquiries remain false or unknown.
+
+
+## Stage 7: actual live GET-only release readiness, no production activation
+
+**Live observation (25 Oct 2026, non-mutating existing original canary):**
+
+- Existing `scripts.probe_first_party_sales_http_readonly --check-private-inbox` completed. Both current public commercial/predictive pages responded, **two** compiled intake endpoints were found, and current first-party catalogues reported **10** commercial offers and **5** Predictive Revenue products. Both existing CRM prospect/buyer APIs denied anonymous access, and private CRM health passed. These facts do **not** demonstrate that any staged new code is deployed, visitor consent was submitted, or a buyer reached Smart CRM.
+- Loopback-only existing Founder Console `/founder` responded 200 **without founder credentials**. This is a local server-bound GET and does NOT determine whether Cloudflare/ingress protects public traffic. New `/founder/earned-media` and `/v1/founder-earned-media/review` responded **404** as the feature is off. **DO NOT enable the flags**, link the private page publicly, or claim external Founder authentication from this local observation.
+- Existing first-party canonical acquisition counts and tenant-scoped customer rows were **not queried**. A visible public catalogue is not evidence of site conversion or settled revenue.
+
+**New implementation:** `empire_os/earned_media_live_release_preflight.py` is a strictly read-only composer around the pre-existing, audited GET-only public canary and anonymous-CRM-denial canary. No duplicate fetch logic, no authentication bypass, cookies, CRM login, POST, invoice, database insert, mail send, published page, systemd unit or scheduler. It explicitly separates: staged source code, live pre-existing GET surface, anonymous CRM boundary, independent Founder ingress/session security, site-owner authorization, deployed new CTA, real buyer replies, contract and bank settlement. It ALWAYS returns `HELD_PRIVATE_AUTH_AND_PRODUCTION_RELEASE` until a separately approved verified release path exists; even a caller boolean claiming founder authentication cannot upgrade it.
+
+**Optional operator command (must exit 2 because release remains held):**
+
+```bash
+cd /home/ubuntu/empire_worktrees/earned_media_advisory_bridge_20261025
+PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_earned_media_advisory_bridge_20261025 \
+  --review-only --with-leadgen --summary --live-release-preflight \
+  --pr-root /home/ubuntu/empire_agents/empire_pr_consultancy_20261011 \
+  --distribution-root /srv/empire_os
+```
+
+`--live-release-preflight` must be **explicitly requested** and is not invoked in the ordinary `--summary` or private Founder API read. The live results are compact and contain only booleans, source states and release holds. Tests inject GET-only fixtures and prove the existing canary was not called during ordinary review. The read-only check is not a real release operation.
+
+**Relevant first-party skills applied:** `empire-lead-research` for dated source verification, provenance and deduplication; `empire-commercial-email-copy` for explicit blocking where contact/consent/suppression or deliverable evidence is missing. These skills are advisory, not authority to send.
+
+### Required gate to move beyond staged evidence
+
+Independently verify external authenticated Founder ingress AND real signed-in session scoping (not local 200 or an environment flag), ASTRA and founder's exact website diff approval, public GET/compiled new CTA after an authorised deploy, then genuine consented enquiries with canonical tenant/exact thread proof, individual scoped proposals and settled cash. Production website unchanged by this worktree, and no publication or outbound authorised.
