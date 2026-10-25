@@ -89,6 +89,14 @@ COMPONENT_TASKS = {
     'buyer_capacity_readiness': 'evidence_analysis',
     'agent_tool_execution_plane': 'engineering_review',
     'commercial_reply_classification': 'commercial_reply',
+    # ORIGINAL Permit Intelligence workflow: reuse the same SkillForge
+    # task selectors, no parallel skill registry or agent execution plane.
+    'permit_public_signal_research': 'lead_generation',
+    'permit_contact_identity_review': 'entity_resolution',
+    'permit_source_evidence_review': 'evidence_analysis',
+    'permit_commercial_email_copy_review': 'email_drafting',
+    'permit_buyer_reply_triage': 'commercial_reply',
+    'permit_commercial_release_review': 'revenue_readiness',
 }
 
 

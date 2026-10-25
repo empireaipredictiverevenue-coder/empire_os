@@ -18,7 +18,7 @@ STEPS = (
 )
 # Auxiliary snapshot is advisory: a Workspace outage must not block the
 # existing personal-Gmail reconciliation or imply any outreach authority.
-OPTIONAL_STEPS = ("refresh_workspace_sent_domain_receipts.py",)
+OPTIONAL_STEPS = ("refresh_workspace_sent_domain_receipts.py", "run_permit_compliance_cycle_observer.py")
 
 def run(*, root=ROOT, invoke=None):
     invoke = invoke or subprocess.run
@@ -53,8 +53,10 @@ def run(*, root=ROOT, invoke=None):
         if len(results)==len(STEPS) and all(x["status"]=="PASS" for x in results):
             for step in OPTIONAL_STEPS:
                 try:
+                    optional_env=(env if step!="run_permit_compliance_cycle_observer.py"
+                                  else {**env,"EMPIRE_PERMIT_COMPLIANCE_OBSERVER_READONLY":"1"})
                     p=invoke([sys.executable,str(root / "scripts" / step),"--write"],
-                             cwd=root,env=env,capture_output=True,text=True,
+                             cwd=root,env=optional_env,capture_output=True,text=True,
                              timeout=90,check=False)
                     optional_results.append({"step":step,
                         "status":"PASS" if p.returncode==0 else "HELD",
