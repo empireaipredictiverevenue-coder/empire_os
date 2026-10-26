@@ -333,6 +333,41 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     }
 
 
+def _commercial_change_radar_overlay(repo_root: Path) -> dict[str, Any]:
+    """Only review-required, evidence-attributed public changes.
+
+    Not part of the canonical roster, buyer pipeline or revenue measures.
+    """
+    radar = _optional_json(
+        repo_root / "runtime/competitive_intelligence/competitor_change_radar_latest.json"
+    )
+    if (radar.get("schema_version") != "empire.competitor_change_radar.v1"
+            or radar.get("mode") != "OBSERVE"
+            or radar.get("execution_authority") != "none"
+            or radar.get("outreach_enabled") is not False
+            or radar.get("buyer_intent_inferred") is not False
+            or radar.get("demand_inferred") is not False
+            or radar.get("verified_revenue") is not False
+            or radar.get("payment_authorized") is not False):
+        return {"available": False, "mode": "OBSERVE",
+                "review_candidate_count": 0, "outreach_enabled": False}
+    queue = radar.get("review_queue", [])
+    if not isinstance(queue, list) or len(queue) > 20:
+        return {"available": False, "mode": "OBSERVE",
+                "review_candidate_count": 0, "outreach_enabled": False}
+    return {
+        "available": True, "mode": "OBSERVE",
+        "generated_at": radar.get("generated_at"),
+        "observed_this_run": radar.get("observed_this_run", 0),
+        "new_baselines_this_run": radar.get("new_baselines_this_run", 0),
+        "review_candidate_count": min(len(queue), 20),
+        "review_queue": queue,
+        "signals_require_human_review": True,
+        "buyer_intent_inferred": False, "revenue_inferred": False,
+        "outreach_enabled": False, "execution_authority": "none",
+    }
+
+
 def refresh_feed_snapshot(
     repo_root: Path,
     writer: PostgresIntelligenceMaterializer,
@@ -369,6 +404,7 @@ def refresh_feed_snapshot(
         ),
     )
     payload["call_acquisition_intelligence"] = _call_acquisition_overlay(repo_root)
+    payload["commercial_change_radar"] = _commercial_change_radar_overlay(repo_root)
     write_feed_snapshot(repo_root, payload)
     return payload
 
@@ -393,10 +429,12 @@ def build_feed_runtime(repo_root: Path) -> dict[str, Any]:
             "outreach_enabled": False,
             "execution_authority": "none",
             "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
+            "commercial_change_radar": _commercial_change_radar_overlay(repo_root),
         }
     return {
         "available": True, **payload,
         "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
+        "commercial_change_radar": _commercial_change_radar_overlay(repo_root),
     }
 
 
