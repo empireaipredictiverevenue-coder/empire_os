@@ -2,7 +2,7 @@
 import CommercialBuyerExplanation from "@/components/CommercialBuyerExplanation";
 import BrokeragePremiumDiscovery from "@/components/BrokeragePremiumDiscovery";
 import TamBuyingIntentEvidenceGuide from "@/components/TamBuyingIntentEvidenceGuide";
-import { ArrowLeft, ArrowRight, ArrowUpRight, LoaderCircle, CheckCircle2, Radar, ShieldCheck, Layers3 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, LoaderCircle, CheckCircle2, Radar, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   reuseCommercialInterestAttempt,
@@ -106,14 +106,6 @@ export default function CommercialPage() {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[linear-gradient(90deg,#030916_0%,rgba(3,9,22,.97)_45%,rgba(3,9,22,.36)_100%),linear-gradient(0deg,#030916_0%,transparent_50%)]" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_84%_32%,rgba(222,176,107,.18),transparent_37%)]" />
       <div className="relative z-10 mx-auto w-[min(1440px,calc(100%-40px))]">
-        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[#b4c7e8]/15 py-6">
-          <a href="/" className="inline-flex items-center gap-3 text-xs font-bold tracking-[.2em] text-white"><span className="grid size-10 place-items-center rounded-xl border border-[#dfb875]/35 bg-[#dfb875]/10 text-[#f1d39e]"><Layers3 className="size-5" aria-hidden="true" /></span> EMPIRE AI</a>
-          <nav aria-label="Commercial navigation" className="flex flex-wrap gap-5 text-xs font-semibold text-[#dce7f8]/70">
-            <a href="/buy" className="hover:text-white">Intelligence products</a>
-            <a href="/predictive-revenue" className="hover:text-white">Predictive Revenue</a>
-            <a href="/trust" className="hover:text-white">Trust</a>
-          </nav>
-        </header>
         <div className="grid items-end gap-10 pb-24 pt-20 lg:grid-cols-[1.3fr_.7fr] lg:pb-28 lg:pt-28">
           <div className="max-w-4xl">
             <p className="flex items-center gap-3 text-[11px] font-bold tracking-[.22em] text-[#f1d39e]"><span className="h-px w-9 bg-[#f1d39e]" /> EMPIRE AI / COMMERCIAL INTELLIGENCE</p>

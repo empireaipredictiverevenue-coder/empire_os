@@ -7,7 +7,7 @@ import requests
 
 ORIGINAL=Path("/srv/empire_os/apps/empire-public-site/out")
 REBUILT=Path("/home/ubuntu/empire_worktrees/website_solar_commercial_premium_20261026/apps/empire-public-site/out")
-PACKET=Path("/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate")
+PACKET=Path("/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2")
 TARGETS={"commercial.html":"/commercial","industries/solar.html":"/industries/solar"}
 ROUTE_DATA=(
  "commercial.txt",

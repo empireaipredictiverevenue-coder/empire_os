@@ -31,6 +31,8 @@ def test_solar_only_existing_image_brand_consent_bounded_proposal():
     assert "/industries/hvac" in content
     assert "No claim of ready-to-buy homeowners" in content
     assert "<form" not in content
+    assert '<nav aria-label="Solar intelligence navigation"' not in content
+    assert "Solar markets change." in content
     assert "fetch(" not in content
     assert "Math.random" not in content
     assert "guaranteed" not in re.sub(r"No claim of ready-to-buy homeowners, guaranteed installations", "", content)
@@ -58,6 +60,7 @@ def test_commercial_offer_and_form_behavior_unchanged():
         "<TamBuyingIntentEvidenceGuide />",
     ]: assert marker in content
     assert content.count("<form onSubmit={submit}")==1
+    assert '<nav aria-label="Commercial navigation"' not in content
     assert content.count('id="commercial-enquiry"')==1
     assert "No automatic order, payment" in content
 

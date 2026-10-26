@@ -20,8 +20,20 @@ Original Commercial function from state declarations through pre-render return, 
 
 The source is committed in the isolated website_solar_commercial_premium_20261026 worktree. Next.js 16.3.5 Webpack static production build, TypeScript and 19 generated routes succeeded.
 
-The complete rebuilt out directory MUST NOT be published: rebuilding changes unrelated generated HTML and risks other owners. Private candidate packet at /home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate has ONLY the two proposed HTML pages, their eight corresponding Next.js route-data TXT sidecars, additive non-colliding hashed assets, original preimages of those ten route files and a SHA-256 manifest. The 60 other rebuilt TXT sidecars and 16 other rebuilt HTML files are EXCLUDED. Original /commercial and /industries/solar public HTTPS both exactly matched repository out before candidate staging.
+The complete rebuilt out directory MUST NOT be published: rebuilding changes unrelated generated HTML and risks other owners. Private candidate packet at /home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2 has ONLY the two proposed HTML pages, their eight corresponding Next.js route-data TXT sidecars, additive non-colliding hashed assets, original preimages of those ten route files and a SHA-256 manifest. The 60 other rebuilt TXT sidecars and 16 other rebuilt HTML files are EXCLUDED. Original /commercial and /industries/solar public HTTPS both exactly matched repository out before candidate staging.
 
 Before publishing, the original ASTRA website owner must check the staged source hashes, exact public baseline, mobile/browser appearance, commercial/legal copy, unchanged first-party form and two-page/asset scope, then handle backup, publish and independent rollback/live readback through its own release operator. Staging is not an activation or final founder visual acceptance. No production mutations, Google indexing submissions, outbound or payment were performed.
 
 An existing unrelated industry navigation test fails on unchanged production: it demands a literal /commercial href instead of the already-deployed source-aware link and expects existing /uk/roofing to be absent. It is not a new redesign failure and should be repaired by its own test owner without discarding the source-aware attribution implementation.
+
+
+## 26 October V2 visual correction
+
+V1 headless browser desktop/mobile screenshots revealed duplicate navigation because original flagship SiteChrome already owns the logo and menu. V2 removes both redundant page-level headers only. Isolated Next.js Webpack build, TypeScript and all 19 generated routes passed.
+
+V2 Chrome accepted Solar and Commercial at 1440 by 900 desktop and 390 by 844 mobile, one global header, no horizontal overflow, no missing images, HTTP errors or JavaScript exceptions, and zero POSTs. Current public approved Commercial offer catalogue rendered through GET; source-aware Solar entry CTA navigated to the existing Commercial form with unchecked consent and disabled submit. No live enquiry was created.
+
+Four full-page screenshots and receipt are under:
+ /home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/browser_qa/
+
+V1 packet is superseded. Website owner independent visual, consent, protected backup and exact release review remain pending.

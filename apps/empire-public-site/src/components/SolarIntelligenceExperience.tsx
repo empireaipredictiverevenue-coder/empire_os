@@ -1,7 +1,7 @@
 import {
   ArrowDownRight, ArrowRight, ArrowUpRight, BadgeCheck,
-  Building2, ChartNoAxesCombined, CircleDot, Compass,
-  FileCheck2, MapPin, Radar, ShieldCheck, Sun, Zap,
+  Building2, ChartNoAxesCombined,
+  FileCheck2, MapPin, Radar, ShieldCheck, Sun,
 } from "lucide-react";
 import type { IndustryPage } from "@/lib/industry-pages";
 import { getBuyerEditorial } from "@/lib/industry-buying-editorial";
@@ -62,18 +62,6 @@ export default function SolarIntelligenceExperience({ page }: { page: IndustryPa
         <div aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(ellipse_at_78%_32%,rgba(208,153,77,.18),transparent_42%)]" />
 
         <div className="relative z-10 mx-auto w-[min(1440px,calc(100%-40px))]">
-          <nav aria-label="Solar intelligence navigation" className="flex flex-wrap items-center justify-between gap-4 border-b border-white/15 py-6">
-            <a href="/" className="inline-flex items-center gap-3 text-xs font-semibold tracking-[.2em] text-white">
-              <span className="grid size-10 place-items-center rounded-xl border border-[#d4b06c]/35 bg-[#d4b06c]/10 text-[#f3d7a2]"><Compass className="size-5" /></span>
-              EMPIRE AI
-            </a>
-            <div className="flex flex-wrap gap-5 text-xs font-medium text-[#e4edff]/80">
-              <a href="/industries" className="transition hover:text-white">Industry intelligence</a>
-              <a href="/predictive-revenue" className="transition hover:text-white">Predictive Revenue</a>
-              <a href="/trust" className="transition hover:text-white">Trust</a>
-            </div>
-          </nav>
-
           <div className="grid items-end gap-12 pb-24 pt-24 lg:grid-cols-[1.12fr_.88fr] lg:pb-28 lg:pt-32">
             <div className="max-w-[780px]">
               <p className="flex items-center gap-3 text-[11px] font-bold tracking-[.23em] text-[#f3d7a2]">
