@@ -24,8 +24,11 @@ from empire_os.buyer_network_research_rotation import accepted_domain
 
 MAX_PAGE_BYTES = 750_000
 MAX_LINKS = 7
-MAX_DOMAINS_PER_CYCLE = 4
-MAX_HISTORY_DOMAINS = 64
+# One existing scheduled worker serves the opened <=500 company research
+# queue. Eight bounded sites per cycle, retaining enough legitimate recent
+# observations to cover the 131+ source-verified company portfolio.
+MAX_DOMAINS_PER_CYCLE = 8
+MAX_HISTORY_DOMAINS = 256
 RECHECK_SECONDS = 24 * 3600
 HOLD_RECHECK_SECONDS = 6 * 3600
 RESULT_TTL_SECONDS = 7 * 24 * 3600

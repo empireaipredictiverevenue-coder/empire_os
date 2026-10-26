@@ -183,13 +183,16 @@ def test_unavailable_or_removed_link_cannot_clear_hold(tmp_path):
     assert saved['observations'][0]['outbound_authorized'] is False
 
 
-def test_automatic_selection_never_exceeds_four_domains(tmp_path):
+def test_automatic_selection_never_exceeds_eight_domains(tmp_path):
     domains=['buyer'+str(i)+'.com' for i in range(15)]
     _runner_fixture(tmp_path,domains=domains)
-    result=cycle.run(root=tmp_path,plan_only=True,max_domains=4,now_epoch=100_000.)
-    assert len(result['selected_domains'])==4
+    result=cycle.run(root=tmp_path,plan_only=True,max_domains=8,now_epoch=100_000.)
+    assert len(result['selected_domains'])==8
+    assert result['network_fetch_performed'] is False
     with pytest.raises(DueDiligenceError,match='batch_bound'):
-        cycle.run(root=tmp_path,plan_only=True,max_domains=5)
+        cycle.run(root=tmp_path,plan_only=True,max_domains=9)
+    from empire_os.buyer_first_party_due_diligence import MAX_HISTORY_DOMAINS
+    assert MAX_HISTORY_DOMAINS >= 131
 
 
 def test_source_race_fails_before_writing_snapshot(tmp_path):

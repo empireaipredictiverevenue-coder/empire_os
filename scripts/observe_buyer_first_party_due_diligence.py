@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Automatic first-party legal/contact link audit on existing buyer scout.
 
-OBSERVE-only. Four domains and seven same-host pages per domain maximum per
+OBSERVE-only. Eight domains and seven same-host pages per domain maximum per
 cycle, daily cache, independently revisited holds, no emails or new timer.
 """
 from __future__ import annotations
@@ -136,7 +136,10 @@ def run(*,root:Path=ROOT,plan_only:bool=False,max_domains:int=MAX_DOMAINS_PER_CY
                 'files_written':0,'outbound_sent':False,'execution_authority':'none'}
     observations=[]
     if selected:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+        # 4 bounded first-party site probes in parallel; 8 total per cycle.
+        # No external search calls, no added timers and no bypass of robots,
+        # private addresses or per-site HTTP timeout limits.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:
             futures={pool.submit(fetch_observer,domain,now_epoch=now):domain
                      for domain in selected}
             for future in concurrent.futures.as_completed(futures):
