@@ -179,3 +179,137 @@ def test_brain_hints_cover_full_current_research_queue_not_just_25_rows():
     assert result['outbound_authorized'] is False
     assert all(type(priority) is int and 0 <= priority <= 150
                for priority in result['research_priority_hints'].values())
+
+
+def test_portfolio_persists_owner_review_without_claiming_execution():
+    source = snapshot(29)
+    first, checkpoint = review(source, None, now=NOW)
+    assert len(first['portfolio_next_actions']) == 29
+    assert len(first['priority_worklist']) == 25
+    assert first['portfolio_next_actions_are_review_not_execution'] is True
+    second, checkpoint = review(source, checkpoint, now=NOW + timedelta(minutes=5))
+    assert len(second['portfolio_next_actions']) == 29
+    assert len(second['priority_worklist']) == 4
+    third, _ = review(source, checkpoint, now=NOW + timedelta(minutes=10))
+    assert len(third['portfolio_next_actions']) == 29
+    assert third['priority_worklist'] == []
+    assert {x['decision_state'] for x in third['portfolio_next_actions']} == {
+        'SURFACED_AWAITING_OWNER_EVIDENCE'
+    }
+    assert all(x['task_dispatched'] is False for x in third['portfolio_next_actions'])
+
+
+def test_changed_inbound_timestamp_reopens_existing_relationship_without_repeat():
+    source = snapshot(2)
+    target = source['targets'][1]
+    target['contact_history_state'] = 'WORKSPACE_RECIPROCAL_THREAD_OBSERVED'
+    target['contact_history_last_inbound_at'] = '2026-10-25T11:00:00+00:00'
+    _, checkpoint = review(source, None, now=NOW)
+    unchanged, checkpoint = review(source, checkpoint, now=NOW + timedelta(minutes=5))
+    assert unchanged['priority_worklist'] == []
+    target['contact_history_last_inbound_at'] = '2026-10-26T17:30:00+00:00'
+    latest, checkpoint = review(source, checkpoint, now=NOW + timedelta(minutes=10))
+    assert [x['domain'] for x in latest['priority_worklist']] == ['buyer1.com']
+    assert latest['priority_worklist'][0]['recommended_action'] == 'REVIEW_EXISTING_BUYER_RELATIONSHIP'
+    again, _ = review(source, checkpoint, now=NOW + timedelta(minutes=15))
+    assert again['priority_worklist'] == []
+
+
+def test_reobserving_same_site_does_not_reissue_identical_research():
+    source = snapshot(2)
+    _, checkpoint = review(source, None, now=NOW)
+    source['targets'][0]['first_party_due_diligence']['observed_at'] = (
+        NOW + timedelta(minutes=2)).isoformat()
+    second, _ = review(source, checkpoint, now=NOW + timedelta(minutes=5))
+    assert second['priority_worklist'] == []
+
+
+def test_source_stale_disables_unverified_sector_priority_but_not_safe_research():
+    source = snapshot(1)
+    source['targets'][0] = row(0, tier='FOUNDER_REVIEW_ONLY', sector=True)
+    source['active_demand_source_state'] = 'UNAVAILABLE_STALE_OR_EMPTY'
+    stale, _ = review(source, None, now=NOW)
+    assert stale['priority_worklist'][0]['recommended_action'] == 'VERIFY_DECISION_MAKER_AND_CONTACT'
+    assert stale['research_priority_hints'] == {}
+    source['active_demand_source_state'] = 'CURRENT_RESEARCH_PRIORITIES'
+    fresh, _ = review(source, None, now=NOW)
+    assert fresh['priority_worklist'][0]['recommended_action'] == 'VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS'
+
+
+def test_hold_fails_closed_even_if_score_and_contact_look_attractive():
+    source = snapshot(2)
+    source['targets'][0] = row(0, contact='WORKSPACE_RECIPROCAL_THREAD_OBSERVED',
+                                tier='FOUNDER_REVIEW_ONLY', sector=True)
+    source['targets'][0]['manual_hold_reason'] = 'REVIEW_REQUIRED'
+    source['targets'][1]['contact_history_state'] = 'SOURCE_UNAVAILABLE'
+    report, _ = review(source, None, now=NOW)
+    assert report['policy_held_count'] == 2
+    assert report['priority_worklist'] == []
+    assert report['research_priority_hints'] == {}
+    assert {r['decision_state'] for r in report['portfolio_next_actions']} == {'POLICY_HOLD'}
+
+
+def test_legacy_emitted_fingerprint_migrates_without_147_repeat_tasks():
+    from empire_os.buyer_acquisition_decision_brain import digest
+    source = snapshot(1)
+    item = source['targets'][0]
+    legacy = {
+        'next_action': 'VERIFY_COMPANY_BUYER_ROLE',
+        'tier': item['tier'],
+        'contact': item['contact_history_state'],
+        'fit': item['active_demand_sector_research_fit']['state'],
+        'sectors': [], 'corridors': [],
+        'due_freshness': 'CURRENT',
+        'due_observed': NOW.isoformat(),
+    }
+    old = digest(legacy)
+    previous = {
+        'schema_version': SCHEMA,
+        'identity_decisions': {'buyer0.com': old},
+        'emitted_decisions': {'buyer0.com': old},
+        'outbound_authorized': False,
+        'payment_authorized': False,
+    }
+    item['contact_history_last_inbound_at'] = None
+    current, checkpoint = review(source, previous, now=NOW)
+    assert current['priority_worklist'] == []
+    assert current['unchanged_recommendations_suppressed'] == 1
+    assert checkpoint['emitted_decisions']['buyer0.com'] != old
+    current, _ = review(source, checkpoint, now=NOW+timedelta(minutes=5))
+    assert current['priority_worklist'] == []
+
+
+def test_source_availability_and_prior_outbound_timestamp_do_not_reissue_work():
+    source = snapshot(2)
+    for target in source['targets']:
+        target['contact_history_last_outbound_at'] = '2026-10-22T11:00:00+00:00'
+        target['contact_history_source_fresh'] = False
+    _, checkpoint = review(source, None, now=NOW)
+    source['targets'][0]['contact_history_source_fresh'] = True
+    source['targets'][1]['contact_history_last_outbound_at'] = '2026-10-24T08:00:00+00:00'
+    second, _ = review(source, checkpoint, now=NOW + timedelta(minutes=5))
+    assert second['priority_worklist'] == []
+
+
+def test_short_lived_enriched_fingerprint_migrates_without_repeat():
+    from empire_os.buyer_acquisition_decision_brain import digest
+    source = snapshot(1)
+    row0 = source['targets'][0]
+    base = {
+        'next_action': 'VERIFY_COMPANY_BUYER_ROLE', 'tier': row0['tier'],
+        'contact': row0['contact_history_state'],
+        'fit': row0['active_demand_sector_research_fit']['state'],
+        'sectors': [], 'corridors': [], 'due_freshness': 'CURRENT',
+        'due_state': None, 'site_role_flags': None, 'evidence_gaps': None,
+        'role_review': 'UNCLASSIFIED_BUYER_RESEARCH', 'contact_next_action': None,
+        'last_inbound_at': None, 'queue_status': None,
+    }
+    enriched = digest({**base, 'last_outbound_at': None, 'contact_source_fresh': False})
+    state = {'schema_version': SCHEMA, 'outbound_authorized': False,
+             'payment_authorized': False,
+             'identity_decisions': {'buyer0.com': enriched},
+             'emitted_decisions': {'buyer0.com': enriched}}
+    row0['contact_history_source_fresh'] = False
+    result, next_state = review(source, state, now=NOW)
+    assert result['priority_worklist'] == []
+    assert next_state['emitted_decisions']['buyer0.com'] != enriched

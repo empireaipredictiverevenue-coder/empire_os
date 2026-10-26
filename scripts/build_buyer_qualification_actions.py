@@ -340,6 +340,16 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'buyer_role_first_party_source':role_review['source_url'] if role_review else None,
             'contact_history_state':contact_state,
             'contact_history_next_action':str(contact.get('next_action') or 'RECONCILE_HISTORY')[:120],
+            # Per-company change evidence, not email content or send authority.
+            'contact_history_last_inbound_at':(
+                str(contact['last_inbound_at'])[:40]
+                if isinstance(contact.get('last_inbound_at'), str) else None
+            ),
+            'contact_history_last_outbound_at':(
+                str(contact['last_outbound_at'])[:40]
+                if isinstance(contact.get('last_outbound_at'), str) else None
+            ),
+            'contact_history_source_fresh':contact.get('gmail_snapshot_fresh') is True,
             'commercial_next_action':action,
             'active_demand_sector_research_fit':sector_fit,
             'buyer_discovery_requirements':list(DISCOVERY_REQUIREMENTS)

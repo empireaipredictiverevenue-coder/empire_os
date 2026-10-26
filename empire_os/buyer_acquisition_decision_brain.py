@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections import Counter
 from datetime import datetime, timezone
+from enum import Enum
 from hashlib import sha256
 import json
 import os
@@ -28,6 +29,19 @@ REFRESH_COOLDOWN = 20 * 60
 MAX_OUTPUT_TASKS = 25
 MAX_STORED_IDENTITIES = 500
 
+
+class BuyerDecision(str, Enum):
+    """Internal, evidence-only decision vocabulary (not execution authority)."""
+    REVIEW_EXISTING_BUYER_RELATIONSHIP = "REVIEW_EXISTING_BUYER_RELATIONSHIP"
+    REVIEW_PREVIOUS_BUYER_CONTACT = "REVIEW_PREVIOUS_BUYER_CONTACT"
+    VERIFY_COMPANY_BUYER_ROLE = "VERIFY_COMPANY_BUYER_ROLE"
+    VERIFY_FIRST_PARTY_SITE = "VERIFY_FIRST_PARTY_SITE"
+    VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS = "VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS"
+    VERIFY_DECISION_MAKER_AND_CONTACT = "VERIFY_DECISION_MAKER_AND_CONTACT"
+    RESEARCH_COMPANY_ROLE = "RESEARCH_COMPANY_ROLE"
+    RESEARCH_EVENT_ECOSYSTEM = "RESEARCH_EVENT_ECOSYSTEM"
+
+
 OWNER = {
     "REVIEW_EXISTING_BUYER_RELATIONSHIP": "existing_founder_commercial_review",
     "REVIEW_PREVIOUS_BUYER_CONTACT": "existing_buyer_gmail_evidence_owner",
@@ -38,7 +52,8 @@ OWNER = {
     "RESEARCH_COMPANY_ROLE": "existing_buyer_network_research_owner",
     "RESEARCH_EVENT_ECOSYSTEM": "existing_buyer_network_research_owner",
 }
-SAFE_STATES = frozenset(OWNER)
+SAFE_STATES = frozenset(action.value for action in BuyerDecision)
+assert SAFE_STATES == frozenset(OWNER), "Every typed decision needs one original owner"
 SENSITIVE_ACTIONS = frozenset({
     "NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY",
 })
@@ -92,7 +107,11 @@ def classify(row: dict) -> str | None:
     dd = dd if isinstance(dd, dict) else {}
     if (action in SENSITIVE_ACTIONS or tier in
             ("MANUAL_EVIDENCE_HOLD", "AUTOMATED_EVIDENCE_HOLD")
-            or contact in ("DO_NOT_PURSUE", "DELIVERY_HOLD", "EXISTING_CONVERSATION_PARTIAL_BOUNCE")):
+            or row.get("manual_hold_reason") is not None
+            or row.get("automated_hold_reason") is not None
+            or row.get("outbound_authorized") is True
+            or contact in ("SOURCE_UNAVAILABLE", "DO_NOT_PURSUE",
+                           "DELIVERY_HOLD", "EXISTING_CONVERSATION_PARTIAL_BOUNCE")):
         return None
     if row.get("buyer_relationship_role_review") == EVENT:
         return "RESEARCH_EVENT_ECOSYSTEM"
@@ -168,6 +187,10 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
     emitted_before = previous.get("emitted_decisions", {}) if previous else {}
     decisions: dict[str, str] = {}
     due: list[dict] = []
+    # The complete, durable state is distinct from the per-cycle change delta.
+    # A surfaced recommendation is not a completed task or a sent message.
+    portfolio: list[dict[str, Any]] = []
+    legacy_emitted: dict[str, str] = {}
     held = 0
     unchanged = 0
     materially_changed = 0
@@ -181,13 +204,28 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         if not isinstance(domain, str) or not DOMAIN.fullmatch(domain) or domain in seen:
             raise ValueError("duplicate_or_invalid_buyer_entity")
         seen.add(domain)
-        recommended = classify(row)
+        # The qualification source normally invalidates stale demand. Also
+        # fail closed here when reviewing an injected/legacy stale snapshot.
+        eligible_row = row
+        if snapshot.get("active_demand_source_state") not in (
+                None, "CURRENT_RESEARCH_PRIORITIES"):
+            eligible_row = {**row, "active_demand_sector_research_fit": {
+                "state": "NO_SECTOR_GAP_MATCH_OBSERVED",
+                "first_party_matching_sector_names": [],
+                "sample_corridors_for_research": [],
+                "market_or_zip_coverage_verified": False,
+            }}
+        recommended = classify(eligible_row)
         if recommended is None:
             held += 1
+            portfolio.append({"domain": domain, "recommended_action": None,
+                              "existing_owner": None, "research_priority": 0,
+                              "decision_state": "POLICY_HOLD",
+                              "task_dispatched": False})
             continue
         if recommended not in SAFE_STATES:
             raise ValueError("unknown_buyer_decision")
-        fit = row.get("active_demand_sector_research_fit")
+        fit = eligible_row.get("active_demand_sector_research_fit")
         fit = fit if isinstance(fit, dict) else {}
         due_diligence = row.get("first_party_due_diligence")
         due_diligence = due_diligence if isinstance(due_diligence, dict) else {}
@@ -199,9 +237,37 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
             "sectors": fit.get("first_party_matching_sector_names", []),
             "corridors": fit.get("sample_corridors_for_research", []),
             "due_freshness": due_diligence.get("freshness"),
-            "due_observed": due_diligence.get("observed_at"),
+            "due_state": due_diligence.get("state"),
+            "site_role_flags": row.get("site_evidence_flags"),
+            "evidence_gaps": row.get("missing_evidence"),
+            "role_review": row.get("buyer_relationship_role_review"),
+            "contact_next_action": row.get("contact_history_next_action"),
+            "last_inbound_at": row.get("contact_history_last_inbound_at"),
+            "queue_status": row.get("queue_status"),
         }
         stamp = digest(semantic)
+        # Upgrade the original v1 fingerprints in place. Enriching the policy
+        # with reply timestamps must not re-surface every prior task once.
+        legacy_stamp = digest({
+            "next_action": recommended,
+            "tier": row.get("tier"),
+            "contact": row.get("contact_history_state"),
+            "fit": fit.get("state"),
+            "sectors": fit.get("first_party_matching_sector_names", []),
+            "corridors": fit.get("sample_corridors_for_research", []),
+            "due_freshness": due_diligence.get("freshness"),
+            "due_observed": due_diligence.get("observed_at"),
+        })
+        # Read-only source availability and historical outbound timestamps
+        # are not new buyer intent. Recognize the short-lived enriched v1
+        # fingerprint to avoid another migration-only reissue.
+        enriched_stamp = digest({
+            **semantic,
+            "last_outbound_at": row.get("contact_history_last_outbound_at"),
+            "contact_source_fresh": row.get("contact_history_source_fresh"),
+        })
+        if emitted_before.get(domain) in (legacy_stamp, enriched_stamp):
+            legacy_emitted[domain] = stamp
         decisions[domain] = stamp
         counters[recommended] += 1
         # Stable prioritisation for the original direct-site researcher.
@@ -211,16 +277,28 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
             "VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS",
             "RESEARCH_COMPANY_ROLE",
         }:
-            priority_hints[domain] = _priority(row, recommended)
-        if before.get(domain) != stamp:
+            priority_hints[domain] = _priority(eligible_row, recommended)
+        if before.get(domain) not in (stamp, legacy_stamp, enriched_stamp):
             materially_changed += 1
-        if emitted_before.get(domain) == stamp:
+        was_surfaced = (emitted_before.get(domain) == stamp
+                         or domain in legacy_emitted)
+        portfolio.append({
+            "domain": domain, "recommended_action": recommended,
+            "existing_owner": OWNER[recommended],
+            "research_priority": _priority(eligible_row, recommended),
+            "source_evidence_fingerprint": stamp,
+            "decision_state": (
+                "SURFACED_AWAITING_OWNER_EVIDENCE" if was_surfaced
+                else "QUEUED_FOR_BOUNDED_REVIEW"),
+            "task_dispatched": False,
+        })
+        if was_surfaced:
             unchanged += 1
             continue
         due.append({
             "domain": domain, "recommended_action": recommended,
             "existing_owner": OWNER[recommended],
-            "research_priority": _priority(row, recommended),
+            "research_priority": _priority(eligible_row, recommended),
             "source_evidence_fingerprint": stamp,
             "first_party_sector_match": fit.get("state") == "FIRST_PARTY_SECTOR_RESEARCH_FIT",
             "market_coverage_verified": False,
@@ -231,7 +309,13 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
     due.sort(key=lambda x: (-x["research_priority"], x["domain"]))
     selected = due[:MAX_OUTPUT_TASKS]
     recorded = {k:v for k,v in emitted_before.items() if decisions.get(k) == v}
+    recorded.update(legacy_emitted)
     recorded.update({x["domain"]:x["source_evidence_fingerprint"] for x in selected})
+    surfaced = {x["domain"] for x in selected}
+    for item in portfolio:
+        if item["domain"] in surfaced:
+            item["decision_state"] = "SURFACED_TO_EXISTING_OWNER_REVIEW"
+    portfolio.sort(key=lambda x: (-x["research_priority"], x["domain"]))
     last_refresh = refresh_attempt or {}
     result = {
         "schema_version": SCHEMA, "mode": "OBSERVE",
@@ -247,6 +331,8 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         "unchanged_recommendations_suppressed": unchanged,
         "policy_held_count": held,
         "priority_worklist": selected,
+        "portfolio_next_actions": portfolio,
+        "portfolio_next_actions_are_review_not_execution": True,
         "worklist_truncated_count": max(0, len(due) - MAX_OUTPUT_TASKS),
         "source_refresh": last_refresh,
         "astra_owner": "existing_astra_dispatcher_advisory_only",

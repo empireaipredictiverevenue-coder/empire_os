@@ -29,6 +29,9 @@ def test_existing_timer_uses_bounded_non_sending_reader(monkeypatch):
         "status": "SIX_THREAD_WORKSPACE_SNAPSHOT_REFRESHED",
         "verified_sent_anchors": 6,
         "new_inbound_header_candidates": 0,
+        "priority_payer_status": "HELD_PRIORITY_PAYER_REVIEW_UNAVAILABLE",
+        "priority_payer_threads_verified": 0,
+        "priority_payer_new_inbound_candidates": None,
         "outbound_sent": False,
         "database_writes": False,
     }
