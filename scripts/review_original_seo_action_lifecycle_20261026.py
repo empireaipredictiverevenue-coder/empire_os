@@ -9,13 +9,13 @@ No new service, API writer, SEO publisher, DB schema, or outbound.
 from __future__ import annotations
 
 import argparse
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timezone, timedelta
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 from urllib.parse import urlsplit
-from urllib.request import Request, urlopen
+from urllib.request import Request, HTTPRedirectHandler, build_opener
 import fcntl
 
 from empire_os.search_intelligence.seo_action_lifecycle_20261026 import (
@@ -49,6 +49,22 @@ def _latest_weekly() -> Path:
     return files[-1]
 
 
+class _OwnedRedirectOnly(HTTPRedirectHandler):
+    """Never follow a purported first-party redirect onto an external host.
+
+    The original SEO GET budget covers public pages ONLY; redirects may not
+    widen that permission into unaudited third-party network requests.
+    """
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target=urlsplit(newurl)
+        if (target.scheme != "https" or target.netloc != "empire-ai.co.uk"
+            or target.username or target.password
+            or not target.path.startswith("/") or target.path.startswith("//")
+            or target.query or target.fragment):
+            raise SEOActionHeld("CROSS_ORIGIN_SEO_REDIRECT_HELD")
+        return super().redirect_request(req,fp,code,msg,headers,newurl)
+
+
 def _read_only_page_check(url: str) -> dict:
     # Only bounded owned routes, no host, scheme, credentials or user parameters.
     route = _path(url)
@@ -58,7 +74,7 @@ def _read_only_page_check(url: str) -> dict:
                       headers={"User-Agent":"EmpireOS-SEO-Audit/1.0"},
                       method="GET")
     try:
-        with urlopen(request, timeout=6) as response:
+        with build_opener(_OwnedRedirectOnly()).open(request, timeout=6) as response:
             target = urlsplit(response.geturl())
             if target.scheme != "https" or target.netloc != "empire-ai.co.uk":
                 raise SEOActionHeld("UNTRUSTED_SEO_REDIRECT_DESTINATION")
@@ -99,7 +115,89 @@ def _read_only_page_check(url: str) -> dict:
     }
 
 
-def build_run(*, observed: datetime | None=None, get=None) -> dict:
+def _previous_receipt(root: Path, now: datetime) -> dict | None:
+    """Last immutable private SEO receipt, max 48 hours old; never search web."""
+    if not root.is_dir() or root.is_symlink():
+        return None
+    today = now.astimezone(timezone.utc).date()
+    for days_ago in (1, 2):
+        earlier = today - timedelta(days=days_ago)
+        path = root / f"seo-actions-{earlier.isoformat()}.json"
+        if not path.exists() and not path.is_symlink():
+            continue
+        if (path.is_symlink() or not path.is_file()
+            or path.stat().st_uid != os.geteuid()
+            or path.stat().st_mode & 0o077):
+            raise SEOActionHeld("PREVIOUS_PRIVATE_SEO_RECEIPT_NOT_TRUSTED")
+        previous = _trusted_json(path)
+        if previous.get("schema_version") != "empire.search.seo_action_lifecycle.v1":
+            raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_SCHEMA_UNTRUSTED")
+        return previous
+    return None
+
+
+def _validated_previous(previous: dict | None, now: datetime) -> dict:
+    if previous is None:
+        return {}
+    if (not isinstance(previous, dict)
+        or previous.get("schema_version") != "empire.search.seo_action_lifecycle.v1"
+        or not isinstance(previous.get("actions"), list)
+        or len(previous["actions"]) > 60
+        or not isinstance(previous.get("weekly_source_as_of"), str)):
+        raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_SCHEMA_UNTRUSTED")
+    try:
+        stamped=datetime.fromisoformat(previous["observed_at"])
+    except (KeyError, ValueError, TypeError) as e:
+        raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_CLOCK_INVALID") from e
+    if (stamped.tzinfo is None or not timedelta(0) < now-stamped <= timedelta(hours=48)):
+        raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_OUTSIDE_FRESHNESS")
+    mapping={}
+    for item in previous["actions"]:
+        if (not isinstance(item, dict) or not isinstance(item.get("id"), str)
+            or not isinstance(item.get("url"), str)
+            or not isinstance(item.get("reason_code"), str)):
+            raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_ACTION_UNTRUSTED")
+        _path(item["url"])
+        if item["id"] in mapping:
+            raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_DUPLICATE_ACTION")
+        mapping[item["id"]]=item
+    return mapping
+
+
+def _previous_success(row: dict, prior: dict | None, *, unchanged_week: bool,
+                      previous_observed_at: str | None, now: datetime) -> bool:
+    if not unchanged_week or prior is None:
+        return False
+    test=prior.get("technical_test")
+    # A cached result inherits the ORIGINAL GET time, never yesterday's
+    # archive timestamp; repeated reuse cannot extend the freshness window.
+    time_string=(test.get("initial_live_test_at_utc") if isinstance(test,dict) else None)
+    time_string=time_string or previous_observed_at
+    try:
+        first_seen=datetime.fromisoformat(time_string)
+    except (ValueError,TypeError):
+        return False
+    if first_seen.tzinfo is None or not timedelta(0)<now-first_seen<=timedelta(hours=48):
+        return False
+    if (prior.get("id") != row["id"] or prior.get("url") != row["url"]
+        or prior.get("reason_code") != row["reason_code"]
+        or prior.get("state") != "tested" or not isinstance(test, dict)):
+        return False
+    return (test.get("status") in {
+                "TESTED_READ_ONLY_NO_MUTATION",
+                "REUSED_RECENT_VERIFIED_TECHNICAL_TEST",
+            }
+            and test.get("http_status") == 200
+            and test.get("self_canonical") is True
+            and test.get("indexable") is True
+            and test.get("html_content_type") is True
+            and test.get("site_changed") is False
+            and test.get("observed_source") == "live_first_party_https_GET"
+            and isinstance(test.get("body_sha256"), str)
+            and len(test["body_sha256"]) == 64)
+
+
+def build_run(*, observed: datetime | None=None, get=None, previous: dict | None=None) -> dict:
     now=observed or datetime.now(timezone.utc)
     if now.tzinfo is None:
         raise SEOActionHeld("AWARE_CLOCK_REQUIRED")
@@ -117,8 +215,42 @@ def build_run(*, observed: datetime | None=None, get=None) -> dict:
         weekly,daily,buyer_journey=buyer,aeo_release=release,
         ops_sales=sales,observed_at=now
     )
+    prior_by_id=_validated_previous(previous, now)
+    same_week=bool(previous and previous.get("weekly_source_as_of") == result["weekly_source_as_of"])
     getter=get or _read_only_page_check
     attempts=0
+    reused=0
+    new_count=0
+    reopened=0
+    for item in result["actions"]:
+        past=prior_by_id.get(item["id"])
+        if past is None:
+            new_count+=1
+            item["previous_state"] = None
+        else:
+            item["previous_state"] = past.get("state")
+            if past.get("state") == "verified" and item["state"] != "verified":
+                reopened+=1
+                item["regression_review_required"] = True
+        if (item["state"] == "staged" and _previous_success(
+            item,past,unchanged_week=same_week,
+            previous_observed_at=previous.get("observed_at") if previous else None,
+            now=now,
+        )):
+            # Keep the original observation timestamp and source digest.
+            # This is *not* a new live test. Revalidation resumes after 48h,
+            # a new weekly GSC source or any observed regression.
+            original=dict(past["technical_test"])
+            original["status"]="REUSED_RECENT_VERIFIED_TECHNICAL_TEST"
+            original["initial_live_test_at_utc"] = (
+                original.get("initial_live_test_at_utc") or previous["observed_at"])
+            original["reused_from_previous_day"]=True
+            item["technical_test"]=original
+            item["state"]="tested"
+            item["state_path"]=["detected","prioritised","staged","tested"]
+            item["next_action"]="PRIOR_LIVE_TECHNICAL_CHECK_STILL_WITHIN_REVIEW_WINDOW"
+            reused+=1
+            continue
     for item in result["actions"]:
         if attempts >= MAX_GETS:
             break
@@ -130,6 +262,8 @@ def build_run(*, observed: datetime | None=None, get=None) -> dict:
         attempts+=1
         outcome=getter(item["url"])
         item["technical_test"]=outcome
+        if isinstance(outcome,dict) and outcome.get("status")=="TESTED_READ_ONLY_NO_MUTATION":
+            outcome["initial_live_test_at_utc"]=now.isoformat()
         if (outcome.get("status") == "TESTED_READ_ONLY_NO_MUTATION"
             and outcome.get("http_status")==200
             and outcome.get("self_canonical") is True
@@ -142,7 +276,19 @@ def build_run(*, observed: datetime | None=None, get=None) -> dict:
             item["next_action"]="INVESTIGATE_FAILED_LIVE_TECHNICAL_CHECK"
     result["state_counts"]={name:sum(i["state"]==name for i in result["actions"])
                             for name in result["lifecycle_states"]}
+    result["milestone_reached_counts"]={
+        name:sum(name in i["state_path"] for i in result["actions"])
+        for name in result["lifecycle_states"]
+    }
     result["read_only_technical_tests_executed"]=attempts
+    result["previous_successful_tests_reused_not_rerun"]=reused
+    result["new_action_ids_since_previous_receipt"]=new_count if previous else None
+    result["reopened_verified_actions"]=reopened if previous else None
+    result["prior_ids_missing_from_current_weekly_sample"]=(
+        sum(action_id not in {a["id"] for a in result["actions"]}
+            for action_id in prior_by_id) if previous else None
+    )
+    result["missing_actions_are_not_assumed_fixed"]=True
     result["unresolved_actions"]=sum(i["state"]!="verified" for i in result["actions"])
     result["private_source_files"]={
         "daily_google_index": f"google-index-{day}.json",
@@ -172,7 +318,8 @@ def run(*, observed: datetime | None=None, write: bool=False, root: Path=ROOT,
             return {"status":"EXISTING_SEO_LIFECYCLE_RECEIPT_PRESERVED",
                     "receipt":str(target),"modified":False,
                     "new_live_checks":0}
-    packet=build_run(observed=now,get=get)
+    previous=_previous_receipt(root,now)
+    packet=build_run(observed=now,get=get,previous=previous)
     if not write:
         return packet
     lockfd=os.open(root/".seo-actions.lock",
@@ -200,6 +347,7 @@ def run(*, observed: datetime | None=None, write: bool=False, root: Path=ROOT,
             "actions":packet["original_action_count"],
             "verified_or_resolved":packet["resolved_existing_owner_actions"],
             "tests":packet["read_only_technical_tests_executed"],
+            "previous_healthy_tests_reused":packet.get("previous_successful_tests_reused_not_rerun",0),
             "database_writes":False,"new_scheduler":False,
             "outbound_sent":False,"publisher_changed":False}
 
