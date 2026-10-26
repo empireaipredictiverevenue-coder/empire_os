@@ -167,3 +167,40 @@ def test_inconsistent_census_never_becomes_claim():
 def test_progress_delta_requires_two_comparable_census_receipts():
     plan = build_recovery_plan(snapshots(), {"metrics": {"v2_records": 3930}}, now=NOW)
     assert plan["metrics"]["v2_records_delta_since_prior_agent_cycle"] == 17
+
+
+def test_agent_distinguishes_degraded_search_from_service_failure():
+    src = snapshots()
+    src["buyer_scout"]["search_query_domain_coverage"] = {
+        "state": "LOW_ELIGIBLE_SEARCH_YIELD",
+        "distinct_queries_submitted": 12,
+        "queries_with_eligible_domains": 1,
+    }
+    plan = build_recovery_plan(src, None, now=NOW)
+    health = plan["buyer_research_source_health"]
+    assert health["state"] == "LOW_ELIGIBLE_SEARCH_YIELD"
+    assert health["queries_submitted"] == 12
+    assert health["queries_with_eligible_domains"] == 1
+    assert health["automatic_additional_search_requests"] == 0
+    assert health["automated_search_restart_authorized_by_degradation"] is False
+    assert health["recovery_owner"] == "existing_buyer_acquisition_scout"
+    assert plan["next_actions"] == []
+    assert plan["outbound_sent"] is False
+
+
+def test_stale_or_missing_search_coverage_stays_unknown():
+    src = snapshots()
+    src["buyer_scout"]["search_query_domain_coverage"] = {
+        "state": "NO_ELIGIBLE_SEARCH_RESULTS",
+        "distinct_queries_submitted": 12,
+        "queries_with_eligible_domains": 0,
+    }
+    src["buyer_scout"]["generated_at"] = iso(120)
+    stale = build_recovery_plan(src, None, now=NOW)
+    assert stale["buyer_research_source_health"]["state"] == "STALE_SCOUT_SEARCH_EVIDENCE"
+    assert stale["buyer_research_source_health"]["queries_submitted"] is None
+
+    fresh = snapshots()
+    uninstrumented = build_recovery_plan(fresh, None, now=NOW)
+    assert uninstrumented["buyer_research_source_health"]["state"] == "SEARCH_COVERAGE_NOT_INSTRUMENTED"
+    assert uninstrumented["buyer_research_source_health"]["queries_with_eligible_domains"] is None

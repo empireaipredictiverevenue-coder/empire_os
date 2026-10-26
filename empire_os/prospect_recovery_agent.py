@@ -167,6 +167,29 @@ def build_recovery_plan(
         active = False
         total = have_record = without = None
     overflow = _int(exchange.get("overflow_count"))
+    # A running Scout is not proof its upstream search sources produced
+    # usable domains. The existing first-party seed lane still operates
+    # under its own evidence rules; degraded search never triggers a
+    # restart storm or new paid query.
+    raw_search = scout.get("search_query_domain_coverage")
+    search = raw_search if isinstance(raw_search, Mapping) else {}
+    valid_search_states = {
+        "SEARCH_DISABLED", "NO_RESEARCH_QUERIES",
+        "NO_ELIGIBLE_SEARCH_RESULTS", "LOW_ELIGIBLE_SEARCH_YIELD",
+        "PARTIAL_OR_HEALTHY_ELIGIBLE_SEARCH_YIELD",
+    }
+    raw_state = search.get("state")
+    search_state = (
+        raw_state if raw_state in valid_search_states
+        else "SEARCH_COVERAGE_NOT_INSTRUMENTED"
+    )
+    scout_age = states["buyer_scout"].get("age_minutes")
+    if (scout_age is None or scout_age > 100
+            or states["buyer_scout"]["state"] != "VALID"):
+        search_state = "STALE_SCOUT_SEARCH_EVIDENCE"
+    search_degraded = search_state in {
+        "NO_ELIGIBLE_SEARCH_RESULTS", "LOW_ELIGIBLE_SEARCH_YIELD"
+    }
     priorities = _buyer_briefs(buyer_plan)
     prior_metrics = (prior or {}).get("metrics") or {}
     prior_total = _int(prior_metrics.get("v2_records"))
@@ -201,6 +224,32 @@ def build_recovery_plan(
         "agent_id": "empire_prospect_recovery",
         "existing_service_supervisor": True,
         "inputs": states,
+        "buyer_research_source_health": {
+            "state": search_state,
+            "search_provider_degradation_inferred_from_result_yield": search_degraded,
+            "queries_submitted": (
+                _int(search.get("distinct_queries_submitted"))
+                if search_state not in {
+                    "STALE_SCOUT_SEARCH_EVIDENCE",
+                    "SEARCH_COVERAGE_NOT_INSTRUMENTED",
+                } else None
+            ),
+            "queries_with_eligible_domains": (
+                _int(search.get("queries_with_eligible_domains"))
+                if search_state not in {
+                    "STALE_SCOUT_SEARCH_EVIDENCE",
+                    "SEARCH_COVERAGE_NOT_INSTRUMENTED",
+                } else None
+            ),
+            "recovery_owner": "existing_buyer_acquisition_scout",
+            "recovery_instruction": (
+                "review_fresh_first_party_and_public_seed_evidence_within_existing_budget"
+                if search_degraded else "continue_existing_buyer_research"
+            ),
+            "automatic_additional_search_requests": 0,
+            "no_verified_buyer_from_query_yield": True,
+            "automated_search_restart_authorized_by_degradation": False,
+        },
         "metrics": {
             "canonical_prospects": total,
             "v2_records": have_record,

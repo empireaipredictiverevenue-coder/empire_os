@@ -37,3 +37,19 @@ def test_agent_imports_no_untrusted_repository_code():
     assert "subprocess.run(" in source
     assert '("/usr/bin/systemctl", "start", "--no-block", unit)' in source
     assert 'MAX_REPAIR_REQUESTS = 2' in source
+
+
+def test_owner_upgrade_keeps_existing_timer_and_preserves_root_checksum_gate():
+    script = (ROOT / "scripts/upgrade_prospect_recovery_search_health_20261026.sh").read_text()
+    assert "sha256sum --check --status" in script
+    assert "installed agent differs from prior reviewed version" in script
+    assert "systemctl stop \"$TIMER\"" in script
+    assert "systemctl start \"$TIMER\"" in script
+    assert "systemctl start \"$SERVICE\"" in script
+    assert "restoring previously verified agent" in script
+    assert "PROSPECT_RECOVERY_SEARCH_HEALTH_ACTIVE" in script
+    assert "automatic_additional_search_requests" in script
+    assert "empire-prospect-recovery-agent.service" in script
+    assert "empire-prospect-recovery-agent.timer" in script
+    assert "systemctl enable" not in script
+    assert "systemctl disable" not in script
