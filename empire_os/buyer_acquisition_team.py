@@ -1503,7 +1503,9 @@ def refresh_buyer_acquisition_plan(
             *permit_targets,
             *list(payload.get("priority_targets") or []),
         ]
-        payload["demand_gap_count"] = len(payload["priority_targets"])
+        # The demand gap count describes the full corridor queue, not the
+        # bounded founder priority list (which includes permit research).
+        payload["demand_gap_count"] = len(payload["demand_gap_queue"])
 
     payload["permit_inventory_demand"] = {
         "status": (

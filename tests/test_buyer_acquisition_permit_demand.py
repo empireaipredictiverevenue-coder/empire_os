@@ -45,6 +45,9 @@ def test_verified_permit_supply_prioritizes_home_service_buyer_hunt(tmp_path):
     assert demand["status"] == "ACTIVE"
     assert demand["verified_current_inventory"] == 400
     assert demand["buyer_hunt_target_count"] == 2
+    # Permit add-ons are priority targets, not Exchange corridor gaps.
+    assert payload["demand_gap_count"] == len(payload["demand_gap_queue"]) == 0
+    assert len(payload["priority_targets"]) >= 2
     assert demand["commercial_ready_claimed"] is False
     assert demand["allocation_authority"] == "none"
     assert demand["outbound_authority"] == "none"
