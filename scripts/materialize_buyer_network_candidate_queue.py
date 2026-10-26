@@ -235,6 +235,25 @@ def collect_domain_context(
                 if domain in line.lower()
             ]
 
+            # An existing first-party verifier has already bound exactly
+            # one official site to this company. A real publisher page need
+            # not print its own domain in visible HTML. Previously the
+            # domain-substring filter discarded those official snippets,
+            # hiding genuinely corroborated buyer-network candidates.
+            # Do not extend this rule to search/contextual runs: their
+            # unrelated text remains ineligible for company attribution.
+            site_bound = (
+                run.get("verification_source") == "direct-site"
+                and run.get("status") == "PASS"
+                and run.get("query") == "buyer-network-active-verification"
+                and len(run_domains) == 1
+                and str(raw_domain).lower().rstrip(".") == domain
+            )
+            if site_bound:
+                domain_lines = list(dict.fromkeys(
+                    domain_lines + [line[:1000] for line in lines[:12]]
+                ))
+
             profile[
                 "evidence_lines"
             ].extend(

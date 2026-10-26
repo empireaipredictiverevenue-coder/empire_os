@@ -161,3 +161,49 @@ def test_failed_search_cycle_never_erases_previous_queue(tmp_path):
     with pytest.raises(RuntimeError, match="DISCOVERY_UNAVAILABLE_PRESERVE_EXISTING_BUYER_QUEUE"):
         mod.main()
     assert prior.read_text() == previous
+
+
+def test_exact_single_domain_first_party_run_recovers_evidence_without_domain_in_body():
+    mod = module()
+    verified = {
+        "status": "PASS",
+        "verification_source": "direct-site",
+        "query": "buyer-network-active-verification",
+        "vertical": "roofing",
+        "domains": ["brokercalls.com"],
+        "stdout_tail": (
+            "Home Services | Pay Per Call Publisher Program. "
+            "We buy roofing leads from publishers. "
+            "Partner payout tracking, TCPA compliance, contact."
+        ),
+    }
+    profiles = mod.collect_domain_context({"runs": [verified]})
+    assert "brokercalls.com" in profiles
+    profile = profiles["brokercalls.com"]
+    assert "publisher program" in " ".join(profile["evidence_lines"]).lower()
+    assert len(profile["evidence_lines"]) == 1
+    assessed = mod.score_profile("brokercalls.com", profile, set())
+    assert assessed["status"] in ("READY_TO_APPROACH", "VERIFY_REQUIREMENTS")
+    assert "outbound_authorized" not in assessed  # contact gate owns that decision
+
+
+def test_unbound_or_multi_domain_search_text_not_attributed_as_first_party():
+    mod = module()
+    base = {
+        "status": "PASS",
+        "query": "buyer-network-active-verification",
+        "vertical": "roofing",
+        "domains": ["vendor-a.com"],
+        "stdout_tail": "Publisher program pay per call roofing leads contact",
+    }
+    for updates in (
+        {"verification_source": "search-result"},
+        {"verification_source": "direct-site", "domains": ["vendor-a.com", "vendor-b.com"]},
+        {"verification_source": "direct-site", "status": "FAILED"},
+        {"verification_source": "direct-site", "query": "unverified-query"},
+    ):
+        row = {**base, **updates}
+        rows = mod.collect_domain_context({"runs": [row]})
+        assert rows["vendor-a.com"]["evidence_lines"] == []
+    official = {**base, "verification_source": "direct-site"}
+    assert mod.collect_domain_context({"runs": [official]})["vendor-a.com"]["evidence_lines"]
