@@ -189,3 +189,19 @@ def test_missing_owner_repository_or_unrecognized_original_event(monkeypatch):
     with pytest.raises(ProspectHandoffHold, match="ORIGINAL_OUTCOME_REVENUE_EVENT"):
         review(financial, repo)
     assert calls == []
+
+
+def test_actual_existing_memory_builder_accepts_only_shadow_candidate(monkeypatch):
+    from empire_os.economic_memory import (
+        build_economic_memory_snapshot as original_builder,
+    )
+    import empire_os.canonical_economic_memory_handoff as handoff
+
+    financial, feedback, repo, _ = setup(monkeypatch)
+    monkeypatch.setattr(handoff, "build_economic_memory_snapshot", original_builder)
+    report = review(financial, repo)
+    assert report["original_economic_memory_preview_candidate_count"] == 1
+    assert report["original_economic_memory_preview_retrievable_count"] == 1
+    assert report["economic_memory_persisted"] is False
+    assert report["original_feedback_independent_financial_attestation"] is False
+    assert report["model_training_authorized"] is False
