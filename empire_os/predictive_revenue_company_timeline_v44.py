@@ -10,7 +10,7 @@ import csv
 from datetime import datetime
 from decimal import Decimal
 from io import StringIO
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 import re
 
 from empire_os.predictive_revenue_universal_margin import (
@@ -367,7 +367,9 @@ TRUSTED_SOURCE_FIELDS = frozenset({
 def review_signed_company_export(*, payload: bytes,
     signed_manifest: Mapping[str, Any], signature_b64: str,
     trusted_source: Mapping[str, Any], as_of_utc: str,
-    forecast_cutoff_utc: str | None = None) -> dict:
+    forecast_cutoff_utc: str | None = None,
+    signal_rows: Sequence[Mapping[str, Any]] = (),
+    issued_forecast_rows: Sequence[Mapping[str, Any]] = ()) -> dict:
     """Verify Ed25519 source signature and report an untrusted company timeline.
 
     Cryptographic validity is conditional on the independently supplied trusted
@@ -505,19 +507,86 @@ def review_signed_company_export(*, payload: bytes,
         if k != "snapshot_sha256_not_external_attestation"
     })
     # V5 reuses the ORIGINAL V4.21 maths and signed-source review;
-    # external source observations and issuer-custodied forecasts stay
-    # empty/HELD until genuine authorised records are provided.
+    # supplied observations and issued rows remain unverified research.
+    # Empty inputs remain the backward-compatible default; no issuance occurs.
     from empire_os.predictive_revenue_brain_staging_v421 import (
         review_v5_cloud_staging,
     )
     result["v5_predictive_cloud_staging_read_only"] = review_v5_cloud_staging(
-        signed_company_review=result
+        signed_company_review=result, signal_rows=signal_rows,
+        issued_forecast_rows=issued_forecast_rows,
     )
     result["snapshot_sha256_not_external_attestation"] = _canonical_hash({
         k: v for k, v in result.items()
         if k != "snapshot_sha256_not_external_attestation"
     })
     return result
+
+
+def build_authorized_company_review(
+    *, resolve_membership: Callable, authorize_company_review: Callable,
+    load_review_inputs: Callable, now: Callable[[], datetime],
+) -> Callable:
+    """Prepare an unmounted server-side adapter for the EXISTING intake.
+
+    Dependencies must be installed by the existing API/auth owners, never
+    supplied by an HTTP caller. resolve_membership must authenticate the
+    principal afresh. A generic CRM read token is insufficient: the separate
+    company/purpose authorizer must grant this exact source review. The loader
+    must use original permitted repositories; it receives no caller file paths,
+    keys, DSNs, tenant IDs, evidence flags, or forecast bodies.
+
+    This factory does not mount a route, activate auth, or claim independent
+    source rights. Production wiring remains held until those owners provide
+    these dependencies. All returned V5 rows remain research-only.
+    """
+    from empire_os.saas_scale import TenantMembership
+
+    if not all(callable(fn) for fn in
+               (resolve_membership, authorize_company_review, load_review_inputs, now)):
+        raise ValueError("company_review_trusted_server_dependencies_required")
+
+    def review(request: Any, *, company_scope: str, source_id: str) -> dict:
+        company = _scope(company_scope, "company_scope")
+        source = _scope(source_id, "source_id")
+        try:
+            member = resolve_membership(request)
+            if not isinstance(member, TenantMembership) or not member.can("read"):
+                raise PermissionError
+            tenant = _scope(member.tenant_id, "tenant_scope")
+            authorized = authorize_company_review(
+                member, company_scope=company, source_id=source,
+                purpose="PREDICTIVE_REVENUE_OBSERVE",
+            )
+            if authorized is not True:
+                raise PermissionError
+        except Exception:
+            raise PermissionError("company_review_access_denied") from None
+
+        moment = now()
+        if not isinstance(moment, datetime) or moment.utcoffset() is None:
+            raise ValueError("company_review_server_clock_required")
+        inputs = load_review_inputs(
+            tenant_scope=tenant, company_scope=company, source_id=source,
+        )
+        expected = {"payload", "signed_manifest", "signature_b64", "trusted_source",
+                    "signal_rows", "issued_forecast_rows"}
+        if not isinstance(inputs, Mapping) or set(inputs) != expected:
+            raise ValueError("company_review_exact_server_input_bundle_required")
+        for name in ("signed_manifest", "trusted_source"):
+            binding = inputs[name]
+            if (not isinstance(binding, Mapping)
+                or binding.get("tenant_scope") != tenant
+                or binding.get("company_scope") != company
+                or binding.get("source_id") != source):
+                raise PermissionError("company_review_source_scope_mismatch")
+        # Existing cryptography, temporal validation and V5 exact row checks
+        # remain authoritative. Never manufacture an issued forecast here.
+        return review_signed_company_export(
+            **dict(inputs), as_of_utc=moment.isoformat(),
+        )
+
+    return review
 
 
 def _read_scoped_export_part(*, source_root: str, relative_path: str,
