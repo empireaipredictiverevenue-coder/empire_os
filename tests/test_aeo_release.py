@@ -40,7 +40,7 @@ def test_bounded_release_is_exact_and_zero_paid(tmp_path: Path):
     loaded=load_release(aeo_root=aeo,recovery_path=recovery,release_path=release)
     assert loaded is not None
     assert released_paths(aeo_root=aeo,recovery_path=recovery,release_path=release) == [
-        "/aeo/roofing/DFW/","/aeo/hvac/DFW/"
+        "/aeo/roofing/DFW","/aeo/hvac/DFW"
     ]
     assert released_file("general_contractor","NYC",aeo_root=aeo,recovery_path=recovery,release_path=release) is None
 

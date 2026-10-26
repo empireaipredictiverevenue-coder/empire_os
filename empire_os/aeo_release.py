@@ -175,7 +175,10 @@ def released_paths(**kwargs) -> list[str]:
     release = load_release(**kwargs)
     if release is None:
         return []
-    return [f"/aeo/{row['niche']}/{row['metro']}/" for row in release["pages"]]
+    # The published page canonical is slashless. Emitting the same route in
+    # sitemap.xml avoids duplicate slash-vs-canonical signals. Published
+    # content, SHA custody and route lookup remain completely unchanged.
+    return [f"/aeo/{row['niche']}/{row['metro']}" for row in release["pages"]]
 
 
 def release_status(
