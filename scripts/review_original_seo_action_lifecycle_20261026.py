@@ -147,15 +147,27 @@ def build_run(*, observed: datetime | None=None, get=None) -> dict:
 
 def run(*, observed: datetime | None=None, write: bool=False, root: Path=ROOT,
         get=None) -> dict:
-    packet=build_run(observed=observed,get=get)
+    now = observed or datetime.now(timezone.utc)
+    if now.tzinfo is None:
+        raise SEOActionHeld("AWARE_CLOCK_REQUIRED")
+    day = now.astimezone(timezone.utc).date().isoformat()
+    target = root / f"seo-actions-{day}.json"
+    if write:
+        if (root.is_symlink() or not root.is_dir()
+            or root.stat().st_uid!=os.geteuid()
+            or root.stat().st_mode & 0o077):
+            raise SEOActionHeld("EXISTING_PRIVATE_SEO_OWNER_DIRECTORY_REQUIRED")
+        if target.exists() or target.is_symlink():
+            prior = _trusted_json(target)
+            if prior.get("schema_version") != "empire.search.seo_action_lifecycle.v1":
+                raise SEOActionHeld("UNTRUSTED_EXISTING_SEO_LIFECYCLE_RECEIPT")
+            # No redundant GSC / AEO reads, site GETs or external lookups.
+            return {"status":"EXISTING_SEO_LIFECYCLE_RECEIPT_PRESERVED",
+                    "receipt":str(target),"modified":False,
+                    "new_live_checks":0}
+    packet=build_run(observed=now,get=get)
     if not write:
         return packet
-    if (root.is_symlink() or not root.is_dir()
-        or root.stat().st_uid!=os.geteuid()
-        or root.stat().st_mode & 0o077):
-        raise SEOActionHeld("EXISTING_PRIVATE_SEO_OWNER_DIRECTORY_REQUIRED")
-    day=datetime.fromisoformat(packet["observed_at"]).date().isoformat()
-    target=root/f"seo-actions-{day}.json"
     lockfd=os.open(root/".seo-actions.lock",
                    os.O_CREAT|os.O_RDWR|os.O_NOFOLLOW,0o600)
     with os.fdopen(lockfd,"rb") as lock:

@@ -138,9 +138,11 @@ def test_private_immutable_receipt_and_idempotence(tmp_path,monkeypatch):
     receipt=Path(result["receipt"])
     assert stat.S_IMODE(receipt.stat().st_mode)==0o600
     assert json.loads(receipt.read_text())["original_action_count"]==4
+    monkeypatch.setattr(operator,"build_run",lambda **kwargs:pytest.fail("duplicate_live_source_read"))
     other=operator.run(observed=NOW,write=True,root=root)
     assert other["status"]=="EXISTING_SEO_LIFECYCLE_RECEIPT_PRESERVED"
-    assert receipt.read_text()==receipt.read_text()
+    assert other["new_live_checks"]==0
+    assert len(list(root.glob("seo-actions-*.json")))==1
 
 
 def test_no_world_readable_receipts(tmp_path,monkeypatch):
