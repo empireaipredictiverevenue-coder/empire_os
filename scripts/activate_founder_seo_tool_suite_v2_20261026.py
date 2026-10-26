@@ -4,6 +4,7 @@
 Build is composed from exactly the running Next.js release plus:
   src/app/founder/seo-operations/page.tsx
   src/app/founder/seo-operations/seo-workbench.tsx
+  src/lib/seo-revenue-focus-review.ts (existing other SEO owner's guarded evidence view)
 No other source owner or public website files may change.
 """
 from __future__ import annotations
@@ -24,10 +25,11 @@ PROPOSAL=Path("/home/ubuntu/empire_releases/seo_unified_tool_suite_candidate_202
 OWNER=PROPOSAL.parent
 BACKUP=OWNER/"activation_backups"
 OLD_BUILD="S1a8PikANQu_TGMcw75JP"
-NEW_BUILD="y_0Wp6TsIUjnSaJ_2thQ4"
+NEW_BUILD="EL-A1kEHfdULfG3zJU8lk"
 OLD_SEO_SHA="56059ee003bb21843a60de4adf59b647b94b3ea32887b747ab6b26c1a53567e4"
-NEW_SEO_SHA="428166ec4cdc47afa5e624b8f068bcd6fc2fd23d81a8ae40dc8e77ea956d3d43"
+NEW_SEO_SHA="bbfdb5950f1f4018646e7242e1bded0087c09b5e112d5e6c4bdf61d3b7e2abd2"
 NEW_WORKBENCH_SHA="0fc221d3945a370e160eb921680dc7c32573ec7d063fd888db2daa5260ce0063"
+NEW_OWNER_FOCUS_SHA="2418d34dccba4ed02f072fb1c4bf3dca600b0e493554d05425f3d854c447de21"
 OWNER_HASHES={
     "src/app/founder/page.tsx":"81ef9399ea3d16d66b8f3033464fb1d76c90a88d1532034f416c950eff550bed",
     "src/app/founder/results/page.tsx":"0e8d344014932715dc6acd9a602c5c50958949e56a1091651bdb929bacaa3e2d",
@@ -35,6 +37,7 @@ OWNER_HASHES={
 }
 SEO=Path("src/app/founder/seo-operations/page.tsx")
 WORKBENCH=Path("src/app/founder/seo-operations/seo-workbench.tsx")
+OWNER_FOCUS=Path("src/lib/seo-revenue-focus-review.ts")
 ROUTES=("/founder","/founder/results","/founder/seo-operations",
         "/founder/agency","/founder/commercial-pipeline",
         "/founder/intent-review","/founder/research","/founder/youtube",
@@ -81,8 +84,12 @@ def check()->dict:
     ensure(digest(PROPOSAL/SEO)==NEW_SEO_SHA,"SEO_SUITE_PAGE_CHANGED")
     ensure(digest(PROPOSAL/WORKBENCH)==NEW_WORKBENCH_SHA,
            "SEO_TOOL_SUITE_SOURCE_CHANGED")
+    ensure(digest(PROPOSAL/OWNER_FOCUS)==NEW_OWNER_FOCUS_SHA,
+           "CONCURRENT_ORIGINAL_SEO_OWNER_VALIDATOR_CHANGED")
     ensure(not (LIVE/WORKBENCH).exists() and not (LIVE/WORKBENCH).is_symlink(),
            "SEO_WORKBENCH_ALREADY_EXISTS")
+    ensure(not (LIVE/OWNER_FOCUS).exists() and not (LIVE/OWNER_FOCUS).is_symlink(),
+           "REVENUE_FIRST_OWNER_ALREADY_PUBLISHED_RECONCILE_FIRST")
     for rel,expected in OWNER_HASHES.items():
         ensure(digest(LIVE/rel)==expected and digest(PROPOSAL/rel)==expected,
                "UNRELATED_FOUNDER_OWNER_SOURCE_MISMATCH")
@@ -97,7 +104,7 @@ def check()->dict:
     return {
         "status":"SEO_UNIFIED_TOOL_SUITE_V2_PREFLIGHT_PASSED",
         "previous_build":OLD_BUILD,"new_build":NEW_BUILD,
-        "exact_source_changes":[str(SEO),str(WORKBENCH)],
+        "exact_source_changes":[str(SEO),str(WORKBENCH),str(OWNER_FOCUS)],
         "unchanged_original_owner_sources":list(OWNER_HASHES),
         "live_modified":False,"database_writes":False,"new_timer":False,
         "outbound":False,"payments":False,
@@ -125,7 +132,8 @@ def verify()->dict:
         if route=="/founder/seo-operations":
             for marker in (b"Organic Growth Command Centre",b"Keyword intelligence",
                            b"Execution queue",b"All SEO tools",b"Observed keywords",
-                           b"Commercial queries",b"Not verified"):
+                           b"Commercial queries",b"Revenue-first operating focus",
+                           b"AEO"):
                 ensure(marker in body,"SEO_TOOL_SUITE_MISSING_EVIDENCE")
     ensure(cmd("systemctl","is-active","empire-founder-console.service")=="active",
            "FOUNDER_OWNER_NOT_RUNNING_AFTER_RELEASE")
@@ -155,6 +163,7 @@ def activate()->dict:
                    "COPIED_NEW_BUILD_ID_MISMATCH")
             atomic_copy(PROPOSAL/SEO,LIVE/SEO)
             atomic_copy(PROPOSAL/WORKBENCH,LIVE/WORKBENCH)
+            atomic_copy(PROPOSAL/OWNER_FOCUS,LIVE/OWNER_FOCUS)
             os.replace(LIVE/".next",oldnext)
             os.replace(incoming,LIVE/".next")
             cmd("systemctl","restart","empire-founder-console.service")
@@ -168,6 +177,7 @@ def activate()->dict:
             if oldpage.is_file():
                 atomic_copy(oldpage,LIVE/SEO)
             (LIVE/WORKBENCH).unlink(missing_ok=True)
+            (LIVE/OWNER_FOCUS).unlink(missing_ok=True)
             if incoming.is_dir():
                 shutil.rmtree(incoming)
             try:
@@ -181,7 +191,7 @@ def activate()->dict:
             "old_build_backup":str(oldnext),
             "old_page_backup":str(oldpage),
             "route_http_statuses":routes,
-            "source_files_changed":2,
+            "source_files_changed":3,
             "original_founder_owner_files_changed":False,
             "no_new_database":True,"no_new_scheduler":True,
             "outbound_sent":False,"payment_activated":False,

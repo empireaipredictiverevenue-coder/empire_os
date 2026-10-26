@@ -13,10 +13,10 @@
 ## Production build and release custody
 
 - Original running Founder private release: `/home/ubuntu/empire_releases/property_birmingham_private_stage_20261022_v3/web`, reviewed old build `S1a8PikANQu_TGMcw75JP`.
-- Reviewed isolated candidate: `/home/ubuntu/empire_releases/seo_unified_tool_suite_candidate_20261026/web`, new Next.js Webpack production build `y_0Wp6TsIUjnSaJ_2thQ4`. Built from the exact original live release, changing only the existing SEO page and adding its SEO workbench component.
-- Preflight and activation operator: `scripts/activate_founder_seo_tool_suite_v2_20261026.py`. Strict build + source SHA checks, unchanged owner SHA validation, original service WorkingDirectory check, two-file-only source promotion, original `.next` backup, health checks across 10 routes and automatic restore of old source+build if restart/health fails. Existing private Founder service restart only; the public website and Search API remain untouched.
+- Reviewed isolated candidate: `/home/ubuntu/empire_releases/seo_unified_tool_suite_candidate_20261026/web`, new Next.js Webpack production build `EL-A1kEHfdULfG3zJU8lk`. Built from the exact original live release, changing the existing SEO page and adding its SEO workbench and the concurrent original revenue-first validation helper.
+- Preflight and activation operator: `scripts/activate_founder_seo_tool_suite_v2_20261026.py`. Strict build + source SHA checks, unchanged owner SHA validation, original service WorkingDirectory check, three-file-only source promotion, original `.next` backup, health checks across 10 routes and automatic restore of old source+build if restart/health fails. Existing private Founder service restart only; the public website and Search API remain untouched.
 - Candidate smoke: private preview on localhost:3109, with already owner-defined agency preview loopback guard. All checked Founder and department routes returned 200, V2 rendered real source values 7 keywords/21 sample impressions/8 resolutions.
-- Release tests: `tests/test_activate_founder_seo_tool_suite_v2_20261026.py` (preflight owner drift, successful activation, rollback); plus original GSC and SEO lifecycle suites. 43 scoped tests passed.
+- Release tests: `tests/test_activate_founder_seo_tool_suite_v2_20261026.py` (preflight owner drift, successful activation, rollback); plus original GSC and SEO lifecycle suites. 43 scoped tests passed, with concurrent revenue-first source preserved and included in the merged candidate.
 
 ### Operator activation, once exact source preflight still matches
 

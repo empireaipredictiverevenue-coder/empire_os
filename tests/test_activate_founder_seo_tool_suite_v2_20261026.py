@@ -24,6 +24,7 @@ def configured(tmp_path,monkeypatch):
     old_page=put(live/owner.SEO,"SEO original")
     new_page=put(proposal/owner.SEO,"SEO unified command centre")
     new_workbench=put(proposal/owner.WORKBENCH,"interactive tool suite")
+    owner_focus=put(proposal/owner.OWNER_FOCUS,"original revenue-first safe validation")
     unchanged={}
     for name in owner.OWNER_HASHES:
         unchanged[name]=put(live/name,name+" original")
@@ -33,7 +34,8 @@ def configured(tmp_path,monkeypatch):
         "BACKUP":proposal.parent/"activation_backups",
         "OLD_BUILD":"OLD","NEW_BUILD":"NEW",
         "OLD_SEO_SHA":old_page,"NEW_SEO_SHA":new_page,
-        "NEW_WORKBENCH_SHA":new_workbench,"OWNER_HASHES":unchanged,
+        "NEW_WORKBENCH_SHA":new_workbench,"NEW_OWNER_FOCUS_SHA":owner_focus,
+        "OWNER_HASHES":unchanged,
     }.items():
         monkeypatch.setattr(owner,key,value)
     monkeypatch.setattr(owner.os,"geteuid",lambda:0)
@@ -58,10 +60,11 @@ def test_exact_source_changes_and_backup(tmp_path,monkeypatch):
     assert owner.check()["live_modified"] is False
     result=owner.activate()
     assert result["status"]=="ORIGINAL_FOUNDER_SEO_TOOL_SUITE_V2_LIVE_VERIFIED"
-    assert result["source_files_changed"]==2
+    assert result["source_files_changed"]==3
     assert (live/".next/BUILD_ID").read_text()=="NEW"
     assert (live/owner.SEO).read_text()=="SEO unified command centre"
     assert (live/owner.WORKBENCH).read_text()=="interactive tool suite"
+    assert (live/owner.OWNER_FOCUS).read_text()=="original revenue-first safe validation"
     assert (proposal.parent/"activation_backups/.next.original/BUILD_ID").read_text()=="OLD"
     assert (proposal.parent/"activation_backups/seo.page.original.tsx").read_text()=="SEO original"
     assert (proposal.parent/"activation_result.json").exists()
@@ -75,6 +78,7 @@ def test_other_owner_changed_blocks_everything(tmp_path,monkeypatch):
     with pytest.raises(owner.SEOReleaseHeld,match="UNRELATED_FOUNDER_OWNER_SOURCE_MISMATCH"):
         owner.activate()
     assert not (live/owner.WORKBENCH).exists()
+    assert not (live/owner.OWNER_FOCUS).exists()
     assert (live/".next/BUILD_ID").read_text()=="OLD"
     assert not (proposal.parent/"activation_backups").exists()
 
@@ -95,5 +99,6 @@ def test_restart_failure_restores_original_page_and_build(tmp_path,monkeypatch):
     assert (live/".next/BUILD_ID").read_text()=="OLD"
     assert (live/owner.SEO).read_text()=="SEO original"
     assert not (live/owner.WORKBENCH).exists()
+    assert not (live/owner.OWNER_FOCUS).exists()
     assert not (proposal.parent/"activation_result.json").exists()
     assert len(attempts)==2
