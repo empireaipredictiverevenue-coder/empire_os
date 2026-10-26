@@ -20,6 +20,7 @@ from empire_os.permit_national_buyer_pilot_readiness import build,validate_revie
 from empire_os.permit_outreach_compliance_agent import audit_batch,validate_batch
 from empire_os.permit_workflow_skill_bindings import bind_existing_skills,validate_bindings
 from empire_os.permit_workspace_draft_compliance_observer import refresh_pinned
+from empire_os.permit_workspace_ten_draft_repair_preflight import oauth_edit_granted
 from empire_os.permit_compliance_private_sources import (
     read_workbench,read_connector_observation,PRIVATE,
 )
@@ -174,6 +175,10 @@ def run(*,root:Path=ROOT,now:datetime|None=None,
                 for r in pilot["owner_review_queue"]),
             "canonical_postal_footer_configured":True,
             "workspace_stop_to_empiredb_suppression_e2e_verified":False,
+            "draft_repair_full_mime_edit_scope_present":oauth_edit_granted(),
+            "draft_repair_scope_needed":"gmail.compose",
+            "draft_repair_changes_applied":0,
+            "drafts_must_repin_after_update":True,
             "explicit_stop_text_missing":policy["blocker_counts"].get(
                 "COPY_MISSING_EXPLICIT_OPTOUT_INSTRUCTION",0),
             "canonical_copywriter_scanned_drafts":sum(
