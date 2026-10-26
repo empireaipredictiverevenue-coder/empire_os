@@ -589,6 +589,120 @@ def build_authorized_company_review(
     return review
 
 
+def build_company_review_file_loader(bindings: Mapping) -> Callable:
+    """Use owner-configured existing export/trust roots, not HTTP file paths.
+
+    This is application wiring, not a new source registry. Configuration must
+    come from the original source owner. Hashes bind the exact reviewed signal
+    and issuance files; they do not independently attest their business truth.
+    Trust metadata is reread on every request so revocation is not cached.
+    """
+    import json
+    from pathlib import Path
+    from hashlib import sha256
+
+    fields = {"source_root", "trusted_root", "payload_file", "manifest_file",
+              "signature_file", "trusted_file", "signal_file", "forecast_file",
+              "signal_sha256", "forecast_sha256"}
+    if not isinstance(bindings, Mapping) or not bindings:
+        raise ValueError("company_review_owner_bindings_required")
+    configured = {}
+    for key, value in bindings.items():
+        if (not isinstance(key, tuple) or len(key) != 3
+            or not isinstance(value, Mapping) or set(value) != fields):
+            raise ValueError("company_review_exact_owner_binding_required")
+        for name in key:
+            _scope(name, "binding_scope")
+        cfg = dict(value)
+        if any(not isinstance(v, str) or not v for v in cfg.values()):
+            raise ValueError("company_review_invalid_owner_binding")
+        for field in ("signal_sha256", "forecast_sha256"):
+            if not re.fullmatch(r"[a-f0-9]{64}", cfg[field]):
+                raise ValueError("company_review_pinned_input_digest_required")
+        source, trust = Path(cfg["source_root"]), Path(cfg["trusted_root"])
+        if not source.is_absolute() or not trust.is_absolute():
+            raise ValueError("company_review_absolute_owner_roots_required")
+        a, b = source.resolve(), trust.resolve()
+        if a.is_relative_to(b) or b.is_relative_to(a):
+            raise ValueError("company_review_separate_trust_root_required")
+        configured[key] = cfg
+
+    def parse(raw: bytes):
+        def unique(pairs):
+            result = {}
+            for key, value in pairs:
+                if key in result:
+                    raise ValueError("company_review_duplicate_json_key")
+                result[key] = value
+            return result
+        def reject_constant(value):
+            raise ValueError("company_review_nonfinite_json")
+        return json.loads(raw, object_pairs_hook=unique, parse_constant=reject_constant)
+
+    def load(*, tenant_scope: str, company_scope: str, source_id: str) -> dict:
+        cfg = configured.get((tenant_scope, company_scope, source_id))
+        if cfg is None:
+            raise PermissionError("company_review_source_not_configured")
+        def read(field, maximum, *, trust=False):
+            return _read_scoped_export_part(
+                source_root=cfg["trusted_root" if trust else "source_root"],
+                relative_path=cfg[field], max_bytes=maximum)
+        manifest = parse(read("manifest_file", 8192))
+        trusted = parse(read("trusted_file", 4096, trust=True))
+        for obj in (manifest, trusted):
+            if (not isinstance(obj, dict) or obj.get("tenant_scope") != tenant_scope
+                or obj.get("company_scope") != company_scope or obj.get("source_id") != source_id):
+                raise PermissionError("company_review_source_scope_mismatch")
+        rows = {}
+        for kind, maximum_rows in (("signal", 500), ("forecast", 1500)):
+            raw = read(kind + "_file", MAX_BYTES)
+            if sha256(raw).hexdigest() != cfg[kind + "_sha256"]:
+                raise ValueError("company_review_input_digest_mismatch")
+            items = parse(raw)
+            if not isinstance(items, list) or len(items) > maximum_rows:
+                raise ValueError("company_review_bounded_row_array_required")
+            rows[kind] = items
+        return {
+            "payload": read("payload_file", MAX_BYTES), "signed_manifest": manifest,
+            "trusted_source": trusted,
+            "signature_b64": read("signature_file", 512).decode("ascii").strip(),
+            "signal_rows": rows["signal"], "issued_forecast_rows": rows["forecast"],
+        }
+    return load
+
+
+def create_company_review_read_router(*, review: Callable | None = None):
+    """Uninstalled route for the existing Founder API owner to mount explicitly.
+
+    Only pass build_authorized_company_review with trusted server dependencies.
+    Missing wiring returns 503. Never falls back to the aggregate demo or accepts
+    client tenant IDs, trusted keys, source paths, or evidence payloads.
+    """
+    from fastapi import APIRouter, HTTPException, Request
+    from fastapi.responses import JSONResponse
+
+    if review is not None and not callable(review):
+        raise ValueError("company_review_server_adapter_required")
+    router = APIRouter(prefix="/v1/predictive-revenue")
+    headers = {"Cache-Control": "no-store", "Vary": "Authorization, Cookie"}
+
+    def company_review(request, company_scope: str, source_id: str):
+        if review is None:
+            raise HTTPException(503, "company_review_not_configured", headers=headers)
+        try:
+            result = review(request, company_scope=company_scope, source_id=source_id)
+        except PermissionError:
+            raise HTTPException(403, "company_review_access_denied", headers=headers) from None
+        except Exception:
+            # Source paths, key material and database errors never reach clients.
+            raise HTTPException(503, "company_review_evidence_unavailable", headers=headers) from None
+        return JSONResponse(result, headers=headers)
+
+    company_review.__annotations__["request"] = Request
+    router.add_api_route("/company-review", company_review, methods=["GET"])
+    return router
+
+
 def _read_scoped_export_part(*, source_root: str, relative_path: str,
                              max_bytes: int) -> bytes:
     """Bounded no-symlink file read from one operator-selected scope."""

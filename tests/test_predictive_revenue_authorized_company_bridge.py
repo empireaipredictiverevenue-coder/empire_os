@@ -106,3 +106,115 @@ def test_naive_server_clock_is_rejected_before_load():
         load_review_inputs=lambda **k: called.append(True), now=lambda: NOW.replace(tzinfo=None))
     with pytest.raises(ValueError, match="clock"): review(None, company_scope=COMPANY, source_id="source-001")
     assert called == []
+
+
+def file_loader(tmp_path):
+    import json
+    from hashlib import sha256
+    from empire_os.predictive_revenue_company_timeline_v44 import build_company_review_file_loader
+    bundle = inputs()
+    source = tmp_path / "exports"; source.mkdir()
+    trust = tmp_path / "trusted"; trust.mkdir()
+    (source / "payload.json").write_bytes(bundle["payload"])
+    (source / "manifest.json").write_text(json.dumps(bundle["signed_manifest"]))
+    (source / "signature.txt").write_text(bundle["signature_b64"])
+    (trust / "source.json").write_text(json.dumps(bundle["trusted_source"]))
+    signal = json.dumps(bundle["signal_rows"]).encode()
+    forecast = json.dumps(bundle["issued_forecast_rows"]).encode()
+    (source / "signals.json").write_bytes(signal)
+    (source / "forecasts.json").write_bytes(forecast)
+    cfg = dict(source_root=str(source), trusted_root=str(trust), payload_file="payload.json",
+        manifest_file="manifest.json", signature_file="signature.txt", trusted_file="source.json",
+        signal_file="signals.json", forecast_file="forecasts.json",
+        signal_sha256=sha256(signal).hexdigest(), forecast_sha256=sha256(forecast).hexdigest())
+    sid = bundle["signed_manifest"]["source_id"]
+    return build_company_review_file_loader({(TENANT, COMPANY, sid):cfg}), cfg, sid
+
+
+def http_client(loader, *, allow=True):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from empire_os.predictive_revenue_company_timeline_v44 import create_company_review_read_router
+    # Test-only authentication stub. No production resolver is installed here.
+    reviewer = build_authorized_company_review(
+        resolve_membership=lambda req: TenantMembership(TENANT, "test-user", "owner")
+            if req.headers.get("authorization") == "Bearer test-fixture" else None,
+        authorize_company_review=lambda *a, **k: allow,
+        load_review_inputs=loader, now=lambda: NOW)
+    app = FastAPI(); app.include_router(create_company_review_read_router(review=reviewer))
+    return TestClient(app)
+
+
+def test_existing_signed_files_to_v5_http_result(tmp_path):
+    loader, _, sid = file_loader(tmp_path)
+    before = {str(p):p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    client = http_client(loader)
+    url = "/v1/predictive-revenue/company-review"
+    params = dict(company_scope=COMPANY, source_id=sid)
+    response = client.get(url, params=params, headers={"Authorization":"Bearer test-fixture"})
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    data = response.json()
+    assert data["tenant_scope"] == TENANT
+    assert len(data["v5_predictive_cloud_staging_read_only"]["issued_forecast_risk_screens_unverified"]) == 1
+    assert "public_key_b64" not in response.text
+    assert "signature_b64" not in response.text
+    assert data["execution_authority"] == "none"
+    assert {str(p):p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert client.post(url, params=params).status_code == 405
+
+
+def test_http_auth_denial_precedes_file_read(tmp_path):
+    loaded=[]
+    client = http_client(lambda **kwargs: loaded.append(kwargs))
+    response = client.get("/v1/predictive-revenue/company-review", params={
+        "company_scope": COMPANY,"source_id":"source-001", "tenant_id":TENANT})
+    assert response.status_code == 403
+    assert loaded == []
+    assert response.headers["cache-control"] == "no-store"
+
+
+def test_unconfigured_http_route_is_explicitly_unavailable():
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from empire_os.predictive_revenue_company_timeline_v44 import create_company_review_read_router
+    app=FastAPI(); app.include_router(create_company_review_read_router())
+    result=TestClient(app).get("/v1/predictive-revenue/company-review", params={"company_scope":COMPANY,"source_id":"source-001"})
+    assert result.status_code == 503
+    assert result.json()["detail"] == "company_review_not_configured"
+
+
+@pytest.mark.parametrize("filename", ["signals.json", "forecasts.json"])
+def test_tampered_input_file_cannot_reach_http_result(tmp_path, filename):
+    from pathlib import Path
+    loader,cfg,sid=file_loader(tmp_path)
+    (Path(cfg["source_root"])/filename).write_text("[]")
+    result=http_client(loader).get("/v1/predictive-revenue/company-review",params={"company_scope":COMPANY,"source_id":sid},headers={"Authorization":"Bearer test-fixture"})
+    assert result.status_code == 503
+    assert str(tmp_path) not in result.text
+
+
+def test_revoked_trust_is_reread_between_requests(tmp_path):
+    import json
+    from pathlib import Path
+    loader,cfg,sid=file_loader(tmp_path)
+    client=http_client(loader)
+    params={"company_scope":COMPANY,"source_id":sid}; headers={"Authorization":"Bearer test-fixture"}
+    assert client.get("/v1/predictive-revenue/company-review",params=params,headers=headers).status_code == 200
+    path=Path(cfg["trusted_root"])/cfg["trusted_file"]
+    obj=json.loads(path.read_text()); obj["status"]="REVOKED";path.write_text(json.dumps(obj))
+    assert client.get("/v1/predictive-revenue/company-review",params=params,headers=headers).status_code == 503
+
+
+def test_source_symlink_is_rejected(tmp_path):
+    from pathlib import Path
+    loader,cfg,sid=file_loader(tmp_path)
+    path=Path(cfg["source_root"])/cfg["signal_file"]
+    target=tmp_path/"outside.json";target.write_bytes(path.read_bytes());path.unlink();path.symlink_to(target)
+    with pytest.raises(ValueError,match="symlink"):
+        loader(tenant_scope=TENANT,company_scope=COMPANY,source_id=sid)
+
+
+def test_other_tenant_has_no_binding(tmp_path):
+    loader,_,sid=file_loader(tmp_path)
+    with pytest.raises(PermissionError):loader(tenant_scope="tenant:other",company_scope=COMPANY,source_id=sid)
