@@ -484,13 +484,20 @@ def _run_prospects(
     }
 
 
-def run_historical_backfill_batch(*, offset: int, limit: int = 10) -> dict[str, Any]:
+def run_historical_backfill_batch(
+    *, offset: int, limit: int = 10, identity_linked: bool = False,
+) -> dict[str, Any]:
     """Run bounded existing v2 scorer against older, not-yet-v2-scored rows.
 
     No lowering of qualification confidence, synthetic evidence, outbound,
     buyer eligibility or payment authority. Cursor persistence is caller-owned.
     """
-    page = _qualification_repository().fetch_historical_pending_page(
+    repository = _qualification_repository()
+    fetch = (
+        repository.fetch_historical_identity_linked_page
+        if identity_linked else repository.fetch_historical_pending_page
+    )
+    page = fetch(
         offset=offset, limit=limit,
         scoring_engine=SCORING_ENGINE, scoring_version=SCORING_VERSION,
     )
@@ -515,6 +522,10 @@ def run_historical_backfill_batch(*, offset: int, limit: int = 10) -> dict[str, 
             evidence_floor_met += 1
     return {
         "schema_version": result["schema_version"],
+        "selection_cohort": (
+            "ACTIVE_IDENTITY_LINKED_UNSCORED" if identity_linked
+            else "CHRONOLOGICAL_UNSCORED"
+        ),
         "tier_counts": dict(sorted(tier_counts.items())),
         "hot_warm_above_evidence_floor": evidence_floor_met,
         "input_website_fields_present_unverified": sum(

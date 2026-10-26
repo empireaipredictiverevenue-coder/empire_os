@@ -164,6 +164,87 @@ class QualificationDataRepository:
             "no_send_authority": True,
         }
 
+    def fetch_historical_identity_linked_page(
+        self,
+        *,
+        offset: int,
+        limit: int,
+        scoring_engine: str,
+        scoring_version: str,
+    ) -> dict[str, Any]:
+        """Bounded existing-linked unscored prospects, without creating identities.
+
+        Cursor is over already-linked canonical source rows, not a second
+        prospect population. This lets v2 scoring reach formerly stranded
+        records whose identity proof already exists.
+        """
+        if type(offset) is not int or not 0 <= offset <= 1_000_000:
+            raise ValueError("historical identity backfill offset out of bounds")
+        if type(limit) is not int or not 1 <= limit <= 25:
+            raise ValueError("historical identity backfill limit must be 1-25")
+        page_size = min(100, max(25, limit * 4))
+        links = self._gateway.query(
+            "prospect_entity_links",
+            "id,prospect_id,entity_id,active,created_at",
+            filters=(DataFilter.eq("active", True),),
+            order=(
+                OrderSpec("created_at", descending=False),
+                OrderSpec("id", descending=False),
+            ),
+            limit=page_size,
+            offset=offset,
+        )
+        ids = [str(link.get("prospect_id") or "").strip() for link in links]
+        if not all(ids) or len(set(ids)) != len(ids):
+            raise ValueError("ambiguous or duplicate active identity links")
+        done: set[str] = set()
+        if ids:
+            existing = self._gateway.query(
+                "prospect_qualifications",
+                "prospect_id",
+                filters=(
+                    DataFilter.eq("scoring_engine", scoring_engine),
+                    DataFilter.eq("scoring_version", scoring_version),
+                    DataFilter.in_("prospect_id", tuple(ids)),
+                ),
+                limit=len(ids),
+            )
+            done = {
+                str(row.get("prospect_id") or "").strip()
+                for row in existing if row.get("prospect_id")
+            }
+            if not done <= set(ids):
+                raise ValueError("unexpected qualification outside linked page")
+        candidates = []
+        scanned = 0
+        for link in links:
+            scanned += 1
+            pid = str(link["prospect_id"])
+            if pid not in done:
+                candidates.append(pid)
+                if len(candidates) == limit:
+                    break
+        rows = []
+        if candidates:
+            records = self._gateway.query(
+                "prospects",
+                PROSPECT_COLUMNS,
+                filters=(DataFilter.in_("id", tuple(candidates)),),
+                limit=len(candidates),
+            )
+            by_id = {str(item.get("id") or ""): dict(item) for item in records}
+            if len(by_id) != len(candidates) or not set(candidates) <= set(by_id):
+                raise ValueError("linked canonical prospect missing")
+            rows = [by_id[pid] for pid in candidates]
+        return {
+            "candidate_rows": rows,
+            "scanned_rows": scanned,
+            "next_offset": offset + scanned,
+            "archive_exhausted": len(links) < page_size and scanned == len(links),
+            "source": "canonical_empiredb_prospect_entity_links",
+            "no_send_authority": True,
+        }
+
     def fetch_unlinked_allocatable_prospects(
         self,
         *,

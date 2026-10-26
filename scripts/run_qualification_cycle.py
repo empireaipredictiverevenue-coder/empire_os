@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 import urllib.parse
 from datetime import datetime, timezone
 
@@ -50,6 +51,7 @@ def main() -> int:
         default=10,
     )
     parser.add_argument("--historical-backfill-limit", type=int, default=0)
+    parser.add_argument("--historical-identity-backfill-limit", type=int, default=0)
     parser.add_argument("--approved-historical-backfill", action="store_true")
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 25:
@@ -63,7 +65,11 @@ def main() -> int:
         parser.error("--evidence-recovery-limit must be between 0 and 25")
     if not 0 <= args.historical_backfill_limit <= 25:
         parser.error("--historical-backfill-limit must be between 0 and 25")
-    if args.historical_backfill_limit and not args.approved_historical_backfill:
+    if not 0 <= args.historical_identity_backfill_limit <= 25:
+        parser.error("--historical-identity-backfill-limit must be between 0 and 25")
+    if args.historical_backfill_limit + args.historical_identity_backfill_limit > 25:
+        parser.error("combined historical backfill limit must not exceed 25")
+    if (args.historical_backfill_limit or args.historical_identity_backfill_limit) and not args.approved_historical_backfill:
         parser.error("historical backfill requires --approved-historical-backfill")
 
     signal_resolution = (
@@ -100,6 +106,34 @@ def main() -> int:
         else:
             historical_backfill["cursor_committed"] = False
             historical_backfill["next_offset"] = current_offset
+    identity_linked_backfill = {
+        "enabled": False, "attempted": 0, "scanned_rows": 0,
+        "qualified": 0, "identity_resolved": 0,
+        "ok": True, "outbound_authorized": False,
+    }
+    if args.historical_identity_backfill_limit:
+        identity_cursor = Path(
+            "/srv/empire_os/runtime/qualification/"
+            "historical_identity_linked_cursor.json"
+        )
+        identity_offset = load_cursor(identity_cursor)
+        identity_linked_backfill = run_historical_backfill_batch(
+            offset=identity_offset,
+            limit=args.historical_identity_backfill_limit,
+            identity_linked=True,
+        )
+        identity_linked_backfill["enabled"] = True
+        if identity_linked_backfill["cursor_may_advance"]:
+            identity_next = (
+                0 if identity_linked_backfill["archive_exhausted"]
+                else identity_linked_backfill["proposed_next_offset"]
+            )
+            save_cursor(identity_next, path=identity_cursor)
+            identity_linked_backfill["cursor_committed"] = True
+            identity_linked_backfill["next_offset"] = identity_next
+        else:
+            identity_linked_backfill["cursor_committed"] = False
+            identity_linked_backfill["next_offset"] = identity_offset
     evidence_recovery = (
         run_evidence_recovery(args.evidence_recovery_limit)
         if args.evidence_recovery_limit
@@ -155,6 +189,7 @@ def main() -> int:
         "signal_resolution": signal_resolution,
         "qualification": qualification,
         "historical_backfill": historical_backfill,
+        "historical_identity_linked_backfill": identity_linked_backfill,
         "evidence_recovery": evidence_recovery,
         "identity_catchup": catchup,
         "omega_projection": omega,
@@ -164,6 +199,7 @@ def main() -> int:
             signal_resolution["ok"]
             and qualification["ok"]
             and historical_backfill["ok"]
+            and identity_linked_backfill["ok"]
             and evidence_recovery["ok"]
             and catchup["ok"]
             and omega["ok"]

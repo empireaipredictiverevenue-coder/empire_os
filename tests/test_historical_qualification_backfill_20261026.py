@@ -174,3 +174,86 @@ def test_backfill_reports_aggregate_evidence_and_tiers_without_identity_leak(mon
     assert "secret-p" not in json.dumps(report)
     assert "private.example" not in json.dumps(report)
     assert report["outbound_authorized"] is False
+
+
+def test_identity_linked_archive_backfill_prioritises_existing_canonical_links():
+    class LinkedGateway:
+        def __init__(self):
+            self.calls = []
+
+        def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+            self.calls.append((table, limit, offset, tuple(filters), tuple(order)))
+            if table == "prospect_entity_links":
+                return [
+                    {"id": f"link{i}", "prospect_id": f"p{i}",
+                     "entity_id": f"e{i}", "active": True}
+                    for i in range(30)
+                ]
+            if table == "prospect_qualifications":
+                return [{"prospect_id": "p0"}, {"prospect_id": "p1"}]
+            if table == "prospects":
+                return [
+                    {"id": "p4", "website": "https://verified.example"},
+                    {"id": "p2", "website": None},
+                    {"id": "p3", "website": None},
+                ]
+            raise AssertionError("unexpected DB table")
+    gw = LinkedGateway()
+    report = QualificationDataRepository(gw).fetch_historical_identity_linked_page(
+        offset=500, limit=3, scoring_engine="empire_os.lead_scoring",
+        scoring_version="v2",
+    )
+    assert [p["id"] for p in report["candidate_rows"]] == ["p2", "p3", "p4"]
+    assert report["next_offset"] == 505
+    assert report["scanned_rows"] == 5
+    assert report["archive_exhausted"] is False
+    assert [c[0] for c in gw.calls] == [
+        "prospect_entity_links", "prospect_qualifications", "prospects",
+    ]
+    assert gw.calls[0][2] == 500
+    assert len(gw.calls[0][4]) == 2
+
+
+def test_identity_linked_archive_page_all_scored_still_progresses():
+    class GW:
+        def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+            if table == "prospect_entity_links":
+                return [{"id": "l1", "prospect_id": "p1", "active": True}]
+            if table == "prospect_qualifications":
+                return [{"prospect_id": "p1"}]
+            raise AssertionError("should not fetch scored prospect")
+    report = QualificationDataRepository(GW()).fetch_historical_identity_linked_page(
+        offset=4, limit=5, scoring_engine="empire_os.lead_scoring",
+        scoring_version="v2",
+    )
+    assert report["candidate_rows"] == []
+    assert report["next_offset"] == 5
+    assert report["archive_exhausted"] is True
+
+
+def test_historical_identity_linked_batch_uses_same_v2_scorer(monkeypatch):
+    from empire_os import qualification_worker_v2 as worker
+
+    class LinkedRepo:
+        def fetch_historical_identity_linked_page(self, **kwargs):
+            return {
+                "candidate_rows": [{"id": "p1", "website": "https://private.example"}],
+                "scanned_rows": 6, "next_offset": 12, "archive_exhausted": False,
+            }
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: LinkedRepo())
+    monkeypatch.setattr(worker, "_run_prospects", lambda prospects, *, schema_version: {
+        "schema_version": schema_version,
+        "ok": True, "attempted": 1, "qualified": 1,
+        "failed": 0, "identity_resolved": 1,
+        "results": [{"prospect_id": "p1", "tier": "hot", "evidence_confidence": .88}],
+    })
+    result = worker.run_historical_backfill_batch(
+        offset=6, limit=1, identity_linked=True,
+    )
+    assert result["selection_cohort"] == "ACTIVE_IDENTITY_LINKED_UNSCORED"
+    assert result["identity_resolved"] == 1
+    assert result["hot_warm_above_evidence_floor"] == 1
+    assert result["cursor_may_advance"] is True
+    assert result["proposed_next_offset"] == 12
+    assert result["outbound_authorized"] is False
+    assert "private.example" not in json.dumps(result)
