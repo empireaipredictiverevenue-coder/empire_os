@@ -21,6 +21,7 @@ from empire_os.permit_outreach_compliance_agent import audit_batch,validate_batc
 from empire_os.permit_workflow_skill_bindings import bind_existing_skills,validate_bindings
 from empire_os.permit_workspace_draft_compliance_observer import refresh_pinned
 from empire_os.permit_workspace_ten_draft_repair_preflight import oauth_edit_granted
+from empire_os.permit_workspace_stop_alias_observer import inspect as inspect_workspace_stop_alias
 from empire_os.permit_compliance_private_sources import (
     read_workbench,read_connector_observation,PRIVATE,
 )
@@ -161,6 +162,12 @@ def run(*,root:Path=ROOT,now:datetime|None=None,
         validate_review(pilot)
         policy=audit_batch(pilot_report=pilot,now=when)
         validate_batch(policy)
+        # Same original Workspace OAuth account, bounded read-only alias
+        # observation. It never creates an intent, sends or writes a
+        # suppression. If the alias query fails, report UNKNOWN rather
+        # than breaking mandatory buyer Gmail/CRM cycle steps.
+        alias_review=inspect_workspace_stop_alias(
+            service_factory=provider_factory,now=when)
         summary={
             **base,
             "status":"PASS_HELD_NO_SEND",
@@ -175,6 +182,18 @@ def run(*,root:Path=ROOT,now:datetime|None=None,
                 for r in pilot["owner_review_queue"]),
             "canonical_postal_footer_configured":True,
             "workspace_stop_to_empiredb_suppression_e2e_verified":False,
+            "workspace_reply_alias_monitor_state":alias_review["status"],
+            "workspace_reply_alias_inbox_messages_observed":
+                alias_review["workspace_reply_alias_inbox_messages_observed"],
+            "workspace_reply_alias_explicit_stop_candidates":
+                alias_review["workspace_reply_alias_explicit_stop_candidates"],
+            "workspace_reply_alias_scan_complete":
+                alias_review["workspace_reply_alias_scan_complete"],
+            "workspace_reply_alias_delivery_observed":
+                alias_review["workspace_reply_alias_delivery_observed"],
+            "workspace_reply_alias_canonical_sent_intent_lineage_verified":False,
+            "workspace_reply_alias_unresolved_stop_hold":(
+                alias_review["workspace_reply_alias_explicit_stop_candidates"]>0),
             "draft_repair_full_mime_edit_scope_present":oauth_edit_granted(),
             "draft_repair_scope_needed":"gmail.compose",
             "draft_repair_changes_applied":0,
