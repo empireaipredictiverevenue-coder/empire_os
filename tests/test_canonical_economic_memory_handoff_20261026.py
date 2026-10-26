@@ -160,10 +160,10 @@ def test_injected_v9_receipt_never_becomes_real_memory(monkeypatch):
     (lambda f,b,r: b["evidence_refs"].remove(
         "canonical:bsc_payment_evidence:" + f["settlement_evidence_id"]
     ), "ORIGINAL_PAYMENT_PROOF"),
-    (lambda f,b,r: b.update(gross_profit_cents=4999), "unverified feedback"),
-    (lambda f,b,r: b.update(actual_cost_cents=7200), "unverified feedback"),
-    (lambda f,b,r: b.update(actual_revenue_cents=12001), "unverified feedback"),
-    (lambda f,b,r: b.update(conversion_outcome="lost"), "unverified feedback"),
+    (lambda f,b,r: b.update(gross_profit_cents=4999), "verified feedback actuals"),
+    (lambda f,b,r: b.update(actual_cost_cents=7200), "verified feedback actuals"),
+    (lambda f,b,r: b.update(actual_revenue_cents=12001), "verified feedback actuals"),
+    (lambda f,b,r: b.update(conversion_outcome="lost"), "outcome label mismatch"),
     (lambda f,b,r: setattr(r, "_gateway", FakeGateway("supabase")), "CANONICAL_EMPIREDB"),
 ])
 def test_rejects_cross_order_false_profit_missing_payment_or_spoofed_owner(
