@@ -1,0 +1,60 @@
+{
+  "buyer_submitted": false,
+  "candidate_file_count": 708,
+  "candidate_inventory_sha256": "62b62b184d5597ffc806a825723c4638f2953702c823561233d30058e398dab2",
+  "candidate_private_path": "/home/ubuntu/empire_releases/earned_media_saas_union_20261026/rebased_from_700_candidate",
+  "existing_astra_issue": "https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103",
+  "files_replaced": [
+    "predictive-revenue.html",
+    "predictive-revenue.txt"
+  ],
+  "independent_astra_owner_approval_verified": false,
+  "latest_published_commercial_html_sha256": "304605ef015372b24ccbf3274313476a3aa7ec06c32c10337c76f860f609d190",
+  "new_708_founder_approval_verified": false,
+  "new_hashed_assets": [
+    "_next/static/chunks/253-428475b66a90b9c5.js",
+    "_next/static/chunks/278-58bad976b629f71d.js",
+    "_next/static/chunks/4c61c53f-9e320c6dacf0f6e8.js",
+    "_next/static/chunks/app/layout-3f3a5fdf87a8014d.js",
+    "_next/static/chunks/app/predictive-revenue/page-2497319cb37cc28e.js",
+    "_next/static/chunks/main-app-18dc27572c56762f.js",
+    "_next/static/chunks/webpack-ce4fd1d2803d11f9.js",
+    "_next/static/css/2280003f88962364.css"
+  ],
+  "owner_handoff": "docs/website/EARNED_MEDIA_SAAS708_ASTRA_OWNER_REBASE_20261026.md",
+  "previous_670_founder_exact_approval_applies": false,
+  "private_chrome_qa_receipt": "docs/website/release_candidates/EARNED_MEDIA_SAAS708_CURRENT_SITE_BROWSER_QA_20261026.json",
+  "private_chrome_qa_receipt_sha256": "16e15e8ed3b888976045cda37312389a43d1415560044d8ab8bc0856cc6470fc",
+  "private_forward_rollback_receipt": "docs/website/release_candidates/EARNED_MEDIA_SAAS708_PRIVATE_RESTORE_20261026.json",
+  "private_forward_rollback_receipt_sha256": "44b604df5fc0767c0c67269b0ef7e0b388b8fdf740bc10aa4d1d8c7a31d20516",
+  "publication_authorized": false,
+  "publication_performed": false,
+  "revenue_verified": false,
+  "review": {
+    "actual_customer_enquiry_verified": false,
+    "actual_revenue_verified": false,
+    "candidate_index_sha256": "62b62b184d5597ffc806a825723c4638f2953702c823561233d30058e398dab2",
+    "founder_previous_670_approval_applies_to_new_708": false,
+    "new_candidate_file_count": 708,
+    "new_static_assets_count": 8,
+    "original_index_sha256": "f6cb9f0f541b041ebd5ca397c3c87268d89a70e086e26a16c1d2534dc13315df",
+    "original_live_file_count": 700,
+    "other_original_files_preserved_exactly": 698,
+    "replaced_existing_files": [
+      "predictive-revenue.html",
+      "predictive-revenue.txt"
+    ],
+    "root_backup_verified": false,
+    "schema_version": "empire.website.earned_media_saas700_source_reconciliation.v1",
+    "site_publication_authorized": false,
+    "site_publication_performed": false,
+    "status": "PRIVATE_708_FILE_REBASE_INTEGRITY_PASS_REVIEW_ONLY",
+    "website_owner_independent_release_signoff": false
+  },
+  "root_backup_verified": false,
+  "schema_version": "empire.website.saas708.original_astra_owner_review_pickup.v1",
+  "source_live_file_count": 700,
+  "source_live_inventory_sha256": "f6cb9f0f541b041ebd5ca397c3c87268d89a70e086e26a16c1d2534dc13315df",
+  "status": "NEW_ORIGINAL_WEBSITE_OWNER_REVIEW_NEEDED_NOT_PUBLISHED",
+  "unchanged_live_files_preserved": 698
+}

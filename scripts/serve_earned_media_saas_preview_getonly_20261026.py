@@ -9,8 +9,18 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 import json
+import os
 
-ROOT = Path("/home/ubuntu/empire_releases/earned_media_saas_union_20261026/rebased_candidate")
+# Explicitly enumerated private trees; never an arbitrary filesystem path.
+_RELEASES = Path("/home/ubuntu/empire_releases/earned_media_saas_union_20261026")
+_ROOTS = {
+    "previous670": _RELEASES / "rebased_candidate",
+    "current700": _RELEASES / "rebased_from_700_candidate",
+}
+_selected = os.environ.get("EMPIRE_SAAS_STATIC_PREVIEW_BASELINE", "previous670")
+if _selected not in _ROOTS:
+    raise SystemExit("INVALID_PRIVATE_SAAS_PREVIEW_BASELINE")
+ROOT = _ROOTS[_selected]
 PORT = 28964
 GET_CATALOGUES = frozenset((
     "/v1/checkout/predictive-revenue/products",

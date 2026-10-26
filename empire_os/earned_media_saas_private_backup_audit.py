@@ -9,13 +9,13 @@ import tarfile
 from empire_os.earned_media_saas_rebased_release import read_index, index_digest, ReleaseHeld
 
 
-def inspect_private_backup(archive: Path, live: Path) -> dict:
+def inspect_private_backup(archive: Path, live: Path, *, expected_count: int = 662) -> dict:
     if (archive.is_symlink() or not archive.is_file()
             or archive.stat().st_size > 120_000_000):
         raise ReleaseHeld("UNSAFE_PRIVATE_BACKUP_ARCHIVE")
     before = read_index(live)
-    if len(before) != 662:
-        raise ReleaseHeld("SOURCE_SITE_BASELINE_NOT_662")
+    if len(before) != expected_count:
+        raise ReleaseHeld("SOURCE_SITE_BASELINE_COUNT_MISMATCH")
     seen: dict[str, str] = {}
     total = 0
     with tarfile.open(archive, mode="r:gz") as tar:
@@ -48,9 +48,10 @@ def inspect_private_backup(archive: Path, live: Path) -> dict:
         raise ReleaseHeld("ORIGINAL_SITE_CHANGED_DURING_BACKUP_VERIFICATION")
     return {
         "schema_version": "empire.website.earned_media_saas_private_backup_audit.v1",
-        "status": "PRIVATE_662_ARCHIVE_MEMBER_HASHES_EXACT",
+        "status": f"PRIVATE_{expected_count}_ARCHIVE_MEMBER_HASHES_EXACT",
         "archive_sha256": sha256(archive.read_bytes()).hexdigest(),
-        "live_662_inventory_sha256": index_digest(before),
+        "live_662_inventory_sha256": index_digest(before) if expected_count == 662 else None,
+        "live_site_inventory_sha256": index_digest(before),
         "verified_regular_files": len(seen),
         "archive_total_uncompressed_bytes": total,
         "private_user_backup_only": True,
