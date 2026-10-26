@@ -679,9 +679,19 @@ def main() -> int:
     parser.add_argument("--refresh", action="store_true")
     parser.add_argument("--preflight", action="store_true",
                         help="Inspect restricted catalog capability; never read market rows.")
+    parser.add_argument("--portfolio", action="store_true",
+                        help="Read saved TAM and Exchange receipts only; aggregate portfolio view.")
     args = parser.parse_args()
-    if args.preflight and args.refresh:
-        parser.error("--preflight and --refresh are mutually exclusive")
+    if sum((args.preflight, args.refresh, args.portfolio)) > 1:
+        parser.error("--preflight, --refresh and --portfolio are mutually exclusive")
+
+    if args.portfolio:
+        from empire_os.tam_revenue_portfolio import read_tam_revenue_portfolio_from_runtime
+        result = read_tam_revenue_portfolio_from_runtime(
+            Path(args.repo_root) / "runtime"
+        )
+        print(json.dumps(result, sort_keys=True, indent=2))
+        return 0
 
     if args.preflight:
         try:
