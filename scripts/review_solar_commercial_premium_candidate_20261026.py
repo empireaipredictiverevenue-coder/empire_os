@@ -47,7 +47,7 @@ def review():
         raise ValueError("SHARED_ASSET_COLLISION_OR_UNSCOPED_ADDITION")
     if not all(old[k]!=new[k] for k in reviewed):
         raise ValueError("EXACT_TWO_ROUTE_DATA_AND_HTML_UPDATE_REQUIRED")
-    if (manifest.get("schema_version")!="empire.website.solar_commercial_premium_candidate.v1"
+    if (manifest.get("schema_version")!="empire.website.solar_commercial_premium_candidate.v2"
         or manifest.get("targets")!={rel:{
             "route":route,"live_before_sha256":old[rel],"proposed_sha256":new[rel]}
             for rel,route in TARGETS.items()}
