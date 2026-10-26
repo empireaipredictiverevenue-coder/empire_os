@@ -148,22 +148,22 @@ def test_injected_v9_receipt_never_becomes_real_memory(monkeypatch):
 
 
 @pytest.mark.parametrize("mutation,error", [
-    (lambda f,b,r: f.update(tenant_id=OTHER), "CROSS_TENANT_OR_UNSCOPED"),
+    (lambda f,b,r: f.update(tenant_id=OTHER), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
     (lambda f,b,r: f.update(revenue_event_consistent=False), "UNTRUSTED_OR_UNRECOGNIZED"),
     (lambda f,b,r: f.update(economic_memory_authorized=True), "UNTRUSTED_OR_UNRECOGNIZED"),
     (lambda f,b,r: f.update(outbound_authorized=True), "UNTRUSTED_OR_UNRECOGNIZED"),
     (lambda f,b,r: f.update(approved_price_cents=12001), "UNRECONCILED_ORIGINAL"),
     (lambda f,b,r: b.update(fulfilment_order_id=OTHER), "CROSS_ORDER"),
     (lambda f,b,r: b.update(buyer_id=OTHER), "CROSS_ORDER"),
-    (lambda f,b,r: b.update(outcome_ref="canonical:commercial_outcomes:" + OTHER), "unverified feedback"),
+    (lambda f,b,r: b.update(outcome_ref="canonical:commercial_outcomes:" + OTHER), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
     (lambda f,b,r: b["evidence_refs"].remove(EVENT_REF), "ORIGINAL_OUTCOME_REVENUE_EVENT"),
     (lambda f,b,r: b["evidence_refs"].remove(
         "canonical:bsc_payment_evidence:" + f["settlement_evidence_id"]
     ), "ORIGINAL_PAYMENT_PROOF"),
-    (lambda f,b,r: b.update(gross_profit_cents=4999), "verified feedback actuals"),
-    (lambda f,b,r: b.update(actual_cost_cents=7200), "verified feedback actuals"),
-    (lambda f,b,r: b.update(actual_revenue_cents=12001), "verified feedback actuals"),
-    (lambda f,b,r: b.update(conversion_outcome="lost"), "outcome label mismatch"),
+    (lambda f,b,r: b.update(gross_profit_cents=4999), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
+    (lambda f,b,r: b.update(actual_cost_cents=7200), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
+    (lambda f,b,r: b.update(actual_revenue_cents=12001), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
+    (lambda f,b,r: b.update(conversion_outcome="lost"), "ORIGINAL_VERIFIED_OUTCOME_READ_HELD"),
     (lambda f,b,r: setattr(r, "_gateway", FakeGateway("supabase")), "CANONICAL_EMPIREDB"),
 ])
 def test_rejects_cross_order_false_profit_missing_payment_or_spoofed_owner(
