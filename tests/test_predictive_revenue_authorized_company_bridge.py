@@ -10,6 +10,7 @@ from test_predictive_revenue_brain_staging_v421 import v5_signal, v5_forecast
 def inputs():
     payload, manifest, signature, trusted, _ = signed_export_fixture()
     signal = v5_signal(1, "PAY_PER_CALL", "WEATHER_STORM")
+    signal["source_id"] = manifest["source_id"]
     forecast = v5_forecast(1, "PAY_PER_CALL", 30)
     for row in (signal, forecast):
         row.update(tenant_scope=TENANT, company_scope=COMPANY)
@@ -218,3 +219,29 @@ def test_source_symlink_is_rejected(tmp_path):
 def test_other_tenant_has_no_binding(tmp_path):
     loader,_,sid=file_loader(tmp_path)
     with pytest.raises(PermissionError):loader(tenant_scope="tenant:other",company_scope=COMPANY,source_id=sid)
+
+
+@pytest.mark.parametrize("source", ["source:unauthorized", None, ""])
+def test_authorized_company_cannot_smuggle_another_source_signal(source, monkeypatch):
+    import empire_os.predictive_revenue_company_timeline_v44 as module
+    bundle = inputs()
+    bundle["signal_rows"][0]["source_id"] = source
+    called = []
+    monkeypatch.setattr(module, "review_signed_company_export", lambda **kw: called.append(kw))
+    reviewer, _, bundle = setup(bundle)
+    with pytest.raises(PermissionError, match="signal_source_not_authorized"):
+        run(reviewer, bundle)
+    assert called == []
+
+
+def test_http_cross_source_signal_denied_without_disclosing_evidence():
+    bundle = inputs()
+    bundle["signal_rows"][0]["source_id"] = "source:private-other"
+    result = http_client(lambda **kw: deepcopy(bundle)).get(
+        "/v1/predictive-revenue/company-review",
+        params={"company_scope": COMPANY, "source_id": bundle["signed_manifest"]["source_id"]},
+        headers={"Authorization": "Bearer test-fixture"})
+    assert result.status_code == 403
+    assert result.json() == {"detail": "company_review_access_denied"}
+    assert "private-other" not in result.text
+    assert result.headers["cache-control"] == "no-store"

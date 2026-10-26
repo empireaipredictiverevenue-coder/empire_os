@@ -580,6 +580,14 @@ def build_authorized_company_review(
                 or binding.get("company_scope") != company
                 or binding.get("source_id") != source):
                 raise PermissionError("company_review_source_scope_mismatch")
+        # Company access to one source cannot authorize observations from
+        # another source, even inside an otherwise tenant-matching bundle.
+        signals = inputs["signal_rows"]
+        if not isinstance(signals, (tuple, list)) or len(signals) > 500:
+            raise ValueError("company_review_bounded_signal_rows_required")
+        for signal in signals:
+            if not isinstance(signal, Mapping) or signal.get("source_id") != source:
+                raise PermissionError("company_review_signal_source_not_authorized")
         # Existing cryptography, temporal validation and V5 exact row checks
         # remain authoritative. Never manufacture an issued forecast here.
         return review_signed_company_export(
