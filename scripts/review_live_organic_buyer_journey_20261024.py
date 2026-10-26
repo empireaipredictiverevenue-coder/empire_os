@@ -42,6 +42,13 @@ class Markup(HTMLParser):
         self.form_count = 0
         self.consent = 0
         self.email = 0
+        # Detect only the EXISTING first-party research enquiry; not a new
+        # form, commercial acceptance or evidence of real submissions.
+        self.research_form_count = 0
+        self.research_form_privacy_reference = False
+        self.research_form_privacy_present = False
+        self.research_form_email = False
+        self.research_form_question = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         a = dict(attrs)
@@ -53,6 +60,21 @@ class Markup(HTMLParser):
             self.links.append(a["href"])
         if tag == "form":
             self.form_count += 1
+            if (a.get("id") == "research-enquiry"
+                and a.get("action") == "/api/research/enquiry"
+                and (a.get("method") or "").lower() == "post"):
+                self.research_form_count += 1
+                self.research_form_privacy_reference = (
+                    a.get("aria-describedby") == "privacy"
+                )
+        if a.get("id") == "privacy":
+            self.research_form_privacy_present = True
+        if (tag == "input" and a.get("type") == "email"
+            and a.get("name") == "reply_email" and "required" in a):
+            self.research_form_email = True
+        if (tag == "textarea" and a.get("name") == "research_question"
+            and "required" in a):
+            self.research_form_question = True
         if tag == "input" and a.get("type") == "checkbox" and "required" in a:
             self.consent += 1
         if tag == "input" and a.get("type") == "email" and "required" in a:
@@ -204,8 +226,22 @@ def review(
             resolved for link in tags.links
             if (resolved := _first_party_route(link)) in expected
         }
+        # Existing research asset forms are an immediate first-party
+        # research enquiry option, not a generic /commercial link and never
+        # proof of a submitted lead. Require the exact action, privacy
+        # reference and form fields; unrelated/random forms do not qualify.
+        direct_research_enquiry = (
+            route.startswith("/research/")
+            and tags.form_count == 1
+            and tags.research_form_count == 1
+            and tags.research_form_privacy_reference
+            and tags.research_form_privacy_present
+            and tags.research_form_email
+            and tags.research_form_question
+        )
         rows.append({
             "route": route, "http_status": status, "canonical_self": got == [expected_canonical],
+            "first_party_research_enquiry_form_present": direct_research_enquiry,
             "direct_buyer_destinations": sorted(direct),
             "sitemap_internal_html_links": sorted(internal),
             "route_ownership_lane": _intent_lane(route),
@@ -242,8 +278,12 @@ def review(
             and x["route"] not in ROUTES_TO_FORMS]
     indirect = [x["route"] for x in rows
                 if not x["direct_buyer_destinations"]
+                and not x["first_party_research_enquiry_form_present"]
                 and x["buyer_form_link_hops"] is not None
                 and x["buyer_form_link_hops"] >= 2]
+    original_research_forms = [
+        x["route"] for x in rows if x["first_party_research_enquiry_form_present"]
+    ]
     intentionally_separate = [x["route"] for x in rows
                               if x["direct_link_intentionally_separate"]]
     disconnected_enterprise = [x["route"] for x in rows
@@ -260,6 +300,9 @@ def review(
         "direct_buyer_link_review_count": len(gaps),
         "indirect_buyer_form_path_pages": indirect,
         "indirect_buyer_form_path_count": len(indirect),
+        "existing_research_enquiry_form_pages": original_research_forms,
+        "existing_research_enquiry_form_page_count": len(original_research_forms),
+        "research_form_present_does_not_verify_submission": True,
         "non_b2b_homeowner_pages_kept_separate": intentionally_separate,
         "enterprise_pages_with_no_bounded_buyer_path": disconnected_enterprise,
         "buyer_paths_proven_as_actual_visits": False,
