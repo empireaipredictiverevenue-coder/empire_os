@@ -39,6 +39,7 @@ DIRECT = BASE / "direct_site_verification_latest.json"
 
 LEDGER = BASE / "research_ledger_latest.json"
 PROGRESS = BASE / "research_progress_latest.json"
+BRAIN = BASE / "team_brain_latest.json"
 
 MAX_CANDIDATES = 8
 MAX_WORKERS = 8
@@ -611,6 +612,7 @@ def select_candidates(
     ledger: dict[str, Any] | None = None,
     *,
     now_epoch: float | None = None,
+    priority_hints: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     clean = {
         **backlog,
@@ -623,8 +625,36 @@ def select_candidates(
     selected, _ = choose_research_batch(
         clean, ledger, now_epoch=now_epoch or time.time(),
         limit=MAX_CANDIDATES,
+        priority_hints=priority_hints,
     )
     return selected
+
+
+def read_existing_team_brain_hints(*, now_epoch: float) -> dict[str, int]:
+    """Optional hints from the ORIGINAL team. Never grant probe eligibility."""
+    try:
+        if (BRAIN.is_symlink() or not BRAIN.is_file()
+                or not 100 <= BRAIN.stat().st_size <= 500_000):
+            return {}
+        data = json.loads(BRAIN.read_text())
+        at = datetime.fromisoformat(str(data.get("generated_at", "")))
+        hints = data.get("research_priority_hints")
+        if (at.utcoffset() is None
+                or not 0 <= now_epoch - at.timestamp() <= 3 * 3600
+                or data.get("schema_version") != "empire.buyer_acquisition.decision_brain.v1"
+                or data.get("mode") != "OBSERVE"
+                or data.get("outbound_authorized") is not False
+                or data.get("external_execution_performed") is not False
+                or data.get("database_writes") is not False
+                or data.get("research_priority_hints_are_not_research_authority") is not True
+                or not isinstance(hints, dict) or len(hints) > 500):
+            return {}
+        if any(not valid_domain(domain) or type(score) is not int
+               or not 0 <= score <= 150 for domain, score in hints.items()):
+            return {}
+        return hints
+    except (OSError, TypeError, ValueError, OverflowError):
+        return {}
 
 
 def read_ledger_and_results() -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -1216,7 +1246,9 @@ def main() -> int:
     if args.force:
         # Explicit manual retry, not an automated infinite retry loop.
         ledger = {**ledger, "domains": {}}
-    candidates = select_candidates(backlog, ledger, now_epoch=timestamp)
+    hints = read_existing_team_brain_hints(now_epoch=timestamp)
+    candidates = select_candidates(backlog, ledger, now_epoch=timestamp,
+                                   priority_hints=hints)
     selected_domains = [item["domain"] for item in candidates]
     if args.plan_only:
         print(json.dumps({

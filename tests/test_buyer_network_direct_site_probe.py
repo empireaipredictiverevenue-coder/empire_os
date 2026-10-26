@@ -169,3 +169,36 @@ def test_publisher_first_site_probe_fetches_exact_official_page_without_sprawl()
     out=mod.probe_candidate({"domain":"leadsmartinc.com","status":"VERIFY_REQUIREMENTS"})
     assert out["pages_attempted"]==len(mod.PATHS)
     assert len(called)==len(mod.PATHS)
+
+
+def test_existing_team_brain_priority_hints_require_safe_fresh_source(tmp_path):
+    from datetime import datetime, timezone, timedelta
+    import json
+    mod=module()
+    src=tmp_path/'team_brain_latest.json'
+    mod.BRAIN=src
+    now=datetime(2026,10,26,17,33,tzinfo=timezone.utc)
+    payload={
+        'schema_version':'empire.buyer_acquisition.decision_brain.v1',
+        'mode':'OBSERVE','generated_at':now.isoformat(),
+        'outbound_authorized':False,'external_execution_performed':False,
+        'database_writes':False,
+        'research_priority_hints_are_not_research_authority':True,
+        'research_priority_hints':{'roofbuyer.com':129,'generic.com':25},
+    }
+    src.write_text(json.dumps(payload))
+    assert mod.read_existing_team_brain_hints(now_epoch=now.timestamp()) == (
+        payload['research_priority_hints'])
+    selected=mod.select_candidates({'candidates':[
+        {'domain':'generic.com','status':'WATCH','score':90},
+        {'domain':'roofbuyer.com','status':'WATCH','score':10}]},
+        now_epoch=now.timestamp(),priority_hints=mod.read_existing_team_brain_hints(
+            now_epoch=now.timestamp()))
+    assert [r['domain'] for r in selected] == ['roofbuyer.com','generic.com']
+    assert mod.read_existing_team_brain_hints(
+        now_epoch=(now+timedelta(hours=4)).timestamp()) == {}
+    src.write_text(json.dumps({**payload,'outbound_authorized':True}))
+    assert mod.read_existing_team_brain_hints(now_epoch=now.timestamp()) == {}
+    src.write_text(json.dumps({**payload,'research_priority_hints':
+        {'yourdomain.com':150,'roofbuyer.com':90}}))
+    assert mod.read_existing_team_brain_hints(now_epoch=now.timestamp()) == {}

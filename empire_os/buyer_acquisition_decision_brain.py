@@ -172,6 +172,7 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
     unchanged = 0
     materially_changed = 0
     counters: Counter[str] = Counter()
+    priority_hints: dict[str, int] = {}
     seen = set()
     for row in rows:
         if not isinstance(row, dict):
@@ -203,6 +204,14 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         stamp = digest(semantic)
         decisions[domain] = stamp
         counters[recommended] += 1
+        # Stable prioritisation for the original direct-site researcher.
+        # Hints neither create work nor bypass eligibility/cooldowns.
+        if recommended in {
+            "VERIFY_FIRST_PARTY_SITE", "VERIFY_COMPANY_BUYER_ROLE",
+            "VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS",
+            "RESEARCH_COMPANY_ROLE",
+        }:
+            priority_hints[domain] = _priority(row, recommended)
         if before.get(domain) != stamp:
             materially_changed += 1
         if emitted_before.get(domain) == stamp:
@@ -231,6 +240,8 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         "source_snapshot_digest": digest(decisions),
         "current_candidates": len(rows),
         "recommendation_types": dict(sorted(counters.items())),
+        "research_priority_hints": dict(sorted(priority_hints.items())),
+        "research_priority_hints_are_not_research_authority": True,
         "materially_changed_recommendations": materially_changed,
         "recommendations_due_or_not_yet_surfaced": len(due),
         "unchanged_recommendations_suppressed": unchanged,

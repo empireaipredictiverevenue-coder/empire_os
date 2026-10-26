@@ -168,3 +168,14 @@ def test_never_treat_dispatched_recommendation_as_contact_or_buyer_acceptance():
                  "outbound_authorized","task_dispatched"):
         assert job[name] is False
     assert report["external_execution_performed"] is False
+
+
+def test_brain_hints_cover_full_current_research_queue_not_just_25_rows():
+    source=snapshot(70)
+    result,_=review(source,None,now=NOW)
+    assert len(result['priority_worklist'])==25
+    assert len(result['research_priority_hints'])==70
+    assert result['research_priority_hints_are_not_research_authority'] is True
+    assert result['outbound_authorized'] is False
+    assert all(type(priority) is int and 0 <= priority <= 150
+               for priority in result['research_priority_hints'].values())

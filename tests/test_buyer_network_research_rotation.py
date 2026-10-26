@@ -123,3 +123,27 @@ def test_founder_excluded_domain_not_selected_from_stale_network_queue():
         {'domain': 'polyares.com', 'observed_epoch': NOW, 'corroborated': True},
     ], now_epoch=NOW)
     assert [x['domain'] for x in fresh] == ['polyares.com']
+
+
+def test_existing_buyer_brain_reranks_eligible_verify_only_preserving_cooldown():
+    queue = {'candidates':[
+        {'domain':'genericbuyer.com','status':'VERIFY_REQUIREMENTS','score':90},
+        {'domain':'roofbuyer.com','status':'VERIFY_REQUIREMENTS','score':10},
+        {'domain':'anotherbuyer.com','status':'WATCH','score':100},
+    ]}
+    base,_=choose_research_batch(queue,{},now_epoch=NOW,limit=2)
+    assert [r['domain'] for r in base] == ['genericbuyer.com','roofbuyer.com']
+    priorities={'roofbuyer.com':120,'genericbuyer.com':4,'anotherbuyer.com':149}
+    ranked,_=choose_research_batch(queue,{},now_epoch=NOW,limit=2,priority_hints=priorities)
+    assert [r['domain'] for r in ranked] == ['roofbuyer.com','genericbuyer.com']
+    ledger={'domains':{'roofbuyer.com':{'last_attempt_epoch':NOW}}}
+    throttled,_=choose_research_batch(queue,ledger,now_epoch=NOW+3600,limit=2,
+                                      priority_hints=priorities)
+    assert 'roofbuyer.com' not in [r['domain'] for r in throttled]
+    assert len(throttled)==2
+    # Hints cannot admit excluded/non-public/suppressed companies.
+    queue['candidates'].append(
+        {'domain':'yourdomain.com','status':'VERIFY_REQUIREMENTS','score':999})
+    selected,_=choose_research_batch(queue,{},now_epoch=NOW,limit=8,
+                                      priority_hints={**priorities,'yourdomain.com':150})
+    assert 'yourdomain.com' not in [r['domain'] for r in selected]
