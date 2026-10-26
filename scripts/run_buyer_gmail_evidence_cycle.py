@@ -18,7 +18,11 @@ STEPS = (
 )
 # Auxiliary snapshot is advisory: a Workspace outage must not block the
 # existing personal-Gmail reconciliation or imply any outreach authority.
-OPTIONAL_STEPS = ("refresh_workspace_sent_domain_receipts.py", "run_permit_compliance_cycle_observer.py")
+OPTIONAL_STEPS = (
+    "refresh_workspace_sent_domain_receipts.py",
+    "poll_workspace_solar_outreach_readonly.py",
+    "run_permit_compliance_cycle_observer.py",
+)
 
 def run(*, root=ROOT, invoke=None):
     invoke = invoke or subprocess.run

@@ -13,6 +13,9 @@ from pathlib import Path
 import stat
 
 from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
+from empire_os.workspace_priority_payer_reply import (
+    collect_priority_payer_threads, newly_observed_priority_candidates,
+)
 from empire_os.workspace_heat_pump_reply_tracking import (
     ANCHORS as HEAT_ANCHORS, collect_heat_pump_threads,
     newly_observed_heat_pump_candidates,
@@ -25,6 +28,7 @@ from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
 ROOT = Path("/srv/empire_os")
 OUTPUT = ROOT / "runtime/buyer_network_intelligence/workspace_solar_outreach_reply_review_latest.json"
+PRIORITY_OUTPUT = ROOT / "runtime/buyer_network_intelligence/workspace_priority_payer_reply_review_latest.json"
 HEAT_OUTPUT = ROOT / "runtime/buyer_network_intelligence/workspace_heat_pump_reply_review_latest.json"
 
 
@@ -40,6 +44,10 @@ def run(*, provider=None, write: bool = False, now=None, output: Path = OUTPUT) 
         "new_inbound_header_candidates": None,
         "source_scan_complete": False,
         "snapshot_written": False,
+        "priority_payer_status": "HELD_PRIORITY_PAYER_THREADS_NOT_SCANNED",
+        "priority_payer_threads_verified": 0,
+        "priority_payer_new_inbound_candidates": None,
+        "priority_payer_snapshot_written": False,
         "heat_pump_status": "HELD_HEAT_PUMP_THREADS_NOT_SCANNED",
         "heat_pump_monitored_threads": len(HEAT_ANCHORS),
         "heat_pump_verified_sent_anchors": 0,
@@ -85,6 +93,38 @@ def run(*, provider=None, write: bool = False, now=None, output: Path = OUTPUT) 
             reviewed["new_inbound_header_candidate_count"] = flags["new_inbound_header_candidates"]
             atomic_private_write(output, reviewed)
             flags["snapshot_written"] = True
+        # Reuse exactly the SAME validated Workspace provider and acquisition
+        # timer for two already-sent prospective payer threads. Their snapshot
+        # is SEPARATE from the six historic commercial-solar cohort. Failure
+        # here does not erase or falsely enlarge the existing six-company scan.
+        try:
+            payer = collect_priority_payer_threads(
+                service, now=now or datetime.now(timezone.utc)
+            )
+            if payer["verified_original_sends"] != 2:
+                raise EvidenceHeld("PRIORITY_PAYER_ORIGINAL_SENT_COVERAGE_INCOMPLETE")
+            if write:
+                destination = PRIORITY_OUTPUT
+                if (destination.is_symlink() or not destination.parent.is_dir()
+                        or destination.parent.is_symlink()):
+                    raise EvidenceHeld("PRIORITY_PRIVATE_DESTINATION_UNSAFE")
+                prior = None
+                if destination.exists():
+                    if (not destination.is_file() or destination.stat().st_size > 30_000
+                            or stat.S_IMODE(destination.stat().st_mode) != 0o600):
+                        raise EvidenceHeld("PRIORITY_PREVIOUS_SNAPSHOT_UNSAFE")
+                    prior = json.loads(destination.read_text(encoding="utf-8"))
+                delta = newly_observed_priority_candidates(payer, prior)
+                payer["new_inbound_header_candidate_count"] = delta
+                atomic_private_write(destination, payer)
+                flags["priority_payer_new_inbound_candidates"] = delta
+                flags["priority_payer_snapshot_written"] = True
+            flags["priority_payer_threads_verified"] = 2
+            flags["priority_payer_status"] = "TWO_PRIORITY_PAYER_THREADS_REVIEWED"
+        except Exception:
+            # No provider diagnostics, addresses or body snippets in service
+            # logs. Missing optional payer monitoring is explicitly held.
+            flags["priority_payer_status"] = "HELD_PRIORITY_PAYER_REVIEW_UNAVAILABLE"
         # Additional pre-existing heat-pump threads use this SAME Workspace
         # read-only client and EXISTING 15-minute cycle. Failure is isolated
         # from the six historical Workspace solar threads.
