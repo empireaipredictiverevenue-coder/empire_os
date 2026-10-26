@@ -16,7 +16,10 @@ from empire_os.buyer_claim_provenance import verified_direct_purchase_receipt
 from empire_os.first_party_evidence_contract import first_party_contact_decision
 
 # This is discovery infrastructure, not evidence of a prospective buyer.
-NON_PROSPECT_DISCOVERY_HOSTS = frozenset({"search.google", "cybo.com"})
+# Generic email platform and research infrastructure are NOT lead-buying firms.
+# Exact host matching only: do not suppress customer business domains that
+# merely have a Gmail mailbox in their public contact details.
+NON_PROSPECT_DISCOVERY_HOSTS = frozenset({"search.google", "cybo.com", "gmail.com"})
 
 BLOCKER_RECOVERY = {
     "direct_buyer_evidence_missing": (

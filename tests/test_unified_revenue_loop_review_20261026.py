@@ -3,6 +3,7 @@ from copy import deepcopy
 import pytest
 
 from scripts.review_unified_revenue_loop_20261026 import report
+from empire_os.revenue_evidence_workplan import RESTORE
 
 
 def payloads():
@@ -10,9 +11,13 @@ def payloads():
         "mode": "OBSERVE", "execution_authority": "none",
         "next_action": "continue_existing_research",
         "cross_system_cohesion": {
+            "schema_version": "empire.cross_system_cohesion.v1",
+            "mode": "OBSERVE",
             "execution_authority": "NONE",
-            "sources": {"x"+str(i): {"status": "CURRENT_OBSERVATION"}
-                        for i in range(9)},
+            "outbound_authorized": False,
+            "sources": {key: {"status": "CURRENT_OBSERVATION",
+                              "sha256": "a"*64 if key == "opportunity_factory" else None}
+                        for key in RESTORE},
             "lifecycle_handoff_gates": [{} for _ in range(12)],
             "emails_sent": False, "db_writes": False,
             "payments_executed": False,
@@ -21,6 +26,9 @@ def payloads():
             "evidence_population_counts": {"recognized_revenue_cents": 0},
         },
         "canonical_opportunity_handoffs": {
+            "schema_version": "empire.opportunity.canonical_handoff_review.v1",
+            "source_reviewed": False,
+            "factory_source_sha256": "a"*64,
             "execution_authority": "NONE",
             "records_reviewed": 18, "handoff_ready_count": 0,
             "items": [{"next_action": "COMPLETE_REAL_FACTORY_VALIDATION"}],
@@ -30,6 +38,8 @@ def payloads():
     relationships = {
         "outbound_authorized": False,
         "buyer_evidence_brain": {
+            "schema_version": "empire.buyer_evidence_brain.v1",
+            "commercial_proof_tasks": [],
             "execution_authority": "NONE",
             "database_writes": False, "new_emails_sent": False,
             "buyer_capacity_evidence": {"status": "NO_VERIFIED_COMMERCIAL_CAPACITY"},

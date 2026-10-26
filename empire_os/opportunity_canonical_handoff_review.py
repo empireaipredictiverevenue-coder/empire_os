@@ -161,7 +161,12 @@ def from_existing_factory(root: Path, *, now: datetime) -> dict[str, Any]:
             return _hold("FACTORY_SOURCE_UNAVAILABLE", status="UNAVAILABLE")
         if path.stat().st_size > MAX_BYTES:
             return _hold("OVERSIZED_FACTORY_SOURCE")
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
+        if len(raw) > MAX_BYTES:
+            return _hold("OVERSIZED_FACTORY_SOURCE")
+        value = json.loads(raw.decode("utf-8"))
     except (OSError, ValueError, UnicodeError):
         return _hold("FACTORY_SOURCE_UNAVAILABLE", status="UNAVAILABLE")
-    return review_factory_handoffs(value, now=now)
+    reviewed = review_factory_handoffs(value, now=now)
+    reviewed["factory_source_sha256"] = sha256(raw).hexdigest()
+    return reviewed

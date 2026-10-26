@@ -7,6 +7,7 @@ scout signals represent converted customers.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from hashlib import sha256
 import json
 from pathlib import Path
 import stat
@@ -68,7 +69,8 @@ def _snapshot(root: Path, key: str, now: datetime) -> tuple[dict[str, Any], dict
     relative, schema, max_age = SOURCES[key]
     path = root / relative
     source = {"source": key, "path": relative, "status": "UNAVAILABLE",
-              "fresh": False, "age_minutes": None, "schema_verified": False}
+              "fresh": False, "age_minutes": None, "schema_verified": False,
+              "sha256": None}
     try:
         if path.is_symlink() or not path.is_file():
             return source, None
@@ -76,7 +78,12 @@ def _snapshot(root: Path, key: str, now: datetime) -> tuple[dict[str, Any], dict
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > MAX_BYTES:
             source["status"] = "UNSAFE_SOURCE"
             return source, None
-        value = json.loads(path.read_text(encoding="utf-8"))
+        raw = path.read_bytes()
+        if len(raw) > MAX_BYTES:
+            source["status"] = "UNSAFE_SOURCE"
+            return source, None
+        value = json.loads(raw.decode("utf-8"))
+        source["sha256"] = sha256(raw).hexdigest()
         if not isinstance(value, dict):
             source["status"] = "INVALID_SOURCE"
             return source, None
@@ -155,6 +162,44 @@ def build_cohesion_snapshot(root: Path, *, now: datetime | None = None) -> dict[
         "recognized_revenue_cents": gross,
         "outcome_conditioned_memories": memory_outcomes,
     }
+    # Exact, previously observed buyer replies may require human review even
+    # when NO downstream buyer is activated. A reply is never a contract.
+    actionable_replies = []
+    if sources["buyer_relationships"]["status"] == "CURRENT_OBSERVATION":
+        raw_actions = relationships.get("founder_action_queue")
+        if isinstance(raw_actions, list) and len(raw_actions) <= 500:
+            seen_reply_entities = set()
+            for row in raw_actions:
+                if not isinstance(row, Mapping):
+                    continue
+                key = row.get("entity_key")
+                incoming = _timestamp(row.get("last_inbound_at"))
+                outgoing = _timestamp(row.get("last_outbound_at"))
+                if (not isinstance(key, str) or not 1 <= len(key) <= 100
+                        or any(c not in "abcdefghijklmnopqrstuvwxyz0123456789-_" for c in key)
+                        or key in seen_reply_entities
+                        or row.get("outbound_authorized") is not False
+                        or row.get("stage") != "INBOUND_REVIEW_REQUIRED"
+                        or row.get("next_founder_action") not in (
+                            "REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",)
+                        or incoming is None or outgoing is None
+                        or not outgoing <= incoming <= current
+                        or (current-incoming).total_seconds() > 14 * 86400):
+                    continue
+                seen_reply_entities.add(key)
+                actionable_replies.append({
+                    "review_ref": "founder_review:" + key,
+                    "existing_owner": "BuyerReplyOperations",
+                    "source_action": row["next_founder_action"],
+                    "buyer_reply_observed_at": incoming.isoformat(),
+                    "source_snapshot": "buyer_relationships",
+                    "buyer_contract_verified": False,
+                    "buyer_route_verified": False,
+                    "new_outbound_authorized": False,
+                    "execution_authority": "NONE",
+                })
+                if len(actionable_replies) >= 3:
+                    break
     actions = []
     if sources["buyer_scout"]["status"] != "CURRENT_OBSERVATION":
         actions.append(("BuyerScout", "RESTORE_EXISTING_SCOUT_EVIDENCE"))
@@ -216,6 +261,7 @@ def build_cohesion_snapshot(root: Path, *, now: datetime | None = None) -> dict[
         "generated_at": current.isoformat(), "sources": sources,
         "population_counts_are_independent_not_a_conversion_funnel": True,
         "evidence_population_counts": counts,
+        "existing_inbound_buyer_reply_reviews": actionable_replies,
         "lifecycle_handoff_gates": stages,
         "buyer_evidence_brain_in_registry": brain_status,
         "canonical_entity_id_join_verified": False,
