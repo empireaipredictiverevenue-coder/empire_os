@@ -271,7 +271,20 @@ def build_run(*, observed: datetime | None=None, get=None, previous: dict | None
             and outcome.get("indexable") is True):
             item["state"]="tested"
             item["state_path"]=["detected","prioritised","staged","tested"]
-            item["next_action"]="REVIEW_OWNER_CONTENT_OR_GOOGLE_INDEX_EVIDENCE_BEFORE_PUBLICATION"
+            if item.get("index_status_first_party") == "GOOGLE_HAS_NO_URL_RECORD":
+                # This page is ALREADY public and technically eligible.
+                # Publication and Google index submission are different
+                # actions: the latter is manual in ordinary Search Console.
+                item["next_action"]=(
+                    "REVIEW_EXACT_GOOGLE_URL_INSPECTION_AND_ORIGINAL_CONTENT;"
+                    "MANUALLY_REQUEST_INDEXING_IF_ELIGIBLE"
+                )
+            elif item.get("index_status_first_party") == "GOOGLE_INDEXED_VERSION_VERIFIED":
+                item["next_action"]=(
+                    "MEASURE_FINAL_GSC_QUERIES_CTR_AND_GENUINE_CONSENTED_BUYER_OUTCOMES"
+                )
+            else:
+                item["next_action"]="REVIEW_SOURCE_EVIDENCE_BEFORE_FURTHER_PUBLICATION"
         elif outcome.get("status") == "TESTED_READ_ONLY_NO_MUTATION":
             item["next_action"]="INVESTIGATE_FAILED_LIVE_TECHNICAL_CHECK"
     result["state_counts"]={name:sum(i["state"]==name for i in result["actions"])

@@ -297,3 +297,61 @@ def test_stale_or_unverified_ops_does_not_fabricate_zero_sales():
     forged["exact_crm_readback_verified"]=True
     with pytest.raises(SEOActionHeld,match="EXCEEDS_AUTHORITY"):
         build_seo_action_lifecycle(w,d,ops_sales=forged,observed_at=NOW)
+
+def test_existing_daily_owner_picks_action_by_actual_google_state_not_repeat_publication(monkeypatch):
+    from scripts import review_live_organic_buyer_journey_20261024 as journey_owner
+    from empire_os import gtm_ops_first_sale_source as ops_owner
+    from pathlib import Path
+    w,d,j,r=sources()
+    def documents(path):
+        if path.name.startswith("google-index-"):return d
+        if path.name.startswith("weekly_seo_growth_actions_"):return w
+        return r
+    monkeypatch.setattr(operator,"_trusted_json",documents)
+    monkeypatch.setattr(operator,"_latest_weekly",lambda:Path("weekly_seo_growth_actions_2026-10-26.json"))
+    monkeypatch.setattr(journey_owner,"review",lambda:j)
+    monkeypatch.setattr(ops_owner,"observe_owner_ops_first_sale",
+                        lambda root,now:verified_owner_sales(0))
+    calls=[]
+    def observe(url):
+        calls.append(url)
+        return {
+          "status":"TESTED_READ_ONLY_NO_MUTATION",
+          "http_status":200,"self_canonical":True,"html_content_type":True,
+          "indexable":True,"website_changed":False,
+        }
+    result=operator.build_run(observed=NOW,get=observe)
+    page=next(a for a in result["actions"] if a["url"]==BASE+"/commercial")
+    assert page["state"]=="tested"
+    assert page["index_status_first_party"]=="GOOGLE_HAS_NO_URL_RECORD"
+    assert page["next_action"]==(
+        "REVIEW_EXACT_GOOGLE_URL_INSPECTION_AND_ORIGINAL_CONTENT;"
+        "MANUALLY_REQUEST_INDEXING_IF_ELIGIBLE"
+    )
+    assert result["canonical_sitewide_sales_evidence"]["sitewide_sales_acquisitions"]==0
+    assert result["indexing_requests_submitted"]==0
+    assert result["automated_publication_authorized"] is False
+    assert result["outbound_sent"] is False
+
+
+def test_indexed_existing_page_focuses_queries_not_republishing(monkeypatch):
+    from scripts import review_live_organic_buyer_journey_20261024 as journey_owner
+    from empire_os import gtm_ops_first_sale_source as ops_owner
+    from pathlib import Path
+    w,d,j,r=sources()
+    w["actions"].append(action("/industries/roofing","LOW_VOLUME_OR_RECENT_PAGE_OBSERVATION","P3_MEASURE_AND_IMPROVE"))
+    def documents(path):
+        if path.name.startswith("google-index-"):return d
+        if path.name.startswith("weekly_seo_growth_actions_"):return w
+        return r
+    monkeypatch.setattr(operator,"_trusted_json",documents)
+    monkeypatch.setattr(operator,"_latest_weekly",lambda:Path("weekly_seo_growth_actions_2026-10-26.json"))
+    monkeypatch.setattr(journey_owner,"review",lambda:j)
+    monkeypatch.setattr(ops_owner,"observe_owner_ops_first_sale",
+                        lambda root,now:verified_owner_sales(0))
+    yes=lambda _:{"status":"TESTED_READ_ONLY_NO_MUTATION","http_status":200,
+                  "self_canonical":True,"html_content_type":True,"indexable":True}
+    result=operator.build_run(observed=NOW,get=yes)
+    page=next(a for a in result["actions"] if a["url"]==BASE+"/industries/roofing")
+    assert page["state"]=="tested"
+    assert page["next_action"]=="MEASURE_FINAL_GSC_QUERIES_CTR_AND_GENUINE_CONSENTED_BUYER_OUTCOMES"

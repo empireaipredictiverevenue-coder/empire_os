@@ -19,3 +19,9 @@ The same lifecycle now consumes only empire_os.gtm_ops_first_sale_source.observe
 Existing action IDs/owners, previous daily immutable reports, Founder route and original weekly GSC review remain untouched. No additional timer, Google-index submission, outbound contact or payment action.
 
 Tests cover exact Google states, invalid/malformed count rejection, verified latest AEO hash-release receipt, real-zero vs stale unknown, genuinely nonzero count handoff to original CRM owner, and no fabricated revenue. The original daily SEO runner will automatically use this module on its next scheduled execution.
+
+## Original owner decision refinement
+
+After a source-backed HTTP 200/self-canonical/indexability check, a public URL still reported GOOGLE_HAS_NO_URL_RECORD must NOT be queued for another automatic publication. The correct owner next action is to inspect Google's exact URL Inspection result and original content usefulness, then manually request indexing in normal Google Search Console only when eligible. An indexed URL instead enters final GSC query/snippet/CTR and real opted-in buyer-outcome measurement. Neither pathway silently submits indexing requests, adds editorial copy, sends contacts or treats aggregate first-party sales counts as organic attribution.
+
+Both branches have regression tests in the pre-existing lifecycle suite with bounded GET-only fake probes. The published pages remain unchanged.
