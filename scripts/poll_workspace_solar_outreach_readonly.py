@@ -13,6 +13,10 @@ from pathlib import Path
 import stat
 
 from empire_os.google_workspace_mailbox import GoogleWorkspaceMailboxProvider
+from empire_os.workspace_heat_pump_reply_tracking import (
+    ANCHORS as HEAT_ANCHORS, collect_heat_pump_threads,
+    newly_observed_heat_pump_candidates,
+)
 from empire_os.workspace_solar_reply_tracking import (
     EvidenceHeld, collect_workspace_solar_threads,
     newly_observed_workspace_replies,
@@ -21,6 +25,7 @@ from scripts.reconcile_buyer_email_relationships import atomic_private_write
 
 ROOT = Path("/srv/empire_os")
 OUTPUT = ROOT / "runtime/buyer_network_intelligence/workspace_solar_outreach_reply_review_latest.json"
+HEAT_OUTPUT = ROOT / "runtime/buyer_network_intelligence/workspace_heat_pump_reply_review_latest.json"
 
 
 def run(*, provider=None, write: bool = False, now=None, output: Path = OUTPUT) -> dict:
@@ -35,6 +40,12 @@ def run(*, provider=None, write: bool = False, now=None, output: Path = OUTPUT) 
         "new_inbound_header_candidates": None,
         "source_scan_complete": False,
         "snapshot_written": False,
+        "heat_pump_status": "HELD_HEAT_PUMP_THREADS_NOT_SCANNED",
+        "heat_pump_monitored_threads": len(HEAT_ANCHORS),
+        "heat_pump_verified_sent_anchors": 0,
+        "heat_pump_inbound_header_candidates": None,
+        "heat_pump_new_inbound_candidates": None,
+        "heat_pump_snapshot_written": False,
         "database_writes": False,
         "outbound_sent": False,
         "automatic_reply_authorized": False,
@@ -74,6 +85,45 @@ def run(*, provider=None, write: bool = False, now=None, output: Path = OUTPUT) 
             reviewed["new_inbound_header_candidate_count"] = flags["new_inbound_header_candidates"]
             atomic_private_write(output, reviewed)
             flags["snapshot_written"] = True
+        # Additional pre-existing heat-pump threads use this SAME Workspace
+        # read-only client and EXISTING 15-minute cycle. Failure is isolated
+        # from the six historical Workspace solar threads.
+        try:
+            heat = collect_heat_pump_threads(
+                service, now=now or datetime.now(timezone.utc)
+            )
+            if heat["verified_original_sends"] != len(HEAT_ANCHORS):
+                raise EvidenceHeld("HEAT_PUMP_SENT_COVERAGE_INCOMPLETE")
+            if write:
+                if (HEAT_OUTPUT.is_symlink() or
+                        not HEAT_OUTPUT.parent.is_dir() or
+                        HEAT_OUTPUT.parent.is_symlink()):
+                    raise EvidenceHeld("HEAT_PUMP_PRIVATE_DESTINATION_UNSAFE")
+                previous_heat = None
+                if HEAT_OUTPUT.exists():
+                    if (not HEAT_OUTPUT.is_file()
+                            or HEAT_OUTPUT.stat().st_size > 50000
+                            or stat.S_IMODE(HEAT_OUTPUT.stat().st_mode) != 0o600):
+                        raise EvidenceHeld("HEAT_PUMP_PREVIOUS_SNAPSHOT_UNSAFE")
+                    previous_heat = json.loads(
+                        HEAT_OUTPUT.read_text(encoding="utf-8")
+                    )
+                delta = newly_observed_heat_pump_candidates(
+                    heat, previous_heat
+                )
+                heat["new_inbound_header_candidate_count"] = delta
+                atomic_private_write(HEAT_OUTPUT, heat)
+                flags["heat_pump_new_inbound_candidates"] = delta
+                flags["heat_pump_snapshot_written"] = True
+            flags["heat_pump_status"] = heat["status"]
+            flags["heat_pump_verified_sent_anchors"] = len(HEAT_ANCHORS)
+            flags["heat_pump_inbound_header_candidates"] = (
+                heat["inbound_header_candidate_count"]
+            )
+        except Exception:
+            # This auxiliary cohort must not leak source/provider diagnostics
+            # or erase the older original cohort's accepted evidence snapshot.
+            flags["heat_pump_status"] = "HELD_HEAT_PUMP_REPLY_REVIEW_UNAVAILABLE"
         flags.update({
             "status": "WORKSPACE_SENT_ANCHORS_VERIFIED_REVIEW_ONLY",
             "verified_sent_anchors_in_live_mailbox": 6,
