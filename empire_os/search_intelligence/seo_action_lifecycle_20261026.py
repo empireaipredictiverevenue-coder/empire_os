@@ -17,6 +17,19 @@ ORIGIN = "https://empire-ai.co.uk"
 WEEKLY_SCHEMA = "empire.search.seo_growth_action_queue.v1"
 DAILY_SCHEMA = "empire.search.google_index_daily_watch.v1"
 AE0_SCHEMA = "empire.seo.original_gated_aeo_release_result.v1"
+AEO_SOURCE_V2_SCHEMA = "empire.seo.original_gated_aeo_source_hint_release.v2"
+ORIGINAL_INDEXED_URLS = {
+    "https://empire-ai.co.uk/",
+    "https://empire-ai.co.uk/commercial",
+    "https://empire-ai.co.uk/industries/roofing",
+    "https://empire-ai.co.uk/industries/solar",
+    "https://empire-ai.co.uk/predictive-revenue",
+}
+VALID_GOOGLE_INDEX_STATES = {
+    "GOOGLE_INDEXED_VERSION_VERIFIED",
+    "GOOGLE_HAS_NO_URL_RECORD",
+    "GOOGLE_INDEX_STATUS_NEEDS_REVIEW",
+}
 STATES = ("detected", "prioritised", "staged", "tested", "published", "verified", "measured")
 PRIORITY = {
     "P0_TECHNICAL": 0, "P1_TECHNICAL": 1, "P1_CRITICAL_PAGE": 2,
@@ -83,21 +96,105 @@ def _closed_live_action(item: dict, journey: Mapping[str, Any],
     return None
 
 
-def _index_state(daily: Mapping[str, Any], url: str) -> str | None:
-    rows = daily.get("exact_url_states")
-    if not isinstance(rows, list):
+def _validated_index_states(daily: Mapping[str, Any]) -> dict[str, str] | None:
+    """Use the original five-URL daily owner's ACTUAL mapping contract.
+
+    Never transform a sitemap, page impressions or empty/malformed source
+    into a fabricated indexed state.
+    """
+    values = daily.get("exact_url_states")
+    if values is None:
         return None
-    for row in rows:
-        if isinstance(row, dict) and row.get("url") == url:
-            # No inference from GSC page impressions.
-            return str(row.get("state") or row.get("status") or "UNKNOWN")
-    return None
+    if (not isinstance(values, dict)
+        or set(values) != ORIGINAL_INDEXED_URLS
+        or any(value not in VALID_GOOGLE_INDEX_STATES
+               for value in values.values())
+        or daily.get("schema_version") != DAILY_SCHEMA
+        or daily.get("status") != "GOOGLE_INDEX_WATCH_RECORDED"
+        or daily.get("scope_checked") != 5
+        or daily.get("google_indexing_submissions") != 0
+        or daily.get("database_writes") is not False
+        or daily.get("website_changed") is not False
+        or daily.get("execution_authority") != "none"
+        or daily.get("full_site_indexation_verified") is not False
+        or daily.get("indexed_verified") != sum(
+            state == "GOOGLE_INDEXED_VERSION_VERIFIED" for state in values.values())
+        or daily.get("unknown_to_google") != sum(
+            state == "GOOGLE_HAS_NO_URL_RECORD" for state in values.values())):
+        raise SEOActionHeld("ORIGINAL_FIVE_URL_GOOGLE_INDEX_EVIDENCE_UNTRUSTED")
+    return values
+
+
+def _index_state(states: Mapping[str, str] | None, url: str) -> str | None:
+    return states.get(url) if states is not None else None
+
+
+def _original_canonical_sales_evidence(source: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Only accept the ORIGINAL GTM Ops sanitized count receipt, no SQL here.
+
+    Even nonzero sitewide enquiry totals NEVER prove AEO origin, organic
+    channel, exact CRM delivery, qualified buyers or settled money.
+    """
+    held = {
+        "status": "CANONICAL_SOURCE_NOT_AVAILABLE",
+        "sitewide_commercial_enquiries": None,
+        "sitewide_predictive_enquiries": None,
+        "sitewide_sales_acquisitions": None,
+        "source_count_verified": False,
+        "verified_aeo_origin_enquiries": None,
+        "verified_organic_conversions": None,
+        "exact_crm_enquiry_receipt_verified": False,
+        "qualified_buyer_verified": False,
+        "earned_revenue_verified": False,
+        "next_existing_owner_action": "REVIEW_EXISTING_PRIVILEGED_OPS_CONTROL_COUNT_RECEIPT",
+    }
+    if source is None:
+        return held
+    if not isinstance(source, Mapping):
+        raise SEOActionHeld("ORIGINAL_SALES_COUNT_RECEIPT_NOT_OBJECT")
+    if source.get("source_count_verified") is False:
+        # The existing owner rejects stale or broken Ops snapshots. No zeros.
+        return held
+    if (source.get("source_count_verified") is not True
+        or source.get("exact_crm_readback_verified") is not False
+        or source.get("specific_response_consent_current_verified") is not False
+        or source.get("individual_buyer_identity_verified") is not False
+        or source.get("outreach_authorized") is not False
+        or source.get("payments_authorized") is not False
+        or source.get("database_writes") is not False
+        or source.get("execution_authority") != "none"):
+        raise SEOActionHeld("ORIGINAL_SALES_COUNT_RECEIPT_EXCEEDS_AUTHORITY")
+    c=source.get("canonical_commercial_enquiries")
+    p=source.get("canonical_predictive_revenue_enquiries")
+    n=source.get("canonical_sales_acquisitions")
+    if (any(type(v) is not int or not 0 <= v <= 20_000_000
+            for v in (c,p,n)) or c+p!=n):
+        raise SEOActionHeld("ORIGINAL_SALES_COUNT_SOURCE_CONTRADICTORY")
+    status=source.get("status")
+    if n==0 and status=="CANONICAL_COMMERCIAL_SALES_INTAKE_ZERO_OBSERVED":
+        action="IMPROVE_SEARCH_DISCOVERY_AND_WAIT_FOR_GENUINE_CONSENTED_ENQUIRY"
+    elif n>0 and status in {
+        "CANONICAL_SALES_ENQUIRIES_FOUNDER_BINDING_HOLD",
+        "CANONICAL_SALES_ENQUIRIES_PRESENT_EXACT_READBACK_REQUIRED",
+    }:
+        action="REVIEW_EXISTING_CRM_OWNER_EXACT_REAL_ENQUIRY_LINEAGE"
+    else:
+        raise SEOActionHeld("ORIGINAL_SALES_COUNT_STATUS_UNTRUSTED")
+    return {**held,
+        "status": status,
+        "sitewide_commercial_enquiries": c,
+        "sitewide_predictive_enquiries": p,
+        "sitewide_sales_acquisitions": n,
+        "source_count_verified": True,
+        "next_existing_owner_action": action,
+    }
 
 
 def build_seo_action_lifecycle(
     weekly: Mapping[str, Any], daily: Mapping[str, Any],
     *, buyer_journey: Mapping[str, Any] | None = None,
     aeo_release: Mapping[str, Any] | None = None,
+    ops_sales: Mapping[str, Any] | None = None,
     observed_at: datetime | None = None,
 ) -> dict[str, Any]:
     now = observed_at or datetime.now(timezone.utc)
@@ -121,13 +218,25 @@ def build_seo_action_lifecycle(
                     or journey.get("site_mutations") is not False):
         raise SEOActionHeld("ORIGINAL_LIVE_BUYER_PATH_REQUIRED")
     release = aeo_release or {}
-    release_valid = (
+    released_v1 = (
         release.get("schema_version") == AE0_SCHEMA
         and release.get("status") == "ORIGINAL_THREE_AEO_B2B_LINKS_GATED_RELEASE_LIVE_VERIFIED"
+    )
+    released_v2 = (
+        release.get("schema_version") == AEO_SOURCE_V2_SCHEMA
+        and release.get("status") == "ORIGINAL_THREE_AEO_SOURCE_HINT_RELEASE_LIVE_VERIFIED"
+        and release.get("other_aeo_pages_untouched") == 207
+        and release.get("no_database_writes") is True
+        and release.get("no_indexing_submissions") is True
+    )
+    release_valid = (
+        (released_v1 or released_v2)
         and release.get("original_release_valid") is True
         and release.get("exact_approved_pages") == 3
         and release.get("live_http_200_pages") == 3
     )
+    index_states = _validated_index_states(daily)
+    sales_evidence = _original_canonical_sales_evidence(ops_sales)
 
     actions = []
     seen = set()
@@ -174,7 +283,7 @@ def build_seo_action_lifecycle(
                           else ["detected", "prioritised", "tested", "verified"],
             "outcome": outcome,
             "evidence_refs": evidence,
-            "index_status_first_party": _index_state(daily, url),
+            "index_status_first_party": _index_state(index_states, url),
             "stage": {
                 "status": "STAGED_SAFE_TECHNICAL_CHECKS" if stage_ready else "REVIEW_REQUIRED",
                 "allowed_automatic_checks": test_methods if not closed else [],
@@ -206,6 +315,9 @@ def build_seo_action_lifecycle(
         "resolved_existing_owner_actions": sum(a["state"] == "verified" for a in actions),
         "unresolved_actions": sum(a["state"] != "verified" for a in actions),
         "actions": actions,
+        "canonical_sitewide_sales_evidence": sales_evidence,
+        "sitewide_acquisitions_never_equated_with_aeo_or_search_attribution": True,
+        "existing_ops_control_canonical_reader_reused": True,
         "existing_daily_and_weekly_owners_retained": True,
         "max_automated_checks_per_action": 3,
         "safe_checks_execute_without_site_mutation": True,

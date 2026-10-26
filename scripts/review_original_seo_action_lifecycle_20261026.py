@@ -24,7 +24,9 @@ from empire_os.search_intelligence.seo_action_lifecycle_20261026 import (
 
 ROOT = Path("/home/ubuntu/empire_releases/seo_daily_index_status_20261026")
 WEEKLY = Path("/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022")
-RELEASE = Path("/home/ubuntu/empire_releases/seo_aeo_governed_three_cta_20261026_v2/activation_result.json")
+# Latest ORIGINAL governed AEO release. The earlier V1 direct-link receipt
+# is historical; current HTML is the separately validated source-hint V2.
+RELEASE = Path("/home/ubuntu/empire_releases/seo_aeo_entry_claim_v2_20261026_stage/activation_result.json")
 MAX_GETS = 8
 MAX_BYTES = 200_000
 
@@ -106,9 +108,14 @@ def build_run(*, observed: datetime | None=None, get=None) -> dict:
     weekly=_trusted_json(_latest_weekly())
     release=_trusted_json(RELEASE)
     from scripts.review_live_organic_buyer_journey_20261024 import review
+    from empire_os.gtm_ops_first_sale_source import observe_owner_ops_first_sale
     buyer=review()
+    # The original privileged five-minute Ops Control is the sole canonical
+    # DB reader. This SEO routine consumes only its safe validated counters.
+    sales=observe_owner_ops_first_sale(Path("/srv/empire_os"),now=now)
     result=build_seo_action_lifecycle(
-        weekly,daily,buyer_journey=buyer,aeo_release=release,observed_at=now
+        weekly,daily,buyer_journey=buyer,aeo_release=release,
+        ops_sales=sales,observed_at=now
     )
     getter=get or _read_only_page_check
     attempts=0

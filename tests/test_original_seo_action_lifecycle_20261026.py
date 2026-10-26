@@ -40,7 +40,20 @@ def sources():
     daily={
         "schema_version":"empire.search.google_index_daily_watch.v1",
         "website_changed":False,"execution_authority":"none","observed_at":NOW.isoformat(),
-        "exact_url_states":[],
+        "status":"GOOGLE_INDEX_WATCH_RECORDED",
+        "scope_checked":5,
+        "google_indexing_submissions":0,
+        "database_writes":False,
+        "full_site_indexation_verified":False,
+        "indexed_verified":3,
+        "unknown_to_google":2,
+        "exact_url_states":{
+            BASE+"/":"GOOGLE_INDEXED_VERSION_VERIFIED",
+            BASE+"/commercial":"GOOGLE_HAS_NO_URL_RECORD",
+            BASE+"/industries/roofing":"GOOGLE_INDEXED_VERSION_VERIFIED",
+            BASE+"/industries/solar":"GOOGLE_HAS_NO_URL_RECORD",
+            BASE+"/predictive-revenue":"GOOGLE_INDEXED_VERSION_VERIFIED",
+        },
     }
     journey={
         "schema_version":"empire.search.live_organic_to_buyer_observer.v1",
@@ -195,3 +208,92 @@ def test_daily_owner_preserves_primary_receipt_if_optional_lifecycle_held(monkey
     result=json.loads(capsys.readouterr().out)
     assert result["status"]=="ORIGINAL_DAILY_GOOGLE_INDEX_REVIEW_RECORDED"
     assert result["seo_action_lifecycle"]["status"]=="SEO_LIFECYCLE_HELD_PRIMARY_GOOGLE_WATCH_PRESERVED"
+
+def test_actual_original_google_mapping_is_carried_to_each_action():
+    w,d,j,r=sources()
+    result=build_seo_action_lifecycle(w,d,buyer_journey=j,aeo_release=r,observed_at=NOW)
+    states={a["url"]:a["index_status_first_party"] for a in result["actions"]}
+    assert states[BASE+"/commercial"]=="GOOGLE_HAS_NO_URL_RECORD"
+    assert states[BASE+"/aeo/roofing/DFW"] is None
+    assert result["indexing_requests_submitted"]==0
+
+
+def test_real_original_aeo_v2_receipt_is_not_rejected_as_old_release():
+    w,d,j,r=sources()
+    r={
+        "schema_version":"empire.seo.original_gated_aeo_source_hint_release.v2",
+        "status":"ORIGINAL_THREE_AEO_SOURCE_HINT_RELEASE_LIVE_VERIFIED",
+        "other_aeo_pages_untouched":207,
+        "no_database_writes":True,"no_indexing_submissions":True,
+        "original_release_valid":True,
+        "exact_approved_pages":3,"live_http_200_pages":3,
+    }
+    out=build_seo_action_lifecycle(w,d,buyer_journey=j,aeo_release=r,observed_at=NOW)
+    a=next(x for x in out["actions"] if "/aeo/roofing/DFW" in x["url"])
+    assert a["state"]=="verified"
+    assert a["published_claim"] is True
+    r["no_indexing_submissions"]=False
+    bad=build_seo_action_lifecycle(w,d,buyer_journey=j,aeo_release=r,observed_at=NOW)
+    a=next(x for x in bad["actions"] if "/aeo/roofing/DFW" in x["url"])
+    assert a["published_claim"] is False
+
+
+def test_google_malformed_or_wrong_counts_fail_closed():
+    w,d,j,r=sources()
+    d["indexed_verified"]=4
+    with pytest.raises(SEOActionHeld,match="GOOGLE_INDEX_EVIDENCE_UNTRUSTED"):
+        build_seo_action_lifecycle(w,d,observed_at=NOW)
+    d["indexed_verified"]=3
+    d["exact_url_states"]["https://evil.example/"]="GOOGLE_INDEXED_VERSION_VERIFIED"
+    with pytest.raises(SEOActionHeld,match="GOOGLE_INDEX_EVIDENCE_UNTRUSTED"):
+        build_seo_action_lifecycle(w,d,observed_at=NOW)
+
+
+def verified_owner_sales(n=0):
+    return {
+      "status":"CANONICAL_COMMERCIAL_SALES_INTAKE_ZERO_OBSERVED" if n==0
+       else "CANONICAL_SALES_ENQUIRIES_PRESENT_EXACT_READBACK_REQUIRED",
+      "canonical_commercial_enquiries":n,
+      "canonical_predictive_revenue_enquiries":0,
+      "canonical_sales_acquisitions":n,
+      "source_count_verified":True,
+      "exact_crm_readback_verified":False,
+      "specific_response_consent_current_verified":False,
+      "individual_buyer_identity_verified":False,
+      "outreach_authorized":False,
+      "payments_authorized":False,
+      "database_writes":False,
+      "execution_authority":"none",
+    }
+
+
+def test_zero_sales_do_not_become_zero_organic_visits_or_aeo_leads():
+    w,d,j,r=sources()
+    out=build_seo_action_lifecycle(w,d,ops_sales=verified_owner_sales(0),observed_at=NOW)
+    sales=out["canonical_sitewide_sales_evidence"]
+    assert sales["sitewide_sales_acquisitions"]==0
+    assert sales["verified_aeo_origin_enquiries"] is None
+    assert sales["verified_organic_conversions"] is None
+    assert sales["next_existing_owner_action"]=="IMPROVE_SEARCH_DISCOVERY_AND_WAIT_FOR_GENUINE_CONSENTED_ENQUIRY"
+    assert out["verified_revenue"] is None
+
+
+def test_positive_sales_require_exact_original_crm_receipt_review():
+    w,d,j,r=sources()
+    out=build_seo_action_lifecycle(w,d,ops_sales=verified_owner_sales(2),observed_at=NOW)
+    evidence=out["canonical_sitewide_sales_evidence"]
+    assert evidence["sitewide_sales_acquisitions"]==2
+    assert evidence["exact_crm_enquiry_receipt_verified"] is False
+    assert evidence["next_existing_owner_action"]=="REVIEW_EXISTING_CRM_OWNER_EXACT_REAL_ENQUIRY_LINEAGE"
+    assert evidence["verified_aeo_origin_enquiries"] is None
+    assert out["verified_revenue"] is None
+
+
+def test_stale_or_unverified_ops_does_not_fabricate_zero_sales():
+    w,d,j,r=sources()
+    out=build_seo_action_lifecycle(w,d,ops_sales={"source_count_verified":False},observed_at=NOW)
+    assert out["canonical_sitewide_sales_evidence"]["sitewide_sales_acquisitions"] is None
+    forged=verified_owner_sales(1)
+    forged["exact_crm_readback_verified"]=True
+    with pytest.raises(SEOActionHeld,match="EXCEEDS_AUTHORITY"):
+        build_seo_action_lifecycle(w,d,ops_sales=forged,observed_at=NOW)
