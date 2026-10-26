@@ -214,6 +214,46 @@ export function getSeoDepartmentReview() {
 }
 
 
+/** Existing, fixed-five-URL GSC indexed VERSION (not a live-URL test). */
+export type OwnedGoogleIndexedVersionRow = {
+  url: string;
+  index_status_reported: true;
+  verdict: string | null;
+  coverageState: string | null;
+  robotsTxtState: string | null;
+  indexingState: string | null;
+  pageFetchState: string | null;
+  googleCanonical: string | null;
+  userCanonical: string | null;
+  lastCrawlTime: string | null;
+  google_indexed_version_only: true;
+  live_url_test_performed: false;
+};
+export type OwnedGoogleIndexedVersion = {
+  schema_version: "empire.search.owned_gsc_index_inspection.v1";
+  status: "INDEXED_VERSION_INSPECTION_RECORDED";
+  mode: "OBSERVE";
+  site: "sc-domain:empire-ai.co.uk";
+  observed_at: string;
+  count: 5;
+  items: OwnedGoogleIndexedVersionRow[];
+  google_live_test_performed: false;
+  full_site_indexation_verified: false;
+  google_indexing_request_sent: false;
+  production_database_writes: false;
+  website_changed: false;
+  outbound_sent: false;
+  execution_authority: "none";
+};
+
+/** Server-side only, same loopback Search Intelligence owner, 6h provider cache. */
+export function getSeoGoogleIndexedVersion() {
+  return request<OwnedGoogleIndexedVersion>(
+    "/v1/search/search-console/indexed-version/fixed",
+  );
+}
+
+
 // Existing private Search Intelligence Quora editorial review: research only.
 export type QuoraReviewTopic = {
   item_id: string;
