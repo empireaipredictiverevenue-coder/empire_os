@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { readdir, readFile, lstat } from "node:fs/promises";
 import path from "node:path";
 import { safeSeoFocus, safeAeoCanary, type SeoOwnerFocus, type AeoLinkCanary } from "../../../lib/seo-revenue-focus-review";
+import SEOWorkbench, { type SearchVisibility } from "./seo-workbench";
 
 export const metadata = {
   title: "SEO Operations · Empire AI",
@@ -43,6 +44,43 @@ async function load(): Promise<{ board: SEOBoard | null; reason: string | null }
     return { board, reason: null };
   } catch { return { board: null, reason: "PRIVATE_SEO_SOURCE_UNAVAILABLE" }; }
 }
+const VISIBLE_NAME = /^seo-visibility-\d{4}-\d{2}-\d{2}\.json$/;
+
+async function loadVisibility(): Promise<{ evidence: SearchVisibility | null; reason: string | null }> {
+  try {
+    const files=(await readdir(ROOT)).filter(name=>VISIBLE_NAME.test(name)).sort();
+    if (!files.length) return {evidence:null,reason:"NO_PRIVATE_GSC_QUERY_PAGE_RECEIPT"};
+    const candidate=path.join(ROOT,files[files.length-1]);
+    const st=await lstat(candidate);
+    if (!st.isFile()||st.isSymbolicLink()||st.size>150000)
+      return {evidence:null,reason:"UNTRUSTED_GSC_RECEIPT_FILE"};
+    const d=JSON.parse(await readFile(candidate,"utf8")) as SearchVisibility;
+    const sample=d?.current_sample;
+    const prior=d?.previous_sample;
+    if (d.schema_version!=="empire.search.original_gsc_visibility_overlap.v1" ||
+        d.status!=="REAL_GSC_QUERY_PAGE_VISIBILITY_OBSERVED" ||
+        d.source!=="google_search_console" || d.site_url!=="sc-domain:empire-ai.co.uk" ||
+        d.competitor_rankings_verified!==false || d.entire_site_traffic_coverage_verified!==false ||
+        d.verified_revenue!==null ||
+        !Array.isArray(d.current_window)||d.current_window.length!==2 ||
+        !Array.isArray(d.previous_window)||d.previous_window.length!==2 ||
+        !Array.isArray(d.queries)||d.queries.length>250 ||
+        !sample||!prior||
+        !Number.isInteger(sample.visible_query_page_impressions)||
+        !Number.isInteger(prior.visible_query_page_impressions)||
+        !Number.isInteger(sample.visible_query_page_clicks)||
+        !Number.isInteger(d.observed_queries)||d.observed_queries!==d.queries.length ||
+        d.queries.some(q => typeof q.query!=="string"||q.query.length>230 ||
+          typeof q.historical_sample_status!=="string" ||
+          !Array.isArray(q.current_observed_exact_pages)||q.current_observed_exact_pages.length>30 ||
+          typeof q.current.visible_clicks!=="number"&&q.current.visible_clicks!==null ||
+          typeof q.current.visible_impressions!=="number"&&q.current.visible_impressions!==null ||
+          typeof q.next_original_owner_action!=="string"))
+      return {evidence:null,reason:"UNTRUSTED_GSC_QUERY_PAGE_SCHEMA"};
+    return {evidence:d,reason:null};
+  } catch { return {evidence:null,reason:"PRIVATE_GSC_VISIBILITY_SOURCE_UNAVAILABLE"}; }
+}
+
 function safePage(url: string): string | null {
   try {
     const p = new URL(url);
@@ -59,7 +97,7 @@ function tone(state: string) {
 }
 export default async function SEOOperationsPage() {
   await connection();
-  const { board, reason } = await load();
+  const [{ board, reason },{ evidence:visibility, reason:visibilityReason }] = await Promise.all([load(), loadVisibility()]);
   const focusReview = safeSeoFocus(board?.revenue_first_original_owner_focus, {
     observed_at: board?.observed_at,
   });
@@ -77,19 +115,15 @@ export default async function SEOOperationsPage() {
         </div>
         <span className="rounded-full border border-sky-400/25 bg-sky-400/10 px-4 py-2 text-xs font-semibold text-sky-200">Daily original owner · Read-only execution</span>
       </header>
+      <SEOWorkbench visibility={visibility} visibilityReason={visibilityReason}
+        jobs={board?.actions ?? []} resolved={board?.resolved_existing_owner_actions ?? 0}
+        liveChecks={board?.read_only_technical_tests_executed ?? 0}
+        recordedAt={board?.observed_at ?? null} />
       {!board ? <section className="mt-8 rounded-xl border border-amber-400/20 p-6">
         <h2 className="font-semibold">Private SEO evidence unavailable</h2>
         <p className="mt-2 text-sm text-slate-400">No trusted lifecycle receipt. No state is inferred.</p>
         <p className="mt-3 font-mono text-xs text-amber-200">{reason}</p>
       </section> : <>
-        <div className="mt-7 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {([["Original actions",board.original_action_count],["Live tests",board.read_only_technical_tests_executed],
-             ["Verified / resolved",board.resolved_existing_owner_actions],["Measured revenue","Not verified"]] as const).map(([label,val])=>
-            <div key={label} className="rounded-xl border border-white/10 bg-white/[0.025] p-5">
-              <p className="text-xs uppercase tracking-wider text-slate-400">{label}</p>
-              <p className="mt-3 text-2xl font-semibold tabular-nums">{val}</p>
-            </div>)}
-        </div>
         <section className="mt-7 rounded-xl border border-sky-400/20 bg-[#091426] p-5">
           <h2 className="text-lg font-semibold">Revenue-first operating focus</h2>
           <p className="mt-2 text-xs text-slate-400">Original Google URL Inspection and canonical Ops Control evidence only. Sitewide enquiries are not attributed to SEO.</p>
