@@ -1,0 +1,27 @@
+{
+  "actual_revenue_verified": false,
+  "added_new_hashed_static_assets": 8,
+  "approval_scope": "ASTRA_ORIGINAL_WEBSITE_OWNER_REVIEW_OF_THIS_EXACT_CANDIDATE_ONLY",
+  "buyer_data_created": false,
+  "candidate_file_count": 670,
+  "candidate_inventory_sha256": "2d37c7537329914fcecf531b34ff6fbeec42413da7dd42f5d5e4174f1411742b",
+  "database_writes_authorized": false,
+  "decision": "FOUNDER_APPROVES_EXACT_REVISED_662_TO_670_PAYLOAD_FOR_ASTRA_REVIEW",
+  "founder_approval_source": "USER_EXPLICIT_FOUNDER_APPROVAL_IN_CURRENT_CHAT_20261026",
+  "founder_direct_quote": "yes i approve",
+  "immediate_publication_authorized": false,
+  "independent_astra_owner_approval_verified": false,
+  "original_website_release_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+  "outbound_or_payment_authorized": false,
+  "previous_672_file_approval_reused": false,
+  "publication_performed": false,
+  "recorded_at_utc": "2026-10-26T18:31:56.826913+00:00",
+  "replaced_existing_files": [
+    "predictive-revenue.html",
+    "predictive-revenue.txt"
+  ],
+  "root_protected_rollback_verified": false,
+  "schema_version": "empire.website.saas670_founder_exact_approval.v1",
+  "source_live_file_count": 662,
+  "source_live_inventory_sha256": "e894e2a9134ad13c6612f886c59b54da72b9c4791947dd0429e912723f0cdaa9"
+}

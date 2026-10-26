@@ -21,7 +21,8 @@ def test_existing_real_release_held_exact_missing_evidence(capsys):
     assert x["gates"]["exact_source_and_670_candidate_pinned"] is True
     assert x["gates"]["isolated_browser_hydration_and_consent_passed"] is True
     assert x["gates"]["current_scope_exact_two_route_eight_assets"] is True
-    assert x["gates"]["revised_exact_payload_founder_approval_verified"] is False
+    # Explicit approval was received for the immutable 670-file hash on 26 Oct.
+    assert x["gates"]["revised_exact_payload_founder_approval_verified"] is True
     assert x["gates"]["root_owned_662_member_backup_verified"] is False
     assert x["gates"]["original_astra_owner_exact_receipt_verified"] is False
     assert x["publication_performed"] is False

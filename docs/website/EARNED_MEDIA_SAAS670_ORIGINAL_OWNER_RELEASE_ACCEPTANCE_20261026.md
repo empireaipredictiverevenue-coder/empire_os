@@ -51,3 +51,22 @@ Even if all receipt gates eventually verify, **this preflight does NOT perform p
 - Existing owner issue: https://github.com/empireaipredictiverevenue-coder/empire_os/issues/103.
 
 **Commercial conversion remains unverified:** A source-hint query string is not validated buyer identity, CRM delivery or realised revenue. We will attribute real enquiries only after authentic buyer consent and tenant-authorised CRM evidence.
+
+
+## 26 October — founder explicitly approved revised 670-file candidate for ASTRA review
+
+The founder directly answered **“yes i approve”** after being shown the exact revised candidate inventory SHA-256 `2d37c7537329914fcecf531b34ff6fbeec42413da7dd42f5d5e4174f1411742b` and explicitly asked whether to approve it **for ASTRA's final review, not immediate publication**.
+
+That approval has been recorded at the original EmpireOS founder evidence path:
+
+`/srv/empire_os/docs/website/release_candidates/SAAS670_FOUNDER_EXACT_APPROVAL_20261026.json`
+
+The byte-identical source receipt is also preserved in the isolated worktree under `docs/website/release_candidates/SAAS670_FOUNDER_EXACT_APPROVAL_20261026.json`. Its SHA-256 is `835643ec77a5170b2906f97db8bcf0ad4f94745e1fa0183d371b86df8ca6e4c7`.
+
+Before recording, the script verified that the original **662-file live index** still equalled `e894e2a9134ad13c6612f886c59b54da72b9c4791947dd0429e912723f0cdaa9` and that the private **670-file candidate index** still equalled the founder-approved hash. The user-approved scope is only `ASTRA_ORIGINAL_WEBSITE_OWNER_REVIEW_OF_THIS_EXACT_CANDIDATE_ONLY`. No approval for direct publication, root privileges, new payment rails, outbound or buyer data was inferred.
+
+The original owner read-only preflight was then re-executed. **Founder exact-payload verification is now PASS**. Remaining held gates are the independent root-owned 662-member production rollback and the original ASTRA owner approval/visual/consent review. The original 672-file publisher is still incompatible with the revised package. No release has been launched.
+
+Recording script: `scripts/record_earned_media_saas670_founder_review_approval_20261026.py` uses exact hash checks and exclusive file creation (cannot silently replace any existing founder receipt). Tests reject a changed candidate, superseded approval, and duplicate or overridden source evidence. Updated current machine preflight receipt: `docs/website/release_candidates/EARNED_MEDIA_SAAS670_OWNER_PREFLIGHT_20261026.json`.
+
+**ASTRA next action:** take ownership of the remaining independent root backup and original release-owner acceptance. Do not construe the founder-approved review receipt as the final go-live authorisation.
