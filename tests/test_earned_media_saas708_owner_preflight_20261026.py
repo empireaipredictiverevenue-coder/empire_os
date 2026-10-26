@@ -25,6 +25,9 @@ def test_exact_founder_approved_release_has_two_external_holds(capsys):
     assert result["gates"]["explicit_708_founder_review_approval"] is True
     assert result["gates"]["isolated_real_browser_cta_consent"] is True
     assert result["gates"]["original_owner_root_700_member_backup"] is False
+    assert result["root_backup_evidence_visibility"] == (
+        "PROTECTED_DIR_UNREADABLE_TO_CURRENT_OPERATOR"
+    )
     assert result["gates"]["independent_original_astra_owner_release_approval"] is False
     assert result["publisher_invoked"] is False
     assert result["website_modified"] is False

@@ -9,6 +9,7 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 import json
+import os
 import stat
 import tarfile
 
@@ -201,6 +202,12 @@ def review(*,
         "candidate_inventory_sha256": CANDIDATE_SHA,
         "founder_receipt_sha256": FOUNDER_SHA,
         "protected_root_backup_sha256": backup_sha if backup_ok else None,
+        "root_backup_evidence_visibility": (
+            "ROOT_ARCHIVE_CONTENT_VERIFIED" if backup_ok else
+            "PROTECTED_DIR_UNREADABLE_TO_CURRENT_OPERATOR"
+            if (root_dir.is_dir() and not os.access(root_dir, os.R_OK | os.X_OK))
+            else "PROTECTED_BACKUP_NOT_VERIFIED"
+        ),
         "original_old_publisher_672_not_applicable": True,
         "production_publication_authorized_by_preflight": False,
         "root_backup_created_by_preflight": False,
