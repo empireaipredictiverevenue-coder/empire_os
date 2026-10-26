@@ -498,8 +498,29 @@ def run_historical_backfill_batch(*, offset: int, limit: int = 10) -> dict[str, 
         page["candidate_rows"],
         schema_version="empire.qualification_historical_backfill.v1",
     )
+    # Aggregates only: prospect IDs, contacts and extracted URLs remain out
+    # of the historical-backfill service report.
+    tier_counts: dict[str, int] = {}
+    evidence_floor_met = 0
+    for row in result.get("results") or []:
+        tier = str(row.get("tier") or "unknown").strip().lower()
+        if tier not in {"hot", "warm", "cold", "dead"}:
+            tier = "unknown"
+        tier_counts[tier] = tier_counts.get(tier, 0) + 1
+        try:
+            confidence = float(row.get("evidence_confidence") or 0)
+        except (TypeError, ValueError):
+            confidence = 0.0
+        if tier in {"hot", "warm"} and confidence >= MIN_DECISION_CONFIDENCE:
+            evidence_floor_met += 1
     return {
         "schema_version": result["schema_version"],
+        "tier_counts": dict(sorted(tier_counts.items())),
+        "hot_warm_above_evidence_floor": evidence_floor_met,
+        "input_website_fields_present_unverified": sum(
+            bool(str(row.get("website") or "").strip())
+            for row in page["candidate_rows"]
+        ),
         "ok": result["ok"],
         "attempted": result["attempted"],
         "qualified": result["qualified"],

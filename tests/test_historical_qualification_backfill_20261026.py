@@ -139,3 +139,38 @@ def test_worker_historical_backfill_uses_existing_scoring_and_redacts_ids(monkey
     assert result["cursor_may_advance"] is True
     assert "secret-person-1" not in json.dumps(result)
     assert result["outbound_authorized"] is False
+
+
+def test_backfill_reports_aggregate_evidence_and_tiers_without_identity_leak(monkeypatch):
+    from empire_os import qualification_worker_v2 as worker
+
+    class Repo:
+        def fetch_historical_pending_page(self, **kwargs):
+            return {
+                "candidate_rows": [
+                    {"id": "secret-p1", "website": "https://private.example"},
+                    {"id": "secret-p2", "website": ""},
+                    {"id": "secret-p3", "website": "https://other.example"},
+                ],
+                "scanned_rows": 5,
+                "next_offset": 25,
+                "archive_exhausted": False,
+            }
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+    monkeypatch.setattr(worker, "_run_prospects", lambda prospects, *, schema_version: {
+        "schema_version": schema_version, "ok": True, "attempted": 3,
+        "qualified": 3, "failed": 0, "identity_resolved": 0,
+        "results": [
+            {"prospect_id": "secret-p1", "tier": "hot", "evidence_confidence": .8},
+            {"prospect_id": "secret-p2", "tier": "warm", "evidence_confidence": .2},
+            {"prospect_id": "secret-p3", "tier": "dead", "evidence_confidence": .0},
+        ],
+    })
+    report = worker.run_historical_backfill_batch(offset=20, limit=3)
+    assert report["tier_counts"] == {"dead": 1, "hot": 1, "warm": 1}
+    assert report["hot_warm_above_evidence_floor"] == 1
+    assert report["input_website_fields_present_unverified"] == 2
+    assert report["proposed_next_offset"] == 25
+    assert "secret-p" not in json.dumps(report)
+    assert "private.example" not in json.dumps(report)
+    assert report["outbound_authorized"] is False
