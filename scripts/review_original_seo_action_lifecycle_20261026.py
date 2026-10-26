@@ -287,6 +287,20 @@ def build_run(*, observed: datetime | None=None, get=None, previous: dict | None
                 item["next_action"]="REVIEW_SOURCE_EVIDENCE_BEFORE_FURTHER_PUBLICATION"
         elif outcome.get("status") == "TESTED_READ_ONLY_NO_MUTATION":
             item["next_action"]="INVESTIGATE_FAILED_LIVE_TECHNICAL_CHECK"
+    # Read-only existing sales canary: catches later webpage rebuilds that
+    # break the three exact deployed source-tagged commercial entry routes.
+    # Independent canary failure must NOT rewrite or fail the original daily
+    # indexed-version receipt or imply no customers visited.
+    try:
+        from scripts.probe_first_party_sales_http_readonly import inspect_aeo_claim_handoff
+        result["aeo_source_handoff_canary"] = inspect_aeo_claim_handoff()
+    except Exception:
+        result["aeo_source_handoff_canary"] = {
+            "status": "HELD",
+            "reason_code": "ORIGINAL_GET_ONLY_AEO_CANARY_UNAVAILABLE",
+            "database_writes": False, "outbound_sent": False,
+            "submitted_enquiries_verified": False,
+        }
     result["state_counts"]={name:sum(i["state"]==name for i in result["actions"])
                             for name in result["lifecycle_states"]}
     result["milestone_reached_counts"]={

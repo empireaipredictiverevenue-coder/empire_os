@@ -12,6 +12,7 @@ import json
 import re
 from html.parser import HTMLParser
 from typing import Callable
+from urllib.parse import quote
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, build_opener, HTTPRedirectHandler
 
@@ -161,6 +162,102 @@ def inspect(fetch: Callable[[str, int], tuple[int, str, bytes]] = fetch_local_ge
     except Exception:
         report["reason_code"] = "UNEXPECTED_READONLY_CANARY_FAILURE"
     return report
+
+
+# Existing founder-approved 3 AEO routes, never a general redirect or a
+# browser-origin attribution proof. All requests use existing local GET reader.
+AEO_APPROVED_ROUTES = (
+    "/aeo/general_contractor/NYC/",
+    "/aeo/hvac/DFW/",
+    "/aeo/roofing/DFW/",
+)
+
+
+class AeoPublishedLinks(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.links: list[str] = []
+        self.canonicals: list[str] = []
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        if tag == "a" and isinstance(a.get("href"), str):
+            self.links.append(a["href"])
+        if tag == "link" and a.get("rel") == "canonical":
+            self.canonicals.append(a.get("href", ""))
+
+
+def inspect_aeo_claim_handoff(
+    fetch: Callable[[str, int], tuple[int, str, bytes]] = fetch_local_get,
+) -> dict:
+    """AEO to original Commercial client: GET-only delivery assurance.
+
+    Confirms the *deployed* current AEO links and commercial JavaScript
+    support. Does not determine referrer, create a buyer or submit an intake.
+    """
+    outcome = {
+        "schema_version": "empire.seo.aeo_source_handoff_canary.v1",
+        "status": "HELD",
+        "approved_aeo_routes": len(AEO_APPROVED_ROUTES),
+        "live_aeo_links_verified": 0,
+        "commercial_compiled_claim_support_verified": False,
+        "canonical_sales_acquisitions_checked": False,
+        "real_browser_visits_verified": False,
+        "submitted_enquiries_verified": False,
+        "organic_channel_attribution_verified": False,
+        "outbound_sent": False,
+        "database_writes": False,
+        "customer_data_read": False,
+        "website_changed": False,
+        "execution_authority": "none",
+    }
+    try:
+        for path in AEO_APPROVED_ROUTES:
+            code, content, blob = fetch(path, MAX_HTML_BYTES)
+            if code != 200 or "text/html" not in content.lower():
+                raise CanaryHeld("AEO_PUBLISHED_GUIDE_NOT_AVAILABLE")
+            parser = AeoPublishedLinks()
+            parser.feed(blob.decode("utf-8", errors="replace"))
+            expected = ("/commercial?entry=" + quote(path, safe="")
+                        + "#commercial-enquiry")
+            if parser.links.count(expected) != 1:
+                raise CanaryHeld("AEO_APPROVED_SOURCE_LINK_DRIFT")
+            if parser.canonicals != ["https://empire-ai.co.uk" + path.rstrip("/")]:
+                raise CanaryHeld("AEO_APPROVED_CANONICAL_DRIFT")
+            outcome["live_aeo_links_verified"] += 1
+
+        code, ctype, blob = fetch("/commercial", MAX_HTML_BYTES)
+        if code != 200 or "text/html" not in ctype.lower():
+            raise CanaryHeld("ORIGINAL_COMMERCIAL_PAGE_UNAVAILABLE")
+        scripts = ScriptParser()
+        scripts.feed(blob.decode("utf-8", errors="replace"))
+        matching = sorted(set(
+            path for path in scripts.srcs
+            if re.fullmatch(
+                r"/_next/static/chunks/app/commercial/page-[a-zA-Z0-9._-]+\.js",
+                path
+            )
+        ))
+        if len(matching) != 1:
+            raise CanaryHeld("ORIGINAL_COMMERCIAL_CLIENT_CHUNK_NOT_EXACT")
+        js_code, js_type, js_content = fetch(matching[0], MAX_JS_BYTES)
+        if js_code != 200 or not any(
+            x in js_type.lower() for x in
+            ("javascript", "text/plain", "application/octet-stream")
+        ):
+            raise CanaryHeld("ORIGINAL_COMMERCIAL_COMPILED_JS_UNAVAILABLE")
+        for path in AEO_APPROVED_ROUTES:
+            if path.encode("ascii") not in js_content:
+                raise CanaryHeld("ORIGINAL_COMMERCIAL_AEO_SOURCE_ALLOWLIST_DRIFT")
+        if b"/v1/checkout/commercial/interests" not in js_content:
+            raise CanaryHeld("ORIGINAL_COMMERCIAL_ENQUIRY_ACTION_DRIFT")
+        outcome["commercial_compiled_claim_support_verified"] = True
+        outcome["status"] = "THREE_AEO_TO_COMMERCIAL_SOURCE_LINKS_GET_VERIFIED"
+    except CanaryHeld as exc:
+        outcome["reason_code"] = str(exc)
+    except Exception:
+        outcome["reason_code"] = "AEO_HANDOFF_GET_SOURCE_UNAVAILABLE"
+    return outcome
 
 
 # These paths are the canonical existing private CRM pilot, not the public
