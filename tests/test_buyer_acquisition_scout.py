@@ -108,13 +108,34 @@ def test_scout_discovers_evidence_without_creating_verified_buyer(monkeypatch):
         },
     )
 
+    scoped_plan = plan()
+    scoped_plan["demand_gap_queue"] = [{
+        "corridor_key": scoped_plan["priority_targets"][0]["corridor_key"],
+        "overflow_count": 4, "buyer_hunt_required": True,
+    }]
     result = run_buyer_scout(
-        plan(),
+        scoped_plan,
         max_queries=10,
         max_domains=10,
         max_probes=10,
     )
 
+    assert result["search_query_domain_coverage"]["queries_with_eligible_domains"] == 4
+    assert result["search_query_domain_coverage"]["state"] == "PARTIAL_OR_HEALTHY_ELIGIBLE_SEARCH_YIELD"
+    assert result["overflow_buyer_research_query_count"] == 2
+    assert result["overflow_research_candidate_count"] == 1
+    assert result["overflow_research_first_party_direct_buyer_count"] == 1
+    assert result["overflow_research_verified_budget_count"] == 0
+    receipt = result["overflow_market_research_receipts"][0]
+    assert receipt["selected_buyer_queries"] == 1
+    assert receipt["queries_with_eligible_domains"] == 1
+    assert receipt["eligible_search_domains"] == 1
+    assert receipt["selected_probe_domains"] == 1
+    assert receipt["first_party_candidates"] == 1
+    assert receipt["first_party_direct_purchase_claim_candidates"] == 1
+    assert receipt["verified_budget_candidates"] == 0
+    assert receipt["state"] == "FIRST_PARTY_BUYER_CLAIM_TERMS_AND_CAPACITY_UNVERIFIED"
+    assert receipt["outbound_authorized"] is False
     assert result["candidate_count"] == 1
     assert result["buyer_relationship_counts"] == {"direct_inventory_buyer": 1}
     assert result["observed_first_party_buyer_claim_receipt_count"] == 1
@@ -563,6 +584,16 @@ def test_public_research_seed_does_not_overwrite_query_accounting(monkeypatch):
     )
     assert result["query_count"] == 4
     assert len(result["queries"]) == 4
+    assert result["search_query_domain_coverage"] == {
+        "state": "NO_ELIGIBLE_SEARCH_RESULTS",
+        "distinct_queries_submitted": 4,
+        "queries_with_eligible_domains": 0,
+        "eligible_domain_count": 0,
+        "fallback_seeds_are_not_search_results": True,
+        "buyer_capacity_inferred": False,
+    }
+    assert result["public_research_seed_domain_count"] == 1
+    assert result["verified_budget_candidate_count"] == 0
 
 
 def test_official_publisher_programmes_get_bounded_fair_probing_without_authority(

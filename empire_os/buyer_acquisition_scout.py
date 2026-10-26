@@ -529,6 +529,29 @@ def run_buyer_scout(
                 ),
             })
 
+    # Record the real query-stage yield separately from curated/official
+    # fallback seeds. A first-party seed is not a search result or buyer.
+    observed_search_queries = {
+        item["query"] for item in queries
+        if any(
+            _host(url) and not is_do_not_pursue_domain(_host(url))
+            and _host(url) not in NON_PROSPECT_DISCOVERY_HOSTS
+            for url in domain_map.get(item["query"], [])
+        )
+    }
+    search_query_count = len(query_text)
+    with_search_domains = len(observed_search_queries)
+    if not search_enabled:
+        search_yield_state = "SEARCH_DISABLED"
+    elif not search_query_count:
+        search_yield_state = "NO_RESEARCH_QUERIES"
+    elif with_search_domains == 0:
+        search_yield_state = "NO_ELIGIBLE_SEARCH_RESULTS"
+    elif with_search_domains * 4 <= search_query_count:
+        search_yield_state = "LOW_ELIGIBLE_SEARCH_YIELD"
+    else:
+        search_yield_state = "PARTIAL_OR_HEALTHY_ELIGIBLE_SEARCH_YIELD"
+
     primary_search_domains = set(provenance)
     search_domain_count = len(primary_search_domains)
     search_has_domains = search_domain_count > 0
@@ -1325,6 +1348,69 @@ def run_buyer_scout(
         if any(c in researched_overflow_corridors
                for c in (item.get("target_corridor_keys") or []))
     ]
+    overflow_market_receipts: list[dict[str, Any]] = []
+    for gap in (gap_rows[:12] if isinstance(gap_rows, list) else []):
+        if (not isinstance(gap, Mapping)
+                or gap.get("buyer_hunt_required") is not True
+                or type(gap.get("overflow_count")) is not int
+                or gap["overflow_count"] <= 0):
+            continue
+        key = str(gap.get("corridor_key") or "")
+        if not key:
+            continue
+        scoped_queries = [
+            item for item in queries
+            if item["target_kind"] == "corridor"
+            and item.get("corridor_key") == key
+            and item.get("buyer_pool") == "direct_demand_buyers"
+        ]
+        discovered_domains = {
+            _host(url) for item in scoped_queries
+            for url in domain_map.get(item["query"], [])
+            if _host(url) in primary_search_domains
+            and any(v.get("corridor_key") == key and v.get("query") == item["query"]
+                    for v in provenance.get(_host(url), []))
+        }
+        candidate_rows = [
+            item for item in candidates
+            if key in (item.get("target_corridor_keys") or [])
+        ]
+        scoped_probes = [
+            host for host in probe_domains
+            if any(entry.get("corridor_key") == key and entry.get("query") in {
+                q["query"] for q in scoped_queries
+            } for entry in provenance.get(host, []))
+        ]
+        overflow_market_receipts.append({
+            "corridor_key": key,
+            "observed_overflow_at_planning": gap["overflow_count"],
+            "selected_buyer_queries": len(scoped_queries),
+            "queries_with_eligible_domains": sum(
+                item["query"] in observed_search_queries
+                for item in scoped_queries
+            ),
+            "eligible_search_domains": len(discovered_domains),
+            "selected_probe_domains": len(scoped_probes),
+            "first_party_candidates": len(candidate_rows),
+            "first_party_direct_purchase_claim_candidates": sum(
+                row.get("explicit_direct_buyer_evidence") is True
+                for row in candidate_rows
+            ),
+            "verified_budget_candidates": sum(
+                row.get("budget_verified") is True for row in candidate_rows
+            ),
+            "state": (
+                "NO_BOUNDED_QUERY_SLOT" if not scoped_queries
+                else "QUERY_NO_ELIGIBLE_DOMAIN" if not discovered_domains
+                else "SEARCH_DOMAIN_NOT_FIRST_PARTY_CANDIDATE"
+                     if not candidate_rows
+                else "FIRST_PARTY_BUYER_CLAIM_TERMS_AND_CAPACITY_UNVERIFIED"
+                     if any(row.get("explicit_direct_buyer_evidence") is True
+                            for row in candidate_rows)
+                else "FIRST_PARTY_RESEARCH_CANDIDATE_NOT_BUYER_PROOF"
+            ),
+            "outbound_authorized": False,
+        })
     candidates.sort(
         key=lambda row: (
             -int(row["direct_buyer_score"]),
@@ -1342,6 +1428,15 @@ def run_buyer_scout(
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "query_count": len(queries),
+        "search_query_domain_coverage": {
+            "state": search_yield_state,
+            "distinct_queries_submitted": search_query_count,
+            "queries_with_eligible_domains": with_search_domains,
+            "eligible_domain_count": search_domain_count,
+            "fallback_seeds_are_not_search_results": True,
+            "buyer_capacity_inferred": False,
+        },
+        "overflow_market_research_receipts": overflow_market_receipts,
         "overflow_buyer_research_query_count": sum(
             item["target_kind"] == "corridor"
             and item.get("corridor_key") in {
