@@ -10,6 +10,10 @@ import json
 from pathlib import Path
 
 from empire_os.heat_pump_market_expansion import run as market_review
+from empire_os.buyer_network_contact_history_gate import (
+    load_context as load_original_contact_context,
+    review as review_original_contact_history,
+)
 
 SCHEMA = "empire.buyer_network.heat_pump_founder_commercial_review.v1"
 SCOUT = Path("runtime/buyer_acquisition/scout_latest.json")
@@ -200,8 +204,41 @@ def review(root: Path, *, now: datetime|None=None) -> dict:
     # Do not promote a Gmail DRAFT to a sent/accepted relationship.
     # A later Gmail state change requires a separate provider readback.
     draft_history = read_prepared_draft_receipts(root, now=now)
+    contact_root = root / "runtime/buyer_network_intelligence"
+    original_contacts = load_original_contact_context(
+        registry_path=contact_root / "commercial_relationship_registry_latest.json",
+        external_path=contact_root / "founder_reported_external_contacts_latest.json",
+        workspace_path=contact_root / "workspace_sent_domain_receipts_latest.json",
+        founder_review_path=contact_root / "multiformat_publisher_founder_review_latest.json",
+    )
     for row in rows:
         row["workspace_draft_preparation"] = draft_history.get(row["domain"])
+        contact = review_original_contact_history(row["domain"], original_contacts)
+        row["original_contact_history_state"] = contact["state"]
+        row["original_contact_history_action"] = contact["next_action"]
+        row["workspace_sent_metadata_observed"] = (
+            contact["workspace_sent_metadata_observed"]
+        )
+        row["workspace_sent_last_at"] = (
+            contact["last_outbound_at"]
+            if contact["workspace_sent_metadata_observed"] else None
+        )
+        # Historical draft creation cannot negate later authenticated SENT
+        # metadata. Sending does not establish delivery or buyer acceptance.
+        if row["workspace_sent_metadata_observed"]:
+            row["current_email_status"] = (
+                "WORKSPACE_SENT_OBSERVED_NOT_DELIVERY_OR_ACCEPTANCE"
+            )
+            if row["priority"] != "HOLD":
+                row["founder_next_action"] = (
+                    "WAIT_FOR_WORKSPACE_REPLY_NO_DUPLICATE_FIRST_TOUCH"
+                )
+        elif row["workspace_draft_preparation"] is not None:
+            row["current_email_status"] = (
+                "PRIOR_DRAFT_CREATION_ONLY_REVERIFY_BEFORE_ANY_SEND"
+            )
+        else:
+            row["current_email_status"] = "NO_EXACT_WORKSPACE_SEND_OBSERVED"
     lane_order={"A_PARTNER_TERMS_REVIEW":0,"B_INSTALLER_BUYBOX_REVIEW":1,
                 "C_INSTALLER_PARTNER_NETWORK_REVIEW":2,
                 "D_SUPPLY_EXCHANGE_ONLY_REVIEW":3,"HOLD":4}
@@ -224,6 +261,9 @@ def review(root: Path, *, now: datetime|None=None) -> dict:
         "founder_prioritized_count":len(top),
         "historical_gmail_draft_preparations":sum(
             x["workspace_draft_preparation"] is not None for x in rows),
+        "workspace_sent_company_count":sum(
+            x["workspace_sent_metadata_observed"] is True for x in rows),
+        "workspace_sent_is_not_delivery_or_buyer_acceptance":True,
         "draft_creation_not_equivalent_to_contact":True,
         "founder_prioritized":top,
         "research_inventory":rows,

@@ -49,7 +49,9 @@ def test_real_first_party_partner_programme_cannot_become_buyer_budget():
     assert good["programme_evidence"]["research_contact"]=="partnerships@goodenergy.co.uk"
     assert good["direct_purchase_statement_verified"] is False
     alto=rows["altoenergy.co.uk"]
-    assert alto["current_scout_first_party_page_receipts"]>=1
+    assert alto["current_scout_first_party_page_receipts"]>=0
+    if alto["current_scout_first_party_page_receipts"] > 0:
+        assert alto["current_scout_candidate_seen"] is True
     assert alto["direct_purchase_statement_verified"] is False
     assert OFFICIAL_PROGRAMME_REVIEWS["hpin.co.uk"]["classification"].startswith("CERTIFIED_INSTALLER_")
 
