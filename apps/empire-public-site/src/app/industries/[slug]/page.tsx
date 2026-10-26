@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import IndustryIntelligencePage from "@/components/IndustryIntelligencePage";
+import SolarIntelligenceExperience from "@/components/SolarIntelligenceExperience";
 import { getIndustryPage, industryPages } from "@/lib/industry-pages";
 
 export function generateStaticParams() {
@@ -26,9 +27,9 @@ export async function generateMetadata({
         "Explore roofing demand, eligible service areas, first-party enquiry quality and how buyers define payable calls. Evidence-first commercial intelligence.",
     },
     solar: {
-      title: "Solar Demand & Referral Qualification | Empire AI",
+      title: "Solar Market Intelligence & Installer Demand | Empire AI",
       description:
-        "Understand solar demand, installer coverage, qualified enquiries and the difference between organic clicks, accepted leads and paid referrals.",
+        "Explore solar market intelligence: territory demand, property and permit signals, installer coverage and buyer qualification for evidence-led commercial decisions.",
     },
   };
   const searchCopy = buyerMetadata[page.slug];
@@ -67,5 +68,6 @@ export default async function IndustryPageRoute({
   const { slug } = await params;
   const page = getIndustryPage(slug);
   if (!page) notFound();
+  if (page.slug === "solar") return <SolarIntelligenceExperience page={page} />;
   return <IndustryIntelligencePage page={page} />;
 }
