@@ -271,8 +271,10 @@ def build_tam_revenue_portfolio(
         "execution_authority": "none",
     }
 
-def read_tam_revenue_portfolio_from_runtime(runtime_root: "str | Path") -> dict[str, Any]:
-    """Compose the three existing saved receipts; no database connection or writes."""
+def read_tam_revenue_portfolio_from_runtime(
+    runtime_root: "str | Path", *, historical_dump: "str | Path | None" = None,
+) -> dict[str, Any]:
+    """Compose existing saved receipts; optionally audit the original 33K archive."""
     import json
     from pathlib import Path
 
@@ -293,11 +295,21 @@ def read_tam_revenue_portfolio_from_runtime(runtime_root: "str | Path") -> dict[
             raise ValueError("invalid runtime receipt")
         return data
 
-    return build_tam_revenue_portfolio(
+    commercial = load("commercial_exchange/latest.json")
+    report = build_tam_revenue_portfolio(
         tam_snapshot=load("tam_market_intelligence/latest.json", required=True),
-        commercial_exchange_snapshot=load("commercial_exchange/latest.json"),
+        commercial_exchange_snapshot=commercial,
         revenue_exchange_snapshot=load("revenue_exchange/latest.json"),
     )
+    # Historical archive is deliberately optional and must not silently be
+    # interpreted as a current EmpireDB count or customer-authorized leads.
+    report["historical_prospect_cohort"] = None
+    if historical_dump is not None:
+        from empire_os.tam_historical_cohort import inspect_archive
+        report["historical_prospect_cohort"] = inspect_archive(
+            dump=Path(historical_dump), exchange=commercial,
+        )
+    return report
 
 
 def _leads_exchange_market_gaps(

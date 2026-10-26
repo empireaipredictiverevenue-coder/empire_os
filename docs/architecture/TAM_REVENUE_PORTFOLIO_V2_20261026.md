@@ -51,3 +51,13 @@ Added `leads_exchange_market_gaps` to the existing `--portfolio` output. It grou
 Readback against saved production evidence (2026-10-26): 97 distinct overflow prospects across 63 niche/metro markets, all 63 without active same-market seats; 950 of 1,057 buyer seats have no usable metro; blocker reasons 874 inactive, 156 not commercially activated and 27 test-identity held. Sector distributions: roofing 38 in 18 markets; HVAC 17 in 12; plumbing 17 in 11; landscaping 8 in 6; electrical 6 in 6; painting 6 in 5; carpentry 3 in 3; pest control 2 in 2. No buyer capacity, price or revenue is inferred. The TAM roster snapshot remains stale (from October 10) and does not provide company-population denominators.
 
 Test outcome: 105 focused TAM regression tests PASS in the isolated worktree. The separate main production branch and frontend/dashboard remain unchanged.
+
+## 26 October — historical 32,899 prospect cohort recovery
+
+The retained September 27 EmpireDB migration archive was audited locally, aggregate-only. It contains 32,899 unique prospect IDs from June–September. Their sorted ID digest exactly matches the separately verified migration evidence: `998bea32ad0fa1539e65d0ebb88b119078289db87db3ca1b06d8b9f9bc27ead2`. This proves the archived cohort identity, not the October live census.
+
+There are 4,285 historically qualified records, 3,109 with v2 scoring, 29,790 without v2, 12,301 historically identity-linked, and 20,598 without a historical active identity link. Exactly 160 archived IDs intersect today's 184 selected Commercial Exchange prospects. Historical contact-field presence does not imply current verification or outbound rights.
+
+The specific backfill defect: production v2 qualification only checks the newest `limit*4` records, so it may find zero pending while thousands of older records remain. A separate, oldest-first page selector and durable private cursor are staged in this isolated branch. The existing v2 scorer is reused, without changing the 0.50 evidence floor or buyer/outbound/payment authority. The backfill is opt-in (bounded to 25 per run) and is not enabled by the existing scheduled service.
+
+The TAM portfolio now supports an optional historical dump aggregate read, keeping the historical cohort distinct from current Exchange/Market GPS. Full production activation requires the existing Qualification owner to promote its source delta through the permitted release path, verify the first small scoring batch, and then continue measured cursor progress; the TAM owner can separately release the read-only presentation code. Neither release changes blocked buyer seats or independently unverified prices.

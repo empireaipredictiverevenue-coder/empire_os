@@ -681,14 +681,19 @@ def main() -> int:
                         help="Inspect restricted catalog capability; never read market rows.")
     parser.add_argument("--portfolio", action="store_true",
                         help="Read saved TAM and Exchange receipts only; aggregate portfolio view.")
+    parser.add_argument("--historical-dump", default=None,
+                        help="Optional retained original EmpireDB dump for aggregate-only cohort audit.")
     args = parser.parse_args()
     if sum((args.preflight, args.refresh, args.portfolio)) > 1:
         parser.error("--preflight, --refresh and --portfolio are mutually exclusive")
+    if args.historical_dump is not None and not args.portfolio:
+        parser.error("--historical-dump requires --portfolio")
 
     if args.portfolio:
         from empire_os.tam_revenue_portfolio import read_tam_revenue_portfolio_from_runtime
         result = read_tam_revenue_portfolio_from_runtime(
-            Path(args.repo_root) / "runtime"
+            Path(args.repo_root) / "runtime",
+            historical_dump=args.historical_dump,
         )
         print(json.dumps(result, sort_keys=True, indent=2))
         return 0
