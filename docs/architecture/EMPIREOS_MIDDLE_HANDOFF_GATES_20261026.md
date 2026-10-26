@@ -132,3 +132,14 @@ EmpireDB, that a matching actual revenue record exists, or that the original
 CRM owner's unreleased login attestation can pass against production.
 The SQL is held; no production database migration, role/grant, money or
 outbound authority was executed.
+
+
+### V6.1 exact event → order continuity
+If an existing `commercial_events` row references a `fulfilment_order_id`,
+the tenant-scoped held RPC now requires that exact order to reference the
+**same** GTM opportunity, source prospect, canonical business entity **and**
+tenant-owned buyer. An event tied to another tenant's order fails even if
+the underlying company is shared. An event with no order reference can
+still qualify as a pre-order event **only if it already has a named buyer
+owned by the authenticated tenant**. Disposable PostgreSQL fixture tests
+exercise both the mismatched and correctly matched order case.

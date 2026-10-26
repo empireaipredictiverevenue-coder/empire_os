@@ -26,7 +26,7 @@ CREATE TABLE public.gtm_opportunities (id uuid PRIMARY KEY);
 CREATE TABLE public.buyers (id uuid PRIMARY KEY,org_id uuid NOT NULL);
 CREATE TABLE public.commercial_events (
  id uuid PRIMARY KEY,opportunity_id uuid,prospect_id uuid,
- entity_id uuid,buyer_id uuid
+ entity_id uuid,buyer_id uuid,fulfilment_order_id uuid
 );
 CREATE TABLE public.fulfilment_orders (
  id uuid PRIMARY KEY,opportunity_id uuid,prospect_id uuid,
@@ -84,7 +84,7 @@ INSERT INTO public.buyers VALUES
   '00000000-0000-0000-0000-0000000000a1'),
  ('00000000-0000-0000-0000-0000000000b2',
   '00000000-0000-0000-0000-0000000000b1');
-INSERT INTO public.commercial_events VALUES
+INSERT INTO public.commercial_events (id,opportunity_id,prospect_id,entity_id,buyer_id) VALUES
  ('00000000-0000-0000-0000-0000000000a3',
   '00000000-0000-0000-0000-000000000003',
   '00000000-0000-0000-0000-000000000001',

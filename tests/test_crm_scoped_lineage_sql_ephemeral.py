@@ -199,3 +199,23 @@ def test_reader_role_without_trusted_session_tenant_receives_nothing(pg):
         result,_=run(query("crm_fixture_unbound",receipt),
                      username="crm_fixture_unbound")
         assert "00000000-0000-0000-0000-000000000002" not in result
+
+
+def test_event_order_link_must_match_same_buyer_and_source_identity(pg):
+    run=pg
+    before,_=run(query("crm_fixture_a",EA),username="crm_fixture_a")
+    assert EA in before
+    try:
+        # A's event references B's order on the shared company. A must NOT
+        # receive a purported continuous handoff from inconsistent receipts.
+        run(f"""UPDATE public.commercial_events
+          SET fulfilment_order_id='{OB}'::uuid WHERE id='{EA}'::uuid;""")
+        invalid,_=run(query("crm_fixture_a",EA),username="crm_fixture_a")
+        assert EA not in invalid
+        run(f"""UPDATE public.commercial_events
+          SET fulfilment_order_id='{OA}'::uuid WHERE id='{EA}'::uuid;""")
+        valid,_=run(query("crm_fixture_a",EA),username="crm_fixture_a")
+        assert EA in valid
+    finally:
+        run(f"""UPDATE public.commercial_events
+            SET fulfilment_order_id=NULL WHERE id='{EA}'::uuid;""")

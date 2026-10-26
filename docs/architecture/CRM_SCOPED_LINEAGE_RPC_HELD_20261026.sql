@@ -103,6 +103,14 @@ WHERE p_prospect IS NOT NULL AND p_opportunity IS NOT NULL
           SELECT 1 FROM public.buyers buyer
           WHERE buyer.id=e.buyer_id AND buyer.org_id=s.tenant_id
         )
+        AND (e.fulfilment_order_id IS NULL OR EXISTS (
+          SELECT 1 FROM public.fulfilment_orders linked_order
+          WHERE linked_order.id=e.fulfilment_order_id
+            AND linked_order.opportunity_id=e.opportunity_id
+            AND linked_order.prospect_id=e.prospect_id
+            AND linked_order.entity_id=e.entity_id
+            AND linked_order.buyer_id=e.buyer_id
+        ))
     ))
     OR
     (p_kind='order' AND EXISTS (
