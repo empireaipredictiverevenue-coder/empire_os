@@ -44,3 +44,10 @@ The command is read-only and requires no new credentials or database role. It do
 3. Add first-party verified company/contact/size/turnover evidence and independent government market denominators to the established TAM + CRM + exchange read contract; avoid counting establishments as unique companies.
 4. Show the aggregate view in Founder Console under the existing TAM owner in a coordinated frontend release, after tenant read authority and snapshot freshness checks.
 5. Address the commercial owners' blocked seat and pricing evidence separately. This implementation creates no buyer activation, outbound, payment or settlement authorization.
+
+## 26 October source-backed Leads Exchange market-gap extension
+Added `leads_exchange_market_gaps` to the existing `--portfolio` output. It groups qualified inventory by **exact** niche and metro only, deduplicates prospect ids within each market, and compares against already observed buyer seats in the same niche/metro. The market join is a **research signal**, never an allocation-eligibility or buyer-capacity authorization. It identifies missing geographical evidence rather than inferring territory coverage. Output includes bounded top 25 markets, complete niche summaries, source observed seat blocker reasons, and no buyer/contact names.
+
+Readback against saved production evidence (2026-10-26): 97 distinct overflow prospects across 63 niche/metro markets, all 63 without active same-market seats; 950 of 1,057 buyer seats have no usable metro; blocker reasons 874 inactive, 156 not commercially activated and 27 test-identity held. Sector distributions: roofing 38 in 18 markets; HVAC 17 in 12; plumbing 17 in 11; landscaping 8 in 6; electrical 6 in 6; painting 6 in 5; carpentry 3 in 3; pest control 2 in 2. No buyer capacity, price or revenue is inferred. The TAM roster snapshot remains stale (from October 10) and does not provide company-population denominators.
+
+Test outcome: 105 focused TAM regression tests PASS in the isolated worktree. The separate main production branch and frontend/dashboard remain unchanged.

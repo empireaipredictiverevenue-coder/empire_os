@@ -217,6 +217,7 @@ def build_tam_revenue_portfolio(
     ):
         raise ValueError("TAM unique entity count mismatch")
     exchange = _commercial_counts(commercial_exchange_snapshot)
+    exchange_market_gaps = _leads_exchange_market_gaps(commercial_exchange_snapshot)
     revenue = _revenue_counts(revenue_exchange_snapshot)
     products = []
     for product_id, label, roles in PRODUCT_LINES:
@@ -256,6 +257,7 @@ def build_tam_revenue_portfolio(
         "company_size_enrichment_count": None,
         "company_turnover_enrichment_count": None,
         "commercial_exchange": exchange,
+        "leads_exchange_market_gaps": exchange_market_gaps,
         "revenue_exchange": revenue,
         "product_line_count": len(products),
         "product_lines": products,
@@ -296,3 +298,159 @@ def read_tam_revenue_portfolio_from_runtime(runtime_root: "str | Path") -> dict[
         commercial_exchange_snapshot=load("commercial_exchange/latest.json"),
         revenue_exchange_snapshot=load("revenue_exchange/latest.json"),
     )
+
+
+def _leads_exchange_market_gaps(
+    data: Mapping[str, Any] | None,
+    *,
+    display_limit: int = 25,
+) -> dict[str, Any]:
+    """Find source-observed supply without proven active same-market buyer seats.
+
+    Niche/metro matching is only a research join: no corridor, consent, buyer
+    eligibility, delivery rights, price or actual capacity is inferred.
+    """
+    if data is None:
+        return {
+            "source_available": False, "market_count": None,
+            "overflow_market_count": None,
+            "markets_missing_active_seats": None,
+            "unscoped_buyer_seats": None,
+            "buyer_seat_activation_blockers": None,
+            "qualified_supply_missing_market_context": None,
+            "niche_summaries": [],
+            "market_assignment_counts_are_distinct_companies": False,
+            "top_markets": [],
+            "displayed_market_count": 0,
+        }
+    # _commercial_counts validates cardinalities and canonical source.
+    _commercial_counts(data)
+    inventory = _rows(data["inventory"], "commercial inventory")
+    seats = _rows(data["buyer_seats"], "commercial buyer seats")
+
+    def label(row: Mapping[str, Any], key: str) -> str:
+        return " ".join(str(row.get(key) or "").strip().casefold().split())
+
+    groups: dict[tuple[str, str], dict[str, Any]] = {}
+    missing_market_supply: set[str] = set()
+    global_scoped_supply: set[str] = set()
+    for row in inventory:
+        state = row.get("state")
+        if state not in ("allocation_candidate", "overflow_no_capacity"):
+            continue
+        pid = str(row.get("prospect_id") or "").strip()
+        niche, metro = label(row, "niche_family"), label(row, "metro")
+        if not pid or not niche or not metro:
+            if pid:
+                missing_market_supply.add(pid)
+            continue
+        global_scoped_supply.add(pid)
+        group = groups.setdefault((niche, metro), {
+            "niche": niche,
+            "metro": metro,
+            "qualified": set(),
+            "overflow": set(),
+            "same_market_buyer_seats": 0,
+            "same_market_active_buyer_seats": 0,
+            "same_market_active_capacity": 0,
+            "same_market_blocked_seats": 0,
+            "activation_blockers": Counter(),
+        })
+        group["qualified"].add(pid)
+        if state == "overflow_no_capacity":
+            group["overflow"].add(pid)
+
+    global_blockers: Counter[str] = Counter()
+    unscoped_seats = 0
+    for row in seats:
+        state = str(row.get("seat_state") or "unknown")
+        reason = str(row.get("activation_reason") or "unspecified")
+        if state != "active_capacity":
+            global_blockers[reason] += 1
+        niche, metro = label(row, "niche_family"), label(row, "metro")
+        if not niche or not metro:
+            unscoped_seats += 1
+            continue
+        group = groups.get((niche, metro))
+        if group is None:
+            continue
+        group["same_market_buyer_seats"] += 1
+        if state == "active_capacity":
+            group["same_market_active_buyer_seats"] += 1
+            group["same_market_active_capacity"] += _nonnegative(
+                row.get("remaining_capacity"), "remaining_capacity"
+            )
+        else:
+            group["same_market_blocked_seats"] += 1
+            group["activation_blockers"][reason] += 1
+
+    markets = []
+    for group in groups.values():
+        supply = len(group["qualified"])
+        overflow = len(group["overflow"])
+        active = group["same_market_active_buyer_seats"]
+        markets.append({
+            "niche": group["niche"],
+            "metro": group["metro"],
+            "qualified_inventory_prospects": supply,
+            "overflow_prospects": overflow,
+            "same_market_observed_buyer_seats": group["same_market_buyer_seats"],
+            "same_market_active_buyer_seats": active,
+            "same_market_active_capacity": group["same_market_active_capacity"],
+            "same_market_blocked_buyer_seats": group["same_market_blocked_seats"],
+            "same_market_blocker_reasons": dict(sorted(group["activation_blockers"].items())),
+            "research_priority": (
+                "OVERFLOW_NO_ACTIVE_MARKET_SEAT"
+                if overflow > 0 and active == 0
+                else "CHECK_CORRIDOR_PRICE_AND_ELIGIBILITY"
+            ),
+            "buyer_eligibility_verified": False,
+            "qualified_buyer_count": None,
+            "market_price_verified": False,
+            "outbound_authorized": False,
+        })
+    markets.sort(key=lambda m: (
+        -m["overflow_prospects"], -m["qualified_inventory_prospects"],
+        m["niche"], m["metro"],
+    ))
+    by_niche: dict[str, dict[str, Any]] = {}
+    for market in markets:
+        niche = market["niche"]
+        summary = by_niche.setdefault(niche, {
+            "niche": niche,
+            "observed_market_count": 0,
+            "overflow_prospect_market_assignments": 0,
+            "qualified_prospect_market_assignments": 0,
+            "markets_missing_active_seats": 0,
+        })
+        summary["observed_market_count"] += 1
+        summary["overflow_prospect_market_assignments"] += market["overflow_prospects"]
+        summary["qualified_prospect_market_assignments"] += market["qualified_inventory_prospects"]
+        summary["markets_missing_active_seats"] += (
+            market["research_priority"] == "OVERFLOW_NO_ACTIVE_MARKET_SEAT"
+        )
+    niche_summaries = sorted(
+        by_niche.values(),
+        key=lambda item: (-item["overflow_prospect_market_assignments"], item["niche"]),
+    )
+    return {
+        "source_available": True,
+        "market_count": len(markets),
+        "overflow_market_count": sum(m["overflow_prospects"] > 0 for m in markets),
+        "markets_missing_active_seats": sum(
+            m["overflow_prospects"] > 0 and m["same_market_active_buyer_seats"] == 0
+            for m in markets
+        ),
+        "unique_scoped_supply_prospects": len(global_scoped_supply),
+        "qualified_supply_missing_market_context": len(missing_market_supply),
+        "unscoped_buyer_seats": unscoped_seats,
+        "buyer_seat_activation_blockers": dict(sorted(global_blockers.items())),
+        "niche_summaries": niche_summaries,
+        "market_assignment_counts_are_distinct_companies": False,
+        "top_markets": markets[:display_limit],
+        "displayed_market_count": min(len(markets), display_limit),
+        "top_markets_complete": len(markets) <= display_limit,
+        "market_matching_proves_buyer_eligibility": False,
+        "mode": "OBSERVE",
+        "execution_authority": "none",
+    }

@@ -213,3 +213,104 @@ def test_saved_receipt_loader_rejects_symlink(tmp_path):
     (folder / "latest.json").symlink_to(other)
     with pytest.raises(ValueError, match="unsafe runtime receipt"):
         read_tam_revenue_portfolio_from_runtime(tmp_path)
+
+
+def test_market_gap_projections_are_scoped_and_deduplicated():
+    x = commercial()
+    x["inventory"] = [
+        {"prospect_id": "p1", "state": "overflow_no_capacity",
+         "niche_family": "roofing", "metro": "Denver, CO"},
+        {"prospect_id": "p1", "state": "allocation_candidate",
+         "niche_family": "roofing", "metro": "denver, co"},
+        {"prospect_id": "p2", "state": "blocked_missing_evidence",
+         "niche_family": "solar", "metro": "Denver, CO"},
+    ]
+    x["buyer_seats"] = [
+        {"buyer_id": "b1", "seat_state": "blocked_missing_evidence",
+         "activation_reason": "buyer_inactive",
+         "niche_family": "roofing", "metro": "denver, co",
+         "remaining_capacity": 500},
+        {"buyer_id": "b2", "seat_state": "blocked_missing_evidence",
+         "activation_reason": "buyer_not_commercially_activated",
+         "niche_family": "roofing", "metro": None,
+         "remaining_capacity": 300},
+    ]
+    gaps = result(commercial_exchange_snapshot=x)["leads_exchange_market_gaps"]
+    assert gaps["market_count"] == 1
+    assert gaps["niche_summaries"] == [{
+        "niche": "roofing",
+        "observed_market_count": 1,
+        "overflow_prospect_market_assignments": 1,
+        "qualified_prospect_market_assignments": 1,
+        "markets_missing_active_seats": 1,
+    }]
+    assert gaps["market_assignment_counts_are_distinct_companies"] is False
+    assert gaps["overflow_market_count"] == 1
+    assert gaps["markets_missing_active_seats"] == 1
+    assert gaps["unscoped_buyer_seats"] == 1
+    assert gaps["qualified_supply_missing_market_context"] == 0
+    assert gaps["buyer_seat_activation_blockers"] == {
+        "buyer_inactive": 1, "buyer_not_commercially_activated": 1,
+    }
+    top = gaps["top_markets"][0]
+    assert top["niche"] == "roofing"
+    assert top["metro"] == "denver, co"
+    assert top["qualified_inventory_prospects"] == 1
+    assert top["overflow_prospects"] == 1
+    assert top["same_market_observed_buyer_seats"] == 1
+    assert top["same_market_active_capacity"] == 0
+    assert top["qualified_buyer_count"] is None
+    assert top["market_price_verified"] is False
+    assert top["research_priority"] == "OVERFLOW_NO_ACTIVE_MARKET_SEAT"
+
+
+def test_scoped_market_active_seat_never_implies_buyer_fit():
+    x = commercial()
+    x["inventory"] = [
+        {"prospect_id": "p1", "state": "overflow_no_capacity",
+         "niche_family": "plumbing", "metro": "Chicago, IL"},
+        {"prospect_id": "p2", "state": "blocked_missing_evidence",
+         "niche_family": None, "metro": None},
+        {"prospect_id": "p3", "state": "blocked_missing_evidence",
+         "niche_family": None, "metro": None},
+    ]
+    x["buyer_seats"] = [
+        {"buyer_id": "b1", "seat_state": "active_capacity",
+         "niche_family": "plumbing", "metro": "chicago, il",
+         "remaining_capacity": 3},
+        {"buyer_id": "b2", "seat_state": "blocked_missing_evidence",
+         "activation_reason": "test_hold",
+         "niche_family": "plumbing", "metro": "Houston, TX"},
+    ]
+    gaps = result(commercial_exchange_snapshot=x)["leads_exchange_market_gaps"]
+    top = gaps["top_markets"][0]
+    assert top["same_market_active_buyer_seats"] == 1
+    assert top["same_market_active_capacity"] == 3
+    assert top["buyer_eligibility_verified"] is False
+    assert top["research_priority"] == "CHECK_CORRIDOR_PRICE_AND_ELIGIBILITY"
+    assert gaps["markets_missing_active_seats"] == 0
+
+
+def test_missing_market_geography_cannot_be_silently_assigned():
+    x = commercial()
+    x["inventory"] = [
+        {"prospect_id": "p1", "state": "overflow_no_capacity",
+         "niche_family": "roofing", "metro": None},
+        {"prospect_id": "p1", "state": "allocation_candidate",
+         "niche_family": "roofing", "metro": None},
+        {"prospect_id": "p2", "state": "blocked_missing_evidence",
+         "niche_family": "roofing", "metro": "Denver"},
+    ]
+    gaps = result(commercial_exchange_snapshot=x)["leads_exchange_market_gaps"]
+    assert gaps["market_count"] == 0
+    assert gaps["qualified_supply_missing_market_context"] == 1
+    assert gaps["unique_scoped_supply_prospects"] == 0
+    assert gaps["top_markets"] == []
+
+
+def test_missing_exchange_market_report_stays_unknown_not_zero():
+    gaps = result()["leads_exchange_market_gaps"]
+    assert gaps["source_available"] is False
+    assert gaps["market_count"] is None
+    assert gaps["unscoped_buyer_seats"] is None
+    assert gaps["top_markets"] == []
