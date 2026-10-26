@@ -17,6 +17,8 @@ import re
 
 from empire_os.permit_multimarket_registry import digest
 from empire_os.business_contact_identity import POSTAL_ADDRESS as CANONICAL_POSTAL_ADDRESS
+from empire_os.permit_evidence_readiness import review as review_evidence
+
 
 SCHEMA="empire.permit_intelligence.original_outreach_compliance_agent.v1"
 POLICY="US_B2B_POTENTIALLY_COMMERCIAL_CAN_SPAM_REVIEW_V1"
@@ -104,7 +106,9 @@ def parse_body(*,subject:str,body:str,from_address:str,recipient:str)->dict:
 
 
 def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
-              owner_evidence:Mapping[str,Any]|None=None)->dict:
+              owner_evidence:Mapping[str,Any]|None=None,
+              verified_evidence:Mapping[str,Mapping[str,Any]]|None=None,
+              verify_source=None,now:datetime|None=None)->dict:
     """Audits existing verified draft *observations*, not self-reported grants.
 
     No input values are permitted to promote a recipient to send ready. We
@@ -132,23 +136,48 @@ def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
     found=set(draft.get("commercial_hold_reasons",[]))
     if not isinstance(draft.get("commercial_hold_reasons"),list):
         raise ValueError("ORIGINAL_COMPLIANCE_HOLDS_UNTRUSTED")
+    # Positive evidence may move the REVIEW status only after a real
+    # independent source verifier corroborates its identity and freshness.
+    # The original Permit draft is never mutated into send authority.
+    readiness=review_evidence(
+        draft=draft,now=now or datetime.now(timezone.utc),
+        evidence=verified_evidence,verify_source=verify_source)
+    checks=readiness["checks"]
+    def verified(name:str)->bool:
+        return checks[name]=="VERIFIED"
+    def observed(name:str)->bool:
+        return checks[name]=="OBSERVED"
     reasons={
         "POSTAL_ADDRESS_NOT_VERIFIED":(
-            "ACTUAL_GMAIL_DRAFT_BODY_POSTAL_ADDRESS_ABSENT" in found
-            or draft.get("verified_business_postal_address") is not True
-        ),
-        "SENDER_IDENTITY_AND_REPLYTO_NOT_ATTESTED":True,
-        "SUBJECT_AND_COMMERCIAL_PRIMARY_PURPOSE_NEED_REVIEW":True,
-        "AD_DISCLOSURE_AS_REQUIRED_NOT_REVIEWED":True,
-        "OPT_OUT_PATH_AND_STOP_SLA_NOT_PROVEN":True,
-        "EXACT_AND_DOMAIN_SUPPRESSION_SEND_TIME_GATE_NOT_PROVEN":True,
-        "COMPLETE_CONTACT_HISTORY_NOT_PROVEN":True,
-        "CONTACT_RIGHTS_SUBSCRIBER_AND_SOURCE_PURPOSE_NOT_APPROVED":True,
-        "EXACT_COPY_FOUNDER_APPROVAL_NOT_PRESENT":True,
+            not observed("canonical_postal_footer")
+            or not verified("business_address_rights")),
+        "SENDER_IDENTITY_AND_REPLYTO_NOT_ATTESTED":(
+            not observed("explicit_reply_to")
+            or not verified("sender_legal_identity")
+            or not verified("reply_alias_delivery")),
+        "SUBJECT_AND_COMMERCIAL_PRIMARY_PURPOSE_NEED_REVIEW":
+            not verified("commercial_subject_review"),
+        "AD_DISCLOSURE_AS_REQUIRED_NOT_REVIEWED":
+            not verified("advertising_disclosure_review"),
+        "OPT_OUT_PATH_AND_STOP_SLA_NOT_PROVEN":(
+            not observed("stop_instruction")
+            or not verified("reply_alias_delivery")
+            or not verified("stop_suppression_process")),
+        "EXACT_AND_DOMAIN_SUPPRESSION_SEND_TIME_GATE_NOT_PROVEN":
+            not verified("exact_domain_suppression"),
+        "COMPLETE_CONTACT_HISTORY_NOT_PROVEN":
+            not verified("complete_contact_history"),
+        "CONTACT_RIGHTS_SUBSCRIBER_AND_SOURCE_PURPOSE_NOT_APPROVED":(
+            not verified("contact_source_rights")
+            or not verified("recipient_marketing_eligibility")),
+        "EXACT_COPY_FOUNDER_APPROVAL_NOT_PRESENT":
+            not verified("exact_copy_approval"),
     }
-    if "ORIGINAL_CANONICAL_COPYWRITER_NEEDS_REVIEW" in found:
+    if ("ORIGINAL_CANONICAL_COPYWRITER_NEEDS_REVIEW" in found
+        and not verified("source_specific_copy_quality")):
         reasons["COPYWRITER_ORIGINAL_QUALITY_REVIEW_REQUIRED"]=True
-    if draft.get("original_canonical_copywriter_quality") is None:
+    if (draft.get("original_canonical_copywriter_quality") is None
+        and not verified("source_specific_copy_quality")):
         reasons["CANONICAL_COPYWRITER_LIVE_QUALITY_NOT_OBSERVED"]=True
     if "ACTUAL_GMAIL_DRAFT_CANONICAL_FOOTER_MISSING" in found:
         reasons["CANONICAL_SENDER_FOOTER_NOT_PRESENT"]=True
@@ -186,7 +215,12 @@ def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
         "detected_blocker_codes":active,
         "auto_detected_count":len(active),
         "source_draft_label":"DRAFT",
-        "state":"HOLD_NEEDS_OWNER_VERIFICATION",
+        "state":("REVIEW_READY_FOR_SEPARATE_CANONICAL_PREFLIGHT"
+                 if not active else "HOLD_NEEDS_OWNER_VERIFICATION"),
+        "evidence_review":readiness,
+        "review_progress_observed_checks":readiness["observed_format_checks"],
+        "review_progress_verified_checks":readiness["independently_verified_checks"],
+        "review_ready":not active,
         "suggested_actions":advice,
         "verified_legal_compliance":False,
         "pre_send_compliance_granted":False,
@@ -195,7 +229,9 @@ def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
     }
 
 
-def audit_batch(*,pilot_report:Mapping[str,Any],now:datetime)->dict:
+def audit_batch(*,pilot_report:Mapping[str,Any],now:datetime,
+                verified_evidence_by_draft:Mapping[str,Mapping[str,Mapping[str,Any]]]|None=None,
+                verify_source=None)->dict:
     """Callable as part of the *existing* Permit Intelligence review cycle."""
     from empire_os.permit_national_buyer_pilot_readiness import validate_review
     validate_review(pilot_report)
@@ -205,8 +241,17 @@ def audit_batch(*,pilot_report:Mapping[str,Any],now:datetime)->dict:
     when=now.astimezone(timezone.utc)
     if when<reviewed or (when-reviewed).total_seconds()>24*60*60:
         raise ValueError("OUTREACH_COMPLIANCE_AGENT_STALE_PILOT")
-    rows=[audit_one(draft=x) for x in pilot_report["owner_review_queue"]]
+    supplied=verified_evidence_by_draft or {}
+    ids={r["draft_id"] for r in pilot_report["owner_review_queue"]}
+    if set(supplied)-ids:
+        raise ValueError("PERMIT_EVIDENCE_UNBOUND_DRAFT_ID")
+    rows=[audit_one(
+        draft=x,now=now,verified_evidence=supplied.get(x["draft_id"]),
+        verify_source=verify_source) for x in pilot_report["owner_review_queue"]]
     counts=Counter(action for row in rows for action in row["detected_blocker_codes"])
+    proof_counts=Counter(
+        name for row in rows for name,status in row["evidence_review"]["checks"].items()
+        if status in ("OBSERVED","VERIFIED"))
     result={
         "schema_version":"empire.permit_intelligence.original_ten_compliance_batch.v1",
         "policy":POLICY,
@@ -216,7 +261,16 @@ def audit_batch(*,pilot_report:Mapping[str,Any],now:datetime)->dict:
         "pilot_report_sha256":pilot_report["pilot_readiness_sha256"],
         "reviewed_at_utc":when.isoformat(),
         "checked_drafts":len(rows),
-        "hold_drafts":sum(x["state"]=="HOLD_NEEDS_OWNER_VERIFICATION" for x in rows),
+        # Every draft remains SEND-held until a separately approved,
+        # send-time canonical outbound governor decision, including any
+        # evidence-complete candidates.
+        "hold_drafts":len(rows),
+        "review_ready_drafts":sum(r["review_ready"] for r in rows),
+        "evidence_observed_check_count":sum(
+            r["review_progress_observed_checks"] for r in rows),
+        "evidence_verified_check_count":sum(
+            r["review_progress_verified_checks"] for r in rows),
+        "evidence_progress_counts":dict(sorted(proof_counts.items())),
         "blocker_counts":dict(sorted(counts.items())),
         "fully_verified_compliant":0,
         "outbound_authorized":False,
@@ -235,6 +289,10 @@ def validate_batch(report:Mapping[str,Any])->None:
             k:v for k,v in report.items() if k!="report_sha256"})
         or report.get("checked_drafts")!=10
         or report.get("hold_drafts")!=10
+        or type(report.get("review_ready_drafts")) is not int
+        or not 0<=report["review_ready_drafts"]<=10
+        or report["review_ready_drafts"]!=sum(
+            r.get("review_ready") is True for r in (report.get("rows") or []))
         or report.get("fully_verified_compliant")!=0
         or report.get("outbound_authorized") is not False
         or report.get("emails_sent")!=0

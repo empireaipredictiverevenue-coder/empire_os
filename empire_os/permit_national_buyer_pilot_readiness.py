@@ -181,6 +181,10 @@ def build(*,workbench:Mapping[str,Any],observation:Mapping[str,Any],
                 current.get("body_has_canonical_postal_footer") is True),
             "expected_reply_to_header_in_draft":(
                 current.get("expected_explicit_reply_to_header_present") is True),
+            "optout_instruction_in_draft":(
+                current.get("body_has_reply_opt_out_request") is True),
+            "sender_brand_in_draft":(
+                current.get("body_has_brand_identity") is True),
             "functional_optout_processing_attested":False,
             "recipient_contact_purpose_approved":False,
             "permit_job_data_distribution_approved":False,
@@ -212,6 +216,14 @@ def build(*,workbench:Mapping[str,Any],observation:Mapping[str,Any],
             not x["body_has_postal_address"] for x in observation["drafts"]),
         "market_counts":dict(sorted(Counter(x["market_id"] for x in rows).items())),
         "trade_counts":dict(sorted(Counter(x["sector"] for x in rows).items())),
+        # The observational stage never grants authority. Track useful
+        # candidate progress separately from the canonical send approval.
+        "observed_contact_candidates":len(rows),
+        "verified_format_ready_drafts":sum(
+            r["canonical_business_postal_footer_in_draft"]
+            and r["expected_reply_to_header_in_draft"]
+            and r["optout_instruction_in_draft"]
+            and r["sender_brand_in_draft"] for r in rows),
         "approved_recipients":0,
         "live_outbound_sent":0,
         "verified_buyer_conversations":0,
@@ -232,6 +244,9 @@ def validate_review(report:Mapping[str,Any])->None:
             k:v for k,v in report.items() if k!="pilot_readiness_sha256"})
         or report.get("company_count")!=10
         or report.get("verified_unique_workspace_drafts")!=10
+        or report.get("observed_contact_candidates")!=10
+        or type(report.get("verified_format_ready_drafts")) is not int
+        or not 0<=report["verified_format_ready_drafts"]<=10
         or report.get("approved_recipients")!=0
         or report.get("live_outbound_sent")!=0
         or report.get("verified_buyer_conversations")!=0
@@ -243,6 +258,12 @@ def validate_review(report:Mapping[str,Any])->None:
     rows=report.get("owner_review_queue")
     if not isinstance(rows,list) or len(rows)!=10:
         raise ValueError("ORIGINAL_BUYER_PILOT_REVIEW_ROW_COUNT_UNTRUSTED")
+    if report["verified_format_ready_drafts"]!=sum(
+        r.get("canonical_business_postal_footer_in_draft") is True
+        and r.get("expected_reply_to_header_in_draft") is True
+        and r.get("optout_instruction_in_draft") is True
+        and r.get("sender_brand_in_draft") is True for r in rows):
+        raise ValueError("ORIGINAL_DRAFT_FORMAT_READINESS_COUNT_TAMPERED")
     for row in rows:
         if (row.get("draft_state")!="GMAIL_DRAFT_CONFIRMED_UNSENT"
             or row.get("manual_approved_to_send") is not False
@@ -253,6 +274,8 @@ def validate_review(report:Mapping[str,Any])->None:
             or row.get("permit_job_data_distribution_approved") is not False
             or row.get("functional_optout_processing_attested") is not False
             or row.get("verified_business_postal_address") is not False
+            or type(row.get("optout_instruction_in_draft")) is not bool
+            or type(row.get("sender_brand_in_draft")) is not bool
             or row.get("priority_review_stage") not in REVIEW_STATES
             or not isinstance(row.get("commercial_hold_reasons"),list)
             or not set(US_COMMERCIAL_REQUIRED_REVIEW).issubset(

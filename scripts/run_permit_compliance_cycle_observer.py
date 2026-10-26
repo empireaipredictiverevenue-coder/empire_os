@@ -173,6 +173,14 @@ def run(*,root:Path=ROOT,now:datetime|None=None,
             "status":"PASS_HELD_NO_SEND",
             "ten_workspace_drafts_inspected":policy["checked_drafts"],
             "drafts_held":policy["hold_drafts"],
+            "observed_contact_candidates":pilot["observed_contact_candidates"],
+            "verified_format_ready_drafts":pilot["verified_format_ready_drafts"],
+            "evidence_review_ready_drafts":policy["review_ready_drafts"],
+            "evidence_observed_check_count":policy["evidence_observed_check_count"],
+            "evidence_independently_verified_check_count":
+                policy["evidence_verified_check_count"],
+            "evidence_progress_counts":policy["evidence_progress_counts"],
+            "canonical_send_release_confirmed":False,
             "postal_footer_missing":pilot["actual_workspace_drafts_without_postal_address"],
             "canonical_founder_postal_footer_missing":sum(
                 not r["canonical_business_postal_footer_in_draft"]
