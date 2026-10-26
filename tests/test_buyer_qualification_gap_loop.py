@@ -148,3 +148,74 @@ def test_recovered_real_reply_reopens_prior_contact_without_automated_send():
     assert reply["newly_surfaced_reviews"][0]["new_intro_authorized"] is False
     same, memory = evaluate(source, memory, now=NOW+timedelta(minutes=10))
     assert same["newly_surfaced_reviews"] == []
+
+
+def test_original_partner_buybox_links_only_exact_company_and_does_not_approve_geo():
+    row=item("buyerco.com", "EXISTING_CONVERSATION")
+    src=snapshot([row])
+    contextual={
+        "buyerco.com": {
+            "entity_key": "existing-partner",
+            "source": "original_commercial_relationship_registry",
+            "source_state": "HISTORICAL_THREAD_CONTEXT_SOURCE_REFRESH_REQUIRED",
+            "requirements_requested_not_verified": [
+                "active_roofing_zips_and_buyer_markets",
+                "accepted_jobs_and_qualified_billable_event"],
+            "full_request_already_known": True,
+            "geography_state": "NO_CURRENT_VERIFIED_BUYER_GEO_SCOPE",
+            "geography_independently_verified": False,
+            "buyer_pilot_qualified": False,
+        },
+    }
+    initial, checkpoint=evaluate(src,None,now=NOW,buyer_partner_context=contextual,
+                                  partner_source_state="PARTIAL_GMAIL_SNAPSHOT_REVIEW_ONLY")
+    target=initial["portfolio"][0]
+    assert initial["linked_partner_requirement_records"] == 1
+    assert initial["previous_partner_buybox_requests_known"] == 1
+    assert initial["independently_verified_buyer_coverage"] == 0
+    assert initial["pilot_qualification_verified"] == 0
+    assert "active_roofing_zips_and_buyer_markets" in target["missing_requirements"]
+    assert target["buyer_accepted_geo_verified"] is False
+    assert target["founder_outbound_buyer_requirements_repeat_blocked"] is True
+    assert target["new_intro_authorized"] is False
+    replay,checkpoint=evaluate(src,checkpoint,now=NOW+timedelta(minutes=5),
+                               buyer_partner_context=contextual,
+                               partner_source_state="PARTIAL_GMAIL_SNAPSHOT_REVIEW_ONLY")
+    assert replay["newly_surfaced_reviews"]==[]
+    assert replay["duplicate_work_suppressed"]==1
+
+
+def test_actual_owner_gap_cycle_counts_unlinked_private_partner_buyboxes(tmp_path):
+    base=tmp_path/"runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    (base/"founder_qualification_actions_latest.json").write_text(
+        json.dumps(snapshot([item("existingpartner.com")])))
+    registry={
+        "schema_version":"empire.commercial_relationship_registry.v1",
+        "generated_at":NOW.isoformat(),"mode":"OBSERVE",
+        "execution_authority":"NONE","outbound_authorized":False,"outbound_sent":False,
+        "next_actions_automatic_sends":False,"founder_actions_are_draft_only":True,
+        "partner_pilot_readiness_is_activation_authority":False,
+        "gmail_snapshot_fresh":False,
+        "relationships":[{"entity_key":"one","identity_domains":["existingpartner.com"],
+                          "gmail_thread_ids":["1a0cfb65e0dd960e"],"outbound_authorized":False,
+                          "commercial_buyer_approved":False,"do_not_pursue":False}],
+        "partner_pilot_readiness_queue":[
+            {"entity_key":"one","reviewed_gmail_thread_id":"1a0cfb65e0dd960e",
+             "activation_gates":{"buyer_buybox_received_and_verified":False},
+             "single_pass_buyer_intake":{"execution_authority":"NONE","outbound_authorized":False,
+                                         "repeat_full_request_blocked":True},
+             "outbound_authorized":False,"live_traffic_authorized":False,
+             "execution_authority":"NONE"},
+            {"entity_key":"other","reviewed_gmail_thread_id":"1a0cfb65e0dd960f"},
+        ],
+    }
+    (base/"commercial_relationship_registry_latest.json").write_text(json.dumps(registry))
+    result=refresh_gap_loop(tmp_path,now=NOW)
+    record=json.loads((base/"qualification_gap_loop_latest.json").read_text())
+    assert result["linked_original_buyboxes"] == 1
+    assert result["unlinked_partner_buyboxes"] == 1
+    assert record["original_partner_buyboxes_in_source"] == 2
+    assert record["partner_buyboxes_not_linked_to_candidate_cohort"] == 1
+    assert record["unlinked_buyboxes_automatically_admitted"] == 0
+    assert record["capacity_claims_accepted"] == 0

@@ -13,6 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
+from empire_os.buyer_qualification_evidence_bridge import load_registry, match_partner_buyboxes
 import json
 import os
 import re
@@ -167,7 +168,9 @@ def priority(action: GapAction, matched: bool, row: dict) -> int:
     return min(150, base)
 
 
-def evaluate(src: dict, previous: dict | None, *, now: datetime) -> tuple[dict, dict]:
+def evaluate(src: dict, previous: dict | None, *, now: datetime,
+             buyer_partner_context: dict[str, dict] | None = None,
+             partner_source_state: str = "SOURCE_NOT_LOADED") -> tuple[dict, dict]:
     rows = _valid_snapshot(src, now)
     if previous is not None and (
             previous.get("schema_version") != SCHEMA
@@ -191,6 +194,13 @@ def evaluate(src: dict, previous: dict | None, *, now: datetime) -> tuple[dict, 
                          and all(isinstance(v, str) and len(v) <= 80 for v in evidence_gaps)
                          else [])
         gaps.extend(g for g in evidence_gaps if g not in gaps)
+        partner = (buyer_partner_context or {}).get(domain)
+        partner = partner if isinstance(partner, dict) else {}
+        # Existing buyer requests are context to resolve, not verified terms.
+        extra = partner.get("requirements_requested_not_verified")
+        extra = (extra if isinstance(extra, list) and
+                 all(isinstance(v, str) and len(v) <= 100 for v in extra) else [])
+        gaps.extend(g for g in extra if g not in gaps)
         # Deliberately exclude refreshed timestamps and the snapshot time.
         # An inbound buyer response or a new requirement changes the fingerprint.
         semantic = {
@@ -206,6 +216,12 @@ def evaluate(src: dict, previous: dict | None, *, now: datetime) -> tuple[dict, 
                           .get("sample_corridors_for_research", []) if matched else []),
             "site_role": row.get("site_corroborated_buyer_role"),
             "first_party_due_diligence_state": (row.get("first_party_due_diligence") or {}).get("state"),
+            "partner_buybox_evidence": {
+                "entity": partner.get("entity_key"),
+                "pending": extra,
+                "previous_full_request_known": partner.get("full_request_already_known") is True,
+                "geo": partner.get("geography_state"),
+            } if partner else None,
             "manual_hold": row.get("manual_hold_reason"),
             "automated_hold": row.get("automated_hold_reason"),
         }
@@ -241,6 +257,9 @@ def evaluate(src: dict, previous: dict | None, *, now: datetime) -> tuple[dict, 
             "buyer_commercial_acceptance_verified": False,
             "action_executed": False,
             "new_intro_authorized": False,
+            "original_partner_requirements_evidence": partner or None,
+            "founder_outbound_buyer_requirements_repeat_blocked":
+                partner.get("full_request_already_known") is True,
         }
         portfolio.append(candidate)
         counters[state] += 1
@@ -263,6 +282,13 @@ def evaluate(src: dict, previous: dict | None, *, now: datetime) -> tuple[dict, 
             p["first_party_sector_match"] and p["contact_history_state"] in LIVE for p in portfolio),
         "prior_contacts_with_first_party_match": sum(
             p["first_party_sector_match"] and p["contact_history_state"] in PRIOR for p in portfolio),
+        "partner_requirement_registry_source_state": partner_source_state,
+        "linked_partner_requirement_records": sum(
+            p["original_partner_requirements_evidence"] is not None for p in portfolio),
+        "previous_partner_buybox_requests_known": sum(
+            p["founder_outbound_buyer_requirements_repeat_blocked"] for p in portfolio),
+        "independently_verified_buyer_coverage": 0,
+        "pilot_qualification_verified": 0,
         "open_geo_verification": sum(p["first_party_sector_match"]
                                      and not p["buyer_accepted_geo_verified"] for p in portfolio),
         "decision_states": dict(sorted(counters.items())),
@@ -313,7 +339,20 @@ def refresh_gap_loop(root: Path, *, now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
     snapshot = _read(root, QUALIFICATION)
     previous = _read(root, MEMORY, max_bytes=220_000) if (root / MEMORY).is_file() else None
-    result, state = evaluate(snapshot, previous, now=now)
+    registry, partner_state = load_registry(root, now=now)
+    admissible_domains = {r["domain"] for r in snapshot.get("targets", [])
+                          if isinstance(r, dict) and isinstance(r.get("domain"), str)}
+    linked = match_partner_buyboxes(registry, allowed_domains=admissible_domains,
+                                    source_state=partner_state)
+    result, state = evaluate(snapshot, previous, now=now,
+                             buyer_partner_context=linked,
+                             partner_source_state=partner_state)
+    source_partners = {x.get("entity_key") for x in registry.get("partner_pilot_readiness_queue", [])
+                       if isinstance(x, dict) and isinstance(x.get("entity_key"), str)}
+    matched_partners = {x["entity_key"] for x in linked.values()}
+    result["original_partner_buyboxes_in_source"] = len(source_partners)
+    result["partner_buyboxes_not_linked_to_candidate_cohort"] = len(source_partners - matched_partners)
+    result["unlinked_buyboxes_automatically_admitted"] = 0
     _atomic(root / REPORT, result)
     _atomic(root / MEMORY, state)
     return {
@@ -323,6 +362,10 @@ def refresh_gap_loop(root: Path, *, now: datetime | None = None) -> dict:
         "new_reviews": len(result["newly_surfaced_reviews"]),
         "unchanged_suppressed": result["duplicate_work_suppressed"],
         "open_geo_verification": result["open_geo_verification"],
+        "linked_original_buyboxes": result["linked_partner_requirement_records"],
+        "unlinked_partner_buyboxes": result["partner_buyboxes_not_linked_to_candidate_cohort"],
+        "repeat_full_buybox_requests_known": result["previous_partner_buybox_requests_known"],
+        "partner_registry_state": partner_state,
         "outbound_authorized": False,
         "database_writes": False,
     }
