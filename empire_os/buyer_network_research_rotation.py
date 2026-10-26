@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import Any, Mapping
+from urllib.parse import urlsplit
+import time
 from empire_os.buyer_review_holds import is_do_not_pursue_domain
 import re
 
@@ -45,6 +47,79 @@ def accepted_domain(domain: str) -> bool:
         for label in labels
     )
 
+
+
+def verified_first_party_snapshot_results(snapshot: Mapping[str, Any] | None,
+                                          *, now_epoch: float | None = None) -> dict[str, dict[str, Any]]:
+    """Current source-owned site evidence; does not grant sales permissions."""
+    if (not isinstance(snapshot, dict)
+            or snapshot.get("schema_version") != "buyer-direct-site-verification-v1"
+            or snapshot.get("authority") != "OBSERVE"
+            or not isinstance(snapshot.get("governance"), dict)
+            or any(snapshot["governance"].get(k) is not False
+                   for k in ("outbound", "traffic_activation", "commercial_terms"))
+            or not isinstance(snapshot.get("results"), list)
+            or len(snapshot["results"]) > 3000):
+        return {}
+    now = time.time() if now_epoch is None else now_epoch
+    try:
+        generated = float(snapshot["generated_epoch"])
+    except (KeyError, TypeError, ValueError):
+        return {}
+    if not 0 <= now - generated <= RESULT_TTL_SECONDS:
+        return {}
+    valid = {}
+    duplicates = set()
+    for row in snapshot["results"]:
+        if not isinstance(row, dict):
+            continue
+        domain = str(row.get("domain") or "").lower()
+        try:
+            observed = float(row.get("observed_epoch") or 0)
+        except (TypeError, ValueError):
+            continue
+        evidence = row.get("evidence")
+        if (not accepted_domain(domain)
+                or not 0 <= now - observed <= RESULT_TTL_SECONDS
+                or row.get("corroborated") is not True
+                or row.get("buyer_role") is not True
+                or type(row.get("pages_successful")) is not int
+                or row["pages_successful"] < 1
+                or type(row.get("positive_category_count")) is not int
+                or row["positive_category_count"] < 2
+                or not isinstance(evidence, dict)
+                or evidence.get("negative_program") is True):
+            continue
+        if domain in valid:
+            duplicates.add(domain)
+        else:
+            valid[domain] = row
+    for domain in duplicates:
+        valid.pop(domain, None)
+    return valid
+
+
+def verified_site_snippets(row: Mapping[str, Any]) -> list[str]:
+    """Only snippets from the single verified official domain may be scored."""
+    domain = str(row.get("domain") or "").lower()
+    snippets = row.get("snippets")
+    if not accepted_domain(domain) or not isinstance(snippets, list):
+        return []
+    evidence = []
+    for item in snippets[:12]:
+        if not isinstance(item, dict):
+            continue
+        try:
+            url = urlsplit(str(item.get("url") or ""))
+            host = str(url.hostname or "").lower()
+        except ValueError:
+            continue
+        if url.scheme != "https" or host not in (domain, "www." + domain):
+            continue
+        value = item.get("text")
+        if isinstance(value, str) and value.strip():
+            evidence.append(value.strip()[:1000])
+    return list(dict.fromkeys(evidence))
 
 def choose_research_batch(
     backlog: Mapping[str, Any],

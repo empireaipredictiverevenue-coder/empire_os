@@ -7,7 +7,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from empire_os.buyer_network_research_rotation import accepted_domain
+from empire_os.buyer_network_research_rotation import (
+    accepted_domain, verified_first_party_snapshot_results, verified_site_snippets,
+)
 from empire_os.buyer_network_contact_history_gate import load_context, review
 
 from empire_os.buyer_network_integration import (
@@ -163,6 +165,7 @@ def normalize_domain(value: str) -> str | None:
 
 def collect_domain_context(
     discovery: dict[str, Any],
+    site_snapshot: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any]]:
 
     profiles: dict[
@@ -259,6 +262,23 @@ def collect_domain_context(
             ].extend(
                 domain_lines[:20]
             )
+
+    # Search Fabric owns the transient discovery snapshot; the original
+    # first-party research owner retains source-bound website observations.
+    # Reconcile both, or a routine search refresh hides genuine companies.
+    for domain, site in verified_first_party_snapshot_results(site_snapshot).items():
+        first_party_lines = verified_site_snippets(site)
+        if not first_party_lines:
+            continue
+        profile = profiles[domain]
+        profile["queries"].add("buyer-network-active-verification")
+        profile["runs"] += 1
+        for vertical in site.get("verticals_detected") or []:
+            if vertical in ("roofing", "hvac", "restoration", "solar", "legal", "home_services"):
+                profile["verticals"].add(vertical)
+        profile["evidence_lines"] = list(dict.fromkeys(
+            first_party_lines + profile["evidence_lines"]
+        ))
 
     return profiles
 
@@ -516,9 +536,18 @@ def main() -> int:
         DISCOVERY.read_text()
     )
 
-    profiles = collect_domain_context(
-        discovery
-    )
+    site_path = DISCOVERY.parent / "direct_site_verification_latest.json"
+    if site_path.is_symlink() or (site_path.exists() and
+            (not site_path.is_file() or site_path.stat().st_size > 4_000_000)):
+        raise RuntimeError("DIRECT_SITE_SOURCE_UNSAFE_PRESERVE_BUYER_QUEUE")
+    if site_path.is_file():
+        try:
+            site_snapshot = json.loads(site_path.read_text())
+        except (OSError, ValueError) as exc:
+            raise RuntimeError("DIRECT_SITE_SOURCE_UNAVAILABLE_PRESERVE_BUYER_QUEUE") from exc
+    else:
+        site_snapshot = None
+    profiles = collect_domain_context(discovery, site_snapshot)
     # A failed or interrupted Search Fabric cycle must not erase the last
     # candidate queue. Leave the existing artifact untouched for review.
     if not profiles:

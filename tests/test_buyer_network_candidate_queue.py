@@ -207,3 +207,59 @@ def test_unbound_or_multi_domain_search_text_not_attributed_as_first_party():
         assert rows["vendor-a.com"]["evidence_lines"] == []
     official = {**base, "verification_source": "direct-site"}
     assert mod.collect_domain_context({"runs": [official]})["vendor-a.com"]["evidence_lines"]
+
+
+def test_durable_first_party_site_snapshot_outlives_empty_discovery():
+    from datetime import datetime,timezone
+    mod=module()
+    now=datetime.now(timezone.utc).timestamp()
+    site={
+        'schema_version':'buyer-direct-site-verification-v1',
+        'authority':'OBSERVE',
+        'generated_epoch':now,
+        'governance':{'outbound':False,'traffic_activation':False,'commercial_terms':False},
+        'results':[{
+            'domain':'brokerresearch.com','corroborated':True,
+            'buyer_role':True,'observed_epoch':now,
+            'positive_category_count':4,'pages_successful':2,
+            'verticals_detected':['roofing'],
+            'evidence':{'publisher_program':True,'active_demand':True,'negative_program':False},
+            'snippets':[{'url':'https://brokerresearch.com/publishers',
+                'text':'We buy roofing calls. Publisher program. Compliance and contact.'}],
+        }],
+    }
+    profiles=mod.collect_domain_context({'runs':[]},site)
+    assert 'brokerresearch.com' in profiles
+    profile=profiles['brokerresearch.com']
+    assert 'buyer-network-active-verification' in profile['queries']
+    assert 'roofing' in profile['verticals']
+    assert len(profile['evidence_lines'])==1
+    assert mod.score_profile('brokerresearch.com',profile,set())['status']!='REJECT'
+    site['results'][0]['snippets']=[
+        {'url':'https://othercompany.com','text':'Pay per call publisher programme'}]
+    assert 'brokerresearch.com' not in mod.collect_domain_context({'runs':[]},site)
+
+
+def test_durable_sites_require_current_source_owner_and_no_unrelated_snippets():
+    from datetime import datetime,timezone
+    from empire_os.buyer_network_research_rotation import (
+        RESULT_TTL_SECONDS,verified_first_party_snapshot_results,
+    )
+    now=datetime.now(timezone.utc).timestamp()
+    base={
+        'schema_version':'buyer-direct-site-verification-v1',
+        'authority':'OBSERVE',
+        'generated_epoch':now,
+        'governance':{'outbound':False,'traffic_activation':False,'commercial_terms':False},
+        'results':[{'domain':'brokerresearch.com','corroborated':True,
+           'buyer_role':True,'observed_epoch':now,
+           'positive_category_count':3,'pages_successful':1,
+           'evidence':{'active_demand':True,'negative_program':False}}],
+    }
+    assert 'brokerresearch.com' in verified_first_party_snapshot_results(base,now_epoch=now)
+    assert not verified_first_party_snapshot_results(
+        {**base,'generated_epoch':now-RESULT_TTL_SECONDS-1},now_epoch=now)
+    assert not verified_first_party_snapshot_results(
+        {**base,'governance':{**base['governance'],'outbound':True}},now_epoch=now)
+    assert not verified_first_party_snapshot_results(
+        {**base,'results':base['results']*2},now_epoch=now)
