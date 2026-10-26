@@ -6,10 +6,12 @@ import argparse
 import json
 import subprocess
 import sys
+from pathlib import Path
 
 from empire_os.buyer_acquisition_team import (
     refresh_buyer_acquisition_plan,
 )
+from empire_os.buyer_acquisition_decision_brain import run_team_brain
 
 
 def refresh_existing_workspace_reply_snapshot() -> dict:
@@ -46,6 +48,26 @@ def refresh_existing_workspace_reply_snapshot() -> dict:
             "status": "SIX_THREAD_WORKSPACE_SNAPSHOT_REFRESHED",
             "verified_sent_anchors": 6,
             "new_inbound_header_candidates": data["new_inbound_header_candidates"],
+            "priority_payer_status": (
+                data["priority_payer_status"]
+                if data.get("priority_payer_status") in (
+                    "TWO_PRIORITY_PAYER_THREADS_REVIEWED",
+                    "HELD_PRIORITY_PAYER_REVIEW_UNAVAILABLE",
+                ) else "HELD_PRIORITY_PAYER_REVIEW_UNAVAILABLE"
+            ),
+            "priority_payer_threads_verified": (
+                2 if data.get("priority_payer_status") == "TWO_PRIORITY_PAYER_THREADS_REVIEWED"
+                and data.get("priority_payer_threads_verified") == 2
+                and data.get("priority_payer_snapshot_written") is True
+                else 0
+            ),
+            "priority_payer_new_inbound_candidates": (
+                data.get("priority_payer_new_inbound_candidates")
+                if type(data.get("priority_payer_new_inbound_candidates")) is int
+                and data.get("priority_payer_new_inbound_candidates") >= 0
+                and data.get("priority_payer_snapshot_written") is True
+                else None
+            ),
             "outbound_sent": False,
             "database_writes": False,
         }
@@ -96,6 +118,19 @@ def main() -> int:
     print(json.dumps({"workspace_solar_reply_tracking":
                       refresh_existing_workspace_reply_snapshot()},
                      sort_keys=True))
+    # Existing five-minute buyer team owns this decision cycle. Only refresh
+    # the ORIGINAL internal qualification workbench when its evidence ages;
+    # never start scout, ASTRA, a separate timer or an external sender.
+    try:
+        decision = run_team_brain(Path(args.repo_root))
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        decision = {
+            "status": "BUYER_TEAM_BRAIN_EVIDENCE_HELD",
+            "error_class": type(exc).__name__,
+            "outbound_authorized": False,
+            "database_writes": False,
+        }
+    print(json.dumps({"buyer_team_brain": decision}, sort_keys=True))
     return 0
 
 
