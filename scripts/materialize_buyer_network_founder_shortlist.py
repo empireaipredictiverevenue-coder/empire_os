@@ -11,6 +11,7 @@ from empire_os.buyer_network_integration import (
     BuyerNetworkIntegration,
 )
 from empire_os.buyer_network_contact_history_gate import load_context, review
+from empire_os.buyer_network_research_rotation import accepted_domain
 
 
 ROOT = Path("/srv/empire_os")
@@ -596,9 +597,15 @@ def main() -> int:
     candidates = []
     for candidate in queue.get("candidates", []):
         domain = str(candidate.get("domain") or "").lower()
-        if candidate.get("status") not in ("READY_TO_APPROACH", "VERIFY_REQUIREMENTS"):
+        # Founder research is an OPEN evidence workstream, not a buyer
+        # approval gate. Keep WATCH candidates visible for independent
+        # research, without assigning approach/send authority to them.
+        if candidate.get("status") not in (
+            "READY_TO_APPROACH", "VERIFY_REQUIREMENTS", "WATCH"
+        ):
             continue
-        if domain in blocked or domain.endswith(".sentry.io"):
+        if (not accepted_domain(domain) or domain in blocked
+                or domain.endswith(".sentry.io")):
             continue
         lines = candidate.get("evidence", {}).get("lines", [])
         if not isinstance(lines, list) or not lines:
@@ -630,7 +637,15 @@ def main() -> int:
         )
     )
 
-    shortlist = candidates[:25]
+    # One existing owner, open research across the whole sourced queue.
+    # Keep the downstream 500-row bounded review contract explicit; never
+    # silently claim that the first five/25 are all eligible prospects.
+    shortlist = candidates[:500]
+    deferred_research_count = max(0, len(candidates) - len(shortlist))
+    queue_state_counts = {
+        state: sum(row["queue_status"] == state for row in candidates)
+        for state in ("READY_TO_APPROACH", "VERIFY_REQUIREMENTS", "WATCH")
+    }
 
     payload = {
         "schema_version":
@@ -653,6 +668,11 @@ def main() -> int:
 
         "eligible_candidate_count":
             len(candidates),
+
+        "open_research_state_counts": queue_state_counts,
+        "open_research_deferred_count": deferred_research_count,
+        "founder_review_not_inferred_from_watch": True,
+        "automatic_outbound_for_watch": False,
 
         "shortlist_count":
             len(shortlist),
