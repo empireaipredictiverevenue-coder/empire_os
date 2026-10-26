@@ -133,6 +133,23 @@ def main():
                 "outbound_sent": False,
                 "database_writes": False,
             }
+    if (args.write_daily and result.get("status") in {
+            "ORIGINAL_DAILY_GOOGLE_INDEX_REVIEW_RECORDED",
+            "ORIGINAL_DAILY_INDEX_WATCH_ALREADY_RECORDED",
+        }):
+        # Original daily owner also owns Semrush-like query/page history.
+        # Exactly two bounded original GSC loopback GETs, private immutable
+        # receipt; optional failure NEVER fails Google/index/lifecycle owner.
+        try:
+            from scripts.review_original_gsc_visibility_v1_20261026 import run as visibility
+            result["seo_keyword_visibility"] = visibility(write=True)
+        except Exception as visibility_error:
+            result["seo_keyword_visibility"] = {
+                "status":"SEO_KEYWORD_VISIBILITY_HELD_GOOGLE_WATCH_PRESERVED",
+                "reason_code":type(visibility_error).__name__,
+                "site_changed":False,"outbound_sent":False,
+                "database_writes":False,
+            }
     print(json.dumps(result,sort_keys=True))
     return 0
 
