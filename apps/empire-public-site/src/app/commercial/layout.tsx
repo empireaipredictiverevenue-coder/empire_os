@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
-// Exact route metadata. Parent layout's canonical "/" must not be inherited
-// by these independently indexable first-party commercial landing pages.
+// Exact first-party commercial page. TAM buyer-readiness explanation, real
+// assessment scope, no promise of indexed rankings, closed deals or payment.
 const pageUrl = "https://empire-ai.co.uk/commercial";
-const pageTitle = "AI Consultancy & Revenue Intelligence | Empire AI";
-const pageDescription = "Explore founder-led AI consultancy, competitor search intelligence, digital workforce and predictive revenue solutions. Request a scoped business enquiry; no payment required.";
+const pageTitle = "Buyer Readiness & Revenue Intelligence | Empire AI";
+const pageDescription = "Learn how to evaluate buyer readiness across your total addressable market, trace revenue leaks and request a scoped Empire AI business assessment. No payment required.";
 
 export const metadata: Metadata = {
   title: pageTitle,
