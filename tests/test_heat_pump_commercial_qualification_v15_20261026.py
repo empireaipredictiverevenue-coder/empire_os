@@ -8,7 +8,7 @@ from empire_os.heat_pump_commercial_review import (
 )
 from scripts.build_buyer_qualification_actions import plan
 
-NOW=datetime(2026,10,26,22,10,tzinfo=timezone.utc)
+NOW=datetime.now(timezone.utc)  # use fresh original Scout when the suite runs
 ROOT=Path('/srv/empire_os')
 
 
