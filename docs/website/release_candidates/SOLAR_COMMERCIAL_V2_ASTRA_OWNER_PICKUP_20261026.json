@@ -1,0 +1,77 @@
+{
+  "automatic_astra_department_dispatch_submitted": false,
+  "candidate": {
+    "added_only_hashed_static_assets": 10,
+    "any_unrelated_live_routes_overwritten": false,
+    "full_site_backup_preimages_in_packet": true,
+    "immutable_packet": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2",
+    "live_existing_static_files": 700,
+    "replaced_html_count": 2,
+    "replaced_matching_next_sidecars": 8,
+    "reviewed_candidate_merged_files": 710,
+    "source_branch": "agent/website-solar-commercial-premium-20261026",
+    "source_commit": "d7229c635",
+    "target_urls": [
+      "/commercial",
+      "/industries/solar"
+    ],
+    "untouched_existing_files": 690
+  },
+  "founder_direction": {
+    "founder_visual_acceptance_of_exact_final_build_verified": false,
+    "instruction": "continue towards the two-page premium Solar and Commercial launch using one existing ASTRA website release owner",
+    "priority_confirmed": true,
+    "root_publication_authority_inferred_from_chat": false
+  },
+  "github_issue": {
+    "approval_receipt_verified": false,
+    "assigned_account": "empireaipredictiverevenue-coder",
+    "assignment_matches_existing_owner_issue_103": true,
+    "number": 128,
+    "owner_acknowledgement_verified": false,
+    "repository": "empireaipredictiverevenue-coder/empire_os",
+    "url": "https://github.com/empireaipredictiverevenue-coder/empire_os/issues/128"
+  },
+  "independent_astra_owner_visual_and_commercial_signoff_verified": false,
+  "is_automatic_department_execution_task": false,
+  "new_release_operator_or_scheduler_created": false,
+  "next_actions": [
+    "ASTRA original website owner acknowledges issue #128 and reviews pinned manifest and all four full-page screenshots",
+    "independently accept founder-facing final visual and commercial copy, explicitly confirm legal and consent preservation",
+    "revalidate live baseline and exact 10 replacements plus 10 additions; stop on any source drift",
+    "prepare and independently verify fresh root-protected full static site backup through original website owner process",
+    "only with owner authority, use the original guarded publish workflow and independently verify HTTPS, assets, old neighboring routes and rollback"
+  ],
+  "next_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+  "no_live_outbound_payment_or_customer_form_submission": true,
+  "original_website_owner_publisher_prepared": false,
+  "owner_readonly_preflight": "/srv/empire_os/.venv/bin/python -B /home/ubuntu/empire_worktrees/website_solar_commercial_premium_20261026/scripts/review_solar_commercial_premium_candidate_20261026.py",
+  "pinned_evidence": {
+    "candidate_manifest": {
+      "absolute_path": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/release_candidate.json",
+      "sha256": "14b65c040e398d74ac637f0845d2fd62046e7e0db9bb2eefdc348dabf1919f39"
+    },
+    "chrome_1440_390_browser_acceptance": {
+      "absolute_path": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/browser_qa/qa_receipt.json",
+      "sha256": "787d8db22341a8cdc0a5d942713f6107759cbe1cc94119589616fa44fb911ab2"
+    },
+    "disposable_full_site_release_and_forced_rollback": {
+      "absolute_path": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/full_site_rehearsal_v2.json",
+      "sha256": "3e5182ed8d568e0f1313fbd25f0e1c404ef836d46b81199b847701ac5c291fe2"
+    },
+    "mixed_original_to_new_browser_qa": {
+      "absolute_path": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/mixed_site_navigation_qa.json",
+      "sha256": "cb2636ad499c8e51c3b476fb4f47a64112a2f2dd61196e44e1d3ddc437782e00"
+    }
+  },
+  "prepared_at_utc": "2026-10-26T23:15:04.927655+00:00",
+  "priority": "P0_EXISTING_OWNER_ONLY_TWO_PAGE_PUBLICATION",
+  "public_website_modified": false,
+  "publication_authorized_now": false,
+  "publication_performed": false,
+  "root_owner_custody_authority_verified": false,
+  "schema_version": "empire.website.astra_two_page_owner_pickup.v1",
+  "separate_root_backup_created": false,
+  "status": "FOUNDER_LAUNCH_DIRECTION_RECORDED_MANUAL_ASTRA_OWNER_ACCEPTANCE_REQUIRED",
+  "work_key": "solar_commercial_premium_exact_v2_20261026"
+}
