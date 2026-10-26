@@ -245,3 +245,119 @@ def test_http_cross_source_signal_denied_without_disclosing_evidence():
     assert result.json() == {"detail": "company_review_access_denied"}
     assert "private-other" not in result.text
     assert result.headers["cache-control"] == "no-store"
+
+
+@pytest.fixture
+def cryptographic_client():
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from test_revenue_crm_signed_auth import A, NOW as AUTH_NOW, token
+    from empire_os.predictive_revenue_company_timeline_v44 import (
+        build_company_review_membership_resolver, create_company_review_read_router)
+    issuer = Ed25519PrivateKey.generate()
+    state = {"active": True, "allow_source": True, "reads": 0, "loads": 0, "subjects": []}
+    def membership(user, tenant):
+        state["reads"] += 1
+        return TenantMembership(tenant, user, "viewer", "active" if state["active"] else "disabled")
+    resolver = build_company_review_membership_resolver(
+        trusted_public_keys={"issuer-1": issuer.public_key()},
+        load_membership=membership, now=lambda: AUTH_NOW)
+    bundle = inputs()
+    payload, manifest, _, trusted, sign = signed_export_fixture()
+    manifest["tenant_scope"] = trusted["tenant_scope"] = A
+    bundle.update(payload=payload, signed_manifest=manifest, trusted_source=trusted, signature_b64=sign(manifest))
+    for name in ("signal_rows", "issued_forecast_rows"):
+        for row in bundle[name]: row["tenant_scope"] = A
+    def authorize(member, **scope):
+        state["subjects"].append(member.user_id)
+        assert scope["purpose"] == "PREDICTIVE_REVENUE_OBSERVE"
+        return state["allow_source"]
+    def load(**scope):
+        state["loads"] += 1
+        assert scope["tenant_scope"] == A
+        return deepcopy(bundle)
+    review = build_authorized_company_review(resolve_membership=resolver,
+        authorize_company_review=authorize, load_review_inputs=load, now=lambda: NOW)
+    app = FastAPI(); app.include_router(create_company_review_read_router(review=review))
+    return TestClient(app), state, lambda **kw: token(issuer, **kw), {
+        "company_scope": COMPANY, "source_id": manifest["source_id"]}
+
+
+def test_original_signed_login_reaches_v5_and_revocation_is_immediate(cryptographic_client):
+    client, state, issue, params = cryptographic_client
+    headers = {"Authorization": "Bearer " + issue()}
+    first = client.get("/v1/predictive-revenue/company-review", params=params, headers=headers)
+    assert first.status_code == 200
+    assert first.json()["v5_predictive_cloud_staging_read_only"]["issued_forecast_risk_screens_unverified"][0]["forecast_id"] == inputs()["issued_forecast_rows"][0]["forecast_id"]
+    assert state["subjects"] == ["founder:verified"]
+    assert state["reads"] == state["loads"] == 1
+    state["active"] = False
+    denied = client.get("/v1/predictive-revenue/company-review", params=params, headers=headers)
+    assert denied.status_code == 403
+    assert state["reads"] == 2 and state["loads"] == 1
+
+
+@pytest.mark.parametrize("claims", [{"aud": "other"}, {"scope": "crm:write"}, {"exp": 1}])
+def test_original_signed_login_rejects_invalid_claims_before_evidence(cryptographic_client, claims):
+    client, state, issue, params = cryptographic_client
+    result = client.get("/v1/predictive-revenue/company-review", params=params,
+        headers={"Authorization": "Bearer " + issue(claims=claims)})
+    assert result.status_code == 403
+    assert state["loads"] == state["reads"] == 0
+
+
+def test_signed_login_alone_never_grants_source_access(cryptographic_client):
+    client, state, issue, params = cryptographic_client
+    state["allow_source"] = False
+    result = client.get("/v1/predictive-revenue/company-review", params=params,
+        headers={"Authorization": "Bearer " + issue()})
+    assert result.status_code == 403
+    assert state["reads"] == 1 and state["loads"] == 0
+
+
+def test_duplicate_bearers_cannot_select_a_principal(cryptographic_client):
+    client, state, issue, params = cryptographic_client
+    auth = "Bearer " + issue()
+    result = client.get("/v1/predictive-revenue/company-review", params=params,
+        headers=[("Authorization", auth), ("Authorization", auth)])
+    assert result.status_code == 403
+    assert state["reads"] == state["loads"] == 0
+
+
+def test_concurrent_signed_principals_remain_request_local():
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from starlette.requests import Request
+    from test_revenue_crm_signed_auth import A, B, NOW as AUTH_NOW, token
+    from empire_os.predictive_revenue_company_timeline_v44 import build_company_review_membership_resolver
+    issuer = Ed25519PrivateKey.generate()
+    barrier = Barrier(2)
+    def membership(user, tenant):
+        barrier.wait(timeout=5)
+        return TenantMembership(tenant, user, "viewer")
+    resolver = build_company_review_membership_resolver(
+        trusted_public_keys={"issuer-1": issuer.public_key()},
+        load_membership=membership, now=lambda: AUTH_NOW)
+    def call(user, tenant):
+        signed = token(issuer, claims={"sub": user, "tenant_id": tenant})
+        request = Request({"type": "http", "headers": [(b"authorization", ("Bearer " + signed).encode())]})
+        result = resolver(request)
+        return result.user_id, result.tenant_id
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(call, "user:first", A)
+        b = pool.submit(call, "user:second", B)
+        assert a.result(timeout=8) == ("user:first", A)
+        assert b.result(timeout=8) == ("user:second", B)
+
+
+def test_untrusted_signature_never_reads_membership(cryptographic_client):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from test_revenue_crm_signed_auth import token
+    client, state, _, params = cryptographic_client
+    forged = token(Ed25519PrivateKey.generate())
+    response = client.get("/v1/predictive-revenue/company-review", params=params,
+        headers={"Authorization": "Bearer " + forged})
+    assert response.status_code == 403
+    assert state["reads"] == state["loads"] == 0

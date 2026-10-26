@@ -523,6 +523,45 @@ def review_signed_company_export(*, payload: bytes,
     return result
 
 
+def build_company_review_membership_resolver(
+    *, trusted_public_keys: Mapping, load_membership: Callable,
+    now: Callable[[], int] | None = None,
+) -> Callable:
+    """Reuse the original signed CRM login for identity, never source permission.
+
+    The existing verifier owns bearer parsing, pinned-key verification, expiry,
+    subject/tenant matching and fresh membership checks. This adapter returns
+    that exact verified membership to the separately required company/purpose
+    authorizer. It neither mints tokens nor widens the CRM token's permissions.
+    Owner-managed public keys and the authoritative membership reader must be
+    installed by the original API owner; importing this module activates none.
+    """
+    from empire_os.revenue_crm_signed_auth import build_signed_crm_tenant_authenticator
+
+    keys = dict(trusted_public_keys)
+    # Validate constructor inputs now, without querying membership or a DB.
+    build_signed_crm_tenant_authenticator(keys, load_membership=load_membership, now=now)
+
+    def resolve(request):
+        # Request-local capture avoids sharing a principal across concurrent
+        # requests and avoids a second, potentially inconsistent identity read.
+        members = []
+        def read_member(user_id, tenant_id):
+            member = load_membership(user_id, tenant_id)
+            members.append(member)
+            return member
+        authenticate = build_signed_crm_tenant_authenticator(
+            keys, load_membership=read_member, now=now,
+        )
+        tenant = authenticate(request)
+        if tenant is None or len(members) != 1:
+            return None
+        member = members[0]
+        return member if member.tenant_id == tenant else None
+
+    return resolve
+
+
 def build_authorized_company_review(
     *, resolve_membership: Callable, authorize_company_review: Callable,
     load_review_inputs: Callable, now: Callable[[], datetime],
