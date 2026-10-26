@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime,timezone
+import os,stat
 from pathlib import Path
 
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -11,7 +13,7 @@ from empire_os.gmail_api_transport import GMAIL_SCOPES, build_gmail_service, _wr
 from empire_os.google_workspace_mailbox import SCOPES as WORKSPACE_MAILBOX_SCOPES, EXPECTED_ACCOUNT
 
 
-def main() -> int:
+def main(argv=None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--client",
@@ -37,7 +39,14 @@ def main() -> int:
         action="store_true",
         help="Explicitly reauthorise the same Workspace sender for Gmail read-only inbox access",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--permit-draft-compose",
+        action="store_true",
+        help="Explicit Workspace owner OAuth reconsent for full draft-only MIME edits",
+    )
+    args = parser.parse_args(argv)
+    if args.mailbox_read and args.permit_draft_compose:
+        parser.error("choose one explicit Workspace permission mode")
 
     client = Path(args.client)
     token = Path(args.token)
@@ -47,7 +56,12 @@ def main() -> int:
             f"OAuth client file missing: {client}"
         )
 
-    requested_scopes = WORKSPACE_MAILBOX_SCOPES if args.mailbox_read else GMAIL_SCOPES
+    compose_scope="https://www.googleapis.com/auth/gmail.compose"
+    requested_scopes = (
+        [*WORKSPACE_MAILBOX_SCOPES,compose_scope]
+        if args.permit_draft_compose
+        else WORKSPACE_MAILBOX_SCOPES if args.mailbox_read else GMAIL_SCOPES
+    )
     flow = InstalledAppFlow.from_client_secrets_file(
         str(client),
         requested_scopes,
@@ -68,10 +82,10 @@ def main() -> int:
         prompt="consent",
     )
 
-    if args.mailbox_read:
-        # Never replace the established sending token with a consent grant
-        # from the wrong Google account or insufficient Gmail permissions.
-        if not set(WORKSPACE_MAILBOX_SCOPES).issubset(set(credentials.scopes or [])):
+    if args.mailbox_read or args.permit_draft_compose:
+        # Never replace the established sender with a grant from another
+        # account or missing prior read/send permissions.
+        if not set(requested_scopes).issubset(set(credentials.scopes or [])):
             raise SystemExit("WORKSPACE_MAILBOX_SCOPES_NOT_GRANTED; no token replaced")
         try:
             profile = build_gmail_service(credentials).users().getProfile(userId="me").execute()
@@ -84,7 +98,24 @@ def main() -> int:
         parents=True,
         exist_ok=True,
     )
-
+    if args.permit_draft_compose:
+        # This is sensitive credential custody. Copy the previous ORIGINAL
+        # token only to a new 0600 private file, after successful consent
+        # and exact Gmail identity checks, never print its bytes.
+        if (not token.is_file() or token.is_symlink()
+            or stat.S_IMODE(token.stat().st_mode)!=0o600):
+            raise SystemExit("ORIGINAL_WORKSPACE_TOKEN_CUSTODY_UNVERIFIED")
+        stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup=token.with_name(token.name+".pre-compose-"+stamp)
+        if backup.exists() or backup.is_symlink():
+            raise SystemExit("ORIGINAL_WORKSPACE_TOKEN_BACKUP_CONFLICT")
+        fd=os.open(backup,os.O_CREAT|os.O_EXCL|os.O_WRONLY|os.O_NOFOLLOW,0o600)
+        try:
+            with os.fdopen(fd,"wb") as f:
+                f.write(token.read_bytes());f.flush();os.fsync(f.fileno())
+        except Exception:
+            backup.unlink(missing_ok=True)
+            raise
     _write_token(token, credentials.to_json())
 
     print("EMPIRE_GMAIL_OAUTH=AUTHORIZED")
