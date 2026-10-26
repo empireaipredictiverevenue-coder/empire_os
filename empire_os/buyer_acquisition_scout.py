@@ -781,17 +781,36 @@ def run_buyer_scout(
         slots=reserved_budget,
         as_of=datetime.now(timezone.utc),
     )
+    # V14: allocate two rotating *existing* probe slots to independently
+    # sourced UK heat-pump research. No new queries, probes, timers or leads.
+    heat_domains = sorted(
+        host for host in research_seed_domains
+        if any(
+            ref == "public:heat_pump_review:UK:" + host
+            for row in (research_seed_records or [])
+            if isinstance(row, Mapping)
+            and _host(str(row.get("website") or row.get("domain") or "")) == host
+            for ref in (row.get("source_refs") or [])
+        )
+    )
+    heat_budget = min(2, domain_budget // 10, len(heat_domains))
+    rotation = int(datetime.now(timezone.utc).timestamp() // 1800)
+    heat_preferred = (
+        [heat_domains[(rotation * heat_budget + i) % len(heat_domains)]
+         for i in range(heat_budget)] if heat_budget else []
+    )
     reserved_keys = (
         opportunity_seed_domains | low_yield_canonical_domains
         | intent_seed_domains
     )
     ranked_domains = ordered_domains[:domain_budget]
-    for host in preferred:
+    for host in [*preferred, *heat_preferred]:
         if host in ranked_domains:
             continue
         replaceable = next((
             value for value in reversed(ranked_domains)
             if value not in reserved_keys and value not in preferred
+            and value not in heat_preferred
         ), None)
         if replaceable is None:
             continue
@@ -801,12 +820,17 @@ def run_buyer_scout(
     # Give the approved research *review queue* actual probe attention, not
     # outbound authority. Critical opportunity/intent seeds still go first.
     selected_publisher_domains = set(ranked_domains) & set(preferred)
+    selected_heat_domains = set(ranked_domains) & set(heat_preferred)
     ranked_domains = (
         [d for d in ranked_domains if d in reserved_keys]
         + [d for d in ranked_domains
            if d in selected_publisher_domains and d not in reserved_keys]
         + [d for d in ranked_domains
-           if d not in reserved_keys and d not in selected_publisher_domains]
+           if d in selected_heat_domains and d not in reserved_keys
+           and d not in selected_publisher_domains]
+        + [d for d in ranked_domains
+           if d not in reserved_keys and d not in selected_publisher_domains
+           and d not in selected_heat_domains]
     )
 
     candidates: list[dict[str, Any]] = []
@@ -1496,6 +1520,14 @@ def run_buyer_scout(
             selected_publisher_domains & set(probe_domains)
         ),
         "publisher_review_claims_are_not_buyer_approval": True,
+        "heat_pump_review_seed_count": len(heat_domains),
+        "heat_pump_review_included_count": len(selected_heat_domains),
+        "heat_pump_review_probed_count": len(
+            selected_heat_domains & set(probe_domains)
+        ),
+        "heat_pump_review_claims_are_not_buyer_approval": True,
+        "heat_pump_additional_search_queries": 0,
+        "heat_pump_new_probe_capacity": 0,
         "public_research_seed_supplement_used": bool(
             research_seed_domain_count
         ),
