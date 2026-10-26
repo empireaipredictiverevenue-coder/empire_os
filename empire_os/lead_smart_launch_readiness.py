@@ -84,8 +84,12 @@ def _supervised_consumer_disclosure(record: Mapping[str, Any] | None) -> bool:
         and record.get("pre_dial_affirmative_consent_proven") is True
         and record.get("specific_call_privacy_notice_live") is True
         and record.get("general_privacy_terms_live") is True
+        # Pin the reviewed CURRENT first-party homeowner consent handler.
+        # Its Oct 21 change added ownership, eligible-project and voluntary
+        # request checks. This verifies software integrity only: recording
+        # legal compliance and Ringba admin settings remain unverified.
         and record.get("call_api_exact_sha256") ==
-            "4ad55e9de33009ce75a9981cd83a962f15004f7a8f9b1a79e5cdf40c1713fb60"
+            "8948f1b47a3451e3cd9aa87d12014557ff0dd98d14d8b98dbd6b5caa9e18c08a"
         and record.get("buyer_admin_configuration_proven") is False
         and record.get("legal_compliance_certified") is False
     )

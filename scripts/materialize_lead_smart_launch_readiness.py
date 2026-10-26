@@ -147,10 +147,14 @@ def approved_live_publication(
         return False
 
 def effective_legal_release_verified() -> bool:
-    """Reuse gateway admission for both deployed legal exports; never mint a receipt."""
-    from empire_os.public_gateway import _approved_static_content_path
+    """Read the published notice receipts from the same source as the live call API.
 
-    return all(_approved_static_content_path(route) is not None
+    Published notices do not certify recording governance or applicable law;
+    those remain separately evaluated before consumer call admission.
+    """
+    from empire_os.empire_ai_public_legal_release import checked_legal_path
+
+    return all(checked_legal_path(route) is not None
                for route in ("privacy", "terms"))
 
 

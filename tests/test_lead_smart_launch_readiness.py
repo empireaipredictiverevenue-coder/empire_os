@@ -471,7 +471,7 @@ def test_recording_approach_is_exact_source_bound_not_fake_legal_certification()
         "pre_dial_affirmative_consent_proven":True,
         "specific_call_privacy_notice_live":True,
         "general_privacy_terms_live":True,
-        "call_api_exact_sha256":"4ad55e9de33009ce75a9981cd83a962f15004f7a8f9b1a79e5cdf40c1713fb60",
+        "call_api_exact_sha256":"8948f1b47a3451e3cd9aa87d12014557ff0dd98d14d8b98dbd6b5caa9e18c08a",
         "buyer_admin_configuration_proven":False,
         "legal_compliance_certified":False,
     }
@@ -486,6 +486,47 @@ def test_recording_approach_is_exact_source_bound_not_fake_legal_certification()
         ("legal_compliance_certified",True),
     ]:
         assert not _supervised_consumer_disclosure({**proof,field:bad})
+
+
+def test_current_consent_review_pin_matches_live_source_bytes():
+    """Catch consent source drift before another frozen old-hash loop."""
+    import hashlib
+    from pathlib import Path
+    from empire_os.lead_smart_launch_readiness import _supervised_consumer_disclosure
+
+    source = Path(__file__).resolve().parents[1] / "empire_os/lead_smart_pilot_call_api.py"
+    digest = hashlib.sha256(source.read_bytes()).hexdigest()
+    proof = {
+        "mandatory_recording_source_ref": "gmail:1a13568711da9a5b",
+        "buyer_disclaimer_test_ref": "gmail:1a145b32d742f3b1",
+        "buyer_deletion_source_ref": "gmail:1a145a443180606f",
+        "buyer_mandatory_recording": True,
+        "buyer_deletes_if_legally_required": True,
+        "pre_dial_affirmative_consent_proven": True,
+        "specific_call_privacy_notice_live": True,
+        "general_privacy_terms_live": True,
+        "call_api_exact_sha256": digest,
+        "buyer_admin_configuration_proven": False,
+        "legal_compliance_certified": False,
+    }
+    assert _supervised_consumer_disclosure(proof) is True
+
+
+def test_public_notices_use_same_receipt_reader_as_consent_api(monkeypatch):
+    from pathlib import Path
+    from empire_os import empire_ai_public_legal_release as releases
+    from scripts.materialize_lead_smart_launch_readiness import effective_legal_release_verified
+
+    seen = []
+    def published(route):
+        seen.append(route)
+        return Path("/some-published-notice") if route == "privacy" else None
+
+    monkeypatch.setattr(releases, "checked_legal_path", published)
+    assert effective_legal_release_verified() is False
+    assert seen == ["privacy", "terms"]
+    monkeypatch.setattr(releases, "checked_legal_path", lambda route: Path("/published") )
+    assert effective_legal_release_verified() is True
 
 
 def test_static_provider_number_assignment_two_hour_window_only():
