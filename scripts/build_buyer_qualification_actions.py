@@ -61,6 +61,95 @@ FIRST_PARTY_ROLE_REVIEWS = {
     },
 }
 
+# Demand priority is advisory until official geo/ZIP, pricing and volume
+# requirements are accepted. Never infer regional capacity from sector words.
+ACTIVE_GAP_SOURCE = Path('runtime/buyer_acquisition/latest.json')
+DEMAND_SOURCE_MAX_AGE_SECONDS = 2 * 3600
+DIRECT_SOURCE_MAX_AGE_SECONDS = 7 * 86400
+KNOWN_SECTORS = frozenset({
+    'roofing', 'hvac', 'plumbing', 'restoration', 'solar',
+    'painting', 'carpentry', 'electrical', 'landscaping',
+    'legal', 'dental', 'general_contractor',
+})
+
+
+def demand_sector_priorities(payload: dict[str, Any], *, now_epoch: float) -> dict[str, dict[str, Any]]:
+    """Read positive overflow only, without treating it as proof of a payer."""
+    if not isinstance(payload, dict) or not isinstance(payload.get('demand_gap_queue'), list):
+        return {}
+    try:
+        stamp = datetime.fromisoformat(str(payload['generated_at']).replace('Z', '+00:00'))
+        age = now_epoch - stamp.timestamp()
+    except (KeyError, ValueError, TypeError, OverflowError):
+        return {}
+    if not 0 <= age <= DEMAND_SOURCE_MAX_AGE_SECONDS:
+        return {}
+    sector_gaps: dict[str, dict[str, Any]] = {}
+    for gap in payload['demand_gap_queue'][:1000]:
+        if not isinstance(gap, dict) or gap.get('buyer_hunt_required') is not True:
+            continue
+        key = gap.get('corridor_key')
+        parts = key.split(':') if isinstance(key, str) else []
+        if len(parts) != 6 or parts[0:2] != ['corridor', 'v1']:
+            continue
+        sector = parts[2]
+        if sector not in KNOWN_SECTORS or not parts[3]:
+            continue
+        overflow = gap.get('overflow_count')
+        if type(overflow) is not int or not 0 < overflow < 100000:
+            continue
+        data = sector_gaps.setdefault(sector, {
+            'gap_count': 0, 'overflow_count': 0, 'corridors': [],
+        })
+        data['gap_count'] += 1
+        data['overflow_count'] += overflow
+        data['corridors'].append(key)
+    for data in sector_gaps.values():
+        data['corridors'] = data['corridors'][:3]
+    return sector_gaps
+
+
+def buyer_demand_fit(
+    *, verticals: list[str], site: dict[str, Any], priorities: dict[str, dict[str, Any]],
+    now_epoch: float,
+) -> dict[str, Any]:
+    """Sector research fit only; NEVER a claim of local buyer capacity."""
+    inferred = sorted(set(verticals) & priorities.keys())
+    verified: list[str] = []
+    try:
+        observed = float(site.get('observed_epoch') or 0)
+    except (TypeError, ValueError):
+        observed = 0
+    if (site.get('corroborated') is True
+            and site.get('buyer_role') is True
+            and type(site.get('pages_successful')) is int
+            and site['pages_successful'] > 0
+            and 0 <= now_epoch - observed <= DIRECT_SOURCE_MAX_AGE_SECONDS
+            and isinstance(site.get('verticals_detected'), list)):
+        verified = sorted(set(v for v in site['verticals_detected']
+                              if isinstance(v, str)) & priorities.keys())
+    matched = verified or inferred
+    return {
+        'state': ('FIRST_PARTY_SECTOR_RESEARCH_FIT' if verified else
+                  'UNVERIFIED_SECTOR_RESEARCH_FIT' if inferred else
+                  'NO_SECTOR_GAP_MATCH_OBSERVED'),
+        'matching_sector_names': matched[:12],
+        'first_party_matching_sector_names': verified[:12],
+        'active_demand_gap_count': sum(priorities[x]['gap_count'] for x in matched),
+        'observed_overflow_units_for_sectors': sum(priorities[x]['overflow_count'] for x in matched),
+        'sample_corridors_for_research': list(dict.fromkeys(
+            corridor for x in matched for corridor in priorities[x]['corridors']
+        ))[:5],
+        'market_or_zip_coverage_verified': False,
+        'buyer_acceptance_verified': False,
+        'inventory_saleable_or_revenue_verified': False,
+        'next_research_action': (
+            'VERIFY_BUYER_ACCEPTED_STATES_ZIPS_HOURS_AND_FORMAT_FOR_MATCHED_SECTORS'
+            if matched else 'RESEARCH_FIRST_PARTY_BUYER_ROLE_AND_SERVICE_SECTOR'
+        ),
+    }
+
+
 DISCOVERY_REQUIREMENTS = (
     'Confirm currently accepted service verticals and consumer intent',
     'Confirm states, ZIP coverage, hours and accepted inventory formats',
@@ -152,6 +241,22 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
     root=Path(root).resolve()
     snapshots, hashes = _snapshots(root)
     research_decisions = load_research_decisions(root/BASE)
+    now_epoch = time.time()
+    demand_path = root / ACTIVE_GAP_SOURCE
+    demand_hash = None
+    demand_state = 'NOT_AVAILABLE_OR_UNSAFE'
+    demand_priorities: dict[str, dict[str, Any]] = {}
+    if (not demand_path.is_symlink() and demand_path.is_file()
+            and demand_path.stat().st_size <= 2_500_000):
+        raw_demand = demand_path.read_bytes()
+        demand_hash = sha256(raw_demand).hexdigest()
+        try:
+            candidate_plan = json.loads(raw_demand)
+        except (UnicodeError, ValueError):
+            demand_state = 'INVALID'
+        else:
+            demand_priorities = demand_sector_priorities(candidate_plan, now_epoch=now_epoch)
+            demand_state = 'CURRENT_RESEARCH_PRIORITIES' if demand_priorities else 'UNAVAILABLE_STALE_OR_EMPTY'
     holds = load_review_holds(root/'config/buyer_network_manual_review_holds.json')
     due_path = root/BASE/'due_diligence_latest.json'
     due_reviews, due_holds = load_due_diligence(due_path, now_epoch=time.time())
@@ -204,6 +309,10 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             gaps=['independent_buyer_review_evidence']
         gap_totals.update(gaps)
         direct=sites.get(domain) or {}
+        sector_fit = buyer_demand_fit(
+            verticals=[v for v in item.get('verticals', []) if isinstance(v, str)],
+            site=direct, priorities=demand_priorities, now_epoch=now_epoch,
+        )
         score=item.get('founder_priority')
         score=score if type(score) is int and 0<=score<=100 else 0
         contact = item.get('contact_history')
@@ -232,6 +341,7 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'contact_history_state':contact_state,
             'contact_history_next_action':str(contact.get('next_action') or 'RECONCILE_HISTORY')[:120],
             'commercial_next_action':action,
+            'active_demand_sector_research_fit':sector_fit,
             'buyer_discovery_requirements':list(DISCOVERY_REQUIREMENTS)
                 if tier in {'FOUNDER_REVIEW_ONLY','EVIDENCE_RECOVERY'} else [],
             'budget_required_to_research_or_discuss_pilot':False,
@@ -275,18 +385,66 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
     order={'FOUNDER_REVIEW_ONLY':0,'DUE_DILIGENCE_PENDING':1,
            'EVIDENCE_RECOVERY':2,'ECOSYSTEM_RESEARCH':3,
            'AUTOMATED_EVIDENCE_HOLD':4,'MANUAL_EVIDENCE_HOLD':5}
-    actions.sort(key=lambda x:(order[x['tier']],-x['founder_priority'],x['domain']))
+    # Existing conversations outrank cold research within the SAME tier.
+    # First-party sector fit outranks inferred broad industry relevance.
+    # No approved contact, geography or capacity is inferred by this order.
+    relationship_order = {
+        'REVIEW_LIVE_RELATIONSHIP_AND_QUALIFY_BUYER_PILOT': 0,
+        'REVIEW_PRIOR_THREAD_FOR_RESPONSE_NO_DUPLICATE_FIRST_TOUCH': 1,
+        'VERIFY_BUSINESS_CONTACT_PATH_AND_PREPARE_DISCOVERY_PROPOSAL': 2,
+    }
+    evidence_order = {
+        'FIRST_PARTY_SECTOR_RESEARCH_FIT': 0,
+        'UNVERIFIED_SECTOR_RESEARCH_FIT': 1,
+        'NO_SECTOR_GAP_MATCH_OBSERVED': 2,
+    }
+    actions.sort(key=lambda x:(
+        order[x['tier']],
+        relationship_order.get(x['commercial_next_action'], 3),
+        evidence_order[x['active_demand_sector_research_fit']['state']],
+        -x['active_demand_sector_research_fit']['observed_overflow_units_for_sectors'],
+        -x['founder_priority'], x['domain'],
+    ))
     # Reject stale mixed-source races. A scheduler might replace its snapshots
     # concurrently; do not promote an optimistic partial report.
     _,after_hashes=_snapshots(root)
     after_due_hash = sha256(due_path.read_bytes()).hexdigest() if due_path.is_file() else None
     if hashes!=after_hashes or due_hash!=after_due_hash:
         raise BuyerPriorityError('source_snapshots_changed_during_read')
+    if demand_hash is not None:
+        if (not demand_path.is_file() or demand_path.is_symlink()
+                or sha256(demand_path.read_bytes()).hexdigest() != demand_hash):
+            raise BuyerPriorityError('demand_priorities_changed_during_read')
     return {
         'schema_version':'empire.buyer_qualification_actions.v1',
         'generated_at':datetime.now(timezone.utc).isoformat(),
         'mode':'OBSERVE','execution_authority':'none',
         'source_sha256':hashes,
+        'active_demand_source_sha256':demand_hash,
+        'active_demand_source_state':demand_state,
+        'active_demand_sector_priorities':{
+            k:{'market_gap_count':v['gap_count'],'observed_overflow_units':v['overflow_count']}
+            for k,v in sorted(demand_priorities.items())
+        },
+        'first_party_sector_research_fit_count':sum(
+            x['active_demand_sector_research_fit']['state']=='FIRST_PARTY_SECTOR_RESEARCH_FIT'
+            for x in actions
+        ),
+        'inferred_sector_research_fit_count':sum(
+            x['active_demand_sector_research_fit']['state']=='UNVERIFIED_SECTOR_RESEARCH_FIT'
+            for x in actions
+        ),
+        'buyer_accepted_geo_or_zip_coverage_count':0,
+        'commercial_priority_research_domains':[
+            {'domain':x['domain'],
+             'sector_fit':x['active_demand_sector_research_fit']['state'],
+             'matched_sectors':x['active_demand_sector_research_fit']['matching_sector_names'],
+             'next_action':x['commercial_next_action']}
+            for x in actions if
+            x['active_demand_sector_research_fit']['state']=='FIRST_PARTY_SECTOR_RESEARCH_FIT'
+            and x['tier']!='ECOSYSTEM_RESEARCH'
+            and x['commercial_next_action']!='NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY'
+        ][:30],
         'network_candidate_count':len(current_domains),
         'shortlisted_count':len(actions),
         'founder_continue_research_count':sum(x['founder_research_decision']=='CONTINUE_RESEARCH' for x in actions),

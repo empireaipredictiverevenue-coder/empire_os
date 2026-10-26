@@ -242,3 +242,79 @@ def test_event_role_keeps_research_but_never_claims_buyer_review(tmp_path):
     assert result['event_ecosystem_not_direct_buyer_count']==1
     assert result['trusted_founder_review_count']==0
     assert event['outbound_authorized'] is False
+
+
+def test_active_overflow_prioritises_official_sector_evidence_without_geo_authority(tmp_path):
+    from datetime import datetime,timezone
+    directory=_case(tmp_path)
+    demand=tmp_path/'runtime/buyer_acquisition/latest.json'
+    demand.parent.mkdir(parents=True,exist_ok=True)
+    now=datetime.now(timezone.utc)
+    demand.write_text(json.dumps({
+        'generated_at':now.isoformat(),
+        'demand_gap_queue':[{
+            'corridor_key':'corridor:v1:roofing:dallas_fort_worth:qualified_lead:lead',
+            'overflow_count':11, 'buyer_hunt_required':True,
+        },{
+            'corridor_key':'corridor:v1:hvac:houston:qualified_lead:lead',
+            'overflow_count':0, 'buyer_hunt_required':True,
+        }],
+    }))
+    file=directory/SOURCES['direct_site']
+    site=json.loads(file.read_text())
+    site['results'][0].update({
+        'observed_epoch':now.timestamp()-100,
+        'pages_successful':2,
+        'verticals_detected':['roofing','hvac'],
+    })
+    file.write_text(json.dumps(site))
+    report=plan(tmp_path)
+    assert report['active_demand_source_state']=='CURRENT_RESEARCH_PRIORITIES'
+    assert report['active_demand_sector_priorities']['roofing']['observed_overflow_units']==11
+    assert report['buyer_accepted_geo_or_zip_coverage_count']==0
+    buyer=next(row for row in report['targets'] if row['domain']=='publisheralpha.example.com')
+    fit=buyer['active_demand_sector_research_fit']
+    assert fit['state']=='FIRST_PARTY_SECTOR_RESEARCH_FIT'
+    assert fit['matching_sector_names']==['roofing']
+    assert fit['observed_overflow_units_for_sectors']==11
+    assert fit['market_or_zip_coverage_verified'] is False
+    assert fit['buyer_acceptance_verified'] is False
+    assert buyer['outbound_authorized'] is False
+    assert report['commercial_priority_research_domains'][0]['domain']=='publisheralpha.example.com'
+
+
+def test_stale_or_forged_demand_is_never_capacity_or_paid_lead_proof(tmp_path):
+    from datetime import datetime,timedelta,timezone
+    from scripts.build_buyer_qualification_actions import (
+        demand_sector_priorities,buyer_demand_fit,
+    )
+    now=datetime.now(timezone.utc)
+    obj={'generated_at':now.isoformat(),'demand_gap_queue':[
+        {'corridor_key':'corridor:v1:roofing:denver_co:qualified_lead:lead',
+         'overflow_count':5,'buyer_hunt_required':True},
+        {'corridor_key':'corridor:v1:roofing:tampa_fl:qualified_lead:lead',
+         'overflow_count':True,'buyer_hunt_required':True},
+    ]}
+    priorities=demand_sector_priorities(obj,now_epoch=now.timestamp())
+    assert priorities['roofing']['overflow_count']==5
+    assert not demand_sector_priorities({
+        **obj,'generated_at':(now-timedelta(hours=6)).isoformat(),
+    },now_epoch=now.timestamp())
+    site={'corroborated':False,'buyer_role':False,
+          'observed_epoch':now.timestamp(),'verticals_detected':['roofing'],
+          'pages_successful':1}
+    fit=buyer_demand_fit(verticals=['roofing'],site=site,priorities=priorities,
+                         now_epoch=now.timestamp())
+    assert fit['state']=='UNVERIFIED_SECTOR_RESEARCH_FIT'
+    assert fit['market_or_zip_coverage_verified'] is False
+    assert fit['buyer_acceptance_verified'] is False
+    assert fit['inventory_saleable_or_revenue_verified'] is False
+    _case(tmp_path)
+    stale=tmp_path/'runtime/buyer_acquisition/latest.json'
+    stale.parent.mkdir(parents=True,exist_ok=True)
+    stale.write_text(json.dumps({
+        **obj,'generated_at':(now-timedelta(days=1)).isoformat(),
+    }))
+    report=plan(tmp_path)
+    assert report['active_demand_source_state']=='UNAVAILABLE_STALE_OR_EMPTY'
+    assert report['first_party_sector_research_fit_count']==0
