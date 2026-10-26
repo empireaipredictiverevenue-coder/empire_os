@@ -211,3 +211,51 @@ def test_omega_reader_failure_does_not_block_exchange():
     assert snapshot["omega_scoring"]["state"] == "CANONICAL_SCORE_JOIN_UNAVAILABLE"
     assert snapshot["omega_scoring"]["scores_with_exact_qualification_and_identity"] == 0
     assert snapshot["automatic_external_delivery"] is False
+
+
+def test_population_census_counts_full_version_scoped_cohort_not_display_window():
+    class CountGateway:
+        def count(self, table, filters=None):
+            if table == "prospects":
+                return 32940
+            assert table == "prospect_qualifications"
+            assert filters["scoring_engine"] == "empire_os.lead_scoring"
+            assert filters["scoring_version"] == "v2"
+            return {
+                (None, None): 3190,
+                ("scored", None): 3190,
+                ("scored", "hot"): 175,
+                ("scored", "warm"): 50,
+                ("scored", "insufficient_evidence"): 2965,
+            }[(filters.get("status"), filters.get("tier"))]
+    result = module.read_qualification_population_counts(CountGateway())
+    assert result["state"] == "CANONICAL_COUNT_AVAILABLE"
+    assert result["canonical_prospect_total"] == 32940
+    assert result["v2_scored_prospect_total"] == 3190
+    assert result["v2_qualification_record_total"] == 3190
+    assert result["prospects_without_v2_record"] == 29750
+    assert result["v2_hot_tier_total"] == 175
+    assert result["v2_warm_tier_total"] == 50
+    assert result["saleable_prospect_count"] is None
+    assert result["independent_count_queries_not_atomic_snapshot"] is True
+
+
+def test_population_count_unavailable_never_fabricates_zero_or_blocks_inventory():
+    class Denied(FakeGateway):
+        def count(self, table, filters=None):
+            raise PermissionError("no aggregate reader")
+    snapshot = module.build_runtime_snapshot(Denied(), limit=1)
+    assert snapshot["inventory_count"] == 1
+    assert snapshot["selection_window"]["limit_reached"] is True
+    assert snapshot["qualification_population_census"]["state"] == "COUNT_UNAVAILABLE"
+    assert snapshot["qualification_population_census"]["v2_scored_prospect_total"] is None
+    assert snapshot["qualification_population_census"]["saleable_prospect_count"] is None
+
+
+def test_population_inconsistent_values_fail_closed():
+    class Inconsistent:
+        def count(self, table, filters=None):
+            return 10 if table == "prospects" else 20
+    result = module.read_qualification_population_counts(Inconsistent())
+    assert result["state"] == "COUNT_UNAVAILABLE"
+    assert result["prospects_without_v2_record"] is None

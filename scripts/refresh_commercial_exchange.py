@@ -363,6 +363,65 @@ def fetch_verified_omega_projection_map(
     return result
 
 
+def read_qualification_population_counts(
+    gateway: CanonicalDataGateway,
+) -> dict[str, Any]:
+    """Census the entire canonical scoring universe, not the 200-row view.
+
+    EmpireDB enforces UNIQUE(prospect_id, scoring_engine, scoring_version);
+    these version-scoped row counts therefore represent distinct prospects.
+    Reads are independent, not a transactionally consistent point-in-time
+    snapshot. Tier alone is NOT sufficient commercial qualification.
+    """
+    filters = {
+        "scoring_engine": "empire_os.lead_scoring",
+        "scoring_version": "v2",
+    }
+    try:
+        total = gateway.count("prospects")
+        v2_records = gateway.count("prospect_qualifications", filters)
+        scored_filters = {**filters, "status": "scored"}
+        scored_v2 = gateway.count("prospect_qualifications", scored_filters)
+        hot = gateway.count("prospect_qualifications", {**scored_filters, "tier": "hot"})
+        warm = gateway.count("prospect_qualifications", {**scored_filters, "tier": "warm"})
+        insufficient = gateway.count(
+            "prospect_qualifications", {**scored_filters, "tier": "insufficient_evidence"}
+        )
+        if any(
+            type(n) is not int or n < 0
+            for n in (total, v2_records, scored_v2, hot, warm, insufficient)
+        ) or v2_records > total or scored_v2 > v2_records or hot + warm + insufficient > scored_v2:
+            raise ValueError("inconsistent qualification census")
+    except Exception:
+        return {
+            "state": "COUNT_UNAVAILABLE",
+            "canonical_prospect_total": None,
+            "v2_qualification_record_total": None,
+            "v2_scored_prospect_total": None,
+            "prospects_without_v2_record": None,
+            "v2_hot_tier_total": None,
+            "v2_warm_tier_total": None,
+            "v2_insufficient_evidence_tier_total": None,
+            "saleable_prospect_count": None,
+            "known_buyer_count_inferred": False,
+        }
+    return {
+        "state": "CANONICAL_COUNT_AVAILABLE",
+        "canonical_prospect_total": total,
+        "v2_qualification_record_total": v2_records,
+        "v2_scored_prospect_total": scored_v2,
+        "prospects_without_v2_record": total - v2_records,
+        "v2_hot_tier_total": hot,
+        "v2_warm_tier_total": warm,
+        "v2_insufficient_evidence_tier_total": insufficient,
+        "saleable_prospect_count": None,
+        "known_buyer_count_inferred": False,
+        "version_unique_prospect_ids": True,
+        "independent_count_queries_not_atomic_snapshot": True,
+        "tier_alone_does_not_prove_evidence_or_identity": True,
+    }
+
+
 def build_runtime_snapshot(
     gateway: CanonicalDataGateway,
     *,
@@ -418,6 +477,14 @@ def build_runtime_snapshot(
     }
     snapshot["source"] = SOURCE
     snapshot["candidate_selection"] = "qualification_driven"
+    snapshot["qualification_population_census"] = read_qualification_population_counts(gateway)
+    snapshot["selection_window"] = {
+        "requested_limit": max(1, min(int(limit), 500)),
+        "selected_prospect_count": len(prospect_ids),
+        "limit_reached": len(prospect_ids) >= max(1, min(int(limit), 500)),
+        "selected_count_is_total_qualified_population": False,
+        "source": "bounded_hot_warm_evidence_filter",
+    }
     snapshot["qualified_candidates_selected"] = len(prospect_ids)
     snapshot["qualified_v2_candidates_selected"] = len(prospect_ids)
     snapshot["qualified_v1_fallback_candidates_selected"] = 0

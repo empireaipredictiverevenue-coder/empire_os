@@ -511,7 +511,7 @@ def run_historical_backfill_batch(
     evidence_floor_met = 0
     for row in result.get("results") or []:
         tier = str(row.get("tier") or "unknown").strip().lower()
-        if tier not in {"hot", "warm", "cold", "dead"}:
+        if tier not in {"hot", "warm", "cold", "dead", "insufficient_evidence"}:
             tier = "unknown"
         tier_counts[tier] = tier_counts.get(tier, 0) + 1
         try:

@@ -18,7 +18,7 @@ fi
 cd "$ROOT"
 printf '%s\n' \
   'd8733b1fe053ccea73bb838f413bce23737831dc646c49b34d5122bb01061be7  empire_os/qualification_data_repository.py' \
-  '1da4d3e8f4aebbc99b201ed4411b3d638490b312afeabed1bbd395fbcac9fb64  empire_os/qualification_worker_v2.py' \
+  'e185eccbd9d6c173803f4c095e85700b9f0fd0b1ae84fa7c8f63dfc414dabd66  empire_os/qualification_worker_v2.py' \
   '66fe3652fd3810c5b5e9873edecf57796f57b7711cdefbb914545d5b7c119e57  scripts/run_qualification_cycle.py' \
   '5613a073d97bfa06befcf75e56880c7892192f2990b4b50fa6b119825bd6fc8b  deploy/systemd/36-empire-qualification-historical-identity-first.conf' |
   sha256sum --check --status || {

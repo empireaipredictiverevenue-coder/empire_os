@@ -257,3 +257,33 @@ def test_historical_identity_linked_batch_uses_same_v2_scorer(monkeypatch):
     assert result["proposed_next_offset"] == 12
     assert result["outbound_authorized"] is False
     assert "private.example" not in json.dumps(result)
+
+
+def test_backfill_reports_insufficient_evidence_as_distinct_tier(monkeypatch):
+    from empire_os import qualification_worker_v2 as worker
+
+    class Repo:
+        def fetch_historical_pending_page(self, **kwargs):
+            return {
+                "candidate_rows": [{"id": "private-p1", "website": ""}],
+                "scanned_rows": 1,
+                "next_offset": 9,
+                "archive_exhausted": False,
+            }
+    monkeypatch.setattr(worker, "_qualification_repository", lambda: Repo())
+    monkeypatch.setattr(worker, "_run_prospects", lambda rows, *, schema_version: {
+        "schema_version": schema_version,
+        "ok": True, "attempted": 1, "qualified": 1, "failed": 0,
+        "identity_resolved": 0,
+        "results": [{
+            "prospect_id": "private-p1", "entity_id": None,
+            "tier": "insufficient_evidence", "evidence_confidence": .3,
+            "identity_resolved": False,
+        }],
+    })
+    result = worker.run_historical_backfill_batch(offset=8, limit=1)
+    assert result["tier_counts"] == {"insufficient_evidence": 1}
+    assert result["hot_warm_above_evidence_floor"] == 0
+    assert result["omega_projection"]["scores_written"] == 0
+    assert result["cortex_evidence_review"]["accounts_evidence_reviewed"] == 0
+    assert "private-p1" not in json.dumps(result)
