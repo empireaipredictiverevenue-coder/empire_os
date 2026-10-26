@@ -23,6 +23,9 @@ REL = Path("runtime/buyer_network_intelligence")
 QUAL = REL / "founder_qualification_actions_latest.json"
 STATE = REL / "team_brain_state_latest.json"
 REPORT = REL / "team_brain_latest.json"
+SITE_LEDGER = REL / "research_ledger_latest.json"
+SITE_RESULTS = REL / "direct_site_verification_latest.json"
+SITE_OBSERVATION_TTL = 7 * 24 * 3600
 DOMAIN = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$")
 REFRESH_AFTER = 20 * 60
 REFRESH_COOLDOWN = 20 * 60
@@ -52,6 +55,11 @@ OWNER = {
     "RESEARCH_COMPANY_ROLE": "existing_buyer_network_research_owner",
     "RESEARCH_EVENT_ECOSYSTEM": "existing_buyer_network_research_owner",
 }
+SITE_RESEARCH_ACTIONS = frozenset({
+    "VERIFY_FIRST_PARTY_SITE", "VERIFY_COMPANY_BUYER_ROLE",
+    "VERIFY_BUYER_GEO_AND_PRODUCT_REQUIREMENTS", "RESEARCH_COMPANY_ROLE",
+    "RESEARCH_EVENT_ECOSYSTEM",
+})
 SAFE_STATES = frozenset(action.value for action in BuyerDecision)
 assert SAFE_STATES == frozenset(OWNER), "Every typed decision needs one original owner"
 SENSITIVE_ACTIONS = frozenset({
@@ -94,6 +102,93 @@ def _stamp(raw: Any, *, now: datetime, max_age: float = 3600 * 3) -> float:
     if not -300 <= age <= max_age:
         raise ValueError("buyer_team_stale_or_future_source_time")
     return age
+
+
+def verified_site_research_receipts(root: Path, *, now: datetime) -> tuple[dict[str, dict], str]:
+    """Join original Scout site attempts by domain, epoch and source authority.
+
+    Site observations never settle a buyer requirement or qualify a payer.
+    Missing, stale or inconsistent receipts produce no claimed completion.
+    """
+    try:
+        ledger = _read(root, SITE_LEDGER)
+        site = _read(root, SITE_RESULTS)
+        if (ledger.get("schema_version") != "empire.buyer_network_research_ledger.v1"
+                or ledger.get("mode") != "OBSERVE"
+                or site.get("schema_version") != "buyer-direct-site-verification-v1"
+                or site.get("authority") != "OBSERVE"
+                or not isinstance(site.get("governance"), dict)
+                or any(site["governance"].get(key) is not False for key in (
+                    "outbound", "forms", "logins", "db_write",
+                    "traffic_activation", "commercial_terms", "funds"))
+                or not isinstance(ledger.get("domains"), dict)
+                or len(ledger["domains"]) > 3000
+                or not isinstance(site.get("results"), list)
+                or len(site["results"]) > 3000):
+            raise ValueError("unsafe_site_research_receipts")
+        _stamp(ledger.get("updated_at"), now=now, max_age=SITE_OBSERVATION_TTL)
+        _stamp(site.get("generated_at"), now=now, max_age=SITE_OBSERVATION_TTL)
+        observed_epoch = float(site["generated_epoch"])
+        if not 0 <= now.timestamp() - observed_epoch <= SITE_OBSERVATION_TTL:
+            raise ValueError("stale_site_research_snapshot")
+        observed: dict[str, dict] = {}
+        duplicates: set[str] = set()
+        for row in site["results"]:
+            if not isinstance(row, dict):
+                continue
+            domain = row.get("domain")
+            if not isinstance(domain, str) or not DOMAIN.fullmatch(domain):
+                continue
+            if domain in observed:
+                duplicates.add(domain)
+            observed[domain] = row
+        for domain in duplicates:
+            observed.pop(domain, None)
+        receipts: dict[str, dict] = {}
+        for domain, attempt in ledger["domains"].items():
+            if (not isinstance(domain, str) or not DOMAIN.fullmatch(domain)
+                    or not isinstance(attempt, dict)):
+                continue
+            row = observed.get(domain)
+            if not row:
+                continue
+            try:
+                timestamp = float(attempt["last_attempt_epoch"])
+                row_timestamp = float(row["observed_epoch"])
+            except (KeyError, TypeError, ValueError, OverflowError):
+                continue
+            if (not 0 <= now.timestamp() - timestamp <= SITE_OBSERVATION_TTL
+                    or abs(timestamp - row_timestamp) > 1.0):
+                continue
+            evidence = row.get("evidence")
+            evidence = evidence if isinstance(evidence, dict) else {}
+            first_party = (
+                attempt.get("status") == "CORROBORATED_FIRST_PARTY"
+                and row.get("corroborated") is True
+                and row.get("buyer_role") is True
+                and type(row.get("pages_successful")) is int
+                and row["pages_successful"] >= 1
+                and type(row.get("positive_category_count")) is int
+                and row["positive_category_count"] >= 2
+                and evidence.get("negative_program") is not True)
+            if first_party:
+                status = "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN"
+            elif attempt.get("status") in (
+                    "CORROBORATED_FIRST_PARTY", "EVIDENCE_INSUFFICIENT"):
+                status = "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED"
+            else:
+                continue
+            receipts[domain] = {
+                "status": status,
+                "observed_at": datetime.fromtimestamp(
+                    timestamp, timezone.utc).isoformat(),
+                "scope": "existing_scout_first_party_site_probe",
+                "decision_action_completed": False,
+                "buyer_acceptance_verified": False,
+            }
+        return receipts, "ORIGINAL_SCOUT_RECEIPTS_VERIFIED"
+    except (OSError, ValueError, TypeError, OverflowError, KeyError):
+        return {}, "SCOUT_RECEIPTS_MISSING_STALE_OR_UNSAFE"
 
 
 def classify(row: dict) -> str | None:
@@ -160,7 +255,9 @@ def _priority(row: dict, action: str) -> int:
 
 
 def review(snapshot: dict, previous: dict | None, *, now: datetime,
-           refresh_attempt: dict | None = None) -> tuple[dict, dict]:
+           refresh_attempt: dict | None = None,
+           site_receipts: dict[str, dict] | None = None,
+           site_source_state: str = "SOURCE_NOT_LOADED") -> tuple[dict, dict]:
     """Decision memory: observe changed evidence once, don't reissue unchanged tasks."""
     if (snapshot.get("schema_version") != "empire.buyer_qualification_actions.v1"
             or snapshot.get("mode") != "OBSERVE"
@@ -316,6 +413,39 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         if item["domain"] in surfaced:
             item["decision_state"] = "SURFACED_TO_EXISTING_OWNER_REVIEW"
     portfolio.sort(key=lambda x: (-x["research_priority"], x["domain"]))
+    outcome_counts: Counter[str] = Counter()
+    validated_source = site_source_state == "ORIGINAL_SCOUT_RECEIPTS_VERIFIED"
+    for item in portfolio:
+        domain = item["domain"]
+        action = item["recommended_action"]
+        if item["decision_state"] == "POLICY_HOLD":
+            outcome = "POLICY_HOLD_NO_EXECUTION"
+        elif action not in SITE_RESEARCH_ACTIONS:
+            outcome = "SITE_PROBE_NOT_PROOF_OF_THIS_OWNER_ACTION"
+        elif not validated_source:
+            outcome = "SCOUT_SOURCE_UNAVAILABLE_NO_COMPLETION_CLAIM"
+        else:
+            match = (site_receipts or {}).get(domain)
+            outcome = (match.get("status") if isinstance(match, dict)
+                       and match.get("decision_action_completed") is False
+                       and match.get("buyer_acceptance_verified") is False
+                       else None)
+            if outcome not in (
+                    "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN",
+                    "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED"):
+                outcome = "NO_MATCHED_SITE_ATTEMPT_OBSERVED"
+        item["owner_research_outcome"] = outcome
+        receipt = (site_receipts or {}).get(domain)
+        item["owner_research_observed_at"] = (
+            receipt.get("observed_at") if validated_source
+            and outcome in (
+                "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN",
+                "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED")
+            and isinstance(receipt, dict)
+            and isinstance(receipt.get("observed_at"), str)
+            else None)
+        item["decision_action_completed"] = False
+        outcome_counts[outcome] += 1
     last_refresh = refresh_attempt or {}
     result = {
         "schema_version": SCHEMA, "mode": "OBSERVE",
@@ -333,6 +463,12 @@ def review(snapshot: dict, previous: dict | None, *, now: datetime,
         "priority_worklist": selected,
         "portfolio_next_actions": portfolio,
         "portfolio_next_actions_are_review_not_execution": True,
+        "owner_research_reconciliation": {
+            "source_state": site_source_state,
+            "outcome_counts": dict(sorted(outcome_counts.items())),
+            "completed_owner_actions_verified": 0,
+            "original_scout_timers_untouched": True,
+        },
         "worklist_truncated_count": max(0, len(due) - MAX_OUTPUT_TASKS),
         "source_refresh": last_refresh,
         "astra_owner": "existing_astra_dispatcher_advisory_only",
@@ -409,7 +545,10 @@ def run_team_brain(root: Path, *, now: datetime | None = None,
                 refresh["failure_class"] = "EXISTING_OWNER_RETURNED_NONZERO"
         except (OSError, subprocess.TimeoutExpired, ValueError):
             refresh["failure_class"] = "EXISTING_OWNER_UNAVAILABLE"
-    result, checkpoint = review(snapshot, previous, now=now, refresh_attempt=refresh)
+    site_receipts, site_source_state = verified_site_research_receipts(root, now=now)
+    result, checkpoint = review(
+        snapshot, previous, now=now, refresh_attempt=refresh,
+        site_receipts=site_receipts, site_source_state=site_source_state)
     _atomic(root / REPORT, result)
     _atomic(root / STATE, checkpoint)
     return {
@@ -420,6 +559,8 @@ def run_team_brain(root: Path, *, now: datetime | None = None,
         "awaiting_next_research_queue_cycle": result["worklist_truncated_count"],
         "repeat_decisions_suppressed": result["unchanged_recommendations_suppressed"],
         "owner_review_recommendations_surfaced": len(result["priority_worklist"]),
+        "owner_research_source_state": site_source_state,
+        "owner_research_outcomes": result["owner_research_reconciliation"]["outcome_counts"],
         "existing_qualification_refresh": refresh["status"],
         "external_execution_performed": False,
         "outbound_authorized": False, "database_writes": False,

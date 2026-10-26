@@ -313,3 +313,97 @@ def test_short_lived_enriched_fingerprint_migrates_without_repeat():
     result, next_state = review(source, state, now=NOW)
     assert result['priority_worklist'] == []
     assert next_state['emitted_decisions']['buyer0.com'] != enriched
+
+
+def test_site_probe_receipts_are_provenance_bound_and_not_completed_buyer_actions(tmp_path):
+    from empire_os.buyer_acquisition_decision_brain import (
+        SITE_LEDGER, SITE_RESULTS, verified_site_research_receipts,
+    )
+    ledger = {
+        "schema_version": "empire.buyer_network_research_ledger.v1",
+        "mode": "OBSERVE", "updated_at": NOW.isoformat(),
+        "domains": {
+            "buyer0.com": {"last_attempt_epoch": NOW.timestamp(), "status": "CORROBORATED_FIRST_PARTY"},
+            "buyer1.com": {"last_attempt_epoch": NOW.timestamp(), "status": "EVIDENCE_INSUFFICIENT"},
+            "buyer2.com": {"last_attempt_epoch": NOW.timestamp(), "status": "CORROBORATED_FIRST_PARTY"},
+        },
+    }
+    def first_party(name, evidence=True, timestamp=None):
+        return {
+            "domain": name, "observed_epoch": NOW.timestamp() if timestamp is None else timestamp,
+            "corroborated": evidence, "buyer_role": evidence,
+            "pages_successful": 2, "positive_category_count": 3,
+            "evidence": {"negative_program": False},
+        }
+    site = {
+        "schema_version": "buyer-direct-site-verification-v1", "authority": "OBSERVE",
+        "generated_at": NOW.isoformat(), "generated_epoch": NOW.timestamp(),
+        "governance": {k: False for k in (
+            "outbound", "forms", "logins", "db_write", "traffic_activation",
+            "commercial_terms", "funds")},
+        "results": [
+            first_party("buyer0.com"),
+            first_party("buyer1.com", evidence=False),
+            first_party("buyer2.com", timestamp=NOW.timestamp()-200),
+        ],
+    }
+    for path, document in ((SITE_LEDGER, ledger), (SITE_RESULTS, site)):
+        output = tmp_path / path
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_text(json.dumps(document))
+    evidence, state = verified_site_research_receipts(tmp_path, now=NOW)
+    assert state == "ORIGINAL_SCOUT_RECEIPTS_VERIFIED"
+    assert set(evidence) == {"buyer0.com", "buyer1.com"}
+    assert evidence["buyer0.com"]["status"] == "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN"
+    assert evidence["buyer1.com"]["status"] == "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED"
+    assert all(not e["decision_action_completed"] and not e["buyer_acceptance_verified"] for e in evidence.values())
+    report, _ = review(snapshot(3), None, now=NOW, site_receipts=evidence,
+                       site_source_state=state)
+    statuses = {r["domain"]: r["owner_research_outcome"] for r in report["portfolio_next_actions"]}
+    assert statuses["buyer0.com"] == "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN"
+    assert statuses["buyer1.com"] == "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED"
+    assert statuses["buyer2.com"] == "NO_MATCHED_SITE_ATTEMPT_OBSERVED"
+    assert report["owner_research_reconciliation"]["completed_owner_actions_verified"] == 0
+
+    site["governance"]["outbound"] = True
+    (tmp_path / SITE_RESULTS).write_text(json.dumps(site))
+    unsafe, health = verified_site_research_receipts(tmp_path, now=NOW)
+    assert unsafe == {} and health == "SCOUT_RECEIPTS_MISSING_STALE_OR_UNSAFE"
+    degraded, _ = review(snapshot(3), None, now=NOW, site_receipts=unsafe,
+                         site_source_state=health)
+    assert all(row["owner_research_outcome"] == "SCOUT_SOURCE_UNAVAILABLE_NO_COMPLETION_CLAIM"
+               for row in degraded["portfolio_next_actions"])
+
+
+def test_site_probe_cannot_resolve_existing_contact_or_policy_hold():
+    source = snapshot(3)
+    source["targets"][0]["contact_history_state"] = "ALREADY_CONTACTED"
+    source["targets"][1]["contact_history_state"] = "WORKSPACE_RECIPROCAL_THREAD_OBSERVED"
+    source["targets"][2]["manual_hold_reason"] = "SUPPRESSED"
+    reported = {f"buyer{i}.com": {
+        "status": "FIRST_PARTY_BUYER_ROLE_OBSERVED_REQUIREMENTS_OPEN",
+        "decision_action_completed": False, "buyer_acceptance_verified": False,
+    } for i in range(3)}
+    result, _ = review(source, None, now=NOW,
+                       site_receipts=reported,
+                       site_source_state="ORIGINAL_SCOUT_RECEIPTS_VERIFIED")
+    states = {x["domain"]: x["owner_research_outcome"] for x in result["portfolio_next_actions"]}
+    assert states["buyer0.com"] == "SITE_PROBE_NOT_PROOF_OF_THIS_OWNER_ACTION"
+    assert states["buyer1.com"] == "SITE_PROBE_NOT_PROOF_OF_THIS_OWNER_ACTION"
+    assert states["buyer2.com"] == "POLICY_HOLD_NO_EXECUTION"
+    assert result["outbound_authorized"] is False
+
+
+def test_research_attempt_without_material_changed_evidence_does_not_resurface_tasks():
+    source = snapshot(1)
+    first, checkpoint = review(source, None, now=NOW)
+    receipt = {"buyer0.com": {
+        "status": "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED",
+        "decision_action_completed": False, "buyer_acceptance_verified": False,
+    }}
+    second, checkpoint = review(source, checkpoint, now=NOW + timedelta(minutes=5),
+                                site_receipts=receipt,
+                                site_source_state="ORIGINAL_SCOUT_RECEIPTS_VERIFIED")
+    assert second["priority_worklist"] == []
+    assert second["materially_changed_recommendations"] == 0
+    assert second["portfolio_next_actions"][0]["owner_research_outcome"] == "SITE_ATTEMPTED_BUYER_ROLE_UNCONFIRMED"
