@@ -3,11 +3,20 @@
 from pathlib import Path
 from hashlib import sha256
 import json
+import subprocess
 import requests
 
 ORIGINAL=Path("/srv/empire_os/apps/empire-public-site/out")
 REBUILT=Path("/home/ubuntu/empire_worktrees/website_solar_commercial_premium_20261026/apps/empire-public-site/out")
 PACKET=Path("/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2")
+WORKTREE=Path("/home/ubuntu/empire_worktrees/website_solar_commercial_premium_20261026")
+SOURCE_PATHS=(
+ "apps/empire-public-site/src/app/industries/[slug]/page.tsx",
+ "apps/empire-public-site/src/app/commercial/page.tsx",
+ "apps/empire-public-site/src/components/SolarIntelligenceExperience.tsx",
+)
+SCREENSHOTS=("solar-desktop.png","solar-mobile.png",
+             "commercial-desktop.png","commercial-mobile.png")
 TARGETS={"commercial.html":"/commercial","industries/solar.html":"/industries/solar"}
 ROUTE_DATA=(
  "commercial.txt",
@@ -49,6 +58,25 @@ def review():
         or manifest.get("publication_authorized_now") is not False
         or manifest.get("unrelated_html_and_route_data_excluded") is not True):
         raise ValueError("MANIFEST_NOT_EXACT_TWO_PAGE_SCOPE")
+    revision=subprocess.check_output(["git","-C",str(WORKTREE),"rev-parse","--short","HEAD"],text=True).strip()
+    if manifest.get("source_commit")!=revision:
+        raise ValueError("UNPINNED_OR_CHANGED_SOURCE_REVISION")
+    if manifest.get("source_sha256")!={rel:sha(WORKTREE/rel) for rel in SOURCE_PATHS}:
+        raise ValueError("OWNER_REVIEWED_APPLICATION_SOURCE_DRIFT")
+    visual=PACKET/"browser_qa"/"qa_receipt.json"
+    if not visual.is_file() or visual.is_symlink() or sha(visual)!=manifest.get("browser_qa_receipt_sha256"):
+        raise ValueError("ISOLATED_CHROME_QA_RECEIPT_UNTRUSTED")
+    try:
+        qa=json.loads(visual.read_text())
+    except Exception as exc:
+        raise ValueError("INVALID_PRIVATE_CHROME_QA") from exc
+    if (qa.get("status")!="ORIGINAL_TWO_PAGE_PRIVATE_DESKTOP_MOBILE_BROWSER_PASS"
+        or qa.get("real_customer_post_count")!=0
+        or qa.get("public_website_modified") is not False
+        or len(qa.get("screens",[]))!=4):
+        raise ValueError("OWNER_CHROME_ACCEPTANCE_NOT_VERIFIED")
+    if manifest.get("browser_review_screenshots_sha256")!={name:sha(PACKET/"browser_qa"/name) for name in SCREENSHOTS}:
+        raise ValueError("EXACT_VISUAL_REVIEW_SCREENSHOTS_CHANGED")
     for rel,route in TARGETS.items():
         r=requests.get("https://empire-ai.co.uk"+route,timeout=15)
         if r.status_code!=200 or sha256(r.content).hexdigest()!=old[rel]:
