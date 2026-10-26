@@ -33,6 +33,15 @@ if systemctl is-active --quiet empire-qualification.service; then
   exit 5
 fi
 
+read_progress() {
+  "$ROOT/.venv/bin/python" -B -c '
+import sys
+sys.path.insert(0, "/srv/empire_os")
+from empire_os.qualification_historical_backfill_cursor import load_cursor
+print(load_cursor())
+'
+}
+BEFORE_OFFSET="$(read_progress)"
 installed_now=0
 if [[ -e "$DROPIN" ]]; then
   cmp -s "$SOURCE" "$DROPIN" || {
@@ -65,13 +74,8 @@ if [[ ! -f "$CURSOR" ]]; then
   exit 8
 fi
 
-NEXT_OFFSET="$("$ROOT/.venv/bin/python" -B -c '
-import sys
-sys.path.insert(0, "/srv/empire_os")
-from empire_os.qualification_historical_backfill_cursor import load_cursor
-print(load_cursor())
-')"
-if [[ ! "$NEXT_OFFSET" =~ ^[0-9]+$ ]] || [[ "$NEXT_OFFSET" -eq 0 ]]; then
+NEXT_OFFSET="$(read_progress)"
+if [[ ! "$NEXT_OFFSET" =~ ^[0-9]+$ ]] || [[ "$NEXT_OFFSET" -le "$BEFORE_OFFSET" ]]; then
   echo "HOLD: no positive backfill cursor progress attested" >&2
   exit 9
 fi
