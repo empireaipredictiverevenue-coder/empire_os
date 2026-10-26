@@ -276,6 +276,23 @@ def write_feed_snapshot(
     return path
 
 
+def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
+    """Re-use original competitor runtime; national call networks are not
+    added to the resolved local contractor roster or credited with demand."""
+    snapshot = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_acquisition_atlas_latest.json"
+    )
+    if (snapshot.get("schema_version")
+            != "empire.competitor_call_acquisition_atlas.v1"
+            or snapshot.get("mode") != "OBSERVE"
+            or snapshot.get("national_operator_roster_distinct_from_local_contractors") is not True
+            or snapshot.get("outreach_enabled") is not False
+            or snapshot.get("execution_authority") != "none"):
+        return {"available": False, "mode": "OBSERVE"}
+    return {"available": True, **snapshot}
+
+
 def refresh_feed_snapshot(
     repo_root: Path,
     writer: PostgresIntelligenceMaterializer,
@@ -311,6 +328,7 @@ def refresh_feed_snapshot(
             runtime / "competitor_search_presence_latest.json"
         ),
     )
+    payload["call_acquisition_intelligence"] = _call_acquisition_overlay(repo_root)
     write_feed_snapshot(repo_root, payload)
     return payload
 
@@ -334,8 +352,12 @@ def build_feed_runtime(repo_root: Path) -> dict[str, Any]:
             "prospect_created": False,
             "outreach_enabled": False,
             "execution_authority": "none",
+            "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
         }
-    return {"available": True, **payload}
+    return {
+        "available": True, **payload,
+        "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
+    }
 
 
 def main() -> int:

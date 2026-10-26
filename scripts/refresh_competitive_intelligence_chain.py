@@ -23,6 +23,7 @@ from empire_os.competitor_audience_runtime import (
 )
 from empire_os.competitor_ecosystem_mining import refresh_ecosystem_snapshot
 from empire_os.competitor_intelligence_feed import refresh_feed_snapshot
+from empire_os.competitor_call_channel_atlas import refresh as refresh_call_acquisition_atlas
 from empire_os.competitor_market_opportunity import (
     refresh_market_opportunity_snapshot,
 )
@@ -284,6 +285,16 @@ def refresh_competitive_intelligence_chain(
             public_only=True,
         ),
         attempts=2,
+        critical=False,
+    )
+    stages.append(stage)
+
+    # Reviewed national acquisition operators live alongside, not inside,
+    # the resolved local contractor roster. Reuse this ORIGINAL refresh
+    # cycle; never create a separate miner daemon, buyer, or contact.
+    stage, _ = _run_stage(
+        "call_acquisition_atlas",
+        lambda: refresh_call_acquisition_atlas(root),
         critical=False,
     )
     stages.append(stage)

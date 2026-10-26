@@ -1,0 +1,244 @@
+{
+  "schema_version": "empire.competitor_call_acquisition_sources.v1",
+  "scope": "US_HOME_SERVICES_OPERATOR_CHANNEL_RESEARCH_NOT_BUYER_ACCEPTANCE",
+  "researched_at_utc": "2026-10-26T20:00:00+00:00",
+  "operators": [
+    {
+      "id": "modernize",
+      "name": "Modernize Home Services",
+      "domain": "modernize.com",
+      "observations": [
+        {
+          "url": "https://modernize.com/contractor-resources/articles/how-a-lead-comes-to-modernize",
+          "channels": [
+            "paid_search",
+            "native_ads",
+            "owned_sites",
+            "organic_search",
+            "publisher_partners",
+            "paid_social",
+            "call_center"
+          ],
+          "outcomes": [
+            "inbound_call",
+            "live_transfer",
+            "form_lead"
+          ],
+          "qualification": [
+            "call_center"
+          ],
+          "payment_models": [],
+          "statement": "The operator describes these acquisition channels and lead-delivery routes."
+        },
+        {
+          "url": "https://modernize.com/affiliates",
+          "channels": [
+            "publisher_partners"
+          ],
+          "outcomes": [
+            "form_lead"
+          ],
+          "qualification": [],
+          "payment_models": [
+            "cpl"
+          ],
+          "statement": "The operator offers an approved affiliate programme with pay-per-lead compensation."
+        },
+        {
+          "url": "https://modernize.com/press/modernize-acquires-get-the-referral",
+          "channels": [
+            "referrals"
+          ],
+          "outcomes": [],
+          "qualification": [],
+          "payment_models": [],
+          "statement": "The operator announced its October 2026 referral-technology acquisition."
+        }
+      ]
+    },
+    {
+      "id": "service_direct",
+      "name": "Service Direct",
+      "domain": "servicedirect.com",
+      "observations": [
+        {
+          "url": "https://blog.servicedirect.com/what-we-do-to-ensure-phone-lead-quality",
+          "channels": [
+            "owned_sites",
+            "publisher_partners"
+          ],
+          "outcomes": [
+            "inbound_call"
+          ],
+          "qualification": [],
+          "payment_models": [],
+          "statement": "The operator describes in-house owned websites and outside publisher lead sources."
+        },
+        {
+          "url": "https://blog.servicedirect.com/how-qualified-are-service-direct-leads",
+          "channels": [
+            "organic_search",
+            "paid_search",
+            "local_search"
+          ],
+          "outcomes": [
+            "inbound_call"
+          ],
+          "qualification": [],
+          "payment_models": [],
+          "statement": "Historical self-reported search-heavy lead sourcing. The reported 85% share is not claimed as current."
+        }
+      ]
+    },
+    {
+      "id": "elocal",
+      "name": "eLocal",
+      "domain": "elocal.com",
+      "observations": [
+        {
+          "url": "https://www.elocal.com/affiliate-contact/",
+          "channels": [
+            "organic_search",
+            "paid_search",
+            "paid_social",
+            "targeted_display",
+            "native_ads",
+            "offline_media",
+            "publisher_partners"
+          ],
+          "outcomes": [
+            "inbound_call",
+            "form_lead"
+          ],
+          "qualification": [
+            "ivr",
+            "call_center",
+            "api_filter"
+          ],
+          "payment_models": [
+            "pay_per_call",
+            "cpl"
+          ],
+          "statement": "The operator describes permitted publisher media, call qualification and pay-for-performance supply."
+        }
+      ]
+    },
+    {
+      "id": "quinstreet",
+      "name": "QuinStreet",
+      "domain": "quinstreet.com",
+      "observations": [
+        {
+          "url": "https://investor.quinstreet.com/",
+          "channels": [
+            "organic_search",
+            "paid_search",
+            "paid_social",
+            "publisher_partners",
+            "call_center"
+          ],
+          "outcomes": [
+            "click",
+            "form_lead",
+            "inbound_call",
+            "appointment",
+            "customer"
+          ],
+          "qualification": [
+            "matching"
+          ],
+          "payment_models": [],
+          "statement": "The operator describes a multi-source performance marketplace with calls, inquiries and customer outcomes."
+        },
+        {
+          "url": "https://www.publicnow.com/view/95C8B91B4C91759CE405CCC3A82FEE346033B7AF",
+          "channels": [
+            "paid_search",
+            "publisher_partners"
+          ],
+          "outcomes": [
+            "click",
+            "form_lead",
+            "inbound_call"
+          ],
+          "qualification": [],
+          "payment_models": [
+            "cpc",
+            "cpl",
+            "cpa",
+            "revenue_share"
+          ],
+          "statement": "Fiscal 2026 annual-report reproduction describes purchased media and publisher payment arrangements."
+        }
+      ]
+    },
+    {
+      "id": "home_services_lead_group",
+      "name": "Home Services Lead Group",
+      "domain": "homeservicesleadgroup.com",
+      "observations": [
+        {
+          "url": "https://homeservicesleadgroup.com/affiliates",
+          "channels": [
+            "organic_search",
+            "paid_search",
+            "paid_social",
+            "email",
+            "content",
+            "publisher_partners"
+          ],
+          "outcomes": [
+            "inbound_call",
+            "form_lead"
+          ],
+          "qualification": [
+            "real_time_call_routing",
+            "s2s_postback"
+          ],
+          "payment_models": [
+            "pay_per_call",
+            "cpl"
+          ],
+          "statement": "The operator lists campaign-specific traffic permissions, attribution and billable-event reporting."
+        }
+      ]
+    }
+  ],
+  "demand_sensors": [
+    {
+      "id": "first_party_gsc",
+      "type": "first_party",
+      "source": "EmpireOS existing Google Search Console integration",
+      "region_resolution": "page_query_country",
+      "limitations": "Impressions/clicks are not homeowner intent, calls or buyer acceptance."
+    },
+    {
+      "id": "google_trends",
+      "type": "public_aggregated",
+      "source": "https://support.google.com/trends/answer/4365533",
+      "region_resolution": "region_city_index",
+      "limitations": "Normalized sampled search interest, not absolute search volume."
+    },
+    {
+      "id": "noaa_storm_events",
+      "type": "official_reported_events",
+      "source": "https://www.ncei.noaa.gov/access/storm-events-database/search",
+      "region_resolution": "county_or_forecast_zone",
+      "limitations": "Events are delayed; not evidence of roof damage at an individual address or a consumer enquiry."
+    },
+    {
+      "id": "us_census_bps",
+      "type": "official_construction_indicator",
+      "source": "https://www.census.gov/construction/bps/index.html",
+      "region_resolution": "state_county_metro_place",
+      "limitations": "New privately owned residential construction permits, not roofing-repair lead counts."
+    },
+    {
+      "id": "chicago_permit_data",
+      "type": "official_permit_record",
+      "source": "https://data.cityofchicago.org/Buildings/Building-Permits/ydr8-5enu",
+      "region_resolution": "city_permit_location_when_available",
+      "limitations": "An issued public permit is not an opted-in homeowner enquiry, current roofing need, or proof of buyer acceptance. Do not mine residential contact identities."
+    }
+  ]
+}
