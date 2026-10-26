@@ -150,6 +150,7 @@ def review_accepted_order_delivery(
         **{key: accepted[key] for key in IDENTITY},
         "fulfilment_order_id": order_id,
         "buyer_acceptance_event_id": accepted.get("buyer_acceptance_event_id"),
+        "buyer_acceptance_at": accepted_at.isoformat(),
         "delivery_outcome_id": latest["id"],
         "delivery_evidence_ref": "canonical:commercial_outcomes:" + latest["id"],
         "reported_delivery_state": latest["delivery_outcome"],

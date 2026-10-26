@@ -231,3 +231,61 @@ The unchanged `revenue_evidence_workplan` action identities now name
 this proof requirement in Buyer Acquisition/Smart CRM work descriptions.
 No live queue jobs, DB permissions, production files, payment, delivery
 actions or mail were changed.
+
+
+## V9 — verified-fulfilment identity → BSC USDT settlement and realised margin
+The original BSC USDT evidence pipeline is already in EmpireOS:
+- `bsc_payment_requests` requires a named buyer, exact fulfilment order,
+  approved price, terms fingerprint, BSC payer/treasury and human approval.
+- `bsc_payment_evidence` records BSC chain 56, exact mainnet USDT contract,
+  transaction ID, block, nonzero base-unit amount and 12+ confirmations.
+- `bsc_escrow_agreements` / `bsc_escrow_evidence` separately record
+  escrow release (a funded contract alone is not a cash settlement).
+- `public.get_verified_actual_cost_evidence(uuid)` is the original
+  revenue-recognizer's privileged actual acquisition/fulfilment cost proof.
+- `public.recognize_bsc_revenue(uuid,text)` is the existing sole privileged
+  revenue event writer; Economic Memory has its own original validated
+  `verified_outcome_feedback` gate. Do not duplicate these writers.
+
+`empire_os/canonical_settlement_handoff.review_fulfilment_payment_settlement`
+is a **pure review-only intermediate adapter** that checks all of:
+1. The same accepted and delivered canonical order, tenant, buyer, source
+   prospect, business entity and exact GTM opportunity, with the V8
+   delivery record still marked only internally coherent.
+2. One original human-approved BSC request to the identical buyer/order,
+   approved after accepted terms, exact SHA256 terms and lossless USDT
+   amount (USD price cents / 100 as the original contractual check).
+3. Direct BSC USDT 18-decimal base units, correct chain/token/treasury,
+   12+ recorded confirmations, nonzero block and approved block floor,
+   matched request, valid approval/verification/expiry window; OR one
+   matching **released** escrow agreement plus exact release receipt.
+4. A bounded known reversal/dispute list: any supplied reversal causes a
+   fresh original owner HOLD. **No list of known reversals can attest the
+   full refund, chargeback or legal finality census.**
+5. If an existing `revenue_recognized` event is available, its exact
+   canonical `revenue:<order_id>:v1` idempotency identity, same order,
+   buyer, opportunity, payment request, proof, tx hash, terms fingerprint,
+   USDT/BSC channel and original actual-cost source/ref/amounts must
+   agree. Its recorded cents, cost cents and margin cents must reconcile
+   to the same order and positive margin. This validates internal
+   book-keeping consistency only; it does not insert or recognize income.
+
+Missing revenue event produces a reported payment linkage with
+`revenue_event_consistent=false`, NEVER automatic recognition. Every
+returned claim of independent chain truth, cost certification, reversal
+completeness, bank finality, payments executed, outbound, economic memory
+and model training is **FALSE**. The next original owner is the existing
+`RevenueRecognition` capability and the existing restricted BSC verifier.
+
+**Source trust:** inputs must ultimately come from the original
+tenant-bound read-only order/evidence owner, as in
+`scripts/review_verified_commercial_order_20261020.py`, and from
+separately verified BSC provider evidence. Injected synthetic fixtures
+are for tests only. The production SQL RPC is still HELD; the CRM owner's
+uncommitted login-hardening patch is not incorporated or overwritten.
+
+This step does not prove receipt of funds or realised revenue, and it
+does not change any original DB role, function, runtime timer, order,
+financial ledger, queue or production service. The existing
+`revenue_evidence_workplan` descriptions name V9's exact review action
+without dispatching a new worker job.

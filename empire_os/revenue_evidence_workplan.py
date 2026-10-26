@@ -96,7 +96,11 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                                   "Then FulfilmentOperations must review same-order delivered_at "
                                   "and exact commercial_outcomes delivery/buyer confirmation with "
                                   "canonical_fulfilment_handoff; verify original provider and buyer receipts "
-                                  "independently before financial recognition")))
+                                  "independently before financial recognition. RevenueRecognition "
+                                  "must then reconcile exact original BSC request, full USDT receipt "
+                                  "or escrow release, approved terms, actual acquisition/fulfilment "
+                                  "costs and one original revenue event via canonical_settlement_handoff; "
+                                  "independent blockchain/refund finality is separately required")))
     # Factory and cohesion must have read the EXACT same immutable bytes.
     # This is generation consistency, NOT cryptographic origin authority.
     factory_hash = statuses["opportunity_factory"].get("sha256")
@@ -173,7 +177,9 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                                   "commercial_terms_materializer, then separately verify source signature, "
                                   "buyer capacity, accepted order, exact latest delivery outcome "
                                   "and provider/buyer confirmation through canonical_fulfilment_handoff; "
-                                  "keep outbound, settlement and revenue holds")))
+                                  "then reconcile exact payment request, direct/escrow settlement, "
+                                  "terms and actual-cost order receipts using canonical_settlement_handoff. "
+                                  "Keep outbound and model-learning authority held")))
     # Publisher suggestions only if actual recognised Gmail evidence is present.
     if brain is not None:
         if (not isinstance(brain, Mapping)
