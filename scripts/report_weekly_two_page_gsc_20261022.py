@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 
 from empire_os.search_intelligence.weekly_two_page_outcomes import build_weekly_report
+from empire_os.weekly_keyword_intent_review import run_weekly_keyword_intent_review
 from scripts.review_live_gsc_page_performance import local_gsc_get
 
 ROOT = Path("/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022")
@@ -61,7 +62,25 @@ def main() -> None:
     parser.add_argument("--write-private",action="store_true")
     args=parser.parse_args()
     try:
-        print(json.dumps(run(as_of=args.as_of,write_private=args.write_private),sort_keys=True))
+        original = run(as_of=args.as_of,write_private=args.write_private)
+        if args.write_private and original.get("status") == "PRIVATE_WEEKLY_GSC_REPORT_WRITTEN":
+            # The SAME existing weekly SEO owner executes its supplementary
+            # keyword review. An optional research failure cannot rewrite or
+            # invalidate the already archived canonical weekly GSC receipt.
+            try:
+                original["keyword_intent_review"] = run_weekly_keyword_intent_review(
+                    as_of=args.as_of, write_private=True,
+                )
+            except (OSError,ValueError,TypeError) as keyword_error:
+                original["keyword_intent_review"] = {
+                    "status": "HELD_WEEKLY_KEYWORD_REVIEW_NOT_ARCHIVED",
+                    "error_type": type(keyword_error).__name__,
+                    "primary_weekly_gsc_receipt_unmodified": True,
+                    "database_writes": False,
+                    "outbound_sent": False,
+                    "execution_authority": "none",
+                }
+        print(json.dumps(original,sort_keys=True))
     except (OSError,ValueError,TypeError) as exc:
         print(json.dumps({"status":"WEEKLY_GSC_REPORT_HELD",
           "reason":str(exc) if isinstance(exc,ValueError) else "SOURCE_UNAVAILABLE",
