@@ -386,12 +386,25 @@ def collect_research_queries(
             corridor = str(gap.get("corridor_key") or "")
             if not corridor or corridor in used_corridors:
                 continue
-            candidate = next((item for item in rows
+            # Research wording must rotate as well as markets. Otherwise
+            # recurring overflow slots replay the SAME failed appointment
+            # query indefinitely even when the existing target declares
+            # multiple pre-existing buyer-research formulations. Do not
+            # synthesize searches or add budget: pick one existing query.
+            options = list(dict.fromkeys(
+                item["query"] for item in rows
                 if item["target_kind"] == "corridor"
                 and item.get("corridor_key") == corridor
-                and item["buyer_pool"] == "direct_demand_buyers"), None)
-            if candidate is None:
+                and item["buyer_pool"] == "direct_demand_buyers"
+            ))
+            if not options:
                 continue
+            chosen = options[int(at.timestamp() // 1800) % len(options)]
+            candidate = next(item for item in rows
+                if item["target_kind"] == "corridor"
+                and item.get("corridor_key") == corridor
+                and item["buyer_pool"] == "direct_demand_buyers"
+                and item["query"] == chosen)
             focused.append(candidate)
             used_corridors.add(corridor)
             if len(focused) >= 2:

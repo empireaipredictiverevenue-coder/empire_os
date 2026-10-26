@@ -882,3 +882,53 @@ def test_recovery_overflow_slots_rotate_across_twelve_market_hunts():
     assert all_seen == {f"overflow:{i}" for i in range(12)}
     assert len({frozenset(cohort) for cohort in cohorts}) >= 3
     assert len(collect_research_queries(plan, max_queries=4, as_of=base)) == 4
+
+
+def test_overflow_research_rotates_existing_query_wording_without_new_budget():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.buyer_acquisition_scout import collect_research_queries
+
+    corridor = "corridor:v1:roofing:denver_co:qualified_lead:lead"
+    permitted_queries = [
+        '"we buy roofing leads" denver co',
+        '"buy roofing calls" denver co',
+        '"roofing" "lead vendors" denver co',
+        '"roofing lead buyer" denver co',
+        '"buy roofing appointments" denver co',
+    ]
+    plan = {
+        "priority_targets": [
+            {"corridor_key": "permit-recovery:v1:nyc", "priority_score": 9999,
+             "research_queries": {"end_service_buyers": ["general contractor nyc"]}},
+            {"corridor_key": corridor, "priority_score": 100,
+             "research_queries": {"direct_demand_buyers": permitted_queries}},
+        ],
+        "product_priority_targets": [
+            {"product_code": "saas_mrr", "priority_score": 150,
+             "research_queries": {"enterprise_and_data_buyers": ["SaaS corporate buyer"]}},
+        ],
+        "icp_priority_targets": [
+            {"icp_profile_key": "legal_mass_tort_plaintiff_firm", "priority_score": 150,
+             "research_queries": {"direct_demand_buyers": ["law firm acquisition"]}},
+        ],
+        "demand_gap_queue": [
+            {"corridor_key": corridor, "buyer_hunt_required": True, "overflow_count": 4},
+        ],
+    }
+    start = datetime(2026, 10, 26, 13, 0, tzinfo=timezone.utc)
+    seen = []
+    for i in range(5):
+        rows = collect_research_queries(
+            plan, max_queries=12, as_of=start + timedelta(minutes=30 * i),
+        )
+        focused = [r for r in rows if r.get("corridor_key") == corridor
+                   and r["buyer_pool"] == "direct_demand_buyers"]
+        assert focused
+        assert focused[0]["query"] in permitted_queries
+        assert len(rows) <= 12
+        assert any(r.get("product_code") == "saas_mrr" for r in rows)
+        assert any(r.get("icp_profile_key") == "legal_mass_tort_plaintiff_firm"
+                   for r in rows)
+        seen.append(focused[0]["query"])
+    assert len(set(seen)) == 5
+    assert len(collect_research_queries(plan, max_queries=4, as_of=start)) == 4
