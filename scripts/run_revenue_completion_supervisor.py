@@ -21,6 +21,12 @@ def main() -> int:
             payload["buyers"]["genuine_review_ready_count"]
         ),
         "next_action": payload["next_action"],
+        "opportunity_handoffs_reviewed": payload["canonical_opportunity_handoffs"]["records_reviewed"],
+        "canonical_handoffs_ready": payload["canonical_opportunity_handoffs"]["handoff_ready_count"],
+        "next_opportunity_handoff_action": (
+            payload["canonical_opportunity_handoffs"]["items"][0]["next_action"]
+            if payload["canonical_opportunity_handoffs"]["items"] else None
+        ),
         "execution_authority": "none",
     }, indent=2, sort_keys=True))
     return 0
