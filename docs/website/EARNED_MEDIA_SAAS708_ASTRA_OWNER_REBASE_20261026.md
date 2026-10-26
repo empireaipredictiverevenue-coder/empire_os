@@ -54,3 +54,21 @@ Rehearsal receipt: `docs/website/release_candidates/EARNED_MEDIA_SAAS708_PRIVATE
 **Absolutely no website publication, send, CRM mutation, live consent submission, checkout/payment change or claimed revenue** was performed by this rebase.
 
 Source: `empire_os/earned_media_saas700_reconciliation.py`, `scripts/qa_earned_media_saas708_current_site_browser_20261026.mjs`, `scripts/rehearse_earned_media_saas708_private_restore_20261026.py`.
+
+
+## 26 October — NEW 708-file founder final-review approval recorded
+
+The founder explicitly responded **“yes i approve”** in direct response to the request to authorise the **708-file** private candidate with exact inventory SHA-256 `62b62b184d5597ffc806a825723c4638f2953702c823561233d30058e398dab2` **for ASTRA final review only, not immediate publication**.
+
+Just before the receipt was written, the server was checked again: the original live site remained **700 files** (`f6cb9f0f541b041ebd5ca397c3c87268d89a70e086e26a16c1d2534dc13315df`), the privately rebased candidate remained **708 files** (`62b62b18...e398dab2`), and the existing live Predictive Revenue page still had its old untracked CTA. The Stage 13 exact diff and original newer Commercial files remained stable.
+
+A new exclusive-create founder approval receipt is recorded at the **original EmpireOS website owner's document path**:
+`/srv/empire_os/docs/website/release_candidates/SAAS708_FOUNDER_EXACT_APPROVAL_20261026.json`
+
+SHA-256 `9c50507dc469678b2e4f69c57bba035c6ea45c07832acab1d0dd89e7b9c67ee6`. A byte-identical copy is at `docs/website/release_candidates/SAAS708_FOUNDER_EXACT_APPROVAL_20261026.json` in the isolated developer worktree. The original older 670-file founder receipt was kept intact and **not transferred**. The new founder-approved scope is `EXACT_708_FILE_CANDIDATE_FOR_ASTRA_FINAL_REVIEW_ONLY`; it explicitly denies immediate deployment, CRM changes, outbound, payments, independent ASTRA signoff or root backup verification.
+
+Release pickup: new founder review receipt plus existing `docs/website/release_candidates/EARNED_MEDIA_SAAS708_ASTRA_PICKUP_20261026.json`, browser and 700->708->700 private restore receipts.
+
+Tests cover immutable approved hashes, exclusive no-overwrite receipt creation, and no publication authority. **32 relevant Python tests, 5 frontend tests and Founder TypeScript passed.**
+
+**ASTRA's remaining work (no approval rerequest required for this exact 708-file review):** establish an independently verified root-owned full 700-file backup; independently review the changed Commercial page, app hydration, desktop/mobile, source parameters and consent; produce original ASTRA owner signoff bound to this exact founder receipt and new candidate hash; use the correct original owner root-guarded publisher for 2 routes + 8 immutable assets. The previous 672-file publisher cannot be reused. A separate production publication authorisation is still required by the original website release procedure.
