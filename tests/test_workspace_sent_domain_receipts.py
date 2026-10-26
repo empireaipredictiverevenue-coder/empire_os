@@ -127,3 +127,65 @@ def test_runner_preview_never_writes_or_sends(tmp_path):
     assert result["database_writes"] is False
     assert not output.exists()
     assert provider.calls==[20]
+
+
+def test_workspace_exact_reply_headers_promote_conversation_observation_only(tmp_path):
+    inbound = {
+        'id':'workspace:inbox:1a155e9d02106aa1',
+        'provider':'google_workspace','status':'received',
+        'from':'Brian <brian@callx.com>',
+        'mailbox_internal_date':NOW.isoformat(),
+        'message_id':'<brian-message-123@callx.com>',
+        'text':'DO NOT PERSIST PRIVATE INBOUND MESSAGE BODY',
+    }
+    reply = message(domain='callx.com',
+        ident='1a155e9d02106aa2',when=NOW+timedelta(minutes=1))
+    reply['in_reply_to']=inbound['message_id']
+    reply['references']=inbound['message_id']
+    report=capture([reply],now=NOW+timedelta(minutes=2),
+                   received_rows=[inbound])
+    assert len(report['reciprocal_threads'])==1
+    assert report['reciprocal_mail_is_not_buyer_acceptance'] is True
+    assert 'brian@callx.com' not in json.dumps(report)
+    assert 'DO NOT PERSIST' not in json.dumps(report)
+    assert 'brian-message-123' not in json.dumps(report)
+    save=tmp_path/'workspace.json'
+    save.write_text(json.dumps(report));os.chmod(save,0o600)
+    assert len(read_previous(save)['reciprocal_threads'])==1
+    registry=tmp_path/'registry.json'
+    registry.write_text(json.dumps({
+      'schema_version':'empire.commercial_relationship_registry.v1',
+      'relationships':[{'entity_key':'callx.com','identity_domains':['callx.com']}],
+      'gmail_snapshot_fresh':False,
+    }))
+    ext=tmp_path/'external.json'
+    ext.write_text(json.dumps({
+      'schema_version':'empire.founder_reported_external_contacts.v1',
+      'observations':[],
+    }))
+    item=review('callx.com',load_context(registry,ext,save))
+    assert item['state']=='WORKSPACE_RECIPROCAL_THREAD_OBSERVED'
+    assert item['workspace_reciprocal_metadata_observed'] is True
+    assert item['history_verified_complete'] is False
+    assert item['outbound_authorized'] is False
+
+
+def test_workspace_reply_does_not_cross_company_or_infer_buyer():
+    received={
+        'id':'workspace:inbox:1a155e9d02106aa1','provider':'google_workspace',
+        'status':'received','from':'Somebody <contact@other-buyer.com>',
+        'mailbox_internal_date':NOW.isoformat(),
+        'message_id':'<not-the-same@other-buyer.com>',
+    }
+    sent=message(domain='callx.com',
+        ident='1a155e9d02106aa2',when=NOW+timedelta(minutes=1))
+    sent['in_reply_to']=received['message_id']
+    sent['references']=received['message_id']
+    observed=capture([sent],now=NOW+timedelta(minutes=2),
+        received_rows=[received])
+    assert observed['reciprocal_threads']==[]
+    assert observed['domain_count']==1
+    received['from']='Caller <brian@callx.com>'
+    sent['references']='<a-different-thread@callx.com>'
+    assert capture([sent],now=NOW+timedelta(minutes=2),
+        received_rows=[received])['reciprocal_threads']==[]

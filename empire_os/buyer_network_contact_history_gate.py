@@ -158,11 +158,16 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
     # The optional Workspace receipt feed is independently protected. Missing
     # coverage is UNKNOWN, never proof a domain has not been contacted.
     workspace_rows = {}
+    workspace_reciprocal = {}
     workspace_source_available = False
     try:
         workspace = read_previous(workspace_path)
         if workspace is not None:
             workspace_rows = {row["domain"]: row for row in workspace["domains"]}
+            workspace_reciprocal = {
+                row["domain"]: row
+                for row in workspace.get("reciprocal_threads", [])
+            }
             workspace_source_available = True
     except WorkspaceSentHistoryError:
         pass
@@ -185,6 +190,7 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
         "founder_review_delivery_source_safe": delivery_source_safe,
         "relationships": relationships,
         "workspace_sent": workspace_rows,
+        "workspace_reciprocal": workspace_reciprocal,
         "workspace_source_available": workspace_source_available,
         "observations": observations,
         "gmail_snapshot_fresh": registry.get("gmail_snapshot_fresh") is True,
@@ -199,6 +205,7 @@ def review(domain: str, context: Mapping) -> dict:
     relation = context.get("relationships", {}).get(key) or {}
     observation = context.get("observations", {}).get(key) or {}
     workspace_sent = context.get("workspace_sent", {}).get(key) or {}
+    workspace_reciprocal = context.get("workspace_reciprocal", {}).get(key) or {}
     confirmed_bounce = context.get("confirmed_delivery_holds", {}).get(key) or {}
     prior_founder_thread = context.get("prior_founder_gmail", {}).get(key) or {}
     have_relation = bool(relation)
@@ -228,6 +235,8 @@ def review(domain: str, context: Mapping) -> dict:
         state, action = "ALREADY_CONTACTED", "REVIEW_PRIOR_OUTBOUND_BEFORE_FOLLOW_UP"
     elif prior_founder_thread:
         state, action = "FOUNDER_REVIEWED_PRIOR_GMAIL_THREAD", "REVIEW_ORIGINAL_GMAIL_THREAD_NO_DUPLICATE_FIRST_INTRO"
+    elif workspace_reciprocal:
+        state, action = "WORKSPACE_RECIPROCAL_THREAD_OBSERVED", "REVIEW_EXISTING_TWO_WAY_WORKSPACE_THREAD_FOR_PILOT_FIT"
     elif workspace_sent:
         state, action = "WORKSPACE_SENT_ALREADY_CONTACTED", "REVIEW_WORKSPACE_THREAD_NO_DUPLICATE_INTRO"
     elif have_relation:
@@ -242,6 +251,8 @@ def review(domain: str, context: Mapping) -> dict:
         "gmail_snapshot_fresh": not stale,
         "known_relationship": have_relation,
         "workspace_sent_metadata_observed": bool(workspace_sent),
+        "workspace_reciprocal_metadata_observed": bool(workspace_reciprocal),
+        "workspace_provider_inbound_observed_at": workspace_reciprocal.get("inbound_at"),
         "workspace_history_source_available": context.get("workspace_source_available", False),
         "founder_external_contact": have_form,
         "thread_count": len(threads),

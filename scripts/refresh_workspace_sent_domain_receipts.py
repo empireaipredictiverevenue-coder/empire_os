@@ -40,7 +40,13 @@ def run(*, provider=None, write=False, output: Path = OUTPUT) -> dict:
     try:
         previous = read_previous(output)
         rows = provider.list_sent(limit=20)
-        snapshot = capture(rows, previous)
+        # This remains the original 15-minute Gmail owner. Include bounded
+        # INBOX metadata to recognise exact In-Reply-To/References joins;
+        # no message bodies, external messages, or new service.
+        received = (provider.list_received(limit=20)
+                    if hasattr(provider, 'list_received') else [])
+        snapshot = capture(rows, previous, received_rows=received)
+        result['reciprocal_thread_domain_count'] = len(snapshot['reciprocal_threads'])
         result["status"] = "PASS"
         result["domains_observed"] = snapshot["domain_count"]
         result["messages_scanned"] = snapshot["scanned_message_count"]

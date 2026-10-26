@@ -86,7 +86,8 @@ def next_commercial_action(
         return 'RESEARCH_RELEVANT_BUYERS_IN_EVENT_ECOSYSTEM_NO_SALES_INTRO'
     if contact_state == 'SOURCE_UNAVAILABLE':
         return 'RECONCILE_CONTACT_HISTORY_BEFORE_ANY_OUTREACH'
-    if contact_state in {'EXISTING_CONVERSATION', 'FOUNDER_FORM_SUBMITTED'}:
+    if contact_state in {'EXISTING_CONVERSATION', 'FOUNDER_FORM_SUBMITTED',
+                         'WORKSPACE_RECIPROCAL_THREAD_OBSERVED'}:
         return 'REVIEW_LIVE_RELATIONSHIP_AND_QUALIFY_BUYER_PILOT'
     if contact_state in {'ALREADY_CONTACTED',
                          'WORKSPACE_SENT_ALREADY_CONTACTED',
