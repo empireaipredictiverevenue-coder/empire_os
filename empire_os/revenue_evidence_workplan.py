@@ -93,7 +93,10 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                                   "for an independently tenant-scoped existing order, reuse "
                                   "canonical_buyer_acceptance_handoff.review_same_order_buyer_acceptance "
                                   "with the ORIGINAL persisted commercial-terms review and acceptance events. "
-                                  "Internal coherence is not external acceptance, cash or delivery authority")))
+                                  "Then FulfilmentOperations must review same-order delivered_at "
+                                  "and exact commercial_outcomes delivery/buyer confirmation with "
+                                  "canonical_fulfilment_handoff; verify original provider and buyer receipts "
+                                  "independently before financial recognition")))
     # Factory and cohesion must have read the EXACT same immutable bytes.
     # This is generation consistency, NOT cryptographic origin authority.
     factory_hash = statuses["opportunity_factory"].get("sha256")
@@ -168,7 +171,9 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                                   "Held RPC is not deployed; verify the same buyer UUID on "
                                   "original approved terms and accepted event using the existing "
                                   "commercial_terms_materializer, then separately verify source signature, "
-                                  "buyer capacity and fulfilment; keep outbound/settlement/revenue holds")))
+                                  "buyer capacity, accepted order, exact latest delivery outcome "
+                                  "and provider/buyer confirmation through canonical_fulfilment_handoff; "
+                                  "keep outbound, settlement and revenue holds")))
     # Publisher suggestions only if actual recognised Gmail evidence is present.
     if brain is not None:
         if (not isinstance(brain, Mapping)

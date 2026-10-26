@@ -179,3 +179,55 @@ payment and Economic Memory stages remain untouched. The existing
 validation step for the Buyer Acquisition and Smart CRM owners. **No
 new sales, emails, database mutations, services, timers or queues
 have been created.** The SQL remains held pending CRM-owner review.
+
+
+## V8 — accepted order → reported delivery → original buyer outcome
+The next transition reuses original `fulfilment_orders` and
+`commercial_outcomes`, without inventing a delivery microservice,
+additional queue or a second CRM. The original
+`empire_os/commercial_order_tenant_session.py` and
+`scripts/review_verified_commercial_order_20261020.py` already contain
+an exact-ID, role-scoped, read-only PostgreSQL order reader. This owner
+remains responsible for supplying authenticated records; caller-supplied
+JSON is not itself provenance.
+
+`empire_os/canonical_fulfilment_handoff.review_accepted_order_delivery`
+now requires:
+- A prior *internally consistent* original approved/accepted commercial
+  terms result from `canonical_buyer_acceptance_handoff`. A merely
+  approved offer does not qualify.
+- EXACT same tenant, buyer, prospect, entity, GTM opportunity and canonical
+  fulfilment order across that receipt and the original order.
+- A post-acceptance `delivered_at`, and `confirmed_at` in chronological
+  order when the latest delivery outcome claims buyer confirmation. No
+  future, forecast-derived, inferred or explicitly unverified evidence.
+- Bounded, exact-order, unique `commercial_outcomes.id` receipts with
+  original nonblank idempotency key and an exact accepted-event UUID; fail
+  closed on changed company/tenant/buyer, duplicates or contradictory
+  latest timestamps. Latest failed/rejected/refunded receipt cannot be
+  hidden behind an earlier reported success.
+- A supported existing outcome evidence kind with a nonblank provider or
+  buyer reference and recording actor, and non-conflicting nested evidence.
+- Explicit distinction **reported delivered** versus **reported confirmed**:
+  both are original-ledger coherence, not independent verification that
+  the provider delivered the service or the buyer physically received it.
+
+The result preserves buyer/order IDs for the original owner, emits the
+single exact latest outcome reference, and assigns
+`FulfilmentOperations` one of two verification actions depending on
+whether buyer confirmation is recorded. It sets independently verified
+delivery, buyer receipt, capacity, funds, economic memory, fulfilment
+execution and outbound authority all to FALSE.
+
+**Trust boundary:** This pure reviewer has no external provider
+signature-verifier or live RLS session of its own. The original tenant
+reader must obtain the canonical order/outcome in a restricted read-only
+transaction. An original provider/buyer evidence owner must independently
+verify the delivery receipt and counterparty confirmation before an actual
+delivery-success claim can be promoted. Financial recognition remains
+solely with the existing order-linked BSC settlement/revenue subsystem.
+
+The unchanged `revenue_evidence_workplan` action identities now name
+this proof requirement in Buyer Acquisition/Smart CRM work descriptions.
+No live queue jobs, DB permissions, production files, payment, delivery
+actions or mail were changed.
