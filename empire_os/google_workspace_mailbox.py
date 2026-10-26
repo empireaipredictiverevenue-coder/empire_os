@@ -56,7 +56,12 @@ class GoogleWorkspaceMailboxProvider:
         try:
             from google.auth.transport.requests import Request
             from google.oauth2.credentials import Credentials
-            credentials = Credentials.from_authorized_user_file(str(self.token_path), SCOPES)
+            # Preserve every explicitly consented OAuth scope on refresh.
+            # Forcing SCOPES here would strip a newly granted gmail.compose
+            # scope and break the original Permit draft editor.
+            credentials = Credentials.from_authorized_user_file(str(self.token_path))
+            if not set(SCOPES).issubset(set(credentials.scopes or [])):
+                raise MailboxReadUnavailable("WORKSPACE_READ_SCOPE_NOT_AUTHORIZED")
             if credentials.expired and credentials.refresh_token:
                 credentials.refresh(Request())
                 _write_token(self.token_path, credentials.to_json())
