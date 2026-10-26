@@ -128,6 +128,7 @@ def choose_research_batch(
     now_epoch: float,
     limit: int = 8,
     priority_hints: Mapping[str, int] | None = None,
+    evidence_yield_penalties: Mapping[str, int] | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Attempt every eligible VERIFY/WATCH in bounded batches, fair within lane.
 
@@ -167,11 +168,15 @@ def choose_research_batch(
     # Original eligibility and 24h cooldown always apply. The existing
     # buyer team brain may only change order among already eligible sites.
     hints = priority_hints if isinstance(priority_hints, Mapping) else {}
+    penalties = evidence_yield_penalties if isinstance(evidence_yield_penalties, Mapping) else {}
     candidate_items.sort(key=lambda c: (
         0 if c.get("status") == "VERIFY_REQUIREMENTS" else 1,
-        -int(hints.get(c["domain"], 0))
+        (-int(hints.get(c["domain"], 0))
             if type(hints.get(c["domain"], 0)) is int
-            and 0 <= hints.get(c["domain"], 0) <= 150 else 0,
+            and 0 <= hints.get(c["domain"], 0) <= 150 else 0)
+        + (int(penalties.get(c["domain"], 0))
+           if type(penalties.get(c["domain"], 0)) is int
+           and 0 <= penalties.get(c["domain"], 0) <= 60 else 0),
         c["_last_attempt"],
         -int(c.get("score") or 0),
         c["domain"],

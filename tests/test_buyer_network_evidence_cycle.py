@@ -115,3 +115,51 @@ def test_prior_stage_failure_prevents_recovery_desk_stage(tmp_path):
     assert result["buyer_recovery_desk_refresh_attempted"] is False
     assert result["execution_authority"] == "NONE"
     assert result["outbound_sent"] is False
+
+
+def test_original_cycle_creates_safe_effectiveness_snapshot_without_duplicate_workers(tmp_path):
+    source = tmp_path / "runtime/buyer_network_intelligence"
+    source.mkdir(parents=True)
+    files = {
+        "verification_backlog_latest.json": {"candidates": []},
+        "research_ledger_latest.json": {"domains": {}},
+        "direct_site_verification_latest.json": {"results": []},
+        "research_progress_latest.json": {"latest_batch_domains": [], "latest_batch_count": 0},
+    }
+    for name, value in files.items():
+        (source / name).write_text(json.dumps(value))
+    result = task.run(root=tmp_path, call=lambda args, **kwargs: FakeDone())
+    assert result["status"] == "PASS"
+    assert result["scout_effectiveness_status"] == "UNMEASURABLE_MISSING_OR_UNSAFE_SOURCE"
+    record = json.loads((source / "scout_effectiveness_latest.json").read_text())
+    assert record["company_research_evidence_improvement_count"] == 0
+    assert record["status"] == "UNMEASURABLE_MISSING_OR_UNSAFE_SOURCE"
+    assert record["database_writes"] is False
+    assert record["outbound_sent"] is False
+
+
+def test_recovery_desk_failure_does_not_hide_valid_effectiveness_measurement(tmp_path):
+    source = tmp_path / "runtime/buyer_network_intelligence"
+    source.mkdir(parents=True)
+    source_data = {
+        "verification_backlog_latest.json": {"candidates": []},
+        "research_ledger_latest.json": {"domains": {}},
+        "direct_site_verification_latest.json": {"results": []},
+        "research_progress_latest.json": {"latest_batch_count": 0,
+                                          "latest_batch_domains": []},
+    }
+    for name, data in source_data.items():
+        (source / name).write_text(json.dumps(data))
+    class Block:
+        returncode = 2
+        stdout = '{"status":"BLOCKED","reason":"UNSAFE_OR_CHANGING_BUYER_EVIDENCE"}'
+        stderr = ''
+    calls=[]
+    def run(args, **kwargs):
+        calls.append(args)
+        return FakeDone() if len(calls) < 4 else Block()
+    outcome = task.run(root=tmp_path, call=run)
+    assert outcome["status"] == "FAILED"
+    assert outcome["scout_effectiveness_status"] == "UNMEASURABLE_MISSING_OR_UNSAFE_SOURCE"
+    assert (source / "scout_effectiveness_latest.json").exists()
+    assert outcome["outbound_sent"] is False

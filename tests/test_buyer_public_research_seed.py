@@ -393,3 +393,47 @@ def test_new_2026_multiniche_call_and_lead_partner_pages_are_advisory():
     assert publisher_review_page_paths('callx.com')==('/publishers',)
     assert publisher_review_page_paths('unreviewed-php-company.com')==()
     assert report['outbound_sent'] is False
+
+from datetime import datetime, timedelta, timezone
+import json
+
+from empire_os.buyer_public_research_seed import refresh_public_research_seeds
+
+
+def test_low_yield_seed_search_backoff_preserves_first_party_fallbacks(tmp_path):
+    now = datetime(2026, 10, 26, 18, 0, tzinfo=timezone.utc)
+    calls = []
+    def empty_search(queries, num):
+        calls.append(len(queries))
+        return {}
+    common = {"search_fn": empty_search, "max_queries": 4,
+              "include_volume": False, "known_registry_domains": set()}
+    a = refresh_public_research_seeds(tmp_path, observed_at=now, **common)
+    b = refresh_public_research_seeds(tmp_path, observed_at=now+timedelta(minutes=30), **common)
+    c = refresh_public_research_seeds(tmp_path, observed_at=now+timedelta(minutes=60), **common)
+    assert len(calls) == 2
+    assert a["consecutive_low_yield_search_cycles"] == 1
+    assert b["consecutive_low_yield_search_cycles"] == 2
+    assert c["fresh_search_result_status"] == "DEFERRED_LOW_YIELD_BACKOFF"
+    assert c["search_queries_submitted"] == 0
+    assert c["source_recovery"]["repeat_search_deferred"] is True
+    assert c["seed_count"] >= 5
+    assert all(x["buyer_capacity_verified"] is False for x in c["seeds"])
+    retry = refresh_public_research_seeds(tmp_path, observed_at=now+timedelta(hours=3), **common)
+    assert len(calls) == 3
+    assert retry["source_recovery"]["repeat_search_deferred"] is False
+    assert retry["search_queries_submitted"] > 0
+    assert retry["outbound_sent"] is False
+
+
+def test_new_public_search_result_clears_low_yield_streak(tmp_path):
+    at = datetime(2026, 10, 26, 18, 0, tzinfo=timezone.utc)
+    refresh_public_research_seeds(tmp_path, observed_at=at,
+                                  search_fn=lambda q,num:{}, max_queries=2)
+    recovered = refresh_public_research_seeds(
+        tmp_path, observed_at=at+timedelta(minutes=30),
+        search_fn=lambda q,num:{q[0]:["newpayercandidate.example"]},
+        max_queries=2)
+    assert recovered["consecutive_low_yield_search_cycles"] == 0
+    assert recovered["source_recovery"]["main_scout_discovery_unchanged"] is True
+    assert recovered["fresh_search_domain_count"] == 1

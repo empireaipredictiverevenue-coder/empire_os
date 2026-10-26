@@ -6,7 +6,7 @@ become a buyer candidate. This module grants no outbound or commercial authority
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -268,6 +268,7 @@ def build_public_research_seeds(
     observed_at: datetime | None = None,
     include_volume: bool = True,
     known_registry_domains: set[str] | None = None,
+    defer_search: bool = False,
 ) -> dict[str, Any]:
     now = observed_at or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -372,7 +373,7 @@ def build_public_research_seeds(
                 query_texts,
                 num=max(1, min(int(results_per_query), 10)),
             )
-            if query_texts
+            if query_texts and not defer_search
             else {}
         )
     except Exception as exc:
@@ -412,6 +413,7 @@ def build_public_research_seeds(
     }
     query_result_status = (
         "NO_SEARCH_QUERIES" if not query_texts
+        else "DEFERRED_LOW_YIELD_BACKOFF" if defer_search
         else "SEARCH_BACKEND_EXCEPTION" if errors
         else "FRESH_DOMAIN_RESULTS_OBSERVED" if observed_from_queries
         else "NO_FRESH_DOMAIN_RESULTS_PROVIDER_HEALTH_UNVERIFIED"
@@ -428,7 +430,8 @@ def build_public_research_seeds(
         },
         "publisher_first_queries_are_discovery_hints_only": True,
         "multimarket_first_party_seed_count": len(_MULTIMARKET_REVIEW_SEEDS),
-        "searches_per_existing_cycle_unchanged": True,
+        "searches_per_existing_cycle_unchanged": not defer_search,
+        "search_queries_submitted": len(query_texts) if not defer_search else 0,
         "markets_targeted": list(sorted(MARKETS)),
         "fresh_search_domain_count": len(observed_from_queries),
         "fresh_search_result_status": query_result_status,
@@ -465,9 +468,57 @@ def refresh_public_research_seeds(
     if not isinstance(plan, dict):
         plan = {}
 
-    kwargs.setdefault('known_registry_domains', load_known_registry_domains(root))
-    payload = build_public_research_seeds(plan, **kwargs)
     path = root / OUTPUT
+    # Consecutive zero-yield or provider-error observations in this ONE seed
+    # lane trigger a two-hour defer window. The existing main Scout, official
+    # license intake and first-party research remain independent and active.
+    now = kwargs.get('observed_at') or datetime.now(timezone.utc)
+    previous: dict[str, Any] = {}
+    try:
+        if not path.is_symlink() and 100 < path.stat().st_size < 2_500_000:
+            loaded = json.loads(path.read_text(encoding='utf-8'))
+            if (isinstance(loaded, dict)
+                    and loaded.get('schema_version') == 'empire.buyer_public_research_seeds.v1'
+                    and loaded.get('mode') == 'OBSERVE'
+                    and loaded.get('execution_authority') == 'none'
+                    and loaded.get('outbound_sent') is False):
+                previous = loaded
+    except (OSError, ValueError, TypeError):
+        pass
+    prior_streak = previous.get('consecutive_low_yield_search_cycles')
+    prior_streak = prior_streak if type(prior_streak) is int and 0 <= prior_streak <= 100 else 0
+    try:
+        prior_at = datetime.fromisoformat(str(previous['last_live_search_at']).replace('Z', '+00:00'))
+        elapsed = (now - prior_at).total_seconds()
+    except (KeyError, ValueError, TypeError):
+        elapsed = 10**10
+    defer = (prior_streak >= 2 and 0 <= elapsed < 2 * 3600
+             and kwargs.get('defer_search') is not False)
+    kwargs.setdefault('known_registry_domains', load_known_registry_domains(root))
+    kwargs['defer_search'] = defer
+    payload = build_public_research_seeds(plan, **kwargs)
+    if defer:
+        streak = prior_streak
+        last_live = previous['last_live_search_at']
+    else:
+        low_yield = payload.get('fresh_search_result_status') in (
+            'SEARCH_BACKEND_EXCEPTION',
+            'NO_FRESH_DOMAIN_RESULTS_PROVIDER_HEALTH_UNVERIFIED')
+        streak = min(100, prior_streak + 1) if low_yield else 0
+        last_live = now.isoformat()
+    payload['consecutive_low_yield_search_cycles'] = streak
+    payload['last_live_search_at'] = last_live
+    payload['source_recovery'] = {
+        'state': 'PUBLIC_SEED_SEARCH_DEFERRED_EXISTING_FALLBACKS_ACTIVE' if defer
+                 else 'PUBLIC_SEED_SEARCH_ATTEMPTED',
+        'main_scout_discovery_unchanged': True,
+        'site_probe_cooldowns_unchanged': True,
+        'repeat_search_deferred': defer,
+        'next_live_search_after': (
+            (datetime.fromisoformat(last_live.replace('Z', '+00:00'))
+             + timedelta(hours=2)).isoformat() if defer else None),
+        'outbound_authorized': False,
+    }
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
     tmp.write_text(

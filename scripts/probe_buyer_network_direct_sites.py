@@ -40,6 +40,7 @@ DIRECT = BASE / "direct_site_verification_latest.json"
 LEDGER = BASE / "research_ledger_latest.json"
 PROGRESS = BASE / "research_progress_latest.json"
 BRAIN = BASE / "team_brain_latest.json"
+EFFECTIVENESS = BASE / "scout_effectiveness_latest.json"
 
 MAX_CANDIDATES = 8
 MAX_WORKERS = 8
@@ -613,6 +614,7 @@ def select_candidates(
     *,
     now_epoch: float | None = None,
     priority_hints: dict[str, int] | None = None,
+    evidence_yield_penalties: dict[str, int] | None = None,
 ) -> list[dict[str, Any]]:
     clean = {
         **backlog,
@@ -626,6 +628,7 @@ def select_candidates(
         clean, ledger, now_epoch=now_epoch or time.time(),
         limit=MAX_CANDIDATES,
         priority_hints=priority_hints,
+        evidence_yield_penalties=evidence_yield_penalties,
     )
     return selected
 
@@ -654,6 +657,34 @@ def read_existing_team_brain_hints(*, now_epoch: float) -> dict[str, int]:
             return {}
         return hints
     except (OSError, TypeError, ValueError, OverflowError):
+        return {}
+
+
+def read_original_scout_yield_penalties(*, now_epoch: float) -> dict[str, int]:
+    """Read bounded advisory reductions; never admit a candidate or bypass a cooldown."""
+    try:
+        if (EFFECTIVENESS.is_symlink() or not EFFECTIVENESS.is_file()
+                or not 100 <= EFFECTIVENESS.stat().st_size <= 500_000):
+            return {}
+        data = json.loads(EFFECTIVENESS.read_text())
+        at = datetime.fromisoformat(str(data.get("generated_at", "")))
+        penalties = data.get("research_deprioritization_hints")
+        if (at.utcoffset() is None
+                or not 0 <= now_epoch - at.timestamp() <= 3 * 3600
+                or data.get("schema_version") != "empire.buyer_scout.effectiveness.v1"
+                or data.get("status") != "MEASURED"
+                or data.get("mode") != "OBSERVE"
+                or data.get("outbound_sent") is not False
+                or data.get("database_writes") is not False
+                or data.get("payment_authorized") is not False
+                or data.get("penalties_are_advisory_not_eligibility") is not True
+                or not isinstance(penalties, dict) or len(penalties) > 500):
+            return {}
+        if any(not valid_domain(domain) or type(value) is not int
+               or not 0 <= value <= 60 for domain, value in penalties.items()):
+            return {}
+        return penalties
+    except (OSError, ValueError, TypeError, OverflowError):
         return {}
 
 
@@ -1247,8 +1278,10 @@ def main() -> int:
         # Explicit manual retry, not an automated infinite retry loop.
         ledger = {**ledger, "domains": {}}
     hints = read_existing_team_brain_hints(now_epoch=timestamp)
+    penalties = read_original_scout_yield_penalties(now_epoch=timestamp)
     candidates = select_candidates(backlog, ledger, now_epoch=timestamp,
-                                   priority_hints=hints)
+                                   priority_hints=hints,
+                                   evidence_yield_penalties=penalties)
     selected_domains = [item["domain"] for item in candidates]
     if args.plan_only:
         print(json.dumps({

@@ -147,3 +147,23 @@ def test_existing_buyer_brain_reranks_eligible_verify_only_preserving_cooldown()
     selected,_=choose_research_batch(queue,{},now_epoch=NOW,limit=8,
                                       priority_hints={**priorities,'yourdomain.com':150})
     assert 'yourdomain.com' not in [r['domain'] for r in selected]
+
+
+def test_repeated_no_yield_hint_reorders_only_due_original_research():
+    queue = {'candidates': [
+        {'domain': 'slowbuyer.com', 'status': 'WATCH', 'score': 60},
+        {'domain': 'freshbuyer.com', 'status': 'WATCH', 'score': 60},
+        {'domain': 'heldbuyer.com', 'status': 'WATCH', 'score': 999},
+    ]}
+    from empire_os.buyer_network_research_rotation import choose_research_batch
+    ledger = {'domains': {'heldbuyer.com': {'last_attempt_epoch': NOW}}}
+    selected, counts = choose_research_batch(
+        queue, ledger, now_epoch=NOW, limit=2,
+        priority_hints={'slowbuyer.com': 100, 'freshbuyer.com': 90},
+        evidence_yield_penalties={'slowbuyer.com': 60, 'heldbuyer.com': 0},
+    )
+    assert [row['domain'] for row in selected] == [
+        'freshbuyer.com', 'slowbuyer.com']
+    assert counts['cooldown'] == 1
+    assert counts['selected'] == 2
+    assert all(row['domain'] != 'heldbuyer.com' for row in selected)

@@ -15,6 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from empire_os.buyer_network_research_rotation import make_research_summary
+from empire_os.buyer_scout_effectiveness import (
+    BASE as BUYER_BASE, PUBLIC, SCOUT, read_safe, research_effectiveness,
+)
 
 ROOT = Path("/srv/empire_os")
 OUT = ROOT / "runtime/buyer_network_intelligence/research_cycle_latest.json"
@@ -52,6 +55,13 @@ def run(
         "LIVE_OUTBOUND": "0",
     })
     steps = STEPS[:1] if plan_only else STEPS
+    private = root / BUYER_BASE
+    before_quality = (read_safe(private / "founder_qualification_actions_latest.json")
+                      if not plan_only else {})
+    before_ledger = (read_safe(private / "research_ledger_latest.json")
+                     if not plan_only else {})
+    prior_effectiveness = (read_safe(private / "scout_effectiveness_latest.json")
+                           if not plan_only else {})
     results = []
     for name in steps:
         args = [sys.executable, str(root / "scripts" / name)]
@@ -117,6 +127,41 @@ def run(
                 "script": "research_progress_reconciliation",
                 "status": "FAILED", "exit_code": 1,
             })
+    effectiveness_status = "PLAN_ONLY" if plan_only else "NOT_RUN_AFTER_PROBE_OR_QUALIFICATION_FAILURE"
+    # The independently optional recovery desk can fail on changing owner
+    # evidence after the original Scout and qualification stages succeeded.
+    # Measure those immutable outcomes, but retain the cycle's FAILED status.
+    measurement_sources_ready = (
+        not plan_only and len(results) >= 3
+        and [r["script"] for r in results[:3]] == list(STEPS[:3])
+        and all(r["status"] == "PASS" for r in results[:3])
+    )
+    if measurement_sources_ready:
+        # Read the outcome AFTER the existing Scout's source owners finish.
+        # Never start a different crawler, worker or extra timer.
+        try:
+            effective = research_effectiveness(
+                before_quality,
+                read_safe(private / "founder_qualification_actions_latest.json"),
+                before_ledger,
+                read_safe(private / "research_ledger_latest.json"),
+                read_safe(private / "direct_site_verification_latest.json"),
+                prior_effectiveness,
+                read_safe(root / PUBLIC), read_safe(root / SCOUT),
+                now=datetime.now(timezone.utc),
+            )
+            destination = private / "scout_effectiveness_latest.json"
+            temporary = destination.with_suffix(".json.tmp")
+            with temporary.open("w", encoding="utf-8") as file:
+                os.fchmod(file.fileno(), 0o600)
+                json.dump(effective, file, sort_keys=True, indent=2)
+                file.write("\n")
+                file.flush()
+                os.fsync(file.fileno())
+            temporary.replace(destination)
+            effectiveness_status = effective["status"]
+        except (OSError, ValueError, TypeError, KeyError):
+            effectiveness_status = "EFFECTIVENESS_UNAVAILABLE_FAIL_CLOSED"
     payload = {
         "schema_version": "empire.buyer_network_research_cycle.v1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -124,6 +169,7 @@ def run(
         "status": "PASS" if all(r["status"] == "PASS" for r in results) else "FAILED",
         "plan_only": plan_only,
         "steps": results,
+        "scout_effectiveness_status": effectiveness_status,
         "outbound_sent": False,
         "db_write": False,
         "canonical_queue_rebuild_performed": False,
