@@ -13,6 +13,7 @@ from typing import Any, Callable, Mapping
 from urllib.parse import urlparse
 
 from empire_os.search_fabric.search import search_domains_parallel
+from empire_os.heat_pump_market_expansion import run as review_original_heat_pump_market
 
 
 OUTPUT = Path("runtime/buyer_acquisition/public_research_seeds.json")
@@ -452,6 +453,81 @@ def build_public_research_seeds(
     }
 
 
+def append_existing_heat_pump_market_review(
+    payload: dict[str, Any], root: Path, *, now: datetime,
+) -> None:
+    """Reuse V13 evidence in original Scout seeds; never create buyer authority."""
+    payload["heat_pump_market_ingestion"] = {
+        "status": "SOURCE_UNAVAILABLE_NO_SEEDS",
+        "public_research_count": 0, "seed_domain_count": 0,
+        "prior_contact_or_identity_held": 0, "outbound_authorized": False,
+    }
+    try:
+        evidence = review_original_heat_pump_market(root, now=now, write=False)
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError):
+        return
+    if (evidence.get("schema_version") !=
+            "empire.buyer_network.heat_pump_public_expansion.v1"
+            or evidence.get("status") != "EXPANDED_PUBLIC_RESEARCH_REVIEW_ONLY"
+            or evidence.get("source_sha256") !=
+            "35da79e6f63dcd378e6523065184f85195f3d3fca9b4260194f05d99f0ec71be"
+            or evidence.get("candidate_count") != 34
+            or evidence.get("outbound_authorized") is not False
+            or evidence.get("database_writes") is not False
+            or evidence.get("eligible_payable_agreements") != 0
+            or evidence.get("buyer_acceptance_verified") is not False):
+        return
+    seeds = payload.get("seeds")
+    if not isinstance(seeds, list):
+        return
+    by_domain = {row["domain"]: row for row in seeds}
+    excluded = {
+        "PRIOR_OUTBOUND_REVIEW_THREAD_NO_DUPLICATE",
+        "POSSIBLE_NEWPOWER_ADVANCED_ALIAS_VERIFY_NO_DUPLICATE",
+        "SUPPRESSED_OR_BOUNCED_DO_NOT_SEND",
+    }
+    included = 0
+    for company in evidence["companies"]:
+        if company["original_contact_state"] in excluded:
+            continue
+        host = company["domain"]
+        ref = "public:heat_pump_review:UK:" + host
+        if host in by_domain:
+            row = by_domain[host]
+            if ref not in row["source_refs"]:
+                row["source_refs"].append(ref)
+            for value, key in (("UK", "target_markets"),
+                               ("hvac", "target_verticals")):
+                if value not in row[key]:
+                    row[key].append(value)
+        else:
+            lane = company["commercial_research_lane"]
+            row = {
+                "domain": host, "website": "https://" + host,
+                "source_refs": [ref], "source_queries": [],
+                "target_buyer_pools": [
+                    "end_service_buyers" if lane == "B_INSTALLER_QUALIFICATION"
+                    else "potential_partner_research"],
+                "target_corridor_keys": [], "target_product_codes": [],
+                "target_markets": ["UK"], "target_verticals": ["hvac"],
+                "truth_class": "OBSERVED_PUBLIC_RESEARCH",
+                "identity_verified": False, "commercial_terms_verified": False,
+                "buyer_capacity_verified": False, "buyer_price_verified": False,
+                "outreach_authorized": False, "execution_authority": "none",
+            }
+            by_domain[host] = row
+        included += 1
+    payload["seeds"] = sorted(by_domain.values(), key=lambda x: x["domain"])
+    payload["seed_count"] = len(payload["seeds"])
+    payload["heat_pump_market_ingestion"] = {
+        "status": "EXISTING_SCOUT_HEAT_PUMP_RESEARCH_SEEDED",
+        "public_research_count": 34, "seed_domain_count": included,
+        "prior_contact_or_identity_held": 34 - included,
+        "buyer_acceptance_verified": False,
+        "outbound_authorized": False,
+    }
+
+
 def refresh_public_research_seeds(
     repo_root: str | Path,
     **kwargs: Any,
@@ -497,6 +573,7 @@ def refresh_public_research_seeds(
     kwargs.setdefault('known_registry_domains', load_known_registry_domains(root))
     kwargs['defer_search'] = defer
     payload = build_public_research_seeds(plan, **kwargs)
+    append_existing_heat_pump_market_review(payload, root, now=now)
     if defer:
         streak = prior_streak
         last_live = previous['last_live_search_at']
