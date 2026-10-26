@@ -101,4 +101,7 @@ print("SEARCH_HEALTH=" + health["state"])
 print("SCOUT_QUERIES_WITH_DOMAINS=" + str(health["queries_with_eligible_domains"]))
 print("SUPERVISOR=EXISTING_SERVICE TIMER=EXISTING_15_MINUTE")
 '
+systemctl start "$TIMER"
+systemctl is-active --quiet "$TIMER"
+timer_was_stopped=false
 success=true
