@@ -176,3 +176,47 @@ def test_no_legal_due_artifact_cannot_claim_review_readiness(tmp_path):
     assert report['first_party_due_diligence_unverified_count']==2
     assert report['due_diligence_pending_count']==1
     assert report['outbound_enabled'] is False
+
+
+def test_commercial_actions_do_not_use_budget_as_discovery_gate(tmp_path):
+    _case(tmp_path)
+    report=plan(tmp_path)
+    assert report['buyer_budget_requirement_not_used_as_discovery_gate'] is True
+    assert report['contact_verified_for_outbound_count']==0
+    assert report['outbound_enabled'] is False
+    for row in report['targets']:
+        assert row['budget_required_to_research_or_discuss_pilot'] is False
+        assert row['commercial_terms_to_be_agreed_before_delivery'] is True
+        assert row['buyer_relationship_accepted_or_pilot_authorized'] is False
+        assert len(row['buyer_discovery_requirements']) == 6
+        assert row['commercial_next_action']
+        assert row['outbound_authorized'] is False
+
+
+def test_contact_history_and_first_party_role_drive_correct_next_action():
+    from scripts.build_buyer_qualification_actions import next_commercial_action
+    def decide(state='DISCOVERED_NO_CONFIRMED_CONTACT',status='READY_TO_APPROACH',
+               tier='FOUNDER_REVIEW_ONLY',role=None):
+        return next_commercial_action(
+            contact_state=state,queue_status=status,tier=tier,verified_role=role)
+    assert decide(state='EXISTING_CONVERSATION') == (
+        'REVIEW_LIVE_RELATIONSHIP_AND_QUALIFY_BUYER_PILOT')
+    assert decide(state='WORKSPACE_SENT_ALREADY_CONTACTED') == (
+        'REVIEW_PRIOR_THREAD_FOR_RESPONSE_NO_DUPLICATE_FIRST_TOUCH')
+    assert decide(state='DELIVERY_HOLD') == (
+        'NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY')
+    assert decide(state='DO_NOT_PURSUE',
+                  role='INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER') == (
+        'NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY')
+    assert decide(role='INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER') == (
+        'RESEARCH_RELEVANT_BUYERS_IN_EVENT_ECOSYSTEM_NO_SALES_INTRO')
+    assert decide(status='WATCH',tier='EVIDENCE_RECOVERY') == (
+        'RESEARCH_COMPANY_ROLE_DEMAND_AND_FIRST_PARTY_CONTACT_PATH')
+
+
+def test_first_party_role_review_does_not_claim_contract_or_buyer_authority():
+    from scripts.build_buyer_qualification_actions import FIRST_PARTY_ROLE_REVIEWS
+    assert FIRST_PARTY_ROLE_REVIEWS['contact.io']['role'] == (
+        'INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER')
+    for domain,item in FIRST_PARTY_ROLE_REVIEWS.items():
+        assert item['source_url'].startswith('https://' + domain + '/')

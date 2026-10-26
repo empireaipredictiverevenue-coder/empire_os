@@ -34,6 +34,71 @@ SOURCES = {
 }
 MAX_BYTES = 2_500_000
 DOMAIN = re.compile(r'^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}$')
+# First-party role review prevents an industry event from being mistaken for
+# a direct buyer. These specific URLs were verified on 26 October 2026.
+# Role review changes only research routing; it grants no send or commercial
+# authority and never overrides suppression/consent evidence.
+FIRST_PARTY_ROLE_REVIEWS = {
+    'contact.io': {
+        'role': 'INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER',
+        'source_url': 'https://contact.io/contact-us/',
+        'next_action': 'RESEARCH_EXHIBITING_BUYERS_OR_PARTNERS_SEPARATELY',
+    },
+    'astoriacompany.com': {
+        'role': 'PUBLISHER_NETWORK_RESEARCH',
+        'source_url': 'https://astoriacompany.com/publishers/sell-calls',
+        'next_action': 'REVIEW_EXISTING_RELATIONSHIP_FOR_OFFER_AND_GEO_FIT',
+    },
+    'cre8tivemarketingllc.com': {
+        'role': 'HOME_SERVICES_PUBLISHER_PROGRAMME_RESEARCH',
+        'source_url': 'https://cre8tivemarketingllc.com/become-pay-per-call-publisher-home-services/',
+        'next_action': 'REVIEW_EXISTING_RELATIONSHIP_FOR_PUBLISHER_PILOT',
+    },
+    'leadsbycall.com': {
+        'role': 'PAY_PER_CALL_NETWORK_RESEARCH',
+        'source_url': 'https://leadsbycall.com/faq.html',
+        'next_action': 'REVIEW_EXISTING_RELATIONSHIP_FOR_PUBLISHER_PILOT',
+    },
+}
+
+DISCOVERY_REQUIREMENTS = (
+    'Confirm currently accepted service verticals and consumer intent',
+    'Confirm states, ZIP coverage, hours and accepted inventory formats',
+    'Confirm permissible first-party organic search traffic and consent requirements',
+    'Agree a bounded proof-of-quality pilot with the buyer, not a volume claim',
+    'Confirm connection/routing, minimum duration and attribution requirements',
+    'Discuss payout, rejection rules and settlement only on the agreed product',
+)
+
+
+def next_commercial_action(
+    *,
+    contact_state: str,
+    queue_status: str,
+    tier: str,
+    verified_role: str | None,
+) -> str:
+    """Pick an executable RESEARCH/review task; no implicit outbound."""
+    if contact_state in {'DO_NOT_PURSUE', 'DELIVERY_HOLD',
+                         'EXISTING_CONVERSATION_PARTIAL_BOUNCE'}:
+        return 'NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY'
+    if verified_role == 'INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER':
+        return 'RESEARCH_RELEVANT_BUYERS_IN_EVENT_ECOSYSTEM_NO_SALES_INTRO'
+    if contact_state == 'SOURCE_UNAVAILABLE':
+        return 'RECONCILE_CONTACT_HISTORY_BEFORE_ANY_OUTREACH'
+    if contact_state in {'EXISTING_CONVERSATION', 'FOUNDER_FORM_SUBMITTED'}:
+        return 'REVIEW_LIVE_RELATIONSHIP_AND_QUALIFY_BUYER_PILOT'
+    if contact_state in {'ALREADY_CONTACTED',
+                         'WORKSPACE_SENT_ALREADY_CONTACTED',
+                         'FOUNDER_REVIEWED_PRIOR_GMAIL_THREAD'}:
+        return 'REVIEW_PRIOR_THREAD_FOR_RESPONSE_NO_DUPLICATE_FIRST_TOUCH'
+    if tier == 'FOUNDER_REVIEW_ONLY':
+        return 'VERIFY_BUSINESS_CONTACT_PATH_AND_PREPARE_DISCOVERY_PROPOSAL'
+    if queue_status == 'VERIFY_REQUIREMENTS':
+        return 'VERIFY_FIRST_PARTY_BUYER_DEMAND_AND_DISCOVERY_CONTACT'
+    return 'RESEARCH_COMPANY_ROLE_DEMAND_AND_FIRST_PARTY_CONTACT_PATH'
+
+
 EVIDENCE_TASKS = {
     'verify_payout_economics': 'Check official payout amount, currency, unit, timing and source; public use of the word payout is not an accepted rate.',
     'verify_compliance_requirements': 'Verify current first-party publisher consent, jurisdiction, privacy and call/lead data obligations.',
@@ -140,13 +205,35 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         direct=sites.get(domain) or {}
         score=item.get('founder_priority')
         score=score if type(score) is int and 0<=score<=100 else 0
+        contact = item.get('contact_history')
+        contact = contact if isinstance(contact,dict) else {}
+        contact_state = str(contact.get('state') or 'UNKNOWN_HISTORY')[:80]
+        role_review = FIRST_PARTY_ROLE_REVIEWS.get(domain)
+        tier = ('MANUAL_EVIDENCE_HOLD' if manual_hold is not None
+                else 'AUTOMATED_EVIDENCE_HOLD' if auto_hold is not None
+                else 'DUE_DILIGENCE_PENDING' if domain in verified_packets and not due_ready
+                else 'FOUNDER_REVIEW_ONLY' if is_founder_review
+                else 'EVIDENCE_RECOVERY')
+        action = ('NO_NEW_SEND_RECONCILE_SUPPRESSION_OR_DELIVERY'
+                  if manual_hold is not None or auto_hold is not None
+                  else next_commercial_action(
+                      contact_state=contact_state,
+                      queue_status=str(item.get('queue_status') or 'WATCH'),
+                      tier=tier,
+                      verified_role=role_review['role'] if role_review else None))
         actions.append({
             'domain':domain,
-            'tier':('MANUAL_EVIDENCE_HOLD' if manual_hold is not None
-                    else 'AUTOMATED_EVIDENCE_HOLD' if auto_hold is not None
-                    else 'DUE_DILIGENCE_PENDING' if domain in verified_packets and not due_ready
-                    else 'FOUNDER_REVIEW_ONLY' if is_founder_review
-                    else 'EVIDENCE_RECOVERY'),
+            'tier':tier,
+            'buyer_relationship_role_review':role_review['role'] if role_review else 'UNCLASSIFIED_BUYER_RESEARCH',
+            'buyer_role_first_party_source':role_review['source_url'] if role_review else None,
+            'contact_history_state':contact_state,
+            'contact_history_next_action':str(contact.get('next_action') or 'RECONCILE_HISTORY')[:120],
+            'commercial_next_action':action,
+            'buyer_discovery_requirements':list(DISCOVERY_REQUIREMENTS)
+                if tier in {'FOUNDER_REVIEW_ONLY','EVIDENCE_RECOVERY'} else [],
+            'budget_required_to_research_or_discuss_pilot':False,
+            'commercial_terms_to_be_agreed_before_delivery':True,
+            'buyer_relationship_accepted_or_pilot_authorized':False,
             'automated_hold_reason':auto_hold['reason_code'] if auto_hold else None,
             'first_party_due_diligence':due_review,
             'manual_hold_reason':manual_hold['reason_code'] if manual_hold is not None else None,
@@ -214,6 +301,15 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         'due_diligence_pending_count':sum(x['tier']=='DUE_DILIGENCE_PENDING' for x in actions),
         'due_diligence_source_sha256':due_hash,
         'contact_verified_for_outbound_count':0,
+        'commercial_action_counts':dict(sorted(Counter(
+            x['commercial_next_action'] for x in actions).items())),
+        'contact_history_state_counts':dict(sorted(Counter(
+            x['contact_history_state'] for x in actions).items())),
+        'event_ecosystem_not_direct_buyer_count':sum(
+            x['buyer_relationship_role_review']=='INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER'
+            for x in actions),
+        'buyer_budget_requirement_not_used_as_discovery_gate':True,
+        'first_party_publisher_role_evidence_only':True,
         'outbound_sent':False,'outbound_enabled':False,
         'human_review_required':True,'buyer_conversation_verified':False,
         'gap_counts':dict(gap_totals),
