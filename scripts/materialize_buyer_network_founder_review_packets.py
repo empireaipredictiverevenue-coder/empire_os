@@ -8,7 +8,7 @@ from typing import Any
 
 from empire_os.buyer_review_holds import load_review_holds
 from empire_os.buyer_first_party_due_diligence import load_due_diligence
-from empire_os.buyer_network_research_rotation import accepted_domain
+from empire_os.buyer_network_research_rotation import accepted_domain, RESULT_TTL_SECONDS
 from empire_os.buyer_network_contact_history_gate import load_context, review
 
 
@@ -24,6 +24,7 @@ BASE = (
 
 DISCOVERY = BASE / "discovery_latest.json"
 VERIFICATION = BASE / "verification_latest.json"
+DIRECT_SITE = BASE / "direct_site_verification_latest.json"
 QUEUE = BASE / "candidate_queue_latest.json"
 
 PACKETS = (
@@ -134,28 +135,66 @@ def write_json(path, value):
     tmp.replace(path)
 
 
-def active_verified_domains(discovery):
+def active_verified_domains(discovery, site_snapshot=None, *, now_epoch=None):
+    """Use durable, independently fetched site results, not transient search rows.
 
-    return {
-        str(domain).lower()
-
-        for run in discovery.get(
-            "runs",
-            [],
-        )
-
-        if run.get("query")
-        == "buyer-network-active-verification"
-
-        for domain in (
-            run.get("domains")
-            or []
-        )
-
-        if valid_domain(
-            str(domain)
-        )
-    }
+    This is only evidence to REVIEW. It does not establish live campaigns,
+    contacts, commercial terms, or permission to approach anyone.
+    """
+    if site_snapshot is None:
+        return {
+            str(domain).lower()
+            for run in discovery.get("runs", [])
+            if run.get("verification_source") == "direct-site"
+            and run.get("status") == "PASS"
+            and run.get("query") == "buyer-network-active-verification"
+            and len(run.get("domains") or []) == 1
+            for domain in (run.get("domains") or [])
+            if valid_domain(str(domain))
+        }
+    if (not isinstance(site_snapshot, dict)
+            or site_snapshot.get("schema_version") != "buyer-direct-site-verification-v1"
+            or site_snapshot.get("authority") != "OBSERVE"
+            or not isinstance(site_snapshot.get("governance"), dict)
+            or site_snapshot["governance"].get("outbound") is not False
+            or site_snapshot["governance"].get("traffic_activation") is not False
+            or site_snapshot["governance"].get("commercial_terms") is not False
+            or not isinstance(site_snapshot.get("results"), list)
+            or len(site_snapshot["results"]) > 3000):
+        return set()
+    now = time.time() if now_epoch is None else now_epoch
+    try:
+        snapshot_epoch = float(site_snapshot["generated_epoch"])
+    except (KeyError, TypeError, ValueError):
+        return set()
+    if not 0 <= now - snapshot_epoch <= RESULT_TTL_SECONDS:
+        return set()
+    corroborated = set()
+    conflicts = set()
+    for row in site_snapshot["results"]:
+        if not isinstance(row, dict):
+            continue
+        domain = str(row.get("domain") or "").lower()
+        if not valid_domain(domain):
+            continue
+        try:
+            observed = float(row.get("observed_epoch") or 0)
+        except (ValueError, TypeError):
+            continue
+        if (not 0 <= now - observed <= RESULT_TTL_SECONDS
+                or row.get("corroborated") is not True
+                or row.get("buyer_role") is not True
+                or type(row.get("pages_successful")) is not int
+                or row["pages_successful"] < 1
+                or type(row.get("positive_category_count")) is not int
+                or row["positive_category_count"] < 2
+                or not isinstance(row.get("evidence"), dict)
+                or row["evidence"].get("negative_program") is True):
+            continue
+        if domain in corroborated:
+            conflicts.add(domain)
+        corroborated.add(domain)
+    return corroborated - conflicts
 
 
 def verification_map(data):
@@ -266,9 +305,17 @@ def main():
     )
     contact_context = load_context()
 
-    active = active_verified_domains(
-        discovery
-    )
+    # Direct-site observer owns durable, timestamped independent evidence.
+    # Search Fabric can replace discovery.runs between cycles, so transient
+    # run entries are not the source of truth for the founder packets.
+    try:
+        if (DIRECT_SITE.is_symlink() or not DIRECT_SITE.is_file()
+                or DIRECT_SITE.stat().st_size > 4_000_000):
+            raise ValueError("BUYER_DIRECT_SITE_SNAPSHOT_UNSAFE")
+        site_snapshot = json.loads(DIRECT_SITE.read_text())
+    except (OSError, ValueError, TypeError):
+        site_snapshot = {"invalid": True}
+    active = active_verified_domains(discovery, site_snapshot)
 
     verified = verification_map(
         verification
