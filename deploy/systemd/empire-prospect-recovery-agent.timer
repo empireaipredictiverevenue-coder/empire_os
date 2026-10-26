@@ -1,0 +1,13 @@
+[Unit]
+Description=Run the EmpireOS Prospect Recovery Mission Agent every 15 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=15min
+AccuracySec=30s
+RandomizedDelaySec=30s
+Persistent=true
+Unit=empire-prospect-recovery-agent.service
+
+[Install]
+WantedBy=timers.target

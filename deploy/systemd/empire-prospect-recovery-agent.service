@@ -1,0 +1,25 @@
+[Unit]
+Description=EmpireOS Prospect Recovery Mission Agent (existing-workflow supervisor)
+After=network-online.target
+Wants=network-online.target
+Documentation=file:/srv/empire_os/docs/architecture/PROSPECT_RECOVERY_AGENT_20261026.md
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/srv/empire_os
+ExecStart=/usr/bin/python3 -I -B /usr/local/libexec/empire-prospect-recovery-agent.py --repo-root /srv/empire_os --execute
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+StateDirectory=empire-prospect-recovery-agent
+StateDirectoryMode=0755
+ReadWritePaths=/var/lib/empire-prospect-recovery-agent
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+LockPersonality=true
+RestrictSUIDSGID=true
+TimeoutStartSec=45
