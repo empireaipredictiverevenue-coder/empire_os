@@ -26,6 +26,9 @@ export default async function FounderResultsPage() {
           >
             ← Founder Console
           </Link>
+          <Link href="/founder/seo-operations" className="ml-4 text-xs font-semibold uppercase tracking-widest text-sky-300 hover:text-sky-100">
+            SEO Operations →
+          </Link>
           <p className="eyebrow mt-6">Empire AI · Daily Results</p>
           <h1 className="mt-2 text-4xl font-semibold tracking-[-0.04em] text-white">
             Operating History

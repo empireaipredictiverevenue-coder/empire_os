@@ -115,6 +115,24 @@ def main():
                 "reason_code":type(exc).__name__,
                 "indexed_verified":None,"unknown_to_google":None,
                 "google_indexing_submissions":0,"new_timer_or_service":False}
+    if (args.write_daily and result.get("status") in {
+            "ORIGINAL_DAILY_GOOGLE_INDEX_REVIEW_RECORDED",
+            "ORIGINAL_DAILY_INDEX_WATCH_ALREADY_RECORDED",
+        }):
+        # The original daily SEO service owns this sequence. Its primary
+        # Google index receipt remains immutable if optional lifecycle work
+        # fails; no new timer, service or database has been introduced.
+        try:
+            from scripts.review_original_seo_action_lifecycle_20261026 import run as seo_cycle
+            result["seo_action_lifecycle"] = seo_cycle(write=True)
+        except Exception as lifecycle_error:
+            result["seo_action_lifecycle"] = {
+                "status": "SEO_LIFECYCLE_HELD_PRIMARY_GOOGLE_WATCH_PRESERVED",
+                "reason_code": type(lifecycle_error).__name__,
+                "website_changed": False,
+                "outbound_sent": False,
+                "database_writes": False,
+            }
     print(json.dumps(result,sort_keys=True))
     return 0
 
