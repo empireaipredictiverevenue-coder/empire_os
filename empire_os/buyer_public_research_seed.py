@@ -24,6 +24,23 @@ _BAD_HOSTS = {
     "mthink.com", "search.google",
 }
 
+# A Bing/HTML discovery for a named US metro can return unrelated overseas
+# pages when its public provider is degraded. Country-code TLD conflict is a
+# provisional source-quality rejection, NOT proof a company cannot serve US.
+# Explicit first-party publisher seeds remain untouched and future owner
+# verification can independently recognise an international US operator.
+_FOREIGN_US_METRO_CC_TLDS = frozenset({
+    "fr", "de", "es", "it", "nl", "ru", "in", "ca", "au", "nz", "uk",
+    "ie", "ch", "at", "be", "pl", "se", "no", "dk", "fi", "jp", "cn",
+})
+
+
+def _search_domain_country_conflict(host: str, query_row: Mapping[str, Any]) -> bool:
+    if query_row.get("source") != "rotating_volume_wave" or not query_row.get("metro"):
+        return False
+    suffix = str(host or "").lower().rstrip(".").rsplit(".", 1)[-1]
+    return suffix in _FOREIGN_US_METRO_CC_TLDS
+
 _VOLUME_VERTICALS = (
     ("roofing contractor", "roofing"),
     ("hvac contractor", "hvac"),
@@ -359,11 +376,17 @@ def build_public_research_seeds(
             f"search_fabric:{type(exc).__name__}:{str(exc)[:160]}"
         )
 
+    source_locale_rejected = 0
     for query_row in queries:
         query = query_row["query"]
         for domain in domain_map.get(query, []) or []:
             host = _host(domain)
             if not host or host in _BAD_HOSTS:
+                continue
+            if _search_domain_country_conflict(host, query_row) and host not in by_domain:
+                # Never promote an overseas search-result accident into an
+                # Oklahoma, Chicago or Dallas local buyer research identity.
+                source_locale_rejected += 1
                 continue
             add_seed(
                 "https://" + host,
@@ -405,6 +428,8 @@ def build_public_research_seeds(
         "fresh_search_domain_count": len(observed_from_queries),
         "fresh_search_result_status": query_result_status,
         "search_provider_health_independently_verified": False,
+        "local_search_country_tld_conflict_rows_held": source_locale_rejected,
+        "held_result_does_not_invalidate_verified_international_companies": True,
         "source_method_comparison": compare_seed_methods(
             seeds, queries, known_registry_domains,
         ),
