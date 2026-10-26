@@ -149,6 +149,7 @@ def inspect_archive(
         raise ValueError("archive contains references outside archived prospect cohort")
 
     overlap_count = None
+    hot_warm_overlap = None
     exchange_source_date = None
     if exchange is not None:
         if (
@@ -167,6 +168,7 @@ def inspect_archive(
             for row in inventory if isinstance(row, dict) and row.get("prospect_id")
         }
         overlap_count = len(prospects & ids)
+        hot_warm_overlap = len(v2_hot_warm & ids)
         exchange_source_date = exchange.get("observed_at")
     return {
         "schema_version": "empire.tam-historical-prospect-census.v1",
@@ -183,6 +185,12 @@ def inspect_archive(
         "archived_v1_qualified_count": len(v1),
         "archived_v2_qualified_count": len(v2),
         "archived_v2_hot_warm_evidence_candidates": len(v2_hot_warm),
+        "archived_v2_hot_warm_with_active_identity_link": len(v2_hot_warm & link_prospects),
+        "archived_v2_hot_warm_in_current_exchange": hot_warm_overlap,
+        "archived_v2_hot_warm_outside_current_exchange": (
+            len(v2_hot_warm) - hot_warm_overlap
+            if hot_warm_overlap is not None else None
+        ),
         "archived_identity_linked_prospects": len(link_prospects),
         "archived_distinct_linked_entities": len(entity_ids),
         "archived_acquisition_linked_prospects": len(acquired),

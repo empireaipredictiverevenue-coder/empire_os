@@ -163,6 +163,8 @@ p1	public-registry
     assert report["archived_unique_prospects"] == 2
     assert report["archived_v2_qualified_count"] == 1
     assert report["archived_v2_hot_warm_evidence_candidates"] == 1
+    assert report["archived_v2_hot_warm_with_active_identity_link"] == 1
+    assert report["archived_v2_hot_warm_in_current_exchange"] is None
     assert report["archived_prospects_without_v2_qualification"] == 1
     assert report["archived_identity_linked_prospects"] == 1
     assert report["archived_missing_metro"] == 1
