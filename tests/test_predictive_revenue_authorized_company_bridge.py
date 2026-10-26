@@ -109,11 +109,11 @@ def test_naive_server_clock_is_rejected_before_load():
     assert called == []
 
 
-def file_loader(tmp_path):
+def file_loader(tmp_path, bundle=None):
     import json
     from hashlib import sha256
     from empire_os.predictive_revenue_company_timeline_v44 import build_company_review_file_loader
-    bundle = inputs()
+    bundle = bundle or inputs()
     source = tmp_path / "exports"; source.mkdir()
     trust = tmp_path / "trusted"; trust.mkdir()
     (source / "payload.json").write_bytes(bundle["payload"])
@@ -361,3 +361,69 @@ def test_untrusted_signature_never_reads_membership(cryptographic_client):
         headers={"Authorization": "Bearer " + forged})
     assert response.status_code == 403
     assert state["reads"] == state["loads"] == 0
+
+
+@pytest.fixture
+def assembled_client(tmp_path):
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from test_revenue_crm_signed_auth import A, token
+    from empire_os.predictive_revenue_company_timeline_v44 import build_signed_company_review_router
+    bundle = inputs()
+    payload, manifest, _, trusted, sign = signed_export_fixture()
+    manifest["tenant_scope"] = trusted["tenant_scope"] = A
+    bundle.update(payload=payload, signed_manifest=manifest, trusted_source=trusted, signature_b64=sign(manifest))
+    for name in ("signal_rows", "issued_forecast_rows"):
+        for row in bundle[name]: row["tenant_scope"] = A
+    _, cfg, source = file_loader(tmp_path, bundle)
+    issuer = Ed25519PrivateKey.generate()
+    epoch = int(NOW.timestamp())
+    bearer = token(issuer, claims={"iat": epoch-3, "nbf": epoch-3, "exp": epoch+200})
+    state = {"allow": True, "reads": 0}
+    def membership(user, tenant):
+        state["reads"] += 1
+        return TenantMembership(tenant, user, "viewer")
+    app = FastAPI()
+    app.include_router(build_signed_company_review_router(
+        trusted_public_keys={"issuer-1": issuer.public_key()}, load_membership=membership,
+        authorize_company_review=lambda *a, **kw: state["allow"],
+        source_bindings={(A, COMPANY, source): cfg}, now=lambda: NOW))
+    return TestClient(app), {"Authorization": "Bearer " + bearer}, {
+        "company_scope": COMPANY, "source_id": source}, cfg, state
+
+
+def test_complete_signed_login_file_v5_http_path_is_repeatable_and_readonly(assembled_client, tmp_path):
+    client, headers, params, _, state = assembled_client
+    before = {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    first = client.get("/v1/predictive-revenue/company-review", params=params, headers=headers)
+    second = client.get("/v1/predictive-revenue/company-review", params=params, headers=headers)
+    assert first.status_code == second.status_code == 200
+    assert first.json() == second.json()
+    data = first.json()
+    v5 = data["v5_predictive_cloud_staging_read_only"]
+    assert len(v5["signal_ingest_research_rows_unverified"]) == 1
+    assert len(v5["issued_forecast_risk_screens_unverified"]) == 1
+    assert v5["decision"].startswith("HOLD_")
+    assert v5["execution_authority"] == "none"
+    assert state["reads"] == 2
+    assert {str(p): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    assert first.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("filename", ["payload.json", "manifest.json", "signature.txt", "signals.json", "forecasts.json"])
+def test_complete_path_rejects_changed_files(assembled_client, filename):
+    from pathlib import Path
+    client, headers, params, cfg, _ = assembled_client
+    (Path(cfg["source_root"]) / filename).write_text("tampered")
+    response = client.get("/v1/predictive-revenue/company-review", params=params, headers=headers)
+    assert response.status_code == 503
+    assert response.json() == {"detail": "company_review_evidence_unavailable"}
+
+
+def test_complete_path_rechecks_source_permission_on_repeat(assembled_client):
+    client, headers, params, _, state = assembled_client
+    assert client.get("/v1/predictive-revenue/company-review", params=params, headers=headers).status_code == 200
+    state["allow"] = False
+    assert client.get("/v1/predictive-revenue/company-review", params=params, headers=headers).status_code == 403
+    assert state["reads"] == 2

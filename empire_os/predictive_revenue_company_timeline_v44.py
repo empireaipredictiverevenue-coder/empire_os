@@ -718,6 +718,39 @@ def build_company_review_file_loader(bindings: Mapping) -> Callable:
     return load
 
 
+def build_signed_company_review_router(
+    *, trusted_public_keys: Mapping, load_membership: Callable,
+    authorize_company_review: Callable, source_bindings: Mapping,
+    now: Callable[[], datetime],
+):
+    """Assemble the existing signed-login/file/V5 path for explicit owner mounting.
+
+    All dependencies are server configuration. No environment defaults, inferred
+    source grants, token minting, production mounting or file writes occur.
+    Both token expiry and evidence review use the supplied server clock.
+    """
+    if not callable(now):
+        raise ValueError("company_review_server_clock_required")
+
+    def clock():
+        moment = now()
+        if not isinstance(moment, datetime) or moment.utcoffset() is None:
+            raise ValueError("company_review_server_clock_required")
+        return moment
+
+    membership = build_company_review_membership_resolver(
+        trusted_public_keys=trusted_public_keys, load_membership=load_membership,
+        now=lambda: int(clock().timestamp()),
+    )
+    loader = build_company_review_file_loader(source_bindings)
+    reviewer = build_authorized_company_review(
+        resolve_membership=membership,
+        authorize_company_review=authorize_company_review,
+        load_review_inputs=loader, now=clock,
+    )
+    return create_company_review_read_router(review=reviewer)
+
+
 def create_company_review_read_router(*, review: Callable | None = None):
     """Uninstalled route for the existing Founder API owner to mount explicitly.
 
