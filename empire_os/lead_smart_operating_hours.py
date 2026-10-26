@@ -19,6 +19,51 @@ REPORT = {
 ALLOWED_ZONES = {"America/Chicago"}
 MAX_CONFIRMATION_AGE_SECONDS = 30 * 86400
 
+# These are reporting-only continental US clocks. Buyer confirmation of a
+# caller-local rule is NOT a live buyer-capacity or caller-location signal.
+CONTIGUOUS_US_ZONES = {
+    "Eastern": "America/New_York",
+    "Central": "America/Chicago",
+    "Mountain": "America/Denver",
+    "Pacific": "America/Los_Angeles",
+}
+
+
+def reported_local_clock_status(*, now: datetime | None = None) -> dict[str, Any]:
+    """Compare historical reported hours across four contiguous US clocks.
+
+    Diagnostic only. No origin timezone or downstream accepting buyer is
+    identified, and Alaska/Hawaii/territory caller hours are not covered.
+    """
+    when = now or datetime.now(timezone.utc)
+    if when.tzinfo is None:
+        raise ValueError("timezone-aware current time required")
+    when = when.astimezone(timezone.utc)
+    clocks = []
+    for region, zone_name in CONTIGUOUS_US_ZONES.items():
+        local = when.astimezone(ZoneInfo(zone_name))
+        start, end = (8, 18) if local.weekday() < 5 else (10, 16)
+        minute = local.hour * 60 + local.minute
+        clocks.append({
+            "region": region,
+            "timezone": zone_name,
+            "local_time": local.isoformat(),
+            "within_historical_reported_hours": start * 60 <= minute < end * 60,
+        })
+    return {
+        "schema_version": "empire.lead_smart.reported_local_clock.v1",
+        "source_ref": "gmail:1a15ea2dfa8c46b1",
+        "policy": "CALLER_LOCAL_HOURS_REPORTED_NOT_VERIFIED_FOR_BUYER_CAPACITY",
+        "checked_at": when.isoformat(),
+        "contiguous_us_clocks": clocks,
+        "all_four_within_historical_reported_hours": all(
+            entry["within_historical_reported_hours"] for entry in clocks
+        ),
+        "caller_timezone_verified": False,
+        "receiving_buyer_capacity_verified": False,
+        "call_authorized": False,
+    }
+
 
 def _confirmed(evidence: Mapping[str, Any] | None, now: datetime) -> bool:
     if not isinstance(evidence, Mapping):
@@ -99,6 +144,7 @@ def evaluate_buyer_hours(
         "source_ref": (
             timezone_confirmation["source_ref"] if confirmation_valid else None
         ),
+        "regional_clock_diagnostic": reported_local_clock_status(now=now),
         "call_authorized": False,
         "execution_authority": "NONE",
     }
