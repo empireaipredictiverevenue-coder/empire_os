@@ -484,6 +484,39 @@ def _run_prospects(
     }
 
 
+def run_historical_backfill_batch(*, offset: int, limit: int = 10) -> dict[str, Any]:
+    """Run bounded existing v2 scorer against older, not-yet-v2-scored rows.
+
+    No lowering of qualification confidence, synthetic evidence, outbound,
+    buyer eligibility or payment authority. Cursor persistence is caller-owned.
+    """
+    page = _qualification_repository().fetch_historical_pending_page(
+        offset=offset, limit=limit,
+        scoring_engine=SCORING_ENGINE, scoring_version=SCORING_VERSION,
+    )
+    result = _run_prospects(
+        page["candidate_rows"],
+        schema_version="empire.qualification_historical_backfill.v1",
+    )
+    return {
+        "schema_version": result["schema_version"],
+        "ok": result["ok"],
+        "attempted": result["attempted"],
+        "qualified": result["qualified"],
+        "failed": result["failed"],
+        "identity_resolved": result["identity_resolved"],
+        "scanned_rows": page["scanned_rows"],
+        "offset_before": offset,
+        "proposed_next_offset": page["next_offset"],
+        "archive_exhausted": page["archive_exhausted"],
+        "cursor_may_advance": result["ok"],
+        "mode": "QUALIFICATION_ONLY",
+        "outbound_authorized": False,
+        "buyer_capacity_unlocked": False,
+        "revenue_verified": False,
+    }
+
+
 def run_cycle(limit: int = 10) -> dict[str, Any]:
     return _run_prospects(
         fetch_pending_prospects(limit),

@@ -11,6 +11,10 @@ from empire_os.qualification_worker_v2 import (
     run_cycle,
     run_identity_catchup,
     run_evidence_recovery,
+    run_historical_backfill_batch,
+)
+from empire_os.qualification_historical_backfill_cursor import (
+    load_cursor, save_cursor,
 )
 from empire_os.sb import request_json
 from empire_os.omega_worker import run_omega_cycle
@@ -45,6 +49,8 @@ def main() -> int:
         type=int,
         default=10,
     )
+    parser.add_argument("--historical-backfill-limit", type=int, default=0)
+    parser.add_argument("--approved-historical-backfill", action="store_true")
     args = parser.parse_args()
     if args.limit < 1 or args.limit > 25:
         parser.error("--limit must be between 1 and 25")
@@ -55,6 +61,10 @@ def main() -> int:
 
     if args.evidence_recovery_limit < 0 or args.evidence_recovery_limit > 25:
         parser.error("--evidence-recovery-limit must be between 0 and 25")
+    if not 0 <= args.historical_backfill_limit <= 25:
+        parser.error("--historical-backfill-limit must be between 0 and 25")
+    if args.historical_backfill_limit and not args.approved_historical_backfill:
+        parser.error("historical backfill requires --approved-historical-backfill")
 
     signal_resolution = (
         run_signal_resolution(args.signal_resolution_limit)
@@ -69,6 +79,27 @@ def main() -> int:
         }
     )
     qualification = run_cycle(args.limit)
+    historical_backfill = {
+        "enabled": False, "attempted": 0, "scanned_rows": 0,
+        "qualified": 0, "ok": True, "outbound_authorized": False,
+    }
+    if args.historical_backfill_limit:
+        current_offset = load_cursor()
+        historical_backfill = run_historical_backfill_batch(
+            offset=current_offset, limit=args.historical_backfill_limit,
+        )
+        historical_backfill["enabled"] = True
+        if historical_backfill["cursor_may_advance"]:
+            next_offset = (
+                0 if historical_backfill["archive_exhausted"]
+                else historical_backfill["proposed_next_offset"]
+            )
+            save_cursor(next_offset)
+            historical_backfill["cursor_committed"] = True
+            historical_backfill["next_offset"] = next_offset
+        else:
+            historical_backfill["cursor_committed"] = False
+            historical_backfill["next_offset"] = current_offset
     evidence_recovery = (
         run_evidence_recovery(args.evidence_recovery_limit)
         if args.evidence_recovery_limit
@@ -123,6 +154,7 @@ def main() -> int:
         "schema_version": "qualification_service_cycle.v4",
         "signal_resolution": signal_resolution,
         "qualification": qualification,
+        "historical_backfill": historical_backfill,
         "evidence_recovery": evidence_recovery,
         "identity_catchup": catchup,
         "omega_projection": omega,
@@ -131,6 +163,7 @@ def main() -> int:
         "ok": bool(
             signal_resolution["ok"]
             and qualification["ok"]
+            and historical_backfill["ok"]
             and evidence_recovery["ok"]
             and catchup["ok"]
             and omega["ok"]
