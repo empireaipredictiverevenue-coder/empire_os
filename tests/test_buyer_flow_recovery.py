@@ -218,3 +218,33 @@ def test_directory_domain_cannot_reenter_via_canonical_or_research_seed(monkeypa
     assert result["canonical_seed_domain_count"] == 0
     assert result["rejected_search_infrastructure_domain_count"] == 2
     assert seen == []
+
+
+def test_generic_gmail_host_is_not_buyer_candidate_even_if_search_returns_it(monkeypatch):
+    seen = []
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.search_domains_parallel",
+        lambda queries, num: {q: ["gmail.com", "actual-installer.example"] for q in queries},
+    )
+    monkeypatch.setattr(
+        "empire_os.buyer_acquisition_scout.probe_site",
+        lambda url, **kw: (seen.append(url) or _evidence(url)),
+    )
+    out=run_buyer_scout(_plan(), max_queries=2, max_domains=5, max_probes=5)
+    assert out["search_domain_count"] == 1
+    assert out["rejected_search_infrastructure_domain_count"] == 1
+    assert {row["domain"] for row in out["candidates"]} == {"actual-installer.example"}
+    assert seen == ["https://actual-installer.example"]
+    # The suppression is for EXACT domain-as-business discovery only;
+    # it does not block companies whose own website lists a Gmail contact.
+    states = candidate_evidence_states({
+        "candidates": [
+            {"domain": "gmail.com", "website": "https://gmail.com",
+             "buyer_relationship": "unknown"},
+            {"domain": "actual-installer.example",
+             "website": "https://actual-installer.example",
+             "buyer_relationship": "unknown",
+             "first_party_people": [{"email": "owner@gmail.com"}]},
+        ]
+    }, now=NOW)
+    assert len(states) == 1

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 from empire_os.buyer_deferred_enrichment import _parked_without_new_evidence
 from empire_os.cross_system_cohesion import build_cohesion_snapshot
 from empire_os.opportunity_canonical_handoff_review import from_existing_factory
+from empire_os.revenue_evidence_workplan import build_workplan
 
 ROOT = Path("/srv/empire_os")
 DEFAULT_TAM_RUNTIME = ROOT / "runtime/coder_tam_lane"
@@ -607,6 +608,11 @@ def tam_reader_prerequisites(
 
 
 def build_snapshot() -> dict[str, Any]:
+    # Shared single-cycle snapshots: do not read a moving source twice and
+    # accidentally combine different Factory generations or decision states.
+    cohesion = build_cohesion_snapshot(ROOT)
+    handoffs = from_existing_factory(ROOT, now=datetime.now(timezone.utc))
+    workplan = build_workplan(cohesion, handoffs)
     tam = tam_status()
     tam_runtime = _read_json(DEFAULT_TAM_SNAPSHOT)
     tam_truth = tam_snapshot_truth(tam_runtime)
@@ -686,9 +692,9 @@ def build_snapshot() -> dict[str, Any]:
         ),
         "buyers": buyers,
         "revenue_stream_portfolio": stream_portfolio_status(),
-        "cross_system_cohesion": build_cohesion_snapshot(ROOT),
-        "canonical_opportunity_handoffs": from_existing_factory(
-            ROOT, now=datetime.now(timezone.utc)),
+        "cross_system_cohesion": cohesion,
+        "canonical_opportunity_handoffs": handoffs,
+        "evidence_workplan": workplan,
         "next_action": next_action,
         "blockers": blockers,
         "outbound_sent": False,

@@ -111,3 +111,42 @@ def test_entire_chain_requires_entity_proof_even_with_current_snapshots(tmp_path
     assert report["buyer_evidence_brain_in_registry"] == (
         "NOT_PRESENT_IN_CURRENT_RECONCILED_SOURCE"
     )
+
+
+def test_recent_recorded_inbound_buyer_reply_becomes_review_only(tmp_path):
+    from empire_os.cross_system_cohesion import build_cohesion_snapshot
+    write_source(tmp_path, "buyer_relationships", extra={
+        "founder_action_queue": [{
+            "entity_key": "lead-smart", "stage": "INBOUND_REVIEW_REQUIRED",
+            "next_founder_action": "REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+            "last_inbound_at": "2026-10-25T11:00:00+00:00",
+            "last_outbound_at": "2026-10-25T10:00:00+00:00",
+            "outbound_authorized": False,
+        }]
+    })
+    r=build_cohesion_snapshot(tmp_path, now=NOW)
+    rows=r["existing_inbound_buyer_reply_reviews"]
+    assert len(rows)==1
+    assert rows[0]["review_ref"]=="founder_review:lead-smart"
+    assert rows[0]["source_action"]=="REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT"
+    assert rows[0]["buyer_contract_verified"] is False
+    assert rows[0]["new_outbound_authorized"] is False
+
+
+def test_old_or_non_review_buyer_threads_never_become_new_actions(tmp_path):
+    from empire_os.cross_system_cohesion import build_cohesion_snapshot
+    write_source(tmp_path, "buyer_relationships", extra={
+        "founder_action_queue": [
+          {"entity_key": "old", "stage": "INBOUND_REVIEW_REQUIRED",
+           "next_founder_action": "REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+           "last_inbound_at": "2026-09-01T10:00:00+00:00",
+           "last_outbound_at": "2026-09-01T09:00:00+00:00",
+           "outbound_authorized": False},
+          {"entity_key": "new-but-answered", "stage": "AWAITING_BUYER",
+           "next_founder_action": "REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+           "last_inbound_at": "2026-10-25T10:00:00+00:00",
+           "last_outbound_at": "2026-10-25T11:00:00+00:00",
+           "outbound_authorized": False},
+        ]
+    })
+    assert build_cohesion_snapshot(tmp_path, now=NOW)["existing_inbound_buyer_reply_reviews"]==[]

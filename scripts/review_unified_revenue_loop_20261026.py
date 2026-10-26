@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from empire_os.revenue_completion_supervisor import build_snapshot
+from empire_os.revenue_evidence_workplan import build_workplan
 from scripts.reconcile_buyer_email_relationships import build as relationship_review
 
 
@@ -16,6 +17,7 @@ def report(supervisor: dict, relationships: dict) -> dict:
     cohesion = supervisor["cross_system_cohesion"]
     handoffs = supervisor["canonical_opportunity_handoffs"]
     brain = relationships["buyer_evidence_brain"]
+    workplan = build_workplan(cohesion, handoffs, brain)
     if (supervisor.get("mode") != "OBSERVE"
             or supervisor.get("execution_authority") != "none"
             or cohesion.get("execution_authority") != "NONE"
@@ -55,6 +57,9 @@ def report(supervisor: dict, relationships: dict) -> dict:
         "canonical_tenant_link_verified": cohesion.get("crm_tenant_link_verified_in_this_reader") is True,
         "recognized_revenue_cents": cohesion.get("evidence_population_counts", {}).get("recognized_revenue_cents"),
         "next_original_supervisor_action": supervisor.get("next_action"),
+        "evidence_work_proposal_count": workplan["work_count"],
+        "next_evidence_work": workplan["work_proposals"][:4],
+        "original_department_queue_mutated": workplan["queue_mutated"],
         "next_factory_handoff_action": (
             handoffs["items"][0].get("next_action") if handoffs.get("items") else None
         ),
