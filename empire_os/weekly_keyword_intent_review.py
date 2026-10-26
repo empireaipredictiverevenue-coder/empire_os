@@ -23,6 +23,7 @@ from empire_os.public_intent_gsc_evidence_bridge import (
     LOOPBACK, MAX_BODY, MAX_ROWS, review_gsc_keyword_ideas,
 )
 from empire_os.public_intent_evidence_triage import build_intent_evidence_review_queue
+from empire_os.search_intelligence.semantic_opportunity_review import review_semantic_opportunity
 
 ROOT=Path("/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022")
 SCHEMA="empire.search.weekly_keyword_intent_evidence.v1"
@@ -90,6 +91,11 @@ def build_weekly_keyword_intent_review(
     end=as_of-timedelta(days=3)  # Source-finalization margin.
     start=end-timedelta(days=6)
     themes=[]
+    unmatched_first_party_rows = {}
+    sensitive_query_pairs = set()
+    matched_query_strings = set()
+    observed_new_queries = []
+    unmatched_count = None
     try:
         packet=_read_gsc_packet(start,end,transport=transport)
         # Validate real source through original GSC bridge before any result.
@@ -105,6 +111,15 @@ def build_weekly_keyword_intent_review(
                 for row in priority["priority_ordered_candidates"]
                 if row["observed_first_party_query"]
             ]
+            # All four market themes use the same original query/page GSC GET.
+            # Preserve unmatched *real* queries without inventing search demand.
+            matched_query_strings.update(row["keyword"] for row in evidence_rows)
+            for row in evidence["observed_other_queries"]:
+                key=(row["query"],row["page_url"])
+                if len(row["query"])>180 or "@" in row["query"]:
+                    sensitive_query_pairs.add(key)
+                else:
+                    unmatched_first_party_rows[key]=row
             themes.append({
                 "market_key":spec.market_key,
                 "seed_keyword":spec.seed_keyword,
@@ -121,6 +136,31 @@ def build_weekly_keyword_intent_review(
                 ],
                 "real_market_keyword_volume":None,
                 "buyer_willingness_to_pay_verified":False,
+            })
+        unmatched_rows = [
+            row for (query,_),row in unmatched_first_party_rows.items()
+            if query not in matched_query_strings
+        ]
+        unmatched_count=len(unmatched_rows)
+        for row in sorted(unmatched_rows,
+                          key=lambda item:(item["query"],item["page_url"]))[:12]:
+            semantic=review_semantic_opportunity(
+                row["query"],source_kind="GSC_QUERY_PAGE",
+                evidence_refs=(row["evidence_ref"],),
+            )
+            observed_new_queries.append({
+                "query":row["query"],
+                "owned_page_url":row["page_url"],
+                "evidence_ref":row["evidence_ref"],
+                "source_kind":"GSC_QUERY_PAGE",
+                "matched_original_seed":False,
+                "intent_label_heuristic":semantic["intent_label"],
+                "semantic_sector_status":semantic["sector_review"]["status"],
+                "owner_review_action":semantic["recommended_review_action"],
+                "market_search_volume":None,
+                "independent_serp_rank_verified":False,
+                "ai_answer_citation_verified":False,
+                "qualified_buyer_verified":False,
             })
         gsc_status="FIRST_PARTY_GSC_QUERY_PAGE_OBSERVED"
         count=packet["count"]
@@ -155,6 +195,12 @@ def build_weekly_keyword_intent_review(
         "original_query_page_rows_returned":count,
         "market_research_count":len(themes),
         "market_reviews":themes,
+        "unmatched_first_party_query_page_rows":unmatched_count,
+        "unmatched_first_party_semantic_review_preview":observed_new_queries,
+        "source_query_rows_redacted_for_privacy":(
+            len(sensitive_query_pairs) if unmatched_count is not None else None
+        ),
+        "semantic_intent_is_heuristic_not_verified_demand":True,
         "market_search_volume":None,
         "customer_leads_qualified":None,
         "sale_or_revenue_verified":False,

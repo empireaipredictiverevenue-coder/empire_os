@@ -90,6 +90,9 @@ export const industryPages: IndustryPage[] = [
     links: [
       { label: "Solar intelligence", href: "/industries/solar" },
       { label: "Roofing intelligence", href: "/industries/roofing" },
+      { label: "Dallas–Fort Worth HVAC market guide", href: "/aeo/hvac/DFW/" },
+      { label: "DFW HVAC pilot research worksheet", href: "/research/campaign_99a64a18052abf58600b64a6" },
+      { label: "Denver HVAC source-validation guide", href: "/research/campaign_83ccabdbe7356a6f17d77440" },
     ],
   },
   {
@@ -130,6 +133,7 @@ export const industryPages: IndustryPage[] = [
     links: [
       { label: "Property intelligence", href: "/industries/property" },
       { label: "Trust Center", href: "/trust" },
+      { label: "Atlanta legal-intelligence research brief", href: "/research/campaign_948947123543615f2c6eab7f" },
     ],
   },
   {
@@ -170,6 +174,8 @@ export const industryPages: IndustryPage[] = [
     links: [
       { label: "Property intelligence", href: "/industries/property" },
       { label: "HVAC intelligence", href: "/industries/hvac" },
+      { label: "DFW roofing market guide", href: "/aeo/roofing/DFW/" },
+      { label: "Denver roofing coverage-gap worksheet", href: "/research/campaign_3438b6c3b110f941407ce1dd" },
     ],
   },
   {
@@ -210,6 +216,8 @@ export const industryPages: IndustryPage[] = [
     links: [
       { label: "Roofing intelligence", href: "/industries/roofing" },
       { label: "Private capital intelligence", href: "/industries/private-equity" },
+      { label: "New York general-contractor market guide", href: "/aeo/general_contractor/NYC/" },
+      { label: "NYC contractor evidence-chain checklist", href: "/research/campaign_7d5e758b1ec56415de7516a6" },
     ],
   },
   {

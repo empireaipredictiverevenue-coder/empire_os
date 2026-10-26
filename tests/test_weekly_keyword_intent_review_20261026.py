@@ -141,3 +141,39 @@ def test_plain_existing_weekly_review_remains_unchanged(monkeypatch,capsys):
     monkeypatch.setattr(sys,"argv",["weekly","--as-of","2026-10-26"])
     owner.main()
     assert json.loads(capsys.readouterr().out)=={"status":"READ_ONLY"}
+
+
+def test_unmatched_real_gsc_queries_feed_original_semantic_review():
+    report=build_weekly_keyword_intent_review(
+        as_of=AS_OF,transport=lambda _:json.dumps(packet()).encode(),
+    )
+    assert report["unmatched_first_party_query_page_rows"] == 1
+    rows=report["unmatched_first_party_semantic_review_preview"]
+    assert len(rows)==1
+    assert rows[0]["query"]=="unrelated historical query"
+    assert rows[0]["source_kind"]=="GSC_QUERY_PAGE"
+    assert rows[0]["evidence_ref"].startswith("gsc-query-page-sha256:")
+    assert rows[0]["matched_original_seed"] is False
+    assert rows[0]["qualified_buyer_verified"] is False
+    assert rows[0]["ai_answer_citation_verified"] is False
+    assert rows[0]["market_search_volume"] is None
+    assert all("how do i know" not in row["query"] for row in rows)
+
+
+def test_missing_gsc_evidence_stays_unknown_for_unmatched_discovery():
+    report=build_weekly_keyword_intent_review(
+        as_of=AS_OF,transport=lambda _:b'{invalid',
+    )
+    assert report["unmatched_first_party_query_page_rows"] is None
+    assert report["unmatched_first_party_semantic_review_preview"] == []
+
+
+def test_private_research_drops_email_like_observed_keyword():
+    source=packet()
+    source["items"][1]["keys"][0]="client@example.com audit request"
+    result=build_weekly_keyword_intent_review(
+        as_of=AS_OF,transport=lambda _:json.dumps(source).encode(),
+    )
+    assert result["unmatched_first_party_query_page_rows"]==0
+    assert result["source_query_rows_redacted_for_privacy"]==1
+    assert result["unmatched_first_party_semantic_review_preview"]==[]

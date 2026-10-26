@@ -46,3 +46,14 @@ PYTHONPATH=. .venv/bin/python -B -m scripts.review_public_intent_offer_method_20
 ```
 
 Financial truth and conversion remain separate: raw searches ≠ relevant buyer ≠ accepted deal ≠ realised paid revenue. The software does not make these claims.
+
+## Additional original GSC query discovery bridge (26 October; source-only enhancement)
+
+The October 26 original weekly owner research module was enhanced in its existing Marcus feature branch so real first-party GSC queries are no longer silently overlooked when none matches generated seed phrases. There is NO second Google GET, search API, scheduler, keyword DB or editorial producer.
+
+- In the same original bounded GSC observation packet, all four market candidate sets preserve the *same* unmatched genuine GSC query/page rows using exact deduplication across markets. Queries matching any original market set are excluded from the unmatched list.
+- The existing Search Intelligence semantic_opportunity_review module receives only the original query text plus exact GSC evidence ref, and labels intent and sector as *heuristic*. Up to 12 owned-only query/page candidates are included in the private 0600 weekly research receipt; bounded raw evidence counts remain visible. Email-like and oversize query phrases are excluded from this preview to reduce accidental sensitive disclosures.
+- No generated idea becomes a Google ranking, proven consumer, volume or keyword difficulty. Both source unavailable and confidential/sensitive query redaction remain explicit.
+- A fresh read-only check of 17–23 Oct GSC on Oct 26 returned two real query/page rows, zero exact matches to the four seeds and **two unmatched actual query/page rows** preserved. Both semantic analyses abstained UNKNOWN_INTENT / UNKNOWN_NO_EXPLICIT_SECTOR_EVIDENCE. This is a positive evidence-custody improvement, not a discovery of two commercially attractive opportunities.
+- Existing combined Marcus/semantic test suite: 91 passed. No published page, autonomous outbound, payment, paid search API, Jev provider call or production DB write.
+- Feature branch alone: retain the installed production weekly owner and coordinate with Search Intelligence owner before merging this isolated minimal module/test/document change. The production weekly GSC script is also edited by another agent and was **not** changed here.

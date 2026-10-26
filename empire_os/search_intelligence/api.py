@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import date
+from threading import Lock
+from time import monotonic
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, Response
@@ -22,6 +24,7 @@ from .local_visibility import (
     analyse_local_grid,
 )
 from .metadata import generate_metadata
+from .owned_url_inspection import inspect_fixed_urls
 from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
@@ -465,6 +468,44 @@ def create_search_router(
     @router.get("/search-console/status")
     def search_console_status():
         return search_console.status().as_dict()
+
+    # One shared, loopback-only bounded cached Google URL Inspection reader:
+    # do not burn provider quota on repeat dashboard reads.
+    indexed_version_lock = Lock()
+    indexed_version_cached = None
+    indexed_version_cache_until = 0.0
+
+    @router.get("/search-console/indexed-version/fixed")
+    def search_console_indexed_version_fixed(response: Response):
+        """Read Google's indexed version for only five fixed owned URLs.
+
+        Uses the existing Search Console adapter and read-only credentials.
+        This is a bounded on-demand review, NOT an indexing/live-URL request.
+        """
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        nonlocal indexed_version_cached, indexed_version_cache_until
+        with indexed_version_lock:
+            now = monotonic()
+            if indexed_version_cached is not None and now < indexed_version_cache_until:
+                return indexed_version_cached
+            if now < indexed_version_cache_until:
+                raise HTTPException(
+                    status_code=503, detail="gsc_indexed_version_inspection_unavailable",
+                    headers={"Cache-Control": "no-store"},
+                )
+            # On failure, retry no earlier than 5 minutes; a real successful
+            # five-URL report is cached for 6 hours per existing API process.
+            indexed_version_cache_until = now + 300.0
+            try:
+                indexed_version_cached = inspect_fixed_urls(search_console)
+                indexed_version_cache_until = monotonic() + 6 * 3600.0
+                return indexed_version_cached
+            except Exception:
+                raise HTTPException(
+                    status_code=503, detail="gsc_indexed_version_inspection_unavailable",
+                    headers={"Cache-Control": "no-store"},
+                ) from None
 
     @router.get("/search-console/observations")
     def search_console_observations(
