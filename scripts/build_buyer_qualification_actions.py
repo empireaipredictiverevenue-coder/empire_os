@@ -23,6 +23,7 @@ from typing import Any
 from empire_os.buyer_review_holds import load_review_holds
 from empire_os.buyer_first_party_due_diligence import load_due_diligence
 from empire_os.buyer_founder_research_decisions import load_research_decisions
+from empire_os.heat_pump_commercial_review import review as heat_pump_commercial_review
 
 ROOT = Path('/srv/empire_os')
 BASE = Path('runtime/buyer_network_intelligence')
@@ -425,8 +426,19 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         if (not demand_path.is_file() or demand_path.is_symlink()
                 or sha256(demand_path.read_bytes()).hexdigest() != demand_hash):
             raise BuyerPriorityError('demand_priorities_changed_during_read')
+    # V15: the original founder report owns this per-market commercial review.
+    # Missing external/public evidence cannot block unrelated buyer work.
+    try:
+        heat_pump_commercial = heat_pump_commercial_review(root)
+    except (OSError, ValueError, TypeError, KeyError):
+        heat_pump_commercial = {
+            'status': 'MARKET_EVIDENCE_NOT_READY_RESEARCH_HOLD',
+            'market_companies': 0, 'founder_prioritized': [],
+            'verified_payable_buyers': 0, 'outbound_authorized': False,
+        }
     return {
         'schema_version':'empire.buyer_qualification_actions.v1',
+        'heat_pump_commercial_review': heat_pump_commercial,
         'generated_at':datetime.now(timezone.utc).isoformat(),
         'mode':'OBSERVE','execution_authority':'none',
         'source_sha256':hashes,
