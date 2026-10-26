@@ -156,7 +156,11 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
         tasks.append(_work("SmartCRM", "ATTEST_CANONICAL_TENANT_BUSINESS_BINDING",
                            "snapshot:buyer_relationships", priority=89,
                            state="PRIVILEGED_READER_REQUIRED",
-                           proof="Verified tenant-scoped EmpireDB binding by the original authenticated CRM reader"))
+                           proof=("Execute only via the existing signed CRM read-only login: "
+                                  "canonical_prospect_tenant_handoff.review_signed_crm_prospect_tenant; "
+                                  "validate original prospect_entity_links, no identity conflicts, "
+                                  "unique active tenant_business_entity_bindings; "
+                                  "GTM opportunity binding and buyer terms separately held")))
     # Publisher suggestions only if actual recognised Gmail evidence is present.
     if brain is not None:
         if (not isinstance(brain, Mapping)
