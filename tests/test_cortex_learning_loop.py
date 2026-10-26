@@ -188,3 +188,29 @@ def test_snapshot_exposes_learning_readiness_without_execution():
     assert result["synthetic_commercial_label_count"] == 0
     assert result["model_weight_mutation_authorized"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_cortex_reviews_historical_qualified_identity_without_fabricating_outcomes():
+    from empire_os.cortex_learning_loop import review_backfill_qualification_with_cortex
+    report = review_backfill_qualification_with_cortex([
+        {"entity_id": "e1", "score": 78.0, "identity_resolved": True,
+         "prospect_id": "private-p1"},
+        {"entity_id": None, "score": 85.0, "identity_resolved": False,
+         "prospect_id": "private-p2"},
+    ])
+    assert report["accounts_evidence_reviewed"] == 1
+    assert report["verified_outcome_missing"] == 1
+    assert report["commercial_learning_labels_created"] == 0
+    assert report["model_weight_mutation_authorized"] is False
+    assert report["complete_digital_twin_claimed"] is False
+    assert "private-p" not in str(report)
+
+
+def test_cortex_backfill_invalid_score_does_not_become_label():
+    from empire_os.cortex_learning_loop import review_backfill_qualification_with_cortex
+    report = review_backfill_qualification_with_cortex([
+        {"entity_id": "e1", "score": "not verified", "identity_resolved": True},
+    ])
+    assert report["invalid_score_or_identity"] == 1
+    assert report["accounts_evidence_reviewed"] == 0
+    assert report["commercial_learning_labels_created"] == 0

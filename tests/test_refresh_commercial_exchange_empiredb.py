@@ -27,6 +27,8 @@ class FakeGateway:
             return []
         if table=='commercial_evidence_registry':
             return []
+        if table=='intelligence_scores':
+            return []
         raise AssertionError(table)
 
 
@@ -34,7 +36,7 @@ def test_empiredb_projection_is_driven_by_qualified_supply_not_raw_recency():
     gateway=FakeGateway()
     snapshot=module.build_runtime_snapshot(gateway,limit=200)
     tables=[call[0] for call in gateway.calls]
-    assert tables==['prospect_qualifications','prospects','prospect_qualifications','prospect_entity_links','buyers','fulfilment_orders','commercial_evidence_registry']
+    assert tables==['prospect_qualifications','prospects','prospect_qualifications','prospect_entity_links','buyers','fulfilment_orders','commercial_evidence_registry','intelligence_scores']
     first=gateway.calls[0]
     filters=first[2]
     assert any(item.column=='status' and item.value=='scored' for item in filters)
@@ -125,3 +127,72 @@ def test_runtime_snapshot_never_promotes_buyer_observed_rate_to_verified_price()
     assert snapshot['verified_market_prices']==[]
     assert snapshot['verified_market_price_count']==0
     assert snapshot['commercial_price_source']=='canonical_empiredb_commercial_evidence_registry'
+
+
+def test_omega_canonical_scoring_overlay_accepts_only_exact_v2_identity_evidence():
+    from empire_os.intelligence.omega import MODEL_VERSION
+    from empire_os.omega_worker import SCORE_TYPE
+
+    class OmegaGateway(FakeGateway):
+        def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+            if table == "intelligence_scores":
+                return [
+                    {
+                        "id": "score-wrong", "entity_type": "company", "entity_id": "other",
+                        "score_type": SCORE_TYPE, "model_key": MODEL_VERSION,
+                        "score": 95, "confidence": .6,
+                        "features": {"prospect_id": "p1", "qualification_id": "q1",
+                                     "evaluation_grade": "A"},
+                    },
+                    {
+                        "id": "score-good", "entity_type": "company", "entity_id": "e1",
+                        "score_type": SCORE_TYPE, "model_key": MODEL_VERSION,
+                        "score": 72, "confidence": .6,
+                        "features": {"prospect_id": "p1", "qualification_id": "q1",
+                                     "evaluation_grade": "B"},
+                    },
+                ]
+            return super().query(
+                table, columns, filters=filters, order=order,
+                limit=limit, offset=offset,
+            )
+    snapshot = module.build_runtime_snapshot(OmegaGateway(), limit=20)
+    overlay = snapshot["inventory"][0]["omega_evidence"]
+    assert overlay["score"] == 72
+    assert overlay["evaluation_grade"] == "B"
+    assert overlay["evidence_ref"] == "canonical:intelligence_scores:score-good"
+    assert snapshot["omega_scoring"]["scores_with_exact_qualification_and_identity"] == 1
+    assert snapshot["omega_scoring"]["changes_inventory_eligibility"] is False
+    assert snapshot["allocation_candidate_count"] == 0
+
+
+def test_missing_omega_data_is_unknown_not_zero_and_does_not_block_exchange():
+    snapshot = module.build_runtime_snapshot(FakeGateway(), limit=20)
+    assert snapshot["omega_scoring"]["state"] == "CANONICAL_SCORE_JOIN_AVAILABLE"
+    assert snapshot["omega_scoring"]["scores_with_exact_qualification_and_identity"] == 0
+    assert "omega_evidence" not in snapshot["inventory"][0]
+    assert snapshot["omega_scoring"]["missing_or_unverified_is_not_zero_score"]
+
+
+def test_stale_omega_qualification_id_is_rejected():
+    from empire_os.intelligence.omega import MODEL_VERSION
+    class G:
+        def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+            return [{
+                "id": "s1", "entity_type": "company", "entity_id": "e1",
+                "score_type": "omega_opportunity", "model_key": MODEL_VERSION,
+                "score": 80, "confidence": .75,
+                "features": {"prospect_id": "p1", "qualification_id": "OLD"},
+            }]
+    rows = module.fetch_verified_omega_projection_map(
+        G(),
+        qualifications={"p1": {
+            "id": "q1", "entity_id": "e1",
+            "scoring_version": "v2", "status": "scored",
+            "evidence_confidence": .75,
+        }},
+        identity_links={"p1": {
+            "entity_id": "e1", "prospect_id": "p1", "active": True,
+        }},
+    )
+    assert rows == {}

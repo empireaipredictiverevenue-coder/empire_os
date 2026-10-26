@@ -279,6 +279,90 @@ def fetch_verified_market_prices(
     return result
 
 
+def fetch_verified_omega_projection_map(
+    gateway: CanonicalDataGateway,
+    *,
+    qualifications: dict[str, dict[str, Any] | None],
+    identity_links: dict[str, dict[str, Any] | None],
+) -> dict[str, dict[str, Any]]:
+    """Join existing Omega 2 scores to exact v2 qualification and identity.
+
+    Advisory scoring only; never substitutes for buyer capacity or source
+    rights. Reject unrelated entity scores, stale qualification IDs and
+    scores without model/evidence lineage.
+    """
+    from empire_os.intelligence.omega import MODEL_VERSION
+    from empire_os.omega_worker import SCORE_TYPE
+
+    ids = {
+        str(row.get("entity_id") or "").strip()
+        for row in identity_links.values()
+        if isinstance(row, dict) and row.get("active") is True
+        and row.get("entity_id")
+    }
+    if not ids:
+        return {}
+    rows = gateway.query(
+        "intelligence_scores",
+        "id,entity_type,entity_id,score_type,score,confidence,model_key,features,scored_at",
+        filters=(
+            DataFilter.in_("entity_id", tuple(sorted(ids))),
+            DataFilter.eq("entity_type", "company"),
+            DataFilter.eq("score_type", SCORE_TYPE),
+            DataFilter.eq("model_key", MODEL_VERSION),
+        ),
+        order=(OrderSpec("scored_at", descending=True),),
+        limit=max(1, min(5000, len(ids) * 5)),
+    )
+    result: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        features = row.get("features")
+        if not isinstance(features, dict):
+            continue
+        pid = str(features.get("prospect_id") or "").strip()
+        q = qualifications.get(pid)
+        link = identity_links.get(pid)
+        if not isinstance(q, dict) or not isinstance(link, dict) or pid in result:
+            continue
+        if (
+            q.get("scoring_version") != "v2"
+            or q.get("status") != "scored"
+            or q.get("tier") not in {"hot", "warm"}
+            or not str(row.get("id") or "").strip()
+            or str(q.get("id") or "") != str(features.get("qualification_id") or "")
+            or link.get("active") is not True
+            or str(q.get("entity_id") or "") != str(link.get("entity_id") or "")
+            or str(row.get("entity_id") or "") != str(link.get("entity_id") or "")
+            or row.get("entity_type") != "company"
+            or row.get("score_type") != SCORE_TYPE
+            or row.get("model_key") != MODEL_VERSION
+        ):
+            continue
+        try:
+            score = float(row["score"])
+            confidence = float(row["confidence"])
+            qconfidence = float(q["evidence_confidence"])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if not (0 <= score <= 100 and MIN_DECISION_CONFIDENCE <= confidence <= 1):
+            continue
+        if confidence != qconfidence:
+            continue
+        result[pid] = {
+            "score": round(score, 2),
+            "confidence": confidence,
+            "model_version": MODEL_VERSION,
+            "evidence_ref": f"canonical:intelligence_scores:{row['id']}",
+            "evaluation_grade": (
+                features.get("evaluation_grade")
+                if features.get("evaluation_grade") in {"A", "B", "C", "D"}
+                else None
+            ),
+            "historical_score_not_buyer_or_revenue_proof": True,
+        }
+    return result
+
+
 def build_runtime_snapshot(
     gateway: CanonicalDataGateway,
     *,
@@ -296,6 +380,17 @@ def build_runtime_snapshot(
     buyers = fetch_buyer_rows(BuyerAllocationDataRepository(gateway))
     allocated = fetch_allocated_prospect_ids(gateway, prospect_ids)
     verified_market_prices = fetch_verified_market_prices(gateway)
+    # Scoring is advisory and must not make the Exchange unavailable if its
+    # separate read-only score projection is inaccessible.
+    try:
+        omega_scores = fetch_verified_omega_projection_map(
+            gateway, qualifications=qualifications, identity_links=identity_links,
+        )
+        omega_state = "CANONICAL_SCORE_JOIN_AVAILABLE"
+    except Exception:
+        # Optional score retrieval cannot suppress canonical inventory.
+        omega_scores = {}
+        omega_state = "CANONICAL_SCORE_JOIN_UNAVAILABLE"
 
     snapshot = build_exchange_snapshot(
         prospects=prospects,
@@ -304,6 +399,23 @@ def build_runtime_snapshot(
         buyers=buyers,
         allocated_prospect_ids=allocated,
     )
+    # Overlay only the exact verified Omega 2 record. It cannot influence
+    # allocation decisions already made by build_exchange_snapshot.
+    for item in snapshot["inventory"]:
+        pid = str(item.get("prospect_id") or "")
+        if pid in omega_scores:
+            item["omega_evidence"] = omega_scores[pid]
+    snapshot["omega_scoring"] = {
+        "state": omega_state,
+        "model_version": "omega-2.0-baseline",
+        "scores_with_exact_qualification_and_identity": sum(
+            "omega_evidence" in item for item in snapshot["inventory"]
+        ),
+        "missing_or_unverified_is_not_zero_score": True,
+        "changes_inventory_eligibility": False,
+        "changes_buyer_capacity": False,
+        "changes_recognized_revenue": False,
+    }
     snapshot["source"] = SOURCE
     snapshot["candidate_selection"] = "qualification_driven"
     snapshot["qualified_candidates_selected"] = len(prospect_ids)

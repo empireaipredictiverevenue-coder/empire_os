@@ -520,8 +520,29 @@ def run_historical_backfill_batch(
             confidence = 0.0
         if tier in {"hot", "warm"} and confidence >= MIN_DECISION_CONFIDENCE:
             evidence_floor_met += 1
+    # The existing Omega worker otherwise inspects only the newest
+    # qualifications; historical v2 rows can stay invisible indefinitely.
+    # Project the just-qualified identity-backed rows through that same
+    # evidence-gated Omega 2 writer, without exporting their identifiers.
+    from empire_os.omega_worker import run_targeted_omega_cycle
+    omega_ids = [
+        str(row["prospect_id"])
+        for row in result.get("results") or []
+        if row.get("identity_resolved") is True
+        and str(row.get("tier") or "").lower() in {"hot", "warm"}
+        and float(row.get("evidence_confidence") or 0) >= MIN_DECISION_CONFIDENCE
+    ]
+    omega_projection = run_targeted_omega_cycle(omega_ids, limit=25)
+    from empire_os.cortex_learning_loop import (
+        review_backfill_qualification_with_cortex,
+    )
+    cortex_review = review_backfill_qualification_with_cortex(
+        result.get("results") or [],
+    )
     return {
         "schema_version": result["schema_version"],
+        "omega_projection": omega_projection,
+        "cortex_evidence_review": cortex_review,
         "selection_cohort": (
             "ACTIVE_IDENTITY_LINKED_UNSCORED" if identity_linked
             else "CHRONOLOGICAL_UNSCORED"

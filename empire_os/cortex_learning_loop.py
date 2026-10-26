@@ -430,3 +430,62 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+def review_backfill_qualification_with_cortex(
+    qualified_rows: list[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Apply original Cortex outcome-evidence guard to newly scored accounts.
+
+    A partial, explicitly non-commercial account context uses only canonical
+    v2 score and identity evidence. Missing payments, fulfilment and revenue
+    stay unavailable; no labels, buyer intent, prices or model training.
+    """
+    assessed = 0
+    blocked_outcome = 0
+    invalid = 0
+    for row in qualified_rows:
+        if not isinstance(row, Mapping):
+            invalid += 1
+            continue
+        entity_id = _clean(row.get("entity_id"))
+        if row.get("identity_resolved") is not True or not entity_id:
+            continue
+        value = row.get("score")
+        try:
+            score = float(value)
+        except (TypeError, ValueError):
+            invalid += 1
+            continue
+        if not 0 <= score <= 100:
+            invalid += 1
+            continue
+        context = {
+            "entity_id": entity_id,
+            "qualification": {"history": [{"score": score}]},
+            "revenue_truth": {"available": False},
+            "commercial": {},
+            "outcomes": {"available": False, "history": []},
+        }
+        packet = build_cortex_learning_packet(context)
+        if packet["learning_ready"] or packet["label"]["available"]:
+            raise ValueError("partial backfill evidence must not produce a Cortex label")
+        if packet["research_features"]["qualification_score"] != score:
+            raise ValueError("Cortex qualification evidence mismatch")
+        assessed += 1
+        blocked_outcome += (
+            "verified_commercial_outcome_missing" in packet["label"]["blockers"]
+        )
+    return {
+        "schema_version": "empire.cortex_backfill_evidence_review.v1",
+        "source": "canonical_qualified_identity_backfill_partial_context",
+        "accounts_evidence_reviewed": assessed,
+        "verified_outcome_missing": blocked_outcome,
+        "invalid_score_or_identity": invalid,
+        "complete_digital_twin_claimed": False,
+        "commercial_learning_labels_created": 0,
+        "model_weight_mutation_authorized": False,
+        "outbound_authorized": False,
+        "payment_authorized": False,
+        "execution_authority": "none",
+    }

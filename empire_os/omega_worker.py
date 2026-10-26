@@ -252,3 +252,92 @@ def run_omega_cycle(limit: int = 10) -> dict[str, Any]:
         "buyer_allocation_actions": False,
         "finished_at": _now(),
     }
+
+
+def fetch_omega_qualification_for_prospect(prospect_id: str) -> dict[str, Any] | None:
+    """Exact-ID canonical v2 read; avoids newest-30 starvation."""
+    pid = _text(prospect_id)
+    if not pid:
+        raise OmegaWorkerError("missing prospect ID for targeted Omega")
+    params = urllib.parse.urlencode({
+        "select": (
+            "id,prospect_id,entity_id,score,tier,status,scoring_engine,"
+            "scoring_version,evidence_confidence,input_snapshot,scored_at"
+        ),
+        "prospect_id": f"eq.{pid}",
+        "scoring_engine": "eq.empire_os.lead_scoring",
+        "scoring_version": "eq.v2",
+        "status": "eq.scored",
+        "entity_id": "not.is.null",
+        "evidence_confidence": f"gte.{MIN_DECISION_CONFIDENCE}",
+        "order": "scored_at.desc",
+        "limit": 2,
+    })
+    rows = request_json(
+        "GET", f"/rest/v1/prospect_qualifications?{params}",
+    ) or []
+    if not isinstance(rows, list) or len(rows) > 1:
+        raise OmegaWorkerError("ambiguous exact v2 qualification")
+    if not rows:
+        return None
+    row = rows[0]
+    if not isinstance(row, Mapping) or _text(row.get("prospect_id")) != pid:
+        raise OmegaWorkerError("exact v2 qualification ID mismatch")
+    return dict(row)
+
+
+def run_targeted_omega_cycle(
+    prospect_ids: list[str],
+    *,
+    limit: int = 25,
+) -> dict[str, Any]:
+    """Recover Omega 2 projections for newly scored historical prospects.
+
+    Only existing canonical scorer/evaluation and evidence-safe score sink.
+    No new tables, model, buyer seat, revenue or outbound. Response is counts
+    only: no prospect IDs/contact fields in saved qualification service logs.
+    """
+    if type(limit) is not int or not 1 <= limit <= 25:
+        raise ValueError("targeted Omega limit must be 1-25")
+    ids = list(dict.fromkeys(_text(value) for value in prospect_ids))
+    if not all(ids) or len(ids) > limit:
+        raise ValueError("invalid targeted Omega prospect list")
+    counters = {
+        "candidate_ids_received": len(ids),
+        "eligible_qualifications": 0,
+        "scores_written": 0,
+        "skipped_existing": 0,
+        "not_evidence_ready": 0,
+        "failed": 0,
+    }
+    for pid in ids:
+        try:
+            qualification = fetch_omega_qualification_for_prospect(pid)
+            if qualification is None:
+                counters["not_evidence_ready"] += 1
+                continue
+            counters["eligible_qualifications"] += 1
+            identity_link = fetch_identity_link(pid)
+            if not identity_link:
+                counters["not_evidence_ready"] += 1
+                continue
+            row = build_omega_score_row(qualification, identity_link)
+            if score_exists(row):
+                counters["skipped_existing"] += 1
+                continue
+            persist_score(row)
+            counters["scores_written"] += 1
+        except Exception:
+            counters["failed"] += 1
+    return {
+        "schema_version": "empire.omega_historical_targeted.v1",
+        "model_version": MODEL_VERSION,
+        "source": "canonical_empiredb_v2_scoring_and_active_identity",
+        **counters,
+        "ok": counters["failed"] == 0,
+        "revenue_verified": False,
+        "outbound_authorized": False,
+        "payment_authorized": False,
+        "buyer_capacity_inferred": False,
+        "execution_authority": "none",
+    }

@@ -104,3 +104,57 @@ def test_omega_projection_includes_read_only_evaluation_contract():
     assert len(features["evaluation_evidence_coverage"]) == 8
     assert row["explanation"]["evaluation_only"] is True
     assert row["explanation"]["value_meter"]["verified_realized_revenue"] is None
+
+
+def test_targeted_historical_omega_reuses_evidence_and_is_idempotent(monkeypatch):
+    q = qualification()
+    seen = []
+    monkeypatch.setattr(
+        worker, "fetch_omega_qualification_for_prospect",
+        lambda pid: q if pid == q["prospect_id"] else None,
+    )
+    monkeypatch.setattr(worker, "fetch_identity_link", lambda pid: identity_link(q))
+    monkeypatch.setattr(worker, "score_exists", lambda row: bool(seen))
+    monkeypatch.setattr(worker, "persist_score", lambda row: seen.append(row))
+    first = worker.run_targeted_omega_cycle([q["prospect_id"]])
+    second = worker.run_targeted_omega_cycle([q["prospect_id"]])
+    assert first["scores_written"] == 1
+    assert first["failed"] == 0
+    assert second["scores_written"] == 0
+    assert second["skipped_existing"] == 1
+    assert len(seen) == 1
+    assert seen[0]["features"]["evaluation_schema_version"] == "empire.omega-evaluation.v2"
+    assert first["execution_authority"] == "none"
+    assert q["prospect_id"] not in str(first)
+
+
+def test_targeted_omega_excludes_unqualified_evidence(monkeypatch):
+    q = qualification(evidence_confidence=0.12)
+    monkeypatch.setattr(worker, "fetch_omega_qualification_for_prospect", lambda pid: q)
+    monkeypatch.setattr(worker, "fetch_identity_link", lambda pid: identity_link(q))
+    monkeypatch.setattr(worker, "persist_score", lambda row: pytest.fail("must not persist"))
+    report = worker.run_targeted_omega_cycle([q["prospect_id"]])
+    assert report["scores_written"] == 0
+    assert report["failed"] == 1
+    assert report["ok"] is False
+
+
+def test_targeted_omega_exact_qualification_reader(monkeypatch):
+    q = qualification()
+    seen = {}
+    def reader(method, url):
+        seen["url"] = url
+        assert method == "GET"
+        return [q]
+    monkeypatch.setattr(worker, "request_json", reader)
+    row = worker.fetch_omega_qualification_for_prospect(q["prospect_id"])
+    assert row == q
+    assert q["prospect_id"] in seen["url"]
+    assert "scoring_version=eq.v2" in seen["url"]
+
+
+def test_targeted_omega_missing_candidate_remains_unknown(monkeypatch):
+    monkeypatch.setattr(worker, "fetch_omega_qualification_for_prospect", lambda pid: None)
+    report = worker.run_targeted_omega_cycle(["prospect-x"])
+    assert report["not_evidence_ready"] == 1
+    assert report["scores_written"] == 0
