@@ -196,3 +196,18 @@ def test_stale_omega_qualification_id_is_rejected():
         }},
     )
     assert rows == {}
+
+
+def test_omega_reader_failure_does_not_block_exchange():
+    class NoScoreGrant(FakeGateway):
+        def query(self, table, columns="*", *, filters=(), order=(), limit=1000, offset=0):
+            if table == "intelligence_scores":
+                raise RuntimeError("score projection inaccessible")
+            return super().query(
+                table, columns, filters=filters, order=order, limit=limit, offset=offset,
+            )
+    snapshot = module.build_runtime_snapshot(NoScoreGrant(), limit=20)
+    assert snapshot["inventory_count"] == 1
+    assert snapshot["omega_scoring"]["state"] == "CANONICAL_SCORE_JOIN_UNAVAILABLE"
+    assert snapshot["omega_scoring"]["scores_with_exact_qualification_and_identity"] == 0
+    assert snapshot["automatic_external_delivery"] is False
