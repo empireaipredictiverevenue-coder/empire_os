@@ -11,11 +11,25 @@ import re
 from typing import Any
 
 
+# Buyer language often includes the event's qualification standard between
+# "per" and "call" (for example "USD $50 per qualified accepted call").
+# These descriptors explain the settlement unit, not evidence that the buyer
+# accepted a specific delivered call or signed a binding agreement.
+_QUALIFIER = r"(?:(?:qualified|accepted|billable|valid|connected)\s+){0,3}"
+_RANGE_BEFORE_PRICE = re.compile(r"\$\s*\d{1,6}(?:\.\d{1,2})?\s*(?:[-–—]|to)\s*$", re.I)
+_NEGATED_PRICE = re.compile(
+    r"(?:\b(?:not|no|never)\s*$|"
+    r"\b(?:do\s+not|don't|will\s+not|won't|cannot|can't)\s+"
+    r"(?:pay|offer|accept|agree|quote|provide)\b[^.!?;:\n]{0,18}$)", re.I
+)
+
+
 _PRICE_RE = re.compile(
     r"(?<!\w)(?:USD\s*)?\$\s*"
     r"(?P<amount>\d{1,6}(?:\.\d{1,2})?)"
-    r"\s*(?:/|per\s+|a\s+)"
-    r"(?P<unit>lead|call)s?\b",
+    r"\s*(?:/\s*|per\s+|a\s+)"
+    + _QUALIFIER
+    + r"(?P<unit>lead|call)s?\b",
     re.I,
 )
 
@@ -24,8 +38,9 @@ _PRICE_WORD_RE = re.compile(
     r"\s*(?:of|at|:|=)?\s*"
     r"(?:USD\s*)?\$\s*"
     r"(?P<amount>\d{1,6}(?:\.\d{1,2})?)"
-    r"\s*(?:/|per\s+|a\s+)"
-    r"(?P<unit>lead|call)s?\b",
+    r"\s*(?:/\s*|per\s+|a\s+)"
+    + _QUALIFIER
+    + r"(?P<unit>lead|call)s?\b",
     re.I,
 )
 def _to_cents(value: str) -> int | None:
@@ -59,6 +74,12 @@ def parse_buyer_stated_price(body_text: str) -> dict[str, Any]:
             if span in seen:
                 continue
             seen.add(span)
+            # "from $25–$75 per qualified call" is a price BAND, not
+            # evidence of a negotiated fixed $75 call payout. Avoid taking
+            # the trailing amount as a binding or proposed fixed price.
+            prefix = text[max(0, span[0] - 48):span[0]]
+            if _RANGE_BEFORE_PRICE.search(prefix) or _NEGATED_PRICE.search(prefix):
+                continue
             cents = _to_cents(match.group("amount"))
             if cents is None:
                 continue
