@@ -80,6 +80,64 @@ def _read_original_scout(root: Path, *, now: datetime) -> tuple[dict, str]:
     return data,sha256(raw).hexdigest()
 
 
+DRAFT_RECEIPTS = Path(
+    "runtime/buyer_network_intelligence/heat_pump_prepared_drafts_latest.json"
+)
+
+
+def read_prepared_draft_receipts(root: Path, *, now: datetime) -> dict[str,dict]:
+    """Historical Gmail draft creations, not evidence of a sent message."""
+    file = root / DRAFT_RECEIPTS
+    if (file.is_symlink() or not file.is_file()
+            or not 100 < file.stat().st_size < 30000
+            or (file.stat().st_mode & 0o777) != 0o600):
+        return {}
+    try:
+        data = json.loads(file.read_text(encoding="utf-8"))
+        observed = datetime.fromisoformat(str(data["observed_at"]).replace("Z","+00:00"))
+        if (data.get("schema_version") !=
+                "empire.buyer_network.heat_pump_prepared_drafts.v1"
+            or data.get("status") !=
+                "WORKSPACE_DRAFT_CREATION_RECEIPTS_REVIEW_ONLY"
+            or data.get("source") != "connected_workspace_gmail_draft_listing"
+            or data.get("live_outbound_sent") is not False
+            or data.get("database_writes") is not False
+            or not isinstance(data.get("drafts"),list)
+            or len(data["drafts"])>12
+            or observed.utcoffset() is None
+            or not 0<=(now-observed).total_seconds()<=7*86400):
+            return {}
+        result={}
+        for item in data["drafts"]:
+            domain=item["domain"]
+            to=item["recipient"]
+            draft_id=item["gmail_draft_id"]
+            message_id=item["gmail_message_id"]
+            if (not isinstance(domain,str) or domain in result
+                or not isinstance(to,str)
+                or not to.lower().endswith("@"+domain)
+                or not isinstance(draft_id,str) or not draft_id.startswith("r-")
+                or not isinstance(message_id,str) or len(message_id)>32
+                or not all(ch in "0123456789abcdef" for ch in message_id)
+                or item.get("observation") !=
+                    "DRAFT_PRESENT_AT_OBSERVATION_NOT_SEND"
+                or item.get("send_authorized") is not False
+                or item.get("ever_sent_verified") is not False):
+                return {}
+            result[domain]={
+                "email_preparation_state":"WORKSPACE_DRAFT_CREATED_NOT_SENT",
+                "verified_draft_observation_at":observed.isoformat(),
+                "draft_id":draft_id,"message_id":message_id,
+                "verified_recipient":to,
+                "email_sent_verified":False,
+                "new_outreach_authorized":False,
+                "live_draft_state_requires_recheck":True,
+            }
+        return result
+    except (OSError,KeyError,ValueError,TypeError,OverflowError):
+        return {}
+
+
 def review(root: Path, *, now: datetime|None=None) -> dict:
     now=now or datetime.now(timezone.utc)
     market=market_review(root,now=now,write=False)
@@ -139,6 +197,11 @@ def review(root: Path, *, now: datetime|None=None) -> dict:
             "contact_approved":False,
             "paid_pilot_verified":False,
         })
+    # Do not promote a Gmail DRAFT to a sent/accepted relationship.
+    # A later Gmail state change requires a separate provider readback.
+    draft_history = read_prepared_draft_receipts(root, now=now)
+    for row in rows:
+        row["workspace_draft_preparation"] = draft_history.get(row["domain"])
     lane_order={"A_PARTNER_TERMS_REVIEW":0,"B_INSTALLER_BUYBOX_REVIEW":1,
                 "C_INSTALLER_PARTNER_NETWORK_REVIEW":2,
                 "D_SUPPLY_EXCHANGE_ONLY_REVIEW":3,"HOLD":4}
@@ -159,6 +222,9 @@ def review(root: Path, *, now: datetime|None=None) -> dict:
         "research_eligible_for_role_qualification":sum(x["priority"]!="HOLD" for x in rows),
         "recent_original_scout_first_party_companies":sum(x["current_scout_first_party_page_receipts"]>0 for x in rows),
         "founder_prioritized_count":len(top),
+        "historical_gmail_draft_preparations":sum(
+            x["workspace_draft_preparation"] is not None for x in rows),
+        "draft_creation_not_equivalent_to_contact":True,
         "founder_prioritized":top,
         "research_inventory":rows,
         "verified_payable_buyers":0,"verified_paid_pilots":0,
