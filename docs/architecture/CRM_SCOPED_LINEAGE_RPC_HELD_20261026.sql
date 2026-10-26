@@ -98,20 +98,22 @@ WHERE p_prospect IS NOT NULL AND p_opportunity IS NOT NULL
       SELECT 1 FROM public.commercial_events e
       WHERE e.id=p_receipt AND e.opportunity_id=g.id
         AND e.prospect_id=s.prospect_id AND e.entity_id=s.entity_id
-        AND (e.buyer_id IS NULL OR EXISTS (
+        AND e.buyer_id IS NOT NULL
+        AND EXISTS (
           SELECT 1 FROM public.buyers buyer
           WHERE buyer.id=e.buyer_id AND buyer.org_id=s.tenant_id
-        ))
+        )
     ))
     OR
     (p_kind='order' AND EXISTS (
       SELECT 1 FROM public.fulfilment_orders o
       WHERE o.id=p_receipt AND o.opportunity_id=g.id
         AND o.prospect_id=s.prospect_id AND o.entity_id=s.entity_id
-        AND (o.buyer_id IS NULL OR EXISTS (
+        AND o.buyer_id IS NOT NULL
+        AND EXISTS (
           SELECT 1 FROM public.buyers buyer
           WHERE buyer.id=o.buyer_id AND buyer.org_id=s.tenant_id
-        ))
+        )
     ))
   )
 $lineage$;

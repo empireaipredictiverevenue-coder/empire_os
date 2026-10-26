@@ -98,3 +98,37 @@ that matching production events/orders exist; an attempted privileged
 read-only check was disallowed by the server command policy.
 Zero live customer handoffs, buyer contracts, payments, or revenue are
 established by these fixture tests.
+
+
+## V6 isolated PostgreSQL proof of tenant isolation
+The HELD scoped RPC in `docs/architecture/CRM_SCOPED_LINEAGE_RPC_HELD_20261026.sql`
+now **requires a non-null exact buyer ID and matching buyer.org_id** for
+either an existing event or an existing order. This is intentional: a
+buyerless event tied only to a globally shared business entity cannot be
+safely disclosed to a CRM tenant. Such early intelligence remains upstream
+until separately verified tenant custody can be represented by an authorised
+source-specific receipt. A buyer ID is only an identity-scoping predicate,
+**not buyer acceptance, capacity or payment proof**.
+
+The isolated, disposable PostgreSQL 18 fixture in
+`tests/crm_scoped_lineage_isolated_fixture.sql` and
+`tests/test_crm_scoped_lineage_sql_ephemeral.py` executes the **actual
+held SQL** in an ephemeral Unix-socket-only test database. It verifies:
+- Two separately authenticated tenant logins share the SAME canonical entity
+  but can retrieve only event/order IDs associated with their OWN buyers.
+- Buyerless events/orders and buyer IDs for another tenant return no row.
+- A CRM login with reader-role membership but NO tenant session binding sees
+  no receipt.
+- Direct raw-table SELECTs are rejected for the restricted CRM role.
+- Revoking a previously valid tenant binding immediately hides its receipt.
+- Any unresolved identity conflict, duplicate active tenant binding or
+  invalid source-matching method prevents receipt promotion.
+- Missing opportunity/prospect, an unsupported receipt kind and an
+  unauthorised receipt fail closed.
+
+This proves SQL security behavior **in an isolated test environment only**.
+It does not establish that the proposed CRM function exists in original
+EmpireDB, that a matching actual revenue record exists, or that the original
+CRM owner's unreleased login attestation can pass against production.
+The SQL is held; no production database migration, role/grant, money or
+outbound authority was executed.
