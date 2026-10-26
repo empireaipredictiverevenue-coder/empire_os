@@ -61,3 +61,10 @@ Source founder Gmail thread `1a134dc80c6a49e7`.
 5. **Economic memory:** accepted payer disposition and confirmed amount first; only later reconcile actual settlement, fulfilment, costs, margins. No receipt = no realised revenue.
 
 **Decision now:** DemandCalls for firm initial fixed USD $50 payable-event agreement, Lead Smart for already built roofing channel once its own consumer-flow controls are reapproved; both require real, consented visitors and a fully verified call-to-cash record. No production runtime/service/database change is approved by this evidence-only packet.
+
+## Independent prelaunch source and legal checks (26 October)
+
+- DemandCalls' publicly available site `https://demandcallsmedia.com/` advertises a live publisher program with garage door its strongest category, call reporting and separately agreed campaign payouts. **That is marketing and does not independently establish the supplier's legal entity, account creation, ability to pay Empire AI, or the USD $50 agreement.** The actual supplier-email exchange above is the commercial reference.
+- **California:** Penal Code §632 generally requires all parties' consent to record confidential conversations; **Florida:** Statutes §934.03(2)(d) generally permits interception where all parties give prior consent, with statutory exceptions. Check the exact multi-state, cell/landline and connected-call scenarios with a qualified compliance owner before recording, and confirm actual in-call notice timing, consent evidence, retention/access/deletion responsibilities and buyer rules. A first-party website notice alone must not be presumed sufficient legal clearance.
+- Public references (separate from buyer email evidence): `https://demandcallsmedia.com/`; California Penal Code 632 text at `https://codes.findlaw.com/ca/penal-code/pen-sect-632/`; Florida 2026 law `https://www.leg.state.fl.us/statutes/index.cfm?App_mode=Display_Statute&URL=0900-0999%2F0934%2FSections%2F0934.03.html`.
+- **No new data capture, recorded call, user location inference, dispatch, buyer payout or launch is authorised by this background check.**
