@@ -355,3 +355,79 @@ def test_indexed_existing_page_focuses_queries_not_republishing(monkeypatch):
     page=next(a for a in result["actions"] if a["url"]==BASE+"/industries/roofing")
     assert page["state"]=="tested"
     assert page["next_action"]=="MEASURE_FINAL_GSC_QUERIES_CTR_AND_GENUINE_CONSENTED_BUYER_OUTCOMES"
+
+def test_verified_unknown_buyer_entry_outweighs_speculative_historical_404s():
+    w,d,j,r=sources()
+    w["actions"] = [
+        action("/aeo/old/historical-404", "RELEVANT_HISTORICAL_404",
+               "P2_ORIGINAL_CONTENT_REVIEW"),
+        action("/industries/solar","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+        action("/commercial","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+    ]
+    result=build_seo_action_lifecycle(w,d,buyer_journey=j,aeo_release=r,
+                                      ops_sales=verified_owner_sales(0),observed_at=NOW)
+    assert [a["url"] for a in result["actions"]] == [
+        BASE+"/commercial", BASE+"/industries/solar", BASE+"/aeo/old/historical-404",
+    ]
+    focus=result["revenue_first_original_owner_focus"]
+    assert focus["status"]=="GROW_DISCOVERY_FOR_PUBLISHED_BUYER_ENTRY"
+    assert focus["google_unknown_exact_buyer_entry_urls"]==[
+        BASE+"/commercial", BASE+"/industries/solar",
+    ]
+    assert focus["sitewide_canonical_sales_count"]==0
+    assert focus["seo_attributed_buyer_count"] is None
+    assert focus["new_publication_authorized"] is False
+    assert focus["google_indexing_requests_submitted"]==0
+
+
+def test_severe_technical_errors_retain_priority_over_current_google_discovery():
+    w,d,j,r=sources()
+    w["actions"]=[
+        action("/aeo/failing-owned-page","HTTP_500","P0_TECHNICAL"),
+        action("/commercial","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+        action("/industries/solar","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+    ]
+    result=build_seo_action_lifecycle(w,d,observed_at=NOW)
+    assert [a["priority"] for a in result["actions"]]==[
+        "P0_TECHNICAL","P2_CONTENT_EVIDENCE","P2_CONTENT_EVIDENCE",
+    ]
+
+
+def test_unverified_ops_counts_remain_unknown_not_zero_and_source_priorities_stay_evidence_based():
+    w,d,j,r=sources()
+    w["actions"]=[
+        action("/commercial","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+        action("/industries/solar","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+    ]
+    report=build_seo_action_lifecycle(w,d,ops_sales={"source_count_verified":False},observed_at=NOW)
+    focus=report["revenue_first_original_owner_focus"]
+    assert focus["status"]=="CANONICAL_SALES_SOURCE_UNVERIFIED"
+    assert focus["sitewide_canonical_sales_count"] is None
+    assert focus["google_unknown_exact_buyer_entry_urls"]==[
+        BASE+"/commercial",BASE+"/industries/solar",
+    ]
+    assert report["verified_revenue"] is None
+
+
+def test_genuine_sitewide_enquiry_only_promotes_original_crm_review_not_seo_attribution():
+    w,d,j,r=sources()
+    report=build_seo_action_lifecycle(w,d,ops_sales=verified_owner_sales(2),observed_at=NOW)
+    focus=report["revenue_first_original_owner_focus"]
+    assert focus["status"]=="EXISTING_CANONICAL_ENQUIRY_REQUIRES_CRM_REVIEW"
+    assert focus["sitewide_canonical_sales_count"]==2
+    assert focus["next_existing_owner_action"]=="VERIFY_EXISTING_CRM_ENQUIRY_CONSENT_AND_ORIGINAL_SOURCE_RECEIPT"
+    assert focus["seo_attributed_buyer_count"] is None
+    assert focus["earned_revenue_verified"] is False
+
+
+def test_no_verified_google_state_never_gets_promoted_or_invented():
+    w,d,j,r=sources()
+    del d["exact_url_states"]
+    w["actions"]=[
+        action("/aeo/old/historical-404","RELEVANT_HISTORICAL_404",
+               "P2_ORIGINAL_CONTENT_REVIEW"),
+        action("/commercial","NO_GSC_PAGE_ROW_RETURNED","P2_CONTENT_EVIDENCE"),
+    ]
+    result=build_seo_action_lifecycle(w,d,observed_at=NOW)
+    assert result["actions"][0]["reason_code"]=="RELEVANT_HISTORICAL_404"
+    assert result["revenue_first_original_owner_focus"]["google_unknown_exact_buyer_entry_urls"]==[]

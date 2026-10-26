@@ -299,7 +299,58 @@ def build_seo_action_lifecycle(
             "qualified_buyer_verified": False,
             "earned_revenue_verified": False,
         })
-    actions.sort(key=lambda x: (PRIORITY[x["priority"]], x["url"]))
+    # The original weekly action list can be older than today's immutable
+    # Google five-URL evidence. Keep P0/P1 technical work in front, but make
+    # currently Google-unknown BUYER ENTRY pages visible before speculative
+    # historical 404-content restoration. Never equate this with rank gain.
+    commercial_entry_order = {
+        ORIGIN + "/commercial": 0,
+        ORIGIN + "/industries/solar": 1,
+    }
+    def evidence_first_priority(item: Mapping[str, Any]) -> tuple[int, int, str]:
+        base = PRIORITY[item["priority"]]
+        if base < 3:
+            return (0, base, item["url"])
+        if (item["url"] in commercial_entry_order
+            and item["index_status_first_party"] == "GOOGLE_HAS_NO_URL_RECORD"):
+            return (1, commercial_entry_order[item["url"]], item["url"])
+        return (2, base, item["url"])
+    actions.sort(key=evidence_first_priority)
+
+    # This compact owner decision is NOT a new independent GSC/DB reader.
+    # Null sitewide counts mean unknown, not zero. A reported acquisition is
+    # never automatically an AEO lead, search click or CRM-verified customer.
+    unknown_entry = [
+        u for u in (ORIGIN + "/commercial", ORIGIN + "/industries/solar")
+        if _index_state(index_states, u) == "GOOGLE_HAS_NO_URL_RECORD"
+    ]
+    verified_sales = sales_evidence["sitewide_sales_acquisitions"]
+    if verified_sales is None:
+        focus_status = "CANONICAL_SALES_SOURCE_UNVERIFIED"
+        founder_action = "CHECK_EXISTING_OPS_CONTROL_EVIDENCE_THEN_REVIEW_GOOGLE_COVERAGE"
+    elif verified_sales > 0:
+        focus_status = "EXISTING_CANONICAL_ENQUIRY_REQUIRES_CRM_REVIEW"
+        founder_action = "VERIFY_EXISTING_CRM_ENQUIRY_CONSENT_AND_ORIGINAL_SOURCE_RECEIPT"
+    elif unknown_entry:
+        focus_status = "GROW_DISCOVERY_FOR_PUBLISHED_BUYER_ENTRY"
+        founder_action = "REVIEW_EXACT_GOOGLE_INDEX_COVERAGE_AND_PAGE_USEFULNESS"
+    else:
+        focus_status = "MEASURE_GSC_VISITS_AND_CONSENTED_BUYER_RESPONSE"
+        founder_action = "REVIEW_EXISTING_GSC_SEARCH_QUERIES_AND_ORIGINAL_CRM_OUTCOMES"
+    focus = {
+        "status": focus_status,
+        "next_existing_owner_action": founder_action,
+        "google_unknown_exact_buyer_entry_urls": unknown_entry,
+        "sitewide_canonical_sales_count": verified_sales,
+        "count_source_verified": sales_evidence["source_count_verified"],
+        "seo_attributed_buyer_count": None,
+        "real_organic_clicks_by_this_source_verified": False,
+        "qualified_buyer_verified": False,
+        "earned_revenue_verified": False,
+        "new_publication_authorized": False,
+        "google_indexing_requests_submitted": 0,
+        "outbound_authority": "none",
+    }
     counts = {x: sum(a["state"] == x for a in actions) for x in STATES}
     reached = {x: sum(x in a["state_path"] for a in actions) for x in STATES}
     return {
@@ -315,6 +366,9 @@ def build_seo_action_lifecycle(
         "resolved_existing_owner_actions": sum(a["state"] == "verified" for a in actions),
         "unresolved_actions": sum(a["state"] != "verified" for a in actions),
         "actions": actions,
+        "revenue_first_original_owner_focus": focus,
+        "exact_google_status_drives_owned_entry_priority": True,
+        "historical_404s_never_supersede_current_verified_buyer_entry_evidence": True,
         "canonical_sitewide_sales_evidence": sales_evidence,
         "sitewide_acquisitions_never_equated_with_aeo_or_search_attribution": True,
         "existing_ops_control_canonical_reader_reused": True,
