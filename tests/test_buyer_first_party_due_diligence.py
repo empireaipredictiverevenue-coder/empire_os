@@ -278,3 +278,26 @@ def test_legacy_invalid_domain_with_critical_hold_fails_closed(tmp_path):
     with pytest.raises(DueDiligenceError,match='observation_invalid'):
         cycle.run(root=tmp_path,plan_only=True,now_epoch=100_100.)
     assert p.read_text()==content
+
+
+def test_timestamp_only_shortlist_rotation_keeps_first_party_evidence(tmp_path):
+    base=_runner_fixture(tmp_path,domains=(DOMAIN,))
+    fetch,_=make_fetch()
+    def concurrent_timestamp_refresh(domain,*,now_epoch):
+        p=base/cycle.SOURCE
+        snapshot=json.loads(p.read_text())
+        snapshot['generated_at']='2026-10-26T15:04:00+00:00'
+        p.write_text(json.dumps(snapshot))
+        return observe_domain(domain,fetch=fetch,now_epoch=now_epoch)
+    result=cycle.run(
+        root=tmp_path,
+        fetch_observer=concurrent_timestamp_refresh,
+        now_epoch=100_000.,
+    )
+    assert result['status']=='PASS'
+    saved=json.loads((base/cycle.OUTPUT).read_text())
+    assert saved['timestamp_only_source_refresh_accepted'] is True
+    assert len(saved['end_source_shortlist_sha256'])==64
+    assert saved['observations'][0]['domain']==DOMAIN
+    assert saved['outbound_sent'] is False
+    assert saved['traffic_activated'] is False

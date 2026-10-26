@@ -43,6 +43,16 @@ def _read(path:Path,max_bytes:int)->tuple[dict[str,Any],str]:
     return data,sha256(raw).hexdigest()
 
 
+def _semantic_shortlist_digest(snapshot:dict[str,Any])->str:
+    # The 5-minute canonical queue owner rewrites generated_at while the
+    # slower, same-origin first-party link collector may still be probing.
+    # Only the single volatile generation timestamp may differ; all rows,
+    # status, evidence, contact history, queue counts and governance must
+    # remain byte-for-byte equivalent under canonical JSON serialisation.
+    stable={key:value for key,value in snapshot.items() if key!='generated_at'}
+    return sha256(json.dumps(stable,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+
+
 def _save(path:Path,payload:dict[str,Any]):
     if path.is_symlink():
         raise DueDiligenceError('due_diligence_output_symlink')
@@ -204,9 +214,14 @@ def run(*,root:Path=ROOT,plan_only:bool=False,max_domains:int=MAX_DOMAINS_PER_CY
     holds=verified_observation_holds(payload,now_epoch=now)
     payload['automated_evidence_hold_count']=len(holds)
     payload['automated_evidence_hold_domains']=sorted(holds)
-    _,ending_hash=_read(base/SOURCE,2_500_000)
+    ending_source,ending_hash=_read(base/SOURCE,2_500_000)
     if ending_hash!=initial_hash:
-        raise DueDiligenceError('due_diligence_shortlist_changed_during_probe')
+        if _semantic_shortlist_digest(ending_source)!=_semantic_shortlist_digest(source):
+            raise DueDiligenceError('due_diligence_shortlist_changed_during_probe')
+        payload['timestamp_only_source_refresh_accepted']=True
+        payload['end_source_shortlist_sha256']=ending_hash
+    else:
+        payload['timestamp_only_source_refresh_accepted']=False
     _save(base/OUTPUT,payload)
     return {'status':'PASS','mode':'OBSERVE',
             'selected_domains':selected,
