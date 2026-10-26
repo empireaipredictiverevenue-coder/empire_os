@@ -14,10 +14,10 @@ The missing workflow is not a goal statement. Each component must produce a **sp
 If any predicate fails, raise `ProspectHandoffHold`. A source table name or a forecast is not an entity link.
 
 ### 2. Canonical business → authorised tenant in the original Smart CRM
-The same reader verifies:
+The fixture-only low-level reader verifies:
 - Exactly one active, current `public.tenant_business_entity_bindings` row through the **existing** `resolve_tenant_entity_binding` helper.
 - The entity and tenant IDs must match the authenticated scoped reader, not an external payload or a mailbox domain.
-- `review_signed_crm_prospect_tenant` consumes the original **`SignedCrmTenantVerifier`** and verifies active membership; the restricted original PostgreSQL session is required to pass the CRM-login privilege check and `public.empire_current_tenant_id()`. The transaction is `READ ONLY` with an explicit four-second timeout.
+- The legacy `review_signed_crm_prospect_tenant` accepts injected test cursors only. **CRM040 explicitly refuses direct CRM reader SELECT on global identity/tenant bindings.** Real CRM reads use the new `crm_scoped_lineage_reader.review_signed_scoped_lineage`, which requires an owner-approved tenant-scoped SQL function, the original `SignedCrmTenantVerifier`, restricted login privilege attestation and `public.empire_current_tenant_id()`. That function is HELD, not deployed.
 - **RELEASE DEPENDENCY:** the live checkout has an *uncommitted CRM-owner change* adding `CRM_LOGIN_AUTHORITY_SQL`. The clean feature branch does not include that unpublished guard. This module explicitly throws `ORIGINAL_CRM_LOGIN_ATTESTATION_UNRELEASED` and does not connect until the CRM owner publishes the original restricted-login protection. We do **not** copy/overwrite that agent's dirty code.
 
 ### Next transitions — still held, not claimed complete
@@ -33,7 +33,7 @@ The same reader verifies:
 **Important:** the new injected-cursor fixture demonstrates that the existing SQL contracts can prove an intermediate identity-to-tenant relationship; it does NOT attest a production tenant session or a paying buyer. Return flags explicitly hold GTM association, buyer acceptance, outbound, funding and payment at FALSE.
 
 ## Where the code connects
-- The original unified `revenue_evidence_workplan` Smart CRM action names the precise signed read-only review function as its next required proof.
+- The unified `revenue_evidence_workplan` Smart CRM action names the precise **tenant-scoped RPC reader**, with the owner-reviewed SQL function still held.
 - The original authenticated CRM service must invoke the helper using its **owner-managed** signed token verifier, dedicated DSN and role-scoped session after the CRM owner's privilege guard is released. No new API route, database, role, service or systemd timer was invented.
 - A future separately reviewed execution bridge can enqueue only supported original worker adapters. The existing `DepartmentWorkQueue` must not be fed invented target actions; no work has been added to the live queue by this slice.
 - All held financial, migration, mainnet, consent, email and cross-tenant writes remain OFF.
@@ -63,6 +63,38 @@ This permits a **source-bound pre-order evidence handoff**, but an arbitrary eve
 - Order state `paid` or `settled` is **not** cash finality. Buyer acceptance, delivery/attribution, independent settled transaction, refunds and Economic Memory require the original downstream attestations.
 
 ### Trust and release boundary
-The existing signed CRM reader now accepts at most **one** of `event_id` or `order_id`, paired with the exact `opportunity_id`, and performs that test inside the original active signed-member, role-scoped, tenant-attested READ ONLY transaction. Incomplete pairs, both receipt types, cross-company links, guessed IDs, ambiguous source binding or revoked tenant authority fail closed. Tests using an injected cursor explicitly report `INJECTED_CONNECTOR_RESEARCH_ONLY`; they are not evidence of a real production DB session.
+The **fixture-only low-level checker** accepts at most one `event_id` or `order_id` paired with an exact `opportunity_id`; it cannot run on the real CRM reader's restricted raw-table privileges. The production-oriented `review_signed_scoped_lineage` instead takes one exact receipt kind (`event` or `order`) and uses only the **held** tenant-safe RPC, in the original signed-member, role-scoped READ ONLY transaction. Incomplete pairs, both receipt types, cross-company links, guessed IDs, ambiguous source binding or revoked tenant authority fail closed. Tests using an injected cursor explicitly report `INJECTED_CONNECTOR_RESEARCH_ONLY`; they are not evidence of a real production DB session.
 
 The CRM owner's as-yet-unreleased `CRM_LOGIN_AUTHORITY_SQL` hardening remains a **hard dependency**. No protected production file, running timer, EmpireDB schema, outbound queue, funds, commercial price or revenue accounting was modified by this release candidate. The read-only checker cannot produce real opportunities without existing authentic records.
+
+
+## V5 tenant-safe RPC correction (26 October) — explicit release blocker
+A fresh review of original `migrations/empiredb/040_revenue_crm_tenant_reader_views.sql`
+established that `empire_revenue_crm_reader` **must not** have raw SELECT
+on `prospect_entity_links` or `tenant_business_entity_bindings`.
+Original `018_tenant_context_foundation.sql` also restricts event/order
+rows by buyer tenant under its separate tenant-reader role.
+Therefore, a raw-table SQL SELECT through the CRM reader was a **test-only**
+capability, never a safe live implementation. The low-level checker now
+fails closed for any non-injected connection.
+
+**Proposed owner-approved implementation, not applied:**
+`docs/architecture/CRM_SCOPED_LINEAGE_RPC_HELD_20261026.sql` is a held,
+guarded SQL DESIGN for `public.empire_crm_exact_lineage(uuid,uuid,uuid,text)`.
+It returns exactly one safe, UUID-only tuple after original login-bound
+tenant, source identity, unresolved-conflict, exact GTM, existing event/order,
+and optional buyer-tenant checks. It does not grant raw table rights to the
+CRM reader. The new adapter `empire_os/crm_scoped_lineage_reader.py` will
+read **only** that scoped function via a signed CRM read-only session;
+before calling it, it checks the original LOGIN privilege envelope,
+the trusted database tenant, and the function's SECURITY DEFINER,
+STABLE, migrator-owned, locked search_path provenance.
+
+The staged function is not deployed. Its SQL requires CRM-owner review,
+fixture security tests (including cross-tenant denial and revoked access),
+explicit founder migration approval, rollback evidence, and exact live role
+privilege reconciliation. No privileged database query was used to claim
+that matching production events/orders exist; an attempted privileged
+read-only check was disallowed by the server command policy.
+Zero live customer handoffs, buyer contracts, payments, or revenue are
+established by these fixture tests.

@@ -162,13 +162,13 @@ def review_signed_crm_prospect_tenant(
     except Exception:
         raise ProspectHandoffHold("SIGNED_CRM_MEMBERSHIP_NOT_VERIFIED") from None
 
+    # CRM040 deliberately forbids raw SELECT on prospect_entity_links and
+    # tenant_business_entity_bindings for empire_revenue_crm_reader. These
+    # low-level SQL checks are only valid for explicit TEST-INJECTED cursors.
+    # Real signed CRM reads must use the separately reviewed tenant-scoped RPC.
     original_connector = connect_factory is None
     if original_connector:
-        try:
-            import psycopg
-            connect_factory = psycopg.connect
-        except ImportError as exc:
-            raise ProspectHandoffHold("ORIGINAL_POSTGRES_CONNECTOR_UNAVAILABLE") from exc
+        raise ProspectHandoffHold("CRM_RAW_LINEAGE_READ_FORBIDDEN_USE_SCOPED_RPC")
     try:
         with connect_factory(dedicated_crm_dsn, connect_timeout=5) as conn:
             with conn.cursor() as cursor:

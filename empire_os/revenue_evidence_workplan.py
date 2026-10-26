@@ -156,15 +156,13 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
         tasks.append(_work("SmartCRM", "ATTEST_CANONICAL_TENANT_BUSINESS_BINDING",
                            "snapshot:buyer_relationships", priority=89,
                            state="PRIVILEGED_READER_REQUIRED",
-                           proof=("Execute only via the existing signed CRM read-only login: "
-                                  "canonical_prospect_tenant_handoff.review_signed_crm_prospect_tenant; "
-                                  "validate original prospect_entity_links, no identity conflicts, "
-                                  "unique active tenant_business_entity_bindings; "
-                                  "then require one exact original commercial_events event_id "
-                                  "for pre-order GTM continuity, OR one exact fulfilment_orders "
-                                  "order_id for existing-order continuity; verify IDs via "
-                                  "canonical_order_lineage_review in the same signed reader. "
-                                  "Buyer acceptance, settlement and economic memory remain separate holds")))
+                           proof=("Original signed CRM and restricted PostgreSQL login, then "
+                                  "crm_scoped_lineage_reader.review_signed_scoped_lineage "
+                                  "with exact prospect, GTM opportunity, and existing event/order "
+                                  "receipt using a CRM-owner approved tenant-safe SECURITY DEFINER RPC. "
+                                  "CRM040 expressly prohibits direct raw binding-table reads. "
+                                  "Held RPC is not deployed; preserve all buyer, outbound, "
+                                  "settlement and revenue holds")))
     # Publisher suggestions only if actual recognised Gmail evidence is present.
     if brain is not None:
         if (not isinstance(brain, Mapping)
