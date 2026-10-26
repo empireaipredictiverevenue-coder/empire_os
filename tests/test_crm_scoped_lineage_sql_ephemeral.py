@@ -77,7 +77,7 @@ def pg():
 def query(login,receipt,kind="event",prospect=P,opportunity=O):
     return f"""BEGIN READ ONLY;
 SET LOCAL ROLE empire_revenue_crm_reader;
-SELECT prospect_id, entity_id, tenant_id, opportunity_id, evidence_id, evidence_kind
+SELECT prospect_id, entity_id, tenant_id, opportunity_id, evidence_id, evidence_kind, buyer_id
 FROM public.empire_crm_exact_lineage(
   '{prospect}'::uuid,'{opportunity}'::uuid,'{receipt}'::uuid,'{kind}'
 );
@@ -90,6 +90,7 @@ def test_original_tenant_a_only_gets_buyer_a_event_and_order(pg):
         result,_=run(query("crm_fixture_a",receipt,kind),
                      username="crm_fixture_a")
         assert receipt in result and TA in result
+        assert "00000000-0000-0000-0000-0000000000a2" in result
     for receipt,kind in ((EB,"event"),(OB,"order"),(ENULL,"event"),(ONULL,"order")):
         result,_=run(query("crm_fixture_a",receipt,kind),
                      username="crm_fixture_a")
@@ -102,6 +103,7 @@ def test_original_tenant_b_only_gets_buyer_b_event_and_order(pg):
         result,_=run(query("crm_fixture_b",receipt,kind),
                      username="crm_fixture_b")
         assert receipt in result and TB in result
+        assert "00000000-0000-0000-0000-0000000000b2" in result
     for receipt,kind in ((EA,"event"),(OA,"order"),(ENULL,"event"),(ONULL,"order")):
         result,_=run(query("crm_fixture_b",receipt,kind),
                      username="crm_fixture_b")

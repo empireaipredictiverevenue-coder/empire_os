@@ -56,7 +56,7 @@ CREATE FUNCTION public.empire_crm_exact_lineage(
 )
 RETURNS TABLE (
   prospect_id uuid, entity_id uuid, tenant_id uuid, opportunity_id uuid,
-  evidence_id uuid, evidence_kind text
+  evidence_id uuid, evidence_kind text, buyer_id uuid
 )
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = ''
 AS $lineage$
@@ -88,7 +88,16 @@ WITH verified_scope AS (
   GROUP BY l.prospect_id,l.entity_id,b.tenant_id
   HAVING count(*)=1
 )
-SELECT s.prospect_id,s.entity_id,s.tenant_id,g.id,p_receipt,p_kind
+SELECT s.prospect_id,s.entity_id,s.tenant_id,g.id,p_receipt,p_kind,
+  CASE WHEN p_kind='event' THEN (
+    SELECT e.buyer_id FROM public.commercial_events e
+    WHERE e.id=p_receipt AND e.opportunity_id=g.id
+      AND e.prospect_id=s.prospect_id AND e.entity_id=s.entity_id
+  ) ELSE (
+    SELECT o.buyer_id FROM public.fulfilment_orders o
+    WHERE o.id=p_receipt AND o.opportunity_id=g.id
+      AND o.prospect_id=s.prospect_id AND o.entity_id=s.entity_id
+  ) END
 FROM verified_scope s
 JOIN public.gtm_opportunities g ON g.id=p_opportunity
 WHERE p_prospect IS NOT NULL AND p_opportunity IS NOT NULL

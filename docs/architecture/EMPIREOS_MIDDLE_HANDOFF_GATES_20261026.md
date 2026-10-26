@@ -143,3 +143,39 @@ the underlying company is shared. An event with no order reference can
 still qualify as a pre-order event **only if it already has a named buyer
 owned by the authenticated tenant**. Disposable PostgreSQL fixture tests
 exercise both the mismatched and correctly matched order case.
+
+
+## V7 — Same-buyer acceptance evidence after exact scoped order identity
+The HELD tenant-safe `empire_crm_exact_lineage` SQL and
+`crm_scoped_lineage_reader.review_signed_scoped_lineage` now return the
+actual **buyer UUID** linked to the exact existing event or order. This
+result is explicitly tenant-owned via the original buyer's `org_id`.
+The receipt still cannot confer terms/acceptance, route, settlement or
+fulfilment authority by itself.
+
+`empire_os/canonical_buyer_acceptance_handoff.py` now verifies the
+next intermediate handoff against the **same** signed-tenant order:
+- Original verified prospect, canonical company, GTM opportunity, tenant,
+  exact fulfilment order and buyer identities must agree.
+- Reuses, rather than duplicates, original
+  `commercial_terms_materializer.build_persisted_terms_stage`, which
+  checks the original approved terms review, installed price/hash/currency,
+  ordered approved and accepted events, acceptance kind/actor/source ref
+  and non-future timestamps. A proposed offer or approved terms alone
+  does not qualify as buyer acceptance.
+- Any mismatch, changed buyer, another order, duplicate acceptance event,
+  wrong terms SHA/price, forecast evidence, expired terms or unsupported
+  source timestamp fails closed.
+- **Test-injected** source evidence yields
+  `INJECTED_ACCEPTANCE_COHERENCE_TEST_ONLY`; it is never an actual
+  customer acceptance, payer capacity, fulfilment, settlement or revenue.
+  The production path still requires the original scoped RPC to be
+  released and the buyer-facing acceptance source independently verified
+  by its original authorised owner.
+
+The separate original buyer capacity/readiness, route/compliance, order,
+payment and Economic Memory stages remain untouched. The existing
+`revenue_evidence_workplan` now names the exact persisted-terms receipt
+validation step for the Buyer Acquisition and Smart CRM owners. **No
+new sales, emails, database mutations, services, timers or queues
+have been created.** The SQL remains held pending CRM-owner review.

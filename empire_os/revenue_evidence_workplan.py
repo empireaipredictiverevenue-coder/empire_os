@@ -89,7 +89,11 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                            "VERIFY_ONE_CONTRACTED_DOWNSTREAM_PAYER_BUYBOX",
                            "snapshot:buyer_capacity",
                            priority=100, state="COMMERCIAL_PROOF_REQUIRED",
-                           proof="Exact named buyer, signed terms, territory, capacity, acceptance and payable price"))
+                           proof=("Exact named buyer, signed terms, territory, capacity, and payable price; "
+                                  "for an independently tenant-scoped existing order, reuse "
+                                  "canonical_buyer_acceptance_handoff.review_same_order_buyer_acceptance "
+                                  "with the ORIGINAL persisted commercial-terms review and acceptance events. "
+                                  "Internal coherence is not external acceptance, cash or delivery authority")))
     # Factory and cohesion must have read the EXACT same immutable bytes.
     # This is generation consistency, NOT cryptographic origin authority.
     factory_hash = statuses["opportunity_factory"].get("sha256")
@@ -161,8 +165,10 @@ def build_workplan(cohesion: Mapping[str, Any], handoffs: Mapping[str, Any],
                                   "with exact prospect, GTM opportunity, and existing event/order "
                                   "receipt using a CRM-owner approved tenant-safe SECURITY DEFINER RPC. "
                                   "CRM040 expressly prohibits direct raw binding-table reads. "
-                                  "Held RPC is not deployed; preserve all buyer, outbound, "
-                                  "settlement and revenue holds")))
+                                  "Held RPC is not deployed; verify the same buyer UUID on "
+                                  "original approved terms and accepted event using the existing "
+                                  "commercial_terms_materializer, then separately verify source signature, "
+                                  "buyer capacity and fulfilment; keep outbound/settlement/revenue holds")))
     # Publisher suggestions only if actual recognised Gmail evidence is present.
     if brain is not None:
         if (not isinstance(brain, Mapping)

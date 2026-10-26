@@ -20,7 +20,8 @@ class ScopedCursor:
         self.auth=auth
         self.rpc_available=rpc_available
         self.rpc_provenance=rpc_provenance
-        self.result=(PROSPECT,ENTITY,TENANT,OPPORTUNITY,EVENT,"event") if result is None else result
+        self.result=(PROSPECT,ENTITY,TENANT,OPPORTUNITY,EVENT,"event",
+                     "00000000-0000-0000-0000-0000000000a2") if result is None else result
         self.calls=[]
     def __enter__(self):return self
     def __exit__(self,*_):pass
@@ -86,6 +87,7 @@ def test_tenant_scoped_rpc_only_no_raw_tables(signed_auth):
     r=run(signed_auth,c)
     assert r["status"]=="INJECTED_SCOPED_RPC_TEST_ONLY"
     assert r["entity_id"]==ENTITY
+    assert r["buyer_id"]=="00000000-0000-0000-0000-0000000000a2"
     assert r["receipt_kind"]=="event"
     assert r["source_rights_verified"] is False
     assert r["buyer_capacity_verified"] is False
@@ -108,8 +110,9 @@ def test_tenant_scoped_rpc_only_no_raw_tables(signed_auth):
     ({"result":False},"ONE_EXACT_AUTHORIZED_LINEAGE_RECEIPT_REQUIRED"),
     ({"bound_tenant":"99999999-9999-4999-8999-999999999999"},"CRM_SESSION_TENANT_SCOPE_MISMATCH"),
     ({"auth":(False,False,False,False)},"RESTRICTED_CRM_READER_ROLE_NOT_ATTESTED"),
-    ({"result":(PROSPECT,ENTITY,"99999999-9999-4999-8999-999999999999",OPPORTUNITY,EVENT,"event")},"SCOPED_LINEAGE_RECEIPT_MISMATCH"),
-    ({"result":(PROSPECT,ENTITY,TENANT,OPPORTUNITY,EVENT,"order")},"SCOPED_LINEAGE_RECEIPT_MISMATCH"),
+    ({"result":(PROSPECT,ENTITY,"99999999-9999-4999-8999-999999999999",OPPORTUNITY,EVENT,"event","00000000-0000-0000-0000-0000000000a2")},"SCOPED_LINEAGE_RECEIPT_MISMATCH"),
+    ({"result":(PROSPECT,ENTITY,TENANT,OPPORTUNITY,EVENT,"order","00000000-0000-0000-0000-0000000000a2")},"SCOPED_LINEAGE_RECEIPT_MISMATCH"),
+    ({"result":(PROSPECT,ENTITY,TENANT,OPPORTUNITY,EVENT,"event",None)},"INVALID_BUYER_ID"),
 ])
 def test_scoped_rpc_missing_cross_tenant_unsafe_held(signed_auth,settings,error):
     with pytest.raises(ProspectHandoffHold,match=error):

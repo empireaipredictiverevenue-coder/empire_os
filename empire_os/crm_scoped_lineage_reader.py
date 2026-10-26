@@ -14,7 +14,7 @@ from empire_os.canonical_prospect_tenant_handoff import ProspectHandoffHold
 
 FUNCTION_SIGNATURE = "public.empire_crm_exact_lineage(uuid,uuid,uuid,text)"
 READ_SQL = (
-    "SELECT prospect_id, entity_id, tenant_id, opportunity_id, evidence_id, evidence_kind "
+    "SELECT prospect_id, entity_id, tenant_id, opportunity_id, evidence_id, evidence_kind, buyer_id "
     "FROM public.empire_crm_exact_lineage(%s::uuid,%s::uuid,%s::uuid,%s::text)"
 )
 
@@ -106,14 +106,15 @@ def review_signed_scoped_lineage(*, signed_crm_bearer: str,
                 cursor.execute(READ_SQL,(prospect,opportunity,evidence,evidence_kind))
                 rows=cursor.fetchall()
                 if (not isinstance(rows,list) or len(rows)!=1
-                        or not isinstance(rows[0],(tuple,list)) or len(rows[0])!=6):
+                        or not isinstance(rows[0],(tuple,list)) or len(rows[0])!=7):
                     raise ProspectHandoffHold("ONE_EXACT_AUTHORIZED_LINEAGE_RECEIPT_REQUIRED")
-                db_prospect,db_entity,db_tenant,db_opportunity,db_receipt,db_kind=rows[0]
+                db_prospect,db_entity,db_tenant,db_opportunity,db_receipt,db_kind,db_buyer=rows[0]
                 if (str(db_prospect)!=prospect or str(db_tenant)!=signed_tenant
                         or str(db_opportunity)!=opportunity or str(db_receipt)!=evidence
                         or db_kind!=evidence_kind):
                     raise ProspectHandoffHold("SCOPED_LINEAGE_RECEIPT_MISMATCH")
                 entity=_id(str(db_entity),"ENTITY_ID")
+                buyer=_id(str(db_buyer),"BUYER_ID")
     except ProspectHandoffHold:
         raise
     except Exception:
@@ -125,6 +126,7 @@ def review_signed_scoped_lineage(*, signed_crm_bearer: str,
         "status":("EXACT_TENANT_SCOPED_RECEIPT_OBSERVED_NOT_PROMOTED"
                   if original else "INJECTED_SCOPED_RPC_TEST_ONLY"),
         "prospect_id":prospect,"entity_id":entity,"tenant_id":signed_tenant,
+        "buyer_id":buyer,
         "opportunity_id":opportunity,"receipt_id":evidence,
         "receipt_kind":evidence_kind,
         "signed_crm_membership_verified":True,
