@@ -220,3 +220,25 @@ def test_first_party_role_review_does_not_claim_contract_or_buyer_authority():
         'INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER')
     for domain,item in FIRST_PARTY_ROLE_REVIEWS.items():
         assert item['source_url'].startswith('https://' + domain + '/')
+
+
+def test_event_role_keeps_research_but_never_claims_buyer_review(tmp_path):
+    directory=_case(tmp_path)
+    # Existing packet has first-party corroboration, but role-specific first-
+    # party evidence identifies the organisation as an industry conference.
+    old_domain='publisheralpha.example.com'
+    event_domain='contact.io'
+    for key,name in SOURCES.items():
+        file=directory/name
+        text=file.read_text().replace(old_domain,event_domain)
+        file.write_text(text)
+    result=plan(tmp_path)
+    event=next(item for item in result['targets'] if item['domain']==event_domain)
+    assert event['tier']=='ECOSYSTEM_RESEARCH'
+    assert event['buyer_relationship_role_review']==(
+        'INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER')
+    assert event['commercial_next_action']==(
+        'RESEARCH_RELEVANT_BUYERS_IN_EVENT_ECOSYSTEM_NO_SALES_INTRO')
+    assert result['event_ecosystem_not_direct_buyer_count']==1
+    assert result['trusted_founder_review_count']==0
+    assert event['outbound_authorized'] is False

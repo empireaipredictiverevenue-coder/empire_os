@@ -211,6 +211,8 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
         role_review = FIRST_PARTY_ROLE_REVIEWS.get(domain)
         tier = ('MANUAL_EVIDENCE_HOLD' if manual_hold is not None
                 else 'AUTOMATED_EVIDENCE_HOLD' if auto_hold is not None
+                else 'ECOSYSTEM_RESEARCH' if role_review is not None
+                    and role_review['role']=='INDUSTRY_CONFERENCE_NOT_VERIFIED_LEAD_BUYER'
                 else 'DUE_DILIGENCE_PENDING' if domain in verified_packets and not due_ready
                 else 'FOUNDER_REVIEW_ONLY' if is_founder_review
                 else 'EVIDENCE_RECOVERY')
@@ -247,7 +249,7 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'site_corroborated_buyer_role':direct.get('buyer_role') is True and direct.get('corroborated') is True,
             'site_evidence_flags':{k: bool(v) for k,v in (direct.get('evidence') or {}).items()
                                    if k in ('active_demand','publisher_program','integration','economics','compliance','contactable','negative_program') and type(v) is bool},
-            'review_source':'founder_review_packets_latest.json' if is_founder_review else 'founder_shortlist_latest.json',
+            'review_source':'founder_review_packets_latest.json' if tier=='FOUNDER_REVIEW_ONLY' else 'founder_shortlist_latest.json',
             'missing_evidence':gaps,
             'next_evidence_actions':[EVIDENCE_TASKS.get(g,
                 'Independent commercial evidence and founder-review confirmation required.') for g in gaps],
@@ -270,7 +272,8 @@ def plan(root: Path = ROOT) -> dict[str,Any]:
             'actual_revenue':False,
         })
     order={'FOUNDER_REVIEW_ONLY':0,'DUE_DILIGENCE_PENDING':1,
-           'EVIDENCE_RECOVERY':2,'AUTOMATED_EVIDENCE_HOLD':3,'MANUAL_EVIDENCE_HOLD':4}
+           'EVIDENCE_RECOVERY':2,'ECOSYSTEM_RESEARCH':3,
+           'AUTOMATED_EVIDENCE_HOLD':4,'MANUAL_EVIDENCE_HOLD':5}
     actions.sort(key=lambda x:(order[x['tier']],-x['founder_priority'],x['domain']))
     # Reject stale mixed-source races. A scheduler might replace its snapshots
     # concurrently; do not promote an optimistic partial report.
