@@ -51,12 +51,29 @@ def test_exact_workspace_monitor_uses_existing_cycle_only(tmp_path):
             "poll_workspace_solar_outreach_readonly.py" else 0)
     result=run(root=tmp_path, invoke=invoke)
     assert calls.count("poll_workspace_solar_outreach_readonly.py") == 1
-    assert calls == list(STEPS+OPTIONAL_STEPS)
+    assert calls == [s for s in STEPS+OPTIONAL_STEPS if s != "review_heat_pump_relationship_cycle.py"]
     assert all(step in calls for step in STEPS)
     assert result["status"] == "PASS"
     assert result["auxiliary_steps"][1]["status"] == "HELD"
     assert result["outbound_authorized"] is False
     assert result["execution_authority"] == "NONE"
+
+
+def test_failed_workspace_scan_does_not_execute_heat_relationship_reader(tmp_path):
+    (tmp_path / "scripts").mkdir()
+    calls = []
+    def invoke(args, **kwargs):
+        step = Path(args[1]).name
+        calls.append(step)
+        return SimpleNamespace(returncode=3 if step ==
+            "poll_workspace_solar_outreach_readonly.py" else 0)
+    result = run(root=tmp_path, invoke=invoke)
+    assert result["status"] == "PASS"
+    assert "review_heat_pump_relationship_cycle.py" not in calls
+    assert result["auxiliary_steps"][2]["status"] == "HELD"
+    assert result["auxiliary_steps"][2]["step"] == "review_heat_pump_relationship_cycle.py"
+    assert "run_permit_compliance_cycle_observer.py" in calls
+    assert result["outbound_authorized"] is False
 
 
 def test_optional_workspace_outage_cannot_block_original_gmail_cycle(tmp_path):
@@ -70,4 +87,4 @@ def test_optional_workspace_outage_cannot_block_original_gmail_cycle(tmp_path):
     assert result["status"]=="PASS"
     assert result["outbound_authorized"] is False
     assert result["auxiliary_steps"][0]["status"]=="HELD"
-    assert calls==list(STEPS+OPTIONAL_STEPS)
+    assert calls==[s for s in STEPS+OPTIONAL_STEPS if s != "review_heat_pump_relationship_cycle.py"]
