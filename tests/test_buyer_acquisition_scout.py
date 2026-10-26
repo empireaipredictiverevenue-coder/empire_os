@@ -732,3 +732,70 @@ def test_small_query_budget_reserves_existing_legal_and_insurance_icp_lanes():
         q.get("icp_profile_key")
     ) for q in queries}) == 12
     assert len(collect_research_queries(plan, max_queries=4)) == 4
+
+
+def test_overflow_recovery_priority_uses_two_existing_scout_queries_without_expanding_budget():
+    from empire_os.buyer_acquisition_scout import collect_research_queries
+
+    targets = [
+        {"corridor_key": "c:protected", "priority_score": 9999,
+         "research_queries": {"direct_demand_buyers": ["protected legacy corridor"]}},
+        {"corridor_key": "c:roofing:dallas", "priority_score": 90,
+         "research_queries": {"direct_demand_buyers": ["first party roofing buyers dallas"]}},
+        {"corridor_key": "c:roofing:denver", "priority_score": 80,
+         "research_queries": {"direct_demand_buyers": ["first party roofing buyers denver"]}},
+    ]
+    for i in range(15):
+        targets.append({"corridor_key": f"c:other:{i}", "priority_score": 200,
+            "research_queries": {"direct_demand_buyers": [f"other buyer query {i}"]}})
+    plan = {
+        "priority_targets": targets,
+        "product_priority_targets": [
+            {"product_code": f"mrr:{i}", "priority_score": 800,
+             "research_queries": {"software_and_advisory_buyers": [f"software MRR buyer {i}"]}}
+            for i in range(12)
+        ],
+        "icp_priority_targets": [
+            {"icp_profile_key": k, "priority_score": 300,
+             "research_queries": {"enterprise_and_data_buyers": [f"buying evidence {k}"]}}
+            for k in [
+                "legal_mass_tort_plaintiff_firm",
+                "legal_plaintiff_growth_firm",
+                "insurance_distribution_growth",
+            ]
+        ],
+        "demand_gap_queue": [
+            {"corridor_key": "c:roofing:dallas", "buyer_hunt_required": True, "overflow_count": 4},
+            {"corridor_key": "c:roofing:denver", "buyer_hunt_required": True, "overflow_count": 4},
+        ],
+    }
+    rows = collect_research_queries(plan, max_queries=12)
+    assert len(rows) == 12
+    assert {r["corridor_key"] for r in rows if r.get("corridor_key") in {
+        "c:roofing:dallas", "c:roofing:denver",
+    }} == {"c:roofing:dallas", "c:roofing:denver"}
+    assert {r["target_kind"] for r in rows} == {"corridor", "icp", "product"}
+    assert {r.get("icp_profile_key") for r in rows} >= {
+        "legal_mass_tort_plaintiff_firm",
+        "legal_plaintiff_growth_firm",
+        "insurance_distribution_growth",
+    }
+    assert len(collect_research_queries(plan, max_queries=4)) == 4
+    plan["demand_gap_queue"] = []
+    without_gap = collect_research_queries(plan, max_queries=12)
+    assert not any(r.get("corridor_key") in {
+        "c:roofing:dallas", "c:roofing:denver",
+    } for r in without_gap)
+
+
+def test_overflow_requires_real_hunt_and_positive_integer_volume():
+    from empire_os.buyer_acquisition_scout import collect_research_queries
+    p = plan()
+    p["demand_gap_queue"] = [
+        {"corridor_key": p["priority_targets"][0]["corridor_key"],
+         "buyer_hunt_required": True, "overflow_count": True},
+    ]
+    # Boolean is not a verified numeric demand count.
+    assert len(collect_research_queries(p, max_queries=12)) == 4
+    p["demand_gap_queue"] = {"invalid": "not_list"}
+    assert len(collect_research_queries(p, max_queries=12)) == 4

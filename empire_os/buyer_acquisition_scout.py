@@ -352,6 +352,53 @@ def collect_research_queries(
                     reserved.append(row)
     rows = reserved + rows
 
+    # The existing Prospect Recovery Agent and Buyer Acquisition Team read
+    # the same canonical demand-gap queue. Honour observed overflow within
+    # the EXISTING search budget rather than leaving buyer-hunt work parked.
+    # These are pre-existing queries from pre-existing approved targets;
+    # no generated contact, buyer, spend or new source is implied.
+    if max_queries >= 8:
+        gaps = plan.get("demand_gap_queue") or []
+        focused: list[dict[str, Any]] = []
+        used_corridors: set[str] = set()
+        for gap in gaps[:12] if isinstance(gaps, list) else []:
+            if (not isinstance(gap, Mapping)
+                    or gap.get("buyer_hunt_required") is not True
+                    or type(gap.get("overflow_count")) is not int
+                    or gap["overflow_count"] <= 0):
+                continue
+            corridor = str(gap.get("corridor_key") or "")
+            if not corridor or corridor in used_corridors:
+                continue
+            candidate = next((item for item in rows
+                if item["target_kind"] == "corridor"
+                and item.get("corridor_key") == corridor
+                and item["buyer_pool"] == "direct_demand_buyers"), None)
+            if candidate is None:
+                continue
+            focused.append(candidate)
+            used_corridors.add(corridor)
+            if len(focused) >= 2:
+                break
+        if focused:
+            # Preserve representation of the three commercial streams and
+            # existing protected insurance/legal ICPs before inserting two
+            # overflow buyer-hunt slots. Avoid starving revenue/MRR lanes.
+            protected: list[dict[str, Any]] = []
+            protected_keys: set[tuple[str, str | None]] = set()
+            for item in reserved:
+                kind = item["target_kind"]
+                subtype = (item.get("icp_profile_key")
+                           if kind == "icp" and item.get("icp_profile_key") in strategic_icp_lanes
+                           else None)
+                key = (kind, subtype)
+                if key not in protected_keys and (kind in {"corridor", "product"}
+                                                 or subtype is not None or kind == "icp"):
+                    protected.append(item)
+                    protected_keys.add(key)
+            rows = protected + focused + [item for item in rows
+                                          if item not in protected and item not in focused]
+
     dedup: list[dict[str, Any]] = []
     seen: set[tuple] = set()
     for row in rows:
@@ -1258,6 +1305,21 @@ def run_buyer_scout(
         "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "query_count": len(queries),
+        "overflow_buyer_research_query_count": sum(
+            item["target_kind"] == "corridor"
+            and item.get("corridor_key") in {
+                str(gap.get("corridor_key") or "")
+                for gap in ((plan.get("demand_gap_queue") or [])[:12]
+                            if isinstance(plan.get("demand_gap_queue"), list)
+                            else [])
+                if isinstance(gap, Mapping)
+                and gap.get("buyer_hunt_required") is True
+                and type(gap.get("overflow_count")) is int
+                and gap["overflow_count"] > 0
+            }
+            for item in queries
+        ),
+        "overflow_research_is_buyer_proof": False,
         "search_enabled": bool(search_enabled),
         "search_domain_count": search_domain_count,
         "rejected_search_infrastructure_domain_count": len(
