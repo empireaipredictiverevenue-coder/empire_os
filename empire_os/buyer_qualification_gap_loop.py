@@ -14,6 +14,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import Any
 from empire_os.buyer_qualification_evidence_bridge import load_registry, match_partner_buyboxes
+from empire_os.buyer_partner_buybox_reply_tracker import read_original_gmail_metadata, review_partner_replies
 import json
 import os
 import re
@@ -353,6 +354,17 @@ def refresh_gap_loop(root: Path, *, now: datetime | None = None) -> dict:
     result["original_partner_buyboxes_in_source"] = len(source_partners)
     result["partner_buyboxes_not_linked_to_candidate_cohort"] = len(source_partners - matched_partners)
     result["unlinked_buyboxes_automatically_admitted"] = 0
+    gmail, gmail_source_state = read_original_gmail_metadata(root, now=now)
+    prior_reply_ids = (previous or {}).get("partner_message_ids")
+    partner_replies, updated_reply_ids = review_partner_replies(
+        registry, gmail, cohort_matches=linked,
+        prior_message_ids=prior_reply_ids,
+        gmail_source_state=gmail_source_state)
+    result["original_partner_buybox_reply_tracking"] = partner_replies
+    result["partner_gmail_metadata_source_state"] = gmail_source_state
+    if partner_replies["status"] == "PRIOR_MESSAGE_CHECKPOINT_INVALID":
+        raise ValueError("unsafe_original_partner_reply_checkpoint")
+    state["partner_message_ids"] = updated_reply_ids
     _atomic(root / REPORT, result)
     _atomic(root / MEMORY, state)
     return {
@@ -366,6 +378,8 @@ def refresh_gap_loop(root: Path, *, now: datetime | None = None) -> dict:
         "unlinked_partner_buyboxes": result["partner_buyboxes_not_linked_to_candidate_cohort"],
         "repeat_full_buybox_requests_known": result["previous_partner_buybox_requests_known"],
         "partner_registry_state": partner_state,
+        "partner_reply_source_state": gmail_source_state,
+        "partner_reply_changes_to_review": partner_replies.get("changed_inbound_message_ids_review_only", 0),
         "outbound_authorized": False,
         "database_writes": False,
     }

@@ -219,3 +219,32 @@ def test_actual_owner_gap_cycle_counts_unlinked_private_partner_buyboxes(tmp_pat
     assert record["partner_buyboxes_not_linked_to_candidate_cohort"] == 1
     assert record["unlinked_buyboxes_automatically_admitted"] == 0
     assert record["capacity_claims_accepted"] == 0
+
+
+def test_original_gap_owner_baselines_existing_partner_reply_metadata_once(tmp_path):
+    from test_buyer_qualification_evidence_bridge import record as registry_fixture
+    from test_buyer_partner_buybox_reply_tracker import sources, NOW as INSTANT
+    from os import chmod
+    from pathlib import Path
+    base=tmp_path/"runtime/buyer_network_intelligence"
+    base.mkdir(parents=True)
+    # Only original qualification can supply a research identity; the partner
+    # reply tracker is allowed to retain entities outside this portfolio.
+    src=snapshot([item("buyerco.com")])
+    src["generated_at"]=INSTANT.isoformat()
+    (base/"founder_qualification_actions_latest.json").write_text(json.dumps(src))
+    registry, gmail, linked=sources()
+    registry["generated_at"]=INSTANT.isoformat()
+    (base/"commercial_relationship_registry_latest.json").write_text(json.dumps(registry))
+    (base/"gmail_relationship_evidence_latest.json").write_text(json.dumps(gmail))
+    chmod(base/"gmail_relationship_evidence_latest.json",0o600)
+    first=refresh_gap_loop(tmp_path,now=INSTANT)
+    assert first["partner_reply_changes_to_review"]==0
+    out=json.loads((base/"qualification_gap_loop_latest.json").read_text())
+    assert out["original_partner_buybox_reply_tracking"]["exact_entity_thread_identities"]==1
+    assert out["original_partner_buybox_reply_tracking"]["partners"][0]["reply_transition"]=="BASELINED_PREEXISTING_INBOUND_NOT_NEW"
+    second=refresh_gap_loop(tmp_path,now=INSTANT+timedelta(minutes=5))
+    assert second["partner_reply_changes_to_review"]==0
+    out=json.loads((base/"qualification_gap_loop_latest.json").read_text())
+    assert out["original_partner_buybox_reply_tracking"]["partners"][0]["reply_transition"]=="MATCHED_INBOUND_MESSAGE_UNCHANGED"
+    assert out["outbound_authorized"] is False
