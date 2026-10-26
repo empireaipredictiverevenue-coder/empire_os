@@ -222,3 +222,38 @@ PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
 ### Required gate to move beyond staged evidence
 
 Independently verify external authenticated Founder ingress AND real signed-in session scoping (not local 200 or an environment flag), ASTRA and founder's exact website diff approval, public GET/compiled new CTA after an authorised deploy, then genuine consented enquiries with canonical tenant/exact thread proof, individual scoped proposals and settled cash. Production website unchanged by this worktree, and no publication or outbound authorised.
+
+
+## Stage 8 — Decouple the public CTA from private Founder authentication (26 October 2026)
+
+**Problem solved in the release candidate:** The Stage 7 full-stack live preflight says `HELD_PRIVATE_AUTH_AND_PRODUCTION_RELEASE` partly because the private Founder Console has no independently verified authenticated application session. That **private-screen block should not automatically hold a separate non-sensitive public website link update**. The user wants the public journey to become useful before another multi-service release.
+
+**Observed current live-source proof:** all three relevant untouched production source files in `/srv/empire_os` matched the exact baseline `362288a6e^` used for the Stage 6 work. Existing production source `first_party_sales_interest.py` already allows browser-claimed `/predictive-revenue` and treats the claim as unverified. It does not require a backend migration or change to support the proposed CTA.
+
+**Prepared a smaller public-only release candidate** (not an actual deployment):
+- Immutable source review: `empire_os/earned_media_public_cta_release.py` and CLI `scripts/review_earned_media_public_cta_release_20261026.py`
+- Deterministic release patch: `docs/commercial/EMPIRE_PUBLIC_OWNED_GUIDE_CTA_TWO_FILE_20261026.patch`
+- Matching SHA256 manifest: `docs/commercial/EMPIRE_PUBLIC_OWNED_GUIDE_CTA_TWO_FILE_20261026.json`
+- Exactly two changed files in that release candidate:
+  1. `apps/empire-public-site/src/components/SaaSRevenueLeakageGuide.tsx`: use reviewed helper instead of a bare /commercial CTA.
+  2. `apps/empire-public-site/src/lib/commercial-entry-review.ts`: add owned-guide same-origin link `/commercial?entry=%2Fpredictive-revenue#commercial-enquiry` while retaining the production allowlist.
+- **Explicitly excluded:** the separate Stage 6 cleanup of dormant `/insights/revenue-opportunity-assessment` entry claims (and hence no backend restart), private Founder UI/routes, unapproved PR article, database/CRM schema or writes, tracking cookies, publisher sends, checkout, funds, other ASTRA public files.
+
+`git -C /srv/empire_os apply --check <absolute patch path>` **passed**, with no production files written. Candidate checks pinned SHA256 for the two website base files **and** unchanged commercial backend, refuse symlinks or any unexpected staging edits, and compare patch/manifest against the deterministic source. The generated patch is 38 lines. The separate live ingress/authentication issue remains pending for private Founder data only.
+
+**Review command:**
+
+```bash
+cd /home/ubuntu/empire_worktrees/earned_media_advisory_bridge_20261025
+PYTHONPATH="$PWD" /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_earned_media_public_cta_release_20261026 --read-only
+```
+
+For the exact review-only patch, add `--emit-patch`. This does not invoke git apply, deploy, send, create customer events, restart nginx/systemd, or activate the analytics funnel. ASTRA needs to compare this two-file source patch against the *actual current website build/release source*, perform its original release procedure and rollback plan, test real served HTML and form catalogues, and obtain the founder's explicit release approval before any public source is changed. Do not treat `git apply --check` as proof that the running website has this code.
+
+**Do not conflate:**
+1. **Public original guide CTA:** tiny candidate, no private auth dependency, still requires approved site-owner deployment and post-release GET tests.
+2. **Private Founder earned-media dashboard:** still fails app-session/ingress proof; do not expose public data or change flags.
+3. **First real buyer conversion:** no source click, consented buyer enquiry, tenant-visible CRM prospect or actual settlement has been verified from the candidate. Wait for a genuine externally submitted request; no synthetic valid enquiry to manufacture green metrics.
+
+The original Stage 6 full worktree retains the separate backend allowlist cleanup for a later owner decision; do **not** accidentally apply its full commit when deploying only this limited website CTA patch.
