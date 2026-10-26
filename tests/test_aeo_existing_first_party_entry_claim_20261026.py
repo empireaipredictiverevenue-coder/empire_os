@@ -66,7 +66,7 @@ def test_exact_three_original_generator_changes_and_no_mass_replication(tmp_path
     new=module_from_spec(newest);newest.loader.exec_module(new)
     git=check_output(["git","-C",str(ROOT),"log","-1","--format=%H",
                       "--", "scripts/aeo_metro_gen.py"],text=True).strip()
-    prev=check_output(["git","-C",str(ROOT),"show",git+":scripts/aeo_metro_gen.py"])
+    prev=check_output(["git","-C",str(ROOT),"show",git+"^:scripts/aeo_metro_gen.py"])
     p=tmp_path/"previous_aeo.py";p.write_bytes(prev)
     old_spec=spec_from_file_location("old_aeo",p)
     old=module_from_spec(old_spec);old_spec.loader.exec_module(old)
