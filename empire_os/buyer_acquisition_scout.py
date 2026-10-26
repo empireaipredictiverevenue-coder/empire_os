@@ -236,6 +236,7 @@ def collect_research_queries(
     plan: Mapping[str, Any],
     *,
     max_queries: int = 30,
+    as_of: datetime | None = None,
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
 
@@ -361,7 +362,22 @@ def collect_research_queries(
         gaps = plan.get("demand_gap_queue") or []
         focused: list[dict[str, Any]] = []
         used_corridors: set[str] = set()
-        for gap in gaps[:12] if isinstance(gaps, list) else []:
+        eligible_gaps = [
+            gap for gap in (gaps[:12] if isinstance(gaps, list) else [])
+            if isinstance(gap, Mapping)
+            and gap.get("buyer_hunt_required") is True
+            and type(gap.get("overflow_count")) is int
+            and gap["overflow_count"] > 0
+        ]
+        at = as_of or datetime.now(timezone.utc)
+        if at.tzinfo is None or at.utcoffset() is None:
+            raise ValueError("overflow research rotation needs timezone-aware time")
+        # Two rotating slots per 30-minute Scout cycle: 12 markets within
+        # six successful cycles, while the actual plan may change over time.
+        if eligible_gaps:
+            shift = (int(at.timestamp() // 1800) * 2) % len(eligible_gaps)
+            eligible_gaps = eligible_gaps[shift:] + eligible_gaps[:shift]
+        for gap in eligible_gaps:
             if (not isinstance(gap, Mapping)
                     or gap.get("buyer_hunt_required") is not True
                     or type(gap.get("overflow_count")) is not int
@@ -1288,6 +1304,27 @@ def run_buyer_scout(
             "outreach_authorized": False,
         })
 
+    # Count only candidates attributable to the selected overflow corridor.
+    # Search relevance alone does not establish buyer intent or capacity.
+    gap_rows = plan.get("demand_gap_queue")
+    researched_overflow_corridors = {
+        str(item.get("corridor_key") or "")
+        for item in queries
+        if item["target_kind"] == "corridor"
+        and any(
+            isinstance(gap, Mapping)
+            and gap.get("buyer_hunt_required") is True
+            and type(gap.get("overflow_count")) is int
+            and gap["overflow_count"] > 0
+            and gap.get("corridor_key") == item.get("corridor_key")
+            for gap in (gap_rows[:12] if isinstance(gap_rows, list) else [])
+        )
+    }
+    focused_candidates = [
+        item for item in candidates
+        if any(c in researched_overflow_corridors
+               for c in (item.get("target_corridor_keys") or []))
+    ]
     candidates.sort(
         key=lambda row: (
             -int(row["direct_buyer_score"]),
@@ -1320,6 +1357,16 @@ def run_buyer_scout(
             for item in queries
         ),
         "overflow_research_is_buyer_proof": False,
+        "overflow_research_corridors": sorted(researched_overflow_corridors),
+        "overflow_research_candidate_count": len(focused_candidates),
+        "overflow_research_first_party_direct_buyer_count": sum(
+            row.get("explicit_direct_buyer_evidence") is True
+            for row in focused_candidates
+        ),
+        "overflow_research_verified_budget_count": sum(
+            row.get("budget_verified") is True for row in focused_candidates
+        ),
+        "overflow_research_outbound_authorized": False,
         "search_enabled": bool(search_enabled),
         "search_domain_count": search_domain_count,
         "rejected_search_infrastructure_domain_count": len(

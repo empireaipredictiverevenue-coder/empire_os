@@ -799,3 +799,55 @@ def test_overflow_requires_real_hunt_and_positive_integer_volume():
     assert len(collect_research_queries(p, max_queries=12)) == 4
     p["demand_gap_queue"] = {"invalid": "not_list"}
     assert len(collect_research_queries(p, max_queries=12)) == 4
+
+
+def test_recovery_overflow_slots_rotate_across_twelve_market_hunts():
+    from datetime import datetime, timedelta, timezone
+    from empire_os.buyer_acquisition_scout import collect_research_queries
+
+    base = datetime(2026, 10, 26, 12, 0, tzinfo=timezone.utc)
+    targets = [
+        {"corridor_key": f"overflow:{i}", "priority_score": 500 - i,
+         "research_queries": {"direct_demand_buyers": [f"buy lead market {i}"]}}
+        for i in range(12)
+    ]
+    plan = {
+        "priority_targets": targets,
+        "product_priority_targets": [
+            {"product_code": f"recurring_mrr_{i}", "priority_score": 700,
+             "research_queries": {"enterprise_and_data_buyers": [f"enterprise buyer {i}"]}}
+            for i in range(20)
+        ],
+        "icp_priority_targets": [
+            {"icp_profile_key": key, "priority_score": 500,
+             "research_queries": {"direct_demand_buyers": [f"icp decision maker {key}"]}}
+            for key in ("legal_mass_tort_plaintiff_firm", "legal_plaintiff_growth_firm",
+                        "insurance_distribution_growth")
+        ],
+        "demand_gap_queue": [
+            {"corridor_key": f"overflow:{i}", "overflow_count": 12 - i,
+             "buyer_hunt_required": True}
+            for i in range(12)
+        ],
+    }
+    all_seen = set()
+    cohorts = []
+    for cycle in range(6):
+        queries = collect_research_queries(
+            plan, max_queries=12, as_of=base + timedelta(minutes=30 * cycle),
+        )
+        selected = {
+            item["corridor_key"] for item in queries
+            if str(item.get("corridor_key") or "").startswith("overflow:")
+            and item["buyer_pool"] == "direct_demand_buyers"
+        }
+        assert len(queries) == 12
+        assert 2 <= len(selected) <= 12  # other free slots may also research overflow
+        assert any(q["target_kind"] == "product" for q in queries)
+        assert any(q.get("icp_profile_key") == "legal_mass_tort_plaintiff_firm"
+                   for q in queries)
+        cohorts.append(selected)
+        all_seen.update(selected)
+    assert all_seen == {f"overflow:{i}" for i in range(12)}
+    assert len({frozenset(cohort) for cohort in cohorts}) >= 3
+    assert len(collect_research_queries(plan, max_queries=4, as_of=base)) == 4
