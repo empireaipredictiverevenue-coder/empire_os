@@ -24,6 +24,8 @@ from empire_os.competitor_audience_runtime import (
 from empire_os.competitor_ecosystem_mining import refresh_ecosystem_snapshot
 from empire_os.competitor_intelligence_feed import refresh_feed_snapshot
 from empire_os.competitor_call_channel_atlas import refresh as refresh_call_acquisition_atlas
+from empire_os.competitor_call_geo_research import refresh as refresh_call_geo_research
+from empire_os.competitor_call_source_watch import refresh as refresh_call_source_watch
 from empire_os.competitor_market_opportunity import (
     refresh_market_opportunity_snapshot,
 )
@@ -295,6 +297,22 @@ def refresh_competitive_intelligence_chain(
     stage, _ = _run_stage(
         "call_acquisition_atlas",
         lambda: refresh_call_acquisition_atlas(root),
+        critical=False,
+    )
+    stages.append(stage)
+    # Consume Search Fabric weather evidence READ ONLY. Keep state-level
+    # research separate from buyer ZIP approvals and live call permission.
+    stage, _ = _run_stage(
+        "call_geo_research",
+        lambda: refresh_call_geo_research(root),
+        critical=False,
+    )
+    stages.append(stage)
+    # At most two allowlisted public pages, respecting robots restrictions;
+    # source hashes are research changes, never automatic lead creation.
+    stage, _ = _run_stage(
+        "call_source_watch",
+        lambda: refresh_call_source_watch(root),
         critical=False,
     )
     stages.append(stage)

@@ -290,7 +290,47 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             or snapshot.get("outreach_enabled") is not False
             or snapshot.get("execution_authority") != "none"):
         return {"available": False, "mode": "OBSERVE"}
-    return {"available": True, **snapshot}
+
+    geo = _optional_json(
+        repo_root / "runtime/competitive_intelligence/call_geo_research_latest.json"
+    )
+    if (geo.get("schema_version") != "empire.competitor_call_geo_research.v1"
+            or geo.get("mode") != "OBSERVE"
+            or geo.get("outbound_authorized") is not False
+            or geo.get("execution_authority") != "none"):
+        geo = {"available": False, "mode": "OBSERVE"}
+    else:
+        geo = {"available": True, **geo}
+
+    watch = _optional_json(
+        repo_root / "runtime/competitive_intelligence/call_source_watch_latest.json"
+    )
+    if (watch.get("schema_version") != "empire.competitor_call_source_watch.v1"
+            or watch.get("mode") != "OBSERVE"
+            or watch.get("outreach_enabled") is not False
+            or watch.get("execution_authority") != "none"):
+        watch_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        watch_summary = {
+            "available": True,
+            "mode": "OBSERVE",
+            "generated_at": watch.get("generated_at"),
+            "checked_this_cycle": watch.get("checked_this_cycle"),
+            "existing_baseline_count": watch.get("existing_baseline_count"),
+            "confirmed_text_changes_this_cycle": watch.get(
+                "confirmed_text_changes_this_cycle", []
+            ),
+            "source_unavailable_this_cycle": watch.get(
+                "source_unavailable_this_cycle", []
+            ),
+            "outreach_enabled": False,
+            "execution_authority": "none",
+        }
+    return {
+        "available": True, **snapshot,
+        "geo_research": geo,
+        "source_change_watch": watch_summary,
+    }
 
 
 def refresh_feed_snapshot(
