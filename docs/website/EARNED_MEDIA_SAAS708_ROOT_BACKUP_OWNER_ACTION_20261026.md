@@ -56,3 +56,20 @@ The original owner must create its own protected root-owned, mode-0600 authority
 The original 672-file / ten-asset publisher must **not** be reused for the revised 708-file candidate. An original-owner reviewed replacement publisher must implement and test exact two-file replacement + eight immutable asset additions, full site hash comparison, root-owned rollback and live smoke checks under a separate publication decision. The founder's current review approval is **not** that final publication decision.
 
 **Outcome:** No public release, CRM write, email, payment or revenue recognition is authorised or claimed by this backup-only handoff.
+
+
+## Update after founder ran the root backup command
+
+The founder's original operator terminal returned:
+
+```
+65f7d9ab99a3808ea4e18922ef662c94365a1511d4e62c0019f03f92bbf220c7  /var/backups/empire-website/saas708-original-site-700-20261026.tar.gz
+```
+
+The command included protected directory/root ownership-and-mode assertions, no-overwrite check, mode-0600 archive check and archive checksum. The returned compressed archive SHA-256 **exactly matches** the previously full-member-verified private archive. The original worktree rechecked its separate private archive directly against all 700 current live file hashes after receiving that output; no source drift.
+
+Source-report receipt: `docs/website/release_candidates/EARNED_MEDIA_SAAS708_ROOT_ARCHIVE_OPERATOR_EVIDENCE_20261026.json`. Do not call it independently root-verified, because the user-level development process still cannot inspect the protected directory's contents.
+
+A *direct* privileged root archive member-audit procedure, whose equivalent has been tested on the exact matching private bytes, is in `docs/website/EARNED_MEDIA_SAAS708_ROOT_ARCHIVE_DIRECT_AUDIT_20261026.md`. It runs wholly from reviewed inline Python, reads (but does not extract) root archive members, verifies all 700 hashes against the current live site and prints JSON; it does not sign as ASTRA or publish anything.
+
+Once the actual original privileged operator executes the direct audit and retains its output, **the remaining independent ASTRA release-owner acceptance and correct original publisher are still required**. Do not request a new founder review approval for the unchanged 708-file candidate.
