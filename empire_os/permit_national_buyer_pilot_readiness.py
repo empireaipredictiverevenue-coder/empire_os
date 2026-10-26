@@ -141,6 +141,10 @@ def build(*,workbench:Mapping[str,Any],observation:Mapping[str,Any],
         reasons=list(US_COMMERCIAL_REQUIRED_REVIEW)
         if not current["body_has_postal_address"]:
             reasons.append("ACTUAL_GMAIL_DRAFT_BODY_POSTAL_ADDRESS_ABSENT")
+        if current.get("body_has_canonical_postal_footer") is False:
+            reasons.append("ACTUAL_GMAIL_DRAFT_CANONICAL_FOOTER_MISSING")
+        if current.get("expected_explicit_reply_to_header_present") is False:
+            reasons.append("ACTUAL_GMAIL_DRAFT_EXPLICIT_REPLY_TO_MISSING")
         if not current["body_has_reply_opt_out_request"]:
             reasons.append("ACTUAL_GMAIL_DRAFT_REPLY_OPTOUT_REQUEST_MISSING")
         if not current["body_has_brand_identity"]:
@@ -173,6 +177,10 @@ def build(*,workbench:Mapping[str,Any],observation:Mapping[str,Any],
             "canonical_original_history_state":original["original_history_state"],
             "global_canonical_hits_cannot_authorize_this_gmail_draft":True,
             "verified_business_postal_address":False,
+            "canonical_business_postal_footer_in_draft":(
+                current.get("body_has_canonical_postal_footer") is True),
+            "expected_reply_to_header_in_draft":(
+                current.get("expected_explicit_reply_to_header_present") is True),
             "functional_optout_processing_attested":False,
             "recipient_contact_purpose_approved":False,
             "permit_job_data_distribution_approved":False,

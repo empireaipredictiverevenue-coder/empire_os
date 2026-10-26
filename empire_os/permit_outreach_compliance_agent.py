@@ -16,6 +16,7 @@ from typing import Any,Mapping
 import re
 
 from empire_os.permit_multimarket_registry import digest
+from empire_os.business_contact_identity import POSTAL_ADDRESS as CANONICAL_POSTAL_ADDRESS
 
 SCHEMA="empire.permit_intelligence.original_outreach_compliance_agent.v1"
 POLICY="US_B2B_POTENTIALLY_COMMERCIAL_CAN_SPAM_REVIEW_V1"
@@ -28,7 +29,7 @@ EMAIL=re.compile(r"^[a-z0-9][a-z0-9._%+-]{0,63}@[a-z0-9-]+(?:\.[a-z0-9-]+)+$")
 POSTAL_SYNTAX=re.compile(
     r"(?im)(?:^|\n)\s*(?:business (?:postal )?address|postal address|"
     r"address)\s*:\s*[^\n]{10,180}\b(?:[A-Z]{2}\s+\d{5}(?:-\d{4})?|"
-    r"[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})\s*$"
+    r"[A-Z]{1,2}\d[A-Z\d]?\s*\d[A-Z]{2})(?:\s*,\s*(?:UK|UNITED KINGDOM))?\s*$"
 )
 OPT_OUT_TEXT=re.compile(
     r"(?i)\b(?:unsubscribe|opt[ -]?out|stop (?:contacting|emailing)|"
@@ -70,8 +71,17 @@ def parse_body(*,subject:str,body:str,from_address:str,recipient:str)->dict:
         or not EMAIL.fullmatch(recipient.casefold())):
         raise ValueError("OUTREACH_DRAFT_BODY_FIELDS_UNVERIFIED")
     postal_match=POSTAL_SYNTAX.search(body)
+    # Existing founder-confirmed canonical business correspondence identity.
+    # An exact text match is NOT a legal finding or live mailbox proof.
+    canonical_line="Postal address: "+CANONICAL_POSTAL_ADDRESS
+    canonical_present=any(
+        line.strip().casefold()==canonical_line.casefold()
+        for line in body.splitlines()
+    )
     flags={
         "syntactic_postal_footer_present":postal_match is not None,
+        "canonical_founder_postal_footer_configured":bool(CANONICAL_POSTAL_ADDRESS),
+        "canonical_founder_postal_footer_present":canonical_present,
         "optout_instruction_text_present":OPT_OUT_TEXT.search(body) is not None,
         "truthful_sender_name_text_present":"Empire AI" in body,
         "apparent_commercial_purpose_review_needed":(
@@ -140,6 +150,10 @@ def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
         reasons["COPYWRITER_ORIGINAL_QUALITY_REVIEW_REQUIRED"]=True
     if draft.get("original_canonical_copywriter_quality") is None:
         reasons["CANONICAL_COPYWRITER_LIVE_QUALITY_NOT_OBSERVED"]=True
+    if "ACTUAL_GMAIL_DRAFT_CANONICAL_FOOTER_MISSING" in found:
+        reasons["CANONICAL_SENDER_FOOTER_NOT_PRESENT"]=True
+    if "ACTUAL_GMAIL_DRAFT_EXPLICIT_REPLY_TO_MISSING" in found:
+        reasons["WORKSPACE_EXPLICIT_REPLY_TO_ROUTE_NOT_OBSERVED"]=True
     if "ACTUAL_GMAIL_DRAFT_REPLY_OPTOUT_REQUEST_MISSING" in found:
         reasons["COPY_MISSING_EXPLICIT_OPTOUT_INSTRUCTION"]=True
     if "ACTUAL_GMAIL_DRAFT_IDENTITY_NOT_PRESENT" in found:
@@ -151,7 +165,11 @@ def audit_one(*,draft:Mapping[str,Any],jurisdiction:str="US",
     # invented personal addresses / unsubscribe links.
     advice=[]
     if reasons["POSTAL_ADDRESS_NOT_VERIFIED"]:
-        advice.append("OWNER_PROVIDE_VERIFIED_LAWFUL_BUSINESS_POSTAL_ADDRESS")
+        advice.append(
+            "ADD_EXISTING_FOUNDER_APPROVED_POSTAL_FOOTER_AND_VERIFY_CURRENT_RIGHTS"
+            if bool(CANONICAL_POSTAL_ADDRESS)
+            else "OWNER_PROVIDE_VERIFIED_LAWFUL_BUSINESS_POSTAL_ADDRESS"
+        )
     advice.extend((
         "VERIFY_FROM_REPLYTO_AND_COMMERCIAL_SUBJECT_CLASSIFICATION",
         "TEST_OPTOUT_REPLY_INTAKE_STOP_SUPPRESSION_WITH_A_SAFE_INTERNAL_TEST",

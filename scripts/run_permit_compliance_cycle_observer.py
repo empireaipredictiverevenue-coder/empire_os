@@ -166,6 +166,14 @@ def run(*,root:Path=ROOT,now:datetime|None=None,
             "ten_workspace_drafts_inspected":policy["checked_drafts"],
             "drafts_held":policy["hold_drafts"],
             "postal_footer_missing":pilot["actual_workspace_drafts_without_postal_address"],
+            "canonical_founder_postal_footer_missing":sum(
+                not r["canonical_business_postal_footer_in_draft"]
+                for r in pilot["owner_review_queue"]),
+            "explicit_reply_to_header_missing":sum(
+                not r["expected_reply_to_header_in_draft"]
+                for r in pilot["owner_review_queue"]),
+            "canonical_postal_footer_configured":True,
+            "workspace_stop_to_empiredb_suppression_e2e_verified":False,
             "explicit_stop_text_missing":policy["blocker_counts"].get(
                 "COPY_MISSING_EXPLICIT_OPTOUT_INSTRUCTION",0),
             "canonical_copywriter_scanned_drafts":sum(

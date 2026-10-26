@@ -98,6 +98,14 @@ def _one(*,response:Mapping[str,Any],pinned:Mapping[str,Any],
     scan=parse_body(subject=hdr["subject"],body=body,
                     from_address=froms,recipient=tos[0])
     flags=scan["static_flags"]
+    reply_to=hdr.get("reply-to","")
+    addresses=getaddresses([reply_to]) if reply_to else []
+    # This is only a route syntax observation, NOT evidence that any
+    # Workspace STOP reply is captured or inserted into EmpireDB.
+    if addresses and (len(addresses)!=1 or
+                      addresses[0][1].casefold()!="reply@mail.empire-ai.co.uk"):
+        raise ValueError("WORKSPACE_DRAFT_REPLY_TO_ROUTE_NOT_EXPECTED")
+    expected_reply_route_present=bool(addresses)
     existing_quality=None
     if copy_company is not None and copy_market is not None:
         from empire_os.permit_canonical_copywriter_review import check_existing_draft
@@ -110,6 +118,9 @@ def _one(*,response:Mapping[str,Any],pinned:Mapping[str,Any],
     return {
         **dict(pinned),
         "body_has_postal_address":flags["syntactic_postal_footer_present"],
+        "body_has_canonical_postal_footer":flags["canonical_founder_postal_footer_present"],
+        "existing_sender_canonical_postal_configured":flags["canonical_founder_postal_footer_configured"],
+        "expected_explicit_reply_to_header_present":expected_reply_route_present,
         "body_has_reply_opt_out_request":flags["optout_instruction_text_present"],
         "body_has_brand_identity":flags["truthful_sender_name_text_present"],
         "body_mentions_no_job_list":not flags["permit_work_is_guaranteed_or_misleading_claim"],
