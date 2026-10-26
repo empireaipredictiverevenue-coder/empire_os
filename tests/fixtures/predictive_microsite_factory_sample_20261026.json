@@ -1,0 +1,106 @@
+{
+  "candidates": [
+    {
+      "site_kind": "local_utility",
+      "audience": "Chicago roof replacement researchers",
+      "offer": "Review the territory research and ask questions before choosing a contractor.",
+      "geography": {
+        "market_id": "US-IL",
+        "kind": "metro",
+        "area": "Chicago, IL",
+        "evidence_refs": [
+          "geo_registry:US-IL"
+        ]
+      },
+      "keyword_opportunity": {
+        "keyword": "chicago roof replacement research",
+        "cluster_key": "roofing_chicago",
+        "intent_class": "territory",
+        "product_key": "roofing_intel",
+        "icp_key": "roofing_researcher",
+        "funnel_stage": "consideration",
+        "cta_key": "review-research",
+        "territory_key": "US-IL",
+        "evidence_refs": [
+          "research-source:example-a"
+        ],
+        "observed_demand": null,
+        "commercial_intent": 0.7,
+        "product_fit": 0.6,
+        "buyer_fit": 0.3,
+        "coverage_gap": 0.4,
+        "competitor_gap": 0.4,
+        "ai_citation_gap": 0.3,
+        "conversion_evidence": 0.0,
+        "strategic_category_value": 0.6,
+        "confidence": 0.3
+      },
+      "headline": "Chicago roof replacement: research and coverage",
+      "subhead": "Read the source notes behind this research and understand which questions still need answers.",
+      "summary": "This page is a research preview. It does not claim contractor availability or approved leads.",
+      "local_facts": [
+        {
+          "statement": "The EmpireOS geographic registry includes a Chicago market anchor.",
+          "source_ref": "empire_os/geo_registry.py:US-IL",
+          "checked_at": "2026-10-26T23:00:00Z"
+        },
+        {
+          "statement": "The public roofing page describes a ZIP coverage check as planning guidance, not an accepted booking.",
+          "source_ref": "apps/empire-public-site/src/app/roofing/page.tsx",
+          "checked_at": "2026-10-26T23:00:00Z"
+        }
+      ]
+    },
+    {
+      "site_kind": "market_report",
+      "audience": "Manchester homeowners researching heating upgrades",
+      "offer": "Read publicly supported heating and property research before contacting an installer.",
+      "geography": {
+        "market_id": "GB-MAN",
+        "kind": "metro",
+        "area": "Manchester",
+        "evidence_refs": [
+          "empire_os/geo_registry.py:GB-MAN"
+        ]
+      },
+      "keyword_opportunity": {
+        "keyword": "manchester heat pump research",
+        "cluster_key": "heat_pump_manchester",
+        "intent_class": "territory",
+        "product_key": "heat_pump_intel",
+        "icp_key": "heating_researcher",
+        "funnel_stage": "consideration",
+        "cta_key": "read-local-evidence",
+        "territory_key": "GB-MAN",
+        "evidence_refs": [
+          "source:heat-pump-research"
+        ],
+        "observed_demand": null,
+        "commercial_intent": null,
+        "product_fit": null,
+        "buyer_fit": null,
+        "coverage_gap": null,
+        "competitor_gap": null,
+        "ai_citation_gap": null,
+        "conversion_evidence": null,
+        "strategic_category_value": null,
+        "confidence": null
+      },
+      "headline": "Manchester heat pump research and planning",
+      "subhead": "Understand the evidence available and the questions to ask before planning a heating upgrade.",
+      "summary": "This is an internal research preview. It does not establish installation eligibility, price or installer capacity.",
+      "local_facts": [
+        {
+          "statement": "The EmpireOS geography registry includes Manchester as a UK market anchor.",
+          "source_ref": "empire_os/geo_registry.py:GB-MAN",
+          "checked_at": "2026-10-26T23:00:00Z"
+        },
+        {
+          "statement": "The existing HVAC industry page describes heating and property intelligence as research signals, not confirmed customer demand.",
+          "source_ref": "apps/empire-public-site/src/lib/industry-pages.ts",
+          "checked_at": "2026-10-26T23:00:00Z"
+        }
+      ]
+    }
+  ]
+}

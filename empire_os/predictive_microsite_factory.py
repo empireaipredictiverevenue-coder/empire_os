@@ -1,0 +1,290 @@
+"""Draft-only Predictive Cloud -> geographically specific microsite proposal.
+
+Builds HTML previews from provided evidence. Never publishes, indexes, sends email,
+claims buyer capacity, or assumes local ZIP/postcode membership.
+"""
+from __future__ import annotations
+
+from datetime import datetime
+from hashlib import sha256
+from html import escape
+import json
+import re
+from typing import Any, Mapping, Sequence
+
+from empire_os.geo_registry import acquisition_markets
+from empire_os.keyword_universe import review_keyword_record
+from empire_os.third_party.slopmonster.deslop import audit, normalise, visible_text
+
+
+MARKETS = {market.market_id: market for market in acquisition_markets()}
+KINDS = {"local_utility", "market_report", "commercial_landing"}
+US_ZIP = re.compile(r"[0-9]{5}\Z")
+UK_POSTCODE = re.compile(r"(?:GIR\s?0AA|(?:[A-Z]{1,2}[0-9][0-9A-Z]?)\s?[0-9][A-Z]{2})\Z", re.I)
+SLUG = re.compile(r"[^a-z0-9]+")
+STOPWORDS = {"the", "and", "with", "from", "this", "that", "your", "into", "local",
+             "for", "you", "are", "our", "about", "research", "review", "area"}
+
+
+def _string(value: Any, name: str, max_chars: int = 500) -> str:
+    if not isinstance(value, str) or not value.strip() or len(value) > max_chars:
+        raise ValueError(f"{name} must be non-empty text up to {max_chars} characters")
+    return value.strip()
+
+
+def _slug(text: str) -> str:
+    return SLUG.sub("-", text.casefold()).strip("-")[:85]
+
+
+def _safe_text(text: str) -> str:
+    return escape(text, quote=True)
+
+
+def _tokens(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]{3,}", text.casefold()) if w not in STOPWORDS}
+
+
+def _fact_rows(spec: Mapping[str, Any]) -> list[dict[str, str]]:
+    rows = spec.get("local_facts", [])
+    if not isinstance(rows, list):
+        raise ValueError("local_facts must be a list")
+    result = []
+    for n, row in enumerate(rows):
+        if not isinstance(row, Mapping):
+            raise ValueError(f"local_facts[{n}] must be an object")
+        result.append({
+            "statement": _string(row.get("statement"), f"fact {n} statement", 800),
+            "source_ref": _string(row.get("source_ref"), f"fact {n} source_ref", 350),
+            "checked_at": _string(row.get("checked_at"), f"fact {n} checked_at", 30),
+        })
+        try:
+            datetime.fromisoformat(result[-1]["checked_at"].replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError(f"fact {n} invalid timestamp") from exc
+    return result
+
+
+def review_geography(geo: Mapping[str, Any]) -> dict[str, Any]:
+    market_id = _string(geo.get("market_id"), "market_id", 60)
+    market = MARKETS.get(market_id)
+    if market is None:
+        raise ValueError("market_id absent from original EmpireOS geo registry")
+    kind = geo.get("kind", "metro")
+    if kind not in {"metro", "us_zip", "uk_postcode"}:
+        raise ValueError("unsupported territory kind")
+    area = _string(geo.get("area", market.metro), "area", 90)
+    refs = geo.get("evidence_refs", [])
+    if not isinstance(refs, list):
+        raise ValueError("geography evidence_refs must be a list")
+    valid_refs = [s.strip() for s in refs if isinstance(s, str) and s.strip()]
+    if kind == "metro" and area.casefold() != market.metro.casefold():
+        raise ValueError("metro name must match canonical geographic registry")
+    if kind == "us_zip" and (market.country_code != "US" or not US_ZIP.fullmatch(area)):
+        raise ValueError("ZIP must be five digits in a US market")
+    if kind == "uk_postcode" and (market.country_code != "GB" or not UK_POSTCODE.fullmatch(area)):
+        raise ValueError("postcode must be UK format in a UK market")
+    # String shape cannot validate that the postcode/ZIP belongs to this city.
+    qualified = kind == "metro" or (geo.get("market_match_verified") is True and bool(valid_refs))
+    return {
+        "market_id": market_id, "metro": market.metro, "country_code": market.country_code,
+        "kind": kind, "area": area, "evidence_refs": valid_refs,
+        "region_verified": qualified,
+        "review_note": ("market anchor only: ZIP/postcode not independently validated"
+                        if kind != "metro" and not qualified else None),
+    }
+
+
+def review_copy(copy: str) -> dict[str, Any]:
+    """Use actual pinned SlopMonster code, retaining findings rather than editing."""
+    text = normalise(copy)
+    findings = audit(text)
+    categories = {
+        category: [
+            {"label": str(x[0]), "detail": str(x[1])} if isinstance(x, tuple)
+            else {"label": str(x)}
+            for x in matches
+        ]
+        for category, matches in findings.items()
+        if matches
+    }
+    return {"engine": "SlopMonster", "pinned_commit": "3fc9787d9337b57c599a80afbefbbb3be5a8eb0b",
+            "score": 5 - len(categories), "categories": categories,
+            "review_required": bool(categories)}
+
+
+def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
+              title: str, subhead: str, summary: str, keyword: str) -> str:
+    kind = spec.get("site_kind")
+    primary = "#65c7ff" if kind != "market_report" else "#e9bb65"
+    evidence_cards = "\n".join(
+        f'<article class="fact"><span class="micro">Evidence note {i}</span>'
+        f'<p>{_safe_text(f["statement"])}</p>'
+        f'<p class="source">Reference: {_safe_text(f["source_ref"])} · Checked: {_safe_text(f["checked_at"])}</p></article>'
+        for i, f in enumerate(facts, 1)
+    )
+    if not evidence_cards:
+        evidence_cards = '<p>No local evidence supplied. This proposal is held for research.</p>'
+    title_html = _safe_text(title)
+    sub_html = _safe_text(subhead)
+    location = _safe_text(geo["area"])
+    summary_html = _safe_text(summary)
+    kw_html = _safe_text(keyword)
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="color-scheme" content="dark">
+<title>{title_html} | Empire AI Research Preview</title>
+<meta name="description" content="{_safe_text(summary[:155])}">
+<style>
+:root {{color-scheme:dark; --ink:#f1f5fa; --dim:#b9c8df; --accent:{primary}; --gold:#e9bb65;}}
+* {{box-sizing:border-box}}
+html {{scroll-behavior:smooth}}
+body {{margin:0; font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif; background:#060d1b; color:var(--ink); line-height:1.6;}}
+body::before {{content:"";position:absolute;left:0;top:0;width:100%;height:600px;pointer-events:none;
+ background:radial-gradient(ellipse at 75% 15%,#174c7e 0%,transparent 52%),
+ radial-gradient(ellipse at 30% 50%,#13243a 0%,transparent 55%);opacity:.8}}
+a {{color:inherit}}
+.skip {{position:absolute;left:-9999px;top:4px}}
+.skip:focus {{left:10px;z-index:10;background:white;color:black;padding:12px}}
+header,main,footer {{position:relative}}
+.wrap {{max-width:1120px;margin:auto;padding:0 26px}}
+nav {{min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}}
+.wordmark {{font-size:1.12rem;font-weight:850;letter-spacing:.08em}}
+.tag,.micro {{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:750}}
+.preview {{font-size:.78rem; color:var(--dim);border:1px solid #425976;border-radius:100px;padding:6px 14px}}
+.hero {{padding:80px 0 66px;max-width:950px}}
+h1 {{font-size:clamp(2.5rem,6.2vw,5.4rem);letter-spacing:-.055em;line-height:1.03;margin:18px 0 24px}}
+h2 {{font-size:clamp(1.6rem,3.4vw,2.5rem);line-height:1.15;letter-spacing:-.03em}}
+.lede {{font-size:clamp(1.1rem,2vw,1.4rem);max-width:760px;color:#dfebfa;line-height:1.55}}
+.desc {{max-width:740px;color:var(--dim)}}
+.action {{display:inline-flex;min-height:48px;align-items:center;background:var(--accent);
+ color:#07101e;text-decoration:none;border-radius:9px;padding:12px 22px;font-weight:800;margin-top:22px}}
+.action:focus-visible,a:focus-visible {{outline:3px solid #fff;outline-offset:4px}}
+.grid {{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:20px}}
+section {{padding:45px 0}}
+.fact {{border:1px solid #283d58;background:#111d30c9;padding:26px;border-radius:16px;overflow-wrap:anywhere}}
+.fact p {{font-size:1.04rem}}
+.source {{color:var(--dim);font-size:.82rem!important}}
+.hint {{border-left:3px solid var(--gold);padding:16px 24px;color:var(--dim);background:#182435}}
+footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
+@media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}}}}
+@media(prefers-reduced-motion:reduce) {{html{{scroll-behavior:auto}}}}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="wrap"><nav aria-label="Main navigation"><span class="wordmark">EMPIRE AI</span>
+<span class="preview">Internal draft · not published</span></nav></header>
+<main id="main">
+<div class="wrap"><section class="hero"><p class="tag">{location} / {kw_html}</p>
+<h1>{title_html}</h1><p class="lede">{sub_html}</p>
+<p class="desc">{summary_html}</p>
+<a class="action" href="#research-method">Review the evidence</a></section></div>
+<div class="wrap"><section id="research-method" aria-labelledby="evidence-title">
+<p class="tag">Territory evidence</p><h2 id="evidence-title">What the available research shows</h2>
+<div class="grid">{evidence_cards}</div></section>
+<section aria-labelledby="next-title"><h2 id="next-title">What still needs verifying</h2>
+<p class="hint">This is a research preview. Source context, actual demand, local service availability,
+buyer acceptance and conversion claims require independent review. No enquiry or payment collection is active.</p>
+</section></div></main>
+<footer><div class="wrap">Empire AI · Internal preview only · Noindex · No lead collection</div></footer>
+</body></html>"""
+
+
+def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
+    """Return proposal and local HTML preview. No database, network, or publishing."""
+    if not isinstance(spec, Mapping):
+        raise ValueError("input must be an object")
+    site_kind = spec.get("site_kind")
+    if site_kind not in KINDS:
+        raise ValueError("site_kind must be local_utility, market_report or commercial_landing")
+    geo = review_geography(spec.get("geography") or {})
+    kw = spec.get("keyword_opportunity")
+    if not isinstance(kw, Mapping):
+        raise ValueError("keyword_opportunity object required")
+    keyword_review = review_keyword_record(kw)
+    if not keyword_review["review_ready"]:
+        raise ValueError(f'invalid keyword opportunity: {keyword_review["blockers"]}')
+    record = keyword_review["record"]
+    if record["territory_key"] and record["territory_key"] != geo["market_id"]:
+        raise ValueError("keyword territory_key must match geographic market_id")
+    facts = _fact_rows(spec)
+    audience = _string(spec.get("audience"), "audience", 200)
+    offer = _string(spec.get("offer"), "offer", 400)
+    title = _string(spec.get("headline", f'{record["keyword"].capitalize()}: {geo["area"]}'), "headline", 160)
+    subhead = _string(spec.get("subhead", f'A research-led review of {record["keyword"]} in {geo["area"]}.'), "subhead", 300)
+    summary = _string(spec.get("summary", offer), "summary", 450)
+    # Same text that appears as page copy is checked, rather than only input fields.
+    html = _template(spec, geo, facts, title, subhead, summary, record["keyword"])
+    copy = visible_text(html)
+    slop = review_copy(copy)
+    blockers = []
+    if not keyword_review["opportunity"]["available"]:
+        blockers.append("keyword scoring evidence incomplete")
+    if not geo["region_verified"]:
+        blockers.append("ZIP/postcode market membership not source-verified")
+    if len(facts) < 2:
+        blockers.append("at least two independently reviewable local source facts required")
+    if len({fact["source_ref"] for fact in facts}) < 2:
+        blockers.append("at least two distinct local evidence references required")
+    if slop["review_required"]:
+        blockers.append("SlopMonster copy findings require editorial review")
+    # Even a candidate with no detected patterns is not automatically publication-ready.
+    evidence_notes = ["Sources are provided by the author; content truth and rights not independently verified."]
+    identity = sha256(json.dumps(
+        {"keyword": record["keyword"], "territory": geo, "site_kind": site_kind,
+         "source_refs": [f["source_ref"] for f in facts]}, sort_keys=True
+    ).encode()).hexdigest()[:20]
+    proposal = {
+        "schema_version": "empire.predictive_microsite_candidate.v1",
+        "id": f"microsite_{identity}", "status": "HOLD_EVIDENCE" if blockers else "DRAFT_REVIEW",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "publishing_enabled": False, "indexation_enabled": False,
+        "outbound_enabled": False, "payments_enabled": False,
+        "candidate_kind": site_kind, "brand_profile": "empire_premium_local",
+        "market": geo, "keyword": keyword_review, "audience": audience, "offer": offer,
+        "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
+        "html_sha256": sha256(html.encode()).hexdigest(),
+        "visual_qa": {
+            "template_includes": ["responsive_grid", "mobile_viewport", "accessible_skip_link",
+                                  "single_h1", "reduced_motion", "focus_visible",
+                                  "noindex", "no_live_form", "48px_min_cta"],
+            "browser_visual_review_complete": False,
+        },
+        "blockers": blockers,
+        "required_approvals": ["research_source_owner", "commercial_claim_reviewer",
+                               "seo_implementation_owner", "website_release_owner"],
+    }
+    return proposal, html
+
+
+def review_portfolio(specs: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Detect repeated location-swapped copy before any multi-site release."""
+    results = []
+    previous: list[tuple[set[str], str]] = []
+    for spec in specs:
+        proposal, html = build_candidate(spec)
+        headline = spec.get("headline", "")
+        sub = spec.get("subhead", "")
+        summary = spec.get("summary", "")
+        # Exclude local geography token strings when comparing core editorial content.
+        text = f"{headline} {sub} {summary} " + " ".join(
+            row.get("statement", "") for row in spec.get("local_facts", []))
+        area = proposal["market"]["area"]
+        metro = proposal["market"]["metro"]
+        for location in {area, metro}:
+            text = re.sub(re.escape(location), "", text, flags=re.I)
+        tokens = _tokens(text)
+        for old, prior_id in previous:
+            similarity = len(tokens & old) / max(1, len(tokens | old))
+            if similarity >= .82:
+                proposal["blockers"].append(
+                    f"near-duplicate location-swapped editorial content versus {prior_id}")
+                proposal["status"] = "HOLD_EVIDENCE"
+                break
+        previous.append((tokens, proposal["id"]))
+        results.append(proposal)
+    return results

@@ -1,0 +1,1 @@
+SlopMonster source: https://github.com/ItsssssJack/SlopMonster commit 3fc9787d9337b57c599a80afbefbbb3be5a8eb0b. MIT: see LICENSE. No upstream modifications.
