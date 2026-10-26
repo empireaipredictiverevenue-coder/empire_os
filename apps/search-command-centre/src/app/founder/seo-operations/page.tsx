@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { readdir, readFile, lstat } from "node:fs/promises";
 import path from "node:path";
+import { safeSeoFocus, safeAeoCanary, type SeoOwnerFocus, type AeoLinkCanary } from "../../../lib/seo-revenue-focus-review";
 
 export const metadata = {
   title: "SEO Operations · Empire AI",
@@ -20,6 +21,8 @@ type SEOBoard = {
   original_action_count: number; resolved_existing_owner_actions: number;
   read_only_technical_tests_executed: number; state_counts: Record<string, number>; milestone_reached_counts?: Record<string, number>;
   actions: Action[]; automated_publication_authorized: false; database_writes: false;
+  revenue_first_original_owner_focus?: SeoOwnerFocus;
+  aeo_source_handoff_canary?: AeoLinkCanary;
 };
 
 async function load(): Promise<{ board: SEOBoard | null; reason: string | null }> {
@@ -57,6 +60,10 @@ function tone(state: string) {
 export default async function SEOOperationsPage() {
   await connection();
   const { board, reason } = await load();
+  const focusReview = safeSeoFocus(board?.revenue_first_original_owner_focus, {
+    observed_at: board?.observed_at,
+  });
+  const aeoReview = safeAeoCanary(board?.aeo_source_handoff_canary);
   return <main className="min-h-screen bg-[#060e1e] text-slate-100">
     <div className="mx-auto max-w-[1500px] px-5 py-8 lg:px-10 lg:py-12">
       <Link href="/founder" className="text-xs font-semibold uppercase tracking-widest text-sky-300">← Founder Console</Link>
@@ -83,6 +90,42 @@ export default async function SEOOperationsPage() {
               <p className="mt-3 text-2xl font-semibold tabular-nums">{val}</p>
             </div>)}
         </div>
+        <section className="mt-7 rounded-xl border border-sky-400/20 bg-[#091426] p-5">
+          <h2 className="text-lg font-semibold">Revenue-first operating focus</h2>
+          <p className="mt-2 text-xs text-slate-400">Original Google URL Inspection and canonical Ops Control evidence only. Sitewide enquiries are not attributed to SEO.</p>
+          {focusReview.aged && <p className="mt-3 text-xs font-semibold text-amber-200">Saved SEO receipt is older than three hours or has an invalid timestamp. Check the observation time before acting.</p>}
+          {focusReview.focus ? <>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-white/10 p-4">
+                <p className="text-xs uppercase text-slate-400">Current owner decision in saved receipt</p>
+                <p className="mt-2 text-sm font-semibold text-sky-200">{focusReview.focus.status.replaceAll("_"," ")}</p>
+                <p className="mt-2 text-xs text-slate-300">{focusReview.focus.next_existing_owner_action.replaceAll("_"," ")}</p>
+              </div>
+              <div className="rounded-lg border border-white/10 p-4">
+                <p className="text-xs uppercase text-slate-400">Sitewide canonical acquisitions</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums">{focusReview.focus.count_source_verified ?
+                  focusReview.focus.sitewide_canonical_sales_count : "Unverified"}</p>
+                <p className="mt-2 text-xs text-slate-400">Original EmpireDB Ops count only. AEO-attributed buyers and earned revenue are not verified.</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-slate-300">Exact Google-unknown buyer-entry pages</p>
+              {focusReview.focus.google_unknown_exact_buyer_entry_urls.length ?
+                <ul className="mt-2 flex flex-wrap gap-3">{focusReview.focus.google_unknown_exact_buyer_entry_urls.map(u=>
+                  <li key={u}><a href={u} target="_blank" rel="noopener noreferrer" className="text-sm text-sky-200 underline underline-offset-4">{new URL(u).pathname}</a></li>
+                )}</ul> : <p className="mt-2 text-xs text-slate-400">No exact unknown buyer entry reported in this snapshot.</p>}
+            </div>
+          </> : <p className="mt-4 text-sm text-amber-200">Revenue-first focus not available in this saved receipt ({focusReview.reason}). The existing daily owner will publish its next evidence snapshot; no zero count is inferred.</p>}
+          <div className="mt-5 border-t border-white/10 pt-4">
+            <p className="text-xs font-semibold text-slate-300">AEO → Commercial navigation health</p>
+            <p className="mt-2 text-sm text-slate-200">{aeoReview ?
+              (aeoReview.status === "THREE_AEO_TO_COMMERCIAL_SOURCE_LINKS_GET_VERIFIED" ?
+                "Three approved source-tagged links and the Commercial client script passed GET-only verification." :
+                "AEO link canary held: inspect the original first-party sales surface.") :
+              "Not attested by this saved SEO receipt."}</p>
+            <p className="mt-2 text-xs text-slate-400">Static handoff health is not evidence of a real visit, consented enquiry, qualified buyer or sale.</p>
+          </div>
+        </section>
         <section className="mt-7 rounded-xl border border-white/10 bg-white/[0.025] p-5">
           <h2 className="font-semibold">Lifecycle milestones reached · detected → prioritised → staged → tested → published → verified → measured</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-7">
