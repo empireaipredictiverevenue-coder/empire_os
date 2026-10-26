@@ -21,6 +21,7 @@ STEPS = (
 OPTIONAL_STEPS = (
     "refresh_workspace_sent_domain_receipts.py",
     "poll_workspace_solar_outreach_readonly.py",
+    "review_heat_pump_relationship_cycle.py",
     "run_permit_compliance_cycle_observer.py",
 )
 
@@ -56,6 +57,14 @@ def run(*, root=ROOT, invoke=None):
         optional_results=[]
         if len(results)==len(STEPS) and all(x["status"]=="PASS" for x in results):
             for step in OPTIONAL_STEPS:
+                # Never interpret an older cached reply snapshot as a fresh
+                # relationship decision after the Workspace source has failed.
+                if (step == "review_heat_pump_relationship_cycle.py" and
+                        not any(x["step"] == "poll_workspace_solar_outreach_readonly.py"
+                                and x["status"] == "PASS" for x in optional_results)):
+                    optional_results.append({"step": step, "status": "HELD",
+                                             "exit_code": 2})
+                    continue
                 try:
                     optional_env=(env if step!="run_permit_compliance_cycle_observer.py"
                                   else {**env,"EMPIRE_PERMIT_COMPLIANCE_OBSERVER_READONLY":"1"})
