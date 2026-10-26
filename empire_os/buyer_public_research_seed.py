@@ -117,6 +117,11 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # verified offers, publisher approvals or payable capacity.
     ("https://www.bfount.com/affiliate.php", "USA", ("home_services", "legal", "insurance", "solar")),
     ("https://www.callx.com/publishers", "USA", ("home_services", "legal", "insurance")),
+    # Original first-party UK publisher programme accepts applications and
+    # advertises roofing/solar/home-improvement enquiry referrals. Account-
+    # specific rates, binding terms and active paid categories are UNKNOWN;
+    # prior email correspondence does not create buyer-capacity authority.
+    ("https://partners.leads.work/affiliate-program/", "UK", ("solar", "roofing", "home_services")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (

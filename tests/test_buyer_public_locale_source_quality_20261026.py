@@ -48,3 +48,22 @@ def test_source_stays_research_not_qualified_buyer_even_for_matching_tld():
     for claim in ("identity_verified","commercial_terms_verified","buyer_capacity_verified",
                   "buyer_price_verified","outreach_authorized"):
         assert x[claim] is False
+
+
+def test_original_scout_retains_genuine_uk_publisher_programme_without_fake_contract():
+    packet=build_public_research_seeds(
+        {},search_fn=lambda queries,num:{},max_queries=2,include_volume=False,
+        observed_at=datetime(2026,10,26,16,0,tzinfo=timezone.utc),
+    )
+    matched=[x for x in packet["seeds"] if x["domain"]=="partners.leads.work"]
+    assert len(matched)==1
+    row=matched[0]
+    assert row["website"]=="https://partners.leads.work/affiliate-program/"
+    assert row["target_markets"]==["UK"]
+    assert set(row["target_verticals"])=={"solar","roofing","home_services"}
+    assert row["buyer_capacity_verified"] is False
+    assert row["buyer_price_verified"] is False
+    assert row["commercial_terms_verified"] is False
+    assert row["outreach_authorized"] is False
+    assert row["execution_authority"]=="none"
+    assert packet["searches_per_existing_cycle_unchanged"] is True
