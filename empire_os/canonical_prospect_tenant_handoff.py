@@ -122,6 +122,9 @@ def review_signed_crm_prospect_tenant(
     entity_id: str,
     as_of: datetime,
     connect_factory: Any = None,
+    order_id: str | None = None,
+    opportunity_id: str | None = None,
+    event_id: str | None = None,
 ) -> dict[str, Any]:
     """Original signed tenant and PostgreSQL role-scoped READ ONLY path.
 
@@ -130,6 +133,14 @@ def review_signed_crm_prospect_tenant(
     its own independent owner-verification stage. Injected connectors in tests
     NEVER attest an independent real database.
     """
+    if order_id is not None and event_id is not None:
+        raise ProspectHandoffHold("ONE_ORIGINAL_EVENT_OR_ORDER_RECEIPT_REQUIRED")
+    if order_id is not None and opportunity_id is None:
+        raise ProspectHandoffHold("EXACT_ORDER_AND_GTM_ID_PAIR_REQUIRED")
+    if event_id is not None and opportunity_id is None:
+        raise ProspectHandoffHold("EXACT_EVENT_AND_GTM_ID_PAIR_REQUIRED")
+    if opportunity_id is not None and order_id is None and event_id is None:
+        raise ProspectHandoffHold("EXACT_GTM_RECEIPT_REQUIRED")
     from empire_os.revenue_crm_signed_auth import SignedCrmTenantVerifier
     from empire_os import revenue_crm_transport as crm_transport
     # The authenticated login contract is being upgraded by the CRM owner.
@@ -174,10 +185,27 @@ def review_signed_crm_prospect_tenant(
                 if (not isinstance(row, (tuple, list)) or len(row) != 1
                         or str(row[0]) != tenant):
                     raise ProspectHandoffHold("CRM_SESSION_TENANT_SCOPE_MISMATCH")
-                result = review_existing_prospect_entity_tenant(
-                    cursor, prospect_id=prospect_id, entity_id=entity_id,
-                    authenticated_tenant_id=tenant, as_of=as_of,
-                )
+                if order_id is not None:
+                    from empire_os.canonical_order_lineage_review import review_existing_order_opportunity_lineage
+                    result = review_existing_order_opportunity_lineage(
+                        cursor, order_id=order_id,
+                        opportunity_id=opportunity_id,
+                        prospect_id=prospect_id, entity_id=entity_id,
+                        authenticated_tenant_id=tenant, as_of=as_of,
+                    )
+                elif event_id is not None:
+                    from empire_os.canonical_order_lineage_review import review_existing_commercial_event_lineage
+                    result = review_existing_commercial_event_lineage(
+                        cursor, event_id=event_id,
+                        opportunity_id=opportunity_id,
+                        prospect_id=prospect_id, entity_id=entity_id,
+                        authenticated_tenant_id=tenant, as_of=as_of,
+                    )
+                else:
+                    result = review_existing_prospect_entity_tenant(
+                        cursor, prospect_id=prospect_id, entity_id=entity_id,
+                        authenticated_tenant_id=tenant, as_of=as_of,
+                    )
     except ProspectHandoffHold:
         raise
     except Exception:

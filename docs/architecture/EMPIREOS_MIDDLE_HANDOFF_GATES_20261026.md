@@ -42,3 +42,27 @@ The same reader verifies:
 `tests/test_canonical_prospect_tenant_handoff_20261026.py` covers exact match, correct active binding, duplicate bindings, unresolved conflicts, source-ref absence, invalid IDs, cross-tenant session mismatch, invalid signed CRM token and missing unpublished privilege guard. It uses synthetic fixture UUIDs only; no real customer data is copied or written.
 
 Next truthful release gate: the CRM owner publishes the dedicated-login attestation contract; then run the restricted owner-credential read-only smoke test against one **actual authorised** prospect/entity/tenant association. Only after that should the original GTM Opportunity linkage be designed from real observed schema evidence.
+
+
+## Original pre-order and post-order GTM continuity — now implemented as READ ONLY checks
+EmpireDB migration 002 **already** places `opportunity_id`, `prospect_id`, and `entity_id` on `commercial_events` and `fulfilment_orders`. A new relation table is unnecessary for checking **existing** immutable events or order rows. Do NOT insert an event/order to make the check succeed.
+
+### 3A. Before a fulfilment order exists
+`canonical_order_lineage_review.review_existing_commercial_event_lineage` requires:
+- Exact UUID of one **existing** `commercial_events` row, and an exact existing `gtm_opportunities.id`.
+- Matching, non-null opportunity/prospect/entity UUIDs from the original existing immutable event.
+- The original same-cursor prospect/entity receipt, absence of unresolved identity conflicts, and exact authenticated tenant binding.
+- Return `EXISTING_EVENT_LINEAGE_OBSERVED_NO_ORDER_AUTHORITY`, never buyer acceptance, an order, payment, lead delivery or economic memory permission.
+This permits a **source-bound pre-order evidence handoff**, but an arbitrary event type doesn't prove its underlying business claim or authorised source rights.
+
+### 3B. When an existing fulfilment order can be independently named
+`canonical_order_lineage_review.review_existing_order_opportunity_lineage` requires:
+- Exact existing `gtm_opportunities.id` and `fulfilment_orders.id` rows; the order must reference the **same** opportunity/prospect/entity.
+- Exact original source+tenant scope, checked in the same restricted read-only cursor.
+- Returns `EXACT_EXISTING_ORDER_SOURCE_LINEAGE_OBSERVED_REVIEW_ONLY`. This is identity continuity, not proof of a buyer contract or delivered and paid service.
+- Order state `paid` or `settled` is **not** cash finality. Buyer acceptance, delivery/attribution, independent settled transaction, refunds and Economic Memory require the original downstream attestations.
+
+### Trust and release boundary
+The existing signed CRM reader now accepts at most **one** of `event_id` or `order_id`, paired with the exact `opportunity_id`, and performs that test inside the original active signed-member, role-scoped, tenant-attested READ ONLY transaction. Incomplete pairs, both receipt types, cross-company links, guessed IDs, ambiguous source binding or revoked tenant authority fail closed. Tests using an injected cursor explicitly report `INJECTED_CONNECTOR_RESEARCH_ONLY`; they are not evidence of a real production DB session.
+
+The CRM owner's as-yet-unreleased `CRM_LOGIN_AUTHORITY_SQL` hardening remains a **hard dependency**. No protected production file, running timer, EmpireDB schema, outbound queue, funds, commercial price or revenue accounting was modified by this release candidate. The read-only checker cannot produce real opportunities without existing authentic records.

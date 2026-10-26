@@ -110,7 +110,7 @@ class FakeAuthCursor(FakeReadOnlyCursor):
             assert statement.lstrip().lower().startswith("select")
         elif not (
             statement.startswith("SET ") or
-            statement.startswith("SELECT ")
+            statement.lstrip().startswith("SELECT " )
         ):
             raise AssertionError("mutation attempted")
     def fetchone(self):
