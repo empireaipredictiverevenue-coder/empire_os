@@ -12,6 +12,7 @@ from empire_os.buyer_acquisition_team import (
     refresh_buyer_acquisition_plan,
 )
 from empire_os.buyer_acquisition_decision_brain import run_team_brain
+from empire_os.buyer_qualification_gap_loop import refresh_gap_loop
 
 
 def refresh_existing_workspace_reply_snapshot() -> dict:
@@ -131,6 +132,18 @@ def main() -> int:
             "database_writes": False,
         }
     print(json.dumps({"buyer_team_brain": decision}, sort_keys=True))
+    # Evidence-gap lifecycle runs inside THIS owner and adds no scheduler,
+    # external network request, CRM mutation, follow-up sender or worker.
+    try:
+        gaps = refresh_gap_loop(Path(args.repo_root))
+    except (ValueError, OSError, KeyError, TypeError) as exc:
+        gaps = {
+            "status": "ORIGINAL_BUYER_GAP_LOOP_HELD",
+            "error_class": type(exc).__name__,
+            "outbound_authorized": False,
+            "database_writes": False,
+        }
+    print(json.dumps({"buyer_qualification_gap_loop": gaps}, sort_keys=True))
     return 0
 
 
