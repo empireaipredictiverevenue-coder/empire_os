@@ -44,6 +44,11 @@ REVIEWED_ENTRY_PATHS = frozenset({
     "/industries/hvac",
     "/industries/property",
     "/insights/revenue-opportunity-assessment",
+    # Only the original three founder-approved, published AEO guides.
+    # Entry remains browser-claimed and never implies SEO attribution.
+    "/aeo/general_contractor/NYC/",
+    "/aeo/hvac/DFW/",
+    "/aeo/roofing/DFW/",
 })
 
 

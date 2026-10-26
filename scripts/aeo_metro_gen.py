@@ -460,7 +460,8 @@ def generate_page(niche: str, metro: str) -> str:
         # reviewed market-guide pages. No link network or mass CTA roll-out.
         # This is a nonbinding /commercial enquiry, never a homeowner form.
         "commercial_assessment_link": (
-            '<a class="btn btn-secondary" href="/commercial">'
+            '<a class="btn btn-secondary" href="/commercial?entry='
+            + f'%2Faeo%2F{niche}%2F{metro}%2F#commercial-enquiry">'
             'Discuss a scoped market assessment</a>'
             if (niche, metro) in {
                 ("general_contractor", "NYC"),

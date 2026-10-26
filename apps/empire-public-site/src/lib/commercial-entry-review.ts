@@ -9,6 +9,7 @@ const REVIEWED_ENTRY_PATHS = new Set([
   "/", "/commercial", "/predictive-revenue",
   "/industries/roofing", "/industries/solar", "/industries/hvac",
   "/industries/property", "/insights/revenue-opportunity-assessment",
+  "/aeo/general_contractor/NYC/", "/aeo/hvac/DFW/", "/aeo/roofing/DFW/",
 ]);
 
 export function industryCommercialProposalHref(slug: string): string {
@@ -16,6 +17,15 @@ export function industryCommercialProposalHref(slug: string): string {
     return "/commercial#commercial-enquiry";
   }
   const path = "/industries/" + slug;
+  return "/commercial?entry=" + encodeURIComponent(path) + "#commercial-enquiry";
+}
+
+/** Exact published, founder-approved AEO paths only. Never an attribution assertion. */
+const AEO_MARKET_ROUTES = new Set([
+  "/aeo/general_contractor/NYC/", "/aeo/hvac/DFW/", "/aeo/roofing/DFW/",
+]);
+export function aeoCommercialProposalHref(path: string): string {
+  if (!AEO_MARKET_ROUTES.has(path)) return "/commercial#commercial-enquiry";
   return "/commercial?entry=" + encodeURIComponent(path) + "#commercial-enquiry";
 }
 
