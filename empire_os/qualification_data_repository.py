@@ -95,6 +95,75 @@ class QualificationDataRepository:
             if str(row.get("id")) not in done
         ][:limit]
 
+    def fetch_historical_pending_page(
+        self,
+        *,
+        offset: int,
+        limit: int,
+        scoring_engine: str,
+        scoring_version: str,
+    ) -> dict[str, Any]:
+        """Bounded archival backfill selection, ordered oldest to newest.
+
+        Returns an advancing offset through canonical prospects. Scored rows
+        count as scanned but are not requalified. If the quota fills inside
+        a page, the next cursor stops directly after the final candidate,
+        preserving all unvisited records for the next cycle.
+        """
+        if type(offset) is not int or not 0 <= offset <= 1_000_000:
+            raise ValueError("historical backfill offset out of bounds")
+        if type(limit) is not int or not 1 <= limit <= 25:
+            raise ValueError("historical backfill limit must be 1-25")
+        page_size = min(100, max(25, limit * 4))
+        prospects = self._gateway.query(
+            "prospects",
+            PROSPECT_COLUMNS,
+            order=(
+                OrderSpec("created_at", descending=False),
+                OrderSpec("id", descending=False),
+            ),
+            limit=page_size,
+            offset=offset,
+        )
+        ids = [str(p.get("id") or "").strip() for p in prospects]
+        if not all(ids) or len(set(ids)) != len(ids):
+            raise ValueError("historical backfill duplicate/empty prospect ids")
+        done: set[str] = set()
+        if ids:
+            existing = self._gateway.query(
+                "prospect_qualifications",
+                "prospect_id",
+                filters=(
+                    DataFilter.eq("scoring_engine", scoring_engine),
+                    DataFilter.eq("scoring_version", scoring_version),
+                    DataFilter.in_("prospect_id", tuple(ids)),
+                ),
+                limit=len(ids),
+            )
+            done = {
+                str(row.get("prospect_id") or "").strip()
+                for row in existing if row.get("prospect_id")
+            }
+            if not done <= set(ids):
+                raise ValueError("historical backfill qualification mismatch")
+        selected: list[dict[str, Any]] = []
+        consumed = 0
+        for row in prospects:
+            consumed += 1
+            if str(row["id"]) not in done:
+                selected.append(dict(row))
+                if len(selected) == limit:
+                    break
+        end_of_archive = consumed == len(prospects) and len(prospects) < page_size
+        return {
+            "candidate_rows": selected,
+            "scanned_rows": consumed,
+            "next_offset": offset + consumed,
+            "archive_exhausted": end_of_archive,
+            "source": "canonical_empiredb_prospects",
+            "no_send_authority": True,
+        }
+
     def fetch_unlinked_allocatable_prospects(
         self,
         *,
