@@ -1,0 +1,218 @@
+{
+  "schema_version": "empire.competitor_video_strategy_sources.v1",
+  "reviewed_at_utc": "2026-10-27T13:20:00+00:00",
+  "vertical": "US_HOME_SERVICES_PAY_PER_CALL",
+  "videos": [
+    {
+      "id": "leadsmart_traffic",
+      "speaker": "Matthew Zivkovic (Lead Smart)",
+      "title": "How To Generate Calls for the Top Growing Pay Per Call Verticals",
+      "youtube_url": "https://www.youtube.com/watch?v=im5dlsEk9aQ",
+      "owner_url": "https://www.ringba.com/blog/how-to-generate-calls-for-the-top-growing-pay-per-call-verticals",
+      "evidence_type": "VERBATIM_EXCERPT_ON_OPERATOR_SITE",
+      "age_scope": "HISTORICAL_2021_NOT_LIVE_CHANNEL_ECONOMICS",
+      "insights": [
+        "Google and Microsoft search advertising, Facebook/Instagram social advertising, SEO and legitimate Google business listings are discussed as acquisition channels.",
+        "Essential home services are a major example vertical; this does not prove current roofing buyer-approved traffic or Empire performance."
+      ],
+      "classifications": [
+        "SEARCH_ACQUISITION",
+        "SOCIAL_ACQUISITION",
+        "ORGANIC_CONTENT"
+      ],
+      "target_owner": "ORIGINAL_ACQUISITION_RESEARCH",
+      "priority": 1
+    },
+    {
+      "id": "adam_full_interview",
+      "speaker": "Adam Young (Ringba)",
+      "title": "Ringba and Pay Per Call – John Casto interview",
+      "youtube_url": "https://www.youtube.com/watch?v=n7D3JxYzq6Q",
+      "owner_url": "https://adamyoung.com/podcasts/ringba-pay-per-call-interview/",
+      "evidence_type": "PUBLISHED_FULL_INTERVIEW_TRANSCRIPT",
+      "age_scope": "2024_INTERVIEW_NOT_REAL_TIME_PLATFORM_POLICY",
+      "insights": [
+        "Keep independent call-source tracking and buyer-level outcome reports; publisher-provided numbers alone constrain optimisation.",
+        "Test differentiated relevant acquisition sources and do not copy competitor advertising or make unverified claims.",
+        "Use appropriate access-authorised call QA for mismatched creative, negative keyword proposals and buyer experience; not surveillance, unauthorised recordings or unsolicited retargeting."
+      ],
+      "classifications": [
+        "ATTRIBUTION",
+        "COMPLIANT_CREATIVE",
+        "BUYER_QA",
+        "ALTERNATIVE_SOURCE_DISCOVERY"
+      ],
+      "target_owner": "ORIGINAL_CRO_AND_SEARCH_OWNER",
+      "priority": 2
+    },
+    {
+      "id": "ringba_partner_management",
+      "speaker": "Ringba training team",
+      "title": "Ringba Product Training: Partner Management",
+      "youtube_url": "https://www.youtube.com/watch?v=mNDlec1P9F0",
+      "owner_url": "https://www.ringba.com/blog/ringba-product-training-partner-management",
+      "evidence_type": "PUBLISHED_OPERATOR_VIDEO_EXCERPT",
+      "age_scope": "OLDER_PRODUCT_FEATURES_VERIFY_CURRENT_AVAILABILITY",
+      "insights": [
+        "Publisher and buyer partner registration and self-service offer review can reduce manual onboarding.",
+        "Partner access/reporting permissions should distinguish publisher views, buyer views and founder-admin views."
+      ],
+      "classifications": [
+        "PUBLISHER_GOVERNANCE",
+        "BUYER_GOVERNANCE"
+      ],
+      "target_owner": "ORIGINAL_BUYER_TEAM_AND_COMPLIANCE",
+      "priority": 3
+    },
+    {
+      "id": "ringba_account_manager",
+      "speaker": "Ringba training team",
+      "title": "Ringba Product Training: Account Manager",
+      "youtube_url": "https://www.youtube.com/watch?v=224mRXnzzf4",
+      "owner_url": "https://www.ringba.com/blog/ringba-product-training-account-manager",
+      "evidence_type": "PUBLISHED_OPERATOR_VIDEO_EXCERPT",
+      "age_scope": "OLDER_PRODUCT_FEATURES_VERIFY_CURRENT_AVAILABILITY",
+      "insights": [
+        "Different partner/team roles can access assigned call reporting with read-only or admin restrictions.",
+        "Read-only operator accountability beats exposing commercial call transcripts to every research agent."
+      ],
+      "classifications": [
+        "ACCESS_GOVERNANCE",
+        "REPORTING"
+      ],
+      "target_owner": "ORIGINAL_CALL_OWNER_AND_FOUNDER_AUTHORITY",
+      "priority": 4
+    },
+    {
+      "id": "ringba_journey",
+      "speaker": "Ringba; Carlos Corona Jr; Dave Maman; Todd Schewber; Ankur Bhardwaj",
+      "title": "The Pay Per Call Journey: Miami Pay Per Call Mastermind",
+      "youtube_url": "https://www.youtube.com/watch?v=BQFok2Sc-24",
+      "owner_url": "https://www.ringba.com/blog/ringba-presents-the-pay-per-call-journey-episode-1-miami-pay-per-call-mastermind",
+      "evidence_type": "OFFICIAL_VIDEO_DESCRIPTION_ONLY_NO_FULL_TRANSCRIPT",
+      "age_scope": "OLDER_INDUSTRY_INTERVIEW_NO_AUDITED_PERFORMANCE",
+      "insights": [
+        "Video description identifies operator interviews and roles; do not attribute undisclosed tactics, traffic or earnings from the video without a transcript."
+      ],
+      "classifications": [
+        "EXPERT_INTERVIEW_RESEARCH"
+      ],
+      "target_owner": "ORIGINAL_COMPETITOR_INTELLIGENCE",
+      "priority": 5
+    },
+    {
+      "id": "ringbax_call_logs",
+      "speaker": "RingbaX",
+      "title": "How to View Call Logs and Block Channels",
+      "youtube_url": "https://www.youtube.com/watch?v=B0yv-idR9Fo",
+      "owner_url": "https://support.ringbax.com/hc/en-us/articles/33306938091927-Ringba-X-Video-Resources",
+      "evidence_type": "OFFICIAL_TUTORIAL_TITLE_ONLY",
+      "age_scope": "JULY_2025_HELP_CENTER_VIDEOS",
+      "insights": [
+        "Buyer-side training explicitly covers call logs and channel blocking; buyer decisions about eligible source quality should be documented separately."
+      ],
+      "classifications": [
+        "BUYER_QA",
+        "CHANNEL_SOURCE_RULES"
+      ],
+      "target_owner": "ORIGINAL_BUYER_COMMERCIAL_TEAM",
+      "priority": 6
+    },
+    {
+      "id": "ringbax_seller_tree",
+      "speaker": "RingbaX",
+      "title": "How to Set Up a Seller Ring Tree and Ring Tree Target",
+      "youtube_url": "https://www.youtube.com/watch?v=uDzWrD17wqg",
+      "owner_url": "https://support.ringbax.com/hc/en-us/articles/33306938091927-Ringba-X-Video-Resources",
+      "evidence_type": "OFFICIAL_TUTORIAL_TITLE_ONLY",
+      "age_scope": "JULY_2025_HELP_CENTER_VIDEOS",
+      "insights": [
+        "The seller-side video resource describes a ring-tree setup; actual routing rules must remain owned and unmodified pending current buyer authority."
+      ],
+      "classifications": [
+        "ROUTING_RESEARCH"
+      ],
+      "target_owner": "ORIGINAL_RINGBA_OWNER",
+      "priority": 7
+    }
+  ],
+  "external_case_evidence": [
+    {
+      "id": "wecall",
+      "source_url": "https://www.ringba.com/blog/wecall-media-case-study",
+      "evidence_type": "OPERATOR_PUBLISHED_CLIENT_STORY_NOT_INDEPENDENT_FINANCIAL_AUDIT",
+      "findings": [
+        "Buyer no-answer/busy disposition and fallback tracking can preserve consenting eligible call experiences; no automatic duplicate resale permission.",
+        "Source creative can generate cheap calls that do not fit the buyer, so source/qualification quality matters more than cheap CPC.",
+        "Ringba reported an early $45,000 revenue period in 2020, not an independently validated example of present profit or Empire performance."
+      ]
+    },
+    {
+      "id": "performcb",
+      "source_url": "https://www.performcb.com/case-studies/study/medicare-marketer-boosts-call-volume-with-new-traffic-channels/",
+      "evidence_type": "OPERATOR_PUBLISHED_CROSS_VERTICAL_CASE_STUDY_NOT_A_ROOFING_FORECAST",
+      "findings": [
+        "Search, social and display sources were tested alongside existing media to reach a new market; campaign has industry-specific call qualification.",
+        "6,800 calls in 90 days and 50% conversion are the company's reported Medicare campaign results, not transferable roofing benchmarks."
+      ]
+    },
+    {
+      "id": "no_ads_broker",
+      "source_url": "https://unik360.beehiiv.com/p/march-21-2024",
+      "evidence_type": "MARKETING_NEWSLETTER_ACCOUNT_NO_INDEPENDENT_REVENUE_PROOF",
+      "findings": [
+        "A call-broker claims to connect qualified buyers and permitted publisher traffic without buying ads directly; terms/source rights and finance proof still necessary."
+      ]
+    }
+  ],
+  "prioritized_actions": [
+    {
+      "rank": 1,
+      "code": "VERIFY_SEARCH_AND_REFERRAL_SOURCE_COHORT",
+      "owner": "ORIGINAL_SEARCH_AND_WEBSITE_ANALYTICS_OWNER",
+      "testable_evidence": "First-party source-labeled page sessions, consented ZIP responses and mapped call handoffs; keep site publishing unchanged"
+    },
+    {
+      "rank": 2,
+      "code": "CALL_BUYER_LOSS_AND_QUALITY_REASONS",
+      "owner": "ORIGINAL_RINGBA_BUYER_AND_COMMERCIAL_OWNER",
+      "testable_evidence": "Permitted aggregated reasons for no-answer/busy/wrong service/short duration/invalid ZIP and independent buyer acceptance; do not open protected recordings"
+    },
+    {
+      "rank": 3,
+      "code": "BUYER_PARTNER_PERMISSIONS_AND_SOURCE_TERMS",
+      "owner": "ORIGINAL_BUYER_ACQUISITION_AND_PUBLISHER_OWNER",
+      "testable_evidence": "Accepted source contract, call qualification, operating hours, buyers and publisher rights before partner onboarding or route changes"
+    },
+    {
+      "rank": 4,
+      "code": "CREATIVE_INTENT_AND_NEGATIVE_KEYWORD_RESEARCH",
+      "owner": "ORIGINAL_SEO_SEARCH_ADS_AND_CRO_OWNER",
+      "testable_evidence": "Buyer-authorised aggregate call-quality dispositions linked to queries and creative; proposals only, no live SEO or media edits"
+    },
+    {
+      "rank": 5,
+      "code": "FOUNDER_REVIEW_ONLY_VIDEO_LIBRARY",
+      "owner": "ORIGINAL_COMPETITOR_RESEARCH_OWNER",
+      "testable_evidence": "Keep reviewed video claims with dates, transcript/description distinction, current policy verification and not-an-ROI-guarantee status"
+    }
+  ],
+  "controls": {
+    "outbound_enabled": false,
+    "paid_traffic_enabled": false,
+    "seo_edit_authorized": false,
+    "buyer_route_changes": false,
+    "new_agent": false,
+    "new_database": false,
+    "script_scraping_private_transcripts": false,
+    "revenue_inferred": false,
+    "marketing_claims_as_own_financials": false
+  },
+  "observed_results": {
+    "live_competitor_channel_traffic_share": null,
+    "empire_paid_or_organic_sessions": null,
+    "empire_payable_calls": null,
+    "empire_settled_cash_margin": null
+  },
+  "disclosure": "Some public pages contain excerpts or titles, not the full YouTube transcript. Other figures are first-party vendor/client marketing case claims, not audited results."
+}

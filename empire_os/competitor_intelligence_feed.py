@@ -447,6 +447,36 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             "execution_authority": "none",
         }
 
+    operator_videos = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "pay_per_call_youtube_research_latest.json"
+    )
+    if (operator_videos.get("schema_version")
+            != "empire.competitor_pay_per_call_video_research.v1"
+            or operator_videos.get("mode") != "OBSERVE"
+            or operator_videos.get("video_count") != 7
+            or operator_videos.get("full_video_playback_claimed") is not False
+            or operator_videos.get("paid_traffic_authorized") is not False
+            or operator_videos.get("seo_publication_authorized") is not False
+            or operator_videos.get("outbound_authorized") is not False
+            or operator_videos.get("execution_authority") != "none"):
+        video_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        video_summary = {
+            "available": True,
+            "mode": "OBSERVE",
+            "reviewed_at_utc": operator_videos.get("reviewed_at_utc"),
+            "video_count": operator_videos.get("video_count"),
+            "full_published_transcript_count":
+                operator_videos.get("full_published_transcript_count"),
+            "video_watchlist": operator_videos.get("video_watchlist"),
+            "owner_research_actions": operator_videos.get("owner_research_actions"),
+            "case_source_count": operator_videos.get("case_source_count"),
+            "full_video_playback_claimed": False,
+            "paid_traffic_authorized": False,
+            "execution_authority": "none",
+        }
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
@@ -456,6 +486,7 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "traffic_source_research": traffic_summary,
         "conversion_evidence_readiness": attribution_summary,
         "cro_owner_handoff": cro_summary,
+        "operator_video_research": video_summary,
     }
 
 
