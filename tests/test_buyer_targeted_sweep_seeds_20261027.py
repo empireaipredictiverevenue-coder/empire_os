@@ -130,3 +130,25 @@ def test_voax_official_marketplace_research_source_is_not_buyer_capacity():
         assert row[key] is False
     assert data["outbound_sent"] is False
     assert data["execution_authority"] == "none"
+
+
+def test_versatile_direct_organic_publisher_page_stays_research_only():
+    result = build_public_research_seeds(
+        {}, search_fn=lambda queries, num: {},
+        max_queries=2, include_volume=False, observed_at=NOW,
+    )
+    rows=[r for r in result["seeds"] if r["domain"]=="versatilereserve.com"]
+    assert len(rows)==1
+    r=rows[0]
+    assert r["website"]=="https://versatilereserve.com/publishers"
+    assert r["target_markets"]==["USA"]
+    assert "roofing" in r["target_verticals"]
+    assert r["source_refs"]==["public:multimarket_review:USA:versatilereserve.com"]
+    assert r["source_queries"]==[]
+    for k in ("identity_verified", "commercial_terms_verified",
+              "buyer_capacity_verified", "buyer_price_verified",
+              "outreach_authorized"):
+        assert r[k] is False
+    assert result["outbound_sent"] is False
+    assert result["database_write_performed"] is False
+    assert result["execution_authority"] == "none"

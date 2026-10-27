@@ -147,6 +147,11 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # 27 Oct: Voax first-party marketplace mentions roofing/HVAC publisher
     # partnerships. Source is research-only even after genuine first enquiry.
     ("https://voaxmedia.com/marketplace", "USA", ("roofing", "hvac", "home_services")),
+    # 27 October: the direct-call purchasing programme offers SEO/organic
+    # publisher consideration and lists home services including roofing.
+    # First commercial email SENT. Specific UK acceptance, ZIP, net terms,
+    # funding and payable buyer events remain unverified: OBSERVE research.
+    ("https://versatilereserve.com/publishers", "USA", ("roofing", "home_services")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (
