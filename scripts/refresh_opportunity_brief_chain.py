@@ -22,6 +22,7 @@ from empire_os.intelligence_materializer_transport import (
     PostgresIntelligenceMaterializer,
 )
 from empire_os.competitor_call_source_watch import refresh as refresh_call_source_watch
+from empire_os.competitor_opportunity_evidence_bridge import build_bridge_runtime
 from empire_os.competitor_call_alert_precision import refresh as refresh_alert_precision
 from empire_os.opportunity_brief import (
     materialize_opportunity_briefs,
@@ -134,10 +135,20 @@ def refresh_opportunity_brief_chain(
     paths = write_opportunity_briefs(root, opportunity_briefs)
 
     competitor_watch = refresh_bounded_competitor_watch(root)
+    commercial_signal_review = build_bridge_runtime(root)
     alert_precision = refresh_bounded_alert_precision(root)
 
     return {
         "competitor_change_radar": competitor_watch,
+        "competitor_commercial_research": {
+            "available": commercial_signal_review.get("available", False),
+            "pending_research_brief_count": commercial_signal_review.get(
+                "current_research_brief_count", 0
+            ),
+            "buyer_admission_authorized": False,
+            "outreach_authorized": False,
+            "execution_authority": "none",
+        },
         "call_geographic_precision": alert_precision,
         "schema_version": "empire.opportunity-brief-refresh-chain.v1",
         "mode": "OBSERVE_TO_REVIEW_ONLY",

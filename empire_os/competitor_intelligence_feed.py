@@ -19,6 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.competitor_opportunity_evidence_bridge import build_bridge_runtime
 from empire_os.competitor_audience_sweep import (
     load_resolved_market_entities,
 )
@@ -536,6 +537,7 @@ def refresh_feed_snapshot(
     )
     payload["call_acquisition_intelligence"] = _call_acquisition_overlay(repo_root)
     payload["commercial_change_radar"] = _commercial_change_radar_overlay(repo_root)
+    payload["commercial_opportunity_research"] = build_bridge_runtime(repo_root)
     write_feed_snapshot(repo_root, payload)
     return payload
 
@@ -561,11 +563,13 @@ def build_feed_runtime(repo_root: Path) -> dict[str, Any]:
             "execution_authority": "none",
             "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
             "commercial_change_radar": _commercial_change_radar_overlay(repo_root),
+            "commercial_opportunity_research": build_bridge_runtime(repo_root),
         }
     return {
         "available": True, **payload,
         "call_acquisition_intelligence": _call_acquisition_overlay(repo_root),
         "commercial_change_radar": _commercial_change_radar_overlay(repo_root),
+        "commercial_opportunity_research": build_bridge_runtime(repo_root),
     }
 
 
