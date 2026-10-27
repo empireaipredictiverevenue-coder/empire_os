@@ -20,6 +20,10 @@ from empire_os.microsite_cinematic_background import (
     chicago_night_skyline_data_uri, chicago_premium_css,
     chicago_owner_photo_data_uri, CHICAGO_PHOTO_SHA256,
     CHICAGO_PHOTO_CREDIT_URL, CHICAGO_PHOTO_LICENSE_URL,
+    chicago_worker_research_photo_data_uri,
+    chicago_4k_photo_asset_validated, CHICAGO_4K_PHOTO_SHA256,
+    CHICAGO_WORKER_PHOTO_SOURCE, CHICAGO_WORKER_PHOTO_SHA256,
+    chicago_4k_visual_refinement_css, chicago_native_4k_layout_css,
 )
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
@@ -261,12 +265,23 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
         and geo.get("kind") == "metro"
         and kind == "local_utility"
     )
-    cinematic_css = chicago_premium_css() if chicago_design else ""
+    cinematic_css = (chicago_premium_css()
+                     + chicago_4k_visual_refinement_css()
+                     + chicago_native_4k_layout_css()
+                     if chicago_design else "")
     photo_asset = chicago_owner_photo_data_uri() if chicago_design else None
+    worker_asset = chicago_worker_research_photo_data_uri() if chicago_design else None
     city_image = photo_asset or (chicago_night_skyline_data_uri() if chicago_design else None)
+    # Embed the high-compression offline city image exactly ONCE. Refer to its
+    # CSS custom property in both city-photo elements to respect the original
+    # site owner's strict 400KB standalone HTML QA size cap.
+    city_photo_css_token = (
+        ' style="--chicago-city-image:url(' + city_image + ')"'
+        if city_image else ""
+    )
     cityscape = (
-        '<div class="site-art" aria-hidden="true" style="background-image:url('
-        + city_image + ')"></div>'
+        '<div class="site-art" aria-hidden="true"'
+        ' style="background-image:var(--chicago-city-image)"></div>'
         if city_image else ""
     )
     photo_credit = (
@@ -278,6 +293,53 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
         ' · dark overlay and WebP adaptation</span>'
         if photo_asset else ""
     )
+    visual_research_heroes = ""
+    if chicago_design and worker_asset and city_image:
+        # Distinct source-verified scenes, photo-labelled as illustrative.
+        # These are visual research navigation cards, not service offers.
+        visual_research_heroes = (
+            '<div class="research-intro"><div>'
+            '<p class="tag">Original source investigation</p>'
+            '<h2>Know the rules. Verify the source.</h2></div>'
+            '<p>A visual guide to Chicago permit requirements, Illinois roofing licences '
+            'and address-based records. No inferred local demand or contractor endorsements.</p></div>'
+            '<div class="research-visual-grid" aria-label="Two official research pathways">'
+            '<article class="research-visual-hero photo-field" style="--feature-image:url('
+            + worker_asset + ')">'
+            '<span class="visual-caption">Illustrative roofing photo · Houston, TX</span>'
+            '<div class="research-visual-content"><span class="tag">01 / PROJECT SCOPE</span>'
+            '<h3>Understand the work before the permit</h3>'
+            '<p>Roof layers, repairs and structural changes can affect which application applies.</p>'
+            '<a href="https://chicago.gov/city/en/sites/guide-to-building-permits/home/help/faq/DOB/EPP-eligible.html" '
+            'target="_blank" rel="noopener noreferrer">City of Chicago permit guidance</a>'
+            '</div></article>'
+            '<article class="research-visual-hero photo-city" style="--feature-image:var(--chicago-city-image)">'
+            '<span class="visual-caption">Chicago River · source-backed cityscape</span>'
+            '<div class="research-visual-content"><span class="tag">02 / PUBLIC RECORD</span>'
+            '<h3>Verify the address and licence</h3>'
+            '<p>Check the original permit application status and Illinois contractor licence records.</p>'
+            '<a href="https://webapps1.chicago.gov/buildingpermit/help" '
+            'target="_blank" rel="noopener noreferrer">Official building permit lookup</a>'
+            '</div></article></div>'
+            '<div class="evidence-path" aria-label="Research verification sequence">'
+            '<div class="evidence-path-item"><span class="evidence-path-num">01</span>'
+            '<span class="evidence-path-label">Permit criteria'
+            '<span class="evidence-path-detail">City of Chicago guidance</span></span></div>'
+            '<div class="evidence-path-item"><span class="evidence-path-num">02</span>'
+            '<span class="evidence-path-label">Licence lookup'
+            '<span class="evidence-path-detail">Illinois IDFPR original source</span></span></div>'
+            '<div class="evidence-path-item"><span class="evidence-path-num">03</span>'
+            '<span class="evidence-path-label">Property record'
+            '<span class="evidence-path-detail">Actual address, not ZIP inference</span></span></div>'
+            '</div>'
+        )
+    if worker_asset:
+        photo_credit += (
+            '<span class="photo-attribution">Roof-work image: '
+            '<a href="' + CHICAGO_WORKER_PHOTO_SOURCE
+            + '" rel="noopener noreferrer" target="_blank">Zohair Mirza / Unsplash</a>'
+            ' · illustrative Houston worksite, not a Chicago provider</span>'
+        )
     if chicago_design and ":" in title:
         left, right = title.split(":", 1)
         title_html = (
@@ -343,7 +405,7 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 .photo-attribution a {{color:var(--brand-cyan);text-underline-offset:3px}}
 </style>
 </head>
-<body>
+<body{city_photo_css_token}>
 {cityscape}
 <a class="skip" href="#main">Skip to content</a>
 <header class="wrap"><nav aria-label="Main navigation"><img class="wordmark" src="{logo_src}" alt="Empire AI Predictive Revenue" width="215" height="49">
@@ -363,6 +425,7 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 </section></div>
 <div class="wrap"><section id="research-method" aria-labelledby="evidence-title">
 <p class="tag">Territory evidence</p><h2 id="evidence-title">What the available research shows</h2>
+{visual_research_heroes}
 <div class="grid">{evidence_cards}</div></section>
 {checklist}
 <section aria-labelledby="next-title"><h2 id="next-title">What still needs verifying</h2>
@@ -432,6 +495,35 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
         "html_sha256": sha256(html.encode()).hexdigest(),
         "locally_useful_research_steps": len(spec.get("research_steps", [])),
+        "four_k_original_asset_available_for_site_owner": (
+            bool(chicago_4k_photo_asset_validated())
+            if (_canonical_brand_contract() is not None
+                and geo.get("market_id") == "US-IL"
+                and geo.get("kind") == "metro"
+                and site_kind == "local_utility")
+            else False
+        ),
+        "four_k_background_master_sha256": (
+            CHICAGO_4K_PHOTO_SHA256 if (_canonical_brand_contract() is not None
+              and geo.get("market_id") == "US-IL"
+              and geo.get("kind") == "metro"
+              and site_kind == "local_utility"
+              and chicago_4k_photo_asset_validated()) else None
+        ),
+        "illustrative_roofing_photo_used": (
+            bool(chicago_worker_research_photo_data_uri()) if
+            (_canonical_brand_contract() is not None
+             and geo.get("market_id") == "US-IL"
+             and geo.get("kind") == "metro" and site_kind == "local_utility")
+            else False
+        ),
+        "illustrative_roofing_photo_sha256": (
+            CHICAGO_WORKER_PHOTO_SHA256 if
+            (_canonical_brand_contract() is not None
+             and geo.get("market_id") == "US-IL" and geo.get("kind") == "metro"
+             and site_kind == "local_utility"
+             and chicago_worker_research_photo_data_uri()) else None
+        ),
         "chicago_photographic_background_used": (
             bool(chicago_owner_photo_data_uri())
             if (_canonical_brand_contract() is not None

@@ -9,9 +9,38 @@ from hashlib import sha256
 from pathlib import Path
 import os
 
-CHICAGO_PHOTO_SHA256 = "2c17ea093608a0fb16286c6b4c765574d3692fea0deafaca2ea34b56045e9a05"
+CHICAGO_PHOTO_SHA256 = "e7b587241803e033576f5fc6f8df5c81993ec89b37b0644699ac7215e2ed8a24"
 CHICAGO_PHOTO_CREDIT_URL = "https://unsplash.com/photos/a-river-running-through-a-city-at-night-IRMWK1Hv0_8"
 CHICAGO_PHOTO_LICENSE_URL = "https://unsplash.com/license"
+
+CHICAGO_WORKER_PHOTO_SHA256 = "b7fa5187e2bb329dd31308533a795dbb0dfcf1b52fcaf0aae94934c62ff05a2d"
+CHICAGO_WORKER_PHOTO_SOURCE = "https://unsplash.com/photos/a-man-standing-on-the-roof-of-a-house--1l0iZaM8ms"
+CHICAGO_4K_PHOTO_SHA256 = "94ab7dd8ef0b83a0ff6f3089a7a913ad723c1a0f541062e8d9e7a16d556c4f10"
+
+
+def _source_photo(name: str, digest: str, limit: int) -> str | None:
+    raw = os.environ.get(name)
+    if not raw:
+        return None
+    p = Path(raw)
+    if not p.is_file() or p.is_symlink():
+        raise ValueError(f"{name}: owner-staged regular file required")
+    data = p.read_bytes()
+    if not 20_000 <= len(data) <= limit or data[:4] != b"RIFF" or data[8:12] != b"WEBP" or sha256(data).hexdigest() != digest:
+        raise ValueError(f"{name}: exact source digest/format required")
+    return "data:image/webp;base64," + b64encode(data).decode("ascii")
+
+
+def chicago_worker_research_photo_data_uri() -> str | None:
+    """Unaltered-source licensed illustrative Texas worksite; never claim Chicago."""
+    return _source_photo("EMPIRE_MICROSITE_CHICAGO_RESEARCH_WORKER_PHOTO", CHICAGO_WORKER_PHOTO_SHA256, 135000)
+
+
+def chicago_4k_photo_asset_validated() -> bool:
+    """Read-only proof for an existing staged 3840x2160 brand hero asset."""
+    return _source_photo("EMPIRE_MICROSITE_CHICAGO_NATIVE_4K_PHOTO", CHICAGO_4K_PHOTO_SHA256, 2000000) is not None
+
+
 
 
 def chicago_owner_photo_data_uri() -> str | None:
@@ -184,5 +213,166 @@ footer {border-top:1px solid #164c83;background:linear-gradient(180deg,transpare
   .decision-list li::before {left:16px;top:23px}
   .site-art {background-position:70% top;height:630px}
   .hero-title-accent {font-size:.96em}
+}
+"""
+
+
+def chicago_4k_visual_refinement_css() -> str:
+    """V9: LinkedIn-derived sharp visual hierarchy, never fake locality data."""
+    return """
+/* LinkedIn visual study: picture-led hierarchy and meaningful, readable evidence */
+body {font-feature-settings:"kern" 1;text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased}
+.site-art {height:clamp(720px,61vw,1100px);opacity:1;background-position:center 40%}
+.site-art::after {background:
+  linear-gradient(90deg,#01091cf9 0%,#01091ce6 25%,#01091c99 54%,#01091c5b 100%),
+  linear-gradient(0deg,#01091c 0%,#01091c9c 16%,transparent 62%),
+  radial-gradient(circle at 65% 23%,#005aff16,transparent 65%)}
+.hero {min-height:685px;padding-top:105px}
+.hero-content h1 {font-weight:860;text-shadow:0 5px 22px #0008;max-width:860px}
+.hero-title-base {letter-spacing:-.062em}
+.hero-title-accent {letter-spacing:-.062em;line-height:1.03}
+.hero .tag {font-size:.87rem;letter-spacing:.16em}
+.signal-panel {box-shadow:0 0 38px #005aff45,inset 0 1px #8de7ff32,0 26px 70px #0009}
+.hero .lede {font-size:clamp(1.18rem,1.55vw,1.42rem);font-weight:550}
+#research-method {padding-top:65px}
+.research-intro {display:flex;gap:18px;align-items:flex-end;
+  justify-content:space-between;max-width:1100px;padding-bottom:22px}
+.research-intro p {max-width:400px;line-height:1.65;color:#a6c2dd}
+.research-intro h2 {margin:9px 0 0;max-width:770px}
+.research-visual-grid {display:grid;grid-template-columns:1.26fr 1fr;
+  gap:19px;margin:25px 0 45px}
+.research-visual-hero {min-width:0;min-height:360px;position:relative;
+  overflow:hidden;border-radius:22px;border:1px solid #2383ca;
+  background:#071833;isolation:isolate;box-shadow:0 20px 55px #0009,inset 0 1px #d6efff32}
+.research-visual-hero::before {content:"";position:absolute;inset:0;
+  background-image:var(--feature-image);background-position:center 47%;background-size:cover;
+  transform:scale(1.002);z-index:-2}
+.research-visual-hero::after {content:"";position:absolute;inset:0;
+  background:linear-gradient(0deg,#01091cf8 0%,#03112fa5 33%,transparent 70%),
+    linear-gradient(90deg,#01091c69,transparent);z-index:-1}
+.research-visual-content {position:absolute;bottom:0;left:0;right:0;padding:27px}
+.research-visual-content .tag {font-size:.77rem}
+.research-visual-content h3 {font-size:clamp(1.7rem,2.6vw,2.7rem);
+  line-height:1.08;letter-spacing:-.04em;max-width:530px;margin:9px 0}
+.research-visual-content p {font-size:.9rem;line-height:1.55;
+  max-width:510px;color:#d6e6f4;margin:0 0 13px}
+.research-visual-content a {display:inline-flex;align-items:center;min-height:44px;
+  color:#41d6ff;font-size:.9rem;text-decoration-thickness:1px;text-underline-offset:5px;
+  font-weight:750}
+.research-visual-hero.photo-field::before {background-position:center 37%}
+.research-visual-hero.photo-city::before {background-position:center 40%}
+.research-visual-hero .visual-caption {position:absolute;right:17px;top:14px;
+  border:1px solid #92caff70;background:#051128ac;backdrop-filter:blur(12px);
+  padding:5px 10px;border-radius:999px;font-size:.65rem;color:#d3edff;letter-spacing:.02em}
+.evidence-path {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:13px;margin:0 0 29px}
+.evidence-path-item {display:flex;align-items:center;gap:12px;
+  border:1px solid #20527b;border-radius:11px;padding:16px 17px;
+  background:linear-gradient(100deg,#0e2c59b8,#06162cbb)}
+.evidence-path-num {flex:0 0 auto;font-size:.9rem;border:1px solid #02c7fe;
+  color:#02c7fe;width:35px;height:35px;line-height:33px;
+  text-align:center;border-radius:50%;font-weight:850}
+.evidence-path-label {font-size:.88rem;color:#deefff;font-weight:700;line-height:1.3}
+.evidence-path-detail {display:block;color:#8fb4d1;font-weight:450;font-size:.75rem;margin-top:3px}
+.grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.fact {min-height:0;padding:27px;border-color:#246ca8;background:
+  linear-gradient(140deg,#0d2b52dd,#071a35eb);border-radius:18px}
+.fact p {font-size:clamp(.94rem,1.05vw,1.08rem);line-height:1.68}
+.fact .source {font-size:.81rem!important}
+.fact .micro {font-size:.73rem}
+.fact .micro:before {font-size:25px}
+.fact:nth-child(1),.fact:nth-child(2) {grid-column:span 1}
+.official-link {font-size:.92rem}
+.decision-list {grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.decision-list li {line-height:1.65;font-size:1rem}
+#utility-title {max-width:900px}
+#utility-title::after {content:"";display:block;width:74px;height:3px;margin-top:22px;
+  background:linear-gradient(90deg,#02c7fe,#005aff)}
+@media(min-width:2000px) {
+  .wrap {max-width:1820px}
+  .hero {min-height:780px}
+  .hero-layout {grid-template-columns:1.18fr .7fr}
+  .research-visual-hero {min-height:480px}
+  .research-visual-content {padding:39px}
+  .grid {grid-template-columns:repeat(3,minmax(0,1fr))}
+  .fact {padding:37px}
+  .fact p {font-size:1.13rem}
+  .decision-list li {font-size:1.09rem;padding:70px 31px 31px}
+}
+@media(max-width:980px) {
+  .research-visual-grid {grid-template-columns:1fr 1fr}
+  .research-visual-hero {min-height:320px}
+  .research-intro {display:block}
+  .grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+  .evidence-path {gap:7px}
+}
+@media(max-width:640px) {
+  .hero {min-height:0;padding-top:35px}
+  .site-art {height:800px;background-position:58% top}
+  .site-art::after {background:linear-gradient(90deg,#01091ce3,#01091c99),
+    linear-gradient(0deg,#01091c 0%,transparent 80%)}
+  .research-visual-grid {grid-template-columns:1fr;gap:13px}
+  .research-visual-hero {min-height:310px}
+  .research-visual-content {padding:22px}
+  .research-visual-content h3 {font-size:clamp(1.7rem,6.5vw,2.4rem)}
+  .evidence-path {grid-template-columns:1fr;gap:8px}
+  .grid,.decision-list {grid-template-columns:1fr}
+  .fact {padding:23px}
+  .fact p {font-size:1rem}
+  .research-intro p {font-size:.95rem}
+}
+"""
+
+
+def chicago_native_4k_layout_css() -> str:
+    """Scale actual interface density for ultra-wide 4K screens, not just photos."""
+    return """
+@media(min-width:2560px) {
+  .wrap {max-width:3060px;padding-inline:72px}
+  nav {min-height:134px}
+  .wordmark {max-width:310px;width:310px}
+  .preview {font-size:1.12rem;padding:12px 24px}
+  .hero {min-height:1020px;padding-top:165px;padding-bottom:124px}
+  .hero-layout {grid-template-columns:minmax(0,1.25fr) minmax(680px,.72fr);gap:100px}
+  .hero-content {max-width:1580px}
+  .hero-content h1 {font-size:clamp(5.5rem,4.25vw,10rem);max-width:1560px;
+    line-height:1.05;margin:22px 0 42px}
+  .hero .tag {font-size:1.33rem;letter-spacing:.2em}
+  .hero .lede {font-size:2rem;max-width:1300px}
+  .hero .desc {font-size:1.38rem;max-width:1260px}
+  .hero .action {font-size:1.42rem;min-height:75px;padding:18px 35px;border-radius:15px}
+  .signal-panel {padding:54px;border-radius:28px}
+  .signal-head {font-size:1.15rem}
+  .signal-value {font-size:1.48rem}
+  .signal-rule {margin:26px 0}
+  #research-method {padding-top:105px}
+  section {padding-block:90px}
+  h2, .research-intro h2 {font-size:clamp(3rem,2.45vw,5.7rem)}
+  .research-intro {max-width:2250px;gap:95px}
+  .research-intro p {max-width:610px;font-size:1.28rem}
+  .research-visual-grid {gap:32px;margin-top:45px;margin-bottom:55px}
+  .research-visual-hero {min-height:620px;border-radius:34px}
+  .research-visual-content {padding:55px}
+  .research-visual-content h3 {font-size:clamp(3rem,2.25vw,5rem);max-width:950px}
+  .research-visual-content p {font-size:1.53rem;max-width:930px}
+  .research-visual-content a {font-size:1.4rem;min-height:64px}
+  .research-visual-hero .visual-caption {font-size:1rem;padding:11px 17px}
+  .evidence-path {gap:24px;margin-bottom:60px}
+  .evidence-path-item {padding:28px 35px;gap:24px}
+  .evidence-path-num {width:58px;height:58px;line-height:56px;font-size:1.3rem}
+  .evidence-path-label {font-size:1.36rem}
+  .evidence-path-detail {font-size:1.08rem}
+  .grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+  .fact {padding:45px;border-radius:26px}
+  .fact p {font-size:1.55rem;line-height:1.6}
+  .fact .micro {font-size:1rem}
+  .fact .source {font-size:1.06rem!important}
+  .fact .official-link {font-size:1.3rem}
+  .decision-list {gap:28px}
+  .decision-list li {font-size:1.5rem;padding:110px 45px 45px}
+  .decision-list li::before {left:45px;top:33px;width:50px;height:50px;line-height:48px;font-size:1.4rem}
+  .hint {font-size:1.45rem;padding:35px 42px}
+  footer {font-size:1.25rem}
 }
 """
