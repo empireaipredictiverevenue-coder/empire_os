@@ -12,9 +12,10 @@ export async function GET(request: Request) {
   };
   const fail = (detail: string, status: number) => Response.json({ detail }, { status, headers });
   const url = new URL(request.url);
+  const expectedOrigin = process.env.EMPIRE_CONSOLE_ORIGIN?.trim() || url.origin;
   const origin = request.headers.get("origin");
   const site = request.headers.get("sec-fetch-site");
-  if ((origin && origin !== url.origin) || (site && site !== "same-origin" && site !== "none"))
+  if ((origin && origin !== expectedOrigin) || (site && site !== "same-origin" && site !== "none"))
     return fail("company_review_access_denied", 403);
   const authorization = request.headers.get("authorization") ?? "";
   const bearer = /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/.exec(authorization);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CompanyReview } from "./company-review";
 import { currencyOf, moneyCents as money } from "./money";
 import { SnapshotEvidence } from "./snapshot-evidence";
 import { connection } from "next/server";
@@ -29,6 +30,7 @@ export default async function PredictiveRevenuePage() {
       <p className="mt-4 max-w-4xl text-sm leading-6 text-slate-400 md:text-base">Real acquisition → intelligence → opportunity → buyer → commercial truth → verified outcomes. Modelled value never becomes recognized revenue without evidence.</p>
     </div><div className="rounded-2xl border border-emerald-400/25 bg-emerald-400/[0.07] p-5 xl:text-right"><p className="text-xs uppercase tracking-[0.14em] text-slate-500">Recognized revenue truth</p><p className="mt-1 text-4xl font-semibold text-white">{money(truth?.recognized_revenue_cents, currencyOf(truth))}</p><p className="mt-2 text-xs text-slate-500">Forecast/modelled value excluded · missing currency remains UNKNOWN</p></div></div></header>
 
+    <CompanyReview />
     {!result.ok || !data ? <section className="panel mt-7"><p className="eyebrow">Live read model</p><h2 className="mt-1 text-xl font-semibold text-white">Predictive Revenue unavailable</h2><p className="mt-4 text-sm text-slate-400">{result.reason ?? "Live evidence unavailable."}</p></section> : <>
       <SnapshotEvidence payload={data} />
       <section className="mt-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-6">

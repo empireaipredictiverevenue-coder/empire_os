@@ -38,6 +38,7 @@ test("existing page renders actual row currency and missing financial evidence",
   page.require = name => {
     if (name === "next/link") return {default: ({children}) => React.createElement("span", null, children)};
     if (name === "next/server") return {connection: async () => {}};
+    if (name === "./company-review") return {CompanyReview: () => null};
     if (name === "./money") return loaded.exports;
     if (name === "./snapshot-evidence") return {SnapshotEvidence: () => null};
     if (name === "@/lib/founder-api") return {getPredictiveRevenueDemo: async () => ({ok: true, data: {
