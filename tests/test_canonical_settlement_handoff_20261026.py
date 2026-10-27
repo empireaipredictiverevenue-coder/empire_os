@@ -86,6 +86,10 @@ def test_complete_order_payment_and_original_recognizer_event_coherence(mode):
     assert v["recognized_revenue_event_ref"].endswith(REVENUE)
     assert v["settlement_source_reported"] == ("direct_payment" if mode=="direct" else "escrow_release")
     assert v["approved_price_cents"]==12000
+    assert v["reported_actual_cost_evidence_refs"]==[
+        "canonical:commercial_evidence_registry:fixture:acquisition-cost",
+        "canonical:commercial_evidence_registry:fixture:fulfilment-cost",
+    ]
     assert v["status"]=="INJECTED_FINANCIAL_LINEAGE_COHERENCE_ONLY"
     for k in ("payment_receipt_independently_verified_here",
               "blockchain_finality_independently_verified_here",
@@ -101,6 +105,7 @@ def test_approved_payment_without_revenue_event_never_counts_revenue():
     assert v["ledger_payment_link_consistent"] is True
     assert v["revenue_event_consistent"] is False
     assert v["recognized_revenue_event_ref"] is None
+    assert v["reported_actual_cost_evidence_refs"] is None
     assert v["revenue_recognition_independently_verified_here"] is False
 
 @pytest.mark.parametrize("change,error",[
@@ -201,4 +206,13 @@ def test_reused_cost_receipt_or_cost_later_than_recognition_rejected():
     cost=a[4]["revenue_event"]["payload"]["actual_cost_evidence"]
     cost["fulfilment_cost"]["observed_at"]="2026-10-26T13:45:00+00:00"
     with pytest.raises(ProspectHandoffHold,match="ACTUAL_COST_OBSERVED_AFTER_REVENUE_EVENT"):
+        run(a)
+
+
+@pytest.mark.parametrize("invalid", ({}, [], 0, True, "", "  ", " invoice-01 "))
+def test_invalid_cost_evidence_id_never_causes_unhandled_type_error(invalid):
+    a=list(inputs())
+    cost=a[4]["revenue_event"]["payload"]["actual_cost_evidence"]
+    cost["acquisition_cost"]["evidence_id"]=invalid
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_ACTUAL_COST_RECEIPT_MISSING"):
         run(a)

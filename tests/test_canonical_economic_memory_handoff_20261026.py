@@ -36,7 +36,8 @@ def owner_feedback(financial):
         financial["settlement_source_reported"] == "direct_payment"
         else "bsc_escrow_evidence") + ":" +
         financial["settlement_evidence_id"])
-    evidence = [outcome, EVENT_REF, proof]
+    evidence = [outcome, EVENT_REF, proof,
+                *financial["reported_actual_cost_evidence_refs"]]
     verified = dict(
         payment_verified=True, fulfilment_verified=True,
         recognized_revenue=True, actual_revenue_cents=12000,
@@ -129,6 +130,8 @@ def test_original_owner_shadow_handoff_never_authenticates_cash_or_writes(
     assert report["original_economic_memory_preview_retrievable_count"] == 1
     assert report["original_revenue_event_ref"] == EVENT_REF
     assert report["reported_gross_profit_cents"] == 5000
+    assert report["original_actual_cost_evidence_refs"] == financial[
+        "reported_actual_cost_evidence_refs"]
     assert calls[0]["tenant_id"] == financial["tenant_id"]
     assert calls[0]["verified_feedback"][0]["outcome_ref"] == feedback["outcome_ref"]
     assert calls[0]["calibration_reviews"] == []
@@ -376,3 +379,33 @@ def test_preview_causal_attribution_must_name_exact_original_work(
         ProspectHandoffHold, match="ORIGINAL_CAUSAL_ATTRIBUTION_PREVIEW_MISMATCH",
     ):
         review(financial, repo)
+
+
+@pytest.mark.parametrize("mutation,reason", [
+    (lambda f,b: f.update(reported_actual_cost_evidence_refs=[]),
+     "MISSING_OR_DUPLICATE_ORIGINAL_COST_PROVENANCE"),
+    (lambda f,b: f.update(reported_actual_cost_evidence_refs=[
+        f["reported_actual_cost_evidence_refs"][0]]*2),
+     "MISSING_OR_DUPLICATE_ORIGINAL_COST_PROVENANCE"),
+    (lambda f,b: f["reported_actual_cost_evidence_refs"].__setitem__(
+        0, "canonical:commercial_evidence_registry:other-invoice"),
+     "ORIGINAL_COST_RECEIPT_LINEAGE_MISMATCH"),
+    (lambda f,b: b["evidence_refs"].remove(
+        f["reported_actual_cost_evidence_refs"][0]),
+     "ORIGINAL_COST_RECEIPT_LINEAGE_MISMATCH"),
+    (lambda f,b: b["cortex_packet"]["label"]["evidence_refs"].remove(
+        f["reported_actual_cost_evidence_refs"][0]),
+     "ORIGINAL_COST_RECEIPT_LINEAGE_MISMATCH"),
+    (lambda f,b: b["evidence_refs"].append(
+        "canonical:commercial_evidence_registry:unrelated-cost"),
+     "ORIGINAL_COST_RECEIPT_LINEAGE_MISMATCH"),
+])
+def test_v10_requires_exact_original_cost_registry_evidence(
+    monkeypatch, mutation, reason,
+):
+    financial, feedback, repo, calls = setup(monkeypatch)
+    mutation(financial, feedback)
+    repo.verified_outcome_feedback = lambda *args, **kwargs: deepcopy(feedback)
+    with pytest.raises(ProspectHandoffHold, match=reason):
+        review(financial, repo)
+    assert calls == []

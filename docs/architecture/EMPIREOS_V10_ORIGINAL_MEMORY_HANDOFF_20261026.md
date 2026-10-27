@@ -45,3 +45,11 @@ The original /srv/empire_os production checkout remains independent. The integra
 - New negative tests cover missing completed work, wrong work tenant, spoofed attribution and unattributed shadow-only outcomes. A real fixture from the ORIGINAL DepartmentWorkQueue/worker validates the shadow positive path; no new writer, worker or scheduler was created.
 
 - Final exact expanded regression (all dated `*20261026.py` tests, canonical BSC and buyer, original economic memory, execution-bus, feedback, decision identity, causal continuity and verified-outcome learning modules): **529 passed, one pre-existing Starlette/anyio deprecation warning** on 27 October 2026. This is a named selection, not the whole-repository suite or a live commercial acceptance test.
+
+
+## 27 October 2026 — exact original acquisition and fulfilment cost IDs
+- The V9 read-only receipt now carries **both exact canonical actual-cost evidence registry refs**, alongside the original reconciled amount and margin; absent revenue event yields no known cost refs.
+- V10 requires each original revenue-feedback evidence list AND the exact Cortex packet label destined for shadow Economic Memory to contain the identical acquisition and fulfilment cost refs. Missing, duplicated, substituted or extra registry cost refs HOLD before any shadow memory preview. Equal currency amounts are insufficient without consistent evidence identities.
+- V9 rejects missing, unhashable, whitespace-padded or invalid-type evidence IDs as explicit source holds rather than uncaught exceptions. This remains source-reported consistency, not external invoice authenticity.
+- On the integrated review branch **79 focused settlement plus Economic Memory tests PASS**, including source-ID substitution, independently arithmetic-consistent receipts, missing packet refs, extra registry refs and malformed cost IDs.
+- The attempted wider regression run was blocked by a command-execution safety check. It was NOT rerun or bypassed. Prior historical expanded results do not certify this new patch. No live payments, BSC verification RPC, production CRM, DB migrations, queue jobs or model training were executed.

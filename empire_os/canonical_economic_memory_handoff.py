@@ -125,6 +125,30 @@ def review_original_economic_memory_handoff(
                    + settlement["settlement_evidence_id"])
     if payment_ref not in feedback.get("evidence_refs", ()):
         raise ProspectHandoffHold("ORIGINAL_PAYMENT_PROOF_LINEAGE_MISMATCH")
+    cost_prefix = "canonical:commercial_evidence_registry:"
+    original_cost_refs = settlement.get("reported_actual_cost_evidence_refs")
+    if (not isinstance(original_cost_refs, list)
+            or len(original_cost_refs) != 2
+            or any(not isinstance(ref, str)
+                   or not ref.startswith(cost_prefix)
+                   or not ref.removeprefix(cost_prefix).strip()
+                   for ref in original_cost_refs)
+            or len(set(original_cost_refs)) != 2):
+        raise ProspectHandoffHold("MISSING_OR_DUPLICATE_ORIGINAL_COST_PROVENANCE")
+    # The original reader builds the packet from the original revenue event,
+    # not from V9's caller-supplied cost IDs. Require equality in both the
+    # feedback and the exact packet that Economic Memory will consume.
+    packet = feedback.get("cortex_packet") or {}
+    label = packet.get("label") or {}
+    evidence_refs = feedback.get("evidence_refs") or ()
+    label_refs = label.get("evidence_refs") or ()
+    if (not isinstance(evidence_refs, (tuple, list))
+            or not isinstance(label_refs, (tuple, list))
+            or set(ref for ref in evidence_refs if isinstance(ref, str)
+                   and ref.startswith(cost_prefix)) != set(original_cost_refs)
+            or set(ref for ref in label_refs if isinstance(ref, str)
+                   and ref.startswith(cost_prefix)) != set(original_cost_refs)):
+        raise ProspectHandoffHold("ORIGINAL_COST_RECEIPT_LINEAGE_MISMATCH")
     gross = feedback.get("actual_revenue_cents")
     cost = feedback.get("actual_cost_cents")
     profit = feedback.get("gross_profit_cents")
@@ -218,6 +242,7 @@ def review_original_economic_memory_handoff(
         "original_feedback_ref": outcome_ref,
         "original_revenue_event_ref": event_ref,
         "original_payment_evidence_ref": payment_ref,
+        "original_actual_cost_evidence_refs": list(original_cost_refs),
         "reported_revenue_cents": gross,
         "reported_actual_cost_cents": cost,
         "reported_gross_profit_cents": profit,

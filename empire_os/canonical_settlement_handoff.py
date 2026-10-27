@@ -228,6 +228,7 @@ def review_fulfilment_payment_settlement(
         result["recognized_revenue_event_ref"]=None
         result["reported_recognized_cost_cents"]=None
         result["reported_recognized_margin_cents"]=None
+        result["reported_actual_cost_evidence_refs"]=None
         return result
     _scope(revenue_event,delivered,order_ref=True)
     payload=revenue_event.get("payload")
@@ -258,15 +259,20 @@ def review_fulfilment_payment_settlement(
     total=0
     cost_times=[]
     cost_ids=set()
+    cost_refs=[]
     for kind in ("acquisition_cost","fulfilment_cost"):
         row=cost.get(kind)
-        if (not isinstance(row,Mapping) or not row.get("evidence_id")
+        if (not isinstance(row,Mapping)
+                or not isinstance(row.get("evidence_id"), str)
+                or not row["evidence_id"].strip()
+                or row["evidence_id"] != row["evidence_id"].strip()
                 or row.get("source_type") not in ("provider_invoice","internal_actual")
                 or type(row.get("amount_cents")) is not int or row["amount_cents"]<0):
             raise ProspectHandoffHold("ORIGINAL_ACTUAL_COST_RECEIPT_MISSING")
         if row["evidence_id"] in cost_ids:
             raise ProspectHandoffHold("DUPLICATE_ACTUAL_COST_EVIDENCE_ID")
         cost_ids.add(row["evidence_id"])
+        cost_refs.append("canonical:commercial_evidence_registry:"+str(row["evidence_id"]))
         cost_times.append(_time(row.get("observed_at"),now))
         total+=row["amount_cents"]
     if (type(revenue_event.get("amount_cents")) is not int
@@ -288,4 +294,7 @@ def review_fulfilment_payment_settlement(
     # tenant-scoped feedback before previewing economic learning.
     result["reported_recognized_cost_cents"]=total
     result["reported_recognized_margin_cents"]=revenue_event["margin_cents"]
+    # Preserve both exact original registry identities; amount equality alone
+    # cannot prove that V9 and the original feedback read used the same costs.
+    result["reported_actual_cost_evidence_refs"]=cost_refs
     return result
