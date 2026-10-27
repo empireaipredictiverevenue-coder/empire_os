@@ -15,6 +15,7 @@ import stat
 from empire_os.workspace_sent_domain_receipts import (
     WorkspaceSentHistoryError, read_previous,
 )
+from empire_os.buyer_personal_gmail_sent_history import read_personal_gmail_sent_receipts
 
 
 REGISTRY = Path("/srv/empire_os/runtime/buyer_network_intelligence/commercial_relationship_registry_latest.json")
@@ -22,6 +23,7 @@ EXTERNAL_CONTACTS = Path("/srv/empire_os/runtime/buyer_network_intelligence/foun
 WORKSPACE_SENT = Path("/srv/empire_os/runtime/buyer_network_intelligence/workspace_sent_domain_receipts_latest.json")
 
 FOUNDER_REVIEW = Path("/srv/empire_os/runtime/buyer_network_intelligence/multiformat_publisher_founder_review_latest.json")
+PERSONAL_SENT = Path("/srv/empire_os/runtime/buyer_network_intelligence/personal_gmail_historical_sent_20261027.json")
 GMAIL_ID = re.compile(r"^[0-9a-f]{16,32}$")
 
 
@@ -183,8 +185,21 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
         delivery_holds = {}
         prior_founder_gmail = {}
         delivery_source_safe = False
+    # Exact pre-existing personal-Gmail SENT proof supplements the bounded
+    # original relationship importer. Do not infer delivered or buyer approved.
+    # Derive from the supplied isolated registry folder during tests.
+    try:
+        personal_prior_sent = read_personal_gmail_sent_receipts(
+            registry_path.parent / PERSONAL_SENT.name
+        )
+        personal_prior_safe = True
+    except ValueError:
+        personal_prior_sent = {}
+        personal_prior_safe = False
     return {
-        "available": delivery_source_safe,
+        "available": delivery_source_safe and personal_prior_safe,
+        "personal_prior_sent": personal_prior_sent,
+        "personal_gmail_prior_source_safe": personal_prior_safe,
         "confirmed_delivery_holds": delivery_holds,
         "prior_founder_gmail": prior_founder_gmail,
         "founder_review_delivery_source_safe": delivery_source_safe,
@@ -208,6 +223,7 @@ def review(domain: str, context: Mapping) -> dict:
     workspace_reciprocal = context.get("workspace_reciprocal", {}).get(key) or {}
     confirmed_bounce = context.get("confirmed_delivery_holds", {}).get(key) or {}
     prior_founder_thread = context.get("prior_founder_gmail", {}).get(key) or {}
+    prior_personal_sent = context.get("personal_prior_sent", {}).get(key) or {}
     have_relation = bool(relation)
     have_form = bool(observation)
     threads = relation.get("gmail_thread_ids") or []
@@ -235,6 +251,8 @@ def review(domain: str, context: Mapping) -> dict:
         state, action = "ALREADY_CONTACTED", "REVIEW_PRIOR_OUTBOUND_BEFORE_FOLLOW_UP"
     elif prior_founder_thread:
         state, action = "FOUNDER_REVIEWED_PRIOR_GMAIL_THREAD", "REVIEW_ORIGINAL_GMAIL_THREAD_NO_DUPLICATE_FIRST_INTRO"
+    elif prior_personal_sent:
+        state, action = "PERSONAL_GMAIL_SENT_ALREADY_CONTACTED", "REVIEW_ORIGINAL_PERSONAL_GMAIL_SENT_NO_DUPLICATE_INTRO"
     elif workspace_reciprocal:
         state, action = "WORKSPACE_RECIPROCAL_THREAD_OBSERVED", "REVIEW_EXISTING_TWO_WAY_WORKSPACE_THREAD_FOR_PILOT_FIT"
     elif workspace_sent:
@@ -260,8 +278,13 @@ def review(domain: str, context: Mapping) -> dict:
         "confirmed_hard_bounce": bool(confirmed_bounce),
         "founder_reviewed_original_gmail_thread": bool(prior_founder_thread),
         "founder_reviewed_gmail_thread_id": prior_founder_thread.get("thread_id"),
+        "personal_gmail_prior_sent_receipt": bool(prior_personal_sent),
+        "personal_gmail_prior_sent_message_id": prior_personal_sent.get("sent_message_id"),
         "confirmed_hard_bounce_code": confirmed_bounce.get("delivery_failure_code"),
-        "last_outbound_at": relation.get("last_outbound_at") or workspace_sent.get("last_sent_at"),
+        "last_outbound_at": (
+            relation.get("last_outbound_at") or workspace_sent.get("last_sent_at")
+            or prior_personal_sent.get("sent_at")
+        ),
         "last_inbound_at": relation.get("last_inbound_at"),
         "registry_stage": relation.get("stage"),
         "outbound_authorized": False,
