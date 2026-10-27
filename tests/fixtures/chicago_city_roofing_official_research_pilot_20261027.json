@@ -41,7 +41,7 @@
       "summary": "A citywide research checklist for properties under Chicago jurisdiction. Check the actual address and project before relying on permit rules. no contractor referral or sale is offered.",
       "local_facts": [
         {
-          "statement": "Chicago's Express Permit guidance identifies reroofing work as a distinct eligible project category, subject to the stated conditions and limitations.",
+          "statement": "Chicago lists roof repair covering up to 25% of roof area, roof recovery over one existing covering layer, and nonstructural roof replacement among work potentially eligible for its Express Permit Program. Extra layers or structural repairs can require architect or engineer documentation. Check all stated limits for the specific project.",
           "source_ref": "Chicago Department of Buildings: Express Permit eligibility, reroofing",
           "official_url": "https://chicago.gov/city/en/sites/guide-to-building-permits/home/help/faq/DOB/EPP-eligible.html",
           "checked_at": "2026-10-27T15:00:00Z"
@@ -53,19 +53,19 @@
           "checked_at": "2026-10-27T15:00:00Z"
         },
         {
-          "statement": "Chicago's permit-application status service provides public access to limited application information by property address. it does not guarantee a complete historical permit record.",
+          "statement": "Chicago's permit-application status service offers limited public application information by property address. It says records for applications older than 36 months may not appear.",
           "source_ref": "City of Chicago: Building Permit Application Status Help",
           "official_url": "https://webapps1.chicago.gov/buildingpermit/help",
           "checked_at": "2026-10-27T15:00:00Z"
         },
         {
-          "statement": "Illinois provides an official professional-licence lookup. Verify the roofing contractor's current licensing status directly before engaging a provider.",
+          "statement": "Chicago's reroofing permit guidance rules out work by someone without a valid Illinois Roofing Contractor license. The Illinois professional licensing authority provides a lookup to verify an individual or business license.",
           "source_ref": "Illinois IDFPR: Check License",
           "official_url": "https://idfpr.illinois.gov/checklicense.html",
           "checked_at": "2026-10-27T15:00:00Z"
         },
         {
-          "statement": "The Census Bureau's ZIP Code Tabulation Areas are approximate geographic representations, not the same as USPS delivery ZIP codes. neither alone establishes a specific property's municipal jurisdiction.",
+          "statement": "The Census Bureau's ZIP Code Tabulation Areas are generalized approximations of USPS delivery ZIP codes. A ZIP or ZCTA alone does not establish which municipality's permit rules apply to a property.",
           "source_ref": "US Census Bureau: ZIP Code Tabulation Areas",
           "official_url": "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html",
           "checked_at": "2026-10-27T15:00:00Z"
@@ -73,10 +73,10 @@
       ],
       "research_steps": [
         "Confirm the property is within City of Chicago jurisdiction using its actual street address. ZIP codes and census ZCTAs alone do not establish jurisdiction.",
-        "Identify the roof type, slope, building height, number of units and proposed work before checking Chicago's reroofing permit or exemption guidance.",
-        "Ask every shortlisted roofer for their legal business name and licensing details, then independently check the current Illinois licensing record.",
-        "Check the City of Chicago's permit application status tools for the property's address, allowing for limits on older or incomplete records.",
-        "Compare written scopes that describe materials, existing roof layers, structural work, insulation, clean-up, warranties and responsibility for any needed permits."
+        "Identify the proposed scope. Chicago lists repairs up to 25% of roof area, recovery over one existing covering layer, and nonstructural replacement among possible Express Permit projects. Confirm extra roof layers, structural work and insulation requirements against official eligibility rules.",
+        "Get the contractor's registered business name and Illinois roofing license details, then check the official state licensing lookup rather than relying on an advertisement.",
+        "Look up the property address in Chicago's permit application status service, remembering that information may be limited and applications older than 36 months may be absent.",
+        "Compare written bids for material specifications, existing layers, structural work, insulation, waste removal, warranties and which party will secure required permits."
       ]
     }
   ]

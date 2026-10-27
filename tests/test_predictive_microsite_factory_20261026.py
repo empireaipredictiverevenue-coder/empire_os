@@ -280,3 +280,28 @@ def test_default_public_logo_does_not_impersonate_owner_signoff(monkeypatch):
     src, digest = _original_brand_image()
     assert src.startswith("data:image/svg+xml;base64,")
     assert len(digest) == 64
+
+
+def test_citywide_roofing_facts_match_source_scope_without_inventing_demand():
+    import json
+    from pathlib import Path
+    spec = json.loads(
+        (Path(__file__).parent / "fixtures" /
+         "chicago_city_roofing_official_research_pilot_20261027.json").read_text()
+    )["candidates"][0]
+    source_statements = " ".join(row["statement"] for row in spec["local_facts"])
+    assert "25% of roof area" in source_statements
+    assert "one existing covering layer" in source_statements
+    assert "36 months" in source_statements
+    assert "Illinois Roofing Contractor license" in source_statements
+    assert "ZIP Code Tabulation Areas" in source_statements
+    assert spec["keyword_opportunity"]["observed_demand"] is None
+    assert spec["geography"]["kind"] == "metro"
+    assert "buyer_signal" not in spec
+    packet, html = build_candidate(spec)
+    assert packet["copy_audit"]["score"] == 5
+    assert packet["status"] == "HOLD_EVIDENCE"
+    assert packet["publishing_enabled"] is False
+    assert "25% of roof area" in html
+    assert "36 months" in html
+    assert "<form" not in html.casefold()
