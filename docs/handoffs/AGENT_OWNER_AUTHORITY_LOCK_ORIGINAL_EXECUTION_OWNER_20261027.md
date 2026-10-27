@@ -71,9 +71,9 @@ current source inspection, not proof every possible direct writer was found.
    defence in depth, never as the sole control.
 3. Bind actual modifications to the signed allowed-path set after the
    sandbox/worktree completes, before changes can be promoted or published.
-   Implement ticket replay protection and revocation in protected original
-   issuer custody; the current candidate has time and policy-revision checks
-   but no server-side ticket-consumption ledger.
+   The draft now includes a one-use receipt under the existing lease lock,
+   but original-owner-protected custody, revocation, reconciliation and
+   adoption must still be independently reviewed before production.
 4. Make producer and consuming service principals independently
    authenticated. Restrict write permissions by workspace and deploy role
    rather than relying on every worker's common `ubuntu` identity.
@@ -156,14 +156,13 @@ from authenticated Git/sandbox readback. A worker's self-reported list
 cannot count as independent evidence. The helper has not been installed
 at any live mutation, promotion or publication boundary.
 
-**Still outstanding:** The draft has **no protected durable one-time
-ticket-consumption mechanism**; signed tickets could be reused while
-valid after the original lease is released. Ticket replay/revocation,
-authenticated service principal boundaries, atomic issuance/consume
-semantics, ticket lifecycle cleanup, and out-of-band shell/plugin access
-must be completed by the **original execution-plane owner** before any
-live lock is described as enforced. Tests are synthetic and do not
-establish production security or independent owner approval.
+**Still outstanding:** The later section adds a test-only one-use ticket
+receipt that survives lease release and rejects replay, but its security
+depends on original-owner-controlled ledger custody and distinct worker
+identities; neither is installed. Signed ticket revocation, secure issuer
+custody, receipt rotation/reconciliation, service identity separation and
+out-of-band shell/plugin access must be independently approved before
+any live lock is called enforced. Synthetic tests are not production proof.
 
 
 ## Draft PR one-use ticket replay control (27 October, review-only)
