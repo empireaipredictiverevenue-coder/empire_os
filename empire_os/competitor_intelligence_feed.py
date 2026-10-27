@@ -417,6 +417,12 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             or cro.get("existing_specialist_reused") is not True
             or cro.get("original_specialist_stage_count") != 12
             or cro.get("measured_conversion_bottleneck_established") is not False
+            or cro.get("cru_meaning_canonical_verified") is not False
+            or not isinstance(cro.get("homeowner_call_cohort_review"), dict)
+            or cro["homeowner_call_cohort_review"].get("source_lineage_verified") is not False
+            or cro["homeowner_call_cohort_review"].get("measured_stage_count") != 0
+            or not isinstance(cro.get("provisional_cru_unit_economics"), dict)
+            or cro["provisional_cru_unit_economics"].get("profitability_calibrated") is not False
             or cro.get("automated_experiment_approved") is not False
             or cro.get("site_changed") is not False
             or cro.get("paid_media_activated") is not False
@@ -430,6 +436,9 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             "original_specialist_unknown_stage_count":
                 cro.get("original_specialist_unknown_stage_count"),
             "primary_bottleneck": cro.get("original_specialist_primary_bottleneck"),
+            "homeowner_call_cohort_review": cro.get("homeowner_call_cohort_review"),
+            "provisional_cru_unit_economics": cro.get("provisional_cru_unit_economics"),
+            "cru_meaning_canonical_verified": False,
             "static_candidate_source_review": cro.get("static_candidate_source_review"),
             "proposed_cro_reviews": cro.get("proposed_cro_reviews"),
             "measured_conversion_bottleneck_established": False,

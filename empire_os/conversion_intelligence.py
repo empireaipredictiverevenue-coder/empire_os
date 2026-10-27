@@ -214,3 +214,99 @@ def review_conversion_system(
         unknown_stages=unknown,
         evidence_refs=tuple(dict.fromkeys(refs)),
     )
+
+
+# Original Conversion Intelligence: same-cohort homeowner call progression.
+# This is an ADDITIVE CRO evaluator, not another scheduler or operator.
+HOMEOWNER_CALL_STAGES = (
+    "landing_sessions",
+    "eligible_zip_interactions",
+    "consented_call_choices",
+    "provider_connected_calls",
+    "buyer_accepted_payable_calls",
+    "independently_settled_calls",
+)
+
+
+def review_homeowner_call_funnel(
+    *,
+    source_id: str,
+    cohort_ref: str,
+    counts: dict[str, int | None],
+    evidence_refs: dict[str, str | None],
+    source_lineage_verified: bool = False,
+    min_sample_size: int = 20,
+) -> dict[str, Any]:
+    """Compare only admissible, same-cohort stages; UNKNOWN never means zero.
+
+    A ref or a supplied count is NOT proof on its own. A source owner must
+    separately confirm the lineage across session, call and cash records.
+    This function cannot grant source, visitor, payout or experiment authority.
+    """
+    if (not isinstance(source_id, str) or not source_id
+            or len(source_id) > 80 or not source_id.replace("_", "").isalnum()
+            or not isinstance(cohort_ref, str) or not 6 <= len(cohort_ref) <= 200
+            or type(min_sample_size) is not int or min_sample_size < 1):
+        raise ValueError("invalid owned source, cohort or sample size")
+    if (not isinstance(counts, dict) or set(counts) != set(HOMEOWNER_CALL_STAGES)
+            or not isinstance(evidence_refs, dict)
+            or set(evidence_refs) != set(HOMEOWNER_CALL_STAGES)):
+        raise ValueError("all original call funnel boundaries required")
+    if type(source_lineage_verified) is not bool:
+        raise ValueError("trusted lineage status must be boolean")
+    prepared = []
+    prior_count = None
+    prior_known = False
+    for step in HOMEOWNER_CALL_STAGES:
+        count = counts[step]
+        ref = evidence_refs[step]
+        if count is not None and (type(count) is not int or count < 0):
+            raise ValueError("call stage count invalid")
+        if ref is not None and (not isinstance(ref, str)
+                                or not 6 <= len(ref) <= 240):
+            raise ValueError("call stage receipt invalid")
+        # Never compare disjoint populations, or silently treat unknown as 0.
+        if count is not None and prior_known and count > prior_count:
+            raise ValueError("same-cohort call stage exceeds previous stage")
+        receipts_bound = count is not None and bool(ref)
+        conversion = None
+        dropout = None
+        if (source_lineage_verified and prior_known and count is not None
+                and prior_count > 0 and receipts_bound):
+            conversion = round(count / prior_count, 4)
+            dropout = prior_count - count
+        prepared.append({
+            "stage": step,
+            "observed_count": count if receipts_bound else None,
+            "evidence_ref": ref if receipts_bound else None,
+            "same_source_cohort": cohort_ref,
+            "stage_conversion_rate": conversion,
+            "stage_dropoff_count": dropout,
+            "rate_ready": conversion is not None and prior_count >= min_sample_size,
+            "no_count_inference": True,
+        })
+        prior_count = count if receipts_bound else None
+        prior_known = receipts_bound
+    measured = [s for s in prepared if s["rate_ready"]]
+    measured.sort(key=lambda s: (s["stage_conversion_rate"],
+                                HOMEOWNER_CALL_STAGES.index(s["stage"])))
+    return {
+        "schema_version": "empire.conversion.homeowner_call_cohort_review.v1",
+        "mode": "OBSERVE",
+        "source_id": source_id,
+        "cohort_ref": cohort_ref,
+        "source_lineage_verified": source_lineage_verified,
+        "stage_reviews": prepared,
+        "measured_stage_count": len(measured),
+        "first_reviewable_bottleneck": measured[0]["stage"] if measured else None,
+        "bottleneck_rate": measured[0]["stage_conversion_rate"] if measured else None,
+        "minimum_sample_size": min_sample_size,
+        "recommended_next_step": (
+            "REVIEW_ORIGINAL_OWNER_COHORT_EVIDENCE" if not measured
+            else "PROPOSE_CONTROLLED_HYPOTHESIS_NO_AUTO_ROLLOUT"
+        ),
+        "experiment_proposal_only": True,
+        "automatic_experiment_rollout": False,
+        "revenue_verified_by_this_review": False,
+        "execution_authority": "none",
+    }

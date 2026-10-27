@@ -15,8 +15,13 @@ from typing import Any, Mapping
 
 from empire_os.conversion_intelligence import (
     CANONICAL_STAGES,
+    HOMEOWNER_CALL_STAGES,
     ConversionStageEvidence,
     review_conversion_system,
+    review_homeowner_call_funnel,
+)
+from empire_os.call_unit_economics_review import (
+    REQUIRED_FIELDS, REQUIRED_RECEIPTS, review_call_unit_economics,
 )
 
 SCHEMA = "empire.competitor_call_cro_owner_handoff.v1"
@@ -62,6 +67,22 @@ def build_cro_owner_handoff(
             stage=stage, entered=None, converted=None, evidence_ref=None
         ) for stage in CANONICAL_STAGES
     ], min_sample_size=20).as_dict()
+    # Original protected commercial event/settlement owner has not issued
+    # same-source observations to this workstream. Do not synthesize them.
+    homeowner_cro = review_homeowner_call_funnel(
+        source_id="unknown_unattributed",
+        cohort_ref="AWAITING_ORIGINAL_SOURCE_SESSION_COHORT",
+        counts={s: None for s in HOMEOWNER_CALL_STAGES},
+        evidence_refs={s: None for s in HOMEOWNER_CALL_STAGES},
+        source_lineage_verified=False,
+    )
+    provisional_cru_unit = review_call_unit_economics(
+        source_id="unknown_unattributed",
+        cohort_ref="AWAITING_ORIGINAL_SOURCE_SESSION_COHORT",
+        currency="USD",
+        values={s: None for s in REQUIRED_FIELDS},
+        receipt_refs={s: None for s in REQUIRED_RECEIPTS},
+    )
 
     page_found = isinstance(page_source, str) and 0 < len(page_source) < 200000
     form_found = isinstance(form_source, str) and 0 < len(form_source) < 100000
@@ -127,6 +148,9 @@ def build_cro_owner_handoff(
         "original_specialist_experiment_candidate": existing["experiment_candidate"],
         "original_specialist_unknown_stage_count": len(existing["unknown_stages"]),
         "existing_stage_review": existing,
+        "homeowner_call_cohort_review": homeowner_cro,
+        "provisional_cru_unit_economics": provisional_cru_unit,
+        "cru_meaning_canonical_verified": False,
         "static_candidate_source_review": {
             "source_path": str(PAGE),
             "form_path": str(FORM),
