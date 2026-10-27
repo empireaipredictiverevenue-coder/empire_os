@@ -136,6 +136,7 @@ def forecast_observation(
     base = {
         "status": "FORECAST_NOT_BOUND",
         "forecast_key": None, "metric": None, "dimension_key": None,
+        "model_name": None, "model_version": None,
         "direction": None, "predicted_value": None,
         "evidence_confidence": None, "fresh_for_research": False,
         "verified_forecast_registry_record": False,
@@ -224,6 +225,7 @@ def forecast_observation(
         return dict(base, status="FORECAST_OUTSIDE_FRESHNESS_WINDOW")
     return dict(
         base, status="OBSERVED_PREDICTIVE_RESEARCH_SIGNAL",
+        model_name=record.model_name, model_version=record.model_version,
         direction=forecast.direction, predicted_value=predicted,
         evidence_confidence=confidence, horizon_days=forecast.horizon_days,
         generated_at=generated_at.isoformat(), fresh_for_research=True,
