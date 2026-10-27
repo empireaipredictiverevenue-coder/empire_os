@@ -32,6 +32,20 @@
 - Your Co-op Energy: https://ui.awin.com/merchant-profile/86971
 - Official Awin status endpoint: https://help.awin.com/apidocs/get-program-information-details-for-publisher
 
+## Awin Join Programme UI: founder-ready messages (150-character limit)
+
+**Verified 27 October 2026:** Awin publisher **3136281**; the programmes below were **Not joined** in the authenticated Awin API. These are prepared **drafts only**, NOT submitted. Do not click the advertiser terms confirmation unless reviewing and agreeing to those exact terms.
+
+Choose promotion type **Content — https://empire-ai.co.uk**.
+
+| Programme | Exact Awin ID | Application message | Characters |
+|---|---|---|---|
+| Project Solar | 118321 | Empire AI is preparing original UK homeowner solar guides. We'd feature Project Solar with clear ad labels and approved links; no traffic claims. | 145 |
+| EcoFlow UK | 51797 | Empire AI is developing original UK solar-storage and backup-power guides. We'd feature EcoFlow products with clear ad labels and approved links. | 145 |
+| Insulation & More — after editorial quality review | 45533 | Empire AI is preparing original UK insulation guides, not mass-produced material. We'd feature suitable products with clear ad labels and links. | 144 |
+
+**Source of UI limit:** Awin publisher help, “How do I join an advertiser program?” https://success.awin.com/s/article/How-do-I-join-an-advertiser-programme?language=en_US . When the user submits one, record the real status from authenticated API or their precise founder confirmation; do not advance from NOT_JOINED to PENDING merely because this draft exists.
+
 ## Founder-reviewed Awin 'Join Programme' application messages
 
 These messages are drafts, NOT sent applications. Select **Content — https://empire-ai.co.uk**. Do not represent homeowner guides as live until independently released.
