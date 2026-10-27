@@ -285,6 +285,96 @@ def write_feed_snapshot(
     return path
 
 
+_LEAD_SMART_PILOT_BLOCKER_OWNERS = {
+    "recording_notice_and_retention_verified": "ORIGINAL_PRIVACY_AND_RECORDING_OWNER",
+    "pilot_stop_verified": "ORIGINAL_SITE_HANDOFF_CONTROL_OWNER",
+    "operating_hours_verified": "ORIGINAL_BUYER_HOURS_OWNER",
+    "caller_id_pass_through_verified": "ORIGINAL_RINGBA_AND_BUYER_ANI_OWNER",
+    "routing_runtime_verified": "ORIGINAL_RINGBA_ROUTE_OWNER",
+}
+
+
+def _original_pilot_readiness_projection(review: Mapping[str, Any]) -> dict[str, Any]:
+    """Project only the original owner's NON-PII readiness; never grant launch."""
+    if (not isinstance(review, Mapping)
+            or review.get("schema_version") != "empire.lead_smart.launch_readiness.v1"
+            or review.get("mode") not in {"PREACTIVATION", "SUPERVISED_PILOT", "FULL_CAMPAIGN"}
+            or any(type(review.get(f)) is not bool for f in (
+                "launch_ready", "call_cta_enabled", "organic_traffic_authorized",
+                "provider_route_mutation", "deployment_performed",
+            ))
+            or review.get("provider_route_mutation") is not False
+            or review.get("deployment_performed") is not False
+            or review.get("execution_authority") != "NONE"):
+        raise ValueError("invalid or executable launch evidence")
+    blockers = review.get("blockers")
+    if (not isinstance(blockers, list) or len(blockers) > 30
+            or any(not isinstance(b, str) or len(b) > 80
+                   or not b.isascii() or not b.isidentifier()
+                   for b in blockers)
+            or len(blockers) != len(set(blockers))
+            or (review["launch_ready"] and (
+                blockers or not review["call_cta_enabled"]
+                or not review["organic_traffic_authorized"]
+            ))):
+        raise ValueError("invalid original launch blocker report")
+    if not review["launch_ready"] and not blockers:
+        raise ValueError("unexplained launch hold")
+    return {
+        "schema_version": "empire.ppc.original_pilot_preflight_overlay.v1",
+        "available": True,
+        "mode": "OBSERVE",
+        "original_pilot_mode": review["mode"],
+        "original_owner_reports_ready": review["launch_ready"],
+        "original_owner_reports_call_cta_enabled": review["call_cta_enabled"],
+        "original_owner_reports_organic_traffic_authorized":
+            review["organic_traffic_authorized"],
+        "blocker_count": len(blockers),
+        "original_owner_blockers": list(blockers),
+        "owner_actions": [
+            {
+                "blocker": b,
+                "original_owner": _LEAD_SMART_PILOT_BLOCKER_OWNERS.get(
+                    b, "ORIGINAL_LEAD_SMART_LAUNCH_OWNER"
+                ),
+                "current_proof": "NOT_VERIFIED_BY_ORIGINAL_LAUNCH_REVIEW",
+            }
+            for b in blockers
+        ],
+        "no_privileged_evidence_copied": True,
+        "buyer_recording_and_route_proofs_not_inferred": True,
+        "provider_campaign_expiry_not_inferred_from_local_pilot": True,
+        "this_feed_can_activate_traffic": False,
+        "this_feed_can_modify_route": False,
+        "this_feed_can_authorize_calls": False,
+        "this_feed_can_settle_revenue": False,
+        "new_timer_or_agent": False,
+        "execution_authority": "none",
+    }
+
+
+def _original_pilot_readiness_overlay(repo_root: Path) -> dict[str, Any]:
+    """Call the EXISTING source-based read-only owner review, not old snapshots."""
+    control = repo_root / "runtime/revenue/lead_smart/pilot/approved_control.json"
+    if not control.is_file() or control.is_symlink():
+        return {"available": False, "mode": "OBSERVE",
+                "status": "ORIGINAL_PILOT_SOURCE_NOT_PRESENT",
+                "execution_authority": "none"}
+    try:
+        from scripts.materialize_lead_smart_launch_readiness import (
+            compute_live_launch_readiness,
+        )
+        review = compute_live_launch_readiness(
+            evidence_root=repo_root / "runtime/revenue/lead_smart",
+            repo_root=repo_root,
+        )
+        return _original_pilot_readiness_projection(review)
+    except (OSError, RuntimeError, ValueError, TypeError, KeyError, ImportError):
+        return {"available": False, "mode": "OBSERVE",
+                "status": "ORIGINAL_OWNER_READINESS_UNVERIFIED",
+                "execution_authority": "none"}
+
+
 def _existing_ppc_switchboard_hub_readiness(repo_root: Path) -> dict[str, Any]:
     """Inventory the *existing* guarded call surfaces; never route anything.
 
@@ -677,6 +767,8 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "operator_video_research": video_summary,
         "call_loss_readiness": loss_summary,
         "source_to_cash_growth_research": growth_summary,
+        "original_lead_smart_pilot_readiness":
+            _original_pilot_readiness_overlay(repo_root),
         "existing_switchboard_and_hubs":
             _existing_ppc_switchboard_hub_readiness(repo_root),
     }

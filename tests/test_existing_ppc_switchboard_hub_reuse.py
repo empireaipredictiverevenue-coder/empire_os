@@ -82,3 +82,110 @@ def test_original_competitor_reader_surfaces_existing_infrastructure(tmp_path, m
     assert overlay["new_hub_or_switchboard_created"] is False
     assert overlay["hub_live_service_verified"] is False
     assert overlay["execution_authority"] == "none"
+
+def _original_launch_fixture():
+    return {
+        "schema_version": "empire.lead_smart.launch_readiness.v1",
+        "mode": "PREACTIVATION",
+        "launch_ready": False,
+        "blockers": [
+            "recording_notice_and_retention_verified", "pilot_stop_verified",
+            "operating_hours_verified", "caller_id_pass_through_verified",
+            "routing_runtime_verified",
+        ],
+        "call_cta_enabled": False,
+        "organic_traffic_authorized": False,
+        "provider_route_mutation": False,
+        "deployment_performed": False,
+        "execution_authority": "NONE",
+        # Never copy these original-owner details into public research.
+        "commercial_truth": {"private_recipient_id": "TEST-PRIVATE"},
+        "recording_details": {"recording_url": "https://example.invalid/private"},
+    }
+
+
+def test_original_owner_source_readiness_projects_all_five_blockers_without_details():
+    from empire_os.competitor_intelligence_feed import (
+        _original_pilot_readiness_projection,
+    )
+    r = _original_pilot_readiness_projection(_original_launch_fixture())
+    assert r["schema_version"] == "empire.ppc.original_pilot_preflight_overlay.v1"
+    assert r["available"] is True and r["mode"] == "OBSERVE"
+    assert r["blocker_count"] == 5
+    assert len(r["owner_actions"]) == 5
+    assert r["owner_actions"][0]["original_owner"] == "ORIGINAL_PRIVACY_AND_RECORDING_OWNER"
+    assert r["owner_actions"][-1]["original_owner"] == "ORIGINAL_RINGBA_ROUTE_OWNER"
+    assert not r["original_owner_reports_ready"]
+    assert not r["this_feed_can_activate_traffic"]
+    assert not r["this_feed_can_authorize_calls"]
+    assert not r["this_feed_can_settle_revenue"]
+    assert r["execution_authority"] == "none"
+    assert "private_recipient_id" not in repr(r)
+    assert "TEST-PRIVATE" not in repr(r)
+    assert "recording_url" not in repr(r)
+
+
+@pytest.mark.parametrize("modify", [
+    lambda r: r.update(execution_authority="RUN"),
+    lambda r: r.update(provider_route_mutation=True),
+    lambda r: r.update(deployment_performed=True),
+    lambda r: r.update(blockers=[]),
+    lambda r: r.update(blockers=["recording_notice_and_retention_verified"] * 2),
+    lambda r: r.update(blockers=["caller ANI +1888"]),
+    lambda r: r.update(launch_ready=True),
+    lambda r: r.update(mode="INVALID"),
+    lambda r: r.update(call_cta_enabled="false"),
+])
+def test_pilot_projection_rejects_untrusted_or_unsafe_review(modify):
+    from empire_os.competitor_intelligence_feed import (
+        _original_pilot_readiness_projection,
+    )
+    r = _original_launch_fixture()
+    modify(r)
+    with pytest.raises(ValueError):
+        _original_pilot_readiness_projection(r)
+
+
+def test_pilot_overlay_without_original_control_is_unknown(tmp_path):
+    from empire_os.competitor_intelligence_feed import (
+        _original_pilot_readiness_overlay,
+    )
+    report = _original_pilot_readiness_overlay(tmp_path)
+    assert report["available"] is False
+    assert report["status"] == "ORIGINAL_PILOT_SOURCE_NOT_PRESENT"
+    assert report["execution_authority"] == "none"
+
+
+def test_pilot_overlay_reuses_original_review_not_stale_snapshots(tmp_path, monkeypatch):
+    from empire_os.competitor_intelligence_feed import (
+        _original_pilot_readiness_overlay,
+    )
+    from scripts import materialize_lead_smart_launch_readiness as original
+    p = tmp_path / "runtime/revenue/lead_smart/pilot/approved_control.json"
+    p.parent.mkdir(parents=True)
+    p.write_text("{}")
+    called = []
+    def original_review(*, repo_root, evidence_root):
+        called.append((repo_root, evidence_root))
+        return _original_launch_fixture()
+    monkeypatch.setattr(original, "compute_live_launch_readiness", original_review)
+    report = _original_pilot_readiness_overlay(tmp_path)
+    assert report["available"] is True and report["blocker_count"] == 5
+    assert len(called) == 1 and called[0][0] == tmp_path
+    assert called[0][1] == tmp_path / "runtime/revenue/lead_smart"
+
+
+def test_bad_original_owner_review_is_unknown_not_granted(tmp_path, monkeypatch):
+    from empire_os.competitor_intelligence_feed import (
+        _original_pilot_readiness_overlay,
+    )
+    from scripts import materialize_lead_smart_launch_readiness as original
+    p = tmp_path / "runtime/revenue/lead_smart/pilot/approved_control.json"
+    p.parent.mkdir(parents=True)
+    p.write_text("{}")
+    monkeypatch.setattr(original, "compute_live_launch_readiness",
+                        lambda **_kwargs: {"execution_authority": "LIVE"})
+    report = _original_pilot_readiness_overlay(tmp_path)
+    assert report["available"] is False
+    assert report["status"] == "ORIGINAL_OWNER_READINESS_UNVERIFIED"
+    assert report["execution_authority"] == "none"
