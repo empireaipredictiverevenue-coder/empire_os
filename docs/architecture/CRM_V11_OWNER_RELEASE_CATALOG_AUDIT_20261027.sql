@@ -21,7 +21,8 @@ flags AS (
     EXISTS(SELECT 1 FROM rpc WHERE
       pg_catalog.pg_get_userbyid(proowner)='empiredb_migrator') AS owner_is_original_migrator,
     EXISTS(SELECT 1 FROM rpc WHERE
-      'search_path=' = ANY(COALESCE(proconfig,ARRAY[]::text[]))) AS locked_empty_search_path,
+      COALESCE(proconfig, ARRAY[]::text[])
+       && ARRAY['search_path=', 'search_path=""']::text[]) AS locked_empty_search_path,
     EXISTS(
       SELECT 1 FROM rpc r,
       LATERAL pg_catalog.aclexplode(COALESCE(

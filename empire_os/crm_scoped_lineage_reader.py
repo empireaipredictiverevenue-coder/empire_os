@@ -90,7 +90,8 @@ def review_signed_scoped_lineage(*, signed_crm_bearer: str,
                 cursor.execute(
                     """
                     SELECT p.prosecdef,p.provolatile,owner.rolname,
-                      ('search_path=' = ANY(COALESCE(p.proconfig,ARRAY[]::text[])))
+                      (COALESCE(p.proconfig,ARRAY[]::text[])
+                       && ARRAY['search_path=', 'search_path=""']::text[])
                     FROM pg_catalog.pg_proc p
                     JOIN pg_catalog.pg_roles owner ON owner.oid=p.proowner
                     WHERE p.oid=pg_catalog.to_regprocedure(%s)
