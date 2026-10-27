@@ -1,0 +1,75 @@
+{
+  "acceptance_scope": "VISUAL_DIRECTION_AND_AS_SHOWN_COMPACT_PREVIEWS_ONLY",
+  "chat_displayed_preview_provenance": {
+    "commercial": {
+      "chat_artifact_name": "empire_ai_commercial_preview.jpg",
+      "display_size_px": [
+        400,
+        267
+      ],
+      "sha256": "5f6273cdbebfc71a91cdbfc4f3555b9bf170792d9f167bc27967258719e1e4b6"
+    },
+    "side_by_side": {
+      "chat_artifact_name": "empire_ai_solar_commercial_preview.webp",
+      "display_size_px": [
+        800,
+        267
+      ],
+      "sha256": "9ccc18a34d396d04388b2993b8571f87b0a1b28bc0b48cd3f72566906190f3b0"
+    },
+    "solar": {
+      "chat_artifact_name": "empire_ai_solar_preview.jpg",
+      "display_size_px": [
+        400,
+        267
+      ],
+      "sha256": "f602548cc7dd6aba398db5124e3099ae866ad8bda505d12aea53f028cec7601b"
+    }
+  },
+  "checkout_authorized": false,
+  "commercial_source_parent_commit": "770d9ea17",
+  "current_brand": "canonical 2026-10-27 orbital-A; navy cobalt cyan and ice; Solar cyan headline",
+  "founder_response": "yes i like them",
+  "immediate_context": "Founder explicitly requested image previews directly in chat after earlier tool images were not visible. Assistant embedded side-by-side plus individual actual staged Solar/Commercial raster previews. Founder then responded positively.",
+  "live_site_mutated": false,
+  "new_owner_root_release_backup_verified": false,
+  "old_V2_release_remains_blocked": true,
+  "original_astra_owner_independent_visual_legal_copy_consent_signoff_verified": false,
+  "owner_review_worktree": "/home/ubuntu/empire_worktrees/website_brand_original_owner_rehearsal_20261027",
+  "owner_source_head_commit": "41d594ab6",
+  "page_routes": [
+    "/industries/solar",
+    "/commercial"
+  ],
+  "previous_old_brand_V2_approval_superseded": true,
+  "public_distribution_rights_verified": false,
+  "publication_authorized_now": false,
+  "recorded_at_utc": "2026-10-27T18:27:28.564311+00:00",
+  "remaining_gates": [
+    "Original ASTRA owner verify final exact commercial offers/prices, consent/legal and assets rights",
+    "Original ASTRA owner coordinate current flagship and other 700-file shared-site releases",
+    "New-brand release needs new exact whole-site inventory, protected rollback and separate owner-approved publication",
+    "Final public HTTPS customer-facing readback before calling either new-brand page live"
+  ],
+  "revenue_claimed": false,
+  "schema_version": "empire.website.solar_commercial_orbital_a_founder_chat_visual_acceptance.v1",
+  "status": "FOUNDER_LIKED_EMBEDDED_CURRENT_BRAND_DESIGN_PREVIEWS",
+  "verified_original_stage_screenshots": {
+    "commercial_desktop_genuine_get_offers": {
+      "path": "/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/solar_commercial_reconciled_20261027/commercial-live-GET-offers-desktop.png",
+      "sha256": "e337044faf666e84374142044a8e2306e3c17f5b22fd8602e859bb4f4c11e822"
+    },
+    "commercial_mobile_genuine_get_offers": {
+      "path": "/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/solar_commercial_reconciled_20261027/commercial-live-GET-offers-mobile.png",
+      "sha256": "845a2120e2c280c7e584b923aa09eff7a5050559082f5fe929c11bfcf8b93ca4"
+    },
+    "solar_desktop_canonical_cyan": {
+      "path": "/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/solar_commercial_reconciled_20261027/solar-desktop-canonical-cyan-20261027.png",
+      "sha256": "d077120140facc5f71e3436348a635ad86e174033e435e325b5edf39d88350e3"
+    },
+    "solar_mobile_canonical_cyan": {
+      "path": "/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/solar_commercial_reconciled_20261027/solar-mobile-canonical-cyan-20261027.png",
+      "sha256": "830eb926c271040ae46be4cc803497d20c5d6f919616f2e9c6bf68c82f5c432b"
+    }
+  }
+}
