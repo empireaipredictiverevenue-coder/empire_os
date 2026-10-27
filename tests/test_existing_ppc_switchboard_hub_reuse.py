@@ -31,6 +31,17 @@ def test_reuses_existing_switchboard_and_hubs_not_new_services(monkeypatch):
     assert r["current_policy_legacy_database"] == "supabase"
     assert r["hub_source_presence_is_not_live_service_proof"]
     assert r["legacy_executor_must_not_be_activated"]
+    first_party = r["existing_empire_analytics"]
+    assert first_party["event_contract"] == "empire.analytics.first_party_event_contract.v1"
+    assert first_party["staged_analytics054_source_present"]
+    assert first_party["existing_dormant_ingress_source_present"]
+    assert "organic_search" in first_party["offline_channel_classes"]
+    assert "paid_search" not in first_party["offline_channel_classes"]
+    assert "cta_click" in first_party["offline_event_types"]
+    assert first_party["production_collection_authorized"] is False
+    assert first_party["real_sessions_verified"] is False
+    assert first_party["commercial_call_attribution_verified"] is False
+    assert first_party["new_tracking_platform_created"] is False
     assert r["routing_authorized"] is False
     assert r["execution_authority"] == "none"
     with pytest.raises(RuntimeError, match="execution is parked"):

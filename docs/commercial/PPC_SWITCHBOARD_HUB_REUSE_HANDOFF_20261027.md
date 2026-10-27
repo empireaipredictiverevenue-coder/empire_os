@@ -38,3 +38,37 @@ Code: empire_os/competitor_intelligence_feed.py
 Tests: tests/test_existing_ppc_switchboard_hub_reuse.py
 
 Remaining missing proofs: live Ringba target, buyer human answer, source-to-call identity, accepted payable call and independently settled cash. This is **existing capability recovery**, not a newly launched PPC switchboard.
+
+## Future Empire-owned omnichannel tracking and analytics
+Founder direction confirmed 27 October 2026. This is a deferred, owner-gated extension of the EXISTING Empire Analytics programme, not approval to activate a collector, phone system or another database.
+
+### Existing infrastructure to reuse
+- empire_os/analytics/first_party_event_contract.py: offline, consent-gated contract for page_view, engagement, cta_click, form_start and form_submit_attempt. Its current offline channel taxonomy is direct, organic_search, organic_social, email, referral, unknown. It is NOT yet a complete paid/social/video/call source registry.
+- empire_os/analytics/offline_session_authority.py: simulated server-controlled session/consent review, not live visitor tracking.
+- empire_os/analytics/dormant_event_ingress.py: unmounted, local-test-only simulation; no live production collector.
+- migrations/empiredb/054_first_party_analytics_ledger_held.sql and Analytics055 privacy erasure: staged guarded EmpireDB design, not proven activated.
+- Tag Intelligence, Search Console, existing private Founder Analytics screen and original CRO, CRM, Ringba and finance owner observations remain separate, and should not be cloned.
+
+Read-only checks on 27 Oct verified: homepage static tag observation exists; GA4/GTM not detected in the bounded audit; consent, live visitor collection, actual website sessions and real attribution remain unverified; HTTP collector is dormant; Analytics054 schema integrity is valid, production migration held behind founder DB gate.
+
+### Multi-channel, multi-purpose business requirements
+Acquisition: organic search, paid search and social, organic social, YouTube/video, email where allowed, publisher referrals/affiliates and direct/unknown.
+Experience/CRO: lawful aggregate landing-session -> CTA -> form/ZIP -> eligible action, error cohorts and approved experiments.
+Calls: existing Ringba Lead Smart provider evidence -> unique incoming call -> distinct target attempts -> IVR/queue -> human answer -> written buyer acceptance/reversal. Provider connection does NOT imply human answer.
+CRM and operations: approved buyer/publisher intake, B2B relationship and consent/suppression signals, service/product engagement and real fulfilment.
+Finance/CRU: independent invoice/settlement, refund, media/publisher and processing cost, true margin per settled unit. No provider estimate as bank settlement.
+Predictive/reliability: campaign freshness, missing source, deduplication, independent replay/ledger lineage, late/failed events, model validation and human-governed actions.
+
+### One first-party analytics spine
+Approved source -> privacy-appropriate server-attested session -> eligible interaction -> actual user-initiated handoff -> provider's unique call -> verified buyer outcome -> independent settlement -> attributable actual margin.
+Event authority is stage-specific; source unknown stays UNKNOWN. Every cohort needs exactly comparable time/tenant/property/channel boundaries, reason codes and verifiable receipts, not copied personal identifiers.
+Do not store raw caller ANI, personal addresses, recording URLs, tracking fingerprints, unrestricted browser query strings, session videos or privileged commercial evidence in the research feed. Preserve UK GDPR/PECR and relevant US obligations.
+
+### Stage gates before live collection or owned telephony
+(1) Public website and privacy owners approve consent UI, purposes, revocation, retention and safe events. (2) Existing Empire Analytics owner validates tenant-authorised server consent and source classification, origin/rate/abuse protection, EmpireDB RLS, erasure and audited write credentials. (3) Admit genuine website events in the original analytics ledger, first on an approved controlled release; do not infer traffic from GSC clicks. (4) Map provider-specific Ringba call events, CRM dispositions and independent finance settlements into verified aggregates without creating a duplicate backend. (5) Extend channel taxonomy for paid_search, paid_social, video and affiliate only through the original contract owner, with documented privacy/legal and ad platform controls. (6) Expose real multi-purpose metrics in the existing private Founder Analytics product, with gated predictive optimisation. (7) Consider owned SIP/telephony only after actual buyer capacity, operational reliability, regulatory approval, call consent, fraud controls and commercial evidence.
+
+### Legacy safety notes
+The retired ppc_router.service is a harmless retired status/no-op unit in source, not a biller. The old telephony_webhook.py has a development default that accepts unsigned payloads if WEBHOOK_SECRET is absent, and can forward apparent charge events to a legacy Hub billing endpoint; it must NOT be started as public production intake. The old general switchboard.py is AGI routing. The B2B call_manager.py is not inbound homeowner call routing. Legacy Vonage and Supabase policy labels must not be presented as our present Ringba and EmpireDB architecture.
+
+### Completed switchboard preview enhancement
+Original ppc_switchboard_adapter.py now shows existing Ringba-for-Lead-Smart and EmpireDB target architecture, declares existing offline event channels and future channel extension candidates, and labels legacy flags as non-executable. A READY buyer allocation plus active legacy flags is now REVIEW_ONLY_EXECUTOR_NOT_IMPLEMENTED, not a claim of a live canonical executor. Call execution remains hard-stopped. No live analytics collector, page edit, ad spend, new API, timer, database, provider route, payment or outbound work was performed.

@@ -21,6 +21,12 @@ from typing import Any, Mapping
 
 from empire_os.competitor_opportunity_evidence_bridge import build_bridge_runtime
 from empire_os.voice_routing_policy import switchboard_status
+from empire_os.analytics.first_party_event_contract import (
+    ALLOWED_EVENTS as ANALYTICS_EVENTS,
+    ALLOWED_CHANNELS as ANALYTICS_CHANNELS,
+    SCHEMA as ANALYTICS_EVENT_SCHEMA,
+)
+from empire_os.analytics.measurement_readiness import review_existing_monitor
 from empire_os.competitor_audience_sweep import (
     load_resolved_market_entities,
 )
@@ -291,6 +297,7 @@ def _existing_ppc_switchboard_hub_readiness(repo_root: Path) -> dict[str, Any]:
         return file.is_file() and not file.is_symlink()
 
     configured = policy.get("execution_allowed") is True
+    tag_review = review_existing_monitor()
     return {
         "schema_version": "empire.ppc.existing_switchboard_hub_readiness.v1",
         "mode": "OBSERVE",
@@ -311,6 +318,27 @@ def _existing_ppc_switchboard_hub_readiness(repo_root: Path) -> dict[str, Any]:
         "voice_policy_flags_request_execution": configured,
         "current_policy_legacy_transport": policy.get("canonical_transport"),
         "current_policy_legacy_database": policy.get("canonical_database"),
+        "existing_empire_analytics": {
+            "event_contract": ANALYTICS_EVENT_SCHEMA,
+            "offline_event_types": sorted(ANALYTICS_EVENTS),
+            "offline_channel_classes": sorted(ANALYTICS_CHANNELS),
+            "staged_analytics054_source_present": present(
+                "migrations/empiredb/054_first_party_analytics_ledger_held.sql"
+            ),
+            "existing_dormant_ingress_source_present": present(
+                "empire_os/analytics/dormant_event_ingress.py"
+            ),
+            "tag_intelligence_source_status": tag_review.get("status"),
+            "tag_static_homepage_observed": (
+                tag_review.get("static_homepage_observation_verified") is True
+            ),
+            "web_analytics_consent_verified": False,
+            "real_sessions_verified": False,
+            "production_collection_authorized": False,
+            "commercial_call_attribution_verified": False,
+            "multichannel_extension_requires_original_analytics_owner": True,
+            "new_tracking_platform_created": False,
+        },
         "original_ppc_adapter_executor_hard_stopped": True,
         "legacy_executor_must_not_be_activated": True,
         "ringba_pilot_owner_requires_independent_routing_proof": True,

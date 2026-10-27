@@ -14,6 +14,9 @@ from typing import Any, Mapping
 
 from empire_os.buyer_allocation import plan_allocation
 from empire_os.voice_routing_policy import switchboard_status
+from empire_os.analytics.first_party_event_contract import (
+    ALLOWED_CHANNELS, SCHEMA as ANALYTICS_EVENT_SCHEMA,
+)
 
 
 def _buyer_index(
@@ -81,8 +84,8 @@ def preview_pay_per_call_route(
     else:
         # Even after policy activation, this adapter remains preview-only
         # until a dedicated canonical execution RPC is implemented.
-        decision = "READY_FOR_CANONICAL_EXECUTOR"
-        reason = "canonical_route_preview_ready"
+        decision = "REVIEW_ONLY_EXECUTOR_NOT_IMPLEMENTED"
+        reason = "legacy_flags_cannot_activate_canonical_ppc_executor"
 
     return {
         "schema_version": "empire.ppc_switchboard_preview.v1",
@@ -96,6 +99,35 @@ def preview_pay_per_call_route(
         "underlying_allocation_decision": underlying_decision,
         "selected_candidate": selected,
         "candidates": candidates,
+        "current_pilot_stack_migration_preview": {
+            "scope": "LEAD_SMART_US_ROOFING_ONLY",
+            "existing_telephony_observer": "ringba",
+            "existing_first_party_database": "EmpireDB PostgreSQL",
+            "legacy_policy_transport": route_policy.get("canonical_transport"),
+            "legacy_policy_database": route_policy.get("canonical_database"),
+            "legacy_stack_can_be_reused_as_live_executor": False,
+            "live_ringba_buyer_leg_verified": False,
+            "buyer_human_answer_verified": False,
+            "source_to_settlement_join_verified": False,
+            "canonical_adapter_refactor_verified": False,
+            "new_routing_service_created": False,
+        },
+        "owned_analytics_reuse": {
+            "existing_event_contract": ANALYTICS_EVENT_SCHEMA,
+            "existing_offline_channels": sorted(ALLOWED_CHANNELS),
+            "future_source_families_for_owner_review": [
+                "paid_search", "paid_social", "organic_video",
+                "publisher_referral", "affiliate_partner", "phone_inbound",
+                "consented_chat", "consented_email", "crm", "settlement",
+            ],
+            "event_ingestion_mode": "DORMANT_OFFLINE_SIMULATION_ONLY",
+            "live_session_collection_verified": False,
+            "website_consent_authority_verified": False,
+            "buyer_call_attribution_verified": False,
+            "realised_cash_join_verified": False,
+            "channel_schema_extension_approved": False,
+            "new_tracking_database_created": False,
+        },
         "route_executed": False,
         "provider_call_created": False,
         "payment_action": False,
