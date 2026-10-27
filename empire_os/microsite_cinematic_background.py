@@ -5,6 +5,33 @@ Not evidence of roofing market activity, Chicago permit jurisdiction or demand.
 """
 from __future__ import annotations
 from base64 import b64encode
+from hashlib import sha256
+from pathlib import Path
+import os
+
+CHICAGO_PHOTO_SHA256 = "2c17ea093608a0fb16286c6b4c765574d3692fea0deafaca2ea34b56045e9a05"
+CHICAGO_PHOTO_CREDIT_URL = "https://unsplash.com/photos/a-river-running-through-a-city-at-night-IRMWK1Hv0_8"
+CHICAGO_PHOTO_LICENSE_URL = "https://unsplash.com/license"
+
+
+def chicago_owner_photo_data_uri() -> str | None:
+    """One private, licensed original-source photograph; no network at render time.
+
+    The first-party release owner must make its own asset/credit decision.
+    No repo-scoped photo file or unchecked CDN URL is silently published.
+    """
+    path = os.getenv("EMPIRE_MICROSITE_CHICAGO_HERO_PHOTO")
+    if not path:
+        return None
+    item = Path(path)
+    if item.is_symlink() or not item.is_file():
+        raise ValueError("Chicago photo must be owner-staged regular file")
+    data = item.read_bytes()
+    if (not 10_000 <= len(data) <= 700_000
+            or data[:4] != b"RIFF" or data[8:12] != b"WEBP"
+            or sha256(data).hexdigest() != CHICAGO_PHOTO_SHA256):
+        raise ValueError("Chicago photo source rights/hash validation failed")
+    return "data:image/webp;base64," + b64encode(data).decode("ascii")
 
 
 def chicago_night_skyline_data_uri() -> str:

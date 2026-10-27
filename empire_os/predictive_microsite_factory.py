@@ -18,6 +18,8 @@ from urllib.parse import urlsplit
 
 from empire_os.microsite_cinematic_background import (
     chicago_night_skyline_data_uri, chicago_premium_css,
+    chicago_owner_photo_data_uri, CHICAGO_PHOTO_SHA256,
+    CHICAGO_PHOTO_CREDIT_URL, CHICAGO_PHOTO_LICENSE_URL,
 )
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
@@ -260,10 +262,21 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
         and kind == "local_utility"
     )
     cinematic_css = chicago_premium_css() if chicago_design else ""
+    photo_asset = chicago_owner_photo_data_uri() if chicago_design else None
+    city_image = photo_asset or (chicago_night_skyline_data_uri() if chicago_design else None)
     cityscape = (
         '<div class="site-art" aria-hidden="true" style="background-image:url('
-        + chicago_night_skyline_data_uri() + ')"></div>'
-        if chicago_design else ""
+        + city_image + ')"></div>'
+        if city_image else ""
+    )
+    photo_credit = (
+        '<span class="photo-attribution">Chicago River skyline photograph: '
+        '<a href="' + CHICAGO_PHOTO_CREDIT_URL
+        + '" rel="noopener noreferrer" target="_blank">Gael D / Unsplash</a>'
+        ' · <a href="' + CHICAGO_PHOTO_LICENSE_URL
+        + '" rel="noopener noreferrer" target="_blank">Unsplash License</a>'
+        ' · dark overlay and WebP adaptation</span>'
+        if photo_asset else ""
     )
     if chicago_design and ":" in title:
         left, right = title.split(":", 1)
@@ -326,6 +339,8 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 @media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}} .wordmark{{width:170px}}}}
 @media(prefers-reduced-motion:reduce) {{html{{scroll-behavior:auto}}}}
 {cinematic_css}
+.photo-attribution {{display:block;max-width:850px;font-size:.72rem;color:var(--dim);padding:8px 0}}
+.photo-attribution a {{color:var(--brand-cyan);text-underline-offset:3px}}
 </style>
 </head>
 <body>
@@ -354,7 +369,7 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 <p class="hint">This is a research preview. Source context, actual demand, local service availability,
 buyer acceptance and conversion claims require independent review. No enquiry or payment collection is active.</p>
 </section></div></main>
-<footer><div class="wrap">Empire AI · Internal preview only · Noindex · No lead collection</div></footer>
+<footer><div class="wrap">Empire AI · Internal preview only · Noindex · No lead collection{photo_credit}</div></footer>
 </body></html>"""
 
 
@@ -417,6 +432,23 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
         "html_sha256": sha256(html.encode()).hexdigest(),
         "locally_useful_research_steps": len(spec.get("research_steps", [])),
+        "chicago_photographic_background_used": (
+            bool(chicago_owner_photo_data_uri())
+            if (_canonical_brand_contract() is not None
+                and geo.get("market_id") == "US-IL"
+                and geo.get("kind") == "metro"
+                and site_kind == "local_utility")
+            else False
+        ),
+        "chicago_photographic_background_sha256": (
+            CHICAGO_PHOTO_SHA256
+            if (_canonical_brand_contract() is not None
+                and geo.get("market_id") == "US-IL"
+                and geo.get("kind") == "metro"
+                and site_kind == "local_utility"
+                and chicago_owner_photo_data_uri())
+            else None
+        ),
         "cinematic_chicago_art_rendered": (
             _canonical_brand_contract() is not None
             and geo.get("market_id") == "US-IL"
