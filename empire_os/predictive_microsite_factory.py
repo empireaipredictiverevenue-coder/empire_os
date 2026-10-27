@@ -6,15 +6,31 @@ claims buyer capacity, or assumes local ZIP/postcode membership.
 from __future__ import annotations
 
 from datetime import datetime
+from base64 import b64encode
 from hashlib import sha256
 from html import escape
 import json
 import re
+from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
 from empire_os.third_party.slopmonster.deslop import audit, normalise, visible_text
+
+
+# Original site-owned branding is read without modifying the website's assets.
+BRAND_ASSET = Path(__file__).resolve().parent.parent / "apps/empire-public-site/public/brand/empire-logo.svg"
+
+
+def _original_brand_image() -> tuple[str, str]:
+    source = BRAND_ASSET.read_bytes()
+    if (not 100 <= len(source) <= 30000
+            or b"<svg " not in source[:200]
+            or any(marker in source.lower() for marker in
+                   (b"<script", b"<foreignobject", b"onload=", b"<!entity", b"<iframe"))):
+        raise ValueError("original Empire AI logo asset unavailable or unsafe")
+    return "data:image/svg+xml;base64," + b64encode(source).decode("ascii"), sha256(source).hexdigest()
 
 
 MARKETS = {market.market_id: market for market in acquisition_markets()}
@@ -115,6 +131,7 @@ def review_copy(copy: str) -> dict[str, Any]:
 def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
               title: str, subhead: str, summary: str, keyword: str) -> str:
     kind = spec.get("site_kind")
+    logo_src, _ = _original_brand_image()
     primary = "#65c7ff" if kind != "market_report" else "#e9bb65"
     evidence_cards = "\n".join(
         f'<article class="fact"><span class="micro">Evidence note {i}</span>'
@@ -152,7 +169,13 @@ a {{color:inherit}}
 header,main,footer {{position:relative}}
 .wrap {{max-width:1120px;margin:auto;padding:0 26px}}
 nav {{min-height:82px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}}
-.wordmark {{font-size:1.12rem;font-weight:850;letter-spacing:.08em}}
+.wordmark {{display:block;max-width:215px;min-width:125px;width:29vw;height:auto}}
+.hero-layout {{display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,300px);align-items:center;gap:28px}}
+.hero-content {{min-width:0}}
+.signal-panel {{border:1px solid #385575;background:linear-gradient(155deg,#142743dd,#0b1529c9);border-radius:20px;padding:25px;box-shadow:0 28px 65px #0005}}
+.signal-head {{font-size:.79rem;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;font-weight:800}}
+.signal-value {{font-size:1.12rem;font-weight:750;line-height:1.45;margin:7px 0 15px}}
+.signal-rule {{border:0;border-top:1px solid #334968;margin:17px 0}}
 .tag,.micro {{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:750}}
 .preview {{font-size:.78rem; color:var(--dim);border:1px solid #425976;border-radius:100px;padding:6px 14px}}
 .hero {{padding:80px 0 66px;max-width:950px}}
@@ -170,19 +193,28 @@ section {{padding:45px 0}}
 .source {{color:var(--dim);font-size:.82rem!important}}
 .hint {{border-left:3px solid var(--gold);padding:16px 24px;color:var(--dim);background:#182435}}
 footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
-@media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}}}}
+@media(max-width:760px) {{.hero-layout{{grid-template-columns:1fr}} .signal-panel{{max-width:560px}}}}
+@media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}} .wordmark{{width:170px}}}}
 @media(prefers-reduced-motion:reduce) {{html{{scroll-behavior:auto}}}}
 </style>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="wrap"><nav aria-label="Main navigation"><span class="wordmark">EMPIRE AI</span>
+<header class="wrap"><nav aria-label="Main navigation"><img class="wordmark" src="{logo_src}" alt="Empire AI Predictive Revenue" width="215" height="49">
 <span class="preview">Internal draft · not published</span></nav></header>
 <main id="main">
-<div class="wrap"><section class="hero"><p class="tag">{location} / {kw_html}</p>
+<div class="wrap"><section class="hero hero-layout"><div class="hero-content">
+<p class="tag">{location} / {kw_html}</p>
 <h1>{title_html}</h1><p class="lede">{sub_html}</p>
 <p class="desc">{summary_html}</p>
-<a class="action" href="#research-method">Review the evidence</a></section></div>
+<a class="action" href="#research-method">Review the evidence</a></div>
+<aside class="signal-panel" aria-label="Evidence summary">
+<p class="signal-head">Research status</p><p class="signal-value">Source review in progress</p>
+<hr class="signal-rule"><p class="signal-head">Evidence references supplied</p>
+<p class="signal-value">{len(facts)} reference notes</p>
+<hr class="signal-rule"><p class="signal-head">Commercial verification</p>
+<p class="signal-value">Not established by this preview</p></aside>
+</section></div>
 <div class="wrap"><section id="research-method" aria-labelledby="evidence-title">
 <p class="tag">Territory evidence</p><h2 id="evidence-title">What the available research shows</h2>
 <div class="grid">{evidence_cards}</div></section>
@@ -252,6 +284,8 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
             "template_includes": ["responsive_grid", "mobile_viewport", "accessible_skip_link",
                                   "single_h1", "reduced_motion", "focus_visible",
                                   "noindex", "no_live_form", "48px_min_cta"],
+            "original_brand_logo_sha256": _original_brand_image()[1],
+            "original_brand_logo_source": "apps/empire-public-site/public/brand/empire-logo.svg",
             "browser_visual_review_complete": False,
         },
         "blockers": blockers,

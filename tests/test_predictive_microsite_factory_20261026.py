@@ -54,7 +54,10 @@ def test_factory_generates_noindex_branded_mobile_preview_and_draft_only():
     assert 'content="noindex,nofollow,noarchive"' in html
     assert 'name="viewport"' in html
     assert "prefers-reduced-motion" in html
-    assert "EMPIRE AI" in html
+    assert "Empire AI Predictive Revenue" in html
+    assert "data:image/svg+xml;base64," in html
+    assert len(packet["visual_qa"]["original_brand_logo_sha256"]) == 64
+    assert "hero-layout" in html
     assert "<form" not in html.lower()
     assert "Internal draft" in html
     assert packet["visual_qa"]["browser_visual_review_complete"] is False
