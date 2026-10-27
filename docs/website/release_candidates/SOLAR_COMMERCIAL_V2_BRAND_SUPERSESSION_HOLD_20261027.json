@@ -1,0 +1,28 @@
+{
+  "approved_founder_brand_standard": "empire_brand_canonical_20261027/brand_contract.json",
+  "canonical_brand_contract_sha256": "ead735b5e223a3b179a23965c1ff11dc67efb78b4cd4e71df9b60550872bc518",
+  "current_brand_original_native_vector_verified": false,
+  "current_logo": "luminous orbital-A, blue halo, blue/silver A",
+  "current_primary_palette": {
+    "cobalt": "#005AFF",
+    "deep_navy": "#01091C",
+    "electric_cyan": "#02C7FE",
+    "ice": "#E7F1FD",
+    "slate": "#8EA1BF"
+  },
+  "existing_owner_brand_rehearsal_branch": "review/website-brand-original-owner-20261027",
+  "founder_directive": "No, we have a new branding system; these pages need changing. Check the actual files.",
+  "founder_publication_authorization_for_prior_candidate": false,
+  "new_outbound_or_payment_authorized": false,
+  "original_astra_owner_publication_signoff_verified": false,
+  "previous_candidate_manifest_sha256": "14b65c040e398d74ac637f0845d2fd62046e7e0db9bb2eefdc348dabf1919f39",
+  "previous_candidate_publisher_must_fail_closed": true,
+  "previous_candidate_status": "SUPERSEDED_REQUIRES_REDESIGN_NOT_AUTHORIZED_FOR_PUBLICATION",
+  "previous_visual_approval_record": "docs/website/release_candidates/SOLAR_COMMERCIAL_V2_FOUNDER_FINAL_VISUAL_APPROVAL_20261027.json",
+  "previous_visual_approval_sha256": "21ef90007ab15a08a91a0b48109fb0640032010249d7ed900971d026d6b23ee1",
+  "public_website_modified": false,
+  "recorded_at_utc": "2026-10-27T14:57:17.685518+00:00",
+  "requires_new_browser_visual_evidence_and_distinct_founder_acceptance": true,
+  "schema_version": "empire.website.solar_commercial_brand_supersession_hold.v1",
+  "source": "FOUNDER_CHAT_CORRECTION_AND_BRAND_REVIEW_20261027"
+}
