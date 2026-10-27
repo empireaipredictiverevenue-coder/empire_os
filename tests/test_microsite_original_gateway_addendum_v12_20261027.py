@@ -46,7 +46,9 @@ def site(tmp_path):
         "lead_form_enabled":False,
         "outbound_authorized":False,
         "execution_authority":"none",
-        "site_owner_live_readback_verified":True,
+        "original_site_owner_staged_export_verified":True,
+        "staged_export_sha256":exact_html,
+        "site_owner_live_readback_verified":False, # must be possible pre-launch
         "original_site_owner_release_approved":True,
         "url":f"https://empire-ai.co.uk/research/{CAMPAIGN_ID}",
     }
@@ -112,7 +114,8 @@ def test_original_owner_fixture_can_admit_one_separately_reviewed_page(site):
     ("lead_form_enabled",True),
     ("outbound_authorized",True),
     ("execution_authority","activate"),
-    ("site_owner_live_readback_verified",False),
+    ("original_site_owner_staged_export_verified",False),
+    ("staged_export_sha256","f"*64),
     ("original_site_owner_release_approved",False),
     ("source_preview_sha256","0"*64),
     ("deployed_html_sha256","0"*64),

@@ -75,8 +75,11 @@ def original_owner_chicago_html(
 ) -> str | None:
     """Return one original-site reviewed page or None. No mutation or rollout.
 
-    CAUTION: Approval files must be independently issued by the existing
-    authorised owners. This validates custody/contents, not authorship signatures.
+    The serving gate checks independent owner-controlled approvals and a
+    byte-verified local staged export. First publication is possible *before*
+    external HTTP readback; the original site owner must then perform and log
+    independent live URL, hash and rollback checks immediately afterwards.
+    CAUTION: this checks receipt contents, not owner cryptographic signatures.
     """
     if campaign_id != CAMPAIGN_ID or not _CAMPAIGN.fullmatch(campaign_id):
         return None
@@ -106,7 +109,11 @@ def original_owner_chicago_html(
                 or receipt.get("lead_form_enabled") is not False
                 or receipt.get("outbound_authorized") is not False
                 or receipt.get("execution_authority") != "none"
-                or receipt.get("site_owner_live_readback_verified") is not True
+                # A FIRST publication cannot already have an external live
+                # readback: that proof can only be collected after serving.
+                # Require the original owner's exact staged export SHA instead.
+                or receipt.get("original_site_owner_staged_export_verified") is not True
+                or receipt.get("staged_export_sha256") != deploy_hash
                 or receipt.get("original_site_owner_release_approved") is not True
                 or receipt.get("url") !=
                 f"https://empire-ai.co.uk/research/{CAMPAIGN_ID}"):

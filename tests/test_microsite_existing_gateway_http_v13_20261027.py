@@ -60,7 +60,9 @@ def staged_approvals(tmp_path):
         "lead_form_enabled": False,
         "outbound_authorized": False,
         "execution_authority": "none",
-        "site_owner_live_readback_verified": True,
+        "original_site_owner_staged_export_verified": True,
+        "staged_export_sha256": deployed_digest,
+        "site_owner_live_readback_verified": False, # first publication not yet observable
         "original_site_owner_release_approved": True,
         "url": f"https://empire-ai.co.uk/research/{CAMPAIGN_ID}",
     }
