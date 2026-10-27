@@ -337,3 +337,88 @@ def inspect_original_warm_partner_closing(
         "no_new_buyer_candidate_promoted": True,
         "no_cross_cohort_matching": True,
     }
+
+
+def inspect_existing_lead_smart_cash_pulse(root: Path, *, now: datetime) -> dict[str, Any]:
+    """Read the safe original campaign pulse, not the protected call records.
+
+    Never infer settlement from observed payout, Ringba test calls or a
+    disabled consumer handoff. Protected owner data stays inaccessible.
+    """
+    from pathlib import Path as _Path
+    import stat
+
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("timezone-aware commercial proof review required")
+    unknown = {
+        "status": "ORIGINAL_LEAD_SMART_PULSE_UNAVAILABLE",
+        "source_freshness": "UNKNOWN",
+        "site_handoffs": None,
+        "site_handoff_switch_enabled": None,
+        "provider_row_count": None,
+        "protected_call_to_cash_receipt": "UNKNOWN",
+        "provider_accepted_calls_claimed": None,
+        "settled_revenue_cents": None,
+        "next_existing_owner_action": "REVIEW_ORIGINAL_RINGBA_REPORTING_AND_CONFIRMED_DISPOSITION",
+        "buyer_route_or_call_activation_authorized": False,
+        "predictive_cloud_calibration_authorized": False,
+        "execution_authority": "none",
+    }
+    path = root / "runtime/revenue/lead_smart/commercial_pulse/latest.json"
+    protected = root / "runtime/revenue/lead_smart/commercial_pulse/call_to_cash_latest.json"
+    protected_status = "UNKNOWN"
+    try:
+        mode = protected.stat()
+        if (not protected.is_symlink() and stat.S_ISREG(mode.st_mode)
+                and mode.st_uid == 0 and stat.S_IMODE(mode.st_mode) == 0o600):
+            protected_status = "PROTECTED_ROOT_ONLY_NOT_READ_BY_OPS"
+        else:
+            protected_status = "UNTRUSTED_PROTECTED_RECEIPT_METADATA"
+    except OSError:
+        protected_status = "MISSING_OR_NOT_STATABLE"
+    try:
+        if path.is_symlink() or not path.is_file() or not 50 <= path.stat().st_size <= 150_000:
+            return {**unknown, "protected_call_to_cash_receipt": protected_status}
+        pulse = json.loads(path.read_text(encoding="utf-8"))
+        when = datetime.fromisoformat(str(pulse["observed_at_utc"]).replace("Z", "+00:00"))
+        seconds = (now.astimezone(timezone.utc) - when.astimezone(timezone.utc)).total_seconds()
+        if (not isinstance(pulse, dict)
+                or pulse.get("schema_version") != "empire.lead_smart.commercial_pulse.v1"
+                or pulse.get("campaign_id") != "CA8278ed3f26e9495b881fe3833174d007"
+                or pulse.get("buyer") != "Lead Smart"
+                or pulse.get("site_route") != "/roofing"
+                or type(pulse.get("site_handoffs_recorded")) is not int
+                or pulse["site_handoffs_recorded"] < 0
+                or type(pulse.get("site_handoff_switch_enabled")) is not bool
+                or pulse.get("no_real_revenue_inferred_from_tracking") is not True
+                or pulse.get("settled_revenue_verified") is not False
+                or pulse.get("qualified_billable_calls_verified") is not False
+                or pulse.get("actual_connected_homeowner_calls_verified") is not False
+                or pulse.get("raw_call_identifiers_persisted") is not False
+                or not 0 <= seconds <= 24 * 3600):
+            return {**unknown, "protected_call_to_cash_receipt": protected_status,
+                    "source_freshness": "INVALID_OR_STALE"}
+        ringba = pulse.get("ringba")
+        if (not isinstance(ringba, dict)
+                or ringba.get("provider_token_read_by_unprivileged_process") is not False
+                or ringba.get("payable_call_verified") is not False
+                or ringba.get("settled_revenue_verified") is not False
+                or ringba.get("buyer_leg_connected_verified") is not False):
+            return {**unknown, "protected_call_to_cash_receipt": protected_status,
+                    "source_freshness": "UNTRUSTED_PROVIDER_SUMMARY"}
+        count = ringba.get("matching_rows_in_returned_window")
+        if type(count) is not int or not 0 <= count <= 100000:
+            return {**unknown, "protected_call_to_cash_receipt": protected_status}
+        return {
+            **unknown,
+            "status": "NO_CONFIRMED_PAYABLE_CALL_FROM_UNPRIVILEGED_OWNER_PULSE",
+            "source_freshness": "FRESH",
+            "site_handoffs": pulse["site_handoffs_recorded"],
+            "site_handoff_switch_enabled": pulse["site_handoff_switch_enabled"],
+            "provider_row_count": count,
+            "protected_call_to_cash_receipt": protected_status,
+            "no_proof_of_accepted_calls": True,
+            "no_proof_of_received_cash": True,
+        }
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+        return {**unknown, "protected_call_to_cash_receipt": protected_status}

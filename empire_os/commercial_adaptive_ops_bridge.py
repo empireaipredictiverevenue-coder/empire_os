@@ -18,6 +18,7 @@ from empire_os.commercial_adaptive_checkpoint_guard import recover_safe_adaptive
 from empire_os.commercial_buyer_source_health import (
     inspect_original_buyer_health, review_buyer_evidence_transition,
     inspect_original_warm_partner_closing,
+    inspect_existing_lead_smart_cash_pulse,
 )
 from empire_os.commercial_verified_learning_review import original_order_reader_capability
 from empire_os.canonical_order_reader_release_integrity import (
@@ -85,6 +86,7 @@ def observe_ops_adaptive_commercial(
     prior_summary = prior.get("adaptive_commercial_summary")
     buyer_evidence = inspect_original_buyer_health(root, now=now)
     warm_closing = inspect_original_warm_partner_closing(root, now=now)
+    lead_smart_cash_pulse = inspect_existing_lead_smart_cash_pulse(root, now=now)
     order_reader = original_order_reader_capability()
     # The original reader capability is not an authenticated tenant/order proof.
     # Only the existing verified-outcome feedback gate can provide that label.
@@ -140,6 +142,7 @@ def observe_ops_adaptive_commercial(
             "active_dependency_gates": len(control["active_dependency_gates"]),
             "original_buyer_evidence_health": buyer_evidence,
             "original_warm_partner_closing": warm_closing,
+            "original_lead_smart_call_to_cash_pulse": lead_smart_cash_pulse,
             "original_commercial_outcome_learning_handoff": learning_handoff,
             "original_buyer_evidence_transition": buyer_transition,
             "original_order_outcome_reader_capability": order_reader,
@@ -212,6 +215,7 @@ def observe_ops_adaptive_commercial(
                 "available": False,
                 "original_buyer_evidence_health": buyer_evidence,
                 "original_warm_partner_closing": warm_closing,
+                "original_lead_smart_call_to_cash_pulse": lead_smart_cash_pulse,
                 "original_commercial_outcome_learning_handoff": learning_handoff,
                 "original_buyer_evidence_transition": buyer_transition,
                 "original_order_outcome_reader_capability": order_reader,
