@@ -18,6 +18,7 @@ from empire_os.media_research_pack import (
 )
 from empire_os.media_last30days_cycle import read_and_refresh_last30days
 from empire_os.media_last30days_merge import merge_last30days_reports
+from empire_os.media_last30days_handoff import refresh_research_handoff
 
 
 OPPORTUNITY_RESEARCH = Path(
@@ -216,8 +217,13 @@ def refresh_media_research_bridge(
         encoding="utf-8",
     )
     tmp.replace(path)
+    # The same existing Media OS cycle provides a bounded research-only handoff
+    # for other owners. No import into their economic/search evidence tables.
+    handoff = (refresh_research_handoff(repo_root, payload)
+               if health.get("enabled") is True else None)
     return {
         **payload,
+        "last30days_owner_handoff": handoff,
         "written_path": str(path.relative_to(repo_root)),
         "external_action_performed": False,
         "database_write_performed": False,
