@@ -16,6 +16,9 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 
+from empire_os.microsite_cinematic_background import (
+    chicago_night_skyline_data_uri, chicago_premium_css,
+)
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
 from empire_os.third_party.slopmonster.deslop import audit, normalise, visible_text
@@ -247,6 +250,27 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
     location = _safe_text(geo["area"])
     summary_html = _safe_text(summary)
     kw_html = _safe_text(keyword)
+    # The founder's accepted visual direction applies only to the single
+    # researched Chicago citywide pilot. Other geographies keep their original
+    # preview presentation; never reuse Chicago imagery on arbitrary markets.
+    chicago_design = (
+        canonical is not None
+        and geo.get("market_id") == "US-IL"
+        and geo.get("kind") == "metro"
+        and kind == "local_utility"
+    )
+    cinematic_css = chicago_premium_css() if chicago_design else ""
+    cityscape = (
+        '<div class="site-art" aria-hidden="true" style="background-image:url('
+        + chicago_night_skyline_data_uri() + ')"></div>'
+        if chicago_design else ""
+    )
+    if chicago_design and ":" in title:
+        left, right = title.split(":", 1)
+        title_html = (
+            '<span class="hero-title-base">' + _safe_text(left + ":") + '</span>'
+            '<span class="hero-title-accent">' + _safe_text(right.strip()) + '</span>'
+        )
     return f"""<!doctype html>
 <html lang="en">
 <head>
@@ -301,9 +325,11 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 @media(max-width:760px) {{.hero-layout{{grid-template-columns:1fr}} .signal-panel{{max-width:560px}}}}
 @media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}} .wordmark{{width:170px}}}}
 @media(prefers-reduced-motion:reduce) {{html{{scroll-behavior:auto}}}}
+{cinematic_css}
 </style>
 </head>
 <body>
+{cityscape}
 <a class="skip" href="#main">Skip to content</a>
 <header class="wrap"><nav aria-label="Main navigation"><img class="wordmark" src="{logo_src}" alt="Empire AI Predictive Revenue" width="215" height="49">
 <span class="preview">Internal draft · not published</span></nav></header>
@@ -391,6 +417,12 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
         "html_sha256": sha256(html.encode()).hexdigest(),
         "locally_useful_research_steps": len(spec.get("research_steps", [])),
+        "cinematic_chicago_art_rendered": (
+            _canonical_brand_contract() is not None
+            and geo.get("market_id") == "US-IL"
+            and geo.get("kind") == "metro"
+            and site_kind == "local_utility"
+        ),
         "linked_official_source_count": sum(bool(fact.get("official_url")) for fact in facts),
         "source_claims_independently_confirmed_by_site_owner": False,
         "visual_qa": {
