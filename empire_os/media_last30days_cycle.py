@@ -17,6 +17,7 @@ import tempfile
 from typing import Any, Mapping
 
 from empire_os.media_last30days_demand import build_last30days_media_candidates
+from empire_os.media_last30days_search_profiles import enabled_plan_json
 
 ROOT = Path("runtime/media_os/last30days")
 CONFIG = ROOT / "config.json"
@@ -86,6 +87,9 @@ def _run_keyless(repo_root: Path, topic: str) -> dict[str, Any] | None:
         "--max-source-fetches", "1", "--no-browser-cookies",
         "--no-verify-freshness", "--emit", "json",
     ]
+    approved_plan = enabled_plan_json(topic)
+    if approved_plan is not None:
+        cmd.extend(("--plan", approved_plan))
     env = {
         key: value for key, value in os.environ.items()
         if not any(secret in key.upper() for secret in (
