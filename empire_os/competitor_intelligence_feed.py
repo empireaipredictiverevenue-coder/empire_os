@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from empire_os.competitor_opportunity_evidence_bridge import build_bridge_runtime
+from empire_os.voice_routing_policy import switchboard_status
 from empire_os.competitor_audience_sweep import (
     load_resolved_market_entities,
 )
@@ -277,6 +278,59 @@ def write_feed_snapshot(
     return path
 
 
+def _existing_ppc_switchboard_hub_readiness(repo_root: Path) -> dict[str, Any]:
+    """Inventory the *existing* guarded call surfaces; never route anything.
+
+    The legacy Voice Lab switchboard and central Hub have source code, but a
+    module's presence or legacy feature flag is NOT a tested Ringba route.
+    Execution in the original PPC adapter deliberately raises RuntimeError.
+    """
+    policy = switchboard_status()
+    def present(rel: str) -> bool:
+        file = repo_root / rel
+        return file.is_file() and not file.is_symlink()
+
+    configured = policy.get("execution_allowed") is True
+    return {
+        "schema_version": "empire.ppc.existing_switchboard_hub_readiness.v1",
+        "mode": "OBSERVE",
+        "canonical_switchboard_adapter_present":
+            present("empire_os/ppc_switchboard_adapter.py"),
+        "legacy_agent_switchboard_present": present("empire_os/switchboard.py"),
+        "legacy_ppc_router_present": present("empire_os/ppc_router.py"),
+        "legacy_telephony_webhook_present":
+            present("empire_os/telephony_webhook.py"),
+        "existing_central_hub_source_present": present("empire_os/hub.py"),
+        "existing_buyer_marketplace_present":
+            present("empire_os/buyer_marketplace_webhooks.py"),
+        "existing_call_manager_present":
+            present("empire_os/call_manager.py"),
+        "existing_voice_gateway_present":
+            present("empire_os/voice_gateway_api.py"),
+        "voice_switchboard_policy_mode": policy.get("mode"),
+        "voice_policy_flags_request_execution": configured,
+        "current_policy_legacy_transport": policy.get("canonical_transport"),
+        "current_policy_legacy_database": policy.get("canonical_database"),
+        "original_ppc_adapter_executor_hard_stopped": True,
+        "legacy_executor_must_not_be_activated": True,
+        "ringba_pilot_owner_requires_independent_routing_proof": True,
+        "legacy_transport_and_database_need_original_owner_refactor": True,
+        "hub_source_presence_is_not_live_service_proof": True,
+        "hub_live_service_verified": False,
+        "provider_route_verified": False,
+        "buyer_human_answer_verified": False,
+        "buyer_accepted_payable_calls_verified": False,
+        "settled_cash_verified": False,
+        "status": ("LEGACY_FLAG_CONFLICT_NEEDS_OWNER_REVIEW" if configured
+                   else "EXISTING_ADAPTER_PARKED_PREVIEW_ONLY"),
+        "new_hub_or_switchboard_created": False,
+        "routing_authorized": False,
+        "payment_authorized": False,
+        "outbound_authorized": False,
+        "execution_authority": "none",
+    }
+
+
 def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     """Re-use original competitor runtime; national call networks are not
     added to the resolved local contractor roster or credited with demand."""
@@ -523,6 +577,8 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "cro_owner_handoff": cro_summary,
         "operator_video_research": video_summary,
         "call_loss_readiness": loss_summary,
+        "existing_switchboard_and_hubs":
+            _existing_ppc_switchboard_hub_readiness(repo_root),
     }
 
 
