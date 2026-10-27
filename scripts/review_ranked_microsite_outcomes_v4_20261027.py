@@ -13,6 +13,9 @@ from empire_os.microsite_page_outcomes_v4 import (
     read_original_weekly_search_report, build_microsite_outcome_register,
 )
 from empire_os.microsite_commercial_intelligence_v3 import build_microsite_commercial_review
+from empire_os.microsite_verified_outcomes_v5 import (
+    OriginalPageReaders, build_approved_microsite_scorecard,
+)
 
 DEFAULT_ORIGINAL_WEEKLY = Path(
     "/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022/"
@@ -54,6 +57,14 @@ def run(
     else:
         baseline = None
     outcomes = build_microsite_outcome_register(queue, original_weekly_gsc=baseline)
+    # No original owner reader authorises a newly minted factory route yet.
+    # Scorecard reports every factory page's metrics as unknown, not zero.
+    verified = None
+    if baseline is not None:
+        window = baseline["current_window"]
+        verified = build_approved_microsite_scorecard(
+            specs, readers=OriginalPageReaders(),
+            window_start=window["start_date"], window_end=window["end_date"])
     out.mkdir(parents=True, exist_ok=True)
     for name, payload in (
         ("ranked_research_queue.json", queue),
@@ -63,6 +74,10 @@ def run(
         (out / name).write_text(
             json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
             encoding="utf-8")
+    if verified is not None:
+        (out / "approved_page_measurement_readiness_v5.json").write_text(
+            json.dumps(verified, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+            encoding="utf-8")
     return {
         "status": "PRIVATE_RANKED_RESEARCH_QUEUE",
         "candidates_ranked": queue["candidate_count"],
@@ -70,6 +85,7 @@ def run(
         "publishable_candidates": queue["publishable_count"],
         "approved_factory_pages": 0,
         "commercial_outcome_attribution_verified": False,
+        "approved_page_measurement_v5_written": verified is not None,
         "external_model_calls": 0,
         "new_services": 0,
         "production_changed": False,

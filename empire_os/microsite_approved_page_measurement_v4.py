@@ -76,7 +76,23 @@ def review_deployed_microsite(
             or loc.username or loc.password or loc.query or loc.fragment
             or not loc.path.startswith("/research/")):
         raise ValueError("unapproved owned-route origin")
-    _owner_row(release, source="original_empire_website_owner", cid=cid, url=url, sha=digest)
+    # Draft previews intentionally carry noindex. A real owner-released public
+    # page may have different, indexable HTML. In that case the original owner
+    # must immutably bind BOTH exact source-preview SHA and deployed asset SHA;
+    # all downstream analytics must reference the deployed (not draft) bytes.
+    deployed_digest = release.get("asset_sha256")
+    if release.get("source_preview_sha256") is None:
+        if deployed_digest != digest:
+            raise ValueError("deployment asset does not match source candidate")
+    elif (release.get("source_preview_sha256") != digest
+          or not isinstance(deployed_digest, str)
+          or len(deployed_digest) != 64
+          or any(ch not in "0123456789abcdef" for ch in deployed_digest)
+          or release.get("deployed_asset_readback_verified") is not True):
+        raise ValueError("original source-preview to released-asset linkage missing")
+    _owner_row(release, source="original_empire_website_owner", cid=cid, url=url, sha=deployed_digest)
+    result["draft_preview_sha256"] = digest
+    result["source_asset_sha256"] = deployed_digest
     result["state"] = "OWNER_DEPLOYMENT_VERIFIED_MEASUREMENT_PENDING"
     result["public_url"] = url
     result["source_receipts"]["site_owner"] = release["source_evidence_ref"]
@@ -87,7 +103,8 @@ def review_deployed_microsite(
         row = reader(url)
         if row is None:
             return None
-        return _owner_row(row, source=owner, cid=cid, url=url, sha=digest)
+        return _owner_row(
+            row, source=owner, cid=cid, url=url, sha=result["source_asset_sha256"])
 
     gsc = source_row(original_gsc_reader, "original_seo_first_party_gsc")
     if gsc is not None:
