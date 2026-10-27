@@ -104,3 +104,9 @@ A read-only scan of all ten National Storm Hub worktrees found no `app/roofing`,
 - Keep routing, call recording, email automation, live phone numbers, payment recognition and weather-data-to-buyer sharing disabled until those separate owners verify the genuine, supervised consumer flow.
 
 **Truthful current status:** `SITE_OWNER_STAGE_NOT_DONE; CALLSCALER_SOURCE_APPROVAL_NOT_GRANTED; APPLICATION_NOT_SUBMITTED; ACCEPTED_PAYABLE_CALLS_NOT_VERIFIED; SETTLED_REVENUE_NOT_VERIFIED`.
+
+## CallScaler source-fit clarification drafted — 27 October 2026
+
+- Original personal Gmail thread: `1a134a52f8a4a371`, support reply message `1a164eebf71b7dd1` (22 October). No new incoming provider reply was found during the latest 27 October check.
+- A single **DRAFT (not sent)** has now been created in that original personal Gmail conversation: draft ID `r1394472598157877737`, message ID `1a17f1f4e69362eb`. It asks whether the existing safety-first `nationalstormhub.com` may host a separate homeowner-initiated, fully disclosed organic roofing page, or whether the marketplace requires a roofing-only domain. It accurately states that no page, buyer route or calls are live. A draft is **not outreach**, commercial acceptance, or an active buyer. Do not schedule or automatically transmit it.
+- No National Storm Hub website-owner source path was edited or production deployed. Original owner must stage and independently review any optional page using its own assigned workstream. Do not dispatch a generic code agent in place of that original owner. The recorded owner handoff remains commit `c4346f25b`.
