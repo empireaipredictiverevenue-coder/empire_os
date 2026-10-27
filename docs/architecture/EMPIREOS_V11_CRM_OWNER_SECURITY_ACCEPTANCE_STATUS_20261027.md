@@ -53,3 +53,51 @@ No production signed bearer, real order, account password, production DBA
 catalogue grant, CRM owner release, real payment or live founder route was
 involved. The original owner-held SQL and unpublished login changes remain
 separate, and this does not automatically qualify a production release.
+
+
+## Original first-party CRM authenticated order HTTP route — review candidate
+
+The isolated PR now includes `empire_os/crm_revenue_case_private_api.py` and
+an **optional, default-disabled** registration in the existing
+`revenue_crm_pilot_activation.build_pilot_routers`. It does not start a
+second FastAPI app, database login or gateway. It preserves the original
+two-router private CRM pilot service and its 127.0.0.1 boundary.
+
+The only new endpoint, if the **original CRM service owner** explicitly
+sets `EMPIRE_CRM_V11_ORDER_READ_ENABLED=1` in that existing private service
+configuration and authorises a guarded deployment, is:
+
+`GET /v1/revenue-crm/prospects/{prospect_id}/opportunities/{opportunity_id}/orders/{order_id}/revenue-case`
+
+It requires the exact original Ed25519-signed, active-membership CRM bearer,
+the original authenticated read resolver and the matching dedicated per-
+tenant login and original tenant-scoped RPC. The handler also verifies
+the exact tenant/order in the V11 result and strictly validates a
+field-allowlisted Pydantic model; it returns only the redacted
+`founder_case_view`, not the original order, tenant UUID, token,
+DSN, financial data or unverified receipts. It uses no-store headers,
+cannot recognise money, sends no mail and writes no tables.
+
+In the absence of the flag, the endpoint is not registered (404). Without
+valid member authentication it returns 401. On missing/held RPC, scope
+mismatch, tampering or unreadable evidence it fails closed with a redacted
+503. The original private service itself still remains off the public
+internet, and its existing security middleware applies.
+
+`tests/test_crm_v11_private_order_api_pg18.py` covers actual HTTP
+access over the original CRM router, signed synthetic token, real psycopg
+and ephemeral PostgreSQL exact-order RPC; an order with test
+`fulfilment_state='paid'` still yields **no verified revenue**.
+It also covers default-off and exact opt-in installation through the
+original private pilot config, private FastAPI service startup, rejection
+of unauthenticated and cross-tenant attempts, and rejection of a payload
+with unexpected secret fields. All original account and database test
+credentials are synthetic and disposable.
+
+**Release remains HELD**, separately requiring the original CRM owner's
+uncommitted transport guard release, the original DBA's authorised
+exact-order SQL security review/deployment, a genuine existing
+authenticated tenant/order read, and the existing founder-console owner's
+private server-side session binding. Do not attach this response to the
+general unauthenticated Founder Overview API or enable the opt-in as a
+substitute for any of those gates.
