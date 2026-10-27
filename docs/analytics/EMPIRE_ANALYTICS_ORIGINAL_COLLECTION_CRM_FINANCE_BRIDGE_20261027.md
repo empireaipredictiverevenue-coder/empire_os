@@ -30,3 +30,26 @@ This extends EXISTING `empire_os/analytics` and EmpireDB Analytics054/055. No du
 - Existing first-party offline consent/session, revocation and channel-stage regressions remain green.
 
 **Execution status:** source-contract and staged SQL **built/tested only**; production collector/schema deployment, real source-to-CRM join and final settled revenue **NOT VERIFIED OR ACTIVATED**. This is a bounded owner handoff, not another framework or a second database.
+
+
+## Production EmpireDB ground truth — founder-run read-only catalog, 27 Oct 2026
+The founder executed the EXISTING `scripts.review_analytics_live_catalog_20261019 --read-only` as the local `postgres` OS peer against canonical EmpireDB. The report established:
+- `database_catalog_observed=true`, `canonical_empiredb=true`, `table_count_catalog=0`;
+- `status=ANALYTICS054_055_NOT_DEPLOYED_IN_OBSERVED_CATALOG`;
+- `analytics054_production_deployed_verified=false`, `analytics055_production_deployed_verified=false`;
+- `maintenance_role_not_activated_verified=true`, `no_public_erasure_execute_verified=true`;
+- `customer_records_read=false`, `database_writes=false`, `website_analytics_consent_verified=false`, `live_visitor_sessions_verified=false`.
+
+The ORIGINAL source-only preflights were independently rerun (nonprivileged, no DB connection) and verified the existing pinned Analytics054/055 SHA256 hashes. The original tag monitor observes static homepage markup, but not live consent, tag firing, sessions or revenue. Analytics075 remains HELD and tested only in isolated PostgreSQL 18. This creates an accurate **zero-table production baseline**; prior UNKNOWN inventory in this document is superseded by the founder-run result.
+
+### Exact approved-owner deployment decision still outstanding
+1. The original DBA must independently attest `empiredb_migrator` NOLOGIN/non-superuser/no-BYPASSRLS against **current** `pg_catalog`, plus safety of schema ownership, backups/recovery, operational lock window and original SQL pin. The general zero-table catalog report does NOT itself positively attest the migrator role.
+2. The founder and original Privacy/Retention owners must expressly approve a **schema-only** installation scope for Analytics054 and Analytics055, with no public analytics collection, browser scripts/cookies, maintenance LOGIN, writer role, app grants or live visitor storage. Retention/erasure authority and legal review for eventual actual collection are separate hard requirements. Neither this handoff nor the founder's read-only check authorises schema writes.
+3. Original DBA, after approval, alone installs the EXACT checked-in 054 and 055 migrations in order through the existing controlled database release, with verified safe owner, collision preflight, backup and restoration procedure. Re-run the existing peer-only `review_analytics_live_catalog_20261019 --read-only` after each migration and verify the expected schema state and forced-RLS/owner protections. STOP on any deviation; do not apply 075 automatically.
+4. Only AFTER 054/055 and separate owner review may the original DBA consider Analytics075 paid/affiliate taxonomy. The isolated fixture passing does not authorise production. Subsequent dedicated consent-authority/writer, publisher-signed source bindings, lawful retention, public website activation, canonical CRM order join, independently reconciled Finance cash and Predictive Revenue calibration each remain individually withheld pending real evidence.
+
+**Current installation decision: `SCHEMA_NOT_INSTALLED_FOUNDER_DBA_APPROVAL_REQUIRED`.**
+**Current ingestion decision: `REAL_COLLECTION_OFF_AND_CONSENT_UNVERIFIED`.**
+**Live cash attribution: `NOT_VERIFIED`.**
+
+An attempted follow-up privileged role-only catalog query from the remote execution tool was blocked by that tool's command restriction. No privileged query or migration was executed by the assistant, and that restriction was not bypassed. Original founder-run catalog status above remains authoritative.
