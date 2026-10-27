@@ -60,7 +60,7 @@ jobs:
         run: npm ci --no-audit --no-fund
       - name: Render snapshot holds and financial unknowns
         working-directory: apps/search-command-centre
-        run: node --test tests/predictive-money.test.cjs tests/predictive-snapshot-panel.test.cjs
+        run: node --test tests/predictive-money.test.cjs tests/predictive-snapshot-panel.test.cjs tests/predictive-company-client.test.cjs
       - name: Lint changed Predictive Revenue components
         working-directory: apps/search-command-centre
         run: npx --no-install eslint src/app/predictive-revenue/page.tsx src/app/predictive-revenue/money.ts src/app/predictive-revenue/snapshot-evidence.tsx
