@@ -455,6 +455,9 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             != "empire.competitor_pay_per_call_video_research.v1"
             or operator_videos.get("mode") != "OBSERVE"
             or operator_videos.get("video_count") != 7
+            or operator_videos.get("deep_study_count") != 10
+            or operator_videos.get("deep_research_execution_authority") != "none"
+            or operator_videos.get("external_benchmark_not_empire_performance", {}).get("not_empire_observations") is not True
             or operator_videos.get("full_video_playback_claimed") is not False
             or operator_videos.get("paid_traffic_authorized") is not False
             or operator_videos.get("seo_publication_authorized") is not False
@@ -472,6 +475,17 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             "video_watchlist": operator_videos.get("video_watchlist"),
             "owner_research_actions": operator_videos.get("owner_research_actions"),
             "case_source_count": operator_videos.get("case_source_count"),
+            "deep_study_count": operator_videos.get("deep_study_count"),
+            "deep_primary_source_lessons": operator_videos.get("deep_primary_source_lessons"),
+            "external_benchmark_not_empire_performance": operator_videos.get(
+                "external_benchmark_not_empire_performance"
+            ),
+            "deep_buyer_first_learning_order": operator_videos.get(
+                "deep_buyer_first_learning_order"
+            ),
+            "deep_original_owner_evidence_gaps": operator_videos.get(
+                "deep_original_owner_evidence_gaps"
+            ),
             "full_video_playback_claimed": False,
             "paid_traffic_authorized": False,
             "execution_authority": "none",

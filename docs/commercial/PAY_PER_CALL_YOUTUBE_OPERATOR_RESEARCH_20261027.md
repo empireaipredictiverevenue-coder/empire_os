@@ -37,3 +37,59 @@ No current audited competitor traffic shares, no video-derived keyword rankings,
 - No new service, PostgreSQL database, YouTube scraper, paid media, website publication or email outreach.
 
 **Recommended next live research task:** original Ringba/buyer owner issues an authorised aggregate call-disposition/source report for the last actual supervised roofing cohort, without personal call recordings, then the existing CRO and per-call-economics evaluators analyse only what is verified.
+
+
+---
+
+## Deep operator comparison — evidence phase 2 (27 October 2026)
+
+This expansion compares older pay-per-call operator interviews and network guides with October 2026 platform developments, a published 2026 home-services sample benchmark, and FTC consumer-calling guidance. Historical network tactics are hypotheses, **not proven current Empire outcomes or authorisation**.
+
+### 1. Map direct buyers versus broker chains
+Gene Morris describes an important risk: a listed payout or earnings-per-click figure may reflect a small exceptional partner or multiple resale intermediaries. Review which counterparty receives a call, which party ultimately owes money, their dispute window, what triggers a reversal and who has commercial authority. Source: https://www.ringba.com/blog/gene-morris-pay-per-call-blueprint
+
+### 2. Buyer readiness is a traffic-acquisition constraint, not only a launch toggle
+Ringba's network guide lists buyer hours, caps, geographic eligibility, agent concurrency, minimum duration, approved traffic methods and payout terms. For US roofing, a storm warning or high search volume cannot override a buyer-specific open/qualified route. Source: https://www.ringba.com/blog/pay-per-call/how-pay-per-call-networks-function (historical indexed training article; live URL may have moved).
+
+### 3. Own real customer demand instead of relying on one media format
+Ringba's 2020 Anthony Sarandrea client story describes owned vertical sites, alternative acquisition channels, measurement and bespoke creative, rather than reliance on a single call-only search-ad format. Vendor-quoted 500% growth and other figures are marketing claims, not Empire forecasts or authenticated results. Source: https://www.ringba.com/blog/anthony-sarandrea-case-study
+
+### 4. Separate caller intent, publisher compliance and buyer service failure
+The 2020 WeCall client story reports that cheap calls can be unhelpful even if technically billable. Ringba QA documentation also distinguishes bad scripts, duration manipulation, publisher traffic defects, buyer cherry-picking and agent performance. These are **possible classifications**, not accusations about Lead Smart or any actual partner. Use original authorised owner-reported dispositions (no answer, busy, wrong geography, wrong roofing service, legitimate rejection, disallowed traffic method, duplicate, disconnected, short-duration, invalid billable rule) and always preserve source references and dispute rights. Sources:
+- https://www.ringba.com/blog/wecall-media-case-study
+- https://www.ringba.com/blog/pay-per-call/quality-assurance
+
+### 5. Answer rate is a material separate conversion gate
+Invoca's *July 2026 Home Services Lead Conversion Benchmarks* reports **52%** of inbound callers spoke to a person, **38%** of answered calls were classified as leads and **45%** of leads converted during the call. The report covers **nine** home-services categories (including plumbing, HVAC and restoration) in Invoca's customer base and is drawn from a much broader multi-industry dataset; it is **not roofing-specific, pay-per-call-billable, independently settled or Empire measurement**. Compare actual answer and accepted-payable events separately before spending to drive more calls.
+Source: https://www.invoca.com/reports/the-invoca-home-services-lead-conversion-benchmarks-report-2026
+
+### 6. Call-only tutorials from 2020–2025 are already outdated
+Google's official Ads guidance: **February 2026** removed new stand-alone call-only ad creation; by **February 2027** existing ones stop impressions. A future source-approved paid roofing campaign must investigate responsive search ads with call assets, not blindly duplicate the operators' old call-only settings. No Google Ads budget or account change is authorised.
+Source: https://support.google.com/google-ads/answer/16619010?hl=en
+
+### 7. Attribution loss after consent decisions is real uncertainty
+Invoca's June 2026 review describes the *ad_storage* consent dependency in Google Ads attribution. First-party tracking must respect privacy; where a website/session/call cannot lawfully be matched, the original source remains UNKNOWN. Never forcibly match callers to ad viewers, ignore opt-outs or backfill lost campaigns from guesses.
+Source: https://www.invoca.com/blog/how-googles-june-2026-privacy-update-will-affect-phone-call-conversion-attribution
+
+### 8. Keep consumer calling permission and resale authority separate
+The FTC's Telemarketing Sales Rule guidance distinguishes a consumer-initiated enquiry from outbound telemarketing and includes seller-specific obligations for prerecorded marketing messages. Inbound calls are not blanket permission for unsolicited callbacks, repeat dialing or arbitrarily rerouting an individual to other networks. Obtain the original legal/commercial owner's jurisdiction-specific review before changing the experience.
+Source: https://www.ftc.gov/business-guidance/resources/complying-telemarketing-sales-rule
+
+### Practical EmpireOS sequence — in original systems only
+1. **Commercial before media:** buyer-specific accepting ZIPs, service type, hours, source eligibility, payable duration and contract.
+2. **Actual reasons for lost calls:** original Ringba/Lead Smart commercial owner provides aggregate source + dispositions and distinguish genuine unavailable buyer from poor-quality caller.
+3. **Full source-to-settlement cohort:** original website source/referrer and consented ZIP-choice, then call ID, delivery, buyer acceptance, reversal and deposited cash through authorised finance. This must be independently reconciled.
+4. **CRO:** original Conversion Intelligence uses the same-source measured dropout to propose truthful hero/ZIP/mobile/consent improvements; no automatic site edit.
+5. **Free acquisition:** original SEO and publisher owners identify existing measured homeowner search/referral intent and permissible editorial channels, not imaginary US roofing demand or fake local listings.
+6. **Paid feasibility:** only after buyer source approval and actual margin: a capped experiment with Google responsive search/call assets or other approved channels, with loss limits and separate founder authority.
+7. **Predictive feedback:** feed only verified cost, settlement and call acceptance into outcome learning. Operator-reported anecdotes remain *research*, not training labels indicating winners.
+
+### Work left incomplete
+Actual source-specific traffic or ranking of profitable roofing keywords; original buyer acceptance terms; source-joined Ringba answer/rejection counts; commercial settlement receipts; current Google Ads account feature/consent verification. These are the **next evidence gaps**, not reasons to manufacture percentages.
+
+The ranked ten-study primary-source packet is now embedded in:
+- docs/commercial/PAY_PER_CALL_YOUTUBE_OPERATOR_RESEARCH_20261027.json > deep_research
+- runtime/competitive_intelligence/pay_per_call_youtube_research_latest.json
+- empire_os.competitor_intelligence_feed.build_feed_runtime > call_acquisition_intelligence.operator_video_research
+
+**Ownership:** Only original website/SEO, Ringba commercial, privacy, buyer acquisition, CRO and finance teams are authorised to make their respective live changes. This work performed research and read-only evidence integration, **not** paid ads, call rerouting, data harvesting or revenue collection.

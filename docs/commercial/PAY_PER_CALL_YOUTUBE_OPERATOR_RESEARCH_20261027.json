@@ -214,5 +214,169 @@
     "empire_payable_calls": null,
     "empire_settled_cash_margin": null
   },
-  "disclosure": "Some public pages contain excerpts or titles, not the full YouTube transcript. Other figures are first-party vendor/client marketing case claims, not audited results."
+  "disclosure": "Some public pages contain excerpts or titles, not the full YouTube transcript. Other figures are first-party vendor/client marketing case claims, not audited results.",
+  "deep_research": {
+    "revision": "DEEP_PRIMARY_SOURCE_REVIEW_20261027",
+    "evidence_scope": "OPERATOR_TRAINING_VENDOR_SAMPLED_CALL_BENCHMARKS_AND_PLATFORM_POLICIES_NOT_EMPIRE_RESULTS",
+    "studies": [
+      {
+        "id": "buyer_terms_before_traffic",
+        "label": "Commercial buyer contract before launch",
+        "rank": 1,
+        "source_url": "https://www.ringba.com/blog/pay-per-call/how-pay-per-call-networks-function",
+        "source_class": "HISTORICAL_RINGBA_TRAINING_GUIDE",
+        "observation": "Networks describe buyer hours, caps, concurrent agents, payout, minimum connected duration, geographies and permitted marketing sources as offer conditions.",
+        "implication": "Require buyer-signed source terms, genuine receiving capacity and operating hours for each market before promoting any consumer call.",
+        "owner": "ORIGINAL_BUYER_COMMERCIAL_TEAM",
+        "evidence_to_unlock": "APPROVED_GEO_HOURS_CAP_PAYOUT_SOURCE_AND_QUALIFICATION_RULES",
+        "prohibited_inference": "Published buyer capacity means Empire buyer capacity"
+      },
+      {
+        "id": "broker_chain_and_disputes",
+        "label": "Counterparty and broker depth transparency",
+        "rank": 2,
+        "source_url": "https://www.ringba.com/blog/gene-morris-pay-per-call-blueprint",
+        "source_class": "GENE_MORRIS_OPERATOR_INTERVIEW_EXCERPT",
+        "observation": "Gene Morris recommends questioning claimed per-click payouts, learning how many intermediaries are between publisher and end buyer, and requesting qualified-call dispositions from affiliate managers.",
+        "implication": "Track counterparty chain, dispute path, written payable terms, reversal deadlines and who confirms original buyer acceptance.",
+        "owner": "ORIGINAL_COMMERCIAL_BUYER_AND_PUBLISHER_TEAM",
+        "evidence_to_unlock": "WRITTEN_COUNTERPARTY_CHAIN_AND_DISPOSITION_RIGHTS",
+        "prohibited_inference": "Advertised earnings-per-click are broadly attainable"
+      },
+      {
+        "id": "owned_media_source_diversity",
+        "label": "Owned publisher properties and alternative traffic",
+        "rank": 3,
+        "source_url": "https://www.ringba.com/blog/anthony-sarandrea-case-study",
+        "source_class": "RINGBA_2020_VENDOR_CLIENT_CASE",
+        "observation": "Anthony Sarandrea case describes vertical-specific owned media, multi-channel acquisition, unique marketing angles and integrated tracking instead of reliance on call-only search advertising.",
+        "implication": "Research existing genuine relevant organic and publisher audiences; preserve competitor SEO owner scope and do not mass-generate doorstep ZIP pages.",
+        "owner": "ORIGINAL_SEARCH_AND_PUBLISHER_OWNER",
+        "evidence_to_unlock": "VERIFIED_APPROVED_REFERRAL_OR_FIRST_PARTY_VISITOR_COHORT",
+        "prohibited_inference": "Historical company call volumes or claimed 500% growth predict Empire results"
+      },
+      {
+        "id": "caller_intent_alignment",
+        "label": "Creative/intent and qualification match",
+        "rank": 4,
+        "source_url": "https://www.ringba.com/blog/wecall-media-case-study",
+        "source_class": "RINGBA_2020_VENDOR_CLIENT_CASE",
+        "observation": "WeCall describes inexpensive calls that did not meet buyer needs and improved feedback by inspecting call reasons and quality.",
+        "implication": "CRO and paid/organic traffic learning should only use consented aggregate accepted versus rejected outcomes, matched to original campaign.",
+        "owner": "ORIGINAL_CRO_MEDIA_AND_RINGBA_OWNER",
+        "evidence_to_unlock": "PERMITTED_AGGREGATE_DISPOSITION_BY_SOURCE_AND_SERVICE",
+        "prohibited_inference": "Low CPC implies low payable call acquisition cost"
+      },
+      {
+        "id": "missed_answer_and_buyer_quality",
+        "label": "Buyer non-answer, busy and agent handling",
+        "rank": 5,
+        "source_url": "https://www.ringba.com/blog/pay-per-call/quality-assurance",
+        "source_class": "HISTORICAL_RINGBA_QA_TRAINING",
+        "observation": "Ringba QA documentation includes agents selectively ending calls, callbacks, bad call scripts, duration issues and two-sided publisher/buyer quality audits.",
+        "implication": "Record permitted reason-coded delivery/rejection counts; differentiate publisher defects from buyer non-answer, unavailable agent and commercial dispute; never replay calls to alternate buyers without authority.",
+        "owner": "ORIGINAL_RINGBA_CALL_OWNER",
+        "evidence_to_unlock": "OWNER_APPROVED_NO_ANSWER_BUSY_REJECTED_DUPLICATE_SHORT_DURATION_REASONS",
+        "prohibited_inference": "Every unaccepted call is a poor homeowner lead"
+      },
+      {
+        "id": "independent_home_service_answer_rates",
+        "label": "External answer-rate benchmark, not a roofing target",
+        "rank": 6,
+        "source_url": "https://www.invoca.com/reports/the-invoca-home-services-lead-conversion-benchmarks-report-2026",
+        "source_class": "VENDOR_2026_CROSS_HOME_SERVICES_SAMPLED_BENCHMARK",
+        "observation": "Invoca reports that 52% of inbound callers reach a person in its home services customers; 38% of answered calls are leads and 45% of those leads convert during the call. Study covers nine sub-industries (not a roofing-only benchmark).",
+        "implication": "Compare distinct answer, qualified lead and booked conversion outcomes without treating them as pay-per-call accepted or independently settled rates.",
+        "owner": "ORIGINAL_CRO_AND_CALL_DELIVERY_TEAM",
+        "evidence_to_unlock": "FIRST_PARTY_BY_COHORT_ANSWER_RATE_AND_REAL_BUYER_ACCEPTANCE",
+        "prohibited_inference": "Vendor samples equal Empire observed rates or roofing billable rates"
+      },
+      {
+        "id": "google_call_ads_transition",
+        "label": "Google call-only ad deprecation",
+        "rank": 7,
+        "source_url": "https://support.google.com/google-ads/answer/16619010?hl=en",
+        "source_class": "GOOGLE_OFFICIAL_2026_AD_FORMAT_POLICY",
+        "observation": "Google removed ability to create new call-only ads in February 2026, and plans for existing call ads to stop serving February 2027; responsive search ads with call assets are the supported transition.",
+        "implication": "Paid traffic research must not recommend creating old call-only ads; preserve paid spend at zero pending source permissions, buyer capacity and actual settlement economics.",
+        "owner": "ORIGINAL_SEARCH_ADS_MEDIA_OWNER",
+        "evidence_to_unlock": "POLICY_COMPLIANT_RESPONSIVE_SEARCH_CALL_ASSET_DESIGN_AND_EXPLICIT_AD_SPEND_GATE",
+        "prohibited_inference": "Historical call-only YouTube tutorial is a current account setup guide"
+      },
+      {
+        "id": "consent_first_party_attribution",
+        "label": "Consent-aware keyword and call source evidence",
+        "rank": 8,
+        "source_url": "https://www.invoca.com/blog/how-googles-june-2026-privacy-update-will-affect-phone-call-conversion-attribution",
+        "source_class": "VENDOR_2026_PRIVACY_CHANGE_EXPLAINER",
+        "observation": "Invoca describes 15 June 2026 change making Google Consent Mode ad_storage decisive for Ads attribution; revoked consent can make conversions unattributed in Ads reports.",
+        "implication": "Preserve privacy-aware first-party lawful source and call lineage; do not backfill unknown sources with guesses or identify denied-consent visitors.",
+        "owner": "ORIGINAL_ANALYTICS_PRIVACY_AND_MEDIA_OWNER",
+        "evidence_to_unlock": "CONSENT_APPROPRIATE_SOURCE_TO_CALL_JOIN_OR_EXPLICIT_UNKNOWN",
+        "prohibited_inference": "Unattributed calls all came from a certain channel"
+      },
+      {
+        "id": "separate_buyer_and_publisher_qa",
+        "label": "Publisher versus advertiser QA ownership",
+        "rank": 9,
+        "source_url": "https://www.ringba.com/blog/pay-per-call/how-pay-per-call-networks-function",
+        "source_class": "HISTORICAL_RINGBA_TRAINING_GUIDE",
+        "observation": "Ringba's network guide distinguishes publisher-source compliance from advertiser call-handling and finance reconciliation duties.",
+        "implication": "Use separate read-only QA reason codes and ownership while preserving original buyer acceptance authority; do not make downstream fraud allegations without evidence.",
+        "owner": "ORIGINAL_COMMERCIAL_QUALITY_AND_FINANCE_OWNERS",
+        "evidence_to_unlock": "SEPARATE_PUBLISHER_RULES_AND_BUYER_DISPOSITION_AUDIT",
+        "prohibited_inference": "Any particular partner is cheating"
+      },
+      {
+        "id": "telemarketing_consent_and_source_rights",
+        "label": "Consent and unwanted calling restrictions",
+        "rank": 10,
+        "source_url": "https://www.ftc.gov/business-guidance/resources/complying-telemarketing-sales-rule",
+        "source_class": "US_GOVERNMENT_COMPLIANCE_GUIDANCE",
+        "observation": "FTC distinguishes consumer-initiated enquiries from unsolicited outbound telemarketing and explains seller-specific prerecorded-call consent requirements and do-not-call obligations.",
+        "implication": "Do not equate an inbound homeowner request with permission for unsolicited calls; require jurisdiction-specific original-owner compliance review.",
+        "owner": "ORIGINAL_PRIVACY_LEGAL_AND_COMMERCIAL_OWNER",
+        "evidence_to_unlock": "APPROVED_CALLER_INITIATED_CONSENT_NOTICE_AND_NO_UNAUTHORISED_RECONTACT",
+        "prohibited_inference": "A lead-generation form permits unlimited callback or resale"
+      }
+    ],
+    "outside_benchmark": {
+      "source_url": "https://www.invoca.com/reports/the-invoca-home-services-lead-conversion-benchmarks-report-2026",
+      "provider": "Invoca",
+      "published": "2026-07",
+      "industry": "MIX_OF_NINE_HOME_SERVICES_CATEGORIES_NOT_ROOFING_ONLY",
+      "sample": "INVOCAS_CUSTOMER_BASE_NOT_US_HOMEOWNER_PAY_PER_CALL_RATES",
+      "calls_answered_pct": 52,
+      "answered_calls_that_are_leads_pct": 38,
+      "leads_converting_during_call_pct": 45,
+      "not_empire_observations": true,
+      "not_roofing_payable_call_rates": true
+    },
+    "operator_learning_order": [
+      "WRITTEN_BUYER_SOURCE_AND_CAPACITY_TERMS",
+      "QUALIFIED_BUYER_DISPOSITION_REASONS",
+      "FIRST_PARTY_SOURCE_TO_CALL_JOIN",
+      "PUBLISHER_ACQUISITION_AND_CREATIVE_CONSISTENCY",
+      "OWNER_MEASURED_CRO_DROP_OFF",
+      "INDEPENDENT_SETTLEMENT_AND_MARGIN",
+      "FUNDED_PAID_TRAFFIC_TEST_ONLY_AFTER_AUTHORITY"
+    ],
+    "remaining_gaps": [
+      "Original buyer source acceptance, payout and duration",
+      "Real paid/organic homeowner sessions by source",
+      "Actual Ringba buyer-leg answer and reason-code proportions",
+      "Original settled payout and chargebacks",
+      "Current permitted advertising account setup and conversion tracking"
+    ],
+    "execution_controls": {
+      "no_outbound": true,
+      "no_paid_spend": true,
+      "no_seo_changes": true,
+      "no_call_routing_changes": true,
+      "no_protected_recordings": true,
+      "no_new_agent": true,
+      "no_duplicate_database": true,
+      "no_automatic_optimisation": true
+    }
+  }
 }

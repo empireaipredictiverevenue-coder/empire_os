@@ -138,8 +138,63 @@ def build_research(source: dict, *, now: datetime | None = None) -> dict:
     if (not isinstance(missing, dict) or len(missing) != 4
             or any(v is not None for v in missing.values())):
         raise ValueError("marketing claims are not actual operator economics")
+    deep = source.get("deep_research")
+    if (not isinstance(deep, dict)
+            or deep.get("revision") != "DEEP_PRIMARY_SOURCE_REVIEW_20261027"
+            or deep.get("evidence_scope") !=
+            "OPERATOR_TRAINING_VENDOR_SAMPLED_CALL_BENCHMARKS_AND_PLATFORM_POLICIES_NOT_EMPIRE_RESULTS"):
+        raise ValueError("deep primary source research absent")
+    studies = deep.get("studies")
+    if (not isinstance(studies, list) or len(studies) != 10
+            or [s.get("rank") for s in studies] != list(range(1, 11))
+            or len({s.get("id") for s in studies}) != 10):
+        raise ValueError("deep pay per call studies must be unique and ranked")
+    domains = {
+        "www.ringba.com", "www.invoca.com",
+        "support.google.com", "www.ftc.gov",
+    }
+    for study in studies:
+        if not isinstance(study, dict):
+            raise ValueError("malformed deep study")
+        _url(study.get("source_url"), domains)
+        for field in ("label", "source_class", "observation", "implication",
+                      "owner", "evidence_to_unlock", "prohibited_inference"):
+            value = study.get(field)
+            if not isinstance(value, str) or not 6 <= len(value) <= 650:
+                raise ValueError("unattributed or invalid deep source statement")
+    benchmark = deep.get("outside_benchmark")
+    if (not isinstance(benchmark, dict)
+            or _url(benchmark.get("source_url"), {"www.invoca.com"})
+            != "https://www.invoca.com/reports/the-invoca-home-services-lead-conversion-benchmarks-report-2026"
+            or benchmark.get("industry") != "MIX_OF_NINE_HOME_SERVICES_CATEGORIES_NOT_ROOFING_ONLY"
+            or benchmark.get("sample") != "INVOCAS_CUSTOMER_BASE_NOT_US_HOMEOWNER_PAY_PER_CALL_RATES"
+            or benchmark.get("calls_answered_pct") != 52
+            or benchmark.get("answered_calls_that_are_leads_pct") != 38
+            or benchmark.get("leads_converting_during_call_pct") != 45
+            or benchmark.get("not_empire_observations") is not True
+            or benchmark.get("not_roofing_payable_call_rates") is not True):
+        raise ValueError("external benchmark cannot become Empire call conversion data")
+    ordered_learning = deep.get("operator_learning_order")
+    if (not isinstance(ordered_learning, list) or len(ordered_learning) != 7
+            or len(set(ordered_learning)) != 7):
+        raise ValueError("original buyer-first research learning order missing")
+    evidence_gaps = deep.get("remaining_gaps")
+    if (not isinstance(evidence_gaps, list) or len(evidence_gaps) != 5):
+        raise ValueError("original real-data gaps omitted")
+    deep_controls = deep.get("execution_controls")
+    if (not isinstance(deep_controls, dict)
+            or len(deep_controls) != 8
+            or any(v is not True for v in deep_controls.values())):
+        raise ValueError("deep research tries to permit execution")
+
     return {
         "schema_version": SCHEMA, "mode": "OBSERVE",
+        "deep_study_count": len(studies),
+        "deep_primary_source_lessons": studies,
+        "external_benchmark_not_empire_performance": benchmark,
+        "deep_buyer_first_learning_order": ordered_learning,
+        "deep_original_owner_evidence_gaps": evidence_gaps,
+        "deep_research_execution_authority": "none",
         "reviewed_at_utc": reviewed.isoformat(),
         "generated_at": now.isoformat(),
         "video_count": len(ordered),
