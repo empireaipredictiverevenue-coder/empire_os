@@ -133,6 +133,10 @@ def review_original_economic_memory_handoff(
             or gross != settlement["approved_price_cents"]
             or type(cost) is not int or cost < 0
             or type(profit) is not int or profit <= 0
+            or type(settlement.get("reported_recognized_cost_cents")) is not int
+            or type(settlement.get("reported_recognized_margin_cents")) is not int
+            or cost != settlement["reported_recognized_cost_cents"]
+            or profit != settlement["reported_recognized_margin_cents"]
             or profit != gross - cost):
         raise ProspectHandoffHold("UNRECONCILED_ORIGINAL_RECOGNIZED_ECONOMICS")
 

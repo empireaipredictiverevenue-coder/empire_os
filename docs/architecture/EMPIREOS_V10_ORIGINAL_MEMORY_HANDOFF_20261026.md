@@ -7,6 +7,7 @@
 - New `canonical_economic_memory_handoff.review_original_economic_memory_handoff` accepts **only** `TENANT_SCOPED_FINANCIAL_LINEAGE_REVIEW_ONLY` from V9; injected fixture receipts, any claimed execution authority, revenue-event mismatch or absent original record fail closed.
 - V10 requires the **original** `ExecutionBusDataRepository` bound to an EmpireDB gateway. That repository's `verified_outcome_feedback` reads the exact order and evidence. V10 does **not** accept caller-supplied feedback, search all customers or infer a tenant from an email/domain.
 - Original `outcome_feedback.validate_verified_feedback` verifies the tenant/label/temporal contract. V10 additionally matches tenant, order, buyer, prospect, entity, original commercial outcome, `revenue_recognized` event and exact direct BSC or escrow evidence source; requires same exact price and internally reconciled actual acquisition/fulfilment costs and positive margin.
+- V10 now requires exact V9 reported recognized cost/margin to match the original feedback cost/profit, preventing independently coherent but economically conflicting records from entering a shadow preview. A negative-margin `revenue_recognized` event fails V9 as required by the original SQL recognizer.
 - V10 calls the **existing** `economic_memory.build_economic_memory_snapshot` only **in-process** with a single exact feedback packet. No `refresh_economic_memory_snapshot`, disk output, new queue, new timer or model-weight change. A retrievable preview is **not** permission to publish it into Economic Memory.
 
 ## What this does NOT establish
@@ -26,3 +27,11 @@ The V10 source and contract tests were added on PR #119, branch `feature/unified
 The original /srv/empire_os production checkout remains independent. The integration branch's local worktree contains separate, uncommitted settlement/cost test edits; do not reset, checkout or overwrite them. The original CRM owner's login-security file is separately owned. For promotion, compare live HEAD and owners' dirty paths, review exact SQL/grants, run disposable isolated-PG and authorised tenant-RLS tests, require counterparty/BSC/refund proof, obtain the applicable explicit release approval and prepare reversible deployment.
 
 **Next original owner:** RevenueRecognition, with CRM owner / FulfilmentOperations / Economic Memory collaboration. **Next verifiable commercial objective:** ONE paid and buyer-accepted heat-pump transaction with independently reconciled fulfilment, original USDT settlement, reversals, costs and buyer terms—not more research-row counts.
+
+## 27 October 2026: V9/V10 exact economic amount reconciliation
+- Isolated review-only worktree; original dirty V9 and CRM owner files were not changed.
+- The V9 actual-cost delta rejects reused cost evidence IDs and actual cost observed after the original recognized event.
+- The original EmpireDB `recognize_bsc_revenue` in migration 036 explicitly requires **strictly positive realized margin**; V9 continues to reject a non-positive `revenue_recognized` event.
+- V9 emits source-reported recognized cost and margin fields; V10 requires exact agreement with the original tenant-scoped feedback packet before any in-process shadow snapshot, rejecting even independently arithmetic-consistent conflicting results.
+- The exact selected regression set (all `tests/*20261026.py`, original BSC payment/verifier, Gmail buyer evidence, scoped commercial order/terms, Economic Memory/control, execution-bus repository, outcome feedback, actual-cost worker and canonical gateway tests) completed **377 passed, 1 existing Starlette/anyio deprecation warning**. It is not a whole-repository test and not independent production-payment evidence.
+- Nothing above authorises PR merge, production SQL, live revenue recognition, payment execution, dispatch or Economic Memory publication.

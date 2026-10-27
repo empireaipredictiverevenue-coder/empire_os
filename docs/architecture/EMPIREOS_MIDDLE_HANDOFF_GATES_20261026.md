@@ -267,7 +267,10 @@ is a **pure review-only intermediate adapter** that checks all of:
    buyer, opportunity, payment request, proof, tx hash, terms fingerprint,
    USDT/BSC channel and original actual-cost source/ref/amounts must
    agree. Its recorded cents, cost cents and margin cents must reconcile
-   to the same order and positive margin. This validates internal
+   to the same order with strictly positive realized margin, matching the
+   original `recognize_bsc_revenue` SQL function. A real loss requires
+   separate owner review; it must not be fabricated into recognized profit.
+   This validates internal
    book-keeping consistency only; it does not insert or recognize income.
 
 Missing revenue event produces a reported payment linkage with

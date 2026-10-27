@@ -226,6 +226,8 @@ def review_fulfilment_payment_settlement(
     if revenue_event is None:
         result["revenue_event_consistent"]=False
         result["recognized_revenue_event_ref"]=None
+        result["reported_recognized_cost_cents"]=None
+        result["reported_recognized_margin_cents"]=None
         return result
     _scope(revenue_event,delivered,order_ref=True)
     payload=revenue_event.get("payload")
@@ -254,13 +256,18 @@ def review_fulfilment_payment_settlement(
             or cost.get("actual_cost_ready") is not True):
         raise ProspectHandoffHold("ORIGINAL_ACTUAL_COST_RECEIPT_MISSING")
     total=0
+    cost_times=[]
+    cost_ids=set()
     for kind in ("acquisition_cost","fulfilment_cost"):
         row=cost.get(kind)
         if (not isinstance(row,Mapping) or not row.get("evidence_id")
                 or row.get("source_type") not in ("provider_invoice","internal_actual")
                 or type(row.get("amount_cents")) is not int or row["amount_cents"]<0):
             raise ProspectHandoffHold("ORIGINAL_ACTUAL_COST_RECEIPT_MISSING")
-        _time(row.get("observed_at"),now)
+        if row["evidence_id"] in cost_ids:
+            raise ProspectHandoffHold("DUPLICATE_ACTUAL_COST_EVIDENCE_ID")
+        cost_ids.add(row["evidence_id"])
+        cost_times.append(_time(row.get("observed_at"),now))
         total+=row["amount_cents"]
     if (type(revenue_event.get("amount_cents")) is not int
             or type(revenue_event.get("cost_cents")) is not int
@@ -270,8 +277,15 @@ def review_fulfilment_payment_settlement(
             or revenue_event["margin_cents"]!=price-total
             or revenue_event["margin_cents"]<=0):
         raise ProspectHandoffHold("UNRECONCILED_RECOGNIZED_REVENUE_MARGINS")
-    if _time(revenue_event.get("occurred_at"),now) < verified:
+    event_time=_time(revenue_event.get("occurred_at"),now)
+    if event_time < verified:
         raise ProspectHandoffHold("REVENUE_EVENT_PREDATES_PAYMENT_VERIFICATION")
+    if any(t>event_time for t in cost_times):
+        raise ProspectHandoffHold("ACTUAL_COST_OBSERVED_AFTER_REVENUE_EVENT")
     result["revenue_event_consistent"]=True
     result["recognized_revenue_event_ref"]="canonical:commercial_events:"+revenue_event["id"]
+    # Source-reported figures only. V10 must match both against its original
+    # tenant-scoped feedback before previewing economic learning.
+    result["reported_recognized_cost_cents"]=total
+    result["reported_recognized_margin_cents"]=revenue_event["margin_cents"]
     return result

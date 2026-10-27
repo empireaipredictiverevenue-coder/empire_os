@@ -205,3 +205,20 @@ def test_actual_existing_memory_builder_accepts_only_shadow_candidate(monkeypatc
     assert report["economic_memory_persisted"] is False
     assert report["original_feedback_independent_financial_attestation"] is False
     assert report["model_training_authorized"] is False
+
+
+
+def test_v10_rejects_profitable_feedback_with_wrong_cost_receipt(monkeypatch):
+    # Both financial packets can be internally consistent; their actual
+    # costs and margin must ALSO agree across the original-source boundary.
+    financial, feedback, repo, calls = setup(monkeypatch)
+    assert financial["reported_recognized_cost_cents"] == 7000
+    assert financial["reported_recognized_margin_cents"] == 5000
+    feedback["actual_cost_cents"] = 6000
+    feedback["gross_profit_cents"] = 6000
+    feedback["cortex_packet"]["verification"]["actual_cost_cents"] = 6000
+    feedback["cortex_packet"]["verification"]["gross_profit_cents"] = 6000
+    repo.verified_outcome_feedback = lambda *args, **kwargs: feedback
+    with pytest.raises(ProspectHandoffHold, match="UNRECONCILED_ORIGINAL_RECOGNIZED_ECONOMICS"):
+        review(financial, repo)
+    assert calls == []

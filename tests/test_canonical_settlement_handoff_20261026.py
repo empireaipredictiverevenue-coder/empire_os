@@ -178,3 +178,27 @@ def test_float_payment_base_units_cannot_be_used_as_chain_evidence():
     a[3]["amount_raw"]=float(120*10**18)
     with pytest.raises(ProspectHandoffHold,match="UNMATCHED_BSC_TRANSFER_AMOUNT_OR_BLOCK"):
         run(a)
+
+
+def test_negative_margin_cannot_be_recognized_under_original_sql_contract():
+    a=list(inputs())
+    cost=a[4]["revenue_event"]["payload"]["actual_cost_evidence"]
+    cost["acquisition_cost"]["amount_cents"]=10000
+    cost["fulfilment_cost"]["amount_cents"]=4000
+    a[4]["revenue_event"]["cost_cents"]=14000
+    a[4]["revenue_event"]["margin_cents"]=-2000
+    with pytest.raises(ProspectHandoffHold,match="UNRECONCILED_RECOGNIZED_REVENUE_MARGINS"):
+        run(a)
+
+
+def test_reused_cost_receipt_or_cost_later_than_recognition_rejected():
+    a=list(inputs())
+    cost=a[4]["revenue_event"]["payload"]["actual_cost_evidence"]
+    cost["fulfilment_cost"]["evidence_id"]=cost["acquisition_cost"]["evidence_id"]
+    with pytest.raises(ProspectHandoffHold,match="DUPLICATE_ACTUAL_COST_EVIDENCE_ID"):
+        run(a)
+    a=list(inputs())
+    cost=a[4]["revenue_event"]["payload"]["actual_cost_evidence"]
+    cost["fulfilment_cost"]["observed_at"]="2026-10-26T13:45:00+00:00"
+    with pytest.raises(ProspectHandoffHold,match="ACTUAL_COST_OBSERVED_AFTER_REVENUE_EVENT"):
+        run(a)
