@@ -24,6 +24,7 @@ from empire_os.microsite_cinematic_background import (
     chicago_4k_photo_asset_validated, CHICAGO_4K_PHOTO_SHA256,
     CHICAGO_WORKER_PHOTO_SOURCE, CHICAGO_WORKER_PHOTO_SHA256,
     chicago_4k_visual_refinement_css, chicago_native_4k_layout_css,
+    chicago_research_depth_v10_css,
 )
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
@@ -268,7 +269,10 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
     cinematic_css = (chicago_premium_css()
                      + chicago_4k_visual_refinement_css()
                      + chicago_native_4k_layout_css()
+                     + chicago_research_depth_v10_css()
                      if chicago_design else "")
+    # Compact Chicago-only CSS to respect the existing strict 400KB QA cap.
+    cinematic_css = re.sub(r"\s+", " ", cinematic_css).strip()
     photo_asset = chicago_owner_photo_data_uri() if chicago_design else None
     worker_asset = chicago_worker_research_photo_data_uri() if chicago_design else None
     city_image = photo_asset or (chicago_night_skyline_data_uri() if chicago_design else None)
@@ -303,6 +307,15 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
             '<h2>Know the rules. Verify the source.</h2></div>'
             '<p>A visual guide to Chicago permit requirements, Illinois roofing licences '
             'and address-based records. No inferred local demand or contractor endorsements.</p></div>'
+            '<div class="research-signal-strip" aria-label="Scope of the source review">'
+            '<div class="research-signal"><strong class="research-signal-mark">'
+            + str(len(facts)).zfill(2) + '</strong>'
+            '<span>Original reference notes</span></div>'
+            '<div class="research-signal"><strong class="research-signal-mark">02</strong>'
+            '<span>Official research pathways</span></div>'
+            '<div class="research-signal"><strong class="research-signal-mark">✓</strong>'
+            '<span>Research only · no sales claims</span></div>'
+            '</div>'
             '<div class="research-visual-grid" aria-label="Two official research pathways">'
             '<article class="research-visual-hero photo-field" style="--feature-image:url('
             + worker_asset + ')">'

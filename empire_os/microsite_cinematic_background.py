@@ -376,3 +376,78 @@ def chicago_native_4k_layout_css() -> str:
   footer {font-size:1.25rem}
 }
 """
+
+
+def chicago_research_depth_v10_css() -> str:
+    """V10: match the opening hero's depth in the useful evidence section."""
+    return """
+/* Research section: photographic continuity and meaningful density, no extra requests */
+#research-method {position:relative;isolation:isolate;padding-top:42px;padding-bottom:72px}
+#research-method::before {content:"";position:absolute;pointer-events:none;
+ left:50%;top:-38px;width:100vw;height:min(1050px,100%);transform:translateX(-50%);
+ background-image:linear-gradient(180deg,#01091cc0 0%,#01091ca3 16%,#01091cdd 65%,#01091c 100%),
+ var(--chicago-city-image);background-position:center 26%;background-size:cover;z-index:-2}
+#research-method::after {content:"";position:absolute;pointer-events:none;
+ left:50%;top:-38px;width:100vw;height:780px;transform:translateX(-50%);
+ background:radial-gradient(ellipse at 85% 26%,#02c7fe30,transparent 46%),
+ radial-gradient(ellipse at 12% 52%,#005aff31,transparent 50%);
+ z-index:-1}
+#research-method > .tag {display:inline-flex;align-items:center;gap:14px;
+ border:1px solid #377eb873;background:#051b3ed6;padding:8px 15px;
+ border-radius:30px;letter-spacing:.18em}
+#research-method > .tag:before {content:"";width:8px;height:8px;border-radius:50%;
+ background:#02c7fe;box-shadow:0 0 15px #02c7fe}
+#research-method > h2 {margin:17px 0 23px;text-shadow:0 3px 28px #000b;
+ font-size:clamp(2.4rem,3.7vw,4.6rem);max-width:1050px}
+.research-intro {margin-bottom:15px;align-items:center;max-width:none;
+ padding:20px 26px;background:linear-gradient(100deg,#071e41ef,#0a32657a 76%,#052344d9);
+ border:1px solid #217bc69e;border-radius:18px;box-shadow:0 14px 42px #0008,inset 0 1px #e2f4ff24}
+.research-intro h2 {font-size:clamp(1.7rem,2.4vw,2.9rem);margin:4px 0 0}
+.research-intro p {color:#deeeff;max-width:480px;margin:0}
+.research-signal-strip {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+ gap:12px;margin:0 0 19px}
+.research-signal {display:flex;align-items:center;gap:14px;min-width:0;
+ padding:15px 17px;border:1px solid #368ace77;border-radius:13px;
+ background:linear-gradient(120deg,#08244cdc,#06152fdd);backdrop-filter:blur(15px)}
+.research-signal-mark {font-size:1.6rem;font-weight:850;line-height:1;
+ color:#02c7fe;text-shadow:0 0 16px #02c7fe61}
+.research-signal span:last-child {font-size:.86rem;line-height:1.35;
+ color:#e7f1fd;font-weight:650}
+.research-visual-grid {margin:12px 0 24px;gap:16px}
+.research-visual-hero {min-height:440px;border-color:#37a1e8;
+ box-shadow:0 0 24px #007aff26,0 24px 50px #000a,inset 0 1px #cbf0ff35}
+.research-visual-hero::after {background:
+ linear-gradient(0deg,#01091cf9 0%,#021632ad 39%,#01162b16 92%),
+ linear-gradient(90deg,#01163080,transparent 70%)}
+.research-visual-content {padding:32px}
+.research-visual-content h3 {text-shadow:0 3px 14px #000e}
+.research-visual-hero .visual-caption {border-color:#47caffaa}
+.evidence-path-item {border-color:#2383cfaa;background:#08234ae8}
+#research-method .fact {border-color:#2381c8aa;
+ box-shadow:inset 0 1px #81ceff31,0 16px 36px #0009}
+@media(min-width:2560px) {
+ #research-method {padding-top:105px}
+ #research-method::before {height:1550px;top:-75px}
+ #research-method::after {height:1250px}
+ #research-method > h2 {font-size:5.4rem;max-width:2300px;margin:28px 0 46px}
+ .research-intro {padding:45px 55px;border-radius:28px;margin-bottom:29px}
+ .research-intro h2 {font-size:3.6rem}
+ .research-intro p {font-size:1.46rem;max-width:900px}
+ .research-signal-strip {gap:28px;margin-bottom:36px}
+ .research-signal {padding:29px 38px;border-radius:22px;gap:26px}
+ .research-signal-mark {font-size:3rem}
+ .research-signal span:last-child {font-size:1.36rem}
+ .research-visual-hero {min-height:680px}
+}
+@media(max-width:760px) {
+ #research-method {padding-top:32px}
+ #research-method::before {height:820px;top:-15px;background-position:58% top}
+ #research-method > h2 {font-size:clamp(2rem,7vw,3rem)}
+ .research-intro {padding:20px;display:block}
+ .research-intro p {margin-top:12px}
+ .research-signal-strip {grid-template-columns:1fr;gap:8px}
+ .research-signal {padding:12px 15px}
+ .research-visual-hero {min-height:340px}
+ .research-visual-content {padding:20px}
+}
+"""
