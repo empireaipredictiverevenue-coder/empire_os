@@ -26,13 +26,48 @@ BRAND_ASSET = Path(__file__).resolve().parent.parent / "apps/empire-public-site/
 
 
 PRIVATE_APPROVED_BRAND_SHA256 = "55e98ad2ae182991d95908738135779102beb81818cd7c3607a3a49e1f2aa596"
+CANONICAL_BRAND_CONTRACT_SHA256 = "ead735b5e223a3b179a23965c1ff11dc67efb78b4cd4e71df9b60550872bc518"
+
+
+def _canonical_brand_contract() -> dict[str, Any] | None:
+    """Use the EXISTING founder-approved brand contract, never a new palette.
+
+    A canonical-branded preview fails closed when the brand contract/asset has
+    been changed or is unavailable. This grants no public distribution rights.
+    """
+    value = os.environ.get("EMPIRE_AI_CANONICAL_BRAND_CONTRACT")
+    if not value:
+        return None
+    path = Path(value)
+    if path.is_symlink() or not path.is_file():
+        raise ValueError("existing canonical brand contract is missing or a symlink")
+    raw = path.read_bytes()
+    if len(raw) > 10000 or sha256(raw).hexdigest() != CANONICAL_BRAND_CONTRACT_SHA256:
+        raise ValueError("existing canonical brand contract digest mismatch")
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("canonical brand contract invalid") from exc
+    if (data.get("schema") != "empire.ai.brand.canonical_reference.v1"
+            or data.get("brand") != "Empire AI"
+            or data.get("brand_name") != "EMPIRE AI"
+            or data.get("strapline") != "PREDICTIVE REVENUE INFRASTRUCTURE"
+            or data.get("colour_tokens") != {
+                "deep_navy": "#01091C", "cobalt": "#005AFF",
+                "electric_cyan": "#02C7FE", "ice": "#E7F1FD",
+                "slate": "#8EA1BF"}):
+        raise ValueError("existing canonical brand contract identity mismatch")
+    return data
 
 
 def _original_brand_image() -> tuple[str, str]:
     # Optional PRIVATE staging-only brand approval candidate: use the existing
     # owner-custodied raster by exact hash. Never commit or transfer its bytes.
     # The website/brand owner still has to approve its production distribution.
+    contract = _canonical_brand_contract()
     private_path = os.environ.get("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO")
+    if contract is not None and not private_path:
+        raise ValueError("canonical brand requires owner-custodied original raster")
     if private_path:
         image_path = Path(private_path)
         if image_path.is_symlink() or not image_path.is_file():
@@ -166,8 +201,17 @@ def review_copy(copy: str) -> dict[str, Any]:
 def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
               title: str, subhead: str, summary: str, keyword: str) -> str:
     kind = spec.get("site_kind")
+    canonical = _canonical_brand_contract()
     logo_src, _ = _original_brand_image()
-    primary = "#65c7ff" if kind != "market_report" else "#e9bb65"
+    tokens = canonical["colour_tokens"] if canonical else None
+    primary = tokens["electric_cyan"] if tokens else (
+        "#65c7ff" if kind != "market_report" else "#e9bb65")
+    signal = tokens["electric_cyan"] if tokens else "#e9bb65"
+    ink = tokens["ice"] if tokens else "#f1f5fa"
+    dim = tokens["slate"] if tokens else "#b9c8df"
+    canvas = tokens["deep_navy"] if tokens else "#060d1b"
+    cobalt = tokens["cobalt"] if tokens else "#174c7e"
+    cyan = tokens["electric_cyan"] if tokens else "#87d7ff"
     evidence_cards = "\n".join(
         f'<article class="fact"><span class="micro">Evidence note {i}</span>'
         f'<p>{_safe_text(f["statement"])}</p>'
@@ -213,12 +257,12 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
 <title>{title_html} | Empire AI Research Preview</title>
 <meta name="description" content="{_safe_text(summary[:155])}">
 <style>
-:root {{color-scheme:dark; --ink:#f1f5fa; --dim:#b9c8df; --accent:{primary}; --gold:#e9bb65;}}
+:root {{color-scheme:dark; --ink:{ink}; --dim:{dim}; --accent:{primary}; --signal:{signal}; --brand-cobalt:{cobalt}; --brand-cyan:{cyan};}}
 * {{box-sizing:border-box}}
 html {{scroll-behavior:smooth}}
-body {{margin:0; font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif; background:#060d1b; color:var(--ink); line-height:1.6;}}
+body {{margin:0; font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif; background:{canvas}; color:var(--ink); line-height:1.6;}}
 body::before {{content:"";position:absolute;left:0;top:0;width:100%;height:600px;pointer-events:none;
- background:radial-gradient(ellipse at 75% 15%,#174c7e 0%,transparent 52%),
+ background:radial-gradient(ellipse at 75% 15%,var(--brand-cobalt) 0%,transparent 52%),
  radial-gradient(ellipse at 30% 50%,#13243a 0%,transparent 55%);opacity:.8}}
 a {{color:inherit}}
 .skip {{position:absolute;left:-9999px;top:4px}}
@@ -230,10 +274,10 @@ nav {{min-height:82px;display:flex;align-items:center;justify-content:space-betw
 .hero-layout {{display:grid;grid-template-columns:minmax(0,1fr) minmax(230px,300px);align-items:center;gap:28px}}
 .hero-content {{min-width:0}}
 .signal-panel {{border:1px solid #385575;background:linear-gradient(155deg,#142743dd,#0b1529c9);border-radius:20px;padding:25px;box-shadow:0 28px 65px #0005}}
-.signal-head {{font-size:.79rem;letter-spacing:.14em;color:var(--gold);text-transform:uppercase;font-weight:800}}
+.signal-head {{font-size:.79rem;letter-spacing:.14em;color:var(--signal);text-transform:uppercase;font-weight:800}}
 .signal-value {{font-size:1.12rem;font-weight:750;line-height:1.45;margin:7px 0 15px}}
 .signal-rule {{border:0;border-top:1px solid #334968;margin:17px 0}}
-.tag,.micro {{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:750}}
+.tag,.micro {{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--signal);font-weight:750}}
 .preview {{font-size:.78rem; color:var(--dim);border:1px solid #425976;border-radius:100px;padding:6px 14px}}
 .hero {{padding:80px 0 66px;max-width:950px}}
 h1 {{font-size:clamp(2.5rem,6.2vw,5.4rem);letter-spacing:-.055em;line-height:1.03;margin:18px 0 24px}}
@@ -248,11 +292,11 @@ section {{padding:45px 0}}
 .fact {{border:1px solid #283d58;background:#111d30c9;padding:26px;border-radius:16px;overflow-wrap:anywhere}}
 .fact p {{font-size:1.04rem}}
 .source {{color:var(--dim);font-size:.82rem!important}}
-.official-link {{display:inline-flex;align-items:center;min-height:44px;color:#87d7ff;font-weight:700;text-underline-offset:3px}}
+.official-link {{display:inline-flex;align-items:center;min-height:44px;color:var(--brand-cyan);font-weight:700;text-underline-offset:3px}}
 .decision-list {{max-width:900px;display:grid;gap:14px;padding-left:24px}}
 .decision-list li {{padding:13px 18px;border:1px solid #283d58;border-radius:12px;background:#101c2e}}
-.decision-list li::marker {{color:var(--gold);font-weight:800}}
-.hint {{border-left:3px solid var(--gold);padding:16px 24px;color:var(--dim);background:#182435}}
+.decision-list li::marker {{color:var(--signal);font-weight:800}}
+.hint {{border-left:3px solid var(--signal);padding:16px 24px;color:var(--dim);background:#182435}}
 footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 @media(max-width:760px) {{.hero-layout{{grid-template-columns:1fr}} .signal-panel{{max-width:560px}}}}
 @media(max-width:600px) {{.hero{{padding:44px 0 32px}} .wrap{{padding:0 20px}} nav{{padding:16px 0}} .wordmark{{width:170px}}}}
@@ -340,7 +384,9 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         "mode": "OBSERVE", "execution_authority": "none",
         "publishing_enabled": False, "indexation_enabled": False,
         "outbound_enabled": False, "payments_enabled": False,
-        "candidate_kind": site_kind, "brand_profile": "empire_premium_local",
+        "candidate_kind": site_kind,
+        "brand_profile": ("empire_canonical_reference_v1"
+                          if _canonical_brand_contract() else "empire_premium_local"),
         "market": geo, "keyword": keyword_review, "audience": audience, "offer": offer,
         "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
         "html_sha256": sha256(html.encode()).hexdigest(),
@@ -352,8 +398,15 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
                                   "single_h1", "reduced_motion", "focus_visible",
                                   "noindex", "no_live_form", "48px_min_cta"],
             "original_brand_logo_sha256": _original_brand_image()[1],
+            "canonical_brand_contract_sha256": (
+                CANONICAL_BRAND_CONTRACT_SHA256
+                if _canonical_brand_contract() else None
+            ),
+            "canonical_brand_reference_used": _canonical_brand_contract() is not None,
             "original_brand_logo_source": (
-                "private_original_orbital_a_raster_approval_candidate"
+                "existing_empire_ai_canonical_brand_owner_custody"
+                if _canonical_brand_contract()
+                else "private_original_orbital_a_raster_approval_candidate"
                 if os.environ.get("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO")
                 else "apps/empire-public-site/public/brand/empire-logo.svg"
             ),

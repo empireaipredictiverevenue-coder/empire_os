@@ -305,3 +305,59 @@ def test_citywide_roofing_facts_match_source_scope_without_inventing_demand():
     assert "25% of roof area" in html
     assert "36 months" in html
     assert "<form" not in html.casefold()
+
+
+def test_canonical_brand_contract_requires_exact_existing_source(tmp_path, monkeypatch):
+    import json
+    from hashlib import sha256
+    import empire_os.predictive_microsite_factory as factory
+    original = {
+        "schema": "empire.ai.brand.canonical_reference.v1",
+        "brand": "Empire AI",
+        "brand_name": "EMPIRE AI",
+        "strapline": "PREDICTIVE REVENUE INFRASTRUCTURE",
+        "colour_tokens": {
+            "deep_navy": "#01091C", "cobalt": "#005AFF",
+            "electric_cyan": "#02C7FE", "ice": "#E7F1FD",
+            "slate": "#8EA1BF",
+        },
+    }
+    brand_path = tmp_path / "contract.json"
+    brand_path.write_text(json.dumps(original), encoding="utf-8")
+    monkeypatch.setenv("EMPIRE_AI_CANONICAL_BRAND_CONTRACT", str(brand_path))
+    monkeypatch.setattr(factory, "CANONICAL_BRAND_CONTRACT_SHA256",
+                        sha256(brand_path.read_bytes()).hexdigest())
+    assert factory._canonical_brand_contract()["colour_tokens"]["electric_cyan"] == "#02C7FE"
+    with pytest.raises(ValueError, match="owner-custodied"):
+        factory._original_brand_image()
+    brand_path.write_text(brand_path.read_text().replace("#005AFF", "#FFCC00"))
+    with pytest.raises(ValueError, match="digest mismatch"):
+        factory._canonical_brand_contract()
+
+
+def test_canonical_brand_system_tokens_govern_microsite_copy_preview(tmp_path, monkeypatch):
+    import json
+    from hashlib import sha256
+    import empire_os.predictive_microsite_factory as factory
+    data = {
+        "schema": "empire.ai.brand.canonical_reference.v1",
+        "brand": "Empire AI", "brand_name": "EMPIRE AI",
+        "strapline": "PREDICTIVE REVENUE INFRASTRUCTURE",
+        "colour_tokens": {
+            "deep_navy": "#01091C", "cobalt": "#005AFF",
+            "electric_cyan": "#02C7FE", "ice": "#E7F1FD", "slate": "#8EA1BF"},
+    }
+    path = tmp_path / "brand_contract.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    monkeypatch.setenv("EMPIRE_AI_CANONICAL_BRAND_CONTRACT", str(path))
+    monkeypatch.setattr(factory, "CANONICAL_BRAND_CONTRACT_SHA256",
+                        sha256(path.read_bytes()).hexdigest())
+    monkeypatch.setattr(factory, "_original_brand_image",
+                        lambda: ("data:image/png;base64,aGVsbG8=", "a" * 64))
+    packet, html = factory.build_candidate(candidate())
+    assert packet["brand_profile"] == "empire_canonical_reference_v1"
+    assert packet["visual_qa"]["canonical_brand_reference_used"] is True
+    assert packet["visual_qa"]["brand_public_distribution_approved_by_owner"] is False
+    assert all(token in html for token in data["colour_tokens"].values())
+    assert "#e9bb65" not in html
+    assert packet["publishing_enabled"] is False
