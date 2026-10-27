@@ -2,7 +2,7 @@
   "schema_version": "empire.execution.owner_register_review_draft.v1",
   "date": "2026-10-27",
   "purpose": "Founder review only. Not a signed owner policy or execution authority.",
-  "status": "UNAPPROVED_REQUIRES_FOUNDER_AND_EXISTING_EXECUTION_OWNER_SIGNOFF",
+  "status": "FOUNDER_ROLLOUT_AUTHORIZED_RUNTIME_LANE_ASSIGNMENTS_UNVERIFIED",
   "signing_key_present": false,
   "policy_signed": false,
   "job_tickets_issued": 0,
@@ -81,5 +81,17 @@
     }
   ],
   "unassigned_policy": "UNKNOWN_AND_MULTIPLE_OWNERS_ARE_HOLD_NOT_SELF_ASSIGN",
-  "instructions": "Each lane requires authenticated principal identity, nonoverlapping exact paths, founder decision receipt, original owner acknowledgment and sealed policy signing before internal_write tickets may be issued. Review conflicts before adopting."
+  "instructions": "Founder is the accountable governance owner and has approved the scoped rollout. Candidate runtime lane assignments remain UNKNOWN/UNAPPROVED; do not self-assign or mint unsigned owner tickets. Preserve other owners workstreams and original safety rails.",
+  "founder_governance_owner": {
+    "founder_role_assertion": "FOUNDER_STATES_I_AM_OWNER_AND_I_DO_AUTH",
+    "founder_approval_recorded_in_chat": true,
+    "connected_github_login": "empireaipredictiverevenue-coder",
+    "github_permission_verified": "admin",
+    "github_tracking_issue": 146,
+    "execution_plane_owner_role_assigned_in_github": true,
+    "founder_has_approved_controlled_governance_integration": true,
+    "worker_service_identity_bound_to_founder": false,
+    "approval_is_not_a_cryptographic_signing_key_or_internal_write_ticket": true,
+    "approval_is_not_production_rollout_confirmation": true
+  }
 }

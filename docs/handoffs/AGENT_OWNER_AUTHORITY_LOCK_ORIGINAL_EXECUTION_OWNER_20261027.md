@@ -203,3 +203,29 @@ principal isolation and rollback on its actual infrastructure.
 **No signed owner policies, real ticket keys, authenticated worker
 assignments, service permissions, production receipt, production agent,
 new timer or live execution state were created by this testing.**
+
+## Founder identifies as accountable original governance owner (27 October)
+
+The founder explicitly stated in ChatGPT, **"i am the owner and i do auth"**.
+The connected repository administrator account was independently read back as
+`empireaipredictiverevenue-coder` with GitHub permission `admin`, and the
+original tracking issue #146 was assigned to that same authenticated account.
+Thus **there is no unidentified second human owner whose approval should be
+requested repeatedly** for this governance integration. The founder has
+approved proceeding with it and owns the decision to adopt it.
+
+`/.github/CODEOWNERS` now declares that existing account as the reviewer
+for a narrow set of Agent & Tool Execution Plane governance files only.
+It does not assign or take over SEO, website, Buyer Acquisition, CRM,
+Finance or any other distinct agent implementation workstream. CODEOWNERS
+is a review declaration: approval enforcement needs independently configured
+GitHub branch protection/rulesets, and GitHub generally does not allow a PR
+author to approve their own change. It does not prevent direct shell writes.
+
+**Technical separation preserved:** the founder's GitHub/admin identity is
+not an authenticated Hermes/Pi/Coder service principal. The six proposed
+runtime lane assignments remain unapproved and no production ticket issuer,
+private signing key, active enforcement gateway, GitHub branch protection,
+review approval or production rollout is created by this record. The
+founder's strategic approval is not a blanket permission for agents to
+self-assign or modify another workstream.

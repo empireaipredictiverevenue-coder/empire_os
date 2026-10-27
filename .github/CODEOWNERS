@@ -1,0 +1,16 @@
+# EmpireOS original Agent & Tool Execution Plane — founder GitHub custody.
+# Scope deliberately excludes website, SEO, buyer, CRM, finance and media lanes.
+# CODEOWNERS requests the named reviewer; GitHub branch protection/rulesets
+# must separately enforce approvals. This file is not runtime authority.
+/.github/CODEOWNERS @empireaipredictiverevenue-coder
+/empire_os/agent_execution_plane.py @empireaipredictiverevenue-coder
+/empire_os/execution_lease.py @empireaipredictiverevenue-coder
+/empire_os/execution_plane_dispatcher.py @empireaipredictiverevenue-coder
+/empire_os/hermes_control.py @empireaipredictiverevenue-coder
+/empire_os/pi_sandbox_runner.py @empireaipredictiverevenue-coder
+/empire_os/empire_coder_sandbox_runner.py @empireaipredictiverevenue-coder
+/empire_os/coder/worker.py @empireaipredictiverevenue-coder
+/empire_os/agent_owner_authority_review.py @empireaipredictiverevenue-coder
+/empire_os/agent_owner_integration_readiness.py @empireaipredictiverevenue-coder
+/docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md @empireaipredictiverevenue-coder
+/docs/handoffs/FOUNDER_WORKSTREAM_OWNER_REGISTER_DRAFT_20261027.json @empireaipredictiverevenue-coder

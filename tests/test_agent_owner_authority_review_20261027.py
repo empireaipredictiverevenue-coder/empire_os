@@ -3,6 +3,7 @@ import hashlib
 import json
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -239,7 +240,10 @@ def test_unsigned_founder_review_register_has_no_mutation_authority():
     root = Path(__file__).resolve().parents[1]
     p = root / "docs/handoffs/FOUNDER_WORKSTREAM_OWNER_REGISTER_DRAFT_20261027.json"
     proposal=json.loads(p.read_text())
-    assert proposal["status"]=="UNAPPROVED_REQUIRES_FOUNDER_AND_EXISTING_EXECUTION_OWNER_SIGNOFF"
+    assert proposal["status"]=="FOUNDER_ROLLOUT_AUTHORIZED_RUNTIME_LANE_ASSIGNMENTS_UNVERIFIED"
+    assert proposal["founder_governance_owner"]["connected_github_login"] == "empireaipredictiverevenue-coder"
+    assert proposal["founder_governance_owner"]["github_permission_verified"] == "admin"
+    assert proposal["founder_governance_owner"]["approval_is_not_a_cryptographic_signing_key_or_internal_write_ticket"] is True
     assert proposal["production_enforcement_enabled"] is False
     assert proposal["policy_signed"] is False
     assert proposal["job_tickets_issued"] == 0
@@ -525,3 +529,42 @@ def test_parallel_replay_cannot_acquire_two_leases(tmp_path):
         reason == "SIGNED_OWNER_TICKET_ALREADY_CONSUMED"
         for status, reason in results if status == "HELD"
     )
+
+
+def test_founder_github_custody_is_limited_to_execution_plane_files():
+    root = Path(__file__).resolve().parents[1]
+    rules = (root / ".github/CODEOWNERS").read_text().splitlines()
+    entries = [line.split() for line in rules if line.strip() and not line.lstrip().startswith("#")]
+    expected_paths = {
+        "/.github/CODEOWNERS",
+        "/empire_os/agent_execution_plane.py",
+        "/empire_os/execution_lease.py",
+        "/empire_os/execution_plane_dispatcher.py",
+        "/empire_os/hermes_control.py",
+        "/empire_os/pi_sandbox_runner.py",
+        "/empire_os/empire_coder_sandbox_runner.py",
+        "/empire_os/coder/worker.py",
+        "/empire_os/agent_owner_authority_review.py",
+        "/empire_os/agent_owner_integration_readiness.py",
+        "/docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md",
+        "/docs/handoffs/FOUNDER_WORKSTREAM_OWNER_REGISTER_DRAFT_20261027.json",
+    }
+    assert set(item[0] for item in entries) == expected_paths
+    assert all(item[1:] == ["@empireaipredictiverevenue-coder"] for item in entries)
+    assert all(not x.startswith(("/apps/", "/empire_os/buyer_",
+                                 "/empire_os/search_", "/empire_os/commercial_"))
+               for x in expected_paths)
+
+
+def test_founder_governance_approval_does_not_approve_runtime_workers():
+    root = Path(__file__).resolve().parents[1]
+    proposal = json.loads((
+        root / "docs/handoffs/FOUNDER_WORKSTREAM_OWNER_REGISTER_DRAFT_20261027.json"
+    ).read_text())
+    assert proposal["founder_governance_owner"]["founder_has_approved_controlled_governance_integration"] is True
+    assert proposal["founder_governance_owner"]["worker_service_identity_bound_to_founder"] is False
+    assert proposal["job_tickets_issued"] == 0
+    assert proposal["policy_signed"] is False
+    assert proposal["production_enforcement_enabled"] is False
+    assert all(entry["approved"] is False for entry in proposal["candidate_assignments"])
+    assert all(entry["authenticated_principal"] is None for entry in proposal["candidate_assignments"])
