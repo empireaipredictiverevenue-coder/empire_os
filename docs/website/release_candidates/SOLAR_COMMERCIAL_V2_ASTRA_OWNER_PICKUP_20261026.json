@@ -25,6 +25,15 @@
   },
   "founder_root_archive_execution_evidence": {
     "expected_baseline_inventory_sha256": "60fe7228a5583ce37c4754c2390d35a5c8f6609b527ecb1e4ad03986546ab8e5",
+    "founder_executed_second_root_readback": {
+      "archive_sha256": "4e7bb1ea2c8fbb81d99ff59e8debdff3b28f20826e1738278af452494f9b3bff",
+      "members_verified": 700,
+      "owner_publication_approval_verified": false,
+      "public_site_changed": false,
+      "publication_authorized": false,
+      "source": "FOUNDER_SUPPLIED_ROOT_TERMINAL_STDOUT_20261027",
+      "status": "ORIGINAL_700_FILE_ROOT_BACKUP_INDEPENDENT_READBACK_VERIFIED"
+    },
     "founder_script_verified_member_count": 700,
     "original_astra_owner_independent_backup_acceptance_verified": false,
     "original_astra_owner_independent_review_verified": false,
@@ -94,6 +103,6 @@
   "root_owner_custody_authority_verified": false,
   "schema_version": "empire.website.astra_two_page_owner_pickup.v1",
   "separate_root_backup_created": true,
-  "status": "FOUNDER_PROTECTED_BACKUP_REPORTED_SUCCESS_ASTRA_OWNER_SIGNOFF_AND_SCOPED_PUBLISHER_HELD",
+  "status": "FOUNDER_ROOT_BACKUP_READBACK_VERIFIED_ASTRA_RELEASE_ACCEPTANCE_STILL_REQUIRED",
   "work_key": "solar_commercial_premium_exact_v2_20261026"
 }
