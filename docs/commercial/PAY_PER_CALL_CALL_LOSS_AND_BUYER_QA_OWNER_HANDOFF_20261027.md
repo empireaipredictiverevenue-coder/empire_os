@@ -73,3 +73,19 @@ For one bounded campaign/time window:
 - Independent finance payment receipt and costs or UNKNOWN if not yet received.
 
 Only then join one real source-aligned cohort to the existing CRO and Call Revenue Unit evaluators. We do not need another test call, another architecture, another buyer approval email or a second service. Production admission remains OFF in the inspected source.
+
+## 27 October — Founder completed live read-only Ringba probe
+
+The founder ran the ORIGINAL root-only probe, returning OBSERVATION_COMPLETE_LAUNCH_HELD. It confirmed authenticated account selection and tracking number-to-campaign binding. The call-log query returned zero matching campaign-and-number call rows IN ITS BOUNDED WINDOW. The route metadata endpoint returned HTTP 403 with the explicit result FORBIDDEN_NO_ROUTE_ABSENCE_INFERENCE. Human buyer connection, present ANI pass-through, final accepted disposition and independently settled cash remain unverified.
+
+CRITICAL WINDOW DETAIL: the existing source module empire_os/lead_smart_ringba_api_observer.py, function fetch_recent_call_logs, hardcodes a seven-day lookback, caps results at 50 rows and has no pagination. On 27 October the buyer's 16 October test is outside that seven-day lookback. Zero returned rows cannot contradict the earlier buyer test or prove no historic calls. Do not assume the API response is an exhaustive seven-day result if more than 50 rows exist.
+
+The current official Reporting guidance (https://support.ringba.com/hc/en-us/articles/17994272778519-Reporting-Video, updated April 2026) confirms the existing Reporting > Default view, date/campaign filters, Call Details columns and CSV export. The original authorised publisher owner should examine the ORIGINAL campaign on two distinct dates: 16 October for the already confirmed historical tests; 20–27 October for recent inbound activity. Set the report timezone explicitly. In Call Details, click the button with the words Customize Columns, not its separate drop-down arrow. Limit the original-owner export to: Inbound Call ID, Campaign ID, Call Date, Dialed #, Connected, Connected Call Length, Duration, Converted, No Conversion Reason, No Payout Reason, Payout, Approved Adjustment, and any specifically authorised final buyer disposition. Filter out buyer test calls when deriving real homeowner acquisition. The displayed payout is a top-line provider indicator, not deposited cash. Ringba considers IVR and queues connected; independent human buyer answer remains UNKNOWN until separately evidenced.
+
+The original commercial owner keeps any original call IDs and raw CSV inside its protected account, and emits only deduplicated, consent-authorised aggregates to CRO, CRU and Predictive Revenue. Never forward ANI, recordings, recording URLs, buyer destinations, credentials or the unredacted customer dataset. The Reporting CSV is restricted by the original publisher role; missing buyer-specific fields stay UNKNOWN and are not inferred from the 403. If necessary, use the EXISTING Lead Smart/Ringba support thread to resolve specific permitted fields, not another generic routing/test request.
+
+Original vendor references:
+- https://support.ringba.com/hc/en-us/articles/26894023126551 (Call Details Column Dictionary; February 2026)
+- https://support.ringba.com/hc/en-us/articles/17994272778519-Reporting-Video (Reporting filters/export; April 2026)
+- https://support.ringba.com/hc/en-us/articles/23787784496535-How-do-I-find-the-Inbound-Call-ID (call dispute ID)
+No route, collector, call, paid campaign, database or revenue was activated.
