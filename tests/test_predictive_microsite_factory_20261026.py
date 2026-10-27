@@ -184,3 +184,63 @@ def test_site_auditor_caps_scan_and_rejects_unsupported_format(tmp_path):
     txt.write_text("Text")
     with pytest.raises(ValueError, match="Only HTML"):
         inspect_page(txt)
+
+def test_official_chicago_pilot_has_useful_checklist_and_genuine_sources():
+    import json
+    from pathlib import Path
+    spec = json.loads(
+        (Path(__file__).parent / "fixtures" /
+         "chicago_roofing_60601_official_research_pilot_20261027.json").read_text()
+    )["candidates"][0]
+    packet, html = build_candidate(spec)
+    assert packet["locally_useful_research_steps"] == 5
+    assert packet["linked_official_source_count"] == 5
+    assert html.count("Read official source") == 5
+    assert 'href="https://chicago.gov/' in html
+    assert 'href="https://idfpr.illinois.gov/checklicense.html"' in html
+    assert 'id="utility-title"' in html
+    assert "source_claims_independently_confirmed_by_site_owner" in packet
+    assert packet["source_claims_independently_confirmed_by_site_owner"] is False
+    assert packet["status"] == "HOLD_EVIDENCE"
+    assert packet["copy_audit"]["score"] == 5
+    assert packet["publishing_enabled"] is False
+    assert "<form" not in html.lower()
+
+
+@pytest.mark.parametrize("url", [
+    "http://chicago.gov/permits", "https://fakechicago.gov/permit",
+    "https://chicago.gov.example.org/permits",
+    "javascript:alert(1)",
+    "https://chicago.gov/permits?tracking=123",
+    "https://user:password@chicago.gov/permits",
+])
+def test_pilot_official_links_require_exact_approved_https_government_host(url):
+    spec = candidate()
+    spec["local_facts"][0]["official_url"] = url
+    with pytest.raises(ValueError):
+        build_candidate(spec)
+
+
+def test_official_links_and_steps_escape_script_and_dangerous_markup():
+    spec = candidate()
+    spec["local_facts"][0]["official_url"] = "https://chicago.gov/permits"
+    spec["research_steps"] = [
+        "Compare written bids before hiring anyone.",
+        "Review permit status for the property, not just the ZIP.",
+        "Check <script>alert(1)</script> with the original government record.",
+    ]
+    packet, html = build_candidate(spec)
+    assert "<script>alert" not in html
+    assert "&lt;script&gt;" in html
+    assert packet["publishing_enabled"] is False
+
+
+def test_duplicate_checklist_cannot_create_fake_distinct_utility():
+    spec = candidate()
+    spec["research_steps"] = [
+        "Check the official building permit record.",
+        "Check the official building permit record.",
+        "Ask for a written price comparison.",
+    ]
+    with pytest.raises(ValueError, match="duplicate steps"):
+        build_candidate(spec)

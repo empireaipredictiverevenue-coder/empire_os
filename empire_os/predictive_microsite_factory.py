@@ -13,6 +13,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlsplit
 
 from empire_os.geo_registry import acquisition_markets
 from empire_os.keyword_universe import review_keyword_record
@@ -73,6 +74,19 @@ def _fact_rows(spec: Mapping[str, Any]) -> list[dict[str, str]]:
             "source_ref": _string(row.get("source_ref"), f"fact {n} source_ref", 350),
             "checked_at": _string(row.get("checked_at"), f"fact {n} checked_at", 30),
         })
+        if row.get("official_url") is not None:
+            url = _string(row["official_url"], f"fact {n} official_url", 450)
+            parsed = urlsplit(url)
+            if (parsed.scheme != "https" or parsed.username or parsed.password
+                    or parsed.port is not None or parsed.query or parsed.fragment
+                    or not parsed.hostname
+                    or parsed.hostname not in {
+                        "chicago.gov", "www.chicago.gov", "311.chicago.gov",
+                        "webapps1.chicago.gov", "idfpr.illinois.gov",
+                        "www.census.gov",
+                    }):
+                raise ValueError(f"fact {n} official_url must link directly to an approved government host")
+            result[-1]["official_url"] = url
         try:
             datetime.fromisoformat(result[-1]["checked_at"].replace("Z", "+00:00"))
         except ValueError as exc:
@@ -136,8 +150,30 @@ def _template(spec: Mapping[str, Any], geo: dict, facts: list[dict[str, str]],
     evidence_cards = "\n".join(
         f'<article class="fact"><span class="micro">Evidence note {i}</span>'
         f'<p>{_safe_text(f["statement"])}</p>'
-        f'<p class="source">Reference: {_safe_text(f["source_ref"])} · Checked: {_safe_text(f["checked_at"])}</p></article>'
+        f'<p class="source">Reference: {_safe_text(f["source_ref"])} · Checked: {_safe_text(f["checked_at"])}</p>'
+        + (f'<a class="official-link" href="{_safe_text(f["official_url"])}" rel="noopener noreferrer" target="_blank">Read official source</a>'
+           if f.get("official_url") else "")
+        + '</article>'
         for i, f in enumerate(facts, 1)
+    )
+    checklist_items = spec.get("research_steps", [])
+    if not isinstance(checklist_items, list) or len(checklist_items) > 8:
+        raise ValueError("research_steps must be a list with at most eight items")
+    if checklist_items and len(checklist_items) < 3:
+        raise ValueError("research_steps needs at least three actionable items")
+    checklist_items = [
+        _string(item, f"research_steps[{n}]", 300)
+        for n, item in enumerate(checklist_items)
+    ]
+    if len(set(item.casefold() for item in checklist_items)) != len(checklist_items):
+        raise ValueError("duplicate steps cannot create local page utility")
+    checklist = (
+        '<section aria-labelledby="utility-title"><p class="tag">Practical planning tool</p>'
+        '<h2 id="utility-title">A decision checklist for this project</h2>'
+        '<ol class="decision-list">' +
+        ''.join(f'<li>{_safe_text(item)}</li>' for item in checklist_items) +
+        '</ol></section>'
+        if checklist_items else ""
     )
     if not evidence_cards:
         evidence_cards = '<p>No local evidence supplied. This proposal is held for research.</p>'
@@ -191,6 +227,10 @@ section {{padding:45px 0}}
 .fact {{border:1px solid #283d58;background:#111d30c9;padding:26px;border-radius:16px;overflow-wrap:anywhere}}
 .fact p {{font-size:1.04rem}}
 .source {{color:var(--dim);font-size:.82rem!important}}
+.official-link {{display:inline-flex;align-items:center;min-height:44px;color:#87d7ff;font-weight:700;text-underline-offset:3px}}
+.decision-list {{max-width:900px;display:grid;gap:14px;padding-left:24px}}
+.decision-list li {{padding:13px 18px;border:1px solid #283d58;border-radius:12px;background:#101c2e}}
+.decision-list li::marker {{color:var(--gold);font-weight:800}}
 .hint {{border-left:3px solid var(--gold);padding:16px 24px;color:var(--dim);background:#182435}}
 footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 @media(max-width:760px) {{.hero-layout{{grid-template-columns:1fr}} .signal-panel{{max-width:560px}}}}
@@ -218,6 +258,7 @@ footer {{padding:32px 0 48px;color:var(--dim);border-top:1px solid #253750}}
 <div class="wrap"><section id="research-method" aria-labelledby="evidence-title">
 <p class="tag">Territory evidence</p><h2 id="evidence-title">What the available research shows</h2>
 <div class="grid">{evidence_cards}</div></section>
+{checklist}
 <section aria-labelledby="next-title"><h2 id="next-title">What still needs verifying</h2>
 <p class="hint">This is a research preview. Source context, actual demand, local service availability,
 buyer acceptance and conversion claims require independent review. No enquiry or payment collection is active.</p>
@@ -262,6 +303,8 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         blockers.append("at least two independently reviewable local source facts required")
     if len({fact["source_ref"] for fact in facts}) < 2:
         blockers.append("at least two distinct local evidence references required")
+    if site_kind == "local_utility" and "research_steps" in spec and len(spec["research_steps"]) < 3:
+        blockers.append("at least three distinct actionable utility steps required")
     if slop["review_required"]:
         blockers.append("SlopMonster copy findings require editorial review")
     # Even a candidate with no detected patterns is not automatically publication-ready.
@@ -280,6 +323,9 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
         "market": geo, "keyword": keyword_review, "audience": audience, "offer": offer,
         "copy_audit": slop, "content_evidence": facts, "evidence_notes": evidence_notes,
         "html_sha256": sha256(html.encode()).hexdigest(),
+        "locally_useful_research_steps": len(spec.get("research_steps", [])),
+        "linked_official_source_count": sum(bool(fact.get("official_url")) for fact in facts),
+        "source_claims_independently_confirmed_by_site_owner": False,
         "visual_qa": {
             "template_includes": ["responsive_grid", "mobile_viewport", "accessible_skip_link",
                                   "single_h1", "reduced_motion", "focus_visible",
