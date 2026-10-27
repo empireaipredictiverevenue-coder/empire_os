@@ -22,6 +22,7 @@ from urllib import robotparser
 import requests
 
 from empire_os.competitor_call_channel_atlas import DOMAINS
+from empire_os.competitor_change_radar import build_radar
 
 SCHEMA = "empire.competitor_call_source_watch.v1"
 ATLAS_SCHEMA = "empire.competitor_call_acquisition_atlas.v1"
@@ -116,6 +117,7 @@ def inspect_sources(
     fetch: Callable[[str], str | None] = fetch_html,
     now: datetime | None = None,
     limit: int = 2,
+    on_public_page: Callable[[str, str, str, datetime], None] | None = None,
 ) -> dict:
     if (atlas.get("schema_version") != ATLAS_SCHEMA
             or atlas.get("outreach_enabled") is not False
@@ -183,6 +185,8 @@ def inspect_sources(
         if digest is None:
             unavailable.append({"url": url, "reason": "PUBLIC_HTML_UNAVAILABLE_OR_INSUFFICIENT"})
             continue
+        if on_public_page is not None:
+            on_public_page(operator, url, body, now)
         old = fingerprints.get(url, {}).get("digest")
         if old is None:
             baseline.append(url)
@@ -211,7 +215,55 @@ def inspect_sources(
     }
 
 
-def refresh(repo_root: Path) -> dict:
+def _publish_radar_from_original_pages(
+    repo_root: Path, public_rows: list[dict], source_failures: list[dict]
+) -> dict:
+    """Use the HTML ALREADY acquired for the canonical digest watch.
+
+    No second request, source roster, service or scheduler. Distinct runtime
+    packet holds redacted human-review facts; the original watcher stays hash-only.
+    """
+    destination = repo_root / "runtime/competitive_intelligence/competitor_change_radar_latest.json"
+    if (not destination.parent.is_dir() or destination.parent.is_symlink()
+            or destination.is_symlink()):
+        raise ValueError("unsafe canonical radar output")
+    if destination.exists():
+        before = json.loads(destination.read_text(encoding="utf-8"))
+    else:
+        before = None
+    result = build_radar(public_rows, previous=before)
+    result["source_failures_this_run"] = [
+        {"source_ref": row["url"], "reason": row["reason"]}
+        for row in source_failures
+    ]
+    result["source_fetch_mode"] = "REUSED_ORIGINAL_SOURCE_WATCH"
+    result["no_new_scheduler"] = True
+    result["database_writes"] = False
+    fd, temp = tempfile.mkstemp(prefix=".competitor-radar-", dir=destination.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as target:
+            json.dump(result, target, indent=2, sort_keys=True)
+            target.write("\n")
+            target.flush()
+            os.fsync(target.fileno())
+        os.replace(temp, destination)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+    return {
+        "status": "OBSERVE_REVIEW_ONLY",
+        "observed_this_run": result["observed_this_run"],
+        "review_candidate_count": result["review_candidate_count"],
+        "outreach_enabled": False,
+        "execution_authority": "none",
+    }
+
+
+def refresh(
+    repo_root: Path, *, permitted: Callable[[str], bool] = permitted_by_robots,
+    fetch: Callable[[str], str | None] = fetch_html,
+) -> dict:
     atlas_path = repo_root / "runtime/competitive_intelligence/call_acquisition_atlas_latest.json"
     atlas = json.loads(atlas_path.read_text(encoding="utf-8"))
     dst = repo_root / DEST
@@ -221,7 +273,29 @@ def refresh(repo_root: Path) -> dict:
         previous = json.loads(dst.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         previous = {}
-    result = inspect_sources(atlas, previous)
+    public_rows: list[dict] = []
+
+    def record(operator: str, url: str, html_body: str, observed_at: datetime) -> None:
+        public_rows.append({
+            "entity_id": operator, "company_name": operator.replace("_", " ").title(),
+            "industry": "call_acquisition_operator", "territory": "US",
+            "source_ref": url, "observed_at": observed_at.isoformat(),
+            "html": html_body, "fetch_authority": "PUBLIC_ROBOTS_PERMITTED",
+        })
+
+    result = inspect_sources(
+        atlas, previous, permitted=permitted, fetch=fetch, on_public_page=record,
+    )
+    try:
+        result["commercial_radar"] = _publish_radar_from_original_pages(
+            repo_root, public_rows, result["source_unavailable_this_cycle"],
+        )
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+        # The existing digest watcher must still refresh if radar evidence is bad.
+        result["commercial_radar"] = {
+            "status": "NOT_PUBLISHED", "error_type": type(exc).__name__,
+            "outreach_enabled": False, "execution_authority": "none",
+        }
     fd, tmp = tempfile.mkstemp(prefix=".call-source-watch-", dir=dst.parent)
     try:
         os.fchmod(fd, 0o600)
