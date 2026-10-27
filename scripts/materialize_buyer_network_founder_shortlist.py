@@ -501,6 +501,7 @@ def build_markdown(
         f"Generated: {payload['generated_at']}",
         "",
         "Authority: OBSERVE / FOUNDER REVIEW ONLY",
+        "Research score/status never gives outbound permission, buyer acceptance or a payable call.",
         "",
         (
             f"Shortlisted buyers: "
@@ -529,11 +530,11 @@ def build_markdown(
                     f"{item['founder_priority']}"
                 ),
                 (
-                    f"- Queue status: "
+                    f"- Research queue status (NOT outreach): "
                     f"{item['queue_status']}"
                 ),
                 (
-                    f"- Qualification: "
+                    f"- Research qualification (NOT buyer acceptance): "
                     f"{item['qualification']['readiness']}"
                 ),
                 (
@@ -543,6 +544,10 @@ def build_markdown(
                 (
                     f"- Already known: "
                     f"{item['already_known']}"
+                ),
+                (
+                    f"- Outbound permission: "
+                    f"{'NONE' if item.get('outbound_authority') is False else 'NOT_VERIFIED'}"
                 ),
                 (
                     f"- Contact history: "

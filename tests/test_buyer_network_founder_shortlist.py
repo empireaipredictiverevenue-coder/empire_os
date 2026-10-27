@@ -200,3 +200,27 @@ def test_open_founder_research_includes_watch_without_promotion_or_old_25_cap(
     assert len(watches) == 30
     assert all(r["founder_class"] == "HOLD" for r in watches)
     assert all(r["outbound_authority"] is False for r in result["shortlist"])
+
+
+def test_founder_shortlist_distinguishes_research_ready_from_contact_permission():
+    mod = module()
+    row = mod.enrich(strong_candidate())
+    row["domain"] = "callscaler.com"
+    row["outreach_status"] = "PERSONAL_GMAIL_SENT_ALREADY_CONTACTED"
+    row["contact_history"] = {
+        "state": "PERSONAL_GMAIL_SENT_ALREADY_CONTACTED",
+        "next_action": "REVIEW_ORIGINAL_PERSONAL_GMAIL_SENT_NO_DUPLICATE_INTRO",
+        "outbound_authorized": False,
+    }
+    result = mod.build_markdown({
+        "generated_at": "2026-10-27T19:40:00+00:00",
+        "shortlist_count": 1,
+        "shortlist": [row],
+    })
+    assert "- Research queue status (NOT outreach): READY_TO_APPROACH" in result
+    assert "- Research qualification (NOT buyer acceptance):" in result
+    assert "- Outbound permission: NONE" in result
+    assert "- Contact history: PERSONAL_GMAIL_SENT_ALREADY_CONTACTED" in result
+    assert "- Contact next action: REVIEW_ORIGINAL_PERSONAL_GMAIL_SENT_NO_DUPLICATE_INTRO" in result
+    assert "Research score/status never gives outbound permission" in result
+    assert "- Queue status: READY_TO_APPROACH" not in result
