@@ -16,6 +16,8 @@ from empire_os.media_research_pack import (
     MediaResearchPack,
     MediaResearchSource,
 )
+from empire_os.media_last30days_cycle import read_and_refresh_last30days
+from empire_os.media_last30days_merge import merge_last30days_reports
 
 
 OPPORTUNITY_RESEARCH = Path(
@@ -65,6 +67,9 @@ def build_media_research_candidates(
             "script_ready_count": 0,
             "candidates": [],
             "search_observations_are_verified_facts": False,
+            "automatic_script_generation_authorized": False,
+            "public_publish_authorized": False,
+            "actual_revenue": False,
             "execution_authority": "none",
         }
 
@@ -186,10 +191,23 @@ def build_media_research_candidates(
 
 def refresh_media_research_bridge(
     repo_root: Path,
+    *,
+    preview: bool = False,
+    enable_last30days_fetch: bool = True,
 ) -> dict[str, Any]:
     payload = build_media_research_candidates(
         _read_json(repo_root / OPPORTUNITY_RESEARCH)
     )
+    reports, health = read_and_refresh_last30days(
+        repo_root, enable_fetch=enable_last30days_fetch and not preview,
+    )
+    if reports:
+        payload = merge_last30days_reports(payload, reports)
+    if health.get("enabled") or health.get("state") != "NOT_CONFIGURED":
+        payload["last30days_source_health"] = health
+    if preview:
+        return {**payload, "queue_written": False, "external_action_performed": False,
+                "database_write_performed": False}
     path = repo_root / OUTPUT
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
