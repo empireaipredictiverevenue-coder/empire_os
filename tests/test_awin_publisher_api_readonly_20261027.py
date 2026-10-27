@@ -158,3 +158,131 @@ def test_idempotent_private_snapshot(tmp_path):
     assert a["status"]==b["status"]=="AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
     assert output.read_bytes()==previous
     assert all(not x["publisher_authorised_to_use_tracking_link"] for x in b["programmes"])
+
+
+
+def test_first_membership_snapshot_is_baseline_not_transition(tmp_path):
+    path=tmp_path/"membership.json"
+    supplier=transport({"122556":"Pending","73922":"Pending"},[])
+    first=review(token_path=token(tmp_path/"secret"),output=path,write=True,
+                 transport=supplier,now=NOW)
+    assert first["status"]=="AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
+    assert first["new_status_transition_count"]==0
+    assert first["historical_status_transition_count"]==0
+    assert first["status_transitions"]==[]
+
+
+def test_real_joined_change_once_and_retained_on_repeat(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    first=review(token_path=cred,output=path,write=True,now=NOW,
+                 transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    assert first["new_status_transition_count"]==0
+    joined={"122556":"Joined","73922":"Pending"}
+    changed=review(token_path=cred,output=path,write=True,now=NOW,
+                   transport=transport(joined,[]))
+    assert changed["new_status_transition_count"]==1
+    assert changed["historical_status_transition_count"]==1
+    assert changed["transition_review_required"] is True
+    event=changed["status_transitions"][0]
+    assert event["advertiser_id"]=="122556"
+    assert event["from_status"]=="PENDING" and event["to_status"]=="JOINED"
+    assert event["required_action"]=="REVIEW_JOINED_PROGRAMME_TERMS_AND_TRACKING_AUTHORISATION"
+    assert event["review_status"]=="REVIEW_NOT_YET_ADMITTED"
+    assert not event["affiliate_publication_authorized"]
+    again=review(token_path=cred,output=path,write=True,now=NOW,
+                 transport=transport(joined,[]))
+    assert again["new_status_transition_count"]==0
+    assert again["historical_status_transition_count"]==1
+    assert again["status_transitions"]==changed["status_transitions"]
+    assert not again["affiliate_publication_authorized"]
+
+
+def test_two_independent_rejections_and_suspensions(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    new=review(token_path=cred,output=path,write=True,now=NOW,
+               transport=transport({"122556":"Rejected","73922":"Suspended"},[]))
+    assert new["new_status_transition_count"]==2
+    assert [(x["advertiser_id"],x["required_action"]) for x in new["status_transitions"]]==[
+        ("122556","REVIEW_REJECTION"),("73922","REVIEW_SUSPENSION")]
+    assert new["commission_earned_verified"] is False
+
+
+def test_old_v1_snapshot_migrates_without_fabricated_events(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    legacy=json.loads(path.read_text())
+    legacy.pop("status_transitions")
+    legacy.pop("new_status_transition_count")
+    legacy.pop("historical_status_transition_count")
+    legacy.pop("transition_review_required")
+    path.write_text(json.dumps(legacy));path.chmod(0o600)
+    newest=review(token_path=cred,output=path,write=True,now=NOW,
+                  transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    assert newest["new_status_transition_count"]==0
+    assert newest["historical_status_transition_count"]==0
+    assert len(newest["programmes"])==2
+
+
+def test_corrupt_existing_history_kept_unchanged(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    existing=json.loads(path.read_text())
+    existing["affiliate_publication_authorized"]=True
+    path.write_text(json.dumps(existing)); path.chmod(0o600)
+    original=path.read_bytes()
+    r=review(token_path=cred,output=path,write=True,now=NOW,
+             transport=transport({"122556":"Joined","73922":"Pending"},[]))
+    assert r["status"].startswith("HELD_")
+    assert r["requests_made"]==0
+    assert path.read_bytes()==original
+
+
+def test_rejects_future_previous_observation(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    existing=json.loads(path.read_text())
+    existing["observed_at"]="2026-10-29T00:00:00+00:00"
+    path.write_text(json.dumps(existing));path.chmod(0o600)
+    r=review(token_path=cred,output=path,write=True,now=NOW,
+             transport=transport({"122556":"Joined","73922":"Pending"},[]))
+    assert r["status"].startswith("HELD_")
+    assert r["requests_made"]==0
+
+
+def test_history_capacity_fails_without_data_loss(tmp_path):
+    path=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport({"122556":"Pending","73922":"Pending"},[]))
+    previous=json.loads(path.read_text())
+    previous["status_transitions"]=[
+        {"event_id":f"{i:024x}","advertiser_id":"122556",
+         "from_status":"PENDING","to_status":"JOINED",
+         "review_required":True,"review_status":"REVIEW_NOT_YET_ADMITTED"}
+        for i in range(80)]
+    path.write_text(json.dumps(previous));path.chmod(0o600)
+    old=path.read_bytes()
+    r=review(token_path=cred,output=path,write=True,now=NOW,
+             transport=transport({"122556":"Joined","73922":"Pending"},[]))
+    assert r["status"].startswith("HELD_")
+    assert path.read_bytes()==old
+
+
+def test_missing_old_snapshot_when_no_write_does_not_create_event(tmp_path):
+    p=tmp_path/"snapshot"
+    cred=token(tmp_path/"secret")
+    r=review(token_path=cred,output=p,write=False,now=NOW,
+             transport=transport({"122556":"Joined","73922":"Joined"},[]))
+    assert r["new_status_transition_count"]==0
+    assert r["status_transitions"]==[]
+    assert not p.exists()
