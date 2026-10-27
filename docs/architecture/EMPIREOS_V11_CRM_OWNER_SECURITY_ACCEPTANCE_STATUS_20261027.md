@@ -27,3 +27,29 @@
 5. RevenueRecognition and FulfilmentOperations attach independent real receipts. A reported CRM 'paid'/'settled' field is not proof of funds, margin or learning rights.
 
 **Do not** start another CRM, worker, database, browser login bypass, payment path or duplicate console. PR #119 stays a review candidate.
+
+## V11 real-driver signed order-to-founder proof — isolated only
+
+New `tests/test_crm_v11_scoped_reader_pg18_end_to_end.py` executes the **actual**
+`crm_scoped_lineage_reader.review_signed_scoped_lineage` with a real
+`psycopg` connection, real PostgreSQL 18 NOINHERIT tenant-bound logins,
+the actual held `SECURITY DEFINER` RPC installed **only inside the ephemeral
+fixture**, and a cryptographically signed synthetic CRM bearer. It injects
+ONLY the existing independently maintained suppression-reader
+`CRM_LOGIN_AUTHORITY_SQL` test contract into the unpublished transport guard;
+production transport source remains untouched.
+
+The tests prove a correctly signed tenant A can retrieve its fixture order;
+tenant B and wrong database-session identity cannot; missing or revoked
+session_user tenant bindings immediately fail closed. Another isolated test
+uses a **test-only protected CRM view** to pass that signed order through the
+**unchanged V11 bridge**, its original CRM view transport, and the redacted
+Founder case DTO. The fixture status intentionally says `paid`, but V11
+still shows `BUYER_ACCEPTANCE` as its first missing verified handoff,
+`revenue_recognized_here=false`, and
+`independent_evidence_attested_here=false`.
+
+No production signed bearer, real order, account password, production DBA
+catalogue grant, CRM owner release, real payment or live founder route was
+involved. The original owner-held SQL and unpublished login changes remain
+separate, and this does not automatically qualify a production release.
