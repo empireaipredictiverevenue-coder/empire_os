@@ -19,6 +19,7 @@ from empire_os.media_research_pack import (
 from empire_os.media_last30days_cycle import read_and_refresh_last30days
 from empire_os.media_last30days_merge import merge_last30days_reports
 from empire_os.media_last30days_handoff import refresh_research_handoff
+from empire_os.gods_eye_nws_refresh import refresh_official_nws_coverage
 
 
 OPPORTUNITY_RESEARCH = Path(
@@ -221,7 +222,17 @@ def refresh_media_research_bridge(
     # for other owners. No import into their economic/search evidence tables.
     handoff = (refresh_research_handoff(repo_root, payload)
                if health.get("enabled") is True else None)
+    # Existing 30-minute Media OS timer owns this optional private NWS reader.
+    # On provider failure retain the old dated file; readers fail shut as it ages.
+    nws = {"status":"NOT_ENABLED_WITH_MEDIA_RESEARCH","fetched":False}
+    if health.get("enabled") is True:
+        try:
+            nws = refresh_official_nws_coverage(repo_root)
+        except (OSError, ValueError, TimeoutError, json.JSONDecodeError) as exc:
+            nws = {"status":"NWS_OFFICIAL_SOURCE_UNAVAILABLE",
+                   "error_type":type(exc).__name__,"fetched":False}
     return {
+        "godseye_nws_private_review": nws,
         **payload,
         "last30days_owner_handoff": handoff,
         "written_path": str(path.relative_to(repo_root)),
