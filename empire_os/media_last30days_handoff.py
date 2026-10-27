@@ -16,6 +16,11 @@ import re
 import stat
 import tempfile
 from typing import Any, Mapping
+from collections import Counter
+
+from empire_os.media_last30days_review_triage import (
+    title_topic_match_candidate, TRIAGE_METHOD, REVIEW_FIRST, CONTEXT_ONLY,
+)
 from urllib.parse import urlsplit
 
 OUTPUT = Path("runtime/media_os/last30days/research_handoff_latest.json")
@@ -138,6 +143,11 @@ def build_research_handoff(
                 "buyer_intent_verified": False,
                 "local_geography_verified": False,
                 "source_text_executable": False,
+                # A conservative *reading order*, not independently verified
+                # relevance. Keep every citation for audit even when off-topic.
+                "title_topic_match_candidate": title_topic_match_candidate(
+                    topic, snippet.get("title"),
+                ),
             })
         topics.append({
             "research_id": c["research_id"],
@@ -146,7 +156,33 @@ def build_research_handoff(
             "observations": observations,
             "review_status": "REQUIRES_INDEPENDENT_TOPIC_RELEVANCE_AND_FACT_CHECK",
         })
+    # Source reuse across topics is common with broad public searches; do not
+    # mistake the same URL appearing twice for independent corroboration.
+    refs_across_topics = Counter(
+        x["source_ref"] for t in topics for x in t["observations"]
+    )
+    for topic in topics:
+        first = 0
+        shared = 0
+        for observation in topic["observations"]:
+            observation["cross_topic_reused_reference"] = (
+                refs_across_topics[observation["source_ref"]] > 1
+            )
+            observation["review_lane"] = (
+                REVIEW_FIRST if observation["title_topic_match_candidate"] else CONTEXT_ONLY
+            )
+            first += int(observation["title_topic_match_candidate"])
+            shared += int(observation["cross_topic_reused_reference"])
+        topic["review_triage"] = {
+            "method": TRIAGE_METHOD,
+            "title_match_candidates_unverified": first,
+            "context_only_references": len(topic["observations"]) - first,
+            "cross_topic_reused_references": shared,
+            "human_review_required": True,
+        }
     count = sum(t["candidate_observation_count"] for t in topics)
+    review_first = sum(t["review_triage"]["title_match_candidates_unverified"] for t in topics)
+    repeated = sum(t["review_triage"]["cross_topic_reused_references"] for t in topics)
     return {
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
@@ -155,6 +191,17 @@ def build_research_handoff(
         "topic_count": len(topics),
         "source_observation_count": count,
         "excluded_observation_count": excluded,
+        "review_triage": {
+            "method": TRIAGE_METHOD,
+            "total_citation_references": count,
+            "title_match_candidates_unverified": review_first,
+            "context_only_references": count - review_first,
+            "cross_topic_reused_references": repeated,
+            "topic_match_independently_verified": False,
+            "buyer_demand_or_commercial_relevance_verified": False,
+            "automatic_actions_authorized": False,
+            "next_action": "HUMAN_READ_ORIGINAL_CITATIONS_AND_INDEPENDENTLY_VERIFY",
+        },
         "topics": topics,
         "consumer_contracts": {
             "predictive_cloud": {
