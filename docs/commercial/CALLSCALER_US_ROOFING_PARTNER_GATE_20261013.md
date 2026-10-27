@@ -72,3 +72,15 @@
 - The exact unresolved question: will CallScaler approve a future independently disclosed roofing source on National Storm Hub, or must the website be exclusively about roofing? No confirmation or application has occurred. An attempted email follow-up was rejected by the mail tool in the previous work period; do not count it as sent.
 - The original National Storm Hub release is 04e1126bc. Its website owner retains source, release and privacy decisions. Do not change storm-alert targeting, visitor data use or page indexing from commercial acquisition.
 - Next commercial action is to obtain source-specific acceptance against a genuine approved URL, then inspect the actual offer qualification and agreement before any routed homeowner call. Keep the original automatic outbound authority disabled.
+
+## Provider contract risk review — 27 October 2026
+
+Read-only public GET of the current CallScaler Marketplace Publisher Agreement returned HTTP 200. Its campaign rules explicitly list location, operating hours, duration, caps, accepted/prohibited sources and qualifications; the campaign settings at the actual call time determine the payable event. Source or buyer acceptance must never be inferred from a public marketplace listing.
+
+The agreement also states that an introduced-buyer restriction applies while participating and for 12 months afterwards, while distinguishing pre-existing independently established buyer relationships. It includes broad publisher indemnification covering marketing, consent, calls, complaints and claims. This matters because Empire AI is separately building direct buyer relationships; founder review of the actual contract and current direct-buyer inventory must precede acceptance of any marketplace agreement. No contract was signed.
+
+Current commercial decision: continue original CallScaler conversation as a qualified conditional prospect; do not apply with National Storm Hub until that property has a genuine owner-approved roofing traffic source and CallScaler individually accepts it. No live calls or payable revenue claimed.
+
+## Existing source-branch survey
+
+A read-only scan of all ten National Storm Hub worktrees found no `app/roofing`, `app/services`, `app/home-services`, `app/privacy`, `app/terms`, or `app/contact` route directories in any inspected branch. This supports a scoped original-owner implementation task instead of accidentally deploying a hidden existing candidate. It does not prove the absence of legal language elsewhere in the existing pages. Commercial acquisition must not edit these source branches or the published site.
