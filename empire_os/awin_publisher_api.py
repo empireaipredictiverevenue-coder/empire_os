@@ -13,7 +13,13 @@ from typing import Callable
 from urllib import request, parse
 
 PUBLISHER_ID = "3136281"
-PROGRAMMES = {"122556": "OVO Solar & Heating", "73922": "Glow Green"}
+PROGRAMMES = {
+    "122556": "OVO Solar & Heating",
+    "73922": "Glow Green",
+    "118321": "Project Solar",
+    "51797": "EcoFlow UK",
+}
+LEGACY_PROGRAMME_IDS = frozenset(("122556", "73922"))
 TOKEN_PATH = Path("/srv/empire_os/runtime/secrets/awin-publisher-api-token")
 SNAPSHOT_PATH = Path("/srv/empire_os/runtime/buyer_network_intelligence/awin_publisher_api_membership_latest.json")
 SCHEMA = "empire.awin.publisher_programme_membership.v1"
@@ -154,7 +160,7 @@ def _read_previous_membership(path: Path, now: datetime) -> tuple[dict[str, str]
             or date.astimezone(timezone.utc) > now.astimezone(timezone.utc) + timedelta(seconds=90)):
         raise AwinAPIHold("AWIN_API_PREVIOUS_TIMESTAMP_INVALID")
     rows = old.get("programmes")
-    if not isinstance(rows, list) or len(rows) != len(PROGRAMMES):
+    if not isinstance(rows, list) or len(rows) not in (len(LEGACY_PROGRAMME_IDS), len(PROGRAMMES)):
         raise AwinAPIHold("AWIN_API_PREVIOUS_PROGRAMMES_INVALID")
     statuses: dict[str, str] = {}
     for row in rows:
@@ -168,7 +174,7 @@ def _read_previous_membership(path: Path, now: datetime) -> tuple[dict[str, str]
                 or row.get("publisher_authorised_to_use_tracking_link") is not False):
             raise AwinAPIHold("AWIN_API_PREVIOUS_MEMBERSHIP_INVALID")
         statuses[ident] = state
-    if set(statuses) != set(PROGRAMMES):
+    if set(statuses) not in (LEGACY_PROGRAMME_IDS, frozenset(PROGRAMMES)):
         raise AwinAPIHold("AWIN_API_PREVIOUS_IDS_INVALID")
     transitions = old.get("status_transitions", [])
     if not isinstance(transitions, list) or len(transitions) > MAX_STATUS_TRANSITIONS:
@@ -201,7 +207,11 @@ def _transition_events(previous: dict[str, str] | None, old_events: list[dict],
         return all_events, new_events
     for row in programmes:
         ident = row["advertiser_id"]
-        before = previous[ident]
+        before = previous.get(ident)
+        # First observed state of an authorised newly tracked programme
+        # is a baseline, not a fabricated status-change event.
+        if before is None:
+            continue
         after = row["membership_status"]
         if before == after:
             continue

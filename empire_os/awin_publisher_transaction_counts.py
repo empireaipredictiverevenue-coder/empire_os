@@ -18,7 +18,7 @@ from urllib import parse, request
 
 from empire_os.awin_publisher_api import (
     AwinAPIHold, _NoRedirect, _private_token, PUBLISHER_ID, PROGRAMMES,
-    TOKEN_PATH, SNAPSHOT_PATH,
+    TOKEN_PATH, SNAPSHOT_PATH, LEGACY_PROGRAMME_IDS,
 )
 
 DEST = Path("/srv/empire_os/runtime/buyer_network_intelligence/awin_publisher_transaction_counts_latest.json")
@@ -57,7 +57,7 @@ def _private_membership(path: Path, now: datetime) -> tuple[list[str], str]:
     if not -90 <= elapsed <= 1800:
         raise AwinAPIHold("AWIN_TRANSACTION_MEMBERSHIP_STALE")
     rows = member.get("programmes")
-    if not isinstance(rows, list) or len(rows) != 2:
+    if not isinstance(rows, list) or len(rows) not in (len(LEGACY_PROGRAMME_IDS), len(PROGRAMMES)):
         raise AwinAPIHold("AWIN_TRANSACTION_MEMBERSHIP_PROGRAMMES_MISSING")
     statuses = {}
     for row in rows:
@@ -70,7 +70,7 @@ def _private_membership(path: Path, now: datetime) -> tuple[list[str], str]:
                 or row.get("publisher_authorised_to_use_tracking_link") is not False):
             raise AwinAPIHold("AWIN_TRANSACTION_MEMBERSHIP_ROW_UNVERIFIED")
         statuses[ident] = row["membership_status"]
-    if set(statuses) != set(PROGRAMMES):
+    if set(statuses) not in (LEGACY_PROGRAMME_IDS, frozenset(PROGRAMMES)):
         raise AwinAPIHold("AWIN_TRANSACTION_MEMBERSHIP_IDENTITY_INVALID")
     return [ident for ident,status in statuses.items() if status == "JOINED"], member["observed_at"]
 

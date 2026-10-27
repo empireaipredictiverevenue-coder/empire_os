@@ -39,7 +39,7 @@ def transport(statuses, count):
         assert q["relationship"]==["any"]
         assert set(q)=={"advertiserId","relationship"}
         advertiser_id=q["advertiserId"][0]
-        return response(advertiser_id,statuses[advertiser_id])
+        return response(advertiser_id,statuses.get(advertiser_id,"Pending"))
     return fetch
 
 
@@ -62,9 +62,9 @@ def test_two_pending_programmes_and_no_secrets_in_snapshot(tmp_path):
     r=review(token_path=cred, output=output, now=NOW,write=True,
              transport=transport(statuses,calls))
     assert r["status"]=="AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
-    assert r["requests_made"]==2 and len(calls)==2
+    assert r["requests_made"]==4 and len(calls)==4
     assert r["publisher_id"]=="3136281"
-    assert [x["membership_status"] for x in r["programmes"]]==["PENDING","PENDING"]
+    assert [x["membership_status"] for x in r["programmes"]]==["PENDING"]*4
     assert r["api_live_verified"]
     assert not r["commission_earned_verified"]
     assert not r["affiliate_publication_authorized"]
@@ -226,7 +226,7 @@ def test_old_v1_snapshot_migrates_without_fabricated_events(tmp_path):
                   transport=transport({"122556":"Pending","73922":"Pending"},[]))
     assert newest["new_status_transition_count"]==0
     assert newest["historical_status_transition_count"]==0
-    assert len(newest["programmes"])==2
+    assert len(newest["programmes"])==4
 
 
 def test_corrupt_existing_history_kept_unchanged(tmp_path):
@@ -286,3 +286,106 @@ def test_missing_old_snapshot_when_no_write_does_not_create_event(tmp_path):
     assert r["new_status_transition_count"]==0
     assert r["status_transitions"]==[]
     assert not p.exists()
+
+
+
+def test_original_two_programme_snapshot_migrates_without_fake_events(tmp_path):
+    cred=token(tmp_path/"secret")
+    path=tmp_path/"history.json"
+    now=NOW
+    from empire_os.awin_publisher_api import PUBLISHER_ID,SCHEMA
+    old={
+        "schema_version":SCHEMA,
+        "status":"AWIN_API_MEMBERSHIP_REVIEW_VERIFIED",
+        "observed_at":now.isoformat(),
+        "publisher_id":PUBLISHER_ID,
+        "api_live_verified":True,
+        "affiliate_publication_authorized":False,
+        "tracking_links_generated":False,
+        "commission_earned_verified":False,
+        "commission_paid_verified":False,
+        "outbound_sent":False,
+        "database_writes":False,
+        "programmes":[
+            {"advertiser_id":id,"membership_status":"PENDING",
+             "membership_verified_by_authenticated_awin_api":True,
+             "publisher_authorised_to_use_tracking_link":False}
+            for id in ("122556","73922")
+        ],
+        "status_transitions":[],
+    }
+    path.write_text(json.dumps(old));path.chmod(0o600)
+    current=review(token_path=cred,output=path,write=True,now=now,
+                   transport=transport({
+                       "122556":"Pending","73922":"Pending",
+                       "118321":"Pending","51797":"Pending"},[]))
+    assert current["status"]=="AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
+    assert current["requests_made"]==4
+    assert current["new_status_transition_count"]==0
+    assert current["historical_status_transition_count"]==0
+    assert {x["advertiser_id"]:x["membership_status"] for x in current["programmes"]}=={
+        "122556":"PENDING","73922":"PENDING",
+        "118321":"PENDING","51797":"PENDING"}
+    assert not current["affiliate_publication_authorized"]
+    assert stat.S_IMODE(path.stat().st_mode)==0o600
+
+
+def test_new_solar_acceptance_has_one_exact_authenticated_event(tmp_path):
+    cred=token(tmp_path/"secret")
+    path=tmp_path/"history.json"
+    initial={id:"Pending" for id in ("122556","73922","118321","51797")}
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport(initial,[]))
+    after=dict(initial)
+    after["118321"]="Joined"
+    after["51797"]="Rejected"
+    r=review(token_path=cred,output=path,write=True,now=NOW,
+             transport=transport(after,[]))
+    assert r["status"]=="AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
+    assert r["new_status_transition_count"]==2
+    assert [(x["advertiser_id"],x["from_status"],x["to_status"]) for x in r["status_transitions"]]==[
+        ("118321","PENDING","JOINED"),
+        ("51797","PENDING","REJECTED"),
+    ]
+    assert r["programmes"][2]["action"]=="REVIEW_JOINED_PROGRAMME_TERMS_AND_TRACKING_AUTHORISATION"
+    assert r["affiliate_publication_authorized"] is False
+    again=review(token_path=cred,output=path,write=True,now=NOW,
+                 transport=transport(after,[]))
+    assert again["new_status_transition_count"]==0
+    assert again["historical_status_transition_count"]==2
+
+
+def test_malicious_partial_three_programme_previous_file_refused(tmp_path):
+    cred=token(tmp_path/"secret")
+    path=tmp_path/"history.json"
+    initial={id:"Pending" for id in ("122556","73922","118321","51797")}
+    review(token_path=cred,output=path,write=True,now=NOW,
+           transport=transport(initial,[]))
+    tampered=json.loads(path.read_text())
+    tampered["programmes"].pop()
+    path.write_text(json.dumps(tampered));path.chmod(0o600)
+    b=path.read_bytes()
+    r=review(token_path=cred,output=path,write=True,now=NOW,
+             transport=transport(initial,[]))
+    assert r["status"].startswith("HELD_")
+    assert r["requests_made"]==0
+    assert path.read_bytes()==b
+
+
+def test_four_programme_authenticated_transaction_reader(tmp_path):
+    from empire_os.awin_publisher_transaction_counts import review as count_review
+    from tests.test_awin_publisher_transaction_counts_20261027 import member,source,token as count_token
+    joined=member(tmp_path,{
+        "122556":"PENDING","73922":"PENDING",
+        "118321":"JOINED","51797":"PENDING"})
+    calls=[]
+    (tmp_path/"other-secret").mkdir()
+    r=count_review(now=NOW.replace(hour=14,minute=50),membership_path=joined,token_path=count_token(tmp_path/"other-secret"),
+                   output=tmp_path/"counts",write=True,
+                   transport=source({"118321":[]},calls))
+    assert r["status"]=="AWIN_JOINED_PROGRAMME_TRANSACTION_COUNTS_OBSERVED"
+    assert r["joined_programmes_checked"]==["118321"]
+    assert r["api_requests_made"]==1
+    assert r["programme_results"][0]["record_count"]==0
+    assert r["revenue_verified"] is False
+    assert stat.S_IMODE((tmp_path/"counts").stat().st_mode)==0o600
