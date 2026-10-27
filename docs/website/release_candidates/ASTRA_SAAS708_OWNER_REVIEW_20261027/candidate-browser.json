@@ -1,0 +1,17 @@
+{
+  "status": "PRIVATE_708_CURRENT_SITE_BROWSER_CTA_AND_CONSENT_PASS",
+  "original_saas_evidence_preview_visible": true,
+  "exact_new_cta": "/commercial?entry=%2Fpredictive-revenue#commercial-enquiry",
+  "html_hydration_page_chunk": "page-2497319cb37cc28e.js",
+  "buyer_initiated_commercial_route_reached": true,
+  "browser_entry_hint_read_as_unverified": "/predictive-revenue",
+  "actual_consent_form_checkbox_rendered": true,
+  "newer_commercial_page_title": "Buyer Readiness & Revenue Intelligence | Empire AI",
+  "runtime_exceptions": 0,
+  "requests_4xx_5xx": 0,
+  "external_requests": 0,
+  "form_posts": 0,
+  "customer_created": false,
+  "publication_executed": false,
+  "browser_qa_duration_seconds": 6
+}
