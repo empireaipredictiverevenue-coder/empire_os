@@ -76,3 +76,11 @@ This requires the exact full 710-file published static inventory before any publ
 Expected status only after a genuine correct release: PUBLIC_HTTPS_EXACT_SOLAR_COMMERCIAL_V2_18_GET_READBACK_PASS. The old website must fail this readback; a green result does not itself substitute for the protected root publication receipt or independent ASTRA owner authority.
 
 Owner must also separately run the pre-existing interactive browser, consent and catalogue post-release checks.
+
+## 27 October: prior release SUPERSEDED by current founder brand (terminal hold)
+
+The founder explicitly rejected the old Solar and Commercial V2 branding after full-page preview review and supplied the EmpireOS branding-file discovery. Canonical source: /home/ubuntu/empire_releases/empire_brand_canonical_20261027/brand_contract.json. Immutable original-repo release hold: docs/website/release_candidates/SOLAR_COMMERCIAL_V2_BRAND_SUPERSESSION_HOLD_20261027.json, SHA-256 b09c23e6c204b061dccc8362f44747dc407f9bc1bfacb8a260d689ce8010e3d9.
+
+The original V2 root publisher, preflight, and public HTTPS readback are now terminally blocked with FOUNDER_REJECTED_PREVIOUS_V2_BRANDING_RELEASE_SUPERSEDED. Prior founder approval and backup are historical, not permission to publish this superseded page design. Twelve focused tests verify the block and preservation of historical reversible transaction evidence.
+
+Original ASTRA owner already maintains website brand branch review/website-brand-original-owner-20261027, head 03511c594, and actual Solar/Commercial desktop/mobile Chrome captures in /home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/owner_wip_combined_qa_20261027/. Reconcile only appropriate previous V2 functional content, consent/idempotency and Solar source attribution into that owner's current new-brand source. Rebuild stage against the current site, collect new visual evidence, and seek fresh founder approval before a newly authorised owner release. Do not publish a two-page old Next.js export just by changing the logo.

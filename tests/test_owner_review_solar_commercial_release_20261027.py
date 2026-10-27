@@ -8,17 +8,17 @@ from scripts import owner_review_solar_commercial_release_20261027 as release
 
 
 def test_preflight_readonly_and_exact_scope():
-    r = release.preflight()
-    assert r["status"] == "TWO_PAGE_SCOPE_VERIFIED_ORIGINAL_OWNER_APPROVAL_REQUIRED"
-    assert (r["site_files_before"], r["site_files_proposed"]) == (700, 710)
-    assert (r["old_pages_replaced"], r["new_assets"]) == (10, 10)
-    assert r["publication_performed"] is False
-    assert r["owner_approval_verified"] is False
+    r = release.candidate()  # historical bytes still inspectable, never releasable
+    assert len(r["baseline"]) == 700
+    assert len(r["after"]) == 710
+    assert (len(r["replacements"]), len(r["additions"])) == (10,10)
+    with pytest.raises(release.OwnerReleaseHold, match="FOUNDER_REJECTED_PREVIOUS_V2_BRANDING"):
+        release.preflight()
 
 
 def test_root_only_apply_rejects_regular_account(monkeypatch):
     monkeypatch.setattr(release.os,"geteuid",lambda:1000)
-    with pytest.raises(release.OwnerReleaseHold, match="ROOT_OPERATOR_ONLY"):
+    with pytest.raises(release.OwnerReleaseHold, match="FOUNDER_REJECTED_PREVIOUS_V2_BRANDING"):
         release.apply()
 
 
@@ -84,10 +84,9 @@ def test_bad_owner_manifest_and_backup_fail_closed(tmp_path, monkeypatch):
 
 
 def test_owner_receipt_absent_and_publication_requires_independent_attestation():
-    # Backup evidence is not by itself a signoff.
-    r=release.preflight()
-    assert not r["owner_approval_verified"]
-    assert "owner" in r["status"].lower()
+    # Backup and old founder approval cannot override later explicit rejection.
+    with pytest.raises(release.OwnerReleaseHold,match="FOUNDER_REJECTED_PREVIOUS_V2_BRANDING"):
+        release.preflight()
     assert release.PUBLISH_FLAG.startswith("--apply-exact-owner-approved-")
     assert release.OWNER_APPROVAL!=release.ROOT_RECEIPT
     assert release.OWNER_APPROVAL.parent==release.BACKUP_DIR
@@ -103,7 +102,9 @@ def test_exact_founder_approval_is_cryptographically_pinned():
     assert a["screenshot_sha256"] == m["browser_review_screenshots_sha256"]
     assert a["founder_approval_for_exact_visual_copy_pricing"] is True
     assert a["publication_authorized_now"] is False
-    assert release.preflight()["founder_exact_visual_copy_pricing_approved"] is True
+    # Historical approval is real but no longer effective for publication.
+    with pytest.raises(release.OwnerReleaseHold,match="FOUNDER_REJECTED_PREVIOUS_V2_BRANDING"):
+        release.preflight()
 
 
 def test_mismatched_founder_approval_sha_fails_closed(monkeypatch):
@@ -131,12 +132,16 @@ def test_public_readback_succeeds_only_with_all_18_exact_get_hashes(monkeypatch)
         data["/"+file]=(release.PACKET/"proposed_site"/file).read_bytes()
     assert len(data)==18
     monkeypatch.setattr(release,"site_inventory",lambda root:final)
+    # Offline-only synthetic legacy readback helper can still be evaluated.
+    monkeypatch.setattr(release,"_require_original_v2_brand_still_approved",lambda:None)
     result=release.public_readback(fetch=lambda route:data[route])
     assert result["status"]=="PUBLIC_HTTPS_EXACT_SOLAR_COMMERCIAL_V2_18_GET_READBACK_PASS"
     assert result["public_gets_only"] is True and result["http_gets"]==18
 
 
 def test_public_readback_rejects_old_version_and_asset_mismatch(monkeypatch):
+    # Test the exact underlying probe with a bypass ONLY in isolated test scope.
+    monkeypatch.setattr(release,"_require_original_v2_brand_still_approved",lambda:None)
     # Old live site must NOT be reported as released.
     with pytest.raises(release.OwnerReleaseHold,match="ORIGINAL_SITE_NOT_PUBLISHED_EXACT_710"):
         release.public_readback(fetch=lambda route:b"NO_EXTERNAL_HTTP_PERFORMED")
@@ -146,3 +151,14 @@ def test_public_readback_rejects_old_version_and_asset_mismatch(monkeypatch):
     monkeypatch.setattr(release,"site_inventory",lambda root:final)
     with pytest.raises(release.OwnerReleaseHold,match="PUBLIC_HTTPS_NEW_HTML_MISMATCH"):
         release.public_readback(fetch=lambda route:b"WRONG_BYTES")
+
+
+
+def test_original_v2_release_remains_terminally_blocked_by_founder_rebranding():
+    assert release.sha(release.BRAND_SUPERSESSION)==release.EXPECTED_BRAND_SUPERSESSION_SHA
+    h=release.read_json(release.BRAND_SUPERSESSION)
+    assert h["previous_candidate_manifest_sha256"]==release.EXPECTED_MANIFEST_SHA
+    assert h["previous_candidate_publisher_must_fail_closed"] is True
+    for action in (release.preflight,release.apply,release.public_readback):
+        with pytest.raises(release.OwnerReleaseHold,match="FOUNDER_REJECTED_PREVIOUS_V2_BRANDING"):
+            action()

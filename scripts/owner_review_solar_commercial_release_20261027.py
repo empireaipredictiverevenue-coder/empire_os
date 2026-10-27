@@ -52,6 +52,25 @@ class OwnerReleaseHold(ValueError):
     pass
 
 
+# Founder explicitly REJECTED the old visual brand after seeing full-page QA.
+# The supersession is historical and immutable; do not use a previous V2 visual
+# receipt to infer new brand approval. Old live/publication modes fail closed.
+BRAND_SUPERSESSION = ROOT / "docs/website/release_candidates/SOLAR_COMMERCIAL_V2_BRAND_SUPERSESSION_HOLD_20261027.json"
+EXPECTED_BRAND_SUPERSESSION_SHA = "b09c23e6c204b061dccc8362f44747dc407f9bc1bfacb8a260d689ce8010e3d9"
+
+
+def _require_original_v2_brand_still_approved() -> None:
+    if not BRAND_SUPERSESSION.is_file() or BRAND_SUPERSESSION.is_symlink():
+        raise OwnerReleaseHold("FOUNDER_BRAND_SUPERSESSION_RECORD_MISSING_RELEASE_HELD")
+    if sha(BRAND_SUPERSESSION) != EXPECTED_BRAND_SUPERSESSION_SHA:
+        raise OwnerReleaseHold("FOUNDER_BRAND_SUPERSESSION_RECORD_CHANGED_RELEASE_HELD")
+    record = read_json(BRAND_SUPERSESSION)
+    if (record.get("previous_candidate_manifest_sha256") != EXPECTED_MANIFEST_SHA
+        or record.get("previous_candidate_publisher_must_fail_closed") is not True):
+        raise OwnerReleaseHold("INVALID_FOUNDER_BRAND_SUPERSESSION_HOLD")
+    raise OwnerReleaseHold("FOUNDER_REJECTED_PREVIOUS_V2_BRANDING_RELEASE_SUPERSEDED")
+
+
 def sha(path: Path) -> str:
     return sha256(path.read_bytes()).hexdigest()
 
@@ -260,6 +279,7 @@ def public_readback(*, fetch=None, live: Path = LIVE) -> dict:
     This performs GETs, never grants release authority, and deliberately
     refuses to report a success for the currently live old pages.
     """
+    _require_original_v2_brand_still_approved()
     get = _public_get if fetch is None else fetch
     source = read_json(SOURCE_INVENTORY)
     m = read_json(MANIFEST)
@@ -317,6 +337,7 @@ def public_readback(*, fetch=None, live: Path = LIVE) -> dict:
 
 
 def preflight(*, live: Path = LIVE) -> dict:
+    _require_original_v2_brand_still_approved()
     r = candidate(live=live)
     return {
         "status":"TWO_PAGE_SCOPE_VERIFIED_ORIGINAL_OWNER_APPROVAL_REQUIRED",
@@ -336,6 +357,7 @@ def preflight(*, live: Path = LIVE) -> dict:
 
 
 def _publish_locked() -> dict:
+    _require_original_v2_brand_still_approved()
     if os.geteuid() != 0:
         raise OwnerReleaseHold("ROOT_OPERATOR_REQUIRED")
     if ROOT_RECEIPT.exists() or ROOT_RECEIPT.is_symlink():
@@ -401,6 +423,7 @@ def _publish_locked() -> dict:
 
 
 def apply() -> dict:
+    _require_original_v2_brand_still_approved()
     if os.geteuid() != 0:
         raise OwnerReleaseHold("ROOT_OPERATOR_ONLY_NO_BUILDER_APPLY")
     if (BACKUP_DIR.is_symlink() or not BACKUP_DIR.is_dir()
