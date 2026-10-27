@@ -390,6 +390,23 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     else:
         traffic_summary = {"available": True, **traffic}
 
+    attribution = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_conversion_readiness_latest.json"
+    )
+    if (attribution.get("schema_version")
+            != "empire.competitor_call_conversion_readiness.v1"
+            or attribution.get("mode") != "OBSERVE"
+            or attribution.get("database_writes") is not False
+            or attribution.get("ad_spend_authorized") is not False
+            or attribution.get("external_send_authorized") is not False
+            or attribution.get("execution_authority") != "none"
+            or attribution.get("exact_source_to_settlement_proven") is not False
+            or attribution.get("acquisition_source_profitability_calibrated") is not False):
+        attribution_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        attribution_summary = {"available": True, **attribution}
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
@@ -397,6 +414,7 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "official_alert_precision": detail_summary,
         "business_model_research": market_summary,
         "traffic_source_research": traffic_summary,
+        "conversion_evidence_readiness": attribution_summary,
     }
 
 
