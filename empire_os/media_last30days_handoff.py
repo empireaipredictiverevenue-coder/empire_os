@@ -210,7 +210,14 @@ def refresh_research_handoff(
     finally:
         if os.path.exists(filename):
             os.unlink(filename)
+    # Existing Media OS timer owns this opt-in cross-owner projection.
+    # Write ONLY to private Media OS runtime, never the website or God’s Eye UI.
+    from empire_os.godseye_last30days_context import refresh_godseye_research_context
+    godseye_review = refresh_godseye_research_context(
+        repo_root, payload, now=_utc(payload["generated_at"]),
+    )
     return {
+        "godseye_private_review": godseye_review,
         "schema_version": SCHEMA,
         "path": str(OUTPUT),
         "status": payload["status"],
