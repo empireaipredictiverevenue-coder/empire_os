@@ -1,11 +1,37 @@
 # Empire AI | Awin UK Home-Energy Partner Growth Pack
-**Evidence date:** 27 October 2026, 15:44 UTC. **Owner:** Empire AI affiliate operations (founder-assigned). **Publisher:** Awin 3136281. **Authority:** research and founder-reviewed application copy only; zero outbound, zero programme applications, zero live links.
+**Original research date:** 27 October 2026, 15:44 UTC. **Commercial status reconciled:** 27 October 2026, 18:22 UTC. **Owner:** Empire AI affiliate operations (founder-assigned). **Publisher:** Awin 3136281. **Authority:** researched offers and founder-submitted applications only; no approved advertiser partnership, no live affiliate link and no affiliate revenue. **The historical baseline below is retained for audit; current statuses supersede it.**
+
+## Current authenticated Awin programme status (supersedes older baseline)
+
+Official publisher `GET /publishers/3136281/programmedetails` verified independently on 27 October 2026 at ~18:19 UTC:
+
+| Advertiser | ID | Current real membership | Application and commercial status |
+|---|---|---|---|
+| OVO Solar & Heating | 122556 | **PENDING** | Submitted earlier; advertiser decision still outstanding |
+| Glow Green - Accelerate - UK | 73922 | **PENDING** | Submitted earlier; advertiser decision still outstanding |
+| Project Solar | 118321 | **PENDING** | Founder submitted in authenticated Awin dashboard on 27 October; real Awin API confirmed |
+| EcoFlow UK | 51797 | **PENDING** | Founder submitted in authenticated Awin dashboard on 27 October; real Awin API confirmed |
+| Insulation & More | 45533 | **NOT JOINED** | Research and editorial candidate only; content-policy review unfinished |
+
+Two real commercial application-related emails went to Project Solar and EcoFlow, plus one enquiry to Awin Publisher Success; all were confirmed in the Empire AI Gmail Sent folder. **Emails do not equal programme acceptance.** Original EmpireOS 15-minute read-only membership cycle now observes all four Pending programmes; `JOINED=0`, tracking/publication authorisation remains false and no affiliate commission/settlement is verified. The original branded website release remains controlled separately by ASTRA.
+
+## Current EcoFlow offers verified by Awin (publisher account **not joined**)
+
+A one-time official Awin **Retrieve Offers** API query (27 October 2026, 18:21–18:23 UTC), filtered to active UK promotions from OVO, Glow Green, Project Solar, EcoFlow UK and Insulation & More, returned **two** matching offers, both EcoFlow. A second account-authenticated read confirmed titles, terms, listed dates and that voucher codes are **not available** to our pending account. No code or tracking link was stored or published.
+
+| Awin promotion ID | Advertiser's offer description | Expiry in source (UTC) | Programme membership | Current action |
+|---|---|---|---|---|
+| **4003423** | EcoFlow STREAM Series **5% off**, excluding new products | **31 December 2026 at 07:15 UTC** | PENDING / voucher code unavailable | Hold. Recheck product exclusion, actual code and merchant terms **only if JOINED** |
+| **3658000** | EcoFlow UK **5% off products**, excluding new products | **1 January 2027 at 06:41 UTC** | PENDING / voucher code unavailable | Hold. Recheck product eligibility, actual code and joined-programme terms **only if JOINED** |
+
+**Critical commercial distinction:** These 5% values are **customer discounts**, not Empire AI publisher commission rates. The public offer record does **not** establish our commission, code eligibility, current live store price, customer savings amount, or permission to advertise. Two offers now are not guaranteed to remain valid on a later publication date. Awin's Offers API can return `urlTracking` for not-joined programmes; **do not use that field to bypass membership**, and do not place unapproved links, voucher phrases, or commissions on the unfinished homeowner pages. Source documentation: https://help.awin.com/apis/apidocs/promotions .
+
 
 ## Proven current commercial baseline
 
 - Read from Empire AI's actual authenticated Awin Publisher API `GET /publishers/3136281/programmes?countryCode=GB&relationship=joined`: **0 Joined UK programmes**.
-- The `pending` counterpart returned **2 active UK programmes**: OVO Solar & Heating (122556), Glow Green - Accelerate - UK (73922). The original 15-minute EmpireOS API observer separately verified both `PENDING` at **2026-10-27T15:37:34Z**.
-- Visible UK programme directory: **3,408** entries when queried 27 Oct (not 3,408 relevant or approved programmes). Exact candidate IDs below verified individually through authenticated `programmedetails?relationship=any`, with all listed additional candidates **Not joined**.
+- **Historical observation at 15:37 UTC, now superseded:** at this point the `pending` endpoint returned only OVO (122556) and Glow Green (73922). Project Solar and EcoFlow were subsequently submitted, and the current table above records **four PENDING**.
+- The initial UK programme directory listed 3,408 visible programmes at ~15:44 UTC; a later Awin `notjoined` query returned 3,410, so these catalogue numbers depend on time and membership filter. They are **not** counts of relevant or approved programmes. The exact candidate IDs below were checked individually; two have since become **PENDING**.
 - One-time read-only Awin transaction check for 20–27 October returned **0 transactions** for existing OVO and Glow Green applications; no all-time or payout claim.
 - Public website observed 27 October: `/industries/solar` HTTP 200 but titled *Solar Demand & Referral Qualification* (B2B), `/heat-pumps` and `/solar` HTTP 404. No Awin URL in checked pages. These do not demonstrate finished homeowner affiliate editorial pages.
 
@@ -13,8 +39,8 @@
 
 | Priority | Name / Awin programme ID | Authentic membership | Public programme economics | Why relevant | Restrictions / quality checks |
 |---|---|---|---|---|---|
-| 1 | Project Solar **118321** | Not joined | Payout **UNKNOWN** pending exact joined commission terms; public 30-day attribution | Best direct fit for UK homeowner solar quotation guides | Do not repeat Project Solar's unverified savings/warranty/performance marketing claims; ensure UK geographic/lead criteria, no fabricated qualified leads |
-| 2 | EcoFlow UK **51797** | Not joined | Public **5% sale commission**, **7-day** attribution | Portable power, home battery and solar-product buying guides, not installer-lead CPL | Product availability, installed vs portable suitability, affiliate promotional rules and exact joined payout to verify |
+| 1 | Project Solar **118321** | **PENDING** | Payout **UNKNOWN** pending exact joined commission terms; public 30-day attribution | Best direct fit for UK homeowner solar quotation guides | Do not repeat Project Solar's unverified savings/warranty/performance marketing claims; ensure UK geographic/lead criteria, no fabricated qualified leads |
+| 2 | EcoFlow UK **51797** | **PENDING** | Public **5% sale commission**, **7-day** attribution | Portable power, home battery and solar-product buying guides, not installer-lead CPL | Product availability, installed vs portable suitability, affiliate promotional rules and exact joined payout to verify |
 | 3 | Insulation & More **45533** | Not joined | Public **3% standard qualifying-sale commission**, **30-day** attribution | Home insulation and energy-efficiency educational content | Public programme expressly rejects **mass-produced content**. Real original editorial expertise and actual useful product research required; this is a special content-quality gate |
 | 4 | Insulation4less UK **37552** | Not joined | Public **2% standard**, **30-day** attribution; product feed mentioned | Trade and homeowner insulation/product guides | Validate product SKU/feed availability and conversion terms. No pricing or 'lowest price' superiority claim unless independently checked |
 | 5 | MoneySupermarket Energy **22713** | Not joined | Commission rates **UNVERIFIED**; public **1-day** attribution | Broader UK household energy switching research | Brand-specific generic energy links and strict click append requirements. The public page includes historical 2021 fee examples — DO NOT use as current commission promises. No bespoke tracking or landing-page publication without advertiser-approved publisher pack |
@@ -34,7 +60,7 @@
 
 ## Awin Join Programme UI: founder-ready messages (150-character limit)
 
-**Verified 27 October 2026:** Awin publisher **3136281**; the programmes below were **Not joined** in the authenticated Awin API. These are prepared **drafts only**, NOT submitted. Do not click the advertiser terms confirmation unless reviewing and agreeing to those exact terms.
+**Historically verified before founder submission:** Project Solar and EcoFlow were originally NOT_JOINED, but **both short messages have since been submitted by the founder through Awin** and both memberships independently verified **PENDING**. Insulation & More remains NOT_JOINED, and its message is still a **draft only**. Do not click the advertiser terms confirmation unless reviewing and agreeing to those exact terms.
 
 Choose promotion type **Content — https://empire-ai.co.uk**.
 
@@ -48,7 +74,7 @@ Choose promotion type **Content — https://empire-ai.co.uk**.
 
 ## Founder-reviewed Awin 'Join Programme' application messages
 
-These messages are drafts, NOT sent applications. Select **Content — https://empire-ai.co.uk**. Do not represent homeowner guides as live until independently released.
+These are longer reference drafts, **not the exact messages used for the two completed platform submissions**. The Project Solar and EcoFlow applications are independently API-confirmed PENDING. Insulation & More is not submitted. Do not represent homeowner guides as live until independently released.
 
 ### 118321 — Project Solar
 
@@ -92,15 +118,15 @@ The official authenticated Awin account GET identified Empire-AI, publisher **31
 1. **Account > Profile > Overview:** Enter truthful business description, website, contact and approved branded image. Check the actual completion indicator; Awin says only complete profiles are displayed in the Publisher Directory.
 2. **Account > Profile > Promotional Spaces:** Confirm the real website URL, Content promotional type, truthful description and appropriate home/energy sectors.
 3. **Account > Payment Details:** Complete the tax residency, business type and bank/payment information privately in Awin. Some accounts require two-step verification before accessing Payment Details. Do not paste banking, tax IDs or API token into chat, GitHub, commercial emails or release receipts.
-4. **Advertisers > Join Programs:** Review each advertiser's current terms, permitted channels and tracked conversion event, then submit exact programme **118321 Project Solar** and **51797 EcoFlow UK** using their 150-character application messages in this pack.
+4. **Advertisers > My Programs > Pending:** Project Solar **118321** and EcoFlow UK **51797** were already submitted on 27 October; verify any subsequent accept/reject decision and actual terms. **Do not submit duplicates.** Future programme applications require their own reviewed conditions.
 5. **Verify separately:** Use the authenticated original EmpireOS Awin API after submissions; only real PENDING/JOINED changes count. Prior direct partner emails are not platform applications. Actual earned commission and paid settlement need separate evidence.
 
 **Official current Awin guidance:** https://success.awin.com/articles/en_US/Knowledge/How-do-I-complete-my-profile and https://success.awin.com/articles/en_US/Knowledge/How-do-I-add-or-edit-my-promotional-sites and https://success.awin.com/articles/en_US/Knowledge/Publisher-Tax-Details-FAQs.
 
 ## Review and activation order
 
-1. Founder chooses the exact additional programmes for Awin applications. **Awin programme enrollment is NOT a read-only API action**; do not forge a join state or submit terms behind the founder's back.
-2. Save submissions with exact advertiser ID and founder/actual UI evidence, not as "Joined". Original Awin API remains the acceptance authority.
+1. **Completed for Project Solar and EcoFlow:** the founder used the real Awin dashboard and both applications are API-confirmed **PENDING**. Remaining prospects such as Insulation & More are NOT_JOINED. The Awin programme API is read-only for enrolment; do not forge a state, resubmit duplicate applications or accept further terms without approval.
+2. Exact advertiser IDs and the authenticated Pending evidence have been saved in the original protected commercial source. Original Awin API remains the acceptance authority, not the outreach emails or the coupon listings.
 3. Independently complete at least one useful, visually branded UK homeowner guide via the EXISTING website/SEO release owner. Consumer claims must be original, cited and quality-reviewed. No affiliate link publishing from this commercial branch.
 4. Once a programme becomes JOINED, retrieve actual in-account terms, allowed channel, conversion trigger, exclusions, and destination/tracking requirements. Prepare one link-placement review; advertiser-specific tracking links need owner-approved release.
 5. Use original EmpireOS 15-minute Awin observer and joined-only transaction-count reader. Verify approved outcomes and *settled payout* from separate Awin settlement evidence. Counts/clicks do not prove funds received.
