@@ -249,3 +249,98 @@ def test_paid_source_even_with_owner_asserted_positive_cohort_cannot_spend():
     assert r["traffic_or_ad_spend_authorized"] is False
     assert r["automated_optimisation_enabled"] is False
     assert r["new_agent_database_or_timer_created"] is False
+
+
+def synthetic_original_call_loss(*, source="organic_search",
+                                cohort="SYNTHETIC_COHORT_NOT_EARNED_CASH",
+                                original_owner_authorized=True):
+    from empire_os.competitor_call_loss_readiness import (
+        COUNTS, NO_CONNECT_REASONS, NO_HUMAN_REASONS, NO_PAYABLE_REASONS,
+        evaluate_approved_call_cohort,
+    )
+    counts = dict(zip(COUNTS, (40, 30, 25, 20, 18)))
+    no_connect = {key: 0 for key in NO_CONNECT_REASONS}
+    no_connect["TARGET_NO_ANSWER"] = 10
+    no_human = {key: 0 for key in NO_HUMAN_REASONS}
+    no_human["IVR_OR_QUEUE_ABANDON"] = 5
+    no_payable = {key: 0 for key in NO_PAYABLE_REASONS}
+    no_payable["WRONG_SERVICE"] = 5
+    return evaluate_approved_call_cohort(
+        source_id=source, cohort_ref=cohort, counts=counts,
+        refs={key: "synthetic-owner-receipt:" + key for key in COUNTS},
+        no_connect_reasons=no_connect, no_human_reasons=no_human,
+        no_payable_reasons=no_payable,
+        original_owner_authorized=original_owner_authorized,
+        source_lineage_verified=True, buyer_acceptance_verified=True,
+        unique_inbound_terminal_dispositions_verified=True,
+    )
+
+
+def test_existing_original_call_loss_separates_queue_and_buyer_rejection():
+    counts, refs, cash, receipts = synthetic_aggregate()
+    result = review_pay_per_call_source_to_cash(
+        registry=original_registry(), source_id="organic_search",
+        cohort_ref="SYNTHETIC_COHORT_NOT_EARNED_CASH",
+        funnel_counts=counts, funnel_evidence_refs=refs,
+        finance_values=cash, finance_receipt_refs=receipts,
+        approved_call_loss_cohort=synthetic_original_call_loss(),
+        source_lineage_verified=True, same_cohort_verified=True,
+        buyer_source_approval_verified=True,
+        buyer_source_approval_ref="synthetic-buyer-source-owner",
+        independent_finance_verified=True,
+    )
+    qa = result["existing_original_call_loss_review"]
+    assert qa["available"] is True
+    assert qa["human_buyer_answers"] == 25
+    assert qa["calls_lost_before_target_connection"] == 10
+    assert qa["target_connected_without_human_answer"] == 5
+    assert qa["human_answered_but_not_payable"] == 5
+    assert qa["rejection_reason_groups"]["no_connect_reasons"]["TARGET_NO_ANSWER"] == 10
+    assert qa["rejection_reason_groups"][
+        "target_connected_but_not_human_answered_reasons"]["IVR_OR_QUEUE_ABANDON"] == 5
+    assert result["next_task"] == "INVESTIGATE_VERIFIED_TARGET_CONNECTED_WITHOUT_HUMAN_ANSWER"
+    assert result["reviewed_cash_margin_cents"] == 91000
+    assert result["traffic_or_ad_spend_authorized"] is False
+
+
+@pytest.mark.parametrize("change", [
+    lambda x: x.update(source_id="youtube_organic"),
+    lambda x: x.update(cohort_ref="DIFFERENT_COHORT"),
+    lambda x: x.update(execution_authority="LIVE"),
+    lambda x: x.update(raw_ringba_target_attempt_counters_not_used=False),
+    lambda x: x.update(buyer_human_answered_calls=31),
+    lambda x: x.update(provider_target_connected_calls=31),
+    lambda x: x.update(caller_ani="+18880000000"),
+    lambda x: x["target_connected_but_not_human_answered_reasons"].update(
+        IVR_OR_QUEUE_ABANDON=999),
+])
+def test_bad_owner_call_loss_proof_fails_closed(change):
+    loss = deepcopy(synthetic_original_call_loss())
+    change(loss)
+    counts, refs, cash, receipts = synthetic_aggregate()
+    with pytest.raises(ValueError):
+        review_pay_per_call_source_to_cash(
+            registry=original_registry(), source_id="organic_search",
+            cohort_ref="SYNTHETIC_COHORT_NOT_EARNED_CASH",
+            funnel_counts=counts, finance_values=cash,
+            approved_call_loss_cohort=loss,
+            source_lineage_verified=True, same_cohort_verified=True,
+        )
+
+
+def test_unapproved_or_unattributed_call_loss_keeps_unknown_metrics():
+    for truth in (synthetic_original_call_loss(original_owner_authorized=False),
+                  synthetic_original_call_loss()):
+        result = review_pay_per_call_source_to_cash(
+            registry=original_registry(), source_id="organic_search",
+            cohort_ref="SYNTHETIC_COHORT_NOT_EARNED_CASH",
+            approved_call_loss_cohort=truth,
+            source_lineage_verified=False, same_cohort_verified=False,
+        )
+        qa = result["existing_original_call_loss_review"]
+        assert qa["available"] is False
+        assert qa["human_buyer_answers"] is None
+        assert qa["target_connected_without_human_answer"] is None
+        assert qa["rejection_reason_groups"] is None
+        assert result["reviewed_cash_margin_cents"] is None
+        assert result["revenue_recognized"] is False

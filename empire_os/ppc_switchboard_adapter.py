@@ -24,6 +24,10 @@ from empire_os.conversion_intelligence import (
 from empire_os.call_unit_economics_review import (
     REQUIRED_FIELDS, REQUIRED_RECEIPTS, review_call_unit_economics,
 )
+from empire_os.competitor_call_loss_readiness import (
+    COUNTS as CALL_LOSS_STAGES,
+    NO_CONNECT_REASONS, NO_HUMAN_REASONS, NO_PAYABLE_REASONS,
+)
 
 
 def _buyer_index(
@@ -146,6 +150,125 @@ def preview_pay_per_call_route(
 
 
 
+
+def _review_original_call_loss_cohort(
+    loss: Mapping[str, Any] | None, *,
+    source_id: str, cohort_ref: str,
+    funnel: Mapping[str, int | None],
+    finance: Mapping[str, int | None],
+    source_lineage_verified: bool,
+    same_cohort_verified: bool,
+) -> dict[str, Any]:
+    """Accept only aggregated, original-owner call-loss proof for this cohort.
+
+    Ringba target *attempts* cannot masquerade as unique inbound calls.
+    A caller reaching IVR/queue is not proof that a human answered. Do not
+    return original provider identifiers or raw commercial records.
+    """
+    unknown = {
+        "available": False,
+        "human_buyer_answers": None,
+        "calls_lost_before_target_connection": None,
+        "target_connected_without_human_answer": None,
+        "human_answered_but_not_payable": None,
+        "rejection_reason_groups": None,
+        "read_only_owner_assertions_not_independent_authentication": True,
+    }
+    if loss is None:
+        return {**unknown, "status": "AWAITING_ORIGINAL_OWNER_CALL_LOSS_COHORT"}
+    allowed_fields = {
+        "schema_version", "mode", "source_id", "cohort_ref",
+        "authoritative_original_owner_cohort",
+        "unique_inbound_terminal_dispositions_verified",
+        "raw_ringba_target_attempt_counters_not_used",
+        *CALL_LOSS_STAGES, "no_connect_reasons",
+        "target_connected_but_not_human_answered_reasons",
+        "not_payable_reasons_among_human_answered",
+        "target_connected_is_human_answered", "publisher_defect_inferred",
+        "buyer_misconduct_inferred", "settled_revenue_inferred",
+        "status", "live_routing_authorized", "execution_authority",
+    }
+    if not isinstance(loss, Mapping) or set(loss) != allowed_fields:
+        raise ValueError("unrecognised or potentially personal call fields")
+    if (not isinstance(loss, Mapping)
+            or loss.get("schema_version")
+                != "empire.competitor_call_loss_approved_cohort.v1"
+            or loss.get("mode") != "OBSERVE"
+            or loss.get("source_id") != source_id
+            or loss.get("cohort_ref") != cohort_ref
+            or loss.get("execution_authority") != "none"
+            or loss.get("live_routing_authorized") is not False
+            or loss.get("target_connected_is_human_answered") is not False
+            or loss.get("raw_ringba_target_attempt_counters_not_used") is not True
+            or type(loss.get("authoritative_original_owner_cohort")) is not bool):
+        raise ValueError("untrusted or mismatched original call loss review")
+    names = list(CALL_LOSS_STAGES)
+    stage_counts = [loss.get(name) for name in names]
+    if any(value is not None and (type(value) is not int or value < 0
+                                  or value > 100_000) for value in stage_counts):
+        raise ValueError("invalid unique-call stage totals")
+    for first, second in zip(stage_counts, stage_counts[1:]):
+        if first is not None and second is not None and second > first:
+            raise ValueError("unique-call stages not monotonically decreasing")
+    approved = loss["authoritative_original_owner_cohort"]
+    if approved and (any(n is None for n in stage_counts)
+                     or loss.get("status") != "REVIEWABLE_APPROVED_AGGREGATE"
+                     or loss.get("unique_inbound_terminal_dispositions_verified") is not True):
+        raise ValueError("incomplete approved commercial cohort")
+    if not approved and (any(n is not None for n in stage_counts)
+                         or loss.get("status") != "ORIGINAL_OWNER_LINEAGE_NOT_VERIFIED"
+                         or any(loss.get(key) is not None for key in (
+                             "no_connect_reasons",
+                             "target_connected_but_not_human_answered_reasons",
+                             "not_payable_reasons_among_human_answered",
+                         ))):
+        raise ValueError("unapproved commercial counts exposed")
+    if not (approved and source_lineage_verified and same_cohort_verified):
+        return {**unknown, "status": "ORIGINAL_OWNER_CALL_LOSS_NOT_ADMISSIBLE"}
+    remap = {
+        "provider_target_connected_calls": "provider_connected_calls",
+        "buyer_accepted_payable_calls": "buyer_accepted_payable_calls",
+        "independently_settled_calls": "independently_settled_calls",
+    }
+    for source, counterpart in remap.items():
+        for group in (funnel, finance):
+            observed = group.get(counterpart)
+            if observed is not None and (
+                    type(observed) is not int or observed != loss[source]):
+                raise ValueError("call-loss/CRO/finance cohort count mismatch")
+
+    reason_sets = (
+        ("no_connect_reasons", NO_CONNECT_REASONS,
+         stage_counts[0] - stage_counts[1]),
+        ("target_connected_but_not_human_answered_reasons",
+         NO_HUMAN_REASONS, stage_counts[1] - stage_counts[2]),
+        ("not_payable_reasons_among_human_answered",
+         NO_PAYABLE_REASONS, stage_counts[2] - stage_counts[3]),
+    )
+    safe_reasons: dict[str, dict[str, int] | None] = {}
+    for field, taxonomy, expected in reason_sets:
+        raw = loss.get(field)
+        if raw is None:
+            safe_reasons[field] = None
+            continue
+        if (not isinstance(raw, Mapping)
+                or set(raw) != set(taxonomy)
+                or any(type(n) is not int or n < 0 for n in raw.values())
+                or sum(raw.values()) != expected):
+            raise ValueError("call-loss reason totals not reconciled")
+        safe_reasons[field] = {key: raw[key] for key in taxonomy}
+    return {
+        "available": True,
+        "status": "ORIGINAL_OWNER_AGGREGATE_REVIEWABLE",
+        "human_buyer_answers": stage_counts[2],
+        "calls_lost_before_target_connection": stage_counts[0] - stage_counts[1],
+        "target_connected_without_human_answer": stage_counts[1] - stage_counts[2],
+        "human_answered_but_not_payable": stage_counts[2] - stage_counts[3],
+        "rejection_reason_groups": safe_reasons,
+        "read_only_owner_assertions_not_independent_authentication": True,
+    }
+
+
 def review_pay_per_call_source_to_cash(
     *,
     registry: Mapping[str, Any],
@@ -155,6 +278,7 @@ def review_pay_per_call_source_to_cash(
     funnel_evidence_refs: dict[str, str | None] | None = None,
     finance_values: dict[str, int | None] | None = None,
     finance_receipt_refs: dict[str, str | None] | None = None,
+    approved_call_loss_cohort: Mapping[str, Any] | None = None,
     source_lineage_verified: bool = False,
     buyer_source_approval_verified: bool = False,
     buyer_source_approval_ref: str | None = None,
@@ -246,6 +370,12 @@ def review_pay_per_call_source_to_cash(
     valid_lineage = (
         source_lineage_verified and same_cohort_verified and not excluded_by_policy
     )
+    loss_review = _review_original_call_loss_cohort(
+        approved_call_loss_cohort, source_id=source_id, cohort_ref=cohort_ref,
+        funnel=counts, finance=values,
+        source_lineage_verified=valid_lineage,
+        same_cohort_verified=same_cohort_verified,
+    )
     cro = review_homeowner_call_funnel(
         source_id=source_id, cohort_ref=cohort_ref,
         counts=counts, evidence_refs=refs,
@@ -275,6 +405,10 @@ def review_pay_per_call_source_to_cash(
     elif cro["measured_stage_count"] == 0:
         task = "RECONCILE_GENUINE_ZIP_TO_CALL_DISPOSITION"
         owner = "ORIGINAL_CRO_AND_CALL_QUALITY_OWNER"
+    elif (loss_review["available"] is True
+          and loss_review["target_connected_without_human_answer"] > 0):
+        task = "INVESTIGATE_VERIFIED_TARGET_CONNECTED_WITHOUT_HUMAN_ANSWER"
+        owner = "ORIGINAL_RINGBA_AND_BUYER_CALL_QUALITY_OWNER"
     elif not unit["profitability_calibrated"]:
         task = "RECONCILE_ACCEPTED_SETTLED_CALLS_AND_ACTUAL_COSTS"
         owner = "ORIGINAL_FINANCE_AND_CALL_OWNER"
@@ -295,6 +429,7 @@ def review_pay_per_call_source_to_cash(
             buyer_source_approval_verified and bool(buyer_source_approval_ref),
         "original_owner_approval_document_authenticated_by_this_view": False,
         "existing_conversion_specialist_review": cro,
+        "existing_original_call_loss_review": loss_review,
         "existing_per_call_economics_review": unit,
         "measured_funnel_stages": cro["measured_stage_count"],
         "reviewed_cash_margin_cents": unit["cash_margin_cents"],
