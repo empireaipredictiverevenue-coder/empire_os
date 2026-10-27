@@ -133,6 +133,11 @@ _MULTIMARKET_REVIEW_SEEDS = (
     ("https://dependablecalls.com/publishers", "USA", ("roofing", "hvac", "home_services", "insurance")),
     ("https://oncall-24.com/join-our-network/", "USA", ("roofing", "home_services")),
     ("https://join.leadswitchmedia.com/publisher", "USA", ("insurance",)),
+    # 27 Oct 2026: Call Center Doctors first-party roofing seller page.
+    # Publisher enquiry genuinely sent to official listed address; nevertheless
+    # no accepted UK sole trader, source/ZIP buy-box, contract, or earned call.
+    # Original Scout only; research metadata grants zero send/traffic authority.
+    ("https://ccdocs.com/sell-calls/roofing/", "USA", ("roofing", "home_services")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (

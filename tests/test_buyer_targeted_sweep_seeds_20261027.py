@@ -62,3 +62,26 @@ def test_search_repeat_does_not_duplicate_reviewed_identity():
         assert rows[0]["outreach_authorized"] is False
         assert rows[0]["buyer_capacity_verified"] is False
         assert rows[0]["source_queries"]  # merged provenance, not duplicate
+
+
+def test_ccdocs_roofing_first_party_offer_is_only_a_research_seed():
+    result = build_public_research_seeds(
+        {}, search_fn=lambda queries, num: {}, max_queries=2,
+        include_volume=False, observed_at=NOW,
+    )
+    rows = [r for r in result["seeds"] if r["domain"] == "ccdocs.com"]
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["website"] == "https://ccdocs.com/sell-calls/roofing/"
+    assert row["target_markets"] == ["USA"]
+    assert "roofing" in row["target_verticals"]
+    assert row["source_refs"] == ["public:multimarket_review:USA:ccdocs.com"]
+    assert row["source_queries"] == []
+    for field in ("identity_verified", "buyer_capacity_verified",
+                  "commercial_terms_verified", "buyer_price_verified",
+                  "outreach_authorized"):
+        assert row[field] is False
+    assert result["query_count"] == 2
+    assert result["database_write_performed"] is False
+    assert result["outbound_sent"] is False
+    assert result["execution_authority"] == "none"
