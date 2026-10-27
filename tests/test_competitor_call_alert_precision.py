@@ -191,11 +191,15 @@ def test_repeat_refresh_is_throttled_before_second_nws_request(tmp_path, monkeyp
     inp = tmp_path / module.GEO
     inp.parent.mkdir(parents=True)
     inp.write_text(json.dumps(snapshot()))
-    prior = review_once(snapshot(), now=datetime.now(timezone.utc),
-                        fetch=lambda _: pytest.fail("unexpected synthetic fetch"))
-    # review_once sees source timestamp maybe future, but this test only needs
-    # an existing recent validated receipt and confirms no network on refresh.
-    prior["generated_at"] = datetime.now(timezone.utc).isoformat()
+    # Seed the *prior receipt* directly: this test exercises the cooldown,
+    # not the historical fixture's alert state at the current wall clock.
+    prior = {
+        "schema_version": module.SCHEMA,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "detail_checked_this_cycle": 1,
+        "observations": [],
+        "execution_authority": "none",
+    }
     (runtime / "call_alert_precision_latest.json").write_text(json.dumps(prior))
     monkeypatch.setattr(module, "fetch_official_alert",
                         lambda _: pytest.fail("second request during cooldown"))

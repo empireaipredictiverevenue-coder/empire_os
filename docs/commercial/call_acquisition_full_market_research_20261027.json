@@ -1,0 +1,347 @@
+{
+  "schema_version": "empire.call_acquisition_operator_research_sources.v1",
+  "observed_at_utc": "2026-10-27T10:45:00+00:00",
+  "scope": "PUBLIC_VERIFIED_BUSINESS_MODEL_DISCLOSURES_NOT_LIVE_TRAFFIC",
+  "operators": [
+    {
+      "id": "angi",
+      "name": "Angi",
+      "source_urls": [
+        "https://www.sec.gov/Archives/edgar/data/1705110/000170511026000011/angi-20251231.htm"
+      ],
+      "channel_families": [
+        "organic_search",
+        "paid_search",
+        "paid_social",
+        "display",
+        "affiliate_publishers",
+        "offline",
+        "retail_referral"
+      ],
+      "conversion_products": [
+        "service_request"
+      ],
+      "business_models": [
+        "lead_fee",
+        "advertising",
+        "subscription"
+      ],
+      "observations": [
+        "2025 filing lists paid and free search, social/display, affiliate agreements, offline TV/radio and retail partner relationships.",
+        "2025 US consumer marketing expense USD 323.470 million; distinct from calls purchased or customer acquisitions.",
+        "2025 customers sought pros for approximately 16 million projects; NOT a pay-per-call figure."
+      ],
+      "reported_indicators": [
+        {
+          "metric": "us_consumer_marketing_expense_2025_usd",
+          "value": 323470000,
+          "source_class": "REGULATORY_FILING",
+          "limitations": "Aggregate marketing expense, not cost of phone calls or Google Ads spend."
+        },
+        {
+          "metric": "consumer_projects_2025_approx",
+          "value": 16000000,
+          "source_class": "REGULATORY_FILING",
+          "limitations": "Projects for which consumers sought pros, not payable calls."
+        }
+      ]
+    },
+    {
+      "id": "quinstreet",
+      "name": "QuinStreet",
+      "source_urls": [
+        "https://www.otcmarkets.com/filing/html?guid=M7wXkHcmvrAgr3h&id=19734290"
+      ],
+      "channel_families": [
+        "organic_search",
+        "paid_search",
+        "paid_social",
+        "display",
+        "affiliate_publishers",
+        "owned_media"
+      ],
+      "conversion_products": [
+        "click",
+        "form_lead",
+        "inbound_call",
+        "application",
+        "customer"
+      ],
+      "business_models": [
+        "cpc",
+        "cpl",
+        "cpa",
+        "revenue_share"
+      ],
+      "observations": [
+        "Fiscal 2026 filing describes owned/accessed targeted media plus search/social/display purchases and large/small online publisher rev share.",
+        "Matches consumers to clients based on fit, response, conversion and economics.",
+        "Media/publisher costs can be revenue share, CPL, CPC or CPA; client payments tied to contract-qualified outcomes."
+      ],
+      "reported_indicators": []
+    },
+    {
+      "id": "modernize",
+      "name": "Modernize Home Services",
+      "source_urls": [
+        "https://modernize.com/contractor-resources/articles/how-a-lead-comes-to-modernize",
+        "https://modernize.com/affiliates"
+      ],
+      "channel_families": [
+        "organic_search",
+        "paid_search",
+        "paid_social",
+        "native_ads",
+        "affiliate_publishers",
+        "owned_media",
+        "call_center"
+      ],
+      "conversion_products": [
+        "form_lead",
+        "inbound_call",
+        "live_transfer"
+      ],
+      "business_models": [
+        "cpl"
+      ],
+      "observations": [
+        "Owns content websites, buys search/social/native, and works with publishers.",
+        "Call center validates consumer projects before some live transfers.",
+        "Affiliate programme pays per submitted roofing, HVAC, solar and other eligible lead; affiliates require approval.",
+        "Affiliate page self-reports connecting more than 25,000 homeowners weekly, not independently audited phone calls."
+      ],
+      "reported_indicators": [
+        {
+          "metric": "self_reported_homeowners_connected_weekly_lower_bound",
+          "value": 25000,
+          "source_class": "OPERATOR_MARKETING_CLAIM",
+          "limitations": "Company claim about homeowner connections, not audited, not per-week pay-per-call volume."
+        }
+      ]
+    },
+    {
+      "id": "elocal",
+      "name": "eLocal",
+      "source_urls": [
+        "https://www.elocal.com/affiliate-contact/"
+      ],
+      "channel_families": [
+        "paid_search",
+        "organic_search",
+        "paid_social",
+        "display",
+        "native_ads",
+        "offline",
+        "affiliate_publishers"
+      ],
+      "conversion_products": [
+        "inbound_call",
+        "form_lead"
+      ],
+      "business_models": [
+        "cpl",
+        "pay_per_call"
+      ],
+      "observations": [
+        "Accepts publisher traffic from search, social, display, native and offline with campaign rules.",
+        "Qualifies by caller category/geography via IVR, API or in-house call center and routes to local advertiser."
+      ],
+      "reported_indicators": []
+    },
+    {
+      "id": "service_direct",
+      "name": "Service Direct",
+      "source_urls": [
+        "https://blog.servicedirect.com/what-we-do-to-ensure-phone-lead-quality",
+        "https://blog.servicedirect.com/how-qualified-are-service-direct-leads"
+      ],
+      "channel_families": [
+        "organic_search",
+        "paid_search",
+        "affiliate_publishers",
+        "owned_media"
+      ],
+      "conversion_products": [
+        "inbound_call"
+      ],
+      "business_models": [
+        "pay_per_call"
+      ],
+      "observations": [
+        "Public article describes lead sourcing from owned sites and outside publishers.",
+        "Historical self-reported search-heavy attribution; 85% figure is historical and not treated as a current channel mix."
+      ],
+      "reported_indicators": []
+    },
+    {
+      "id": "aragon",
+      "name": "Aragon Advertising",
+      "source_urls": [
+        "https://aragon-advertising.com/advertisers/pay-per-call/",
+        "https://aragon-advertising.com/affiliates/"
+      ],
+      "channel_families": [
+        "organic_search",
+        "paid_search",
+        "paid_social",
+        "affiliate_publishers",
+        "owned_media",
+        "influencer",
+        "call_center"
+      ],
+      "conversion_products": [
+        "inbound_call",
+        "live_transfer"
+      ],
+      "business_models": [
+        "duration_based_cpl",
+        "cpa"
+      ],
+      "observations": [
+        "Describes vetted affiliate network, owned properties and internal media team supplying inbound calls.",
+        "Offers call-quality dispositions and specific campaign CPA goals.",
+        "Affiliate agreement process: applicant traffic review, vetted sources, matching, manager, qualified-call payouts.",
+        "Claims millions of calls delivered monthly on marketing page; no audited volume, date-specific count or payable-call breakdown."
+      ],
+      "reported_indicators": []
+    },
+    {
+      "id": "ringpartner",
+      "name": "RingPartner",
+      "source_urls": [
+        "https://www.ringpartner.com/affiliate-program/"
+      ],
+      "channel_families": [
+        "affiliate_publishers"
+      ],
+      "conversion_products": [
+        "inbound_call",
+        "form_lead",
+        "live_transfer",
+        "click"
+      ],
+      "business_models": [
+        "qualified_campaign_payout"
+      ],
+      "observations": [
+        "Offers geo- and vertical-specific publisher campaigns, real-time reporting and manager-supported payout conditions.",
+        "Says hundreds of campaigns available; self-reported, not evidence of actual Empire-accessible offers."
+      ],
+      "reported_indicators": []
+    },
+    {
+      "id": "marketcall",
+      "name": "Marketcall",
+      "source_urls": [
+        "https://www.marketcall.com/affiliates",
+        "https://www.marketcall.com/"
+      ],
+      "channel_families": [
+        "affiliate_publishers",
+        "owned_media"
+      ],
+      "conversion_products": [
+        "inbound_call"
+      ],
+      "business_models": [
+        "pay_per_call"
+      ],
+      "observations": [
+        "Offers publisher templates, tracking, landing pages and callback tools; claims weekly partner payouts.",
+        "Marketing site claims 19,462,818 calls attracted cumulatively; undated/self-reported, not independently audited or attributable to roofing."
+      ],
+      "reported_indicators": [
+        {
+          "metric": "self_reported_lifetime_calls_attracted",
+          "value": 19462818,
+          "source_class": "OPERATOR_MARKETING_CLAIM",
+          "limitations": "Cumulative public marketing-counter figure, date and method not independently confirmed; not payable calls."
+        }
+      ]
+    }
+  ],
+  "platform_and_policy_sources": [
+    {
+      "key": "ringba_rtb",
+      "url": "https://support.ringba.com/hc/en-us/articles/33203751300503-Ringba-Glossary",
+      "evidence": "RTB lets publishers request a bid; platform checks target availability and bid modifiers. This is routing/monetisation tech, not traffic acquisition."
+    },
+    {
+      "key": "google_calls",
+      "url": "https://support.google.com/google-ads/answer/6100664/about-phone-call-conversion-tracking?hl=en-GB",
+      "evidence": "Google Ads can measure calls by keyword and campaign with call conversion tracking; not proof of a sale."
+    },
+    {
+      "key": "lsa_lead_resale",
+      "url": "https://support.google.com/localservices/answer/6245891?hl=en",
+      "evidence": "Google Local Services Ads prohibit lead reselling and forwarding to unrelated businesses."
+    },
+    {
+      "key": "search_scaled_content",
+      "url": "https://developers.google.com/search/docs/essentials/spam-policies",
+      "evidence": "Doorway pages and scaled low-value content violate spam policies; no mass interchangeable ZIP pages."
+    }
+  ],
+  "zero_paid_spend_priority": [
+    {
+      "priority": 1,
+      "method": "FIRST_PARTY_INTENT_ACQUISITION",
+      "requires": "Existing GSC query/page referrals, independently visible acquisition source, consented page metrics",
+      "execution_owner": "ORIGINAL_SEARCH_INTELLIGENCE_AND_WEBSITE_OWNERS",
+      "objective": "Identify existing user demand and improve real services journeys; no additional page publishing authorised."
+    },
+    {
+      "priority": 2,
+      "method": "EARNED_PUBLISHER_DISTRIBUTION",
+      "requires": "Relevant owner-operated audiences, written placement rights, source attribution and authorised buyer traffic-source terms",
+      "execution_owner": "ORIGINAL_PARTNER_AND_BUYER_TEAM",
+      "objective": "Secure permitted introductions and content placements instead of paid CPC and unapproved affiliates."
+    },
+    {
+      "priority": 3,
+      "method": "REAL_CALL_CONVERSION_ANALYTICS",
+      "requires": "First-party sessions, ZIP request, explicit consent, attempted/connected call, Ringba call_id and independently accepted payable outcome",
+      "execution_owner": "ORIGINAL_LEAD_SMART_COMMERCIAL_TEAM",
+      "objective": "Find drop-off from engaged homeowner to paid outcome; unknowns remain NULL."
+    },
+    {
+      "priority": 4,
+      "method": "CALL_MARKET_COMPETITOR_RESEARCH",
+      "requires": "Public source URLs for operator owned properties, publisher/partner contracts, documented source restrictions",
+      "execution_owner": "ORIGINAL_COMPETITOR_INTELLIGENCE",
+      "objective": "Observe legitimate public channel opportunities and buyer qualification mechanics."
+    },
+    {
+      "priority": 5,
+      "method": "PAID_TEST_EXCLUDED_UNTIL_FUNDED",
+      "requires": "Separate explicit paid-media authority, contracted margin and approved compliant traffic source",
+      "execution_owner": "FOUNDER_FUNDING_GATE",
+      "objective": "No paid campaigns currently authorised."
+    }
+  ],
+  "measurement_contract": {
+    "first_party_sessions": "UNKNOWN",
+    "source_channel_attributed_sessions": "UNKNOWN",
+    "eligible_zip_page_views": "UNKNOWN",
+    "consented_call_choices": "UNKNOWN",
+    "connected_calls": "UNKNOWN",
+    "buyer_accepted_payable_calls": "UNKNOWN",
+    "independently_paid_settlement_usd": "UNKNOWN",
+    "true_per_channel_cost_usd": "UNKNOWN",
+    "expected_profit_or_best_channel": "NOT_CALIBRATED",
+    "measurement_formula": "accepted_and_paid_revenue - actual_media_cost - real_processing_cost - credits_or_reversals",
+    "differentiation": "A clicked call button, call of minimum duration or contracted theoretical payout is not earned revenue."
+  },
+  "prohibitions": {
+    "new_database": false,
+    "new_agent": false,
+    "new_timer": false,
+    "outbound_enabled": false,
+    "paid_traffic_enabled": false,
+    "site_publishing_enabled": false,
+    "auto_contact_capture": false,
+    "call_route_mutation": false,
+    "derived_traffic_estimates": false
+  },
+  "status": "PRIMARY_SOURCE_RESEARCH_EVIDENCE_COLLECTED_NOT_PROVEN_TRAFFIC_MIX"
+}

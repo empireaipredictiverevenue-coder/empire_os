@@ -357,11 +357,27 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
                 "accepted_buyer_territory_verified": False,
                 "outreach_enabled": False, "execution_authority": "none",
             }
+    market = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_acquisition_market_research_latest.json"
+    )
+    if (market.get("schema_version") != "empire.call_acquisition_operator_research.v1"
+            or market.get("mode") != "OBSERVE"
+            or market.get("outbound_enabled") is not False
+            or market.get("paid_traffic_enabled") is not False
+            or market.get("live_call_traffic_authorized") is not False
+            or market.get("execution_authority") != "none"
+            or market.get("ranking_of_profitable_channels_verified") is not False):
+        market_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        market_summary = {"available": True, **market}
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
         "source_change_watch": watch_summary,
         "official_alert_precision": detail_summary,
+        "business_model_research": market_summary,
     }
 
 
