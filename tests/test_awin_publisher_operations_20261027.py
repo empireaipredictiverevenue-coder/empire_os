@@ -208,3 +208,22 @@ def test_existing_unsafe_destination_blocks(tmp_path):
 def test_other_network_or_programme_never_inferred():
     with pytest.raises(AwinReviewHold):
         evaluate({"publisher_id":"something-else"},[],now=NOW)
+def test_skillforge_discovers_exact_affiliate_task_but_never_self_approves():
+    from pathlib import Path
+    from empire_os.skill_exchange import discover_task_skills, recommend_work_item_skills
+    from empire_os.skill_trust import load_work_item_skill_context
+    root=Path(__file__).resolve().parents[1]
+    skillroot=root/"empire_os/skills_library/skills"
+    found=discover_task_skills("affiliate_publisher_operations",root=skillroot)
+    assert found["status"]=="local_candidates"
+    assert [x["name"] for x in found["skills"]]==["empire-affiliate-publisher-operations"]
+    target={"id":"awin-3136281-observe","department_keys":["sales"],
+            "target_component":"awin_affiliate_publisher_operations"}
+    choices=recommend_work_item_skills(target,root=skillroot)
+    assert choices["skill_recommendations"][0]["skills"][0]["name"]=="empire-affiliate-publisher-operations"
+    gated=load_work_item_skill_context(target,root=skillroot,registry={
+        "schema_version":"empire.skill_trust.v1","approved_skills":{}
+    })
+    assert gated["skills"]==[]
+    assert gated["rejected"][0]["reason"]=="skill_not_approved"
+    assert gated["execution_authority"]=="none"
