@@ -243,3 +243,130 @@ def test_unsigned_founder_review_register_has_no_mutation_authority():
     params["trusted_policy_sha256"]=digest(proposal)
     with pytest.raises(OwnerAuthorityHold,match="MISSING_SIGNED_AUTHORITY"):
         verify_owner_mutation(**params)
+
+
+def test_lease_cannot_extend_past_the_signed_ticket(tmp_path):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import acquire_owner_authorized_lease
+    private, params, _ = fixture()
+    ticket = deepcopy(params["signed_ticket"])
+    ticket.pop("signature")
+    ticket["expires_at"] = (NOW + timedelta(seconds=90)).isoformat()
+    params["signed_ticket"] = signed(private, ticket)
+    leases = ExecutionLeaseManager(tmp_path / "leases")
+    with pytest.raises(OwnerAuthorityHold, match="OWNER_LEASE_OUTLIVES_SIGNED_TICKET"):
+        acquire_owner_authorized_lease(lease_manager=leases, ttl_seconds=1200, **params)
+    assert leases.active() == []
+    allowed = acquire_owner_authorized_lease(lease_manager=leases, ttl_seconds=60, **params)
+    assert allowed.owner == "synthetic_website_worker"
+    assert leases.release(allowed.lease_id)
+
+
+@pytest.mark.parametrize("bad_ttl", [0, -1, 1, 59, 7201, True, 61.5, "1800"])
+def test_lease_ttl_rejects_invalid_or_implicitly_clamped_durations(tmp_path, bad_ttl):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import acquire_owner_authorized_lease
+    _, params, _ = fixture()
+    manager = ExecutionLeaseManager(tmp_path / "leases")
+    with pytest.raises(OwnerAuthorityHold, match="OWNER_LEASE_TTL_OUT_OF_BOUNDS"):
+        acquire_owner_authorized_lease(lease_manager=manager, ttl_seconds=bad_ttl, **params)
+    assert manager.active() == []
+
+
+def test_actual_worktree_changed_path_attestation(tmp_path):
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    target = root / "apps/example-site/src/page.tsx"
+    target.parent.mkdir(parents=True)
+    target.write_text("safe changes")
+    changed = ("apps/example-site/src/page.tsx",)
+    result = attest_actual_worktree_changes(
+        trusted_worktree_root=root,
+        signed_changed_paths=changed,
+        independently_observed_changed_paths=changed,
+    )
+    assert result["status"] == "ORIGINAL_OWNER_WORKTREE_PATH_ATTESTED"
+    assert result["production_publication_authorized"] is False
+
+
+def test_symlinked_changed_file_cannot_escape_owner_worktree(tmp_path):
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    target = root / "apps/example-site"
+    target.mkdir(parents=True)
+    outside = tmp_path / "other-agent.py"
+    outside.write_text("secret")
+    (target / "page.tsx").symlink_to(outside)
+    changed = ("apps/example-site/page.tsx",)
+    with pytest.raises(OwnerAuthorityHold, match="SYMLINKED_CHANGED_PATH_DENIED"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=changed,
+            independently_observed_changed_paths=changed,
+        )
+
+
+def test_symlinked_parent_directory_is_rejected(tmp_path):
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    root.mkdir()
+    outside = tmp_path / "other-agent"
+    outside.mkdir()
+    (outside / "page.py").write_text("value")
+    (root / "apps").symlink_to(outside, target_is_directory=True)
+    changed = ("apps/page.py",)
+    with pytest.raises(OwnerAuthorityHold, match="SYMLINKED_CHANGED_PATH_DENIED"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=changed,
+            independently_observed_changed_paths=changed,
+        )
+
+
+def test_hardlinked_changed_file_is_rejected(tmp_path):
+    import os
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    root.mkdir()
+    outside = tmp_path / "other-agent.py"
+    outside.write_text("value")
+    os.link(outside, root / "page.py")
+    changed = ("page.py",)
+    with pytest.raises(OwnerAuthorityHold, match="HARDLINKED_CHANGED_FILE_DENIED"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=changed,
+            independently_observed_changed_paths=changed,
+        )
+
+
+def test_postflight_added_or_deleted_files_need_independent_review(tmp_path):
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    root.mkdir()
+    (root / "page.py").write_text("approved")
+    with pytest.raises(OwnerAuthorityHold, match="ACTUAL_CHANGES_NOT_EQUAL_TO_SIGNED_FILES"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=("page.py",),
+            independently_observed_changed_paths=("page.py", "unexpected.py"),
+        )
+    with pytest.raises(OwnerAuthorityHold, match="MISSING_CHANGED_PATH_REQUIRES_OWNER_REVIEW"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=("deleted.py",),
+            independently_observed_changed_paths=("deleted.py",),
+        )
+
+
+@pytest.mark.parametrize("unsafe_path", ["apps/site/page.py\n", "apps/site/page.py\x00"])
+def test_control_character_paths_are_not_mutation_targets(tmp_path, unsafe_path):
+    from empire_os.agent_owner_authority_review import attest_actual_worktree_changes
+    root = tmp_path / "safe"
+    root.mkdir()
+    with pytest.raises(OwnerAuthorityHold, match="UNSAFE_PATH"):
+        attest_actual_worktree_changes(
+            trusted_worktree_root=root,
+            signed_changed_paths=(unsafe_path,),
+            independently_observed_changed_paths=(unsafe_path,),
+        )

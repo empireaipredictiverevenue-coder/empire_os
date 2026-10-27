@@ -129,3 +129,38 @@ GitHub PR or merge all ancestor commits into upstream. The review owner
 should examine only the three scoped candidate commits and their exact
 patches in the shared local EmpireOS worktree; reconcile against their
 current base through a separate controlled original-owner release.
+
+
+## Draft PR security-hardening review — 27 October, no live activation
+
+A further red-team review found that the first candidate lease adapter
+did not independently bound the existing lease lifetime by the signed
+job ticket's expiry. The draft now **fails closed** when a caller
+requests a lease exceeding its still-valid ticket lifetime, and rejects
+lease durations that the original lease manager would otherwise silently
+clamp. This is additional candidate defence, not protection against
+direct calls to the unmodified production lease manager.
+
+The original owner also needs **post-mutation evidence**, because an
+approved relative path can point to another lane through a symlink or
+hard link inside a worktree. The additive
+`attest_actual_worktree_changes` helper checks that an independently
+observed, exact changed-file set matches the previously signed file set
+and contains only local regular single-link files, with no symlinks in
+their ancestor path. It is conservative: deletion, rename, missing
+file, hardlink or symlink attempts require **separate review**.
+
+**Mandatory trusted inputs:** The original owner must derive the worktree
+root from the protected execution service and the actual changed paths
+from authenticated Git/sandbox readback. A worker's self-reported list
+cannot count as independent evidence. The helper has not been installed
+at any live mutation, promotion or publication boundary.
+
+**Still outstanding:** The draft has **no protected durable one-time
+ticket-consumption mechanism**; signed tickets could be reused while
+valid after the original lease is released. Ticket replay/revocation,
+authenticated service principal boundaries, atomic issuance/consume
+semantics, ticket lifecycle cleanup, and out-of-band shell/plugin access
+must be completed by the **original execution-plane owner** before any
+live lock is described as enforced. Tests are synthetic and do not
+establish production security or independent owner approval.

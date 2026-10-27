@@ -10,6 +10,8 @@ from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import re
+import stat
+from pathlib import Path
 from typing import Any, Mapping
 
 from cryptography.exceptions import InvalidSignature
@@ -33,7 +35,10 @@ def _id(v: Any) -> str:
 def _path(v: Any) -> str:
     if not isinstance(v, str) or len(v) > 300 or not v:
         raise OwnerAuthorityHold("INVALID_PATH")
-    if v.startswith(("/", "~")) or "\\" in v or "//" in v or v.endswith("/"):
+    if (
+        v.startswith(("/", "~")) or "\\" in v or "//" in v
+        or v.endswith("/") or any(ord(char) < 32 or ord(char) == 127 for char in v)
+    ):
         raise OwnerAuthorityHold("UNSAFE_PATH")
     parts = v.split("/")
     if any(
@@ -257,9 +262,70 @@ def acquire_owner_authorized_lease(
         lease_resources=lease_resources,
         now=now,
     )
+    # Never grant an operational lease longer than the signed job ticket.
+    # The existing lease manager clamps TTL values to [60, 7200], so reject
+    # out-of-bounds requests here instead of silently expanding authority.
+    if type(ttl_seconds) is not int or not 60 <= ttl_seconds <= 7200:
+        raise OwnerAuthorityHold("OWNER_LEASE_TTL_OUT_OF_BOUNDS")
+    expires_at = _timestamp(signed_ticket.get("expires_at"))
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise OwnerAuthorityHold("CLOCK_REQUIRED")
+    time_remaining = (expires_at - now.astimezone(timezone.utc)).total_seconds()
+    if ttl_seconds > time_remaining:
+        raise OwnerAuthorityHold("OWNER_LEASE_OUTLIVES_SIGNED_TICKET")
     return lease_manager.acquire(
         owner=review["principal"],
         job_id=review["request_job_id"],
         resources=lease_resources,
         ttl_seconds=ttl_seconds,
     )
+
+
+def attest_actual_worktree_changes(
+    *,
+    trusted_worktree_root: Path,
+    signed_changed_paths: tuple[str, ...],
+    independently_observed_changed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Post-worktree *additional* check, not a substitute for signed authority.
+
+    The original owner MUST derive independently_observed_changed_paths from
+    trusted Git/worktree readback, not from a worker assertion. This rejects
+    symlinks or hard-linked paths that could escape the authorised source lane.
+    Deletions/renames need a separate owner-reviewed contract, not a bypass.
+    """
+    if (
+        not isinstance(trusted_worktree_root, Path)
+        or trusted_worktree_root.is_symlink()
+        or not trusted_worktree_root.is_dir()
+    ):
+        raise OwnerAuthorityHold("UNTRUSTED_WORKTREE_ROOT")
+    root = trusted_worktree_root.resolve(strict=True)
+    signed = tuple(_path(p) for p in signed_changed_paths)
+    observed = tuple(_path(p) for p in independently_observed_changed_paths)
+    if not signed or len(set(signed)) != len(signed) or signed != observed:
+        raise OwnerAuthorityHold("ACTUAL_CHANGES_NOT_EQUAL_TO_SIGNED_FILES")
+    for relpath in observed:
+        candidate = root
+        for segment in relpath.split("/"):
+            candidate = candidate / segment
+            if candidate.is_symlink():
+                raise OwnerAuthorityHold("SYMLINKED_CHANGED_PATH_DENIED")
+            if not candidate.exists():
+                raise OwnerAuthorityHold("MISSING_CHANGED_PATH_REQUIRES_OWNER_REVIEW")
+        try:
+            metadata = candidate.lstat()
+        except OSError as exc:
+            raise OwnerAuthorityHold("UNREADABLE_CHANGED_PATH") from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OwnerAuthorityHold("NONREGULAR_CHANGED_FILE_DENIED")
+        if metadata.st_nlink != 1:
+            raise OwnerAuthorityHold("HARDLINKED_CHANGED_FILE_DENIED")
+        if candidate.resolve(strict=True) != root / relpath:
+            raise OwnerAuthorityHold("OUTSIDE_TRUSTED_WORKTREE")
+    return {
+        "status": "ORIGINAL_OWNER_WORKTREE_PATH_ATTESTED",
+        "path_count": len(observed),
+        "production_publication_authorized": False,
+        "no_untrusted_worktree_paths": True,
+    }
