@@ -275,3 +275,39 @@ def test_calibration_original_issued_digest_must_precede_actual_outcome():
     original["original_immutable_forecast_sha256"] = "0" * 64
     with pytest.raises(ValueError, match="original pre-outcome"):
         review_historical_model_calibration([original])
+
+
+def test_original_existing_site_owner_release_does_not_approve_factory_candidates():
+    from scripts.review_ranked_microsite_outcomes_v4_20261027 import (
+        review_original_site_owner_handoff,
+    )
+    result = review_original_site_owner_handoff(
+        queue(), release_reader=lambda: {
+            "campaigns": [{"campaign_id": f"campaign_{n:024x}"} for n in range(5)]
+        })
+    assert result["original_verified_campaign_count"] == 5
+    assert result["factory_candidate_count"] == 2
+    assert result["factory_release_identity_join_verified"] is False
+    assert result["factory_pages_original_owner_released"] == 0
+    assert result["publishing_authorized"] is False
+
+
+def test_missing_original_site_owner_release_keeps_count_unknown():
+    from scripts.review_ranked_microsite_outcomes_v4_20261027 import (
+        review_original_site_owner_handoff,
+    )
+    result = review_original_site_owner_handoff(queue(), release_reader=lambda: None)
+    assert result["status"] == "ORIGINAL_OWNER_RELEASE_NOT_VERIFIED"
+    assert result["original_verified_campaign_count"] is None
+    assert result["factory_pages_original_owner_released"] is None
+
+
+def test_owner_reader_cannot_invent_factory_release_from_a_malformed_claim():
+    from scripts.review_ranked_microsite_outcomes_v4_20261027 import (
+        review_original_site_owner_handoff,
+    )
+    with pytest.raises(ValueError, match="malformed"):
+        review_original_site_owner_handoff(
+            queue(), release_reader=lambda: {
+                "campaigns": "not a verified release"
+            })

@@ -16,12 +16,53 @@ from empire_os.microsite_commercial_intelligence_v3 import build_microsite_comme
 from empire_os.microsite_verified_outcomes_v5 import (
     OriginalPageReaders, build_approved_microsite_scorecard,
 )
+from empire_os.owned_campaign_release import load_release as original_site_release_reader
 
 DEFAULT_ORIGINAL_WEEKLY = Path(
     "/home/ubuntu/empire_releases/seo_weekly_gsc_two_page_20261022/"
     "weekly_two_page_2026-10-26.json"
 )
 ORIGINAL_WEEKLY_ROOT = DEFAULT_ORIGINAL_WEEKLY.parent
+
+
+def review_original_site_owner_handoff(queue, *, release_reader=None) -> dict:
+    """Read the incumbent publisher, not a factory-controlled approval flag.
+
+    The original publisher only recognises its fixed five owned campaigns;
+    it has no independently checked factory candidate -> source-preview ->
+    deployed asset identity contract. Therefore no factory page is released
+    even if a candidate coincidentally shares an older campaign's wording.
+    """
+    if queue.get("schema_version") != "empire.microsite_ranked_production_research_queue.v4":
+        raise ValueError("factory research queue required")
+    reader = original_site_release_reader if release_reader is None else release_reader
+    original = reader()
+    if original is None:
+        status, count = "ORIGINAL_OWNER_RELEASE_NOT_VERIFIED", None
+    elif not isinstance(original, dict) or not isinstance(original.get("campaigns"), list):
+        raise ValueError("original site owner returned malformed release")
+    else:
+        count = len(original["campaigns"])
+        status = "ORIGINAL_OWNER_EXISTING_CAMPAIGNS_VERIFIED"
+    return {
+        "schema_version": "empire.microsite_original_owner_handoff.v1",
+        "source_owner": "empire_os.owned_campaign_release.load_release",
+        "source_contract_limit": "ORIGINAL_FIVE_CAMPAIGNS_ONLY",
+        "status": status,
+        "original_verified_campaign_count": count,
+        "factory_candidate_count": queue["candidate_count"],
+        "factory_release_identity_join_verified": False,
+        "factory_pages_original_owner_released": 0 if original is not None else None,
+        "current_owner_change_required": (
+            "Existing website owner must extend original immutable release "
+            "contract and independently bind candidate ID, preview SHA, "
+            "deployed SHA, campaign ID, asset ID, route and approval receipt"
+        ),
+        "publishing_authorized": False,
+        "production_mutations": 0,
+        "execution_authority": "none",
+    }
+
 
 
 def run(
@@ -57,6 +98,7 @@ def run(
     else:
         baseline = None
     outcomes = build_microsite_outcome_register(queue, original_weekly_gsc=baseline)
+    owner_handoff = review_original_site_owner_handoff(queue)
     # No original owner reader authorises a newly minted factory route yet.
     # Scorecard reports every factory page's metrics as unknown, not zero.
     verified = None
@@ -70,6 +112,7 @@ def run(
         ("ranked_research_queue.json", queue),
         ("microsite_outcomes.json", outcomes),
         ("calibration_readiness.json", calibration),
+        ("original_site_owner_release_handoff.json", owner_handoff),
     ):
         (out / name).write_text(
             json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
@@ -84,6 +127,8 @@ def run(
         "calibrated_models": calibration["verified_model_count"],
         "publishable_candidates": queue["publishable_count"],
         "approved_factory_pages": 0,
+        "original_owner_release_status": owner_handoff["status"],
+        "original_owner_existing_campaigns": owner_handoff["original_verified_campaign_count"],
         "commercial_outcome_attribution_verified": False,
         "approved_page_measurement_v5_written": verified is not None,
         "external_model_calls": 0,
