@@ -27,3 +27,19 @@ LeadBank: on 22 October Empire already asked the buyer for acceptance of UK sole
 4. Predictive Cloud/Quant owner: compare original pre-outcome predictions against validated actuals; first run **shadow calibration**, no training or revenue recognition from forecasted amounts.
 
 **Status:** `EVIDENCE_CHAIN_WIRED` / `NO_CONFIRMED_PAYABLE_CALL_FROM_CURRENT_PUBLIC_PULSE` / `PROTECTED_SETTLEMENT_OWNER_REVIEW_REQUIRED`. No verified sale claimed.
+
+
+## 27 October evidence refinement — no repeat buyer test
+
+Ringba Support replied on **26 October 2026**, directing Empire AI to the original **Reporting** page for call details and recordings if any. The answer did not confirm account-specific visibility of final adjustment/disposition, nor address the lawful recording-erasure procedure. Do not treat this support reply as either buyer acceptance or proof of a payable call.
+
+Official Ringba Reporting reference: https://support.ringba.com/hc/en-us/articles/26894023126551-Call-Details-Report-Column-Dictionary (last updated 19 February 2026). For the **original campaign** and a bounded call-date window, the original authorised publisher account should use **Reporting > Call Details > Customize Columns** and inspect only the account-permitted columns:
+
+- Reconciliation identity: `Inbound Call ID`, `Campaign ID`, `Publisher`, `Call Date`; preserve raw call identity **only with the original protected owner**.
+- Genuine routing and duration: `Connected`, `Connected Call Length`, `Duration`. Connected Call Length can include a target's IVR or queue, so it does **not** alone prove a human buyer accepted a payable call.
+- Conversion and commercial review: `Converted`, `No Conversion Reason`, `No Payout Reason`, `Payout`, `Approved Adjustment`. If authorized, use `Winning Bid Dynamic Duration` to understand RTB duration for that call. Neither `Winning Bid` nor `Payout` alone independently establishes cash settlement or final accepted payable value.
+- Exclude known provider test calls and any row not tied to the verified first-party site handoff/consent event; resolve scrub/reversal and any buyer final payable disposition through the existing buyer/finance owner. Never derive a blanket 120-second payout rule from a duration column.
+
+Official recording reference: https://support.ringba.com/hc/en-us/articles/29804960197527-Call-Recording (updated 15 July 2026). Ringba states that recordings are kept indefinitely while an account exists and call logs are not changed or deleted by policy. A recording may begin only when the final target answers; a connected intermediary does not establish a final target answer. **Unresolved privacy/compliance dependency:** original call/buyer owner must obtain the applicable controller/processor retention, access and erasure handling procedure and match the live recording/disclosure flow before expanding a recorded consumer-call campaign. Do not download recordings, expose recording links or switch on customer handoffs to settle this documentary issue.
+
+Current preserved conclusion: the latest original safe Ringba window shows **zero matched call rows and zero first-party handoffs**, not a complete historical audit. The protected root-only receipt remains unchanged. No proven earned call or cash receipt; no Predictive Cloud training.
