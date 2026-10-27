@@ -93,6 +93,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="Explicit path to existing PR/consultancy branch/worktree")
     parser.add_argument("--distribution-root", type=Path,
                         help="Explicit path to canonical existing Revenue Distribution snapshot")
+    parser.add_argument("--existing-original-source-map", action="store_true",
+                        help="Use only existing original PR consultancy worktree and EmpireOS canonical Revenue Distribution; no records copied")
     parser.add_argument("--with-leadgen", action="store_true",
                         help="Add bounded original B2B demand and research account priority review")
     parser.add_argument("--summary", action="store_true",
@@ -102,6 +104,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--live-release-preflight", action="store_true",
                         help="Opt-in GET-only existing public enquiry/anonymous CRM checks; never authorises release")
     args = parser.parse_args(argv)
+    if args.existing_original_source_map:
+        if args.pr_root is not None or args.distribution_root is not None:
+            parser.error("--existing-original-source-map cannot override explicit source roots")
+        args.pr_root = Path("/home/ubuntu/empire_agents/empire_pr_consultancy_20261011")
+        args.distribution_root = Path("/srv/empire_os")
+        if any(not root.is_dir() or root.is_symlink() for root in
+               (args.pr_root, args.distribution_root)):
+            parser.error("original canonical source directories unavailable or untrusted")
     if args.summary and args.sample_opportunity_id:
         parser.error("--summary cannot be combined with --sample-opportunity-id")
     if args.sample_opportunity_id and not args.with_leadgen:

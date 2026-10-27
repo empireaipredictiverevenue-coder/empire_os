@@ -17,7 +17,7 @@ SCHEMA = "empire.earned_media.sales_actionability_review.v1"
 SOURCE_SCHEMA = "empire.earned_media.public_request_observation.v1"
 MAX_LEADS = 200
 MAX_OBSERVATIONS = 10
-PUBLIC_PROBE_DOC = "docs/commercial/PR_CONSULTANCY_MARKETPLACE_PUBLIC_OBSERVATION_20261025.json"
+PUBLIC_PROBE_DOC = "docs/commercial/PR_CONSULTANCY_MARKETPLACE_PUBLIC_OBSERVATION_20261027.json"
 
 COMMON_GATES = (
     "ORIGINAL_SOURCE_CURRENT_AND_ALLOWED",

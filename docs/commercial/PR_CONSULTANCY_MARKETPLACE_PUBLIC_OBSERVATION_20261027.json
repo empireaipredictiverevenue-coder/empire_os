@@ -1,0 +1,41 @@
+{
+  "schema_version": "empire.earned_media.public_request_observation.v1",
+  "mode": "OBSERVE",
+  "execution_authority": "none",
+  "method": "PUBLIC_WEB_SEARCH_OBSERVATION_NOT_AUTHENTICATED_UPWORK_SESSION",
+  "observed_date": "2026-10-27",
+  "limitations": [
+    "Public index visibility does not verify authenticated marketplace application availability or buyer identity",
+    "Upwork listing relative dates and crawl timing may be inconsistent; do not infer listing freshness from snippets",
+    "Upwork direct page fetch denied automated request; no application, fee, paid Connects or account session was used",
+    "Supplier delivery experience and eligibility for HubSpot, Grow.com and P21 remain unverified",
+    "The third historical brokered Flexstack URL could not be independently retrieved and is not included as an indexed positive observation",
+    "No buyer conversation, permission to contact, offer acceptance, contract or realised revenue established"
+  ],
+  "observations": [
+    {
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Consultant-Needed-Revenue-Operations-Setup-for-B2B-Sales-Team_~022113313008957668345/",
+      "observed_date": "2026-10-27",
+      "discovery_channel": "PUBLIC_SEARCH_RESULT",
+      "source_channel_detail": "Exact Upwork listing remains web-indexed; public search result displays HubSpot lifecycle/MQL/SQL, stage, routing and attribution requirements; direct unauthenticated fetch forbidden",
+      "publicly_indexed": true,
+      "public_source_requirements": "Demonstrate a real completed HubSpot RevOps project and explain first two weeks; expert delivery capability not yet verified",
+      "authenticated_listing_available": false,
+      "identified_buying_organisation": false,
+      "supplier_eligibility_verified": false,
+      "outreach_authorized": false
+    },
+    {
+      "source_url": "https://www.upwork.com/freelance-jobs/apply/HubSpot-RevOps-Grow-Automation-Specialist_~022097530147436142669/",
+      "observed_date": "2026-10-27",
+      "discovery_channel": "PUBLIC_SEARCH_RESULT",
+      "source_channel_detail": "Exact Upwork listing indexed; public search result shows HubSpot/Grow.com/P21 ERP sales data, BI and automation work; direct unauthenticated fetch forbidden",
+      "publicly_indexed": true,
+      "public_source_requirements": "Demonstrate actual HubSpot RevOps delivery, Grow BI dashboards and ERP integration experience; delivery credentials not verified",
+      "authenticated_listing_available": false,
+      "identified_buying_organisation": false,
+      "supplier_eligibility_verified": false,
+      "outreach_authorized": false
+    }
+  ]
+}
