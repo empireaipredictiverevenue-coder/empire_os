@@ -1,0 +1,44 @@
+{
+  "approval_scope": {
+    "all_other_pages_excluded": true,
+    "design": true,
+    "displayed_copy": true,
+    "displayed_pricing": true,
+    "other_prices_or_offer_changes_authorized": false,
+    "outbound_or_synthetic_leads_authorized": false,
+    "payment_or_checkout_activation_authorized": false,
+    "screenshot_set": "solar-desktop, solar-mobile, commercial-desktop, commercial-mobile",
+    "target_routes": [
+      "/commercial",
+      "/industries/solar"
+    ]
+  },
+  "browser_qa_receipt_sha256": "787d8db22341a8cdc0a5d942713f6107759cbe1cc94119589616fa44fb911ab2",
+  "candidate_manifest_sha256": "14b65c040e398d74ac637f0845d2fd62046e7e0db9bb2eefdc348dabf1919f39",
+  "captured_at_utc": "2026-10-27T13:46:02.140382+00:00",
+  "founder_approval_for_exact_visual_copy_pricing": true,
+  "founder_exact_response": "yes i approve",
+  "no_authority_to_change_unreviewed_files": true,
+  "original_website_owner_independent_approval_verified": false,
+  "proposed_html_sha256": {
+    "commercial.html": "bd1db1b4d4824eec8f96583286719d7bdca4dcaa0bece841e043e2d34abec03a",
+    "industries/solar.html": "ae7ab39875d5f38def5d000590e07ce3c4d4fccd968f5a82b9f8e241c4ebf040"
+  },
+  "proposed_new_hashed_assets": 10,
+  "proposed_route_data_files": 8,
+  "publication_authorized_now": false,
+  "publication_performed": false,
+  "question_being_approved": "Do you approve these exact Solar and Commercial V2 designs, copy and displayed pricing for publication?",
+  "root_backup_sha256": "4e7bb1ea2c8fbb81d99ff59e8debdff3b28f20826e1738278af452494f9b3bff",
+  "schema_version": "empire.website.solar_commercial_v2_founder_final_visual_approval.v1",
+  "screenshot_sha256": {
+    "commercial-desktop.png": "0d8b639917108fa35a33bcc52d460d769f383ad8bdebf045ad7242b3c44132f1",
+    "commercial-mobile.png": "54009faba2013d7bae7bb0ec351db62abdd091dfc404b1a5c62ac3d1de9d802f",
+    "solar-desktop.png": "07c9e23f6520991cb2c1b3091486fe0995cc5b8b80b92dea9440a8a5c709426b",
+    "solar-mobile.png": "f8766e962bd85361d0acff812a1d786dadd12b4b160eaa20b1b188d24bb9a7ab"
+  },
+  "separate_original_astra_owner_signoff_still_required": true,
+  "source": "FOUNDER_DIRECT_CHAT_REPLY_20261027",
+  "source_commit": "d7229c635",
+  "status": "FOUNDER_EXPLICIT_FINAL_APPROVAL_OF_PINNED_SOLAR_COMMERCIAL_V2"
+}

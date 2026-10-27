@@ -18,10 +18,18 @@
     "untouched_existing_files": 690
   },
   "founder_direction": {
-    "founder_visual_acceptance_of_exact_final_build_verified": false,
+    "founder_visual_acceptance_of_exact_final_build_verified": true,
     "instruction": "continue towards the two-page premium Solar and Commercial launch using one existing ASTRA website release owner",
     "priority_confirmed": true,
     "root_publication_authority_inferred_from_chat": false
+  },
+  "founder_final_visual_approval": {
+    "founder_approved_exact_candidate_visual_copy_pricing": true,
+    "original_astra_website_owner_approval_verified": false,
+    "receipt_path": "docs/website/release_candidates/SOLAR_COMMERCIAL_V2_FOUNDER_FINAL_VISUAL_APPROVAL_20261027.json",
+    "receipt_sha256": "21ef90007ab15a08a91a0b48109fb0640032010249d7ed900971d026d6b23ee1",
+    "root_publication_authority_granted": false,
+    "source": "FOUNDER_DIRECT_CHAT_REPLY_20261027"
   },
   "founder_root_archive_execution_evidence": {
     "expected_baseline_inventory_sha256": "60fe7228a5583ce37c4754c2390d35a5c8f6609b527ecb1e4ad03986546ab8e5",
@@ -99,10 +107,10 @@
   "public_website_modified": false,
   "publication_authorized_now": false,
   "publication_performed": false,
-  "record_updated_at_utc": "2026-10-27T10:20:44.729863+00:00",
+  "record_updated_at_utc": "2026-10-27T13:46:02.140791+00:00",
   "root_owner_custody_authority_verified": false,
   "schema_version": "empire.website.astra_two_page_owner_pickup.v1",
   "separate_root_backup_created": true,
-  "status": "FOUNDER_ROOT_BACKUP_READBACK_VERIFIED_ASTRA_RELEASE_ACCEPTANCE_STILL_REQUIRED",
+  "status": "FOUNDER_EXACT_VISUAL_COPY_PRICING_APPROVED_ASTRA_OWNER_RELEASE_HELD",
   "work_key": "solar_commercial_premium_exact_v2_20261026"
 }
