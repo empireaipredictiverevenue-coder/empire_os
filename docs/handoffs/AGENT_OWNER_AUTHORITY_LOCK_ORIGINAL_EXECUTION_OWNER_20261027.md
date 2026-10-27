@@ -1,0 +1,131 @@
+# Agent ownership authority — original Execution Plane owner pickup
+
+Date: 27 October 2026
+Source: explicit founder request to stop cross-agent workstream collisions.
+Status: **PRIVATE CANDIDATE, NOT DEPLOYED.** No standing owner assignments created.
+
+## Observed root cause
+
+The original `empire_os/execution_lease.py` prevents simultaneous overlapping domain/path **leases**. But a worker can request a lease using an owner string it supplies, and the lease expires. This is coordination, not standing founder-authorised ownership. The canonical architecture (`docs/AGENT_TOOL_EXECUTION_PLANE_ARCHITECTURE.md`) already names the Execution Plane as the owner of this control. This patch does not replace that system.
+
+A ChatGPT chat with direct remote shell or API write access can also bypass the Execution Plane. **No code-only patch inside this one module prevents such direct calls.** Live enforcement requires limiting those write paths to the governed original gateway.
+
+## Candidate changes
+
+- `empire_os/agent_owner_authority_review.py`: pure, fail-closed Ed25519 signed founder-policy and per-job ticket verifier, exact authenticated worker identity/job/capability/department binding, pinned founder policy hash for revocation, exact file paths and domain leases. Rejects missing/invalid policy, unknown owner, overlapping assignments, out-of-lane path, forged or expired ticket, missing lease coverage and changed digest.
+- `acquire_owner_authorized_lease`: owner-reviewed adapter that verifies the standing assignment and job ticket BEFORE using the **existing** `ExecutionLeaseManager.acquire`, not a second lease manager.
+- `tests/test_agent_owner_authority_review_20261027.py`: synthetic-only, no named production owners. Tests positive and multiple negative cases against existing lease manager.
+
+## Mandatory original-owner integration review
+
+1. Confirm original governance owner; review the candidate in branch `review/agent-owner-authority-20261027`. Do **not** cherry-pick into a dirty live tree.
+2. Founder reviews **one central exact workstream-to-principal-to-path ownership register**. UNKNOWN/ambiguous assignments remain unowned and blocked for mutation, not self-assigned by a worker. No real policy or signing private key exists in this candidate.
+3. The original trusted issuer securely signs the current owner policy and individual bounded internal-write job tickets. Private signing key must be inaccessible to all workers, ChatGPT chats, repository and runtime output. Trusted public key and current policy digest must be pinned by the original trusted control-plane owner, not provided by the requesting worker.
+4. Derive `authenticated_worker_principal` from trusted service/gateway identity, **never** from an agent's `owner` field, prompt or ticket. Reassign by founder-authorised, pinned policy revision. Review clock/rollback and ticket revocation, including replay and use-once ticket consumption.
+5. Bind the validator at every original mutating entry point: `empire_os/hermes_control.py`, `empire_os/pi_sandbox_runner.py`, `empire_os/empire_coder_sandbox_runner.py`, `empire_os/coder/worker.py`, with normal `ExecutionRequest`/allowed-path validation and the existing lease lock. Confirm actual changed paths are checked after worktree/sandbox apply as well.
+6. Govern direct production mutators separately (shell/Desktop Commander, Git, website, CRM, email plugins and root deploy operators) through authenticated roles and least-privilege OS/service permissions; this test-only candidate does **not** restrict them.
+7. Conduct existing owner integration tests, rollback rehearsal, service/queue compatibility verification and founder-controlled release. Do not silently enable enforcement without preserving original working jobs and explicit affected-owner acceptance.
+
+## Acceptance
+
+No unowned or cross-owner mutation can obtain a lease through governed workers, even after an old lease expires; a valid assigned worker can lease an exact scoped path. No other agent can fabricate a founder ticket or edit standing policy. Direct out-of-band writes cannot bypass the adopted production gateway. No outreach/payment/SEO/site mutation follows from ownership assignment alone.
+
+## Current constraints
+
+This branch is **not a deployed organisation-wide lock**. Existing workers still use the unmodified original `ExecutionLeaseManager`; signed ticket issuance, trusted service identity, founder-assigned policy, protected execution gateway, and live integration are all pending. No service, timer, website, CRM, inbox, buyer acquisition or Awin owner was modified.
+
+
+## 27 October original live permission audit — read-only
+
+The live original execution-plane services `empire-hermes-control.service`,
+`empire-coder-worker.service`, and `empire-coder-verify-drain.service`
+all report `User=ubuntu` and `Group=ubuntu`. The repository root is
+`ubuntu:ubuntu` `0755`; `empire_os/` is `ubuntu:ubuntu` `0775`.
+The current lease state is mode `0600` but also owned by `ubuntu`.
+The services retain different systemd path-level write restrictions,
+but that does NOT establish independent worker identities or prevent
+out-of-band mutation by the shared `ubuntu` principal.
+
+The original mutation entry points inspected are:
+
+- `empire_os/hermes_control.py`: around line 1532;
+- `empire_os/pi_sandbox_runner.py`: around line 311;
+- `empire_os/empire_coder_sandbox_runner.py`: around line 364;
+- `empire_os/coder/worker.py`: around line 368.
+
+Each directly calls the existing `ExecutionLeaseManager.acquire`.
+The dispatcher alone is NOT a complete enforcement boundary. This is
+current source inspection, not proof every possible direct writer was found.
+
+### Original owner's rollout conditions
+
+1. First seal and authenticate the founder-reviewed exact assignment register.
+   The adjacent `FOUNDER_WORKSTREAM_OWNER_REGISTER_DRAFT_20261027.json`
+   names proposed **roles**, not real authenticated principals. All entries
+   are unapproved. It must never be used as a signed policy or imported as
+   production authority.
+2. Route ALL four verified mutating worker entry points, including direct
+   worker invocation paths, through the signed owner verifier, *then* the
+   existing lease manager. Reject requests without tickets; no observe job
+   should need a mutation ticket. Add existing dispatcher admission checks as
+   defence in depth, never as the sole control.
+3. Bind actual modifications to the signed allowed-path set after the
+   sandbox/worktree completes, before changes can be promoted or published.
+   Implement ticket replay protection and revocation in protected original
+   issuer custody; the current candidate has time and policy-revision checks
+   but no server-side ticket-consumption ledger.
+4. Make producer and consuming service principals independently
+   authenticated. Restrict write permissions by workspace and deploy role
+   rather than relying on every worker's common `ubuntu` identity.
+   Test unprivileged read-only researchers and verifier access; don't
+   recursively `chown` or `chmod` the live repository.
+5. Gate direct GitHub, Desktop Commander, root shell, website, outbound mail,
+   billing and database writes at their existing connector/service
+   permission boundaries. No in-Python execution-plane guard can prevent a
+   separate authorised direct write channel from bypassing it.
+6. Rehearse under original owner control with actual queues, timers,
+   root-custodied rollback and stale-owner/reassignment scenarios. The
+   draft is ready for integration *review*, not an unconditional cutover.
+
+**Recorded result:** production owner identities and release signatures
+have not been issued; direct shell/plugin write restrictions are not
+confirmed. This remains `OWNER_INTEGRATION_HOLD`, not an organisation-wide
+ownership lock.
+
+
+## Private integration-readiness acceptance check
+
+Added read-only candidate `empire_os/agent_owner_integration_readiness.py`.
+The owner can run the same static inspection against production without
+mutating services, scheduling jobs, making signed assignments or granting
+lease access:
+
+```bash
+cd /home/ubuntu/empire_worktrees/agent_owner_authority_review_20261027
+PYTHONPATH=. /srv/empire_os/.venv/bin/python -B - <<'PY'
+from pathlib import Path
+import json
+from empire_os.agent_owner_integration_readiness import inspect_original_owner_integration
+print(json.dumps(inspect_original_owner_integration(Path('/srv/empire_os')),
+                 sort_keys=True, indent=2))
+PY
+```
+
+The tool intentionally emits `ORIGINAL_OWNER_INTEGRATION_HOLD`, never
+production enforcement PASS based on static code patterns. The original
+execution-plane owner must provide independent authenticated policy custody,
+worker identity checks, real mutator integration, replay protection and
+out-of-band permission proof. A pasted adapter name is not execution proof.
+
+A further private fix rejects nested `.env.production` and `.env.local`
+as mutation paths. Unit coverage is synthetic; no production credentials,
+agent identities or owner assignments were created.
+
+### Repository handoff caveat
+
+At 27 October the private review branch was observed **4,559 commits ahead
+of `origin/main`**. Do not push the private production-history branch as a
+GitHub PR or merge all ancestor commits into upstream. The review owner
+should examine only the three scoped candidate commits and their exact
+patches in the shared local EmpireOS worktree; reconcile against their
+current base through a separate controlled original-owner release.

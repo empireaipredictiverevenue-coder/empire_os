@@ -1,0 +1,85 @@
+{
+  "schema_version": "empire.execution.owner_register_review_draft.v1",
+  "date": "2026-10-27",
+  "purpose": "Founder review only. Not a signed owner policy or execution authority.",
+  "status": "UNAPPROVED_REQUIRES_FOUNDER_AND_EXISTING_EXECUTION_OWNER_SIGNOFF",
+  "signing_key_present": false,
+  "policy_signed": false,
+  "job_tickets_issued": 0,
+  "production_enforcement_enabled": false,
+  "cross_lane_mutation_approved": false,
+  "candidate_assignments": [
+    {
+      "workstream": "execution_plane_governance",
+      "candidate_owner_role": "EXISTING_AGENT_AND_TOOL_EXECUTION_PLANE_OWNER",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "empire_os/execution_lease.py",
+        "empire_os/execution_plane_dispatcher.py",
+        "empire_os/agent_execution_plane.py",
+        "empire_os/hermes_control.py",
+        "empire_os/pi_sandbox_runner.py",
+        "empire_os/empire_coder_sandbox_runner.py",
+        "empire_os/coder/worker.py"
+      ],
+      "identity_evidence": "ORIGINAL_ARCHITECTURE_OWNER_ROLE_ONLY_NO_AUTHENTICATED_PRINCIPAL",
+      "approved": false
+    },
+    {
+      "workstream": "website_brand_publication",
+      "candidate_owner_role": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "apps/empire-public-site",
+        "docs/website/release_candidates"
+      ],
+      "identity_evidence": "OWNER_ROLE_APPEARS_IN_EXISTING_WEBSITE_RELEASE_EVIDENCE_ONLY",
+      "approved": false
+    },
+    {
+      "workstream": "search_seo_aeo_geo",
+      "candidate_owner_role": "EXISTING_SEO_IMPLEMENTATION_OWNER",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "empire_os/search_intelligence",
+        "empire_os/search_fabric"
+      ],
+      "identity_evidence": "FOUNDER_SCOPED_OWNER_HANDOFF_NO_PRINCIPAL_IDENTITY",
+      "approved": false
+    },
+    {
+      "workstream": "buyer_acquisition_and_partner_referrals",
+      "candidate_owner_role": "EXISTING_BUYER_ACQUISITION_AND_COMMERCIAL_REPLY_OWNER",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "empire_os/buyer_acquisition_team.py",
+        "empire_os/commercial_relationship_registry.py",
+        "empire_os/awin_publisher_api.py"
+      ],
+      "identity_evidence": "EXISTING_ORIGINAL_OWNER_MODULES_ONLY",
+      "approved": false
+    },
+    {
+      "workstream": "crm_finance_revenue_truth",
+      "candidate_owner_role": "EXISTING_CRM_AND_FINANCE_EVIDENCE_OWNERS",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "empire_os/revenue_distribution_review.py"
+      ],
+      "identity_evidence": "SEPARATE_AUTHORITIES_NOT_YET_MAPPED_DO_NOT_COMBINE_WITHOUT_REVIEW",
+      "approved": false
+    },
+    {
+      "workstream": "media_youtube_branding",
+      "candidate_owner_role": "EXISTING_MEDIA_OS_AND_BRANDING_OWNERS",
+      "authenticated_principal": null,
+      "paths_for_owner_to_verify": [
+        "empire_os/media_runtime.py"
+      ],
+      "identity_evidence": "SEPARATE_AUTHORITIES_NOT_YET_MAPPED_DO_NOT_COMBINE_WITHOUT_REVIEW",
+      "approved": false
+    }
+  ],
+  "unassigned_policy": "UNKNOWN_AND_MULTIPLE_OWNERS_ARE_HOLD_NOT_SELF_ASSIGN",
+  "instructions": "Each lane requires authenticated principal identity, nonoverlapping exact paths, founder decision receipt, original owner acknowledgment and sealed policy signing before internal_write tickets may be issued. Review conflicts before adopting."
+}
