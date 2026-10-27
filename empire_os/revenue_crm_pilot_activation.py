@@ -159,6 +159,7 @@ def build_pilot_routers(config_path: Path) -> tuple[APIRouter, APIRouter]:
             resolve_authenticated_read=resolver,
             signed_crm_verifier=case_verifier,
             dedicated_tenant_dsns=readers,
+            load_original_membership=verified_membership,
         )
         # The original private service inspects direct route paths. Avoid a
         # nested router: preserve the original single-router contract.

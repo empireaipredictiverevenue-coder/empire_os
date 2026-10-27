@@ -101,3 +101,30 @@ authenticated tenant/order read, and the existing founder-console owner's
 private server-side session binding. Do not attach this response to the
 general unauthenticated Founder Overview API or enable the opt-in as a
 substitute for any of those gates.
+
+
+## V11 founder-only membership correction — 27 October
+
+An additional security review of the optional V11 HTTP endpoint found that
+the original `SignedCrmTenantVerifier` intentionally allows any tenant member
+with `read` permission, including ordinary viewers. The order-specific
+`founder_case_view` is an internal founder operations display: generic CRM
+read membership MUST NOT be sufficient authority for this panel.
+
+The opt-in V11 route now also verifies an active **owner** membership through
+the *original* first-party CRM `verified_membership` lookup. It first
+authenticates the signed original Ed25519 token, then extracts only the
+already signature-validated subject and resolves that same subject and tenant
+against the original active membership reader. The membership must have
+exact user and tenant binding, role `owner`, and original `admin` authority.
+Unsupported, revoked, viewer, analyst, operator, and admin memberships are
+refused; caller-controlled `X-Role` or `X-Owner` is never trusted.
+Missing original membership authority prevents route construction.
+
+Disposable PostgreSQL/HTTP tests include signed positive owner access and
+negative viewer, analyst, operator, and admin access, including spoofed
+owner headers. This hardening is **review branch only**; the live CRM owner
+must still approve integration with the actual founder's owner membership,
+publish their transport guard, and obtain the independent DBA SQL release.
+No new token issuer, login, DB role, Founder Overview exposure, or outbound
+permission is introduced.

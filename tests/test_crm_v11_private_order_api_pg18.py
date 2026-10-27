@@ -18,6 +18,7 @@ from empire_os.revenue_crm_signed_auth import (
     SignedCrmTenantVerifier, build_signed_crm_tenant_authenticator,
 )
 from empire_os.revenue_crm_suppression_evidence_reader import CRM_LOGIN_AUTHORITY_SQL
+from empire_os.saas_scale import TenantMembership
 from tests.test_crm_scoped_lineage_sql_ephemeral import pg, P, O, OA, OB, TA, TB
 from tests.test_crm_v11_scoped_reader_pg18_end_to_end import PROSPECT_VIEW_SQL
 from tests.test_revenue_crm_signed_auth import (
@@ -25,19 +26,22 @@ from tests.test_revenue_crm_signed_auth import (
 )
 
 
-def setup_http(pg, signed, monkeypatch, *, enabled=True):
+def setup_http(pg, signed, monkeypatch, *, enabled=True, membership_role="owner"):
     pg(sql=PROSPECT_VIEW_SQL)
     root = getclosurevars(pg).nonlocals
     assert root["address"].startswith("/tmp/empire-lineage-fixture-")
     dsn = (f"host={root['address']} port={root['port']} "
            "dbname=crm_exact_lineage_fixture user=crm_fixture_a")
     private, keys = signed
+    def original_membership(user_id: str, tenant_id: str):
+        return TenantMembership(tenant_id=tenant_id, user_id=user_id,
+                                role=membership_role)
     authenticate = build_signed_crm_tenant_authenticator(
-        keys, load_membership=live_membership, now=lambda: AUTH_NOW,
+        keys, load_membership=original_membership, now=lambda: AUTH_NOW,
     )
     reader = build_authenticated_revenue_crm_resolver(authenticate, {TA: dsn})
     verifier = SignedCrmTenantVerifier(
-        keys, load_membership=live_membership, now=lambda: AUTH_NOW,
+        keys, load_membership=original_membership, now=lambda: AUTH_NOW,
     )
     # Original transport owner's login-attestation code remains unpublished.
     # Restore pre-existing suppression-reader SQL strictly within this test.
@@ -51,6 +55,7 @@ def setup_http(pg, signed, monkeypatch, *, enabled=True):
             resolve_authenticated_read=reader,
             signed_crm_verifier=verifier,
             dedicated_tenant_dsns={TA: dsn},
+            load_original_membership=original_membership,
         ))
     app = FastAPI()
     app.include_router(router)
@@ -192,3 +197,43 @@ def test_existing_loopback_pilot_service_accepts_optin_without_public_access(
     health = client.get("/health")
     assert health.status_code == 200
     assert health.json()["payment_authority"] == "none"
+
+
+@pytest.mark.parametrize("role", ["viewer", "analyst", "operator", "admin"])
+def test_signed_non_owner_members_cannot_open_founder_revenue_case(
+    pg, signed, monkeypatch, role,
+):
+    client, bearer, path = setup_http(
+        pg, signed, monkeypatch, membership_role=role,
+    )
+    result = client.get(
+        path,
+        headers={
+            "Authorization": f"Bearer {bearer}",
+            "X-Role": "owner",
+            "X-Owner": "true",
+        },
+    )
+    assert result.status_code == 403
+    assert result.json() == {"detail": "crm_owner_membership_required"}
+    assert "tenant_id" not in result.text
+    assert bearer not in result.text
+
+
+def test_private_founder_router_refuses_missing_original_owner_lookup(
+    signed,
+):
+    from empire_os.crm_revenue_case_private_api import (
+        create_private_revenue_case_router,
+    )
+    _, keys = signed
+    verifier = SignedCrmTenantVerifier(
+        keys, load_membership=live_membership, now=lambda: AUTH_NOW,
+    )
+    with pytest.raises(ValueError, match="original CRM owner membership"):
+        create_private_revenue_case_router(
+            resolve_authenticated_read=lambda _: None,
+            signed_crm_verifier=verifier,
+            dedicated_tenant_dsns={TA: "fixture-only-dsn"},
+            load_original_membership=None,
+        )

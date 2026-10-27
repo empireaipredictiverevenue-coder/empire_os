@@ -6,6 +6,8 @@ tenant header, source writes, payment execution or public founder overview.
 """
 from __future__ import annotations
 
+import base64
+import json
 from datetime import datetime, timezone
 from typing import Callable, Literal, Mapping
 from uuid import UUID
@@ -17,6 +19,7 @@ from empire_os.crm_revenue_case_bridge import review_signed_crm_revenue_case
 from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from empire_os.revenue_crm_signed_auth import SignedCrmTenantVerifier
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
+from empire_os.saas_scale import TenantMembership
 
 STAGES = ("BUYER_ACCEPTANCE", "FULFILMENT", "SETTLEMENT_LEDGER",
           "RECOGNIZER_EVENT", "ECONOMIC_MEMORY_SHADOW")
@@ -51,12 +54,15 @@ def create_private_revenue_case_router(
     *, resolve_authenticated_read: Callable[[Request], AuthenticatedRevenueCrmRead | None],
     signed_crm_verifier: SignedCrmTenantVerifier,
     dedicated_tenant_dsns: Mapping[str, str],
+    load_original_membership: Callable[[str, str], TenantMembership | None],
 ) -> APIRouter:
     """Existing signed CRM and dedicated login only; no route without opt-in."""
     if not callable(resolve_authenticated_read):
         raise ValueError("original signed CRM tenant resolver required")
     if type(signed_crm_verifier) is not SignedCrmTenantVerifier:
         raise ValueError("original pinned signed CRM verifier required")
+    if not callable(load_original_membership):
+        raise ValueError("original CRM owner membership lookup required")
     if not isinstance(dedicated_tenant_dsns, Mapping) or not dedicated_tenant_dsns:
         raise ValueError("original dedicated CRM tenant login inventory required")
     known = dict(dedicated_tenant_dsns)
@@ -92,6 +98,25 @@ def create_private_revenue_case_router(
                 or access.repository.tenant_id != access.tenant_id
                 or access.repository.dsn != known.get(access.tenant_id)):
             raise HTTPException(503, detail="authenticated_crm_read_unavailable")
+        # The ordinary CRM read permission includes viewers and analysts.
+        # A V11 *founder* order case instead requires a fresh original OWNER
+        # membership; never elevate based on caller-provided role headers.
+        try:
+            if signed_crm_verifier.authenticate(bearer) != access.tenant_id:
+                raise ValueError("signed CRM tenant mismatch")
+            segment = bearer.split(".")[1]
+            claims = json.loads(base64.urlsafe_b64decode(
+                segment + "=" * (-len(segment) % 4)))
+            subject = claims["sub"]
+            membership = load_original_membership(subject, access.tenant_id)
+            if (not isinstance(membership, TenantMembership)
+                    or membership.user_id != subject
+                    or membership.tenant_id != access.tenant_id
+                    or membership.role != "owner"
+                    or not membership.can("admin")):
+                raise PermissionError("original founder owner membership required")
+        except Exception:
+            raise HTTPException(403, detail="crm_owner_membership_required") from None
         # Re-authenticate through the ORIGINAL pinned verifier and per-tenant
         # session_user reader. Neither identity nor DSN comes from path/header.
         try:
