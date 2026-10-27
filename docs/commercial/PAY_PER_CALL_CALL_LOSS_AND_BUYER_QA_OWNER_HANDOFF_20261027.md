@@ -34,3 +34,42 @@ Original competitor intelligence can read new evidence snapshot at runtime/compe
 
 ## IVR-to-human gap
 A target-connected event can terminate in IVR, queue, or hold without a human answering. The new code separately classifies IVR_OR_QUEUE_ABANDON, AGENT_DID_NOT_ANSWER, TARGET_DISCONNECT_BEFORE_HUMAN, and UNCLASSIFIED_NO_HUMAN, and requires those reasons to reconcile with target-connected minus independently human-answered unique calls. No category is assumed from existing Ringba dashboard aggregates. Such counts remain UNKNOWN until the original commercial owner verifies the same source and cohort.
+
+## 27 Oct 2026 owner evidence reconciliation — commercial confirmation already received
+
+The original buyer's email statements were checked directly in the connected professional/personal Gmail threads. Do NOT send yet another repeated onboarding or routing approval request.
+
+### Buyer-supplied statements (EMAIL-REPORTED, not live-provider independently measured)
+- 16 Oct, Lead Smart Support, Gmail message 1a145122e620d481: its Roofing Nationwide Direct route is configured; original inbound caller ID passes unchanged. Calls are recorded on Ringba; live homeowner source page needs recording disclosure.
+- 16 Oct, Lead Smart Support, Gmail message 1a145b32d742f3b1: its operator placed a test call, heard the recording announcement and approved sending calls during offer hours. The message alone does not establish human buyer answer, payable call or cash settlement.
+- 21 Oct, Lead Smart, Gmail message 1a15ea2dfa8c46b1: buyer-variant qualification duration 60–150 seconds total (NOT one fixed 120-second connected threshold); non-relevant/spam/solicitor/renter/coached-incentivised calls may be rejected; disputes can be raised in original correspondence. Publisher payout shown in Ringba is top-line, NOT confirmed settlement. No static caps claimed; accepted geography and buyer participation can change within day though coverage view refreshes daily; offer hours follow caller location/timezone. ACH, wire and PayPal are the options stated. These are historical written programme statements and must not be promoted into live capacity/accepted payable counts.
+- 23 Oct, Lead Smart, Gmail message 1a16911d65d0b41b: Ringba Reporting is the existing location to examine call logs and test calls; RTB is optional different price/duration discovery, not a mandatory migration from the approved Direct/DID route.
+- 26 Oct, Ringba Support, inbound reply forwarded to original inbox as message 1a1782a9a55360c0: Support points to Reporting and Recording support articles. It does NOT by itself supply current permission to view buyer-specific final dispositions, actual buyer answer, a bank-confirmed payment, or a tailored recording erasure procedure.
+
+Do not count this correspondence as a fresh API observation or independent technical buyer-leg verification. Keep the written buyer setup/approval **YES (historically confirmed)** separate from **live provider buyer route UNKNOWN**, **independently human-answered UNKNOWN**, **buyer scrub/accepted disposition UNKNOWN**, **settled payment UNKNOWN**.
+
+### Original runtime evidence, inspected 27 Oct approx 14:57 UTC
+- Original safe commercial pulse: fresh, site handoffs 0, consumer dial-handoff gate OFF, zero matching rows in its bounded provider-returned window (not a global historical count).
+- Root-owned 0600 call-to-cash original receipt exists and was most recently modified at 14:22 UTC. Its contents have NOT been accessed by this research worker; presence does NOT imply settlement.
+- Original buyer-admin proof file expected at runtime/revenue/lead_smart/buyer_admin/verified_configuration.json was absent. Existing original proof validator safely returns (False, False). The written email does NOT automatically count as a fresh independent administrator-signed receipt.
+- The prior 9 Oct Ringba routing observation remains stale for today's connection proof.
+- Local supervised-pilot site-handoff window ended 26 Oct 21:44 UTC; do not confuse this with Ringba platform campaign expiry.
+- Existing programmatic root-only one-hit probe was NOT executed here because the remote command interface rejected privilege escalation. No credential workaround attempted.
+
+### One original-owner operator action, no route / no send
+The original Ringba commercial owner can invoke its existing redacted, read-only probe inside the authorised server terminal:
+
+    cd /srv/empire_os
+    sudo env PYTHONPATH=/srv/empire_os /srv/empire_os/.venv/bin/python -B -m scripts.probe_lead_smart_ringba_root_readonly
+
+This produces only sanitised account, call-log, tracking and routing status; it does NOT dial a call, update buyer routing or approve revenue. If the provider's CallRoutes continues to return 403, record restricted account scope as UNKNOWN and use the original authorised Ringba Reporting view or Lead Smart's existing commercial operations contact. Do not bypass publisher permissions or request private buyer destinations.
+
+### Required disposition report, original owner only
+For one bounded campaign/time window:
+- Unique provider inbound calls and anonymised original-call identity hashes; exclude ANI, recording links and untrusted raw payloads.
+- Original campaign/number and source, provider CONNECTED status and duration, explicit final human buyer answer or UNKNOWN.
+- Deduplicated target attempts, final terminal reason (no target / no answer / busy / short / wrong service / geography / duplicate / scrub / eligible).
+- Written buyer-specific payable threshold/rules, final accepted/rejected outcome and adjustment history; distinguish headline Ringba payout from adjusted/approved final.
+- Independent finance payment receipt and costs or UNKNOWN if not yet received.
+
+Only then join one real source-aligned cohort to the existing CRO and Call Revenue Unit evaluators. We do not need another test call, another architecture, another buyer approval email or a second service. Production admission remains OFF in the inspected source.
