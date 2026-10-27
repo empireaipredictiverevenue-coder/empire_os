@@ -53,3 +53,31 @@ The ORIGINAL source-only preflights were independently rerun (nonprivileged, no 
 **Live cash attribution: `NOT_VERIFIED`.**
 
 An attempted follow-up privileged role-only catalog query from the remote execution tool was blocked by that tool's command restriction. No privileged query or migration was executed by the assistant, and that restriction was not bypassed. Original founder-run catalog status above remains authoritative.
+
+## Founder approval and guarded schema-only release command — 27 Oct 2026
+
+The founder explicitly approved installing ONLY empty locked-down Analytics054 and Analytics055 tables and erasure definitions, with ZERO visitor collection, runtime grants, new services, website changes, Analytics075 application or commercial activation.
+
+**Release driver prepared:** `scripts/deploy_empiredb_analytics054055_schema_only_20261027.sh`. This uses exactly the pinned and committed 054/055 source hashes, verifies current EmpireDB is the original PG18 primary, no Analytics collisions, the NOLOGIN migrator safety state, a recent existing encrypted pgBackRest backup with fixed AES-256 config, exclusive lock and purpose-restricted preflight. It copies approved SQL privately for executing as the local PostgreSQL peer. It then requires exact read-back of THREE force-RLS tables after 054, and FOUR force-RLS/owner-protected, EMPTY tables after 055. It does not create a writer or call any service/website API.
+
+**Privileged remote execution constraint:** The Remote Desktop Commander command channel declined the operator's root `--preflight` invocation (`Command not allowed`). No alternate shell/privilege workaround was attempted, and **no production migration has yet been run**. Founder can execute the reviewed root command below directly in the authorised Ubuntu terminal:
+
+```bash
+cd /srv/empire_os && \
+sudo bash scripts/deploy_empiredb_analytics054055_schema_only_20261027.sh --preflight && \
+sudo bash scripts/deploy_empiredb_analytics054055_schema_only_20261027.sh --apply --schema-only-founder-approved-20261027
+```
+
+The preflight is a separate no-write pass and exits nonzero on any mismatch; `&&` prevents installation if it fails. The application checks preflight again and stops on mismatch. **Do not retry** a partial migration failure automatically: 054 commits before 055, and a 055 failure leaves 054 installed for exact DBA review. Files containing private DDL execution stdout/stderr are root-only under `/var/backups/empiredb/analytics054055-schema-release-20261027`; the existing encrypted pgBackRest repository is not replaced.
+
+On successful application the final output must include `ANALYTICS054055_STATUS=SCHEMA_ONLY_INSTALLATION_VERIFIED` and internal catalog read-back. The independent original peer-only verifier may then be re-run:
+
+```bash
+cd /srv/empire_os
+sudo -u postgres env PYTHONPATH=/srv/empire_os /srv/empire_os/.venv/bin/python -B \
+  -m scripts.review_analytics_live_catalog_20261019 --read-only
+```
+
+Expected `status=ANALYTICS054_055_CATALOG_OBJECTS_OBSERVED_RELEASE_HELD`, `table_count_catalog=4`, two deployment booleans true, no public erasure execute, no maintenance login and **no real visitor/consent evidence**. That represents infrastructure presence, NOT legal/privacy/marketing authority.
+
+The shell runner and preflight tests passed locally; original migration fixture tests passed. Current truth remains `SCHEMA_NOT_INSTALLED_IN_LATEST_AUTHORITATIVE_CATALOG` until the user's operator result proves otherwise.
