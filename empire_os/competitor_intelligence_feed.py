@@ -326,10 +326,42 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             "outreach_enabled": False,
             "execution_authority": "none",
         }
+    detail = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_alert_precision_latest.json"
+    )
+    if (detail.get("schema_version")
+            != "empire.competitor_call_alert_precision.v1"
+            or detail.get("mode") != "OBSERVE"
+            or detail.get("outreach_enabled") is not False
+            or detail.get("execution_authority") != "none"
+            or detail.get("accepted_buyer_territory_verified") is not False
+            or detail.get("evidence_has_no_zip_or_property_mapping") is not True):
+        detail_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        observed = detail.get("observations")
+        if not isinstance(observed, list) or len(observed) > 30:
+            detail_summary = {"available": False, "mode": "OBSERVE"}
+        else:
+            detail_summary = {
+                "available": True,
+                "mode": "OBSERVE",
+                "observed_at": detail.get("generated_at"),
+                "checked_this_cycle": detail.get("detail_checked_this_cycle"),
+                "last_fetch_status": detail.get("last_fetch_status"),
+                "official_detail_observation_count": len(observed),
+                "county_ugc_area_count": detail.get("county_ugc_area_count"),
+                "forecast_zone_area_count": detail.get("forecast_zone_area_count"),
+                "observations": observed,
+                "affected_property_zip_codes_verified": False,
+                "accepted_buyer_territory_verified": False,
+                "outreach_enabled": False, "execution_authority": "none",
+            }
     return {
         "available": True, **snapshot,
         "geo_research": geo,
         "source_change_watch": watch_summary,
+        "official_alert_precision": detail_summary,
     }
 
 

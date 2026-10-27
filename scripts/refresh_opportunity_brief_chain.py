@@ -22,6 +22,7 @@ from empire_os.intelligence_materializer_transport import (
     PostgresIntelligenceMaterializer,
 )
 from empire_os.competitor_call_source_watch import refresh as refresh_call_source_watch
+from empire_os.competitor_call_alert_precision import refresh as refresh_alert_precision
 from empire_os.opportunity_brief import (
     materialize_opportunity_briefs,
     write_opportunity_briefs,
@@ -67,6 +68,44 @@ def refresh_bounded_competitor_watch(
     }
 
 
+def refresh_bounded_alert_precision(
+    repo_root: Path,
+    *,
+    precision_fn: Callable[[Path], dict[str, Any]] = refresh_alert_precision,
+) -> dict[str, Any]:
+    """Exactly one official NWS detail review in the original 15min cycle.
+
+    It is noncritical; an unavailable feed or permission never interrupts
+    the canonical opportunity briefing or enables any outreach/call traffic.
+    """
+    source = repo_root / "runtime/search_fabric_evidence/geo_opportunity_latest_v68.json"
+    if not source.is_file() or source.is_symlink():
+        return {
+            "status": "ORIGINAL_GEO_OBSERVATION_UNAVAILABLE",
+            "checked": 0, "execution_authority": "none",
+        }
+    try:
+        result = precision_fn(repo_root)
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        return {
+            "status": "COUNTY_ZONE_RESEARCH_HELD",
+            "error_type": type(exc).__name__,
+            "checked": 0, "execution_authority": "none",
+        }
+    return {
+        "status": result.get("last_fetch_status", "UNKNOWN"),
+        "checked": int(result.get("detail_checked_this_cycle") or 0),
+        "official_detail_observation_count": int(
+            result.get("official_detail_observation_count") or 0
+        ),
+        "county_ugc_area_count": int(result.get("county_ugc_area_count") or 0),
+        "forecast_zone_area_count": int(result.get("forecast_zone_area_count") or 0),
+        "geographic_precision": "NWS_COUNTY_OR_FORECAST_UGC_NOT_HOMEOWNER_ZIP",
+        "buyer_territory_or_homeowner_lead_verified": False,
+        "execution_authority": "none",
+    }
+
+
 def refresh_opportunity_brief_chain(
     repo_root: str | Path,
     *,
@@ -95,9 +134,11 @@ def refresh_opportunity_brief_chain(
     paths = write_opportunity_briefs(root, opportunity_briefs)
 
     competitor_watch = refresh_bounded_competitor_watch(root)
+    alert_precision = refresh_bounded_alert_precision(root)
 
     return {
         "competitor_change_radar": competitor_watch,
+        "call_geographic_precision": alert_precision,
         "schema_version": "empire.opportunity-brief-refresh-chain.v1",
         "mode": "OBSERVE_TO_REVIEW_ONLY",
         "canonical_signal_row_count": int(
