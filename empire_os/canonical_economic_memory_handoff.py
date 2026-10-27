@@ -17,6 +17,8 @@ from empire_os.canonical_settlement_handoff import SCHEMA as V9_SCHEMA
 from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 from empire_os.outcome_feedback import validate_verified_feedback
 from empire_os.economic_memory import build_economic_memory_snapshot
+from empire_os.department_work_queue import DepartmentWorkQueue, DepartmentWorkQueueError
+from empire_os.decision_identity import validate_causal_lineage, causal_lineage_from_work
 
 SCHEMA = "empire.canonical.settlement_to_economic_memory_handoff.v1"
 ORDER_KEYS = ("tenant_id", "buyer_id", "prospect_id", "entity_id",
@@ -140,11 +142,38 @@ def review_original_economic_memory_handoff(
             or profit != gross - cost):
         raise ProspectHandoffHold("UNRECONCILED_ORIGINAL_RECOGNIZED_ECONOMICS")
 
+    # A retrievable outcome is not automatically attributable to an executed
+    # decision. Only the ORIGINAL completed DepartmentWorkQueue item may bind
+    # causal credit. Missing execution is still useful as an unattributed
+    # shadow outcome, but never a claimed causal-learning proof.
+    canonical_work = []
+    causal = feedback.get("causal_lineage")
+    if causal is not None:
+        try:
+            causal = validate_causal_lineage(causal)
+            if (causal.get("tenant_id") != tenant_id
+                    or causal.get("opportunity_id") != settlement["opportunity_id"]):
+                raise ValueError("causal order scope mismatch")
+            if causal["causal_eligible"]:
+                task_key = causal["task_key"]
+                work = DepartmentWorkQueue.read_completed_work(repo_root, task_key)
+                expected = causal_lineage_from_work(
+                    work, tenant_id=tenant_id,
+                    opportunity_key=causal["opportunity_key"],
+                    opportunity_id=settlement["opportunity_id"],
+                )
+                if expected != causal:
+                    raise ValueError("causal execution owner record mismatch")
+                canonical_work = [work]
+        except (ValueError, TypeError, KeyError, OSError,
+                DepartmentWorkQueueError) as exc:
+            raise ProspectHandoffHold("ORIGINAL_COMPLETED_CAUSAL_WORK_HELD") from exc
+
     # Existing Economic Memory makes a transient SHADOW preview. No refresh,
     # filesystem write, output JSON publication, dispatcher or model training.
     try:
         preview = build_economic_memory_snapshot(
-            executive_evaluation={}, department_work=[],
+            executive_evaluation={}, department_work=canonical_work,
             cortex_learning={"packets": [feedback["cortex_packet"]]},
             tenant_id=tenant_id, verified_feedback=[feedback],
             calibration_reviews=[], as_of=now,
@@ -159,6 +188,27 @@ def review_original_economic_memory_handoff(
             or preview.get("promoted_learning") is not False
             or preview.get("model_weight_mutation_authorized") is not False):
         raise ProspectHandoffHold("UNTRUSTED_ORIGINAL_MEMORY_PREVIEW")
+    attribution_count = preview.get("plan_outcome_attribution_count", 0)
+    decision_count = preview.get("decision_outcome_attribution_count", 0)
+    plans = preview.get("plan_outcome_attributions", ())
+    decisions = preview.get("decision_outcome_attributions", ())
+    if (type(attribution_count) is not int or attribution_count < 0
+            or type(decision_count) is not int or decision_count < 0
+            or (not canonical_work and (attribution_count or decision_count
+                                        or plans or decisions))
+            or (canonical_work and (attribution_count != 1 or decision_count != 1))):
+        raise ProspectHandoffHold("ORIGINAL_CAUSAL_ATTRIBUTION_PREVIEW_MISMATCH")
+    if canonical_work:
+        expected = {"tenant_id": tenant_id,
+                    "outcome_ref": outcome_ref,
+                    "work_id": canonical_work[0]["id"]}
+        if (not isinstance(plans, list) or len(plans) != 1
+                or not isinstance(decisions, list) or len(decisions) != 1
+                or any(not isinstance(record, Mapping)
+                       or any(record.get(k) != v for k, v in expected.items())
+                       for record in (plans[0], decisions[0]))
+                or decisions[0].get("decision_ref") != causal["decision_ref"]):
+            raise ProspectHandoffHold("ORIGINAL_CAUSAL_ATTRIBUTION_PREVIEW_MISMATCH")
     return {
         "schema_version": SCHEMA,
         "status": "ORIGINAL_SHADOW_MEMORY_COHERENCE_ONLY_NOT_FINANCIAL_FINALITY",
@@ -172,6 +222,11 @@ def review_original_economic_memory_handoff(
         "reported_actual_cost_cents": cost,
         "reported_gross_profit_cents": profit,
         "original_owner_feedback_consistent": True,
+        "original_completed_work_lineage_consistent": bool(canonical_work),
+        "original_shadow_causal_attribution_count": attribution_count,
+        "original_shadow_decision_attribution_count": decision_count,
+        "causal_learning_eligibility_independently_verified_here": False,
+        "eligible_for_learning": False,
         "original_economic_memory_preview_candidate_count":
             preview.get("outcome_memory_candidate_count", 0),
         "original_economic_memory_preview_retrievable_count":

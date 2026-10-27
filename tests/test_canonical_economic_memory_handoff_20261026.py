@@ -14,6 +14,9 @@ from empire_os.execution_bus_data_repository import ExecutionBusDataRepository
 from tests.test_canonical_settlement_handoff_20261026 import (
     NOW, inputs, run, REVENUE, OTHER,
 )
+# Reuse the ORIGINAL queue/worker fixture (real persisted DONE receipt and
+# selection identity), not a fabricated "completed" decision.
+from tests.test_runtime_causal_lineage_continuity import completed
 
 EVENT_REF = "canonical:commercial_events:" + REVENUE
 
@@ -222,3 +225,154 @@ def test_v10_rejects_profitable_feedback_with_wrong_cost_receipt(monkeypatch):
     with pytest.raises(ProspectHandoffHold, match="UNRECONCILED_ORIGINAL_RECOGNIZED_ECONOMICS"):
         review(financial, repo)
     assert calls == []
+
+
+def _attach_original_completed_work(monkeypatch, financial, feedback, repo, work):
+    """Use a real queue-generated fixture, never fabricate decision identities."""
+    from empire_os.decision_identity import causal_lineage_from_work
+    from tests.test_runtime_causal_lineage_continuity import KEY
+    work = deepcopy(work)
+    work["tenant_id"] = financial["tenant_id"]
+    provenance = work["commercial_decision_provenance"]
+    provenance["tenant_id"] = financial["tenant_id"]
+    provenance["opportunity_id"] = financial["opportunity_id"]
+    causal = causal_lineage_from_work(
+        work, tenant_id=financial["tenant_id"], opportunity_key=KEY,
+        opportunity_id=financial["opportunity_id"],
+    )
+    feedback["causal_lineage"] = deepcopy(causal)
+    for key in ("opportunity_key", "prediction_ref", "decision_ref", "execution_ref"):
+        feedback[key] = causal[key]
+    learning = feedback["cortex_packet"]["learning_lineage"]
+    learning.update(
+        {key: causal[key] for key in
+         ("opportunity_key", "prediction_ref", "decision_ref", "execution_ref")}
+    )
+    learning["causal_lineage"] = deepcopy(causal)
+    repo.verified_outcome_feedback = lambda *args, **kwargs: deepcopy(feedback)
+    monkeypatch.setattr(
+        "empire_os.canonical_economic_memory_handoff.DepartmentWorkQueue.read_completed_work",
+        staticmethod(lambda repo_root, work_id: deepcopy(work)),
+    )
+    return work, causal
+
+
+def test_original_completed_work_creates_shadow_causal_attribution_without_authority(
+    monkeypatch, completed,
+):
+    from empire_os.economic_memory import (
+        build_economic_memory_snapshot as original_builder,
+    )
+    import empire_os.canonical_economic_memory_handoff as handoff
+
+    financial, feedback, repo, _ = setup(monkeypatch)
+    original, causal = _attach_original_completed_work(
+        monkeypatch, financial, feedback, repo, completed,
+    )
+    monkeypatch.setattr(
+        handoff, "build_economic_memory_snapshot", original_builder,
+    )
+    report = review(financial, repo)
+    assert report["original_completed_work_lineage_consistent"] is True
+    assert report["original_shadow_causal_attribution_count"] == 1
+    assert report["original_shadow_decision_attribution_count"] == 1
+    assert report["causal_learning_eligibility_independently_verified_here"] is False
+    assert report["eligible_for_learning"] is False
+    assert report["economic_memory_persisted"] is False
+    assert causal["execution_ref"] == "department_work:" + original["id"]
+
+
+def test_missing_canonical_completed_work_holds_before_memory_preview(
+    monkeypatch, completed,
+):
+    from empire_os.department_work_queue import DepartmentWorkQueueError
+
+    financial, feedback, repo, calls = setup(monkeypatch)
+    _attach_original_completed_work(
+        monkeypatch, financial, feedback, repo, completed,
+    )
+    monkeypatch.setattr(
+        "empire_os.canonical_economic_memory_handoff.DepartmentWorkQueue.read_completed_work",
+        staticmethod(lambda *args: (_ for _ in ()).throw(
+            DepartmentWorkQueueError("completed work missing"),
+        )),
+    )
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_COMPLETED_CAUSAL_WORK_HELD"):
+        review(financial, repo)
+    assert calls == []
+
+
+def test_wrong_work_scope_holds_before_memory_preview(monkeypatch, completed):
+    financial, feedback, repo, calls = setup(monkeypatch)
+    work, _ = _attach_original_completed_work(
+        monkeypatch, financial, feedback, repo, completed,
+    )
+    work["tenant_id"] = OTHER
+    monkeypatch.setattr(
+        "empire_os.canonical_economic_memory_handoff.DepartmentWorkQueue.read_completed_work",
+        staticmethod(lambda *args: deepcopy(work)),
+    )
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_COMPLETED_CAUSAL_WORK_HELD"):
+        review(financial, repo)
+    assert calls == []
+
+
+def test_unattributed_shadow_outcome_must_not_claim_causal_credit(monkeypatch):
+    financial, _, repo, calls = setup(monkeypatch)
+    report = review(financial, repo)
+    assert report["original_completed_work_lineage_consistent"] is False
+    assert report["original_shadow_causal_attribution_count"] == 0
+    assert report["original_shadow_decision_attribution_count"] == 0
+    assert report["eligible_for_learning"] is False
+    assert calls[0]["department_work"] == []
+
+
+def test_injected_causal_attribution_in_preview_rejected(monkeypatch):
+    financial, _, repo, calls = setup(monkeypatch)
+    def bad_preview(**kwargs):
+        return dict(schema_version="empire.economic_memory.v1", mode="OBSERVE",
+                    execution_authority="none", accounting_authority="none",
+                    commercial_authority="none", promoted_learning=False,
+                    model_weight_mutation_authorized=False,
+                    plan_outcome_attribution_count=1,
+                    decision_outcome_attribution_count=1)
+    monkeypatch.setattr(
+        "empire_os.canonical_economic_memory_handoff.build_economic_memory_snapshot",
+        bad_preview,
+    )
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_CAUSAL_ATTRIBUTION_PREVIEW_MISMATCH"):
+        review(financial, repo)
+
+
+def test_preview_causal_attribution_must_name_exact_original_work(
+    monkeypatch, completed,
+):
+    financial, feedback, repo, _ = setup(monkeypatch)
+    work, causal = _attach_original_completed_work(
+        monkeypatch, financial, feedback, repo, completed,
+    )
+    def wrong_preview(**kwargs):
+        expected = dict(
+            tenant_id=financial["tenant_id"], outcome_ref=feedback["outcome_ref"],
+            work_id=OTHER,  # not the real persisted completed work
+        )
+        return dict(
+            schema_version="empire.economic_memory.v1", mode="OBSERVE",
+            execution_authority="none", accounting_authority="none",
+            commercial_authority="none", promoted_learning=False,
+            model_weight_mutation_authorized=False,
+            plan_outcome_attribution_count=1,
+            decision_outcome_attribution_count=1,
+            plan_outcome_attributions=[expected],
+            decision_outcome_attributions=[
+                {**expected, "decision_ref": causal["decision_ref"]},
+            ],
+        )
+    monkeypatch.setattr(
+        "empire_os.canonical_economic_memory_handoff.build_economic_memory_snapshot",
+        wrong_preview,
+    )
+    with pytest.raises(
+        ProspectHandoffHold, match="ORIGINAL_CAUSAL_ATTRIBUTION_PREVIEW_MISMATCH",
+    ):
+        review(financial, repo)
