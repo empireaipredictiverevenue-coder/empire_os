@@ -372,12 +372,31 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     else:
         market_summary = {"available": True, **market}
 
+    traffic = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_traffic_source_registry_latest.json"
+    )
+    if (traffic.get("schema_version") != "empire.call_traffic_source_registry.v1"
+            or traffic.get("mode") != "OBSERVE"
+            or traffic.get("source_count") != 15
+            or traffic.get("organic_earned_count") != 7
+            or traffic.get("paid_candidate_count") != 7
+            or traffic.get("policy_excluded_count") != 1
+            or traffic.get("media_spend_authorized") is not False
+            or traffic.get("ad_account_mutation") is not False
+            or traffic.get("outbound_authorized") is not False
+            or traffic.get("execution_authority") != "none"):
+        traffic_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        traffic_summary = {"available": True, **traffic}
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
         "source_change_watch": watch_summary,
         "official_alert_precision": detail_summary,
         "business_model_research": market_summary,
+        "traffic_source_research": traffic_summary,
     }
 
 

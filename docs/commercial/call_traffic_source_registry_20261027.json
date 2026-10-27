@@ -1,0 +1,277 @@
+{
+  "schema_version": "empire.call_traffic_source_registry_sources.v1",
+  "researched_at_utc": "2026-10-27T11:00:00+00:00",
+  "vertical": "US_ROOFING_HOMEOWNER_INFORMATION",
+  "purpose": "RESEARCH_FREE_AND_PAID_CHANNELS_NOT_APPROVED_CAMPAIGN_PLAN",
+  "channels": [
+    {
+      "id": "organic_search",
+      "name": "Google/Bing organic search",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "SEARCH",
+      "intent": "HIGH",
+      "research_rank": 1,
+      "route": "EDITORIAL_TO_CONSENTED_SITE_CALL",
+      "publisher_role_fit": "ELIGIBLE_IF_ORIGINAL_SITE_MEETS_SEARCH_POLICIES",
+      "permission_state": "OWNER_SEO_WORKSTREAM_NO_EDIT",
+      "sources": [
+        "https://developers.google.com/search/docs/essentials/spam-policies"
+      ],
+      "next_proof": "Original GSC query/page impressions, real organic sessions, usable published homeowner service pages",
+      "scope": "Existing first-party properties only; avoid doorway and scaled low-value ZIP pages"
+    },
+    {
+      "id": "earned_local_publisher",
+      "name": "Earned homeowner publisher placements",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "REFERRAL",
+      "intent": "HIGH",
+      "research_rank": 2,
+      "route": "EDITORIAL_LINK_TO_CONSENTED_SITE_CALL",
+      "publisher_role_fit": "REQUIRES_VALID_PLACEMENT_AND_BUYER_SOURCE_PERMISSIONS",
+      "permission_state": "PARTNER_REVIEW_NOT_APPROVED",
+      "sources": [
+        "https://modernize.com/affiliates"
+      ],
+      "next_proof": "Verified partner's audience and written permission for accurate editorial reference",
+      "scope": "Earned placements only; negotiated commissions become performance-paid, not free"
+    },
+    {
+      "id": "youtube_organic",
+      "name": "YouTube helpful videos and Shorts",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "SOCIAL_VIDEO",
+      "intent": "MEDIUM",
+      "research_rank": 3,
+      "route": "VIDEO_TO_SOURCE_TAGGED_PAGE",
+      "publisher_role_fit": "CONDITIONAL_ON_VIDEO_CONTENT_RULES_AND_LINK_PERMISSIONS",
+      "permission_state": "CONTENT_OWNER_REVIEW_NOT_PUBLISHED",
+      "sources": [
+        "https://support.google.com/youtube/answer/11914225?hl=en-GB"
+      ],
+      "next_proof": "Viewer geography, link clicks, landing sessions and downstream call events",
+      "scope": "Repair/cost explainer, contractor selection, official safety guidance"
+    },
+    {
+      "id": "community_earned",
+      "name": "Relevant homeowner forums and local community contribution",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "COMMUNITY",
+      "intent": "MEDIUM",
+      "research_rank": 4,
+      "route": "HELPFUL_REPLY_TO_OPTED_IN_PAGE_WHEN_PERMITTED",
+      "publisher_role_fit": "MODERATOR_AND_COMMUNITY_RULES_MUST_PERMIT_REFERENCES",
+      "permission_state": "COMMUNITY_RULES_REVIEW_ONLY",
+      "sources": [
+        "https://support.reddithelp.com/hc/en-us/articles/360043504051-Spam"
+      ],
+      "next_proof": "Community rules and useful, allowed non-promotional participation",
+      "scope": "Do not scrape users, auto-post, DM, masquerade as contractor or spam"
+    },
+    {
+      "id": "opt_in_homeowner_referrals",
+      "name": "Consent-based newsletter and word-of-mouth referrals",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "OWNED_AUDIENCE",
+      "intent": "MEDIUM",
+      "research_rank": 5,
+      "route": "EXPLICITLY_OPTED_IN_PAGE_LINK",
+      "publisher_role_fit": "CONSENT_EVIDENCE_REQUIRED",
+      "permission_state": "NO_VALIDATED_US_HOMEOWNER_LIST",
+      "sources": [
+        "https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business"
+      ],
+      "next_proof": "Subscriber opt-in and unsubscribe provenance; publication rights",
+      "scope": "No purchased contact lists or unsolicited homeowner messages"
+    },
+    {
+      "id": "nextdoor_business_page",
+      "name": "Nextdoor local business page and organic posts",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "LOCAL_SOCIAL",
+      "intent": "MEDIUM",
+      "research_rank": 6,
+      "route": "LOCAL_BUSINESS_PAGE_TO_REQUEST",
+      "publisher_role_fit": "CONDITIONAL_GENUINE_LOCAL_PROVIDER_ONLY",
+      "permission_state": "HOLD_EMPIRE_NOT_LOCAL_CONTRACTOR",
+      "sources": [
+        "https://business.nextdoor.com/en-us/small-business"
+      ],
+      "next_proof": "Genuine local business identity, local posting rights and approved buyer traffic source",
+      "scope": "Free page/posts only for qualifying local provider; Empire cannot claim to be roofer"
+    },
+    {
+      "id": "pinterest_organic",
+      "name": "Pinterest organic roof-repair guidance",
+      "cost_class": "FREE_MEDIA_WITH_LABOUR",
+      "audience": "HOMEOWNER",
+      "channel_family": "VISUAL_DISCOVERY",
+      "intent": "LOW",
+      "research_rank": 7,
+      "route": "PIN_TO_INFORMATION_PAGE",
+      "publisher_role_fit": "CONTENT_AND_LINK_RULES_REVIEW",
+      "permission_state": "CONTENT_OWNER_REVIEW_ONLY",
+      "sources": [
+        "https://help.pinterest.com/en-gb/business/article/conversion-insights"
+      ],
+      "next_proof": "Organic pin outbound clicks and first-party source attribution",
+      "scope": "Consideration demand, not emergency-call intent"
+    },
+    {
+      "id": "google_search_ads",
+      "name": "Google Search responsive ads with call assets",
+      "cost_class": "PAID_CPC",
+      "audience": "HOMEOWNER",
+      "channel_family": "SEARCH",
+      "intent": "HIGH",
+      "research_rank": 101,
+      "route": "SEARCH_AD_CALL_ASSET_OR_SITE",
+      "publisher_role_fit": "LANDING_AND_ADVERTISER_POLICY_REVIEW_REQUIRED",
+      "permission_state": "PAID_DISABLED_BUDGET_AND_BUYER_APPROVAL_REQUIRED",
+      "sources": [
+        "https://support.google.com/google-ads/answer/16619010?hl=en",
+        "https://support.google.com/google-ads/answer/3022575?hl=en"
+      ],
+      "next_proof": "Actual geo-specific CPC, paid click-to-call, accepted Ringba call rate, refund and cost per settled call",
+      "scope": "Call-only format deprecated; responsive search ads with call assets"
+    },
+    {
+      "id": "microsoft_ads",
+      "name": "Microsoft/Bing Search Ads with call extensions",
+      "cost_class": "PAID_CPC",
+      "audience": "HOMEOWNER",
+      "channel_family": "SEARCH",
+      "intent": "HIGH",
+      "research_rank": 102,
+      "route": "SEARCH_CALL_EXTENSION_OR_PAGE",
+      "publisher_role_fit": "LANDING_AND_ADVERTISER_POLICY_REVIEW_REQUIRED",
+      "permission_state": "PAID_DISABLED_BUDGET_AND_BUYER_APPROVAL_REQUIRED",
+      "sources": [
+        "https://about.ads.microsoft.com/en/solutions/ad-products-formats/search/ad-extensions"
+      ],
+      "next_proof": "Real CPC, eligible geography, buyer-approved hours and phone tracking outcomes",
+      "scope": "Search call extensions supported; advertiser rules apply"
+    },
+    {
+      "id": "meta_call_ads",
+      "name": "Meta Facebook/Instagram phone-call ads",
+      "cost_class": "PAID_AD_AUCTION",
+      "audience": "HOMEOWNER",
+      "channel_family": "SOCIAL_VIDEO",
+      "intent": "MEDIUM",
+      "research_rank": 103,
+      "route": "PAID_AD_TO_DIRECT_CALL",
+      "publisher_role_fit": "AD_POLICY_AND_CONSUMER_NOTICE_REVIEW_REQUIRED",
+      "permission_state": "PAID_DISABLED_BUDGET_AND_BUYER_APPROVAL_REQUIRED",
+      "sources": [
+        "https://www.facebook.com/business/ads/ad-objectives/lead-generation/lead-ads-with-calling",
+        "https://www.facebook.com/business/ads/ad-objectives/lead-generation/lead-ads-with-forms"
+      ],
+      "next_proof": "Measured eligible calls from creative, geography and delivery hours; genuine buyer-accepted disposition",
+      "scope": "Calls and form lead products are distinct; never mark form submission as payable call"
+    },
+    {
+      "id": "nextdoor_paid",
+      "name": "Nextdoor local business ads",
+      "cost_class": "PAID_AD_AUCTION",
+      "audience": "HOMEOWNER",
+      "channel_family": "LOCAL_SOCIAL",
+      "intent": "MEDIUM",
+      "research_rank": 104,
+      "route": "LOCAL_AD_TO_BUSINESS_CONTACT",
+      "publisher_role_fit": "CONDITIONAL_LOCAL_PROVIDER_ELIGIBILITY",
+      "permission_state": "HOLD_EMPIRE_NOT_LOCAL_CONTRACTOR",
+      "sources": [
+        "https://business.nextdoor.com/en-us/small-business"
+      ],
+      "next_proof": "Legitimate local advertiser identity, geographic scope and buyer approval before any spend",
+      "scope": "Not a compliant lead-broker shortcut unless advertiser eligibility confirmed"
+    },
+    {
+      "id": "publisher_paid",
+      "name": "Approved publisher traffic partnerships / CPL inventory",
+      "cost_class": "PERFORMANCE_PAID",
+      "audience": "HOMEOWNER",
+      "channel_family": "AFFILIATE_PUBLISHER",
+      "intent": "HIGH",
+      "research_rank": 105,
+      "route": "PARTNER_TO_AGREED_INBOUND_CALL_OR_FORM",
+      "publisher_role_fit": "WRITTEN_PARTNER_AND_BUYER_SOURCE_APPROVAL_REQUIRED",
+      "permission_state": "NOT_APPROVED_NO_DEAL",
+      "sources": [
+        "https://modernize.com/affiliates"
+      ],
+      "next_proof": "Signed source rights, allowed methods, consent, payable definition, exclusivity, reversals and price cap",
+      "scope": "Performance-based does not make traffic free; no auto-sourcing without terms"
+    },
+    {
+      "id": "pinterest_ads",
+      "name": "Pinterest consideration or leads ads",
+      "cost_class": "PAID_CPC_OR_CPA",
+      "audience": "HOMEOWNER",
+      "channel_family": "VISUAL_DISCOVERY",
+      "intent": "LOW",
+      "research_rank": 106,
+      "route": "PROMOTED_PIN_TO_PAGE",
+      "publisher_role_fit": "AD_AND_LANDING_POLICY_REVIEW_REQUIRED",
+      "permission_state": "PAID_DISABLED_BUDGET_AND_BUYER_APPROVAL_REQUIRED",
+      "sources": [
+        "https://help.pinterest.com/en-gb/business/article/campaign-objectives"
+      ],
+      "next_proof": "Measurable outbound clicks, on-site call-start and accepted paid outcome",
+      "scope": "Typically mid-funnel roof inspiration; benchmark only after high-intent channels"
+    },
+    {
+      "id": "reddit_ads",
+      "name": "Reddit lead-generation advertising",
+      "cost_class": "PAID_AD_AUCTION",
+      "audience": "HOMEOWNER",
+      "channel_family": "COMMUNITY",
+      "intent": "LOW",
+      "research_rank": 107,
+      "route": "PAID_AD_TO_SITE_LEAD",
+      "publisher_role_fit": "AD_PLATFORM_POLICY_REVIEW_REQUIRED",
+      "permission_state": "PAID_DISABLED_BUDGET_AND_BUYER_APPROVAL_REQUIRED",
+      "sources": [
+        "https://business.reddithelp.com/articles/Knowledge/about-lead-generation-ads"
+      ],
+      "next_proof": "Real first-party eligible lead-to-call conversion, accepted outcomes, cost",
+      "scope": "Reddit currently documents lead campaigns linked to website conversion events; not guaranteed phone-call ad objective"
+    },
+    {
+      "id": "google_lsa",
+      "name": "Google Local Services Ads",
+      "cost_class": "PAID_PER_ELIGIBLE_LEAD",
+      "audience": "HOMEOWNER",
+      "channel_family": "LOCAL_SEARCH",
+      "intent": "HIGH",
+      "research_rank": 999,
+      "route": "LOCAL_PROVIDER_DIRECT_ONLY",
+      "publisher_role_fit": "PROHIBITED_FOR_LEAD_RESELLING",
+      "permission_state": "EXCLUDE_EMPIRE_LEAD_RESALE",
+      "sources": [
+        "https://support.google.com/adspolicy/answer/6245891?hl=en-GB"
+      ],
+      "next_proof": "Not applicable to Empire lead resale; only legitimate eligible service provider may advertise for own fulfilment",
+      "scope": "Google policy expressly prohibits lead selling and routing to unrelated companies"
+    }
+  ],
+  "global_controls": {
+    "mode": "OBSERVE",
+    "media_spend_authority": false,
+    "ad_account_mutation": false,
+    "leads_created": false,
+    "outbound_sent": false,
+    "site_published": false,
+    "call_route_mutation": false,
+    "publisher_admission_approved": false,
+    "settled_revenue_verified": false
+  },
+  "ranking_note": "Research ranks 1-7 / 101-107 are strategic investigation order, not proven profit, absolute free operating cost or live eligibility."
+}
