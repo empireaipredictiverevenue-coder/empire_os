@@ -30,3 +30,25 @@ The actual accepted terms, delivered outcomes, BSC receipt, costs, reversals and
 A wider source/CRM integration selection also passed **449 tests with one existing Starlette/anyio deprecation warning**; this is not the whole-repository suite or a real production RPC acceptance check.
 
 No database writes, payments, outbound, recognition events, trainable labels or live UI route changes are part of this feature.
+
+## 27 October — Founder Console display and owner security release review
+
+- The original CRM pilot service is **active** and its private loopback `/health` reports approved read-only pilot mode, no outbound or payments. Health does NOT confirm the separate exact-order SQL RPC is installed.
+- The original production checkout's `empire_os/revenue_crm_transport.py` has an UNCOMMITTED CRM-owner-only `CRM_LOGIN_AUTHORITY_SQL` hardening delta. The V11 PR's branch deliberately does not copy or commit that owner's private work. Without the original owner releasing its login proof, `review_signed_scoped_lineage` fails closed with `ORIGINAL_CRM_LOGIN_ATTESTATION_UNRELEASED`.
+- The `CRM_SCOPED_LINEAGE_RPC_HELD_20261026.sql` release candidate remains explicitly **DO NOT RUN/APPLY**. V11 did not install/grant it and did not inspect raw tenant/customer tables. Owner sign-off and exact role/tenant-RLS, catalog, rollback and independent production privilege checks are outstanding.
+- The existing `apps/search-command-centre/src/lib/founder-api.ts` gets founder overview via a general no-store API fetch without a user-bound CRM bearer at that call site. Private order details must NEVER be put into that overview or a publicly reachable route.
+- The V11 bridge now emits a **whitelisted `founder_case_view`**, limited to the hashed case reference, reported order state, source-stage status and next owner/action, with no tenant/order/prospect/buyer UUID, token, DSN or payment refs. It remains a formatter, NOT a separate authentication control.
+- A presentational `apps/search-command-centre/src/app/founder/revenue-case-panel.tsx` component is staged. It takes ONLY that redacted view, has NO browser fetch, session management or route, and displays a hold when no signed order view exists. It is NOT currently imported into the original founder page; the console owner must first provide a server-side session-authorised order-detail route.
+- Additional negative tests deny spoofed authentication/profit statuses and check that the display DTO contains no secret bearer, full entity UUIDs or connection details. No live order was read, no signed founder session was impersonated and no founder-console deployment was performed.
+
+### Exact release sequence for the original CRM and console owners
+
+1. **CRM transport owner:** finish/review/commit the in-progress dedicated-login attestation in the original checkout; validate the dedicated login's fixed role membership, no inherited/wider privileges and exact session_user binding.
+2. **CRM SQL/security owner:** independently review the held exact-order `SECURITY DEFINER` RPC, enforce safe search path, public execute revocation, strict role-only EXECUTE, tenant binding and zero raw-table grants; run disposable staging SQL/security tests and retain rollback. Explicitly approve release before deployment.
+3. **First-party CRM owner:** authenticate a real founder CRM session with the existing signed Ed25519 tenant token and current canonical membership; pass one existing exact order/prospect/opportunity UUID triplet through the original restricted login and prove the RPC's one-row tenant/order match. No fake fixture or global order scan.
+4. **Existing Founder API owner:** wire the authenticated **server-side** owner reader to the private case-detail route and `founder_case_view` only, with no-store/no-cache, session-scoped access, no tokens or DSN client-side; attach the staged component inside the existing founder console. Run security and visual checks before a separate approved production release.
+5. **RevenueRecognition and FulfilmentOperations:** independently attach original V7–V10 receipt evidence by the same order, verify contracted payer, provider/buyer delivery, BSC/escrow, reversal census and invoice/cost proof before any revenue or learning promotion.
+
+Validated in the isolated review worktree: **458 selected Python tests passed**, one existing Starlette/anyio deprecation warning, and the staged TSX component passed **strict TypeScript compilation** with the original console's installed toolchain. This is not an end-to-end browser/session test, privileged production SQL audit or live order verification. The production console still does NOT show an actual V11 order.
+
+This PR cannot certify owner approval, live authenticated order availability or production data; those remain UNKNOWN / HELD.

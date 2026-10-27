@@ -1,6 +1,7 @@
 """V11 original signed CRM connection: offline owner-interface contract tests."""
 from copy import deepcopy
 from types import SimpleNamespace
+import json
 
 import pytest
 
@@ -95,6 +96,18 @@ def test_one_genuine_owner_interface_receipt_shows_only_unverified_order_state(
                for s in report["revenue_case"]["source_handoff_stages"])
     assert report["database_writes"] is False
     assert report["payments_executed"] is False
+    view = report["founder_case_view"]
+    assert view["schema_version"] == "empire.crm.founder_revenue_case_view.v1"
+    assert view["next_missing_stage"] == "BUYER_ACCEPTANCE"
+    assert view["reported_order_state"] == state
+    assert view["recognized_revenue_verified_here"] is False
+    assert view["independent_evidence_attested_here"] is False
+    assert view["economic_memory_training_authorized"] is False
+    serialized = json.dumps(view, sort_keys=True)
+    assert all(private not in serialized for private in (
+        TENANT, PROSPECT, OPPORTUNITY, ENTITY, BUYER, ORDER,
+        "TEST_ONLY", signed_auth[1],
+    ))
     assert reads["rpc"][0]["evidence_kind"] == "order"
     assert reads["rpc"][0]["evidence_id"] == ORDER
     assert "connect_factory" not in reads["rpc"][0]
@@ -213,3 +226,31 @@ def test_bad_ids_and_non_original_verifier_fail_before_authentication(
         )
     assert reads["rpc"] == []
     assert reads["view"] == []
+
+
+@pytest.mark.parametrize("field,bad", [
+    ("authenticated_crm_order_observed", False),
+    ("authenticated_crm_signed_membership_verified", False),
+    ("authenticated_crm_tenant_scope_verified", False),
+    ("revenue_recognized_here", True),
+    ("eligible_for_learning", True),
+    ("database_writes", True),
+    ("mode", "EXECUTE"),
+    ("execution_authority", "EXECUTE"),
+])
+def test_founder_view_requires_original_no_authority_contract(
+    monkeypatch, signed_auth, field, bad
+):
+    prepare(monkeypatch)
+    verified = review(signed_auth)["revenue_case"]
+    verified[field] = bad
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_CRM_FOUNDER_VIEW_NOT_AUTHENTICATED"):
+        bridge._private_founder_case_view(verified)
+
+
+def test_founder_view_never_accepts_extra_or_promoted_stage(monkeypatch, signed_auth):
+    prepare(monkeypatch)
+    verified = review(signed_auth)["revenue_case"]
+    verified["source_handoff_stages"][0]["status"] = "PAID"
+    with pytest.raises(ProspectHandoffHold, match="ORIGINAL_CRM_FOUNDER_STAGES_UNTRUSTED"):
+        bridge._private_founder_case_view(verified)

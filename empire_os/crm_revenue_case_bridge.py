@@ -41,6 +41,48 @@ def _uuid(value: Any) -> str:
     return value
 
 
+def _private_founder_case_view(case: dict[str, Any]) -> dict[str, Any]:
+    """Minimal, non-PII display model; NOT authentication or route authority.
+
+    Called only AFTER the original signed CRM reader returns a scoped order.
+    Never expose UUIDs, bearer, DSN, source payloads or payment references.
+    The API/console owner must separately enforce its real session boundary.
+    """
+    if (case.get("authenticated_crm_order_observed") is not True
+            or case.get("authenticated_crm_signed_membership_verified") is not True
+            or case.get("authenticated_crm_tenant_scope_verified") is not True
+            or case.get("mode") != "OBSERVE"
+            or case.get("execution_authority") != "NONE"
+            or case.get("revenue_recognized_here") is not False
+            or case.get("eligible_for_learning") is not False
+            or case.get("database_writes") is not False):
+        raise ProspectHandoffHold("ORIGINAL_CRM_FOUNDER_VIEW_NOT_AUTHENTICATED")
+    stages = case.get("source_handoff_stages")
+    if (not isinstance(stages, list) or len(stages) != 5
+            or any(not isinstance(s, dict)
+                   or s.get("status") not in ("NOT_OBSERVED", "SOURCE_REPORTED_COHERENCE_ONLY")
+                   or not isinstance(s.get("stage"), str)
+                   for s in stages)):
+        raise ProspectHandoffHold("ORIGINAL_CRM_FOUNDER_STAGES_UNTRUSTED")
+    return {
+        "schema_version": "empire.crm.founder_revenue_case_view.v1",
+        "status": "SIGNED_ORDER_OBSERVED_FINANCIAL_PROOF_UNATTESTED",
+        "mode": "OBSERVE",
+        "case_ref": case["case_id"],
+        "reported_order_state": case.get("original_crm_order_state_reported"),
+        "next_missing_stage": case["next_missing_stage"],
+        "next_original_owner": case["next_original_owner"],
+        "next_original_action": case["next_original_action"],
+        "stages": [{"stage": item["stage"], "status": item["status"]} for item in stages],
+        "independent_evidence_attested_here": False,
+        "recognized_revenue_verified_here": False,
+        "economic_memory_training_authorized": False,
+        "database_writes": False,
+        "outbound_sent": False,
+        "execution_authority": "NONE",
+    }
+
+
 def review_signed_crm_revenue_case(
     *,
     signed_crm_bearer: str,
@@ -145,6 +187,7 @@ def review_signed_crm_revenue_case(
         "fulfilment_order_id": order,
         "crm_order_source": "ORIGINAL_SIGNED_TENANT_RPC_AND_TENANT_SCOPED_PROSPECT_VIEW",
         "revenue_case": case,
+        "founder_case_view": _private_founder_case_view(case),
         "original_crm_owner_rpc_approved_by_this_bridge": False,
         "real_buyer_terms_independently_verified_here": False,
         "external_delivery_verified_here": False,
