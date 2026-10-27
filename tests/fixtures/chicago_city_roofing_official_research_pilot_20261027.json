@@ -1,0 +1,83 @@
+{
+  "candidates": [
+    {
+      "site_kind": "local_utility",
+      "audience": "People planning roofing work on properties confirmed within City of Chicago jurisdiction",
+      "offer": "Use city building-permit guidance and Illinois licensing records to compare a roofing project scope. No lead collection or booking.",
+      "geography": {
+        "market_id": "US-IL",
+        "kind": "metro",
+        "area": "Chicago, IL",
+        "evidence_refs": [
+          "empire_os/geo_registry.py:US-IL",
+          "chicago.gov:city-permits"
+        ]
+      },
+      "keyword_opportunity": {
+        "keyword": "Chicago roof replacement permit checklist",
+        "cluster_key": "chicago_roofing_citywide_permit_decision",
+        "intent_class": "territory",
+        "product_key": "roofing_intel",
+        "icp_key": "roofing_researcher",
+        "funnel_stage": "consideration",
+        "cta_key": "review-research",
+        "territory_key": "US-IL",
+        "evidence_refs": [
+          "research-source:example-a"
+        ],
+        "observed_demand": null,
+        "commercial_intent": 0.7,
+        "product_fit": 0.6,
+        "buyer_fit": null,
+        "coverage_gap": 0.4,
+        "competitor_gap": 0.4,
+        "ai_citation_gap": 0.3,
+        "conversion_evidence": null,
+        "strategic_category_value": 0.6,
+        "confidence": null
+      },
+      "headline": "Chicago reroofing: permits, licensing and scope checks",
+      "subhead": "Five checks to make before hiring a roofer, backed by the City of Chicago and Illinois licensing guidance.",
+      "summary": "A citywide research checklist for properties under Chicago jurisdiction. Check the actual address and project before relying on permit rules. no contractor referral or sale is offered.",
+      "local_facts": [
+        {
+          "statement": "Chicago's Express Permit guidance identifies reroofing work as a distinct eligible project category, subject to the stated conditions and limitations.",
+          "source_ref": "Chicago Department of Buildings: Express Permit eligibility, reroofing",
+          "official_url": "https://chicago.gov/city/en/sites/guide-to-building-permits/home/help/faq/DOB/EPP-eligible.html",
+          "checked_at": "2026-10-27T15:00:00Z"
+        },
+        {
+          "statement": "The City of Chicago explains that permits are generally needed for most construction and repair work. Check the precise project and property circumstances against the current city guidance.",
+          "source_ref": "City of Chicago: Building Permit Application Instructions",
+          "official_url": "https://chicago.gov/city/en/sites/guide-to-building-permits/home/instructions.html",
+          "checked_at": "2026-10-27T15:00:00Z"
+        },
+        {
+          "statement": "Chicago's permit-application status service provides public access to limited application information by property address. it does not guarantee a complete historical permit record.",
+          "source_ref": "City of Chicago: Building Permit Application Status Help",
+          "official_url": "https://webapps1.chicago.gov/buildingpermit/help",
+          "checked_at": "2026-10-27T15:00:00Z"
+        },
+        {
+          "statement": "Illinois provides an official professional-licence lookup. Verify the roofing contractor's current licensing status directly before engaging a provider.",
+          "source_ref": "Illinois IDFPR: Check License",
+          "official_url": "https://idfpr.illinois.gov/checklicense.html",
+          "checked_at": "2026-10-27T15:00:00Z"
+        },
+        {
+          "statement": "The Census Bureau's ZIP Code Tabulation Areas are approximate geographic representations, not the same as USPS delivery ZIP codes. neither alone establishes a specific property's municipal jurisdiction.",
+          "source_ref": "US Census Bureau: ZIP Code Tabulation Areas",
+          "official_url": "https://www.census.gov/programs-surveys/geography/guidance/geo-areas/zctas.html",
+          "checked_at": "2026-10-27T15:00:00Z"
+        }
+      ],
+      "research_steps": [
+        "Confirm the property is within City of Chicago jurisdiction using its actual street address. ZIP codes and census ZCTAs alone do not establish jurisdiction.",
+        "Identify the roof type, slope, building height, number of units and proposed work before checking Chicago's reroofing permit or exemption guidance.",
+        "Ask every shortlisted roofer for their legal business name and licensing details, then independently check the current Illinois licensing record.",
+        "Check the City of Chicago's permit application status tools for the property's address, allowing for limits on older or incomplete records.",
+        "Compare written scopes that describe materials, existing roof layers, structural work, insulation, clean-up, warranties and responsibility for any needed permits."
+      ]
+    }
+  ]
+}

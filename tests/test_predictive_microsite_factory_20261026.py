@@ -244,3 +244,39 @@ def test_duplicate_checklist_cannot_create_fake_distinct_utility():
     ]
     with pytest.raises(ValueError, match="duplicate steps"):
         build_candidate(spec)
+
+def test_citywide_chicago_candidate_keeps_real_jurisdiction_and_keyword_unknown():
+    import json
+    from pathlib import Path
+    p = Path(__file__).parent / "fixtures" / "chicago_city_roofing_official_research_pilot_20261027.json"
+    spec = json.loads(p.read_text())["candidates"][0]
+    item, html = build_candidate(spec)
+    assert item["market"]["kind"] == "metro"
+    assert item["market"]["region_verified"] is True
+    assert item["copy_audit"]["score"] == 5
+    assert item["linked_official_source_count"] == 5
+    assert item["locally_useful_research_steps"] == 5
+    assert "keyword scoring evidence incomplete" in item["blockers"]
+    assert item["status"] == "HOLD_EVIDENCE"
+    assert 'content="noindex,nofollow,noarchive"' in html
+    assert item["visual_qa"]["brand_public_distribution_approved_by_owner"] is False
+
+
+def test_private_original_logo_requires_exact_existing_owner_custodied_bytes(tmp_path, monkeypatch):
+    from empire_os.predictive_microsite_factory import _original_brand_image
+    monkeypatch.setenv("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO", str(tmp_path / "missing.png"))
+    with pytest.raises(ValueError, match="regular existing"):
+        _original_brand_image()
+    fake = tmp_path / "other.png"
+    fake.write_bytes(b"\x89PNG\r\n\x1a\n" + b"x" * 128)
+    monkeypatch.setenv("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO", str(fake))
+    with pytest.raises(ValueError, match="fingerprint mismatch"):
+        _original_brand_image()
+
+
+def test_default_public_logo_does_not_impersonate_owner_signoff(monkeypatch):
+    from empire_os.predictive_microsite_factory import _original_brand_image
+    monkeypatch.delenv("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO", raising=False)
+    src, digest = _original_brand_image()
+    assert src.startswith("data:image/svg+xml;base64,")
+    assert len(digest) == 64

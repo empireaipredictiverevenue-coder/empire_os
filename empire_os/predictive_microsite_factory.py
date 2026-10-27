@@ -10,6 +10,7 @@ from base64 import b64encode
 from hashlib import sha256
 from html import escape
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -24,7 +25,27 @@ from empire_os.third_party.slopmonster.deslop import audit, normalise, visible_t
 BRAND_ASSET = Path(__file__).resolve().parent.parent / "apps/empire-public-site/public/brand/empire-logo.svg"
 
 
+PRIVATE_APPROVED_BRAND_SHA256 = "55e98ad2ae182991d95908738135779102beb81818cd7c3607a3a49e1f2aa596"
+
+
 def _original_brand_image() -> tuple[str, str]:
+    # Optional PRIVATE staging-only brand approval candidate: use the existing
+    # owner-custodied raster by exact hash. Never commit or transfer its bytes.
+    # The website/brand owner still has to approve its production distribution.
+    private_path = os.environ.get("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO")
+    if private_path:
+        image_path = Path(private_path)
+        if image_path.is_symlink() or not image_path.is_file():
+            raise ValueError("private original logo must be a regular existing file")
+        source = image_path.read_bytes()
+        if (sha256(source).hexdigest() != PRIVATE_APPROVED_BRAND_SHA256
+                or len(source) > 150000
+                or source[:8] != b"\x89PNG\r\n\x1a\n"
+                or source[12:16] != b"IHDR"
+                or int.from_bytes(source[16:20], "big") != 820
+                or int.from_bytes(source[20:24], "big") != 160):
+            raise ValueError("private original logo fingerprint mismatch")
+        return "data:image/png;base64," + b64encode(source).decode("ascii"), PRIVATE_APPROVED_BRAND_SHA256
     source = BRAND_ASSET.read_bytes()
     if (not 100 <= len(source) <= 30000
             or b"<svg " not in source[:200]
@@ -331,7 +352,12 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
                                   "single_h1", "reduced_motion", "focus_visible",
                                   "noindex", "no_live_form", "48px_min_cta"],
             "original_brand_logo_sha256": _original_brand_image()[1],
-            "original_brand_logo_source": "apps/empire-public-site/public/brand/empire-logo.svg",
+            "original_brand_logo_source": (
+                "private_original_orbital_a_raster_approval_candidate"
+                if os.environ.get("EMPIRE_MICROSITE_PRIVATE_APPROVED_LOGO")
+                else "apps/empire-public-site/public/brand/empire-logo.svg"
+            ),
+            "brand_public_distribution_approved_by_owner": False,
             "browser_visual_review_complete": False,
         },
         "blockers": blockers,
