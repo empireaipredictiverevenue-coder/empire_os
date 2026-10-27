@@ -110,3 +110,23 @@ def test_next_wave_first_party_sources_remain_unapproved_and_distinct():
     assert result["outbound_sent"] is False
     assert result["database_write_performed"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_voax_official_marketplace_research_source_is_not_buyer_capacity():
+    data = build_public_research_seeds(
+        {}, search_fn=lambda queries, num: {}, max_queries=2,
+        include_volume=False, observed_at=NOW,
+    )
+    matches = [r for r in data["seeds"] if r["domain"] == "voaxmedia.com"]
+    assert len(matches) == 1
+    row = matches[0]
+    assert row["website"] == "https://voaxmedia.com/marketplace"
+    assert row["target_markets"] == ["USA"]
+    assert "roofing" in row["target_verticals"]
+    assert row["source_refs"] == ["public:multimarket_review:USA:voaxmedia.com"]
+    for key in ("identity_verified", "buyer_capacity_verified",
+                "commercial_terms_verified", "buyer_price_verified",
+                "outreach_authorized"):
+        assert row[key] is False
+    assert data["outbound_sent"] is False
+    assert data["execution_authority"] == "none"

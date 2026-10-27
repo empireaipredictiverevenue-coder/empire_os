@@ -144,6 +144,9 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # a specific UK publisher contract, target ZIP, route and price are proven.
     ("https://callthread.com/site/publisher/homepage", "USA", ("roofing", "home_services")),
     ("https://intergmedia.com/pay-per-call/", "USA", ("roofing", "home_services")),
+    # 27 Oct: Voax first-party marketplace mentions roofing/HVAC publisher
+    # partnerships. Source is research-only even after genuine first enquiry.
+    ("https://voaxmedia.com/marketplace", "USA", ("roofing", "hvac", "home_services")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (
