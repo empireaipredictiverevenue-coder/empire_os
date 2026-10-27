@@ -491,6 +491,27 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
             "execution_authority": "none",
         }
 
+    loss = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_loss_readiness_latest.json"
+    )
+    if (loss.get("schema_version") != "empire.competitor_call_loss_readiness.v1"
+            or loss.get("mode") != "OBSERVE"
+            or loss.get("bounded_rows_absence_is_proof_of_no_calls") is not False
+            or loss.get("ringba_provider_payout_as_settled_revenue") is not False
+            or loss.get("accepted_payable_call_count_verified") is not None
+            or loss.get("buyer_human_answer_count_verified") is not None
+            or loss.get("actual_cash_margin_cents") is not None
+            or loss.get("all_disposition_reasons_unknown") is not True
+            or loss.get("live_call_activation_authorized") is not False
+            or loss.get("routing_changes_authorized") is not False
+            or loss.get("source_ad_spend_authorized") is not False
+            or loss.get("protected_commercial_receipts_opened") is not False
+            or loss.get("execution_authority") != "none"):
+        loss_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        loss_summary = {"available": True, **loss}
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
@@ -501,6 +522,7 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "conversion_evidence_readiness": attribution_summary,
         "cro_owner_handoff": cro_summary,
         "operator_video_research": video_summary,
+        "call_loss_readiness": loss_summary,
     }
 
 
