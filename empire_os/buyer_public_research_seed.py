@@ -122,6 +122,17 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # specific rates, binding terms and active paid categories are UNKNOWN;
     # prior email correspondence does not create buyer-capacity authority.
     ("https://partners.leads.work/affiliate-program/", "UK", ("solar", "roofing", "home_services")),
+    # 2026-10-27 first-party public publisher pages found during an original
+    # home-services buyer sweep. Existing contact history was checked against
+    # both founder Gmail accounts; no matching messages were returned for
+    # these domains on that date. That is NOT proof no other history exists.
+    # These are research hints ONLY; no approval, live call demand, buyer
+    # capacity, contract, rate, funding or send authority is inferred.
+    ("https://tryleadledger.com/affiliates", "USA", ("roofing", "home_services")),
+    ("https://luxenworks.com/", "USA", ("roofing", "hvac", "home_services")),
+    ("https://dependablecalls.com/publishers", "USA", ("roofing", "hvac", "home_services", "insurance")),
+    ("https://oncall-24.com/join-our-network/", "USA", ("roofing", "home_services")),
+    ("https://join.leadswitchmedia.com/publisher", "USA", ("insurance",)),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (

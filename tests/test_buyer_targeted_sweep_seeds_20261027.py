@@ -1,0 +1,64 @@
+"""Five first-party candidate sites enter the original Scout once, research-only."""
+from datetime import datetime, timezone
+
+from empire_os.buyer_public_research_seed import build_public_research_seeds
+
+NOW = datetime(2026, 10, 27, 15, 0, tzinfo=timezone.utc)
+
+EXPECTED = {
+    "tryleadledger.com": "roofing",
+    "luxenworks.com": "roofing",
+    "dependablecalls.com": "roofing",
+    "oncall-24.com": "roofing",
+    "join.leadswitchmedia.com": "insurance",
+}
+
+
+def test_reviewed_publisher_roster_preserves_original_scout_governance():
+    calls = []
+    def no_public_search(queries, num):
+        calls.append((tuple(queries), num))
+        return {}
+    result = build_public_research_seeds(
+        {}, search_fn=no_public_search, max_queries=8, results_per_query=4,
+        include_volume=False, observed_at=NOW,
+    )
+    by_domain = {x["domain"]: x for x in result["seeds"]}
+    assert len(calls) == 1  # zero additional calls from adding five source URLs
+    assert result["query_count"] == 2  # existing bounded publisher-only rotation
+    assert result["mode"] == "OBSERVE"
+    assert result["outbound_sent"] is False
+    assert result["database_write_performed"] is False
+    assert result["commercial_authority"] == "none"
+    assert result["execution_authority"] == "none"
+    for domain, vertical in EXPECTED.items():
+        assert domain in by_domain
+        row = by_domain[domain]
+        assert row["target_markets"] == ["USA"]
+        assert vertical in row["target_verticals"]
+        assert row["source_refs"] == [f"public:multimarket_review:USA:{domain}"]
+        assert row["source_queries"] == []
+        assert row["truth_class"] == "OBSERVED_PUBLIC_RESEARCH"
+        assert row["identity_verified"] is False
+        assert row["commercial_terms_verified"] is False
+        assert row["buyer_capacity_verified"] is False
+        assert row["buyer_price_verified"] is False
+        assert row["outreach_authorized"] is False
+        assert row["execution_authority"] == "none"
+    # Existing well-known already-contacted networks were not reintroduced
+    # through this addition (their historical contact states stay authoritative).
+    assert len(result["seeds"]) == len(by_domain)
+
+
+def test_search_repeat_does_not_duplicate_reviewed_identity():
+    def returning_same_domain(queries, num):
+        return {q:["luxenworks.com","tryleadledger.com"] for q in queries}
+    result = build_public_research_seeds(
+        {}, search_fn=returning_same_domain,
+        max_queries=2, include_volume=False, observed_at=NOW)
+    for domain in ("luxenworks.com","tryleadledger.com"):
+        rows=[r for r in result["seeds"] if r["domain"]==domain]
+        assert len(rows)==1
+        assert rows[0]["outreach_authorized"] is False
+        assert rows[0]["buyer_capacity_verified"] is False
+        assert rows[0]["source_queries"]  # merged provenance, not duplicate
