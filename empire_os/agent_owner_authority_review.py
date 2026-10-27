@@ -9,10 +9,16 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
+import os
 import re
 import stat
 from pathlib import Path
 from typing import Any, Mapping
+from uuid import uuid4
+
+from empire_os.execution_lease import (
+    ExecutionLease, ExecutionLeaseManager, _normalise_resource, resources_conflict,
+)
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -147,6 +153,7 @@ def verify_owner_mutation(
     if _id(ticket.get("principal")) != principal:
         raise OwnerAuthorityHold("SPOOFED_WORKER_OWNER")
     assignment_id = _id(ticket.get("assignment_id"))
+    _id(ticket.get("ticket_id"))  # Signed one-use identity from the trusted issuer.
 
     assignments = policy.get("assignments")
     if not isinstance(assignments, list) or not 1 <= len(assignments) <= 100:
@@ -273,12 +280,64 @@ def acquire_owner_authorized_lease(
     time_remaining = (expires_at - now.astimezone(timezone.utc)).total_seconds()
     if ttl_seconds > time_remaining:
         raise OwnerAuthorityHold("OWNER_LEASE_OUTLIVES_SIGNED_TICKET")
-    return lease_manager.acquire(
-        owner=review["principal"],
-        job_id=review["request_job_id"],
-        resources=lease_resources,
-        ttl_seconds=ttl_seconds,
-    )
+    if type(lease_manager) is not ExecutionLeaseManager:
+        raise OwnerAuthorityHold("TRUSTED_ORIGINAL_LEASE_MANAGER_REQUIRED")
+    path = _ticket_receipt_path(lease_manager)
+    ticket_id = _id(signed_ticket.get("ticket_id"))
+    ticket_digest = hashlib.sha256(("empire-owner-ticket-v1:" + ticket_id).encode("ascii")).hexdigest()
+    # The ORIGINAL manager's lock serializes the replay check and lease state;
+    # no second manager, process, database, scheduler or competing lock.
+    with lease_manager._locked():
+        actual_now = datetime.now(timezone.utc)
+        if abs((actual_now - now.astimezone(timezone.utc)).total_seconds()) > 90:
+            raise OwnerAuthorityHold("TRUSTED_JOB_CLOCK_STALE")
+        if not _timestamp(signed_ticket.get("issued_at")) <= actual_now < expires_at:
+            raise OwnerAuthorityHold("OWNER_TICKET_NOT_LIVE_AT_LEASE_ACQUISITION")
+        if ttl_seconds > (expires_at - actual_now).total_seconds():
+            raise OwnerAuthorityHold("OWNER_LEASE_OUTLIVES_SIGNED_TICKET")
+        consumed = _read_consumptions(path)
+        if ticket_digest in consumed:
+            raise OwnerAuthorityHold("SIGNED_OWNER_TICKET_ALREADY_CONSUMED")
+        if len(consumed) >= MAX_CONSUMED_TICKETS:
+            raise OwnerAuthorityHold("TICKET_RECEIPT_CAPACITY_REVIEW_REQUIRED")
+        # Original manager historically skips malformed rows. The protected
+        # owner adapter refuses corrupt live state instead of treating it as
+        # free capacity for a second worker.
+        state = lease_manager.state_path
+        if state.exists() or state.is_symlink():
+            try:
+                metadata = state.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_CUSTODY_UNSAFE")
+                raw_leases = json.loads(state.read_text(encoding="utf8"))
+                if not isinstance(raw_leases, list):
+                    raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_CORRUPT")
+            except (OSError, TypeError, ValueError) as exc:
+                raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_UNREADABLE") from exc
+        else:
+            raw_leases = []
+        parsed = lease_manager._read()
+        if len(parsed) != len(raw_leases):
+            raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_PARTIALLY_INVALID")
+        normalized = tuple(dict.fromkeys(_normalise_resource(r) for r in lease_resources))
+        if len(normalized) != len(lease_resources):
+            raise OwnerAuthorityHold("DUPLICATE_MUTATION_LEASE_RESOURCE")
+        active = lease_manager._prune(parsed, now=actual_now)
+        if any(resources_conflict(normalized, lease.resources) for lease in active):
+            raise OwnerAuthorityHold("ORIGINAL_EXECUTION_LEASE_CONFLICT")
+        lease = ExecutionLease(
+            lease_id="exec_lease_" + uuid4().hex,
+            owner=review["principal"], job_id=review["request_job_id"],
+            resources=normalized,
+            acquired_at=actual_now.isoformat(),
+            expires_at=(actual_now + timedelta(seconds=ttl_seconds)).isoformat(),
+        )
+        # Persist the one-use receipt BEFORE committing the lease. A crash
+        # between writes may burn a ticket, but cannot allow replay. The
+        # original owner must reconcile burnt tickets via a fresh signed ID.
+        _persist_consumptions(path, [*consumed, ticket_digest])
+        lease_manager._write([*active, lease])
+        return lease
 
 
 def attest_actual_worktree_changes(
@@ -329,3 +388,108 @@ def attest_actual_worktree_changes(
         "production_publication_authorized": False,
         "no_untrusted_worktree_paths": True,
     }
+
+
+# This subordinate replay receipt uses the ORIGINAL lease manager's exclusive
+# flock. It is a review-only candidate; the original execution-plane owner
+# must independently accept its private API coupling, file custody and
+# rollback rules before any production installation.
+TICKET_RECEIPT_SCHEMA = "empire.execution.owner_ticket_consumption.v1"
+TICKET_RECEIPT_NAME = ".owner_ticket_consumption.json"
+MAX_CONSUMED_TICKETS = 4096
+
+
+def _ticket_receipt_path(lease_manager: Any) -> Path:
+    root = getattr(lease_manager, "root", None)
+    if not isinstance(root, Path) or root.is_symlink() or not root.is_dir():
+        raise OwnerAuthorityHold("UNTRUSTED_ORIGINAL_LEASE_ROOT")
+    if stat.S_IMODE(root.stat().st_mode) != 0o700:
+        raise OwnerAuthorityHold("UNSAFE_ORIGINAL_LEASE_ROOT_PERMISSIONS")
+    return root / TICKET_RECEIPT_NAME
+
+
+def _read_consumptions(path: Path) -> list[str]:
+    """Missing, corrupt or unsafe custody is a HOLD, never a clean slate."""
+    try:
+        metadata = path.lstat()
+        if (not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+                or metadata.st_nlink != 1
+                or metadata.st_uid != os.geteuid()
+                or not 50 <= metadata.st_size <= 400_000):
+            raise OwnerAuthorityHold("UNSAFE_TICKET_RECEIPT_CUSTODY")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or set(raw) != {"schema_version", "consumed"}:
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_SCHEMA")
+        if raw["schema_version"] != TICKET_RECEIPT_SCHEMA:
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_SCHEMA")
+        tokens = raw["consumed"]
+        if (not isinstance(tokens, list) or len(tokens) > MAX_CONSUMED_TICKETS
+                or any(not isinstance(x, str) or not re.fullmatch(r"[0-9a-f]{64}", x)
+                       for x in tokens)
+                or len(set(tokens)) != len(tokens)):
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_CONTENTS")
+        return tokens
+    except OwnerAuthorityHold:
+        raise
+    except (OSError, ValueError, TypeError, UnicodeError) as exc:
+        raise OwnerAuthorityHold("TICKET_RECEIPT_MISSING_OR_UNREADABLE") from exc
+
+
+def _persist_consumptions(path: Path, consumed: list[str]) -> None:
+    """Only while the original lease manager's exclusive lock is held."""
+    if len(consumed) > MAX_CONSUMED_TICKETS:
+        raise OwnerAuthorityHold("TICKET_RECEIPT_CAPACITY_REVIEW_REQUIRED")
+    content = json.dumps(
+        {"schema_version": TICKET_RECEIPT_SCHEMA, "consumed": consumed},
+        sort_keys=True, separators=(",", ":")
+    ).encode("utf-8") + b"\n"
+    name = path.with_name(".owner_ticket_receipt_stage_" + uuid4().hex)
+    fd = os.open(name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if name.exists():
+            name.unlink()
+
+
+def provision_owner_ticket_receipts_for_review(lease_manager: Any) -> Path:
+    """Explicit *offline/test* provisioning only, not a live auto-initializer.
+
+    The original owner must securely provision a protected receipt once and
+    attest its custody. Deleting it never silently resets used ticket IDs.
+    """
+    path = _ticket_receipt_path(lease_manager)
+    with lease_manager._locked():
+        if path.exists() or path.is_symlink():
+            raise OwnerAuthorityHold("EXISTING_TICKET_RECEIPT_CANNOT_BE_RESET")
+        # O_EXCL ensures two initializers cannot replace a live receipt.
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(json.dumps(
+                    {"schema_version": TICKET_RECEIPT_SCHEMA, "consumed": []},
+                    separators=(",", ":")
+                ).encode("utf-8") + b"\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+    return path

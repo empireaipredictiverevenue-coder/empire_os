@@ -11,7 +11,7 @@ from empire_os.agent_owner_authority_review import (
     OwnerAuthorityHold, POLICY_SCHEMA, TICKET_SCHEMA, verify_owner_mutation
 )
 
-NOW = datetime(2026, 10, 27, 19, 30, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
 
 
 def signed(private, payload):
@@ -47,6 +47,7 @@ def fixture():
     ticket=signed(private,{
         "schema_version":TICKET_SCHEMA,
         "job_id":"job_123",
+        "ticket_id":"synthetic_ticket_123",
         "principal":"synthetic_website_worker",
         "assignment_id":"synthetic_website_lane",
         "founder_decision_ref":"SYNTHETIC_TEST_ONLY",
@@ -214,17 +215,23 @@ def test_unauthorized_worker_cannot_obtain_the_original_execution_lease(tmp_path
 
 
 def test_signed_and_verified_owner_may_use_existing_lease_not_new_lock(tmp_path):
-    from empire_os.execution_lease import ExecutionLeaseManager, ExecutionLeaseError
-    from empire_os.agent_owner_authority_review import acquire_owner_authorized_lease
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
     _,params,_=fixture()
     lease=ExecutionLeaseManager(tmp_path/"leases")
-    first=acquire_owner_authorized_lease(lease_manager=lease, **params)
+    provision_owner_ticket_receipts_for_review(lease)
+    first=acquire_owner_authorized_lease(lease_manager=lease, ttl_seconds=900, **params)
     assert first.owner=="synthetic_website_worker"
     assert len(lease.active())==1
-    with pytest.raises(ExecutionLeaseError, match="lease_conflict"):
-        acquire_owner_authorized_lease(lease_manager=lease, **params)
+    with pytest.raises(OwnerAuthorityHold, match="SIGNED_OWNER_TICKET_ALREADY_CONSUMED"):
+        acquire_owner_authorized_lease(lease_manager=lease, ttl_seconds=900, **params)
     assert lease.release(first.lease_id)
     assert lease.active()==[]
+    # The ticket remains consumed after the original lease was released.
+    with pytest.raises(OwnerAuthorityHold, match="SIGNED_OWNER_TICKET_ALREADY_CONSUMED"):
+        acquire_owner_authorized_lease(lease_manager=lease, ttl_seconds=900, **params)
 
 
 def test_unsigned_founder_review_register_has_no_mutation_authority():
@@ -247,13 +254,16 @@ def test_unsigned_founder_review_register_has_no_mutation_authority():
 
 def test_lease_cannot_extend_past_the_signed_ticket(tmp_path):
     from empire_os.execution_lease import ExecutionLeaseManager
-    from empire_os.agent_owner_authority_review import acquire_owner_authorized_lease
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
     private, params, _ = fixture()
     ticket = deepcopy(params["signed_ticket"])
     ticket.pop("signature")
     ticket["expires_at"] = (NOW + timedelta(seconds=90)).isoformat()
     params["signed_ticket"] = signed(private, ticket)
     leases = ExecutionLeaseManager(tmp_path / "leases")
+    provision_owner_ticket_receipts_for_review(leases)
     with pytest.raises(OwnerAuthorityHold, match="OWNER_LEASE_OUTLIVES_SIGNED_TICKET"):
         acquire_owner_authorized_lease(lease_manager=leases, ttl_seconds=1200, **params)
     assert leases.active() == []
@@ -370,3 +380,148 @@ def test_control_character_paths_are_not_mutation_targets(tmp_path, unsafe_path)
             signed_changed_paths=(unsafe_path,),
             independently_observed_changed_paths=(unsafe_path,),
         )
+
+
+def test_replay_receipt_survives_new_lease_manager_instance(tmp_path):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    _, params, _ = fixture()
+    root = tmp_path / "original_execution_plane"
+    first_manager = ExecutionLeaseManager(root)
+    provision_owner_ticket_receipts_for_review(first_manager)
+    first = acquire_owner_authorized_lease(
+        lease_manager=first_manager, ttl_seconds=900, **params
+    )
+    assert first_manager.release(first.lease_id)
+    new_process_manager = ExecutionLeaseManager(root)
+    with pytest.raises(OwnerAuthorityHold, match="SIGNED_OWNER_TICKET_ALREADY_CONSUMED"):
+        acquire_owner_authorized_lease(
+            lease_manager=new_process_manager, ttl_seconds=900, **params
+        )
+
+
+def test_replay_receipt_missing_or_deleted_never_resets_used_tickets(tmp_path):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    _, params, _ = fixture()
+    manager = ExecutionLeaseManager(tmp_path / "leases")
+    with pytest.raises(OwnerAuthorityHold, match="TICKET_RECEIPT_MISSING_OR_UNREADABLE"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+    receipt = provision_owner_ticket_receipts_for_review(manager)
+    with pytest.raises(OwnerAuthorityHold, match="EXISTING_TICKET_RECEIPT_CANNOT_BE_RESET"):
+        provision_owner_ticket_receipts_for_review(manager)
+    ticket = acquire_owner_authorized_lease(
+        lease_manager=manager, ttl_seconds=900, **params
+    )
+    assert manager.release(ticket.lease_id)
+    receipt.unlink()
+    with pytest.raises(OwnerAuthorityHold, match="TICKET_RECEIPT_MISSING_OR_UNREADABLE"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+
+
+def test_corrupt_or_symlinked_private_ticket_receipt_is_a_hold(tmp_path):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    _, params, _ = fixture()
+    manager = ExecutionLeaseManager(tmp_path / "leases")
+    receipt = provision_owner_ticket_receipts_for_review(manager)
+    receipt.write_text("{" + "broken_json" * 10)
+    with pytest.raises(OwnerAuthorityHold, match="TICKET_RECEIPT_MISSING_OR_UNREADABLE"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+    receipt.unlink()
+    fake = tmp_path / "fake.json"
+    fake.write_text("[]")
+    receipt.symlink_to(fake)
+    with pytest.raises(OwnerAuthorityHold, match="UNSAFE_TICKET_RECEIPT_CUSTODY"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+
+
+def test_second_distinct_ticket_waits_on_original_conflict_without_being_consumed(tmp_path):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    private, params, _ = fixture()
+    manager = ExecutionLeaseManager(tmp_path / "leases")
+    provision_owner_ticket_receipts_for_review(manager)
+    first = acquire_owner_authorized_lease(
+        lease_manager=manager, ttl_seconds=900, **params
+    )
+    ticket = deepcopy(params["signed_ticket"])
+    ticket.pop("signature")
+    ticket["ticket_id"] = "synthetic_new_ticket_456"
+    params["signed_ticket"] = signed(private, ticket)
+    with pytest.raises(OwnerAuthorityHold, match="ORIGINAL_EXECUTION_LEASE_CONFLICT"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+    assert manager.release(first.lease_id)
+    second = acquire_owner_authorized_lease(
+        lease_manager=manager, ttl_seconds=900, **params
+    )
+    assert second.lease_id != first.lease_id
+
+
+def test_failed_original_lease_commit_burns_ticket_instead_of_allowing_replay(tmp_path, monkeypatch):
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    _, params, _ = fixture()
+    manager = ExecutionLeaseManager(tmp_path / "leases")
+    provision_owner_ticket_receipts_for_review(manager)
+    original_write = manager._write
+    def simulate_crash(_leases):
+        raise OSError("injected_lease_persistence_failure")
+    monkeypatch.setattr(manager, "_write", simulate_crash)
+    with pytest.raises(OSError, match="injected_lease_persistence_failure"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+    monkeypatch.setattr(manager, "_write", original_write)
+    with pytest.raises(OwnerAuthorityHold, match="SIGNED_OWNER_TICKET_ALREADY_CONSUMED"):
+        acquire_owner_authorized_lease(
+            lease_manager=manager, ttl_seconds=900, **params
+        )
+
+
+def test_parallel_replay_cannot_acquire_two_leases(tmp_path):
+    from concurrent.futures import ThreadPoolExecutor
+    from empire_os.execution_lease import ExecutionLeaseManager
+    from empire_os.agent_owner_authority_review import (
+        acquire_owner_authorized_lease, provision_owner_ticket_receipts_for_review,
+    )
+    _, params, _ = fixture()
+    root = tmp_path / "leases"
+    provision_owner_ticket_receipts_for_review(ExecutionLeaseManager(root))
+    def try_one(_):
+        manager = ExecutionLeaseManager(root)
+        try:
+            lease = acquire_owner_authorized_lease(
+                lease_manager=manager, ttl_seconds=900, **params
+            )
+            return ("GRANTED", lease.lease_id)
+        except OwnerAuthorityHold as exc:
+            return ("HELD", str(exc))
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(try_one, range(8)))
+    assert sum(status == "GRANTED" for status, _ in results) == 1
+    assert sum(status == "HELD" for status, _ in results) == 7
+    assert all(
+        reason == "SIGNED_OWNER_TICKET_ALREADY_CONSUMED"
+        for status, reason in results if status == "HELD"
+    )

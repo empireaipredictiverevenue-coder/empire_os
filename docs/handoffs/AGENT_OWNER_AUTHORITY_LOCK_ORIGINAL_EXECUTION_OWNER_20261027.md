@@ -164,3 +164,43 @@ semantics, ticket lifecycle cleanup, and out-of-band shell/plugin access
 must be completed by the **original execution-plane owner** before any
 live lock is described as enforced. Tests are synthetic and do not
 establish production security or independent owner approval.
+
+
+## Draft PR one-use ticket replay control (27 October, review-only)
+
+The next isolated candidate reuses the **existing** `ExecutionLeaseManager._locked`
+file lock to serialize a valid signed ticket, the current lease-conflict
+check and consumption of the one-use ticket identifier. It does **not**
+introduce a second scheduler, agent, lock service, database or production
+worker. It stores only SHA-256 digests of signed ticket IDs in a private
+`0600` sibling receipt under the *original* lease-manager root.
+
+The receipt is **not** silently created or reset by normal job execution.
+For tests, `provision_owner_ticket_receipts_for_review` explicitly
+initializes it inside a temporary synthetic lease root. Production
+initialization requires the original execution-plane owner's protected
+custody, identity separation, backup strategy and first-run/rollback
+approval. A missing, malformed, symlinked, invalidly owned or corrupt
+receipt fails closed. Retention is bounded to 4,096 consumed IDs and
+**capacity exhaustion is a HOLD**, not a licence to delete or rotate history.
+The original owner must plan secure archival/rotation before the cap.
+
+The record is persisted and fsynced before the existing lease state is
+committed while the original lock remains held. An injected failure after
+consumption may therefore **burn** a valid ticket without granting work.
+The permitted recovery is issuance of a *new* authenticated ticket, not
+deleting the receipt or recycling an old ID. Independent worker
+identities, trusted ticket issuance, replay-custody permissions, complete
+release-time checks and out-of-band GitHub/shell/plugin write restrictions
+still require original-owner integration and attestation.
+
+The private adapter invokes some internal `ExecutionLeaseManager`
+functions to share its lock and original conflict semantics. This is
+a **review-only compatibility assumption**, not permission to change or
+deploy the original lease manager. The owner must assess maintenance
+coupling and assess crashes, concurrent processes, corruption,
+principal isolation and rollback on its actual infrastructure.
+
+**No signed owner policies, real ticket keys, authenticated worker
+assignments, service permissions, production receipt, production agent,
+new timer or live execution state were created by this testing.**
