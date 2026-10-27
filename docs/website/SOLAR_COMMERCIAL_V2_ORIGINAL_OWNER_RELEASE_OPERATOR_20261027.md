@@ -53,3 +53,14 @@ Public HTTPS browser smoke and real consent/catalog checks must follow original-
 Seven local tests cover exact scope, pinned immutable candidate, nonroot blocked live action, unprivileged protected backup blocked, untrusted owner backup directory blocked, success on a full disposable site copy and forced post-install rollback to all 700 original hashes. No live file, CRM, DB, payment or outbound changes were made.
 
 **Use the existing ASTRA website owner. Do not merge this into a separate concurrent website release, and do not use the old SaaS-only publisher.**
+
+
+## 27 October — founder exact visual/copy/displayed-pricing approval
+
+The founder explicitly responded "yes i approve" to the exact request for approval of the final Solar and Commercial V2 designs, copy, and displayed pricing. The original repo saved the complete SHA-bound chat authority evidence at:
+
+    docs/website/release_candidates/SOLAR_COMMERCIAL_V2_FOUNDER_FINAL_VISUAL_APPROVAL_20261027.json
+
+Receipt SHA-256: 21ef90007ab15a08a91a0b48109fb0640032010249d7ed900971d026d6b23ee1.
+
+This owner release code rejects a modified or missing founder approval receipt, checks that its screenshot hashes, manifest and source match the immutable reviewed candidate, and separately requires the ASTRA root-only approval receipt to cite the founder receipt SHA in the approved_founder_visual_receipt_sha256 field. If these bindings differ, no publication occurs. This founder approval is not a claim that ASTRA itself independently accepted or performed a release.

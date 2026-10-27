@@ -91,3 +91,22 @@ def test_owner_receipt_absent_and_publication_requires_independent_attestation()
     assert release.PUBLISH_FLAG.startswith("--apply-exact-owner-approved-")
     assert release.OWNER_APPROVAL!=release.ROOT_RECEIPT
     assert release.OWNER_APPROVAL.parent==release.BACKUP_DIR
+
+
+
+def test_exact_founder_approval_is_cryptographically_pinned():
+    assert release.sha(release.FOUNDER_RECEIPT) == release.EXPECTED_FOUNDER_RECEIPT_SHA
+    a = release.read_json(release.FOUNDER_RECEIPT)
+    m = release.read_json(release.MANIFEST)
+    assert a["candidate_manifest_sha256"] == release.EXPECTED_MANIFEST_SHA
+    assert a["source_commit"] == release.SOURCE_COMMIT
+    assert a["screenshot_sha256"] == m["browser_review_screenshots_sha256"]
+    assert a["founder_approval_for_exact_visual_copy_pricing"] is True
+    assert a["publication_authorized_now"] is False
+    assert release.preflight()["founder_exact_visual_copy_pricing_approved"] is True
+
+
+def test_mismatched_founder_approval_sha_fails_closed(monkeypatch):
+    monkeypatch.setattr(release, "EXPECTED_FOUNDER_RECEIPT_SHA", "0" * 64)
+    with pytest.raises(release.OwnerReleaseHold, match="EXACT_FOUNDER_VISUAL_APPROVAL_RECEIPT_CHANGED"):
+        release.candidate()

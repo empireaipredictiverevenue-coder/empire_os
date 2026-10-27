@@ -41,6 +41,8 @@ EXPECTED_BACKUP_SHA = "4e7bb1ea2c8fbb81d99ff59e8debdff3b28f20826e1738278af452494
 EXPECTED_MANIFEST_SHA = "14b65c040e398d74ac637f0845d2fd62046e7e0db9bb2eefdc348dabf1919f39"
 EXPECTED_INVENTORY_SHA = "60fe7228a5583ce37c4754c2390d35a5c8f6609b527ecb1e4ad03986546ab8e5"
 SOURCE_COMMIT = "d7229c635"
+FOUNDER_RECEIPT = ROOT / "docs/website/release_candidates/SOLAR_COMMERCIAL_V2_FOUNDER_FINAL_VISUAL_APPROVAL_20261027.json"
+EXPECTED_FOUNDER_RECEIPT_SHA = "21ef90007ab15a08a91a0b48109fb0640032010249d7ed900971d026d6b23ee1"
 PUBLISH_FLAG = "--apply-exact-owner-approved-solar-commercial-v2"
 ROUTES = ("/commercial", "/industries/solar")
 NEIGHBOURS = ("/", "/buy", "/industries", "/industries/hvac", "/predictive-revenue", "/trust")
@@ -92,6 +94,18 @@ def candidate(*, live: Path = LIVE, packet: Path = PACKET) -> dict[str, Any]:
         or source.get("candidate_manifest_sha256") != EXPECTED_MANIFEST_SHA
         or source.get("expected_count") != 700):
         raise OwnerReleaseHold("CANDIDATE_IDENTITY_OR_AUTHORITY_MISMATCH")
+    if sha(FOUNDER_RECEIPT) != EXPECTED_FOUNDER_RECEIPT_SHA:
+        raise OwnerReleaseHold("EXACT_FOUNDER_VISUAL_APPROVAL_RECEIPT_CHANGED")
+    founder = read_json(FOUNDER_RECEIPT)
+    if (founder.get("schema_version") != "empire.website.solar_commercial_v2_founder_final_visual_approval.v1"
+        or founder.get("source_commit") != SOURCE_COMMIT
+        or founder.get("candidate_manifest_sha256") != EXPECTED_MANIFEST_SHA
+        or founder.get("browser_qa_receipt_sha256") != m.get("browser_qa_receipt_sha256")
+        or founder.get("screenshot_sha256") != m.get("browser_review_screenshots_sha256")
+        or founder.get("founder_approval_for_exact_visual_copy_pricing") is not True
+        or founder.get("original_website_owner_independent_approval_verified") is not False
+        or founder.get("publication_authorized_now") is not False):
+        raise OwnerReleaseHold("FOUNDER_APPROVAL_BOUND_TO_DIFFERENT_RELEASE")
     baseline = site_inventory(live)
     if len(baseline) != 700 or baseline != source.get("baseline_sha256"):
         raise OwnerReleaseHold("COMPLETE_700_FILE_BASELINE_CHANGED")
@@ -195,6 +209,7 @@ def verify_owner_and_archive(release: dict[str, Any],
         "original_owner": "EXISTING_ASTRA_WEBSITE_RELEASE_OWNER",
         "independent_visual_and_commercial_copy_review_complete": True,
         "final_founder_visual_acceptance_confirmed": True,
+        "approved_founder_visual_receipt_sha256": EXPECTED_FOUNDER_RECEIPT_SHA,
         "approved_manifest_sha256": EXPECTED_MANIFEST_SHA,
         "approved_root_backup_sha256": EXPECTED_BACKUP_SHA,
         "approved_source_commit": SOURCE_COMMIT,
@@ -234,6 +249,8 @@ def preflight(*, live: Path = LIVE) -> dict:
         "old_pages_replaced":len(r["replacements"]),
         "new_assets":len(r["additions"]),
         "founder_root_backup_sha256_pinned":EXPECTED_BACKUP_SHA,
+        "founder_exact_visual_copy_pricing_approved":True,
+        "founder_approval_receipt_sha256":EXPECTED_FOUNDER_RECEIPT_SHA,
         "owner_approval_verified":False,
         "root_backup_verified_in_this_nonroot_session":False,
         "publication_performed":False,
@@ -275,6 +292,7 @@ def _publish_locked() -> dict:
             "status": "EXACT_SOLAR_COMMERCIAL_V2_PUBLISHED_ORIGIN_GET_AND_BYTES_VERIFIED",
             "source_commit": SOURCE_COMMIT,
             "manifest_sha256": EXPECTED_MANIFEST_SHA,
+            "founder_approval_receipt_sha256": EXPECTED_FOUNDER_RECEIPT_SHA,
             "root_backup_sha256": approved["archive_sha256"],
             "original_owner_receipt_sha256": approved["owner_receipt_sha256"],
             "before_file_count": len(release["baseline"]),
