@@ -138,6 +138,12 @@ _MULTIMARKET_REVIEW_SEEDS = (
     # no accepted UK sole trader, source/ZIP buy-box, contract, or earned call.
     # Original Scout only; research metadata grants zero send/traffic authority.
     ("https://ccdocs.com/sell-calls/roofing/", "USA", ("roofing", "home_services")),
+    # 27 October 2026: first-party programme pages verified; two genuine
+    # initial commercial enquiries sent from original Workspace founder mail.
+    # Neither public offer is an accepting buyer or payable programme until
+    # a specific UK publisher contract, target ZIP, route and price are proven.
+    ("https://callthread.com/site/publisher/homepage", "USA", ("roofing", "home_services")),
+    ("https://intergmedia.com/pay-per-call/", "USA", ("roofing", "home_services")),
 )
 MARKETS = frozenset({"UK", "USA", "AU", "CA"})
 _MARKET_PUBLISHER_QUERIES = (

@@ -85,3 +85,28 @@ def test_ccdocs_roofing_first_party_offer_is_only_a_research_seed():
     assert result["database_write_performed"] is False
     assert result["outbound_sent"] is False
     assert result["execution_authority"] == "none"
+
+
+def test_next_wave_first_party_sources_remain_unapproved_and_distinct():
+    result = build_public_research_seeds(
+        {}, search_fn=lambda queries, num: {},
+        max_queries=2, include_volume=False, observed_at=NOW,
+    )
+    rows = {r["domain"]: r for r in result["seeds"]}
+    for domain, url in {
+        "callthread.com": "https://callthread.com/site/publisher/homepage",
+        "intergmedia.com": "https://intergmedia.com/pay-per-call/",
+    }.items():
+        row = rows[domain]
+        assert row["website"] == url
+        assert row["target_markets"] == ["USA"]
+        assert "roofing" in row["target_verticals"]
+        assert row["source_queries"] == []
+        assert row["source_refs"] == [f"public:multimarket_review:USA:{domain}"]
+        for key in ("identity_verified", "commercial_terms_verified",
+                    "buyer_capacity_verified", "buyer_price_verified",
+                    "outreach_authorized"):
+            assert row[key] is False
+    assert result["outbound_sent"] is False
+    assert result["database_write_performed"] is False
+    assert result["execution_authority"] == "none"
