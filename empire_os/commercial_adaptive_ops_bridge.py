@@ -17,6 +17,7 @@ from empire_os.commercial_sales_director_adaptive_review import SOURCE_KINDS
 from empire_os.commercial_adaptive_checkpoint_guard import recover_safe_adaptive_checkpoints
 from empire_os.commercial_buyer_source_health import (
     inspect_original_buyer_health, review_buyer_evidence_transition,
+    inspect_original_warm_partner_closing,
 )
 from empire_os.commercial_verified_learning_review import original_order_reader_capability
 from empire_os.canonical_order_reader_release_integrity import (
@@ -83,7 +84,23 @@ def observe_ops_adaptive_commercial(
     previous_control = prior.get("adaptive_commercial_review")
     prior_summary = prior.get("adaptive_commercial_summary")
     buyer_evidence = inspect_original_buyer_health(root, now=now)
+    warm_closing = inspect_original_warm_partner_closing(root, now=now)
     order_reader = original_order_reader_capability()
+    # The original reader capability is not an authenticated tenant/order proof.
+    # Only the existing verified-outcome feedback gate can provide that label.
+    learning_handoff = {
+        "status": "CANONICAL_TENANT_ORDER_SETTLEMENT_PROOF_REQUIRED",
+        "original_verified_outcome_gate": "empire_os.outcome_feedback.validate_verified_feedback",
+        "original_learning_review": "empire_os.commercial_verified_learning_review.review_verified_learning_candidate",
+        "reader_method_present_not_owner_release_or_tenant_proof":
+            order_reader.get("original_reader_method_available_in_running_code") is True,
+        "canonical_tenant_and_order_selected": False,
+        "verified_terminal_outcome_observed": False,
+        "recognized_revenue_cents": None,
+        "calibration_metric_computed": False,
+        "training_authorized": False,
+        "execution_authority": "none",
+    }
     order_release_integrity = inspect_canonical_reader_release_integrity(root)
     prior_integrity = (
         prior_summary.get("original_order_reader_release_integrity")
@@ -122,6 +139,8 @@ def observe_ops_adaptive_commercial(
             "reviewed_at": now.astimezone(timezone.utc).isoformat(),
             "active_dependency_gates": len(control["active_dependency_gates"]),
             "original_buyer_evidence_health": buyer_evidence,
+            "original_warm_partner_closing": warm_closing,
+            "original_commercial_outcome_learning_handoff": learning_handoff,
             "original_buyer_evidence_transition": buyer_transition,
             "original_order_outcome_reader_capability": order_reader,
             "original_order_reader_release_integrity": order_release_integrity,
@@ -192,6 +211,8 @@ def observe_ops_adaptive_commercial(
                 "status": "ADAPTIVE_COMMERCIAL_EVIDENCE_UNAVAILABLE",
                 "available": False,
                 "original_buyer_evidence_health": buyer_evidence,
+                "original_warm_partner_closing": warm_closing,
+                "original_commercial_outcome_learning_handoff": learning_handoff,
                 "original_buyer_evidence_transition": buyer_transition,
                 "original_order_outcome_reader_capability": order_reader,
                 "original_order_reader_release_integrity": order_release_integrity,

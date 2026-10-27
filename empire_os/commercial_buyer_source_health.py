@@ -226,3 +226,114 @@ def review_buyer_evidence_transition(
         "task_dispatched": False,
         "execution_authority": "none",
     }
+
+
+def inspect_original_warm_partner_closing(
+    root: Path, *, now: datetime,
+) -> dict[str, Any]:
+    """Read original founder relationship/buy-box ownership, never send or admit.
+
+    Relationship replies establish what buyer said, not commercial settlement.
+    Use only the pre-existing registry's protected review queue, no names,
+    addresses, email bodies or prospect records from other systems.
+    """
+    from empire_os.buyer_qualification_evidence_bridge import load_registry
+
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("timezone-aware commercial review required")
+    raw, source_state = load_registry(root, now=now.astimezone(timezone.utc))
+    held = {
+        "schema_version": "empire.commercial.existing_warm_partner_closing.v1",
+        "mode": "OBSERVE",
+        "source_state": source_state,
+        "status": "ORIGINAL_FOUNDER_REGISTRY_REVIEW_HOLD",
+        "warm_relationship_count": None,
+        "warm_reviews": [],
+        "confirmed_buyer_payable_agreement_count": None,
+        "verified_order_outcome_count": None,
+        "verified_recognized_revenue_cents": None,
+        "qualification_requires_existing_commercial_owner": True,
+        "actual_revenue_claimed": False,
+        "outbound_authorized": False,
+        "agent_tasks_created": False,
+        "execution_authority": "none",
+    }
+    if not raw:
+        return held
+    relationships = raw.get("relationships", [])
+    warm = raw.get("warm_business_action_queue", [])
+    pilots = raw.get("partner_pilot_readiness_queue", [])
+    if (not isinstance(relationships, list) or len(relationships) > 500
+            or not isinstance(warm, list) or len(warm) > 25
+            or not isinstance(pilots, list) or len(pilots) > 50
+            or raw.get("founder_actions_are_draft_only") is not True
+            or raw.get("outbound_authorized") is not False
+            or raw.get("outbound_sent") is not False):
+        return held
+    by_entity: dict[str, list[dict]] = {}
+    for item in relationships:
+        if isinstance(item, dict) and isinstance(item.get("entity_key"), str):
+            by_entity.setdefault(item["entity_key"], []).append(item)
+    by_pilot: dict[str, list[dict]] = {}
+    for item in pilots:
+        if isinstance(item, dict) and isinstance(item.get("entity_key"), str):
+            by_pilot.setdefault(item["entity_key"], []).append(item)
+    work = []
+    seen: set[str] = set()
+    for item in warm:
+        if not isinstance(item, dict):
+            return held
+        key = item.get("entity_key")
+        if not isinstance(key, str) or not 1 <= len(key) <= 110 or key in seen:
+            return held
+        seen.add(key)
+        rel = by_entity.get(key, [])
+        pilot = by_pilot.get(key, [])
+        if len(rel) != 1 or len(pilot) > 1:
+            return held
+        relation = rel[0]
+        partner = pilot[0] if pilot else {}
+        stage = relation.get("stage")
+        next_task = partner.get("current_next_partner_task") or relation.get("next_founder_action")
+        allowed_tasks = {
+            "WAIT_CURRENT_BUYBOX_AND_SOURCE_APPROVAL",
+            "CONFIRM_VALIDATED_AFFILIATE_TERMS_AND_BUYBOX",
+            "DEFER_INQUIRLY_UNTIL_VERIFIED_TRAFFIC_NO_REPEAT_REQUEST",
+            "CLARIFY_CONNEXIS_LIVE_CALLS_VS_API_CPL_TERMS",
+            "REVIEW_EXISTING_ROUTING_RECORDING_REPLY_NO_REPEAT",
+            "REVIEW_ANSWERED_FIELDS_ONLY_NO_REPEAT_QUESTIONNAIRE",
+            "WAIT_BUYER_ONBOARDING_AND_MARKETS",
+        }
+        if next_task not in allowed_tasks:
+            next_task = "REVIEW_ORIGINAL_OWNER_EVIDENCE_NO_REPEAT"
+        work.append({
+            "entity_key": key,
+            "partner_name": str(relation.get("company") or "")[:100],
+            "relationship_stage": stage if stage in {
+                "AWAITING_BUYER", "INBOUND_REVIEW_REQUIRED", "EVIDENCE_HOLD",
+                "CONTACTED_AWAITING_RESPONSE", "DELIVERY_HOLD", "RESEARCH_ONLY"
+            } else "UNKNOWN",
+            "original_partner_pilot_stage": str(partner.get("activation_stage") or "NOT_IN_PILOT")[:80],
+            "original_next_founder_task": next_task,
+            "two_way_thread_original_owner_reported": partner.get("two_way_gmail_thread_observed") is True,
+            "original_owner_verified_pilot_gate_count": (
+                int(partner.get("gate_count_verified"))
+                if type(partner.get("gate_count_verified")) is int
+                and 0 <= partner["gate_count_verified"] <= 9 else None
+            ),
+            "buyer_acceptance_independently_verified_by_review": False,
+            "written_payable_terms_independently_verified_by_review": False,
+            "settled_order_verified_by_review": False,
+            "next_owner": "existing_founder_commercial_and_partner_relationship_owner",
+            "no_repeat_outreach_automatic": True,
+            "send_authorized": False,
+        })
+    return {
+        **held,
+        "status": "EXISTING_WARM_BUYERS_REQUIRE_OWNER_TERMS_PROOF",
+        "warm_relationship_count": len(work),
+        "warm_reviews": work,
+        "buyer_ready_count_not_claimed": None,
+        "no_new_buyer_candidate_promoted": True,
+        "no_cross_cohort_matching": True,
+    }
