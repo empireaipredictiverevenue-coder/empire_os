@@ -263,7 +263,15 @@ def refresh_research_handoff(
     godseye_review = refresh_godseye_research_context(
         repo_root, payload, now=_utc(payload["generated_at"]),
     )
+    # Owner-readable research suggestions, refreshed on the SAME Media OS timer.
+    # This writes no file owned by SEO, makes no GSC/keyword claims, and does
+    # not execute the owner's decisions or change public content.
+    from empire_os.media_last30days_seo_review import refresh_seo_owner_review
+    seo_review = refresh_seo_owner_review(
+        repo_root, payload, now=_utc(payload["generated_at"]),
+    )
     return {
+        "seo_owner_private_review": seo_review,
         "godseye_private_review": godseye_review,
         "schema_version": SCHEMA,
         "path": str(OUTPUT),
