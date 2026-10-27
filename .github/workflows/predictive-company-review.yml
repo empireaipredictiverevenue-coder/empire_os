@@ -7,6 +7,7 @@ on:
       - 'empire_os/saas_scale.py'
       - 'empire_os/founder_dashboard_service.py'
       - 'tests/test_founder_dashboard_service_routes.py'
+      - 'tests/test_predictive_company_browser_vertical_slice.py'
       - 'tests/test_predictive_revenue_*.py'
       - 'tests/test_revenue_crm_signed_auth.py'
       - 'tests/test_saas_scale.py'
@@ -18,7 +19,7 @@ permissions:
 jobs:
   signed-company-review:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Fetch exact test commit without initializing unrelated submodules
         env:
@@ -54,3 +55,39 @@ jobs:
           tests/test_saas_scale.py
           tests/test_predictive_revenue_demo.py
           tests/test_founder_dashboard_service_routes.py
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Fetch exact reviewed frontend for combined browser acceptance
+        env:
+          REVIEW_TOKEN: ${{ github.token }}
+          REVIEW_REPOSITORY: ${{ github.repository }}
+          FRONTEND_SHA: '4dcc01841074d14657459945481e47073b674a69'
+        run: |
+          set -eu
+          mkdir "$RUNNER_TEMP/predictive-review-web"
+          cd "$RUNNER_TEMP/predictive-review-web"
+          git init .
+          git remote add origin "https://github.com/${REVIEW_REPOSITORY}.git"
+          auth=$(printf 'x-access-token:%s' "$REVIEW_TOKEN" | base64 -w0)
+          echo "::add-mask::$auth"
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags --depth=1 origin "$FRONTEND_SHA"
+          unset auth REVIEW_TOKEN
+          git checkout --detach FETCH_HEAD
+          test "$(git rev-parse HEAD)" = "$FRONTEND_SHA"
+          if git config --local --get-regexp 'extraheader|credential'; then exit 1; fi
+      - name: Build pinned original React application
+        run: |
+          set -eu
+          cd "$RUNNER_TEMP/predictive-review-web/apps/search-command-centre"
+          npm ci --no-audit --no-fund
+          NEXT_TELEMETRY_DISABLED=1 npx --no-install next build --webpack
+          npm install --prefix "$RUNNER_TEMP/predictive-browser" --no-audit --no-fund puppeteer@25.11.0
+      - name: Original signed login through V5 and React (isolated fixtures only)
+        env:
+          PYTHONPATH: '.:tests'
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          EMPIRE_TEST_FRONTEND_ROOT="$RUNNER_TEMP/predictive-review-web/apps/search-command-centre" \
+          EMPIRE_TEST_PUPPETEER_PATH="$RUNNER_TEMP/predictive-browser/node_modules/puppeteer" \
+          python -B -m pytest -q -p no:cacheprovider tests/test_predictive_company_browser_vertical_slice.py
