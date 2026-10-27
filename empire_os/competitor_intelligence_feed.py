@@ -365,6 +365,8 @@ def _commercial_change_radar_overlay(repo_root: Path) -> dict[str, Any]:
         "research_fact_counts_this_run": radar.get("research_fact_counts_this_run", {}),
         "source_fetch_mode": radar.get("source_fetch_mode"),
         "review_candidate_count": min(len(queue), 20),
+        "new_review_candidate_count": radar.get("new_review_candidate_count", 0),
+        "pending_review_count": min(len(queue), 20),
         "review_queue": queue,
         "signals_require_human_review": True,
         "buyer_intent_inferred": False, "revenue_inferred": False,

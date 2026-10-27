@@ -34,11 +34,19 @@ PYTHONPATH=. .venv/bin/python -B scripts/review_competitor_change_radar.py \
 ```
 
 ## Boundaries and next exact work
-- Existing first-party watcher-to-radar hook is implemented and tested in the original refresh function. It runs when the existing competitive intelligence refresh invokes that function; **no new timer is added**, and no independent ongoing refresh cadence was established. Observe actual operational invocations before claiming 24/7 coverage.
+- The original source watcher is now invoked by the installed 15-minute opportunity-brief job as well as by the original competitive refresh entrypoint. No new timer or crawler was introduced.
 - Existing TAM and Buyer Acquisition owner must own later entity reconciliation, verified buybox/decision-maker evidence, permitted email verification waterfall and suppression; raw pricing changes are NOT qualified leads.
 - Existing customer-voice owner can add licensed/permitted complaint and social observations, with source citations and deduplication; no private group scraping or rule evasion.
 - Predictive Cloud owner should evaluate whether historical observed changes preceded genuine qualified conversations and paid outcomes, including false-positive counts and costs. Do not fabricate measurements.
 - Cross-country repricing should be handled only after lawful source, currency, tax and geo evidence exists. Do not claim proxy-derived regional prices from generic UK responses.
 - Preserve no paid traffic, no unsolicited sends, no money, no production payment activation.
 
-**Acceptance:** bounded semantic interpretation integrated into the existing original source-watcher refresh, read-only canonical snapshot and feed overlay validated, live observations recorded, original DB/CRM/search owners preserved. Running timer cadence is not newly activated; CRM promotion and Predictive Cloud outcome feedback remain **NOT CONNECTED** until their owning systems validate them.
+**Acceptance:** source-attributed change extraction, persistent human-review queue, existing timer integration, canonical founder-feed visibility and live public observations verified. No CRM activation, customer messaging, paid traffic, funds, extra service or database writes.
+
+## October 27 implementation continuation
+
+- Pending competitor-change reviews now remain in the original radar snapshot across unchanged scans and unavailable pages. Repeated changes to the same source are consolidated, not counted as new leads. New alerts and the remaining review backlog have separate counts.
+- The internal acknowledge_review function closes a specified review ID only after an explicit reviewer identifier, explanation and timestamp. The decision is audited and does not approve buyer outreach or revenue. Authenticated founder UI controls are still separate owner work.
+- The installed empire-opportunity-brief.timer is active on its existing 15-minute schedule. Its current service executes scripts/refresh_opportunity_brief_chain.py; this script now calls the original bounded competitor source watcher after the regular opportunity-brief steps, without creating a new timer or fetcher. Failures in competitor research cannot interrupt opportunity-brief generation.
+- Company-source baselines, facts and human reviews feed the existing commercial_change_radar summary. This is research evidence, NOT prospect creation, permission to send, buyer agreement or verified money.
+- CRM promotion, a visible interactive acknowledgement button and Predictive Cloud financial backtesting are separate unfinished integrations owned by their existing teams.

@@ -255,6 +255,8 @@ def _publish_radar_from_original_pages(
         "status": "OBSERVE_REVIEW_ONLY",
         "observed_this_run": result["observed_this_run"],
         "review_candidate_count": result["review_candidate_count"],
+        "new_review_candidate_count": result["new_review_candidate_count"],
+        "pending_review_count": result["pending_review_count"],
         "outreach_enabled": False,
         "execution_authority": "none",
     }

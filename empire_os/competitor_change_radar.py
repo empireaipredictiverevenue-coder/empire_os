@@ -185,6 +185,72 @@ def compare_observations(previous: Mapping[str, Any] | None,
     return result
 
 
+
+
+def _review_id(entity_id: str, source_ref: str, first_detected_at: str) -> str:
+    return hashlib.sha256(
+        f"{entity_id}|{source_ref}|{first_detected_at}".encode()
+    ).hexdigest()[:24]
+
+
+def _research_priority(changes: list[Mapping[str, Any]]) -> str:
+    return ("PRICING_OR_OFFER_REVIEW" if any(
+        item.get("category") in {"pricing", "offers"} for item in changes
+    ) else "FEATURE_OR_ANNOUNCEMENT_REVIEW")
+
+
+def acknowledge_review(
+    snapshot: Mapping[str, Any], *, review_id: str,
+    reviewer: str, reason: str, now: datetime,
+) -> dict[str, Any]:
+    """Explicit human resolution; does not create buyer actions or outbound."""
+    if (snapshot.get("schema_version") != SCHEMA
+            or snapshot.get("mode") != "OBSERVE"
+            or snapshot.get("execution_authority") != "none"
+            or snapshot.get("outreach_enabled") is not False
+            or snapshot.get("payment_authorized") is not False
+            or snapshot.get("buyer_intent_inferred") is not False):
+        raise ValueError("untrusted radar")
+    if (not isinstance(now, datetime) or now.tzinfo is None
+            or not re.fullmatch(r"[a-f0-9]{24}", review_id or "")):
+        raise ValueError("valid review ID and timezone required")
+    if not re.fullmatch(r"[a-zA-Z0-9_.-]{2,60}", reviewer or ""):
+        raise ValueError("bounded reviewer ID required")
+    reason = str(reason or "").strip()
+    if not 8 <= len(reason) <= 500:
+        raise ValueError("review resolution explanation required")
+    pending = snapshot.get("review_queue", [])
+    if not isinstance(pending, list):
+        raise ValueError("invalid review queue")
+    matching = [item for item in pending if item.get("review_id") == review_id]
+    if len(matching) != 1:
+        raise ValueError("review item does not exist or is already resolved")
+    now_iso = now.astimezone(timezone.utc).isoformat()
+    item = matching[0]
+    resolved = snapshot.get("resolved_reviews", [])
+    if not isinstance(resolved, list) or len(resolved) > 100:
+        raise ValueError("invalid resolution history")
+    result = dict(snapshot)
+    result["review_queue"] = [
+        row for row in pending if row.get("review_id") != review_id
+    ]
+    result["review_candidate_count"] = len(result["review_queue"])
+    result["pending_review_count"] = len(result["review_queue"])
+    result["resolved_reviews"] = [
+        *resolved, {
+            "review_id": review_id,
+            "entity_id": item["entity_id"],
+            "source_ref": item["source_ref"],
+            "resolved_at": now_iso,
+            "reviewer": reviewer,
+            "reason": reason,
+            "decision": "REVIEW_CLOSED_NOT_BUYER_CONFIRMED",
+        },
+    ][-100:]
+    result["last_resolution_at"] = now_iso
+    return result
+
+
 def build_radar(rows: list[Mapping[str, Any]], *,
                 previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Compare bounded snapshots; output review candidates, never leads or revenue."""
@@ -214,18 +280,68 @@ def build_radar(rows: list[Mapping[str, Any]], *,
     for identity, record in prev_index.items():
         if identity not in seen:
             observations.append(record)
-    queue = [
-        {"entity_id": cmp["entity_id"], "source_ref": cmp["source_ref"],
-         "observed_at": cmp["observed_at"], "changes": cmp["changes"][:20],
-         "change_count": len(cmp["changes"]), "status": "HUMAN_REVIEW_ONLY",
-         "research_priority": (
-             "PRICING_OR_OFFER_REVIEW"
-             if any(change["category"] in {"pricing", "offers"}
-                    for change in cmp["changes"])
-             else "FEATURE_OR_ANNOUNCEMENT_REVIEW"
-         )}
-        for cmp in comparisons if cmp["requires_human_review"]
-    ]
+    # A fleeting observation is not a useful operator queue. Preserve earlier
+    # unresolved changes through subsequent unchanged / unavailable scans.
+    old_queue = prior.get("review_queue", [])
+    if not isinstance(old_queue, list) or len(old_queue) > MAX_SOURCE_COUNT:
+        raise ValueError("invalid existing review queue")
+    pending: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in old_queue:
+        if not isinstance(item, Mapping):
+            raise ValueError("invalid review item")
+        key = (str(item.get("entity_id") or ""), str(item.get("source_ref") or ""))
+        if (not key[0] or not _safe_source(key[1])
+                or item.get("status") not in {"HUMAN_REVIEW_ONLY", "PENDING_REVIEW"}
+                or key in pending):
+            raise ValueError("untrusted or repeated review item")
+        prior_changes = item.get("changes", [])
+        if not isinstance(prior_changes, list) or len(prior_changes) > 20:
+            raise ValueError("invalid prior change evidence")
+        pending[key] = {
+            **item, "status": "PENDING_REVIEW",
+            "changes": list(prior_changes),
+            "review_id": str(item.get("review_id") or _review_id(*key, str(item.get("observed_at")))),
+            "first_detected_at": item.get("first_detected_at") or item.get("observed_at"),
+            "research_priority": item.get("research_priority") or _research_priority(prior_changes),
+        }
+    new_review_count = 0
+    for cmp in comparisons:
+        if not cmp["requires_human_review"]:
+            continue
+        key = (cmp["entity_id"], cmp["source_ref"])
+        existing = pending.get(key)
+        if existing is None:
+            new_review_count += 1
+            existing = {
+                "entity_id": key[0], "source_ref": key[1],
+                "first_detected_at": cmp["observed_at"],
+                "review_id": _review_id(*key, cmp["observed_at"]),
+                "changes": [],
+            }
+        evidence = {}
+        for item in [*existing["changes"], *cmp["changes"]]:
+            if not isinstance(item, Mapping) or item.get("category") not in CATEGORIES:
+                continue
+            identity = (item.get("category"), item.get("change"), item.get("digest"))
+            evidence[identity] = dict(item)
+        combined = list(evidence.values())[-20:]
+        existing.update({
+            "observed_at": cmp["observed_at"],
+            "latest_change_at": cmp["observed_at"],
+            "changes": combined,
+            "change_count": len(combined),
+            "status": "PENDING_REVIEW",
+            "research_priority": _research_priority(combined),
+        })
+        pending[key] = existing
+    queue = sorted(pending.values(), key=lambda x: (
+        x["research_priority"] != "PRICING_OR_OFFER_REVIEW",
+        str(x["first_detected_at"]),
+        x["entity_id"],
+    ))
+    resolved_reviews = prior.get("resolved_reviews", [])
+    if not isinstance(resolved_reviews, list) or len(resolved_reviews) > 100:
+        raise ValueError("invalid review resolution history")
     return {
         "schema_version": SCHEMA, "mode": "OBSERVE",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -234,6 +350,9 @@ def build_radar(rows: list[Mapping[str, Any]], *,
         "new_baselines_this_run": sum(x["status"] == "BASELINE_ONLY" for x in comparisons),
         "unchanged_this_run": sum(x["status"] == "UNCHANGED" for x in comparisons),
         "review_candidate_count": len(queue),
+        "new_review_candidate_count": new_review_count,
+        "pending_review_count": len(queue),
+        "resolved_reviews": resolved_reviews,
         "research_fact_counts_this_run": {
             category: sum(len(obs["facts"][category])
                           for obs in observations if (obs["entity_id"], obs["source_ref"]) in seen)

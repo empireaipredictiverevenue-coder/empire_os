@@ -21,10 +21,50 @@ from empire_os.competitor_audience_runtime import (
 from empire_os.intelligence_materializer_transport import (
     PostgresIntelligenceMaterializer,
 )
+from empire_os.competitor_call_source_watch import refresh as refresh_call_source_watch
 from empire_os.opportunity_brief import (
     materialize_opportunity_briefs,
     write_opportunity_briefs,
 )
+
+
+def refresh_bounded_competitor_watch(
+    repo_root: Path,
+    *,
+    watch_fn: Callable[[Path], dict[str, Any]] = refresh_call_source_watch,
+) -> dict[str, Any]:
+    """Share the existing 15-minute opportunity-brief cadence.
+
+    No new timer, daemon, source roster, DB materializer, or outbound action.
+    Never make a failed market observation fail the original opportunity briefs.
+    """
+    atlas = repo_root / "runtime/competitive_intelligence/call_acquisition_atlas_latest.json"
+    if not atlas.is_file() or atlas.is_symlink():
+        return {
+            "status": "ORIGINAL_OPERATOR_ATLAS_UNAVAILABLE",
+            "checked": 0, "execution_authority": "none",
+        }
+    try:
+        result = watch_fn(repo_root)
+    except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+        return {
+            "status": "RESEARCH_REFRESH_FAILED",
+            "error_type": type(exc).__name__,
+            "checked": 0, "execution_authority": "none",
+        }
+    radar = result.get("commercial_radar", {})
+    return {
+        "status": "BOUNDED_ORIGINAL_WATCHER_REFRESHED",
+        "checked": int(result.get("checked_this_cycle") or 0),
+        "source_unavailable_count": len(
+            result.get("source_unavailable_this_cycle") or []
+        ),
+        "radar_status": radar.get("status", "NOT_PUBLISHED"),
+        "radar_pending_review_count": int(radar.get("pending_review_count") or 0),
+        "radar_new_review_candidate_count": int(radar.get("new_review_candidate_count") or 0),
+        "execution_authority": "none",
+        "outreach_enabled": False,
+    }
 
 
 def refresh_opportunity_brief_chain(
@@ -54,7 +94,10 @@ def refresh_opportunity_brief_chain(
     opportunity_briefs = materialize_opportunity_briefs(account_briefs)
     paths = write_opportunity_briefs(root, opportunity_briefs)
 
+    competitor_watch = refresh_bounded_competitor_watch(root)
+
     return {
+        "competitor_change_radar": competitor_watch,
         "schema_version": "empire.opportunity-brief-refresh-chain.v1",
         "mode": "OBSERVE_TO_REVIEW_ONLY",
         "canonical_signal_row_count": int(

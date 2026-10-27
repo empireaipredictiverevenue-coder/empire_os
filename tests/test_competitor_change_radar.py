@@ -71,7 +71,7 @@ def test_second_snapshot_detects_specific_price_and_offer_changes():
     assert {"pricing", "offers"} <= {x["category"] for x in changes}
     assert any("£49" in x["text"] for x in changes)
     assert any("£39" in x["text"] for x in changes)
-    assert second["review_queue"][0]["status"] == "HUMAN_REVIEW_ONLY"
+    assert second["review_queue"][0]["status"] == "PENDING_REVIEW"
     assert second["outreach_enabled"] is False
     assert second["payment_authorized"] is False
 
