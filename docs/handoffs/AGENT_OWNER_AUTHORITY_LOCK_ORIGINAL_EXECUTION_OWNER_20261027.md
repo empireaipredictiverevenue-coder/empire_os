@@ -229,3 +229,50 @@ private signing key, active enforcement gateway, GitHub branch protection,
 review approval or production rollout is created by this record. The
 founder's strategic approval is not a blanket permission for agents to
 self-assign or modify another workstream.
+
+
+## Original shared execution-lease enforcement boundary (review branch only)
+
+The original `empire_os/execution_lease.py` is now part of this *draft*
+review diff. Ordinary `ExecutionLeaseManager.acquire` verifies a
+**root-owned, mode 0644** marker at
+`/etc/empire_os/owner_lock.enforced`. The containing directory must be
+root-owned and non-group/world-writable; the marker must be a regular
+single-linked file of exact bytes `ENFORCE\n`. An unsafe, malformed or
+unreadable present marker fails closed. The check is repeated after
+acquiring the existing exclusive lease lock to reduce activation races.
+
+When the marker is absent in the existing trusted directory, **original
+lease behaviour is preserved**, including unchanged observer operations.
+An environment variable cannot turn the lock on or off. When the
+root-controlled marker is present, all plain `.acquire` calls—including
+Hermes, Pi, Empire Coder sandbox and the structured-patch worker—must
+return `SIGNED_WORKSTREAM_TICKET_REQUIRED`, regardless of a
+worker-supplied `owner` label.
+
+This is **not** yet full live enforcement. The proposed signed-ticket
+adapter reuses the original flock but has **not** been wired into the
+four workers with independently authenticated principal and issuer
+credentials; directly enabling the marker now would disable legitimate
+mutating jobs instead of allowing approved ones. The original release
+owner MUST NOT install the marker until all mutating paths have an
+authenticated signed-ticket entry point, ticket issuance/custody,
+postflight attestation and operational rollback.
+
+Original direct `ExecutionLeaseManager.acquire` remains compatible in
+its off state; tests verify that the protected marker rejects plain
+mutators and untrusted configuration, and regression suites exercise
+existing worker behaviour. This gate does NOT prevent an external agent
+with direct write privileges from ignoring the lease manager, nor does
+it secure private `ExecutionLeaseManager._write` against processes
+sharing its Unix principal. Root/shell/GitHub/connector and separate
+service permission boundaries must be established before activation.
+
+**Activation receipt required:** original founder-controlled operator
+reviews deployed code digest, authenticated per-service IDs, revocation
+and journal custody, fully signed and pinned owner assignments, root
+marker mode and hash, concurrent work/leasing quiescence, fault-injected
+recovery, reversible marker removal, all four legitimate-job success
+cases, unassigned-job denials and read-back on live services.
+**No marker, service override, production package or runtime credential
+was installed by this review candidate.**

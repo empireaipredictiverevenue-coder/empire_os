@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 import fcntl
 import json
 import os
+import stat
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterator
 from uuid import uuid4
@@ -27,6 +28,53 @@ PROTECTED_EXACT = {
 
 class ExecutionLeaseError(RuntimeError):
     pass
+
+# Root-controlled activation is deliberately absent in production until
+# independent service-identity/issuer/protected-access acceptance is complete.
+# A per-worker environment variable is NOT sufficient activation authority.
+OWNER_LOCK_MARKER = Path("/etc/empire_os/owner_lock.enforced")
+
+
+def owner_mutation_lock_active() -> bool:
+    """Fail closed for any present or unreadable activation marker.
+
+    This shared lease boundary catches direct original worker calls too.
+    A missing root-owned marker preserves the existing original lease path.
+    Only the original root-custodied release owner may activate or remove it.
+    """
+    path = OWNER_LOCK_MARKER
+    try:
+        folder = path.parent.lstat()
+        if (
+            not stat.S_ISDIR(folder.st_mode)
+            or folder.st_uid != 0
+            or folder.st_mode & 0o022
+        ):
+            raise ExecutionLeaseError("owner_lock_config_parent_untrusted")
+        info = path.lstat()
+    except FileNotFoundError as exc:
+        if getattr(exc, "filename", None) == str(path):
+            return False
+        raise ExecutionLeaseError("owner_lock_config_parent_missing") from exc
+    except OSError as exc:
+        raise ExecutionLeaseError("owner_lock_config_unreadable") from exc
+    if (
+        not stat.S_ISREG(info.st_mode)
+        or info.st_uid != 0
+        or stat.S_IMODE(info.st_mode) != 0o644
+        or info.st_nlink != 1
+        or info.st_size != 8
+    ):
+        raise ExecutionLeaseError("owner_lock_config_custody_invalid")
+    try:
+        value = path.read_bytes()
+    except OSError as exc:
+        raise ExecutionLeaseError("owner_lock_config_unreadable") from exc
+    if value != b"ENFORCE\n":
+        raise ExecutionLeaseError("owner_lock_config_invalid")
+    return True
+
+
 
 
 @dataclass(frozen=True)
@@ -204,8 +252,18 @@ class ExecutionLeaseManager:
             raise ExecutionLeaseError("at least one lease resource required")
 
         ttl = max(60, min(int(ttl_seconds), 7200))
+        # Preserve original off-mode behaviour. With protected enforcement
+        # active, direct acquire() can never impersonate a trusted signer;
+        # only the separate signed-ticket adapter (under this SAME flock)
+        # can grant a mutation lease after authenticated review.
+        if owner_mutation_lock_active():
+            raise ExecutionLeaseError("SIGNED_WORKSTREAM_TICKET_REQUIRED")
         now = _now()
         with self._locked():
+            # Close the race with a concurrent root-controlled activation
+            # while a mutation lease waits on another worker's flock.
+            if owner_mutation_lock_active():
+                raise ExecutionLeaseError("SIGNED_WORKSTREAM_TICKET_REQUIRED")
             active = self._prune(self._read(), now=now)
             for lease in active:
                 if resources_conflict(normalised, lease.resources):
