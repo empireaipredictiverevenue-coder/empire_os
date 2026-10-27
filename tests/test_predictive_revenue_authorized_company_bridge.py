@@ -366,7 +366,7 @@ def test_untrusted_signature_never_reads_membership(cryptographic_client):
 @pytest.fixture
 def assembled_client(tmp_path):
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-    from fastapi import FastAPI
+    from empire_os.founder_dashboard_service import build_founder_dashboard_service
     from fastapi.testclient import TestClient
     from test_revenue_crm_signed_auth import A, token
     from empire_os.predictive_revenue_company_timeline_v44 import build_signed_company_review_router
@@ -384,8 +384,8 @@ def assembled_client(tmp_path):
     def membership(user, tenant):
         state["reads"] += 1
         return TenantMembership(tenant, user, "viewer")
-    app = FastAPI()
-    app.include_router(build_signed_company_review_router(
+    app = build_founder_dashboard_service(
+        company_review_router_factory=lambda: build_signed_company_review_router(
         trusted_public_keys={"issuer-1": issuer.public_key()}, load_membership=membership,
         authorize_company_review=lambda *a, **kw: state["allow"],
         source_bindings={(A, COMPANY, source): cfg}, now=lambda: NOW))
@@ -427,3 +427,13 @@ def test_complete_path_rechecks_source_permission_on_repeat(assembled_client):
     state["allow"] = False
     assert client.get("/v1/predictive-revenue/company-review", params=params, headers=headers).status_code == 403
     assert state["reads"] == 2
+
+
+def test_original_founder_service_does_not_authorize_loopback_or_query_tenant(assembled_client):
+    client, _, params, _, state = assembled_client
+    response = client.get("/v1/predictive-revenue/company-review", params={**params, "tenant_id": "forged"})
+    assert response.status_code == 403
+    assert state["reads"] == 0
+    paths = client.app.openapi()["paths"]
+    assert "/v1/predictive-revenue/demo" in paths
+    assert "/v1/predictive-cloud/status" in paths

@@ -5,6 +5,8 @@ on:
       - 'empire_os/predictive_revenue_*.py'
       - 'empire_os/revenue_crm_*.py'
       - 'empire_os/saas_scale.py'
+      - 'empire_os/founder_dashboard_service.py'
+      - 'tests/test_founder_dashboard_service_routes.py'
       - 'tests/test_predictive_revenue_*.py'
       - 'tests/test_revenue_crm_signed_auth.py'
       - 'tests/test_saas_scale.py'
@@ -51,3 +53,4 @@ jobs:
           tests/test_revenue_crm_signed_auth.py
           tests/test_saas_scale.py
           tests/test_predictive_revenue_demo.py
+          tests/test_founder_dashboard_service_routes.py

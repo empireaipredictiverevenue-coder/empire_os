@@ -29,6 +29,7 @@ from empire_os.revenue_pulse_api import create_revenue_pulse_router
 from empire_os.predictive_cloud_status_api import create_predictive_cloud_status_router
 from empire_os.predictive_revenue_demo_api import create_predictive_revenue_demo_router
 from empire_os.spatial_physical_api import create_spatial_physical_router
+from empire_os.predictive_revenue_company_timeline_v44 import create_company_review_read_router
 
 
 RouterFactory = Callable[[], APIRouter]
@@ -57,8 +58,18 @@ READ_ONLY_ROUTER_FACTORIES: tuple[RouterFactory, ...] = (
 )
 
 
-def build_founder_dashboard_service() -> FastAPI:
-    """Construct the canonical loopback-only Founder read API."""
+def build_founder_dashboard_service(
+    *, company_review_router_factory: RouterFactory | None = None,
+) -> FastAPI:
+    """Construct the original API with optional server-owned company auth wiring.
+
+    Supply a factory calling build_signed_company_review_router with the
+    original login verifier, fresh membership reader and approved source
+    bindings. Without that wiring the mounted endpoint returns explicit 503;
+    loopback access never implies tenant or source permission.
+    """
+    if company_review_router_factory is not None and not callable(company_review_router_factory):
+        raise ValueError("company_review_server_router_factory_required")
     service = FastAPI(
         title="Empire Founder Read API",
         docs_url=None,
@@ -68,6 +79,15 @@ def build_founder_dashboard_service() -> FastAPI:
 
     for factory in READ_ONLY_ROUTER_FACTORIES:
         service.include_router(factory())
+
+    company_router = (
+        create_company_review_read_router()
+        if company_review_router_factory is None
+        else company_review_router_factory()
+    )
+    if not isinstance(company_router, APIRouter):
+        raise ValueError("company_review_api_router_required")
+    service.include_router(company_router)
 
     @service.get("/health")
     def health() -> dict[str, object]:

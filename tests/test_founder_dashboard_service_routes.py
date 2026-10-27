@@ -48,3 +48,22 @@ def test_fresh_founder_service_mounts_predictive_revenue_demo_routes():
     paths = _documented_paths(build_founder_dashboard_service())
     assert PREDICTIVE_REVENUE_DEMO_PATH in paths
     assert PREDICTIVE_REVENUE_DEMO_LIVE_PATH in paths
+
+
+def test_company_review_is_mounted_but_unconfigured_access_is_held():
+    from fastapi.testclient import TestClient
+    client = TestClient(build_founder_dashboard_service())
+    path = "/v1/predictive-revenue/company-review"
+    response = client.get(path, params={"company_scope": "example", "source_id": "source"})
+    assert response.status_code == 503
+    assert response.json() == {"detail": "company_review_not_configured"}
+    assert response.headers["cache-control"] == "no-store"
+    assert client.post(path).status_code == 405
+    assert client.get("/health").json()["read_only"] is True
+
+
+def test_bad_company_router_configuration_fails_service_construction():
+    import pytest
+    for factory in (False, lambda: None):
+        with pytest.raises(ValueError):
+            build_founder_dashboard_service(company_review_router_factory=factory)
