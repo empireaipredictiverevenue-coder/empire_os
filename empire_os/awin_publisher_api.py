@@ -1,8 +1,9 @@
 """Read-only Awin publisher relationship API; NEVER publishes links or revenue."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
+from hashlib import sha256
 import os
 from pathlib import Path
 import re
@@ -115,6 +116,116 @@ def _normalise(details: dict, advertiser_id: str) -> dict:
     }
 
 
+
+MAX_STATUS_TRANSITIONS = 80
+VALID_STATUSES = frozenset(STATUS_CODES.values())
+
+
+def _read_previous_membership(path: Path, now: datetime) -> tuple[dict[str, str] | None, list[dict]]:
+    """Treat previous private snapshot as untrusted; refuse ambiguous history."""
+    if not path.exists() and not path.is_symlink():
+        return None, []
+    if (path.is_symlink() or not path.is_file()
+            or stat.S_IMODE(path.stat().st_mode) != 0o600
+            or not 200 <= path.stat().st_size <= 64000):
+        raise AwinAPIHold("AWIN_API_PREVIOUS_SNAPSHOT_UNSAFE")
+    try:
+        old = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, UnicodeError) as exc:
+        raise AwinAPIHold("AWIN_API_PREVIOUS_SNAPSHOT_UNREADABLE") from exc
+    if (not isinstance(old, dict)
+            or old.get("schema_version") != SCHEMA
+            or old.get("status") != "AWIN_API_MEMBERSHIP_REVIEW_VERIFIED"
+            or old.get("publisher_id") != PUBLISHER_ID
+            or old.get("api_live_verified") is not True
+            or old.get("affiliate_publication_authorized") is not False
+            or old.get("tracking_links_generated") is not False
+            or old.get("commission_earned_verified") is not False
+            or old.get("commission_paid_verified") is not False
+            or old.get("outbound_sent") is not False
+            or old.get("database_writes") is not False):
+        raise AwinAPIHold("AWIN_API_PREVIOUS_AUTHORITY_INVALID")
+    at = old.get("observed_at")
+    try:
+        date = datetime.fromisoformat(at) if isinstance(at, str) else None
+    except ValueError:
+        date = None
+    if (date is None or date.utcoffset() is None
+            or date.astimezone(timezone.utc) > now.astimezone(timezone.utc) + timedelta(seconds=90)):
+        raise AwinAPIHold("AWIN_API_PREVIOUS_TIMESTAMP_INVALID")
+    rows = old.get("programmes")
+    if not isinstance(rows, list) or len(rows) != len(PROGRAMMES):
+        raise AwinAPIHold("AWIN_API_PREVIOUS_PROGRAMMES_INVALID")
+    statuses: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise AwinAPIHold("AWIN_API_PREVIOUS_ROW_INVALID")
+        ident = row.get("advertiser_id")
+        state = row.get("membership_status")
+        if (ident not in PROGRAMMES or ident in statuses
+                or not isinstance(state, str) or state not in VALID_STATUSES
+                or row.get("membership_verified_by_authenticated_awin_api") is not True
+                or row.get("publisher_authorised_to_use_tracking_link") is not False):
+            raise AwinAPIHold("AWIN_API_PREVIOUS_MEMBERSHIP_INVALID")
+        statuses[ident] = state
+    if set(statuses) != set(PROGRAMMES):
+        raise AwinAPIHold("AWIN_API_PREVIOUS_IDS_INVALID")
+    transitions = old.get("status_transitions", [])
+    if not isinstance(transitions, list) or len(transitions) > MAX_STATUS_TRANSITIONS:
+        raise AwinAPIHold("AWIN_API_PREVIOUS_HISTORY_INVALID")
+    observed_ids: set[str] = set()
+    for event in transitions:
+        if not isinstance(event, dict):
+            raise AwinAPIHold("AWIN_API_PREVIOUS_EVENT_INVALID")
+        event_id=event.get("event_id")
+        if (not isinstance(event_id, str)
+                or not re.fullmatch(r"[a-f0-9]{24}", event_id)
+                or event_id in observed_ids
+                or event.get("advertiser_id") not in PROGRAMMES
+                or event.get("from_status") not in VALID_STATUSES
+                or event.get("to_status") not in VALID_STATUSES
+                or event["from_status"] == event["to_status"]
+                or event.get("review_required") is not True
+                or event.get("review_status") != "REVIEW_NOT_YET_ADMITTED"):
+            raise AwinAPIHold("AWIN_API_PREVIOUS_EVENT_UNVERIFIED")
+        observed_ids.add(event_id)
+    return statuses, transitions
+
+
+def _transition_events(previous: dict[str, str] | None, old_events: list[dict],
+                       programmes: list[dict], at: datetime) -> tuple[list[dict], list[dict]]:
+    """First authenticated snapshot is a baseline, not an invented change."""
+    all_events = list(old_events)
+    new_events: list[dict] = []
+    if previous is None:
+        return all_events, new_events
+    for row in programmes:
+        ident = row["advertiser_id"]
+        before = previous[ident]
+        after = row["membership_status"]
+        if before == after:
+            continue
+        digest = sha256(
+            f"{PUBLISHER_ID}|{ident}|{before}|{after}|{at.astimezone(timezone.utc).isoformat()}".encode("utf-8")
+        ).hexdigest()[:24]
+        new_events.append({
+            "event_id": digest,
+            "advertiser_id": ident,
+            "from_status": before,
+            "to_status": after,
+            "detected_at": at.astimezone(timezone.utc).isoformat(),
+            "required_action": row["action"],
+            "review_required": True,
+            "review_status": "REVIEW_NOT_YET_ADMITTED",
+            "affiliate_publication_authorized": False,
+            "commission_verified": False,
+        })
+    if len(all_events) + len(new_events) > MAX_STATUS_TRANSITIONS:
+        raise AwinAPIHold("AWIN_API_STATUS_HISTORY_CAPACITY_REVIEW_REQUIRED")
+    all_events.extend(new_events)
+    return all_events, new_events
+
+
 def review(*, token_path: Path = TOKEN_PATH, output: Path = SNAPSHOT_PATH,
            now: datetime | None = None, transport: Callable = _transport,
            write: bool = False) -> dict:
@@ -133,6 +244,7 @@ def review(*, token_path: Path = TOKEN_PATH, output: Path = SNAPSHOT_PATH,
         if not isinstance(current, datetime) or current.utcoffset() is None:
             raise AwinAPIHold("AWIN_API_TIME_INVALID")
         token = _private_token(token_path)
+        previous, historic_events = _read_previous_membership(output, current)
         programmes = []
         for advertiser_id in PROGRAMMES:
             params = parse.urlencode({"advertiserId": advertiser_id,
@@ -141,6 +253,8 @@ def review(*, token_path: Path = TOKEN_PATH, output: Path = SNAPSHOT_PATH,
             requests_made += 1
             data = transport(url, token)
             programmes.append(_normalise(data, advertiser_id))
+        transitions, new_transitions = _transition_events(
+            previous, historic_events, programmes, current)
         result = {
             "schema_version": SCHEMA,
             "status": "AWIN_API_MEMBERSHIP_REVIEW_VERIFIED",
@@ -149,6 +263,10 @@ def review(*, token_path: Path = TOKEN_PATH, output: Path = SNAPSHOT_PATH,
             "source": "AWIN_AUTHENTICATED_PUBLISHER_API_PROGRAMMEDETAILS",
             "api_live_verified": True, "programmes": programmes,
             "requests_made": requests_made,
+            "status_transitions": transitions,
+            "new_status_transition_count": len(new_transitions),
+            "historical_status_transition_count": len(transitions),
+            "transition_review_required": bool(new_transitions),
             "any_joined": any(x["membership_status"] == "JOINED" for x in programmes),
             "advertiser_terms_reviewed": False,
             "tracking_links_generated": False,
