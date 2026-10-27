@@ -70,6 +70,33 @@ These messages are drafts, NOT sent applications. Select **Content — https://e
 
 > Empire AI develops original UK home-energy research and advice aimed at helping readers understand home upgrade and tariff comparison options. We are building content rather than claiming a live audience. If your Energy programme accepts us, we will use only your authorised non-incentive Energy campaign links, required tracking parameters and compliant disclosure. We will not construct alternative links or make rate/savings claims without current approval.
 
+## Awin publisher-profile completion: authentic account readiness
+
+The official authenticated Awin account GET identified Empire-AI, publisher **3136281**, with **userOwner** access. This is not proof that Awin has verified its profile, tax status, payment settings or directory visibility. Treat all four as **UNKNOWN** until read back from the authenticated dashboard.
+
+### Ready-to-paste Account > Profile > Overview > Description
+
+> Empire AI is an independent UK digital publisher and technology business, currently offering predictive revenue and business information. We are developing original, evidence-led consumer guides covering UK home solar PV, heat-pump suitability, energy storage and insulation. Our consumer pages are not yet live, and we make no claims of established home-energy readership or affiliate sales. We intend to promote only appropriate UK products and services through original content, clearly disclosed partner links and approved Awin tracking. Our existing website is https://empire-ai.co.uk. Publisher ID: 3136281.
+
+### Ready-to-paste Account > Profile > Promotional Spaces
+
+**Real website URL:** https://empire-ai.co.uk
+**Promotion type:** Content (only if it accurately describes the account's publishing activity).
+
+> UK first-party website with existing predictive revenue and business content, plus original source-checked UK consumer guides in production for solar, heat pumps, storage and insulation. Future affiliate placements will be clearly labelled and made only after approval. Dedicated home-energy consumer pages and their audience metrics are not yet live or independently verified.
+
+**Do not invent:** monthly visitors, social followers, consumer lead volume, reviews, sales, accepted commission or live page URLs. Add real visitor counts only after authenticated analytics readback. Use only the founder-approved orbital-A brand logo, not an unapproved graphic.
+
+### Exact dashboard acceptance sequence
+
+1. **Account > Profile > Overview:** Enter truthful business description, website, contact and approved branded image. Check the actual completion indicator; Awin says only complete profiles are displayed in the Publisher Directory.
+2. **Account > Profile > Promotional Spaces:** Confirm the real website URL, Content promotional type, truthful description and appropriate home/energy sectors.
+3. **Account > Payment Details:** Complete the tax residency, business type and bank/payment information privately in Awin. Some accounts require two-step verification before accessing Payment Details. Do not paste banking, tax IDs or API token into chat, GitHub, commercial emails or release receipts.
+4. **Advertisers > Join Programs:** Review each advertiser's current terms, permitted channels and tracked conversion event, then submit exact programme **118321 Project Solar** and **51797 EcoFlow UK** using their 150-character application messages in this pack.
+5. **Verify separately:** Use the authenticated original EmpireOS Awin API after submissions; only real PENDING/JOINED changes count. Prior direct partner emails are not platform applications. Actual earned commission and paid settlement need separate evidence.
+
+**Official current Awin guidance:** https://success.awin.com/articles/en_US/Knowledge/How-do-I-complete-my-profile and https://success.awin.com/articles/en_US/Knowledge/How-do-I-add-or-edit-my-promotional-sites and https://success.awin.com/articles/en_US/Knowledge/Publisher-Tax-Details-FAQs.
+
 ## Review and activation order
 
 1. Founder chooses the exact additional programmes for Awin applications. **Awin programme enrollment is NOT a read-only API action**; do not forge a join state or submit terms behind the founder's back.
