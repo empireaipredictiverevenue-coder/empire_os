@@ -59,6 +59,7 @@ def cohort(connected=60, human=50, accepted=30, settled=20, **flags):
         counts=flags.get("counts", counts),
         no_connect_reasons=flags.get("no_connect_reasons", reasons),
         no_payable_reasons=flags.get("no_payable_reasons", unpayable),
+        no_human_reasons=flags.get("no_human_reasons"),
         refs={key: "synthetic:receipt:" + key for key in COUNTS},
         original_owner_authorized=flags.get("original_owner_authorized", True),
         source_lineage_verified=flags.get("source_lineage_verified", True),
@@ -81,7 +82,7 @@ def test_live_pulse_zero_rows_is_not_zero_traffic_or_calls():
     assert result["campaign_expiry_in_pulse_is_past"]
     assert not result["campaign_expiry_is_provider_currently_confirmed"]
     assert result["pilot_mode"] == "PREACTIVATION"
-    assert result["top_owner_action"] == "VERIFY_ORIGINAL_CAMPAIGN_EXPIRY_WITH_OWNER"
+    assert result["top_owner_action"] == "VERIFY_SEPARATE_PROVIDER_CAMPAIGN_AND_EXPIRED_LOCAL_HANDOFF"
     assert not result["live_call_activation_authorized"]
 
 def test_stale_pulse_does_not_derive_zero_calls():
@@ -170,3 +171,34 @@ def test_untrusted_owner_receipt_excluded_from_founder_feed(tmp_path):
     (dst / "call_loss_readiness_latest.json").write_text(json.dumps(valid))
     bad = build_feed_runtime(tmp_path)
     assert bad["call_acquisition_intelligence"]["call_loss_readiness"]["available"] is False
+
+def test_connected_to_ivr_not_necessarily_human_answered():
+    from empire_os.competitor_call_loss_readiness import NO_HUMAN_REASONS
+    reasons = {k: 0 for k in NO_HUMAN_REASONS}
+    reasons["IVR_OR_QUEUE_ABANDON"] = 10
+    r = cohort(no_human_reasons=reasons)
+    assert r["target_connected_but_not_human_answered_reasons"]["IVR_OR_QUEUE_ABANDON"] == 10
+    assert r["buyer_human_answered_calls"] == 50
+    assert r["provider_target_connected_calls"] == 60
+    bad = dict(reasons)
+    bad["IVR_OR_QUEUE_ABANDON"] = 11
+    with pytest.raises(ValueError):
+        cohort(no_human_reasons=bad)
+    unconfirmed = cohort(no_human_reasons=reasons, source_lineage_verified=False)
+    assert unconfirmed["target_connected_but_not_human_answered_reasons"] is None
+
+
+def test_routing_record_from_old_date_cannot_verify_live_buyer():
+    routing = {
+        "schema_version": "empire.lead_smart.ringba_routing_observation.v1",
+        "mode": "OBSERVE",
+        "observed_at": "2026-10-09T23:05:56+00:00",
+        "execution_authority": "NONE",
+        "routing_runtime_verified": False,
+    }
+    r = summarize_readable_pulse(pulse(), pilot(), now=NOW,
+                                 routing_observation=routing)
+    assert r["ringba_routing_observation_source_valid"] is True
+    assert r["ringba_routing_observation_fresh"] is False
+    assert r["ringba_live_campaign_state"] == "UNKNOWN_NOT_VERIFIED"
+    assert r["campaign_expiry_provenance"] == "LOCAL_SITE_HANDOFF_CONTROL_NOT_RINGBA_CAMPAIGN"

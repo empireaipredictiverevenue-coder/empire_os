@@ -1,6 +1,11 @@
 # EmpireOS — Call-loss intelligence and buyer-side review
 27 October 2026 | Original competitor/call acquisition research | OBSERVE
 
+## Additional reconciliation on 27 October 2026
+The 26 October 21:44 UTC timestamp is a **local first-party site-handoff admission cutoff**, copied by the original commercial pulse from the existing pilot control. It is **not** the live Ringba campaign expiration. The current Ringba campaign state remains UNKNOWN without a separate authenticated current provider read. The last accessible routing observation was 9 October 23:05 UTC, too old to establish 27 October buyer connectivity; tracking verification on 26 October proves tracking assignment, not an accepting human buyer or live commercial route.
+
+Existing Founder competitor intelligence now exposes these separately under its original call-loss readiness overlay, with a specific handoff to reconcile local admission state against a separately verified provider campaign. None of this extends a campaign or authorizes a new call. Do not combine Ringba target-attempt counts with unique calls.
+
 ## Live accessible evidence
 Original commercial pulse: runtime/revenue/lead_smart/commercial_pulse/latest.json.
 Observed 27 October 11:36:56 UTC; supervised-pilot campaign expiry recorded as 26 October 21:44 UTC. This timestamp is NOT proof of current Ringba campaign configuration. The pulse has zero matching call rows in its bounded returned Ringba window, NOT proof of zero calls outside that window. Human buyer connection, payable acceptance and actual cash settlement remain unverified. Site-handoff count in pulse is 0, which does not mean zero site sessions. Original effective pilot is PREACTIVATION; traffic and routing OFF. Root-owned call-to-cash source NOT opened.
@@ -26,3 +31,6 @@ Original competitor intelligence can read new evidence snapshot at runtime/compe
 5. Finance/CRU owner: separately verify real cash settlements, reversals, source costs and margin; no inferred ROAS from vendor marketing case studies.
 
 **Policy:** No new agent, timer, PostgreSQL database, outbound, route mutation, paid spend, automatic experiment, SEO change or revenue recognition.
+
+## IVR-to-human gap
+A target-connected event can terminate in IVR, queue, or hold without a human answering. The new code separately classifies IVR_OR_QUEUE_ABANDON, AGENT_DID_NOT_ANSWER, TARGET_DISCONNECT_BEFORE_HUMAN, and UNCLASSIFIED_NO_HUMAN, and requires those reasons to reconcile with target-connected minus independently human-answered unique calls. No category is assumed from existing Ringba dashboard aggregates. Such counts remain UNKNOWN until the original commercial owner verifies the same source and cohort.

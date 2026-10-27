@@ -22,6 +22,8 @@ PULSE_SCHEMA = "empire.lead_smart.commercial_pulse.v1"
 PILOT_SCHEMA = "empire.lead_smart.effective_pilot_state.v1"
 PULSE = Path("runtime/revenue/lead_smart/commercial_pulse/latest.json")
 PILOT = Path("runtime/revenue/lead_smart/effective_pilot_state/latest.json")
+CONTROL = Path("runtime/revenue/lead_smart/pilot/approved_control.json")
+ROUTING = Path("runtime/revenue/lead_smart/ringba/routing_observation/latest.json")
 DEST = Path("runtime/competitive_intelligence/call_loss_readiness_latest.json")
 OFFICIAL_REPORT = "https://support.ringba.com/hc/en-us/articles/26894023126551"
 OFFICIAL_DASHBOARD = "https://support.ringba.com/hc/en-us/articles/24286807682839-Ringba-Dashboard"
@@ -34,6 +36,12 @@ NO_CONNECT_REASONS = (
     "CALLER_LEFT_BEFORE_CONNECTION",
     "BLOCKED_BY_SOURCE_POLICY",
     "UNCLASSIFIED_NO_CONNECT",
+)
+NO_HUMAN_REASONS = (
+    "IVR_OR_QUEUE_ABANDON",
+    "AGENT_DID_NOT_ANSWER",
+    "TARGET_DISCONNECT_BEFORE_HUMAN",
+    "UNCLASSIFIED_NO_HUMAN",
 )
 NO_PAYABLE_REASONS = (
     "WRONG_SERVICE",
@@ -71,6 +79,8 @@ def summarize_readable_pulse(
     pulse: Mapping[str, Any] | None,
     pilot: Mapping[str, Any] | None,
     *, now: datetime | None = None,
+    local_control: Mapping[str, Any] | None = None,
+    routing_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
@@ -107,6 +117,36 @@ def summarize_readable_pulse(
     )
     expires = _clock(p.get("campaign_expires_at")) if pulse_fresh else None
     expired_in_snapshot = expires is not None and expires < now
+    control = local_control if isinstance(local_control, Mapping) else {}
+    control_expiry = _clock(control.get("ends_at"))
+    control_readable = (
+        control.get("mode") == "SUPERVISED_PILOT"
+        and type(control.get("enabled")) is bool
+        and control_expiry is not None
+        and type(control.get("max_site_handoffs")) is int
+        and control.get("max_site_handoffs") > 0
+    )
+    control_matches_pulse = (
+        pulse_fresh and control_readable
+        and control.get("mode") == p.get("campaign_mode")
+        and control.get("enabled") is p.get("site_handoff_switch_enabled")
+        and control_expiry == expires
+    )
+    provider = routing_observation if isinstance(routing_observation, Mapping) else {}
+    routing_observed = _clock(provider.get("observed_at"))
+    routing_source_valid = (
+        provider.get("schema_version")
+            == "empire.lead_smart.ringba_routing_observation.v1"
+        and provider.get("mode") == "OBSERVE"
+        and provider.get("execution_authority") == "NONE"
+        and provider.get("routing_runtime_verified") is False
+        and routing_observed is not None
+    )
+    routing_age = ((now - routing_observed).total_seconds()
+                   if routing_source_valid else None)
+    routing_evidence_fresh = (
+        routing_age is not None and 0 <= routing_age <= 36 * 3600
+    )
     return {
         "schema_version": SCHEMA,
         "mode": "OBSERVE",
@@ -128,6 +168,22 @@ def summarize_readable_pulse(
             expires.isoformat() if expires else None
         ),
         "campaign_expiry_in_pulse_is_past": expired_in_snapshot,
+        "campaign_expiry_provenance": "LOCAL_SITE_HANDOFF_CONTROL_NOT_RINGBA_CAMPAIGN",
+        "local_site_handoff_control_readable": control_readable,
+        "local_site_handoff_control_matches_pulse": control_matches_pulse,
+        "local_site_handoff_enabled": (
+            control.get("enabled") if control_readable else None
+        ),
+        "local_site_handoff_window_ended": (
+            control_expiry < now if control_readable else None
+        ),
+        "ringba_live_campaign_state": "UNKNOWN_NOT_VERIFIED",
+        "ringba_routing_observation_source_valid": routing_source_valid,
+        "ringba_routing_observation_fresh": routing_evidence_fresh,
+        "ringba_routing_last_observed_at": (
+            routing_observed.isoformat() if routing_source_valid else None
+        ),
+        "ringba_runtime_route_verified_by_latest_snapshot": False,
         "campaign_expiry_is_provider_currently_confirmed": False,
         "ringba_matching_rows_bounded_observation": exact,
         "bounded_rows_absence_is_proof_of_no_calls": False,
@@ -169,7 +225,9 @@ def summarize_readable_pulse(
         ],
         "official_ringba_sources": [OFFICIAL_REPORT, OFFICIAL_DASHBOARD],
         "top_owner_action": (
-            "VERIFY_ORIGINAL_CAMPAIGN_EXPIRY_WITH_OWNER"
+            "RECONCILE_LOCAL_CONTROL_VS_COMMERCIAL_PULSE"
+            if control_readable and pulse_fresh and not control_matches_pulse
+            else "VERIFY_SEPARATE_PROVIDER_CAMPAIGN_AND_EXPIRED_LOCAL_HANDOFF"
             if expired_in_snapshot
             else "VERIFY_ORIGINAL_BUYER_AVAILABILITY_AND_CALL_DISPOSITION"
         ),
@@ -193,6 +251,7 @@ def evaluate_approved_call_cohort(
     source_lineage_verified: bool,
     buyer_acceptance_verified: bool,
     unique_inbound_terminal_dispositions_verified: bool,
+    no_human_reasons: Mapping[str, int] | None = None,
 ) -> dict[str, Any]:
     """Never transform an unverified aggregate into a real call cohort.
 
@@ -243,6 +302,12 @@ def evaluate_approved_call_cohort(
                       if counts["provider_incoming_calls"] is not None
                       and counts["provider_target_connected_calls"] is not None
                       else None)
+    nh = reason_check(no_human_reasons, NO_HUMAN_REASONS,
+                      counts["provider_target_connected_calls"] -
+                      counts["buyer_human_answered_calls"]
+                      if counts["provider_target_connected_calls"] is not None
+                      and counts["buyer_human_answered_calls"] is not None
+                      else None)
     np = reason_check(no_payable_reasons, NO_PAYABLE_REASONS,
                       counts["buyer_human_answered_calls"] -
                       counts["buyer_accepted_payable_calls"]
@@ -256,7 +321,7 @@ def evaluate_approved_call_cohort(
         and all(counts[k] is not None and refs[k] for k in COUNTS)
     )
     if not authoritative:
-        nc, np = None, None
+        nc, nh, np = None, None, None
     incoming = counts["provider_incoming_calls"] if authoritative else None
     connected = counts["provider_target_connected_calls"] if authoritative else None
     human = counts["buyer_human_answered_calls"] if authoritative else None
@@ -277,6 +342,7 @@ def evaluate_approved_call_cohort(
             counts["independently_settled_calls"] if authoritative else None
         ),
         "no_connect_reasons": nc,
+        "target_connected_but_not_human_answered_reasons": nh,
         "not_payable_reasons_among_human_answered": np,
         "target_connected_is_human_answered": False,
         "publisher_defect_inferred": False,
@@ -303,6 +369,7 @@ def refresh(root: Path) -> dict:
     report = summarize_readable_pulse(
         _load_readonly(root / PULSE),
         _load_readonly(root / PILOT),
+        routing_observation=_load_readonly(root / ROUTING),
     )
     destination = root / DEST
     if not destination.parent.is_dir() or destination.parent.is_symlink() or destination.is_symlink():
