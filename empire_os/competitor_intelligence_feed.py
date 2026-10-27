@@ -407,6 +407,36 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     else:
         attribution_summary = {"available": True, **attribution}
 
+    cro = _optional_json(
+        repo_root / "runtime/competitive_intelligence/"
+        "call_cro_owner_handoff_latest.json"
+    )
+    if (cro.get("schema_version")
+            != "empire.competitor_call_cro_owner_handoff.v1"
+            or cro.get("mode") != "OBSERVE"
+            or cro.get("existing_specialist_reused") is not True
+            or cro.get("original_specialist_stage_count") != 12
+            or cro.get("measured_conversion_bottleneck_established") is not False
+            or cro.get("automated_experiment_approved") is not False
+            or cro.get("site_changed") is not False
+            or cro.get("paid_media_activated") is not False
+            or cro.get("execution_authority") != "none"):
+        cro_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        cro_summary = {
+            "available": True, "mode": "OBSERVE",
+            "generated_at": cro.get("generated_at"),
+            "existing_specialist_reused": True,
+            "original_specialist_unknown_stage_count":
+                cro.get("original_specialist_unknown_stage_count"),
+            "primary_bottleneck": cro.get("original_specialist_primary_bottleneck"),
+            "static_candidate_source_review": cro.get("static_candidate_source_review"),
+            "proposed_cro_reviews": cro.get("proposed_cro_reviews"),
+            "measured_conversion_bottleneck_established": False,
+            "automated_experiment_approved": False,
+            "execution_authority": "none",
+        }
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
@@ -415,6 +445,7 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "business_model_research": market_summary,
         "traffic_source_research": traffic_summary,
         "conversion_evidence_readiness": attribution_summary,
+        "cro_owner_handoff": cro_summary,
     }
 
 
