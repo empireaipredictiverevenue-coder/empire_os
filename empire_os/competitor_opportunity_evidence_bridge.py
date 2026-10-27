@@ -91,6 +91,14 @@ def build_commercial_evidence_bridge(
     scout = buyer_scout or {}
     scout_state = "UNAVAILABLE"
     buyer_index: dict[str, dict] = {}
+    ambiguous_buyer_domains: set[str] = set()
+    buyer_proof_gaps: list[dict[str, Any]] = []
+    scout_source_counts = {
+        "research_candidate_count": 0,
+        "canonical_identity_source_reported_verified_count": 0,
+        "written_terms_source_reported_verified_count": 0,
+        "budget_source_reported_verified_count": 0,
+    }
     if scout:
         if (scout.get("mode") != "OBSERVE"
                 or scout.get("execution_authority") != "none"
@@ -100,13 +108,44 @@ def build_commercial_evidence_bridge(
         if not isinstance(candidates, list) or len(candidates) > 500:
             raise ValueError("unbounded buyer-scout candidates")
         scout_state = "READ_ONLY"
+        scout_source_counts["research_candidate_count"] = len(candidates)
         for candidate in candidates:
             if not isinstance(candidate, Mapping):
                 continue
+            for flag, metric in (
+                ("canonical_identity_verified", "canonical_identity_source_reported_verified_count"),
+                ("commercial_terms_verified", "written_terms_source_reported_verified_count"),
+                ("budget_verified", "budget_source_reported_verified_count"),
+            ):
+                if candidate.get(flag) is True:
+                    scout_source_counts[metric] += 1
             domain = _domain(candidate.get("domain", ""))
             if domain:
-                # An exact web-domain match is research identity only.
-                buyer_index[domain] = dict(candidate)
+                if domain in buyer_index:
+                    ambiguous_buyer_domains.add(domain)
+                else:
+                    # Exact web-domain match is only research identity.
+                    buyer_index[domain] = dict(candidate)
+                missing = [
+                    name for name, flag in (
+                        ("canonical_identity", "canonical_identity_verified"),
+                        ("commercial_terms", "commercial_terms_verified"),
+                        ("verified_budget", "budget_verified"),
+                    ) if candidate.get(flag) is not True
+                ]
+                if len(buyer_proof_gaps) < 10:
+                    buyer_proof_gaps.append({
+                        "domain": domain,
+                        "missing_source_reported_proofs": missing,
+                        "accepted_geography": "UNKNOWN",
+                        "accepted_product_and_call_criteria": "UNKNOWN",
+                        "operating_hours_and_caps": "UNKNOWN",
+                        "independently_paid_outcome": False,
+                        "status": "RESEARCH_GAPS_ONLY_NOT_BUYER_ACCEPTANCE",
+                        "task_dispatched": False,
+                    })
+        for domain in ambiguous_buyer_domains:
+            buyer_index.pop(domain, None)
     briefs = opportunity_briefs or {}
     brief_state = "UNAVAILABLE"
     brief_index: dict[str, dict] = {}
@@ -224,6 +263,10 @@ def build_commercial_evidence_bridge(
             c["existing_opportunity_brief_exact_domain_match"] for c in cards
         ),
         "buyer_scout_source_state": scout_state,
+        "buyer_scout_proof_coverage": scout_source_counts,
+        "buyer_scout_proof_gap_sample": buyer_proof_gaps,
+        "buyer_scout_ambiguous_domain_count": len(ambiguous_buyer_domains),
+        "buyer_acceptance_confirmed_by_bridge": 0,
         "opportunity_brief_source_state": brief_state,
         "research_cards": cards,
         "demand_inferred": False, "buyer_admission_authorized": False,

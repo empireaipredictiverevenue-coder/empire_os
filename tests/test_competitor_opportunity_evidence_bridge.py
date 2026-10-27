@@ -163,3 +163,43 @@ def test_no_snapshot_or_invalid_snapshot_fails_closed(tmp_path):
     base.mkdir(parents=True)
     (base / "competitor_change_radar_latest.json").write_text("{}")
     assert build_bridge_runtime(tmp_path)["available"] is False
+
+
+def test_buyer_scout_proof_gaps_preserve_unknown_buyer_authority():
+    scout = buyer()
+    scout["candidates"].append({
+        "domain": "differentbuyer.com",
+        "candidate_state": "RESEARCH_EVIDENCE_ONLY",
+        "canonical_identity_verified": True,
+        "commercial_terms_verified": True,
+        "budget_verified": False,
+    })
+    result = build_commercial_evidence_bridge(
+        radar(), buyer_scout=scout, now=NOW+timedelta(minutes=3),
+    )
+    coverage = result["buyer_scout_proof_coverage"]
+    assert coverage["research_candidate_count"] == 2
+    assert coverage["canonical_identity_source_reported_verified_count"] == 1
+    assert coverage["written_terms_source_reported_verified_count"] == 1
+    assert coverage["budget_source_reported_verified_count"] == 0
+    assert result["buyer_acceptance_confirmed_by_bridge"] == 0
+    gaps = result["buyer_scout_proof_gap_sample"]
+    assert len(gaps) == 2
+    assert all(x["accepted_geography"] == "UNKNOWN" for x in gaps)
+    assert all(x["task_dispatched"] is False for x in gaps)
+
+
+def test_duplicate_scout_domain_is_ambiguous_not_verified_match():
+    scout = buyer()
+    scout["candidates"].append({
+        "domain": "www.examplebuyers.com",
+        "candidate_state": "RESEARCH_EVIDENCE_ONLY",
+        "commercial_terms_verified": True,
+    })
+    result = build_commercial_evidence_bridge(
+        radar(), buyer_scout=scout, now=NOW+timedelta(minutes=3),
+    )
+    assert result["buyer_scout_ambiguous_domain_count"] == 1
+    assert result["exact_buyer_scout_domain_matches"] == 0
+    assert result["current_research_brief_count"] == 1
+    assert result["qualified_lead_count"] == 0

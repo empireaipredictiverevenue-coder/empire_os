@@ -31,3 +31,9 @@ Continue the Olly Rosewell competitor-monitoring research within the existing Em
 Within the existing commercial evidence owner, develop a verified buyer/ICP proof checklist and evidence collection for leads the buyer has actually agreed to accept. Specifically corroborate accepted geographies, qualified call/lead criteria, operating hours, caps, pricing/payment terms, consent and independent acceptance. A radar change can open review but must never bypass this evidence. Predictive Cloud model feedback must consume verified historical conversions/settlements only. User-generated complaints and supplier prices are subsequent licensed-source research, NOT authority for messaging or payments.
 
 Status: `CANONICAL_FIRST_PARTY_RESEARCH_BRIDGE_IMPLEMENTED` / `REVIEW_ONLY` / `NO_COMMERCIAL_ADMISSION`.
+
+## Verified buyer research proof coverage extension
+
+The bridge now reads only the original Buyer Scout's already-published candidate rows and exposes the count of research candidates, source-reported canonical identity flags, written commercial-terms flags, and budget-evidence flags. These are **source-reported flags, not independent buyer acceptance**. It emits at most ten minimal-domain proof-gap rows without contact details, email addresses or outreach authority; exact duplicate source domains are considered ambiguous rather than matched.
+
+On 27 October 2026 the current source had 5 Buyer Scout research candidates and 0 affirmative canonical-identity, written-terms or budget-verification flags. Radar had 4 successful source baselines and 0 pending public changes; thus 0 competitor-driven commercial review briefs, 0 new qualified leads and 0 independently verified settlements were attributed. No source was modified to make these values appear positive.
