@@ -64,3 +64,15 @@ The founder explicitly responded "yes i approve" to the exact request for approv
 Receipt SHA-256: 21ef90007ab15a08a91a0b48109fb0640032010249d7ed900971d026d6b23ee1.
 
 This owner release code rejects a modified or missing founder approval receipt, checks that its screenshot hashes, manifest and source match the immutable reviewed candidate, and separately requires the ASTRA root-only approval receipt to cite the founder receipt SHA in the approved_founder_visual_receipt_sha256 field. If these bindings differ, no publication occurs. This founder approval is not a claim that ASTRA itself independently accepted or performed a release.
+
+## Post-publication public HTTPS readback (GET-only)
+
+Original owner must independently verify actual customer-facing HTTPS *after* an authorised publication. This read-only mode is newly provided; it has not been used to deploy anything:
+
+    PYTHONPATH=/home/ubuntu/empire_worktrees/solar_commercial_owner_release_review_20261027 /srv/empire_os/.venv/bin/python -B /home/ubuntu/empire_worktrees/solar_commercial_owner_release_review_20261027/scripts/owner_review_solar_commercial_release_20261027.py --public-readback
+
+This requires the exact full 710-file published static inventory before any public HTTP request. It then performs only **18 GETs** over HTTPS to empire-ai.co.uk: the two exact new HTML routes, six unchanged neighbour routes, and ten new hashed assets. Every byte digest must match the reviewed V2 manifest or the originally backed-up page. It does not send a real enquiry, accept terms, activate payments, make CRM writes or grant any approval.
+
+Expected status only after a genuine correct release: PUBLIC_HTTPS_EXACT_SOLAR_COMMERCIAL_V2_18_GET_READBACK_PASS. The old website must fail this readback; a green result does not itself substitute for the protected root publication receipt or independent ASTRA owner authority.
+
+Owner must also separately run the pre-existing interactive browser, consent and catalogue post-release checks.

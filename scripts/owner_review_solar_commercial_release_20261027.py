@@ -239,6 +239,83 @@ def _origin_get(route: str) -> bytes:
         return body
 
 
+def _public_get(route: str) -> bytes:
+    # Public customer-facing HTTPS, distinct from localhost origin.
+    # No POST or form submission is ever performed here.
+    req = Request("https://empire-ai.co.uk" + route, headers={
+        "User-Agent": "Empire-ASTRA-PostRelease-PublicReadback/1.0",
+    }, method="GET")
+    with urlopen(req, timeout=18) as response:
+        if response.status != 200 or response.geturl().split("?")[0] != "https://empire-ai.co.uk" + route:
+            raise OwnerReleaseHold("PUBLIC_HTTPS_ROUTE_NOT_EXACT_200:" + route)
+        body = response.read(21000001)
+        if not body or len(body) > 21000000:
+            raise OwnerReleaseHold("PUBLIC_HTTPS_INVALID_RESPONSE:" + route)
+        return body
+
+
+def public_readback(*, fetch=None, live: Path = LIVE) -> dict:
+    """Verify public HTTPS only AFTER an owner-authorised release.
+
+    This performs GETs, never grants release authority, and deliberately
+    refuses to report a success for the currently live old pages.
+    """
+    get = _public_get if fetch is None else fetch
+    source = read_json(SOURCE_INVENTORY)
+    m = read_json(MANIFEST)
+    if sha(MANIFEST) != EXPECTED_MANIFEST_SHA or sha(SOURCE_INVENTORY) != EXPECTED_INVENTORY_SHA:
+        raise OwnerReleaseHold("PUBLIC_READBACK_PINNED_SOURCE_CHANGED")
+    if m.get("source_commit") != SOURCE_COMMIT:
+        raise OwnerReleaseHold("PUBLIC_READBACK_SOURCE_IDENTITY_CHANGED")
+    existing = source["baseline_sha256"]
+    replace = {
+        path: row["proposed_sha256"]
+        for path,row in (m["targets"] | m["route_data_sidecars"]).items()
+    }
+    additions = m["added_assets_sha256"]
+    if len(existing)!=700 or len(replace)!=10 or len(additions)!=10:
+        raise OwnerReleaseHold("PUBLIC_READBACK_SCOPE_CHANGED")
+    expected = existing | replace | additions
+    if site_inventory(live) != expected:
+        raise OwnerReleaseHold("PUBLIC_READBACK_ORIGINAL_SITE_NOT_PUBLISHED_EXACT_710")
+    routes = (("/commercial","commercial.html"),
+              ("/industries/solar","industries/solar.html"))
+    adjacent = (
+        ("/","index.html"),
+        ("/buy","buy.html"),
+        ("/industries","industries.html"),
+        ("/industries/hvac","industries/hvac.html"),
+        ("/predictive-revenue","predictive-revenue.html"),
+        ("/trust","trust.html"),
+    )
+    checked = []
+    for route, file in routes:
+        if sha256(get(route)).hexdigest() != replace[file]:
+            raise OwnerReleaseHold("PUBLIC_HTTPS_NEW_HTML_MISMATCH:" + route)
+        checked.append(route)
+    for route, file in adjacent:
+        if sha256(get(route)).hexdigest() != existing[file]:
+            raise OwnerReleaseHold("PUBLIC_HTTPS_NEIGHBOUR_CHANGED:" + route)
+        checked.append(route)
+    for path, digest in additions.items():
+        if sha256(get("/"+path)).hexdigest() != digest:
+            raise OwnerReleaseHold("PUBLIC_HTTPS_HASHED_ASSET_MISMATCH:"+path)
+        checked.append("/"+path)
+    return {
+        "status":"PUBLIC_HTTPS_EXACT_SOLAR_COMMERCIAL_V2_18_GET_READBACK_PASS",
+        "public_html_routes":2,
+        "unchanged_neighbour_routes":6,
+        "new_immutable_assets":10,
+        "matched_live_site_file_count":710,
+        "http_gets":len(checked),
+        "public_gets_only":True,
+        "form_submissions":0,
+        "payments_activated":False,
+        "owner_authority_granted_by_this_probe":False,
+        "publication_action_performed_by_this_probe":False,
+    }
+
+
 def preflight(*, live: Path = LIVE) -> dict:
     r = candidate(live=live)
     return {
@@ -347,6 +424,7 @@ def main() -> int:
     choice = parser.add_mutually_exclusive_group(required=True)
     choice.add_argument("--preflight",action="store_true")
     choice.add_argument("--audit-protected-backup",action="store_true")
+    choice.add_argument("--public-readback",action="store_true")
     choice.add_argument(PUBLISH_FLAG,action="store_true")
     a = parser.parse_args()
     try:
@@ -354,6 +432,8 @@ def main() -> int:
             result=preflight()
         elif a.audit_protected_backup:
             result=verify_protected_backup(candidate())
+        elif a.public_readback:
+            result=public_readback()
         else:
             result=apply()
         print(json.dumps(result, sort_keys=True))

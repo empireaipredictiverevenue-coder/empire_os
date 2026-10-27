@@ -110,3 +110,39 @@ def test_mismatched_founder_approval_sha_fails_closed(monkeypatch):
     monkeypatch.setattr(release, "EXPECTED_FOUNDER_RECEIPT_SHA", "0" * 64)
     with pytest.raises(release.OwnerReleaseHold, match="EXACT_FOUNDER_VISUAL_APPROVAL_RECEIPT_CHANGED"):
         release.candidate()
+
+
+
+def test_public_readback_succeeds_only_with_all_18_exact_get_hashes(monkeypatch):
+    m=release.read_json(release.MANIFEST)
+    baseline=release.read_json(release.SOURCE_INVENTORY)["baseline_sha256"]
+    final=baseline | {x:y["proposed_sha256"] for x,y in (m["targets"] | m["route_data_sidecars"]).items()} | m["added_assets_sha256"]
+    data={}
+    for route, file in [
+        ("/commercial","commercial.html"),("/industries/solar","industries/solar.html"),
+        ("/","index.html"),("/buy","buy.html"),("/industries","industries.html"),
+        ("/industries/hvac","industries/hvac.html"),
+        ("/predictive-revenue","predictive-revenue.html"),("/trust","trust.html"),
+    ]:
+        # sha() is real bytes; return immutable exact proposed/original local bytes.
+        path=(release.PACKET/"proposed_site"/file) if file in m["targets"] else release.LIVE/file
+        data[route]=path.read_bytes()
+    for file in m["added_assets_sha256"]:
+        data["/"+file]=(release.PACKET/"proposed_site"/file).read_bytes()
+    assert len(data)==18
+    monkeypatch.setattr(release,"site_inventory",lambda root:final)
+    result=release.public_readback(fetch=lambda route:data[route])
+    assert result["status"]=="PUBLIC_HTTPS_EXACT_SOLAR_COMMERCIAL_V2_18_GET_READBACK_PASS"
+    assert result["public_gets_only"] is True and result["http_gets"]==18
+
+
+def test_public_readback_rejects_old_version_and_asset_mismatch(monkeypatch):
+    # Old live site must NOT be reported as released.
+    with pytest.raises(release.OwnerReleaseHold,match="ORIGINAL_SITE_NOT_PUBLISHED_EXACT_710"):
+        release.public_readback(fetch=lambda route:b"NO_EXTERNAL_HTTP_PERFORMED")
+    m=release.read_json(release.MANIFEST)
+    base=release.read_json(release.SOURCE_INVENTORY)["baseline_sha256"]
+    final=base | {x:y["proposed_sha256"] for x,y in (m["targets"] | m["route_data_sidecars"]).items()} | m["added_assets_sha256"]
+    monkeypatch.setattr(release,"site_inventory",lambda root:final)
+    with pytest.raises(release.OwnerReleaseHold,match="PUBLIC_HTTPS_NEW_HTML_MISMATCH"):
+        release.public_readback(fetch=lambda route:b"WRONG_BYTES")
