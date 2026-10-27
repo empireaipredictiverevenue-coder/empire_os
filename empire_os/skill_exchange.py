@@ -15,6 +15,7 @@ TASK_SKILLS = {
     'lead_generation': ('lead_generation', ('empire-lead-research',)),
     'seo_research': ('seo', ('empire-seo-intelligence',)),
     'commercial_reply': ('sales', ('empire-reply-triage',)),
+    'affiliate_publisher_operations': ('sales', ('empire-affiliate-publisher-operations',)),
     'predictive_forecast': ('predictive', ('empire-forecast-validation',)),
     'revenue_reconciliation': ('finance', ('empire-revenue-reconciliation',)),
     'engineering_review': ('engineering', ('empire-engineering-verification',)),
@@ -89,6 +90,7 @@ COMPONENT_TASKS = {
     'buyer_capacity_readiness': 'evidence_analysis',
     'agent_tool_execution_plane': 'engineering_review',
     'commercial_reply_classification': 'commercial_reply',
+    'awin_affiliate_publisher_operations': 'affiliate_publisher_operations',
     # ORIGINAL Permit Intelligence workflow: reuse the same SkillForge
     # task selectors, no parallel skill registry or agent execution plane.
     'permit_public_signal_research': 'lead_generation',
