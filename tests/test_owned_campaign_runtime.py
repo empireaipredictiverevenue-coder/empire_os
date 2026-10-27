@@ -181,8 +181,13 @@ def test_preflight_independent_and_schema_held(prepared):
     assert not r['publication_performed'] and not r['campaign_state_mutated']
 
 
-def test_release_absent_and_sitemap_excludes_blocked(tmp_path, marketing):
+def test_release_absent_and_sitemap_excludes_blocked(tmp_path, marketing, monkeypatch):
     from empire_os.public_gateway import _sitemap_xml, research_page
+    from empire_os import owned_campaign_release as owner_release
+    # Public routes normally read /srv/empire_os. This test must use its
+    # empty isolated fixture even when the real five sites are already live.
+    monkeypatch.setattr(owner_release, 'released_html',
+                        lambda campaign_id: released_html(campaign_id, tmp_path))
     assert load_release(tmp_path) is None and released_paths(tmp_path) == []
     for c in marketing['campaigns']:
         assert released_html(c['campaign_id'], tmp_path) is None

@@ -59,7 +59,11 @@ def released_html(campaign_id, root=ROOT):
         for c in release['campaigns']:
             if c['campaign_id'] == campaign_id:
                 return render_asset(_landing(c))
-    return None
+    # Original-owner optional single-page extension. All five existing
+    # campaign identities win before this guarded fallback is considered.
+    # Missing owner-custodied SEO/brand/site evidence remains unpublished.
+    from empire_os.microsite_original_gateway_addendum_v12 import original_owner_chicago_html
+    return original_owner_chicago_html(campaign_id, root=root)
 
 
 def released_paths(root=ROOT):
