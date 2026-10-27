@@ -422,3 +422,79 @@ def inspect_existing_lead_smart_cash_pulse(root: Path, *, now: datetime) -> dict
         }
     except (OSError, ValueError, TypeError, KeyError, UnicodeError, OverflowError):
         return {**unknown, "protected_call_to_cash_receipt": protected_status}
+
+
+def inspect_original_callmart_publisher_receipt(root: Path, *, now: datetime) -> dict[str, Any]:
+    """Original submitted publisher form receipt, never acceptance or a call buyer.
+
+    Callmart is a future insurance publisher marketplace. Application success
+    does NOT confirm available buyer capacity, payout terms or traffic.
+    """
+    import re
+    import stat
+
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise ValueError("timezone-aware application receipt review required")
+    unknown = {
+        "schema_version": "empire.commercial.callmart_publisher_application_review.v1",
+        "mode": "OBSERVE",
+        "status": "APPLICATION_RECEIPT_UNAVAILABLE",
+        "application_submitted": None,
+        "review_pending": None,
+        "insurer_call_vertical_live": False,
+        "buyer_terms_verified": False,
+        "insurance_calls_live": False,
+        "verified_insurance_call_volume": None,
+        "buyer_acceptance_verified": False,
+        "verified_revenue_cents": None,
+        "followup_owner": "original_buyer_network_applications_and_commercial_reply_owner",
+        "no_duplicate_submission_authorized": True,
+        "outbound_authorized": False,
+        "agent_tasks_created": False,
+        "execution_authority": "none",
+    }
+    p = root / "runtime/buyer_network_intelligence/callmart_publisher_application_20261027.json"
+    try:
+        st = p.stat()
+        if (p.is_symlink() or not stat.S_ISREG(st.st_mode)
+                or stat.S_IMODE(st.st_mode) != 0o600
+                or not 200 <= st.st_size <= 10_000):
+            return unknown
+        receipt = json.loads(p.read_text(encoding="utf-8"))
+        at = datetime.fromisoformat(receipt["observed_at_utc"].replace("Z", "+00:00"))
+        if at.utcoffset() is None:
+            return unknown
+        age = (now.astimezone(timezone.utc) - at.astimezone(timezone.utc)).total_seconds()
+        if (not isinstance(receipt, dict)
+                or receipt.get("schema_version") !=
+                    "empire.callmart.publisher_application_external_receipt.v1"
+                or receipt.get("status") != "EXTERNAL_APPLICATION_HTTP_SUCCESS_REVIEW_PENDING"
+                or receipt.get("http_status") != 200
+                or receipt.get("form_url") != "https://app.callmart.io/apply/publisher"
+                or receipt.get("company") != "Empire AI"
+                or receipt.get("daily_live_insurance_call_volume") != 0
+                or receipt.get("corporate_website_only_not_live_insurance_landing") is not True
+                or receipt.get("provider_acknowledgement") !=
+                    "Application received. Our team will review it and follow up if it is a fit."
+                or receipt.get("applicant_approved") is not False
+                or receipt.get("traffic_enabled") is not False
+                or receipt.get("buyer_terms_verified") is not False
+                or receipt.get("outbound_sent") is not False
+                or receipt.get("execution_authority") != "none"
+                or not isinstance(receipt.get("original_application_fields_sha256"), str)
+                or re.fullmatch("[a-f0-9]{64}", receipt["original_application_fields_sha256"]) is None
+                or not 0 <= age <= 30 * 86400):
+            return {**unknown, "status": "APPLICATION_RECEIPT_REQUIRES_OWNER_REVIEW"}
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError, OverflowError):
+        return unknown
+    return {
+        **unknown,
+        "status": "APPLICATION_SUBMITTED_AWAITING_CALLMART_REVIEW",
+        "application_submitted": True,
+        "review_pending": True,
+        "submission_date": at.date().isoformat(),
+        "verified_insurance_call_volume": 0,
+        "official_publisher_application": "https://app.callmart.io/apply/publisher",
+        "original_proof": "PROVIDER_HTTP_200_APPLICATION_RECEIVED",
+        "insurance_not_active": True,
+    }
