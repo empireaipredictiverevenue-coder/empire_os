@@ -193,6 +193,17 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
             registry_path.parent / PERSONAL_SENT.name
         )
         personal_prior_safe = True
+        # One exact manually verified publisher-domain/mail-domain bridge:
+        # namasteynetwork.com's first-party home-services page explicitly
+        # lists namastey@namasteymail.com as its publisher contact.
+        # Only apply when the original personal Gmail SENT receipt for that
+        # email domain is authenticated. Do not merge arbitrary domains.
+        if ("namasteymail.com" in personal_prior_sent
+                and "namasteynetwork.com" not in personal_prior_sent):
+            personal_prior_sent["namasteynetwork.com"] = {
+                **personal_prior_sent["namasteymail.com"],
+                "source": "FOUNDER_REVIEWED_PUBLIC_CONTACT_DOMAIN_ALIAS",
+            }
     except ValueError:
         personal_prior_sent = {}
         personal_prior_safe = False

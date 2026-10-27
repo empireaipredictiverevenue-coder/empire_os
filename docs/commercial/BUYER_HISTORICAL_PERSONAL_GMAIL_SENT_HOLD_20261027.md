@@ -49,3 +49,10 @@ live buy-box, written payable event and settlement terms before activation.
 
 Test scope: `tests/test_buyer_personal_gmail_historical_hold_20261027.py`
 plus the existing contact-history and Workspace source-guard tests.
+
+
+## One independently reviewed cross-domain contact (27 October, 18:23 UTC)
+
+The original first-party publisher page `https://namasteynetwork.com/home-services.html` explicitly lists `namastey@namasteymail.com`. The founder personal-Gmail thread `1a0d9de9548a5945` contains a verified SENT message `1a12771d14fd8d2e` to that exact published address on 10 October 2026. Although the contact mailbox is on `namasteymail.com`, the brand's public site domain is `namasteynetwork.com`. The existing contact-history reader consequently missed the archived sent receipt for the site identity after the original registry changed.
+
+An exact single reviewed mail-domain alias is now applied **only if the actual privately stored `namasteymail.com` SENT proof passes validation**. It holds the `namasteynetwork.com` site identity against repeat first introductions, preserves opt-out precedence, and authorizes no outreach. No generic domain-alias discovery and no unreviewed equivalence are enabled. A missing or invalid original sent record still returns UNKNOWN/SOURCE_UNAVAILABLE rather than fabricating contact.

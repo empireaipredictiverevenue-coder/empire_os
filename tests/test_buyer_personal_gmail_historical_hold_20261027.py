@@ -131,3 +131,39 @@ def test_opt_out_wins_over_historical_sent_receipt(tmp_path):
     ctx=load_context(reg,ext,tmp_path/"no_workspace.json")
     assert review("advertisingresults.com",ctx)["state"]=="DO_NOT_PURSUE"
     assert review("advertisingresults.com",ctx)["outbound_authorized"] is False
+
+
+def test_exact_verified_namastey_site_mail_domain_binding_holds_repeat(tmp_path):
+    reg, ext, path = setup(tmp_path, source(
+        receipt("namasteymail.com", "namastey@namasteymail.com",
+                "1a12771d14fd8d2e", "1a0d9de9548a5945",
+                "2026-10-10T20:12:13+00:00"),
+    ))
+    ctx=load_context(reg,ext,tmp_path/"no_workspace.json")
+    for domain in ("namasteymail.com","namasteynetwork.com"):
+        item=review(domain,ctx)
+        assert item["state"]=="PERSONAL_GMAIL_SENT_ALREADY_CONTACTED"
+        assert item["last_outbound_at"]=="2026-10-10T20:12:13+00:00"
+        assert item["outbound_authorized"] is False
+    assert ctx["personal_prior_sent"]["namasteynetwork.com"]["source"] == "FOUNDER_REVIEWED_PUBLIC_CONTACT_DOMAIN_ALIAS"
+    assert review("namastey-other.com",ctx)["state"]=="UNKNOWN_HISTORY"
+
+
+def test_mail_domain_alias_without_verified_sent_receipt_remains_unknown(tmp_path):
+    reg,ext,path=setup(tmp_path,source())
+    ctx=load_context(reg,ext,tmp_path/"no_workspace.json")
+    assert review("namasteynetwork.com",ctx)["state"]=="UNKNOWN_HISTORY"
+    assert review("namasteynetwork.com",ctx)["outbound_authorized"] is False
+
+
+def test_namastey_opt_out_still_overrides_mail_domain_alias(tmp_path):
+    reg,ext,path=setup(tmp_path,source(
+        receipt("namasteymail.com","namastey@namasteymail.com",
+                "1a12771d14fd8d2e","1a0d9de9548a5945",
+                "2026-10-10T20:12:13+00:00"),
+    ))
+    d=json.loads(reg.read_text())
+    d["relationships"]=[{"entity_key":"namasteynetwork.com","do_not_pursue":True}]
+    reg.write_text(json.dumps(d))
+    ctx=load_context(reg,ext,tmp_path/"no_workspace.json")
+    assert review("namasteynetwork.com",ctx)["state"]=="DO_NOT_PURSUE"
