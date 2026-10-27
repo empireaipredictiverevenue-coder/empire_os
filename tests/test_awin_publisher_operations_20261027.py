@@ -227,3 +227,97 @@ def test_skillforge_discovers_exact_affiliate_task_but_never_self_approves():
     assert gated["skills"]==[]
     assert gated["rejected"][0]["reason"]=="skill_not_approved"
     assert gated["execution_authority"]=="none"
+
+
+
+def test_real_new_candidate_only_once_without_resending(tmp_path):
+    write_src(tmp_path)
+
+    class Provider:
+        configured = True
+        def __init__(self):
+            self.messages = [email()]
+        def _service(self):
+            return Service(self.messages)
+
+    provider = Provider()
+    first = run(root=tmp_path, provider=provider, write=True, now=NOW)
+    assert first["status"]=="AWIN_NETWORK_APPROVED_PROGRAMME_APPLICATIONS_PENDING_REVIEW"
+    assert first["new_potential_inbound_headers"] == 1
+    assert first["potential_inbound_headers"] == 1
+    path = tmp_path / OUTPUT
+    one = json.loads(path.read_text())
+    assert one["programmes"][1]["new_inbound_header_candidates"] == 1
+    second = run(root=tmp_path, provider=provider, write=True, now=NOW)
+    assert second["new_potential_inbound_headers"] == 0
+    assert second["potential_inbound_headers"] == 1
+    two = json.loads(path.read_text())
+    assert two["programmes"][1]["new_inbound_header_candidates"] == 0
+    assert one["seen_programme_message_refs"] == two["seen_programme_message_refs"]
+    assert all(not x["advertiser_acceptance_verified"] for x in two["programmes"])
+
+
+def test_candidate_history_survives_shorter_window(tmp_path):
+    write_src(tmp_path)
+
+    class Provider:
+        configured = True
+        def __init__(self):
+            self.messages = [email()]
+        def _service(self):
+            return Service(self.messages)
+
+    provider = Provider()
+    first = run(root=tmp_path,provider=provider,write=True,now=NOW)
+    assert first["new_potential_inbound_headers"] == 1
+    provider.messages = []
+    no_longer_visible = run(root=tmp_path,provider=provider,write=True,now=NOW)
+    assert no_longer_visible["new_potential_inbound_headers"] == 0
+    provider.messages = [email()]
+    return_to_view = run(root=tmp_path,provider=provider,write=True,now=NOW)
+    assert return_to_view["new_potential_inbound_headers"] == 0
+    assert return_to_view["potential_inbound_headers"] == 1
+
+
+def test_old_v1_private_snapshot_migrates_without_duplicate(tmp_path):
+    write_src(tmp_path)
+    existing = evaluate(receipt(),scan_awin_candidates(Service([email()]),now=NOW),now=NOW)
+    existing.pop("seen_programme_message_refs",None)
+    existing.pop("new_candidate_count",None)
+    for item in existing["programmes"]:
+        item.pop("inbound_header_candidate_count",None)
+    _atomic_private_write(tmp_path/OUTPUT,existing)
+    class Provider:
+        configured = True
+        def _service(self):
+            return Service([email()])
+    r=run(root=tmp_path,provider=Provider(),write=True,now=NOW)
+    assert r["status"]=="AWIN_NETWORK_APPROVED_PROGRAMME_APPLICATIONS_PENDING_REVIEW"
+    assert r["new_potential_inbound_headers"]==0
+
+
+def test_tampered_old_snapshot_preserved_and_held(tmp_path):
+    write_src(tmp_path)
+    path=tmp_path/OUTPUT
+    initial=evaluate(receipt(),[],now=NOW)
+    initial["execution_authority"]="LIVE"
+    _atomic_private_write(path,initial)
+    data=path.read_bytes()
+    class Provider:
+        configured = True
+        def _service(self):
+            return Service([email()])
+    r=run(root=tmp_path,provider=Provider(),write=True,now=NOW)
+    assert r["status"].startswith("HELD_")
+    assert not r["snapshot_written"]
+    assert path.read_bytes()==data
+
+
+def test_gmail_search_bounded_to_authorised_provider_domains():
+    service=Service([email()])
+    scan_awin_candidates(service,now=NOW)
+    q=service.requests[0][1]["q"]
+    assert "from:awin.com" in q
+    assert "from:ovoenergy.com" in q
+    assert "from:glowgreenltd.com" in q
+    assert " -in:trash" in q

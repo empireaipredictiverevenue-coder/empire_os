@@ -101,7 +101,9 @@ def scan_awin_candidates(service: Any, *, now: datetime) -> list[dict]:
         raise AwinReviewHold("AWIN_AWARE_CLOCK_REQUIRED")
     now = now.astimezone(timezone.utc)
     start = (now - timedelta(days=WINDOW_DAYS)).strftime("%Y/%m/%d")
-    query = f'after:{start} (OVO OR "Glow Green" OR 122556 OR 73922) -in:trash'
+    query = (f'after:{start} '
+             f'(from:awin.com OR from:ovoenergy.com OR from:glowgreenltd.com) '
+             f'(OVO OR "Glow Green" OR 122556 OR 73922) -in:trash')
     try:
         response = service.users().messages().list(
             userId="me", q=query, maxResults=MAX_GMAIL_MATCHES + 1,
@@ -162,7 +164,56 @@ def scan_awin_candidates(service: Any, *, now: datetime) -> list[dict]:
         raise AwinReviewHold("AWIN_GMAIL_METADATA_UNAVAILABLE") from exc
 
 
-def evaluate(source: dict, candidates: list[dict], *, now: datetime) -> dict:
+
+def previous_seen_pairs(path: Path) -> set[tuple[str, str]]:
+    """Read last private review; preserve seen IDs so repeated polls aren't new."""
+    if not path.exists():
+        return set()
+    if (path.is_symlink() or not path.is_file()
+            or stat.S_IMODE(path.stat().st_mode) != 0o600
+            or not 100 < path.stat().st_size < 30000):
+        raise AwinReviewHold("AWIN_PREVIOUS_SNAPSHOT_UNSAFE")
+    try:
+        prior = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError) as exc:
+        raise AwinReviewHold("AWIN_PREVIOUS_SNAPSHOT_INVALID") from exc
+    if (not isinstance(prior, dict) or prior.get("schema_version") != SCHEMA
+            or prior.get("publisher_id") != "3136281"
+            or prior.get("execution_authority") != "NONE"
+            or prior.get("outbound_sent") is not False
+            or prior.get("database_writes") is not False
+            or prior.get("affiliate_publication_authorized") is not False):
+        raise AwinReviewHold("AWIN_PREVIOUS_SNAPSHOT_AUTHORITY_INVALID")
+    programmes = prior.get("programmes")
+    if (not isinstance(programmes, list) or len(programmes) != 2
+            or {row.get("advertiser_id"): row.get("advertiser")
+                for row in programmes if isinstance(row, dict)} != PROGRAMMES):
+        raise AwinReviewHold("AWIN_PREVIOUS_PROGRAMME_MISMATCH")
+    rows: set[tuple[str, str]] = set()
+    for item in programmes:
+        ids = item.get("inbound_gmail_message_ids")
+        if (not isinstance(ids, list) or len(ids) > MAX_GMAIL_MATCHES
+                or any(not isinstance(m, str) or not GMAIL_ID.fullmatch(m) for m in ids)
+                or len(ids) != len(set(ids))):
+            raise AwinReviewHold("AWIN_PREVIOUS_CANDIDATE_IDS_INVALID")
+        rows.update((item["advertiser_id"], m) for m in ids)
+    historical = prior.get("seen_programme_message_refs", [])
+    if not isinstance(historical, list) or len(historical) > 250:
+        raise AwinReviewHold("AWIN_PREVIOUS_SEEN_OVERFLOW")
+    for pair in historical:
+        if (not isinstance(pair, list) or len(pair) != 2
+                or pair[0] not in PROGRAMMES or not isinstance(pair[1], str)
+                or not GMAIL_ID.fullmatch(pair[1])):
+            raise AwinReviewHold("AWIN_PREVIOUS_SEEN_INVALID")
+        rows.add((pair[0], pair[1]))
+    if len(rows) > 250:
+        raise AwinReviewHold("AWIN_PREVIOUS_SEEN_OVERFLOW")
+    return rows
+
+
+
+def evaluate(source: dict, candidates: list[dict], *, now: datetime,
+             previous_seen: set[tuple[str, str]] | None = None) -> dict:
     if not isinstance(source, dict) or not isinstance(candidates, list):
         raise AwinReviewHold("AWIN_SOURCE_INVALID")
     if source.get("publisher_id") != "3136281":
@@ -174,6 +225,20 @@ def evaluate(source: dict, candidates: list[dict], *, now: datetime) -> dict:
         raise AwinReviewHold("AWIN_PUBLISHING_STATUS_UNVERIFIED")
     if len(candidates) > MAX_GMAIL_MATCHES * 2:
         raise AwinReviewHold("AWIN_CANDIDATES_OVER_BOUNDS")
+    if not isinstance(previous_seen, (set, type(None))):
+        raise AwinReviewHold("AWIN_PREVIOUS_SEEN_INVALID")
+    seen = set(previous_seen or ())
+    if len(seen) > 250 or any(
+            not isinstance(pair, tuple) or len(pair) != 2
+            or pair[0] not in PROGRAMMES or not GMAIL_ID.fullmatch(str(pair[1]))
+            for pair in seen):
+        raise AwinReviewHold("AWIN_PREVIOUS_SEEN_INVALID")
+    current = {(row["advertiser_id"], row["gmail_message_id"])
+               for row in candidates}
+    updated = seen | current
+    if len(updated) > 250:
+        raise AwinReviewHold("AWIN_SEEN_CANDIDATE_CAPACITY_HELD")
+    newest = current - seen
     programmes = []
     for entry in source["advertiser_programmes"]:
         ident = entry["advertiser_id"]
@@ -183,7 +248,9 @@ def evaluate(source: dict, candidates: list[dict], *, now: datetime) -> dict:
             "advertiser": entry["advertiser"],
             "application_status": entry["status"],
             "application_source": "FOUNDER_REPORTED_NOT_AWIN_API",
-            "new_inbound_header_candidates": len(matching),
+            "inbound_header_candidate_count": len(matching),
+            "new_inbound_header_candidates": sum(
+                (ident, r["gmail_message_id"]) in newest for r in matching),
             "inbound_gmail_message_ids": [r["gmail_message_id"] for r in matching],
             "next_action": "REVIEW_AWIN_MESSAGE_AND_CHECK_DASHBOARD" if matching
                            else "AWAIT_ADVERTISER_DECISION_NO_REPEAT_APPLICATION",
@@ -201,6 +268,8 @@ def evaluate(source: dict, candidates: list[dict], *, now: datetime) -> dict:
         "email_verification_confirmed": bool(source.get("email_verification_confirmed") is True),
         "programmes": programmes,
         "candidate_count": len(candidates),
+        "new_candidate_count": len(newest),
+        "seen_programme_message_refs": [list(pair) for pair in sorted(updated)],
         "source_limited_to_recent_gmail_metadata": True,
         "candidate_metadata_is_not_advertiser_approval": True,
         "website_owner_handoff_present": bool(readiness.get("owner_handoff_path")),
@@ -253,14 +322,17 @@ def run(*, root: Path = Path("/srv/empire_os"), provider=None,
         if not provider.configured:
             raise AwinReviewHold("AWIN_WORKSPACE_READER_UNAVAILABLE")
         current = now or datetime.now(timezone.utc)
+        previous_seen = previous_seen_pairs(root / OUTPUT)
         candidates = scan_awin_candidates(provider._service(), now=current)
-        review = evaluate(source, candidates, now=current)
+        review = evaluate(source, candidates, now=current,
+                          previous_seen=previous_seen)
         if write:
             _atomic_private_write(root / OUTPUT, review)
         return {
             "status": review["status"],
             "programme_review_count": len(review["programmes"]),
             "potential_inbound_headers": review["candidate_count"],
+            "new_potential_inbound_headers": review["new_candidate_count"],
             "snapshot_written": write,
             "outbound_sent": False, "database_writes": False,
             "execution_authority": "NONE",
