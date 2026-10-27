@@ -21,6 +21,7 @@ from typing import Any, Mapping
 
 from empire_os.competitor_opportunity_evidence_bridge import build_bridge_runtime
 from empire_os.voice_routing_policy import switchboard_status
+from empire_os.ppc_switchboard_adapter import review_pay_per_call_source_to_cash
 from empire_os.analytics.first_party_event_contract import (
     ALLOWED_EVENTS as ANALYTICS_EVENTS,
     ALLOWED_CHANNELS as ANALYTICS_CHANNELS,
@@ -594,6 +595,76 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
     else:
         loss_summary = {"available": True, **loss}
 
+    # The existing PPC adapter is a *preview*, not an active route. Join the
+    # ORIGINAL competitor registry with the ORIGINAL CRO and cash specialists
+    # only for ranked owner research, never as verified website traffic.
+    if traffic_summary.get("available") is not True:
+        growth_summary = {"available": False, "mode": "OBSERVE"}
+    else:
+        try:
+            candidates = []
+            original_sources = [
+                *traffic_summary["free_or_earned"],
+                *traffic_summary["paid_research_only"],
+                *traffic_summary["excluded"],
+            ]
+            for original in original_sources:
+                review = review_pay_per_call_source_to_cash(
+                    registry=traffic_summary,
+                    source_id=original["id"],
+                    cohort_ref="ORIGINAL_OWNER_SOURCE_COHORT_NOT_YET_OBSERVED",
+                )
+                candidates.append({
+                    "source_id": review["source_id"],
+                    "source_name": original["name"],
+                    "cost_class": review["source_cost_class"],
+                    "research_rank": review["source_research_rank"],
+                    "original_source_status": review["original_source_status"],
+                    "policy_excluded": review["source_policy_excluded"],
+                    "measured_stage_count": review["measured_funnel_stages"],
+                    "cash_margin_cents": review["reviewed_cash_margin_cents"],
+                    "next_owner": review["next_owner"],
+                    "next_task": review["next_task"],
+                    "activation_authorized": False,
+                })
+            candidates.sort(key=lambda r: r["research_rank"])
+            growth_summary = {
+                "available": True, "mode": "OBSERVE",
+                "schema_version": "empire.ppc.source_to_cash_research_queue.v1",
+                "canonical_existing_adapter": "empire_os.ppc_switchboard_adapter",
+                "original_traffic_source_count": len(candidates),
+                "organic_research_count": sum(
+                    1 for r in candidates if r["research_rank"] < 100
+                ),
+                "paid_unfunded_count": sum(
+                    1 for r in candidates if 100 <= r["research_rank"] < 999
+                ),
+                "policy_excluded_count": sum(
+                    1 for r in candidates if r["policy_excluded"]
+                ),
+                "original_cro_review_available":
+                    cro_summary.get("available") is True,
+                "original_call_loss_review_available":
+                    loss_summary.get("available") is True,
+                "ranked_source_research_queue": candidates,
+                "first_measurement_action":
+                    "ORIGINAL_ANALYTICS_OWNER_SOURCE_TO_SESSION_COHORT",
+                "accepted_calls_verified": False,
+                "source_profitability_calibrated": False,
+                "all_channels_research_not_live_campaigns": True,
+                "original_seo_website_owner_scope_preserved": True,
+                "no_paid_media_spend": True,
+                "no_route_mutation": True,
+                "no_new_service_database_or_agent": True,
+                "execution_authority": "none",
+            }
+            if (len(candidates) != 15 or growth_summary["organic_research_count"] != 7
+                    or growth_summary["paid_unfunded_count"] != 7
+                    or growth_summary["policy_excluded_count"] != 1):
+                raise ValueError("incomplete approved source research queue")
+        except (ValueError, TypeError, KeyError):
+            growth_summary = {"available": False, "mode": "OBSERVE"}
+
     return {
         "available": True, **snapshot,
         "geo_research": geo,
@@ -605,6 +676,7 @@ def _call_acquisition_overlay(repo_root: Path) -> dict[str, Any]:
         "cro_owner_handoff": cro_summary,
         "operator_video_research": video_summary,
         "call_loss_readiness": loss_summary,
+        "source_to_cash_growth_research": growth_summary,
         "existing_switchboard_and_hubs":
             _existing_ppc_switchboard_hub_readiness(repo_root),
     }
