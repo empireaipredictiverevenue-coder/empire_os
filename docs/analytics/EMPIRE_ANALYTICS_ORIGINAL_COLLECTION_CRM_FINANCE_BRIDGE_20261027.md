@@ -121,3 +121,12 @@ The original server owner must supply its independently authenticated tenant UUI
 5. Analytics075 is independently held: original privacy/DBA review of partner and paid attribution must precede any paid or affiliate source admission.
 
 **Status:** `054055_PRODUCTION_SCHEMA_INSTALLED`; `SIGNED_ADMISSION_ISOLATED_PG18_VERIFIED`; `PRODUCTION_CMP_SIGNER_UNBOUND`; `PRODUCTION_WRITER_AND_PUBLIC_COLLECTION_OFF`; `REAL_CRM_FINANCE_ATTRIBUTION_UNKNOWN`. No changes to separate companies or another agent's website release.
+
+## Original Analytics054 writer access — real isolated PostgreSQL security proof
+`tests/analytics/test_tenant_bound_writer_pg18_20261027.py` extends ONLY the disposable private-socket PostgreSQL 18 fixture. It constructs a temporary, distinct tenant-A LOGIN and narrow RLS policies on the ORIGINAL Analytics054/055 four-table schema; **none of this SQL is a production migration or remotely installed**.
+
+The fixture demonstrates the actual permission contract: original session INSERT and limited SELECT/UPDATE-for-lock; consent-decision SELECT/INSERT; event INSERT; all tenant-A/property scoped under forced RLS. Original triggers accept the grant → event path, then refuse events after revoke. A cross-tenant-B signed-looking insert is refused even if a caller sets a spoofed `empire.analytics_tenant` session GUC. The fixture writer cannot enter the NOLOGIN migrator role, read the audit table, select event-receipt rows, delete sessions or call the erasure function. Actual original PostgreSQL row locks, grants, trigger contracts and RLS were exercised and passed.
+
+**Not an approved production identity design:** a per-tenant PostgreSQL LOGIN in a fixture is an isolation experiment, not a mandate to create thousands of roles. The original EmpireDB owner must decide a bounded first-party role/identity model (or a securely reviewed SECURITY DEFINER proxy), real credential custody, login-to-tenant binding, explicit transaction admission, erasure and connection-pool separation, safe policy escalation, replay/idempotency, legal consent and rollback before any production grants. Do not trust browser-selected tenant headers, caller-settable session GUC or artificial `verified_owner_config` flags as independent authority.
+
+**Status:** `PG18_TENANT_WRITER_FIXTURE_PASS`; `LIVE_WRITER_NOT_PROVISIONED`; `LIVE_CONSENT_NOT_APPROVED`; `LIVE_SOURCE_SIGNERS_NOT_BOUND`; `LIVE_COLLECTION_OFF`; `CRM_AND_SETTLED_FINANCE_LINK_NOT_VERIFIED`. No changes to payment, website/SEO or other company lanes.
