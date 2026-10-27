@@ -23,6 +23,19 @@
     "priority_confirmed": true,
     "root_publication_authority_inferred_from_chat": false
   },
+  "founder_root_archive_execution_evidence": {
+    "expected_baseline_inventory_sha256": "60fe7228a5583ce37c4754c2390d35a5c8f6609b527ecb1e4ad03986546ab8e5",
+    "founder_script_verified_member_count": 700,
+    "original_astra_owner_independent_backup_acceptance_verified": false,
+    "original_astra_owner_independent_review_verified": false,
+    "original_root_archive_unreadable_to_unprivileged_connected_session": true,
+    "public_site_modified": false,
+    "publication_authority_granted": false,
+    "reported_status": "ROOT_BACKUP_700_FILES_SHA256_VERIFIED",
+    "root_archive_path": "/var/backups/empire-website/solar-commercial-v2-before-20261027.tar.gz",
+    "root_archive_sha256": "4e7bb1ea2c8fbb81d99ff59e8debdff3b28f20826e1738278af452494f9b3bff",
+    "source": "FOUNDER_ROOT_TERMINAL_OUTPUT_20261027"
+  },
   "github_issue": {
     "approval_receipt_verified": false,
     "assigned_account": "empireaipredictiverevenue-coder",
@@ -46,6 +59,14 @@
   "no_live_outbound_payment_or_customer_form_submission": true,
   "original_website_owner_publisher_prepared": false,
   "owner_readonly_preflight": "/srv/empire_os/.venv/bin/python -B /home/ubuntu/empire_worktrees/website_solar_commercial_premium_20261026/scripts/review_solar_commercial_premium_candidate_20261026.py",
+  "owner_root_release_preconditions": {
+    "do_not_use_saas_only_owner_publish_saas_evidence_20261025_py": true,
+    "exact_root_archive_hash_independently_verify": true,
+    "independent_visual_commercial_copy_review": true,
+    "no_owner_receipt_currently_verified": true,
+    "original_astra_owner_signed_approval_for_exact_solar_commercial_v2": true,
+    "owner_scoped_publisher_for_two_pages_eight_sidecars_ten_assets_required": true
+  },
   "pinned_evidence": {
     "candidate_manifest": {
       "absolute_path": "/home/ubuntu/empire_releases/website_solar_commercial_premium_20261026_candidate_v2/release_candidate.json",
@@ -69,9 +90,10 @@
   "public_website_modified": false,
   "publication_authorized_now": false,
   "publication_performed": false,
+  "record_updated_at_utc": "2026-10-27T10:20:44.729863+00:00",
   "root_owner_custody_authority_verified": false,
   "schema_version": "empire.website.astra_two_page_owner_pickup.v1",
-  "separate_root_backup_created": false,
-  "status": "FOUNDER_LAUNCH_DIRECTION_RECORDED_MANUAL_ASTRA_OWNER_ACCEPTANCE_REQUIRED",
+  "separate_root_backup_created": true,
+  "status": "FOUNDER_PROTECTED_BACKUP_REPORTED_SUCCESS_ASTRA_OWNER_SIGNOFF_AND_SCOPED_PUBLISHER_HELD",
   "work_key": "solar_commercial_premium_exact_v2_20261026"
 }
