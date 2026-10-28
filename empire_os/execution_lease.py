@@ -257,7 +257,22 @@ class ExecutionLeaseManager:
         # only the separate signed-ticket adapter (under this SAME flock)
         # can grant a mutation lease after authenticated review.
         if owner_mutation_lock_active():
-            raise ExecutionLeaseError("SIGNED_WORKSTREAM_TICKET_REQUIRED")
+            # Original admission boundary; no separate worker, scheduler or
+            # lease manager. Sealed founder credentials + real service UID
+            # are required; missing custody is an explicit HOLD.
+            from empire_os.agent_owner_authority_review import (
+                OwnerAuthorityHold, acquire_sealed_owner_lease,
+            )
+            try:
+                return acquire_sealed_owner_lease(
+                    lease_manager=self, lease_owner=clean_owner,
+                    job_id=clean_job, resources=normalised, ttl_seconds=ttl,
+                )
+            except OwnerAuthorityHold as exc:
+                # Preserve existing Hermes/Pi/Coder error-handling contract.
+                raise ExecutionLeaseError(
+                    f"SIGNED_WORKSTREAM_TICKET_REQUIRED:{exc}"
+                ) from exc
         now = _now()
         with self._locked():
             # Close the race with a concurrent root-controlled activation

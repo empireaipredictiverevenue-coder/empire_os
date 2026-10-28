@@ -493,3 +493,179 @@ def provision_owner_ticket_receipts_for_review(lease_manager: Any) -> Path:
             path.unlink(missing_ok=True)
             raise
     return path
+
+
+# Existing-original-manager live adapter. Nothing below issues tickets, signs
+# founder policies or creates another scheduler/worker/lease implementation.
+# The original release owner must provision this root-owned configuration and
+# distinct systemd User= identities before the marker may ever be activated.
+SEALED_AUTHORITY_ROOT = Path("/etc/empire_os/owner_authority")
+ORIGINAL_MUTATING_LEASE_OWNERS = frozenset({"hermes", "pi", "empire_coder"})
+MAX_SEALED_ARTIFACT_BYTES = 262144
+
+
+def _sealed_root_directory(directory: Path) -> None:
+    try:
+        info = directory.lstat()
+    except OSError as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_CUSTODY_NOT_PROVISIONED") from exc
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or info.st_uid != 0
+        or info.st_mode & 0o022
+    ):
+        raise OwnerAuthorityHold("SEALED_OWNER_CUSTODY_UNSAFE")
+
+
+def _sealed_file(path: Path) -> bytes:
+    """No worker-supplied paths, no symlinks, no non-root files."""
+    try:
+        if path.is_symlink():
+            raise OwnerAuthorityHold("SEALED_OWNER_SYMLINK_DENIED")
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != 0
+                or info.st_nlink != 1
+                or info.st_mode & 0o022
+                or info.st_size <= 0
+                or info.st_size > MAX_SEALED_ARTIFACT_BYTES
+            ):
+                raise OwnerAuthorityHold("SEALED_OWNER_FILE_CUSTODY_UNSAFE")
+            data = os.read(fd, MAX_SEALED_ARTIFACT_BYTES + 1)
+            if len(data) != info.st_size:
+                raise OwnerAuthorityHold("SEALED_OWNER_FILE_CHANGED")
+            return data
+        finally:
+            os.close(fd)
+    except OwnerAuthorityHold:
+        raise
+    except OSError as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_FILE_UNAVAILABLE") from exc
+
+
+def _sealed_json(path: Path) -> dict:
+    try:
+        data = json.loads(_sealed_file(path))
+    except OwnerAuthorityHold:
+        raise
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_INVALID_JSON") from exc
+    if not isinstance(data, dict):
+        raise OwnerAuthorityHold("SEALED_OWNER_INVALID_JSON")
+    return data
+
+
+def _production_repository_owner_uid() -> int:
+    """Fail closed if the canonical production repo owner cannot be read."""
+    try:
+        return Path("/srv/empire_os").stat().st_uid
+    except OSError as exc:
+        raise OwnerAuthorityHold("PRODUCTION_REPOSITORY_CUSTODY_UNKNOWN") from exc
+
+
+def _principal_for_authenticated_uid(
+    registry: Mapping[str, Any], *, kernel_uid: int, lease_owner: str
+) -> str:
+    """Identity comes from kernel UID + root-owned registry, never job labels."""
+    # Existing services and interactive remote shell all use the same ubuntu
+    # repository owner. That Unix identity is never admissible as a protected
+    # mutation principal, regardless of a root-published mapping that names it.
+    if kernel_uid in (0, _production_repository_owner_uid()):
+        raise OwnerAuthorityHold("SHARED_OR_PRIVILEGED_UNIX_IDENTITY_DENIED")
+    if registry.get("schema_version") != "empire.execution.owner_principals.v1":
+        raise OwnerAuthorityHold("UNTRUSTED_OWNER_PRINCIPAL_SCHEMA")
+    rows = registry.get("workers")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 16:
+        raise OwnerAuthorityHold("NO_PROVISIONED_WORKER_PRINCIPALS")
+    seen_uids: set[int] = set()
+    seen_principals: set[str] = set()
+    matched: str | None = None
+    for row in rows:
+        if not isinstance(row, dict):
+            raise OwnerAuthorityHold("UNTRUSTED_WORKER_PRINCIPAL_ROW")
+        uid = row.get("uid")
+        if type(uid) is not int or uid <= 0 or uid in seen_uids:
+            raise OwnerAuthorityHold("SHARED_OR_INVALID_WORKER_UNIX_IDENTITY")
+        seen_uids.add(uid)
+        principal = _id(row.get("principal"))
+        if principal in seen_principals:
+            raise OwnerAuthorityHold("DUPLICATED_AUTHENTICATED_WORKER")
+        seen_principals.add(principal)
+        permitted_owner = _id(row.get("lease_owner"))
+        if permitted_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+            raise OwnerAuthorityHold("UNKNOWN_ORIGINAL_WORKER_CLASS")
+        if kernel_uid == uid:
+            if permitted_owner != lease_owner:
+                raise OwnerAuthorityHold("WORKER_UID_CROSS_LANE_IMPERSONATION")
+            matched = principal
+    if matched is None:
+        raise OwnerAuthorityHold("NO_AUTHENTICATED_WORKER_UID_MAPPING")
+    return matched
+
+
+def acquire_sealed_owner_lease(
+    *,
+    lease_manager: ExecutionLeaseManager,
+    lease_owner: str,
+    job_id: str,
+    resources: tuple[str, ...],
+    ttl_seconds: int,
+) -> ExecutionLease:
+    """Founder's *staged* sealed adapter behind original shared lease guard.
+
+    Requires root-owned issuer artifacts and a distinct kernel UID mapped
+    to the original worker lane. All missing/ambiguous bindings HOLD. Does
+    not issue keys, rotate receipts or grant production release authority.
+    """
+    if type(lease_manager) is not ExecutionLeaseManager:
+        raise OwnerAuthorityHold("TRUSTED_ORIGINAL_LEASE_MANAGER_REQUIRED")
+    if lease_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+        raise OwnerAuthorityHold("UNKNOWN_MUTATION_WORKER_CLASS")
+    if (
+        not isinstance(job_id, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id)
+        or ".." in job_id
+    ):
+        raise OwnerAuthorityHold("UNTRUSTED_MUTATING_JOB_ID")
+    root = SEALED_AUTHORITY_ROOT
+    _sealed_root_directory(root.parent)
+    _sealed_root_directory(root)
+    for folder in (root / "tickets", root / "tickets" / lease_owner):
+        _sealed_root_directory(folder)
+    assigned = _principal_for_authenticated_uid(
+        _sealed_json(root / "principals.json"),
+        kernel_uid=os.geteuid(),
+        lease_owner=lease_owner,
+    )
+    policy = _sealed_json(root / "policy.json")
+    ticket = _sealed_json(root / "tickets" / lease_owner / (job_id + ".json"))
+    key_hex = _sealed_file(root / "founder_public_key.hex").decode("ascii").strip()
+    sha_hex = _sealed_file(root / "pinned_policy_sha256.txt").decode("ascii").strip()
+    try:
+        key_bytes = bytes.fromhex(key_hex)
+        if len(key_bytes) != 32:
+            raise ValueError("wrong ed25519 key size")
+        public_key = Ed25519PublicKey.from_public_bytes(key_bytes)
+    except (ValueError, TypeError) as exc:
+        raise OwnerAuthorityHold("TRUSTED_FOUNDER_PUBLIC_KEY_INVALID") from exc
+    intended_paths = tuple(r[5:] for r in resources if r.startswith("path:"))
+    if not intended_paths:
+        raise OwnerAuthorityHold("MISSING_EXACT_JOB_PATH_SCOPE")
+    return acquire_owner_authorized_lease(
+        lease_manager=lease_manager,
+        signed_policy=policy,
+        signed_ticket=ticket,
+        trusted_founder_public_key=public_key,
+        trusted_policy_sha256=sha_hex,
+        authenticated_worker_principal=assigned,
+        request_job_id=job_id,
+        request_department=ticket.get("department"),
+        request_capability=ticket.get("capability"),
+        changed_paths=intended_paths,
+        lease_resources=resources,
+        now=datetime.now(timezone.utc),
+        ttl_seconds=ttl_seconds,
+    )

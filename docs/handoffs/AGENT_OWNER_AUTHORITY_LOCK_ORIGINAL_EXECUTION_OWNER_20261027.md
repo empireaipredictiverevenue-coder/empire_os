@@ -276,3 +276,80 @@ recovery, reversible marker removal, all four legitimate-job success
 cases, unassigned-job denials and read-back on live services.
 **No marker, service override, production package or runtime credential
 was installed by this review candidate.**
+
+
+## Sealed worker admission and activation/rollback rehearsal — 27 October
+
+The ORIGINAL `ExecutionLeaseManager.acquire` now has an isolated draft path
+from the root-controlled activation marker to
+`acquire_sealed_owner_lease` in the **existing**
+`empire_os/agent_owner_authority_review.py`. No second lease subsystem,
+scheduler, runtime daemon or database was introduced. When the marker is
+absent the original worker call paths and leases behave as before.
+
+When root-controlled enforcement is on, a mutating lease request requires
+all of the following *already provisioned* in
+`/etc/empire_os/owner_authority`: an immutable root-owned canonical signed
+policy, pinned SHA-256, founder public key, a current signed job ticket
+under `tickets/<original_lease_owner>/<job_id>.json`, and a root-owned
+kernel UID-to-principal registry. Every directory is checked for root
+custody/non-writable mode. Files are read with no-follow, root-ownership,
+regular-file, size and write-permission checks. Missing or invalid files
+fail closed and are mapped back into the original
+`ExecutionLeaseError` contract expected by Hermes, Pi and Empire Coder.
+
+The worker principal is derived from **kernel effective UID and the
+protected registry**, *not* the job's self-reported owner, environment
+variables or untrusted signed-ticket fields. Duplicate Unix UID
+assignments or a worker asking for another original worker's lease lane
+are rejected. Critically, a UID equal to root or to the canonical
+production repository owner (currently `ubuntu`) is rejected outright.
+Thus the present shared-service identity cannot activate privileged
+mutation by simply adding a mapping. The root-custodied signer and
+service-specific Unix accounts are NOT provisioned by this candidate.
+
+The first synthetic end-to-end test now exercises the original lease
+manager with a valid founder-signed policy and job ticket, a distinct
+simulated worker identity, the original lease replay receipt and conflict
+manager. A separate rehearsal switches the gate OFF → ON → OFF: legacy
+lease, unsigned denial, signed allow, release, rollback and restored
+legacy lease. It does not touch the real `/etc` or live leases.
+
+### Direct-write audit (read-only, actual EmpireOS production host)
+
+At 27 October the actual remote-shell EUID was `1000 (ubuntu)`.
+Non-destructive `os.access(..., W_OK)` reported **true** for all of
+`/srv/empire_os`, `/srv/empire_os/empire_os`,
+`/srv/empire_os/.git`, `/srv/empire_os/runtime`, and
+`/srv/empire_os/runtime/execution_plane`. The shared worker units
+`empire-hermes-control.service`, `empire-coder-worker.service`, and
+`empire-coder-verify-drain.service` still all have `User=ubuntu`,
+`Group=ubuntu`, `DynamicUser=no`, with varying systemd sandbox
+restrictions. The actual root-owned `/etc/empire_os` was *not* writable
+by the shell; `owner_authority/` and `owner_lock.enforced` were absent.
+No live owner-lock validator was installed. These facts demonstrate that
+**direct shell/source/git/runtime bypass protection is NOT verified**.
+
+### Production cutover and rollback acceptance — NOT SATISFIED
+
+- Establish distinct, least-privilege Unix service UIDs and protected
+  service-to-lease-manager IPC/custody. Current single-UID lease file and
+  one-use receipt cannot safely be shared across segregated service users
+  without a root-custodied broker or original-owner reviewed ACL design.
+- Protect root signing private keys in existing governance custody;
+  pin signed policy, per-job signed tickets and revoked tickets in the
+  protected original issuer. Public verification material must never be
+  treated as a private signing key.
+- Remove direct writer access for unapproved services/shell and restrict
+  GitHub/connector write permissions. Do NOT recursively change owners,
+  stop legitimate workers or add service accounts blindly on production.
+- Rehearse legitimate Hermes/Pi/Coder jobs, actual file postflight
+  attestation, direct-write denial, active-job drain, identity
+  separation, receipt-corruption handling, ticket-revocation and
+  concurrent rollback under the genuine service principals.
+- Only after those acceptance receipts exist, perform a founder-approved
+  root-controlled marker activation and rollback readback.
+
+**Result: review-code integration and synthetic dry-run PASS;
+production credentials, identity separation, direct-write controls and
+live release remain HOLD. No production activation has occurred.**
