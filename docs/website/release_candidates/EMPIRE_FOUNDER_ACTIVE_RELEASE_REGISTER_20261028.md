@@ -36,4 +36,10 @@
 - Root rollback archive for pre-Naperville state: `/var/backups/empire-website/chicago-naperville-prepublish-20261028-700.tar`. Post-Naperville source and two-guide original gateway snapshots are also in `/var/backups/empire-website/`.
 - Historical preview guards for commercial recorded homeowner calls remain unchanged; informational guides have no `tel:` links, forms, or search indexation.
 
+## Additional exact-current candidate evidence — 28 October 2026, 13:12 UTC
+
+- **746-file client interaction verification:** 1440×900 desktop and 390×844 mobile Chrome checked all three SaaS diagnostic choices (six successful React state transitions), original consent form and CTA, privacy and Commercial enquiry links. No uncaught JavaScript exception, external request, horizontal overflow or submitted forms. Proof `/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/astra_746_three_route_browser_20261028/INTERACTIVE_746_CURRENT_SITE_20261028.json`. Owner worktree documentation commit `86edf1d29`.
+- **Official founder brand ZIP:** original board's bytes match the bundle's pinned source SHA256 `3d453f2a68aa8fbcd4d2cbefd54d7663d2dd533a6dbf86a475d69acf24671aeb`. ZIP has no creator licence/assignment record. Brand rights remain owner-gated, not approved merely through Drive custody.
+- No new service or duplicate agent. Current 707 live / 746 private; exact root backup and owner publication authority still absent.
+
 **Next active owner milestone:** Existing ASTRA owner independently verifies public brand distribution rights (founder-controlled Drive files alone are not a licence) and current Commercial non-VAT copy, creates the original root-owned protected 707 backup and signed exact manifest/operator acceptance, then runs the prepared guarded 707→746 site transaction and 50 live HTTPS readbacks. No additional website build, SaaS research, clone publisher, or agency task is needed. Current proof: `/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/astra_746_release_verifier_hardening_20261028T125223Z.json`. Still **NOT LIVE**.
