@@ -695,6 +695,7 @@ def home():
 
 
 # Existing gateway owns these routes; no second service or autonomous publisher.
+@app.head('/research/{campaign_id}')
 @app.get('/research/{campaign_id}')
 def research_page(campaign_id: str):
     from empire_os.owned_campaign_release import released_html
