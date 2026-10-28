@@ -1,0 +1,774 @@
+"""Private owner-authority preflight for the ORIGINAL EmpireOS execution plane.
+
+Candidate only: no issuer, deployment, agent, timer, or external action.
+Only a trusted founder-policy signer can establish standing owners. Worker-
+supplied labels and temporary execution leases NEVER confer ownership.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timedelta, timezone
+import hashlib
+import json
+import os
+import re
+import stat
+from pathlib import Path
+from typing import Any, Mapping
+from uuid import uuid4
+
+from empire_os.execution_lease import (
+    ExecutionLease, ExecutionLeaseManager, _normalise_resource, resources_conflict,
+)
+
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+
+POLICY_SCHEMA = "empire.execution.owner_policy.v1"
+TICKET_SCHEMA = "empire.execution.owner_ticket.v1"
+_ID = re.compile(r"[a-z][a-z0-9_-]{1,80}\Z")
+
+
+class OwnerAuthorityHold(ValueError):
+    """Hold a mutation without falling back to self-assigned authority."""
+
+
+def _id(v: Any) -> str:
+    if not isinstance(v, str) or not _ID.fullmatch(v):
+        raise OwnerAuthorityHold("INVALID_OWNER_OR_DOMAIN_ID")
+    return v
+
+
+def _path(v: Any) -> str:
+    if not isinstance(v, str) or len(v) > 300 or not v:
+        raise OwnerAuthorityHold("INVALID_PATH")
+    if (
+        v.startswith(("/", "~")) or "\\" in v or "//" in v
+        or v.endswith("/") or any(ord(char) < 32 or ord(char) == 127 for char in v)
+    ):
+        raise OwnerAuthorityHold("UNSAFE_PATH")
+    parts = v.split("/")
+    if any(
+        p in (".", "..", "", ".git")
+        or p == ".env" or p.startswith(".env.")
+        for p in parts
+    ):
+        raise OwnerAuthorityHold("UNSAFE_PATH")
+    if parts[0] in ("runtime", "recovery", "toop") or parts[0].startswith("."):
+        raise OwnerAuthorityHold("PROTECTED_PATH")
+    return v
+
+
+def _prefix(parent: str, child: str) -> bool:
+    return parent == child or child.startswith(parent + "/")
+
+
+def _timestamp(v: Any) -> datetime:
+    if not isinstance(v, str) or len(v) > 45:
+        raise OwnerAuthorityHold("INVALID_CLOCK")
+    try:
+        t = datetime.fromisoformat(v)
+    except (ValueError, OverflowError) as exc:
+        raise OwnerAuthorityHold("INVALID_CLOCK") from exc
+    if t.utcoffset() is None:
+        raise OwnerAuthorityHold("NAIVE_CLOCK")
+    return t.astimezone(timezone.utc)
+
+
+def _verify_signed(obj: Mapping[str, Any], *, public_key: Ed25519PublicKey) -> dict:
+    if not isinstance(obj, Mapping) or not isinstance(obj.get("signature"), str):
+        raise OwnerAuthorityHold("MISSING_SIGNED_AUTHORITY")
+    try:
+        signature = bytes.fromhex(obj["signature"])
+        data = {k: v for k, v in obj.items() if k != "signature"}
+        encoded = json.dumps(data, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf8")
+        public_key.verify(signature, encoded)
+    except (InvalidSignature, ValueError, TypeError) as exc:
+        raise OwnerAuthorityHold("AUTHORITY_SIGNATURE_INVALID") from exc
+    return data
+
+
+def _unique_paths(value: Any) -> tuple[str, ...]:
+    if not isinstance(value, list) or not 1 <= len(value) <= 50:
+        raise OwnerAuthorityHold("NO_BOUNDED_PATH_SCOPE")
+    paths = tuple(_path(v) for v in value)
+    if len(set(paths)) != len(paths):
+        raise OwnerAuthorityHold("DUPLICATE_PATH")
+    return paths
+
+def verify_owner_mutation(
+    *,
+    signed_policy: Mapping[str, Any],
+    signed_ticket: Mapping[str, Any],
+    trusted_founder_public_key: Ed25519PublicKey,
+    trusted_policy_sha256: str,
+    authenticated_worker_principal: str,
+    request_job_id: str,
+    request_department: str,
+    request_capability: str,
+    changed_paths: tuple[str, ...],
+    lease_resources: tuple[str, ...],
+    now: datetime,
+) -> dict[str, Any]:
+    """Check exactly one mutating request before the EXISTING lease manager.
+
+    The caller MUST source the founder public key from trusted custody and the
+    principal from authenticated worker identity, never the worker's payload.
+    Approval here does not replace a lease or any production release gate.
+    """
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise OwnerAuthorityHold("CLOCK_REQUIRED")
+    at = now.astimezone(timezone.utc)
+    if not isinstance(trusted_policy_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", trusted_policy_sha256):
+        raise OwnerAuthorityHold("NO_PINNED_FOUNDER_POLICY")
+    try:
+        raw_policy = json.dumps(signed_policy, sort_keys=True, separators=(",", ":"), allow_nan=False).encode("utf8")
+    except (TypeError, ValueError) as exc:
+        raise OwnerAuthorityHold("INVALID_FOUNDER_POLICY_PAYLOAD") from exc
+    if hashlib.sha256(raw_policy).hexdigest() != trusted_policy_sha256:
+        raise OwnerAuthorityHold("STALE_OR_REVOKED_OWNER_POLICY")
+    policy = _verify_signed(signed_policy, public_key=trusted_founder_public_key)
+    ticket = _verify_signed(signed_ticket, public_key=trusted_founder_public_key)
+    if policy.get("schema_version") != POLICY_SCHEMA:
+        raise OwnerAuthorityHold("OWNER_POLICY_NOT_CANONICAL")
+    if ticket.get("schema_version") != TICKET_SCHEMA:
+        raise OwnerAuthorityHold("OWNER_TICKET_NOT_CANONICAL")
+    if policy.get("issuer") != "FOUNDER_CONTROLLED_EXECUTION_OWNER":
+        raise OwnerAuthorityHold("UNKNOWN_OWNER_ISSUER")
+    if ticket.get("authority") != "internal_write":
+        raise OwnerAuthorityHold("NO_INTERNAL_WRITE_TICKET")
+
+    issued = _timestamp(ticket.get("issued_at"))
+    expires = _timestamp(ticket.get("expires_at"))
+    if issued > at + timedelta(seconds=90) or at >= expires or issued > at:
+        raise OwnerAuthorityHold("TICKET_NOT_CURRENT")
+    if expires - issued > timedelta(hours=2) or expires <= issued:
+        raise OwnerAuthorityHold("TICKET_LIFETIME_INVALID")
+    if ticket.get("job_id") != request_job_id or not request_job_id:
+        raise OwnerAuthorityHold("JOB_ID_MISMATCH")
+    if ticket.get("department") != request_department or not request_department:
+        raise OwnerAuthorityHold("DEPARTMENT_MISMATCH")
+    if ticket.get("capability") != request_capability or not request_capability:
+        raise OwnerAuthorityHold("CAPABILITY_MISMATCH")
+    principal = _id(authenticated_worker_principal)
+    if _id(ticket.get("principal")) != principal:
+        raise OwnerAuthorityHold("SPOOFED_WORKER_OWNER")
+    assignment_id = _id(ticket.get("assignment_id"))
+    _id(ticket.get("ticket_id"))  # Signed one-use identity from the trusted issuer.
+
+    assignments = policy.get("assignments")
+    if not isinstance(assignments, list) or not 1 <= len(assignments) <= 100:
+        raise OwnerAuthorityHold("NO_APPROVED_WORKSTREAMS")
+    seen_ids: set[str] = set()
+    scopes: list[tuple[str, str]] = []
+    chosen = None
+    for row in assignments:
+        if not isinstance(row, dict) or row.get("approved") is not True:
+            raise OwnerAuthorityHold("UNAPPROVED_WORKSTREAM")
+        aid = _id(row.get("assignment_id"))
+        _id(row.get("principal"))
+        if aid in seen_ids:
+            raise OwnerAuthorityHold("DUPLICATE_WORKSTREAM_OWNER")
+        seen_ids.add(aid)
+        if not isinstance(row.get("department"), str) or not row["department"]:
+            raise OwnerAuthorityHold("OWNER_DEPARTMENT_UNVERIFIED")
+        paths = _unique_paths(row.get("allowed_paths"))
+        caps = row.get("capabilities")
+        domains = row.get("allowed_domains")
+        if not isinstance(caps, list) or not caps or not all(isinstance(v, str) for v in caps):
+            raise OwnerAuthorityHold("OWNER_CAPABILITY_UNVERIFIED")
+        if not isinstance(domains, list) or not all(isinstance(v, str) and _ID.fullmatch(v) for v in domains):
+            raise OwnerAuthorityHold("OWNER_DOMAINS_UNVERIFIED")
+        if not isinstance(row.get("founder_decision_ref"), str) or not row["founder_decision_ref"]:
+            raise OwnerAuthorityHold("NO_FOUNDER_ASSIGNMENT_RECEIPT")
+        scopes.extend((aid, p) for p in paths)
+        if aid == assignment_id:
+            chosen = row
+    for i, (left_id, left_path) in enumerate(scopes):
+        for right_id, right_path in scopes[i + 1:]:
+            if left_id != right_id and (_prefix(left_path, right_path) or _prefix(right_path, left_path)):
+                raise OwnerAuthorityHold("OVERLAPPING_WORKSTREAM_ASSIGNMENTS")
+    if chosen is None:
+        raise OwnerAuthorityHold("UNKNOWN_WORKSTREAM")
+    if (
+        chosen["principal"] != principal
+        or chosen["department"] != request_department
+        or request_capability not in chosen["capabilities"]
+        or chosen["founder_decision_ref"] != ticket.get("founder_decision_ref")
+    ):
+        raise OwnerAuthorityHold("WORKSTREAM_NOT_ASSIGNED_TO_REQUESTER")
+
+    targets = tuple(_path(p) for p in changed_paths)
+    signed_paths = _unique_paths(ticket.get("changed_paths"))
+    if not targets or targets != signed_paths:
+        raise OwnerAuthorityHold("UNSIGNED_OR_CHANGED_FILE_SET")
+    if not all(any(_prefix(p, t) for p in chosen["allowed_paths"]) for t in targets):
+        raise OwnerAuthorityHold("CROSS_AGENT_FILE_CHANGE")
+    signed_leases = ticket.get("lease_resources")
+    if not isinstance(signed_leases, list) or not lease_resources or tuple(signed_leases) != lease_resources:
+        raise OwnerAuthorityHold("LEASE_NOT_BOUND_TO_OWNER_TICKET")
+    if not {f"path:{p}" for p in targets}.issubset(set(lease_resources)):
+        raise OwnerAuthorityHold("CHANGED_FILES_NOT_FULLY_LEASED")
+    for resource in lease_resources:
+        if not isinstance(resource, str):
+            raise OwnerAuthorityHold("BAD_LEASE_RESOURCE")
+        if resource.startswith("path:"):
+            path = _path(resource[5:])
+            if not any(_prefix(p, path) for p in chosen["allowed_paths"]):
+                raise OwnerAuthorityHold("CROSS_AGENT_LEASE_SCOPE")
+        elif resource.startswith("domain:"):
+            if resource[7:] not in chosen["allowed_domains"]:
+                raise OwnerAuthorityHold("UNAPPROVED_LOGICAL_DOMAIN")
+        else:
+            raise OwnerAuthorityHold("UNSUPPORTED_RESOURCE_CLASS")
+    return {
+        "status": "FOUNDER_OWNER_SCOPE_VALIDATED_BEFORE_LEASE",
+        "assignment_id": assignment_id,
+        "principal": principal,
+        "request_job_id": request_job_id,
+        "verified_path_count": len(targets),
+        "existing_execution_lease_still_required": True,
+        "production_release_authorized": False,
+        "external_actions_authorized": False,
+        "payment_actions_authorized": False,
+    }
+
+
+def acquire_owner_authorized_lease(
+    *,
+    lease_manager: Any,
+    signed_policy: Mapping[str, Any],
+    signed_ticket: Mapping[str, Any],
+    trusted_founder_public_key: Ed25519PublicKey,
+    trusted_policy_sha256: str,
+    authenticated_worker_principal: str,
+    request_job_id: str,
+    request_department: str,
+    request_capability: str,
+    changed_paths: tuple[str, ...],
+    lease_resources: tuple[str, ...],
+    now: datetime,
+    ttl_seconds: int = 1200,
+) -> Any:
+    """Private adapter using the EXISTING lease manager, not a second lock.
+
+    The original trusted execution-plane owner must bind the verified service
+    identity, pinned key and policy digest, and mandate this path for ALL
+    mutating workers before enabling it. Do not import for live work until
+    original-owner integration/rollback and founder assignments are approved.
+    """
+    review = verify_owner_mutation(
+        signed_policy=signed_policy,
+        signed_ticket=signed_ticket,
+        trusted_founder_public_key=trusted_founder_public_key,
+        trusted_policy_sha256=trusted_policy_sha256,
+        authenticated_worker_principal=authenticated_worker_principal,
+        request_job_id=request_job_id,
+        request_department=request_department,
+        request_capability=request_capability,
+        changed_paths=changed_paths,
+        lease_resources=lease_resources,
+        now=now,
+    )
+    # Never grant an operational lease longer than the signed job ticket.
+    # The existing lease manager clamps TTL values to [60, 7200], so reject
+    # out-of-bounds requests here instead of silently expanding authority.
+    if type(ttl_seconds) is not int or not 60 <= ttl_seconds <= 7200:
+        raise OwnerAuthorityHold("OWNER_LEASE_TTL_OUT_OF_BOUNDS")
+    expires_at = _timestamp(signed_ticket.get("expires_at"))
+    if not isinstance(now, datetime) or now.utcoffset() is None:
+        raise OwnerAuthorityHold("CLOCK_REQUIRED")
+    time_remaining = (expires_at - now.astimezone(timezone.utc)).total_seconds()
+    if ttl_seconds > time_remaining:
+        raise OwnerAuthorityHold("OWNER_LEASE_OUTLIVES_SIGNED_TICKET")
+    if type(lease_manager) is not ExecutionLeaseManager:
+        raise OwnerAuthorityHold("TRUSTED_ORIGINAL_LEASE_MANAGER_REQUIRED")
+    path = _ticket_receipt_path(lease_manager)
+    ticket_id = _id(signed_ticket.get("ticket_id"))
+    ticket_digest = hashlib.sha256(("empire-owner-ticket-v1:" + ticket_id).encode("ascii")).hexdigest()
+    # The ORIGINAL manager's lock serializes the replay check and lease state;
+    # no second manager, process, database, scheduler or competing lock.
+    with lease_manager._locked():
+        actual_now = datetime.now(timezone.utc)
+        if abs((actual_now - now.astimezone(timezone.utc)).total_seconds()) > 90:
+            raise OwnerAuthorityHold("TRUSTED_JOB_CLOCK_STALE")
+        if not _timestamp(signed_ticket.get("issued_at")) <= actual_now < expires_at:
+            raise OwnerAuthorityHold("OWNER_TICKET_NOT_LIVE_AT_LEASE_ACQUISITION")
+        if ttl_seconds > (expires_at - actual_now).total_seconds():
+            raise OwnerAuthorityHold("OWNER_LEASE_OUTLIVES_SIGNED_TICKET")
+        consumed = _read_consumptions(path)
+        if ticket_digest in consumed:
+            raise OwnerAuthorityHold("SIGNED_OWNER_TICKET_ALREADY_CONSUMED")
+        if len(consumed) >= MAX_CONSUMED_TICKETS:
+            raise OwnerAuthorityHold("TICKET_RECEIPT_CAPACITY_REVIEW_REQUIRED")
+        # Original manager historically skips malformed rows. The protected
+        # owner adapter refuses corrupt live state instead of treating it as
+        # free capacity for a second worker.
+        state = lease_manager.state_path
+        if state.exists() or state.is_symlink():
+            try:
+                metadata = state.lstat()
+                if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                    raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_CUSTODY_UNSAFE")
+                raw_leases = json.loads(state.read_text(encoding="utf8"))
+                if not isinstance(raw_leases, list):
+                    raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_CORRUPT")
+            except (OSError, TypeError, ValueError) as exc:
+                raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_UNREADABLE") from exc
+        else:
+            raw_leases = []
+        parsed = lease_manager._read()
+        if len(parsed) != len(raw_leases):
+            raise OwnerAuthorityHold("ORIGINAL_LEASE_STATE_PARTIALLY_INVALID")
+        normalized = tuple(dict.fromkeys(_normalise_resource(r) for r in lease_resources))
+        if len(normalized) != len(lease_resources):
+            raise OwnerAuthorityHold("DUPLICATE_MUTATION_LEASE_RESOURCE")
+        active = lease_manager._prune(parsed, now=actual_now)
+        if any(resources_conflict(normalized, lease.resources) for lease in active):
+            raise OwnerAuthorityHold("ORIGINAL_EXECUTION_LEASE_CONFLICT")
+        lease = ExecutionLease(
+            lease_id="exec_lease_" + uuid4().hex,
+            owner=review["principal"], job_id=review["request_job_id"],
+            resources=normalized,
+            acquired_at=actual_now.isoformat(),
+            expires_at=(actual_now + timedelta(seconds=ttl_seconds)).isoformat(),
+        )
+        # Persist the one-use receipt BEFORE committing the lease. A crash
+        # between writes may burn a ticket, but cannot allow replay. The
+        # original owner must reconcile burnt tickets via a fresh signed ID.
+        _persist_consumptions(path, [*consumed, ticket_digest])
+        lease_manager._write([*active, lease])
+        return lease
+
+
+def attest_actual_worktree_changes(
+    *,
+    trusted_worktree_root: Path,
+    signed_changed_paths: tuple[str, ...],
+    independently_observed_changed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Post-worktree *additional* check, not a substitute for signed authority.
+
+    The original owner MUST derive independently_observed_changed_paths from
+    trusted Git/worktree readback, not from a worker assertion. This rejects
+    symlinks or hard-linked paths that could escape the authorised source lane.
+    Deletions/renames need a separate owner-reviewed contract, not a bypass.
+    """
+    if (
+        not isinstance(trusted_worktree_root, Path)
+        or trusted_worktree_root.is_symlink()
+        or not trusted_worktree_root.is_dir()
+    ):
+        raise OwnerAuthorityHold("UNTRUSTED_WORKTREE_ROOT")
+    root = trusted_worktree_root.resolve(strict=True)
+    signed = tuple(_path(p) for p in signed_changed_paths)
+    observed = tuple(_path(p) for p in independently_observed_changed_paths)
+    if not signed or len(set(signed)) != len(signed) or signed != observed:
+        raise OwnerAuthorityHold("ACTUAL_CHANGES_NOT_EQUAL_TO_SIGNED_FILES")
+    for relpath in observed:
+        candidate = root
+        for segment in relpath.split("/"):
+            candidate = candidate / segment
+            if candidate.is_symlink():
+                raise OwnerAuthorityHold("SYMLINKED_CHANGED_PATH_DENIED")
+            if not candidate.exists():
+                raise OwnerAuthorityHold("MISSING_CHANGED_PATH_REQUIRES_OWNER_REVIEW")
+        try:
+            metadata = candidate.lstat()
+        except OSError as exc:
+            raise OwnerAuthorityHold("UNREADABLE_CHANGED_PATH") from exc
+        if not stat.S_ISREG(metadata.st_mode):
+            raise OwnerAuthorityHold("NONREGULAR_CHANGED_FILE_DENIED")
+        if metadata.st_nlink != 1:
+            raise OwnerAuthorityHold("HARDLINKED_CHANGED_FILE_DENIED")
+        if candidate.resolve(strict=True) != root / relpath:
+            raise OwnerAuthorityHold("OUTSIDE_TRUSTED_WORKTREE")
+    return {
+        "status": "ORIGINAL_OWNER_WORKTREE_PATH_ATTESTED",
+        "path_count": len(observed),
+        "production_publication_authorized": False,
+        "no_untrusted_worktree_paths": True,
+    }
+
+
+# This subordinate replay receipt uses the ORIGINAL lease manager's exclusive
+# flock. It is a review-only candidate; the original execution-plane owner
+# must independently accept its private API coupling, file custody and
+# rollback rules before any production installation.
+TICKET_RECEIPT_SCHEMA = "empire.execution.owner_ticket_consumption.v1"
+TICKET_RECEIPT_NAME = ".owner_ticket_consumption.json"
+MAX_CONSUMED_TICKETS = 4096
+
+
+def _ticket_receipt_path(lease_manager: Any) -> Path:
+    root = getattr(lease_manager, "root", None)
+    if not isinstance(root, Path) or root.is_symlink() or not root.is_dir():
+        raise OwnerAuthorityHold("UNTRUSTED_ORIGINAL_LEASE_ROOT")
+    if stat.S_IMODE(root.stat().st_mode) != 0o700:
+        raise OwnerAuthorityHold("UNSAFE_ORIGINAL_LEASE_ROOT_PERMISSIONS")
+    return root / TICKET_RECEIPT_NAME
+
+
+def _read_consumptions(path: Path) -> list[str]:
+    """Missing, corrupt or unsafe custody is a HOLD, never a clean slate."""
+    try:
+        metadata = path.lstat()
+        if (not stat.S_ISREG(metadata.st_mode)
+                or stat.S_IMODE(metadata.st_mode) != 0o600
+                or metadata.st_nlink != 1
+                or metadata.st_uid != os.geteuid()
+                or not 50 <= metadata.st_size <= 400_000):
+            raise OwnerAuthorityHold("UNSAFE_TICKET_RECEIPT_CUSTODY")
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or set(raw) != {"schema_version", "consumed"}:
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_SCHEMA")
+        if raw["schema_version"] != TICKET_RECEIPT_SCHEMA:
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_SCHEMA")
+        tokens = raw["consumed"]
+        if (not isinstance(tokens, list) or len(tokens) > MAX_CONSUMED_TICKETS
+                or any(not isinstance(x, str) or not re.fullmatch(r"[0-9a-f]{64}", x)
+                       for x in tokens)
+                or len(set(tokens)) != len(tokens)):
+            raise OwnerAuthorityHold("INVALID_TICKET_RECEIPT_CONTENTS")
+        return tokens
+    except OwnerAuthorityHold:
+        raise
+    except (OSError, ValueError, TypeError, UnicodeError) as exc:
+        raise OwnerAuthorityHold("TICKET_RECEIPT_MISSING_OR_UNREADABLE") from exc
+
+
+def _persist_consumptions(path: Path, consumed: list[str]) -> None:
+    """Only while the original lease manager's exclusive lock is held."""
+    if len(consumed) > MAX_CONSUMED_TICKETS:
+        raise OwnerAuthorityHold("TICKET_RECEIPT_CAPACITY_REVIEW_REQUIRED")
+    content = json.dumps(
+        {"schema_version": TICKET_RECEIPT_SCHEMA, "consumed": consumed},
+        sort_keys=True, separators=(",", ":")
+    ).encode("utf-8") + b"\n"
+    name = path.with_name(".owner_ticket_receipt_stage_" + uuid4().hex)
+    fd = os.open(name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(name, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if name.exists():
+            name.unlink()
+
+
+def provision_owner_ticket_receipts_for_review(lease_manager: Any) -> Path:
+    """Explicit *offline/test* provisioning only, not a live auto-initializer.
+
+    The original owner must securely provision a protected receipt once and
+    attest its custody. Deleting it never silently resets used ticket IDs.
+    """
+    path = _ticket_receipt_path(lease_manager)
+    with lease_manager._locked():
+        if path.exists() or path.is_symlink():
+            raise OwnerAuthorityHold("EXISTING_TICKET_RECEIPT_CANNOT_BE_RESET")
+        # O_EXCL ensures two initializers cannot replace a live receipt.
+        fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as stream:
+                os.fchmod(stream.fileno(), 0o600)
+                stream.write(json.dumps(
+                    {"schema_version": TICKET_RECEIPT_SCHEMA, "consumed": []},
+                    separators=(",", ":")
+                ).encode("utf-8") + b"\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            directory_fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except BaseException:
+            path.unlink(missing_ok=True)
+            raise
+    return path
+
+
+# Existing-original-manager live adapter. Nothing below issues tickets, signs
+# founder policies or creates another scheduler/worker/lease implementation.
+# The original release owner must provision this root-owned configuration and
+# distinct systemd User= identities before the marker may ever be activated.
+SEALED_AUTHORITY_ROOT = Path("/etc/empire_os/owner_authority")
+ORIGINAL_MUTATING_LEASE_OWNERS = frozenset({"hermes", "pi", "empire_coder"})
+MAX_SEALED_ARTIFACT_BYTES = 262144
+
+
+def _sealed_root_directory(directory: Path) -> None:
+    try:
+        info = directory.lstat()
+    except OSError as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_CUSTODY_NOT_PROVISIONED") from exc
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or info.st_uid != 0
+        or info.st_mode & 0o022
+    ):
+        raise OwnerAuthorityHold("SEALED_OWNER_CUSTODY_UNSAFE")
+
+
+def _sealed_file(path: Path) -> bytes:
+    """No worker-supplied paths, no symlinks, no non-root files."""
+    try:
+        if path.is_symlink():
+            raise OwnerAuthorityHold("SEALED_OWNER_SYMLINK_DENIED")
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != 0
+                or info.st_nlink != 1
+                or info.st_mode & 0o022
+                or info.st_size <= 0
+                or info.st_size > MAX_SEALED_ARTIFACT_BYTES
+            ):
+                raise OwnerAuthorityHold("SEALED_OWNER_FILE_CUSTODY_UNSAFE")
+            data = os.read(fd, MAX_SEALED_ARTIFACT_BYTES + 1)
+            if len(data) != info.st_size:
+                raise OwnerAuthorityHold("SEALED_OWNER_FILE_CHANGED")
+            return data
+        finally:
+            os.close(fd)
+    except OwnerAuthorityHold:
+        raise
+    except OSError as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_FILE_UNAVAILABLE") from exc
+
+
+def _sealed_json(path: Path) -> dict:
+    try:
+        data = json.loads(_sealed_file(path))
+    except OwnerAuthorityHold:
+        raise
+    except (TypeError, ValueError, UnicodeError) as exc:
+        raise OwnerAuthorityHold("SEALED_OWNER_INVALID_JSON") from exc
+    if not isinstance(data, dict):
+        raise OwnerAuthorityHold("SEALED_OWNER_INVALID_JSON")
+    return data
+
+
+def _production_repository_owner_uid() -> int:
+    """Fail closed if the canonical production repo owner cannot be read."""
+    try:
+        return Path("/srv/empire_os").stat().st_uid
+    except OSError as exc:
+        raise OwnerAuthorityHold("PRODUCTION_REPOSITORY_CUSTODY_UNKNOWN") from exc
+
+
+def _principal_for_authenticated_uid(
+    registry: Mapping[str, Any], *, kernel_uid: int, lease_owner: str
+) -> str:
+    """Identity comes from kernel UID + root-owned registry, never job labels."""
+    # Existing services and interactive remote shell all use the same ubuntu
+    # repository owner. That Unix identity is never admissible as a protected
+    # mutation principal, regardless of a root-published mapping that names it.
+    if kernel_uid in (0, _production_repository_owner_uid()):
+        raise OwnerAuthorityHold("SHARED_OR_PRIVILEGED_UNIX_IDENTITY_DENIED")
+    if registry.get("schema_version") != "empire.execution.owner_principals.v1":
+        raise OwnerAuthorityHold("UNTRUSTED_OWNER_PRINCIPAL_SCHEMA")
+    rows = registry.get("workers")
+    if not isinstance(rows, list) or not 1 <= len(rows) <= 16:
+        raise OwnerAuthorityHold("NO_PROVISIONED_WORKER_PRINCIPALS")
+    seen_uids: set[int] = set()
+    seen_principals: set[str] = set()
+    matched: str | None = None
+    for row in rows:
+        if not isinstance(row, dict):
+            raise OwnerAuthorityHold("UNTRUSTED_WORKER_PRINCIPAL_ROW")
+        uid = row.get("uid")
+        if type(uid) is not int or uid <= 0 or uid in seen_uids:
+            raise OwnerAuthorityHold("SHARED_OR_INVALID_WORKER_UNIX_IDENTITY")
+        seen_uids.add(uid)
+        principal = _id(row.get("principal"))
+        if principal in seen_principals:
+            raise OwnerAuthorityHold("DUPLICATED_AUTHENTICATED_WORKER")
+        seen_principals.add(principal)
+        permitted_owner = _id(row.get("lease_owner"))
+        if permitted_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+            raise OwnerAuthorityHold("UNKNOWN_ORIGINAL_WORKER_CLASS")
+        if kernel_uid == uid:
+            if permitted_owner != lease_owner:
+                raise OwnerAuthorityHold("WORKER_UID_CROSS_LANE_IMPERSONATION")
+            matched = principal
+    if matched is None:
+        raise OwnerAuthorityHold("NO_AUTHENTICATED_WORKER_UID_MAPPING")
+    return matched
+
+
+def _attest_protected_original_lease_custody(
+    lease_manager: ExecutionLeaseManager,
+) -> None:
+    """Refuse a worker that can bypass tickets by editing original lease state.
+
+    This intentionally exposes the remaining need for the ORIGINAL plane's
+    protected admission broker. Existing rootless file-backed leases cannot
+    provide a security boundary when mutating workers own the same state.
+    No live files, permissions, users or leases are changed by this check.
+    """
+    repo_root = Path("/srv/empire_os")
+    state_root = lease_manager.root
+    if not isinstance(state_root, Path):
+        raise OwnerAuthorityHold("ORIGINAL_LEASE_ROOT_UNKNOWN")
+    guarded = (repo_root, repo_root / ".git", state_root,
+               state_root / ".leases.lock", state_root / "leases.json",
+               state_root / TICKET_RECEIPT_NAME)
+    for path in guarded:
+        try:
+            info = path.lstat()
+        except FileNotFoundError as exc:
+            # Lease state files may be created only by a protected original
+            # broker. The manager-root itself must always exist.
+            if path in (repo_root, repo_root / ".git", state_root):
+                raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_MISSING") from exc
+            continue
+        except OSError as exc:
+            raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_UNREADABLE") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_IS_SYMLINK")
+        if info.st_uid == os.geteuid() or os.access(path, os.W_OK, effective_ids=True):
+            raise OwnerAuthorityHold("UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS")
+    # The original file manager itself must not run under the same worker UID
+    # that can manufacture a new leases.json inside its writable root.
+    try:
+        if os.access(state_root, os.W_OK, effective_ids=True):
+            raise OwnerAuthorityHold("UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS")
+    except OSError as exc:
+        raise OwnerAuthorityHold("LEASE_CUSTODY_VERIFICATION_FAILED") from exc
+
+
+def acquire_sealed_owner_lease(
+    *,
+    lease_manager: ExecutionLeaseManager,
+    lease_owner: str,
+    job_id: str,
+    resources: tuple[str, ...],
+    ttl_seconds: int,
+) -> ExecutionLease:
+    """Founder's *staged* sealed adapter behind original shared lease guard.
+
+    Requires root-owned issuer artifacts and a distinct kernel UID mapped
+    to the original worker lane. All missing/ambiguous bindings HOLD. Does
+    not issue keys, rotate receipts or grant production release authority.
+    """
+    if type(lease_manager) is not ExecutionLeaseManager:
+        raise OwnerAuthorityHold("TRUSTED_ORIGINAL_LEASE_MANAGER_REQUIRED")
+    if lease_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+        raise OwnerAuthorityHold("UNKNOWN_MUTATION_WORKER_CLASS")
+    _attest_protected_original_lease_custody(lease_manager)
+    if (
+        not isinstance(job_id, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id)
+        or ".." in job_id
+    ):
+        raise OwnerAuthorityHold("UNTRUSTED_MUTATING_JOB_ID")
+    root = SEALED_AUTHORITY_ROOT
+    _sealed_root_directory(root.parent)
+    _sealed_root_directory(root)
+    for folder in (root / "tickets", root / "tickets" / lease_owner):
+        _sealed_root_directory(folder)
+    assigned = _principal_for_authenticated_uid(
+        _sealed_json(root / "principals.json"),
+        kernel_uid=os.geteuid(),
+        lease_owner=lease_owner,
+    )
+    policy = _sealed_json(root / "policy.json")
+    ticket = _sealed_json(root / "tickets" / lease_owner / (job_id + ".json"))
+    key_hex = _sealed_file(root / "founder_public_key.hex").decode("ascii").strip()
+    sha_hex = _sealed_file(root / "pinned_policy_sha256.txt").decode("ascii").strip()
+    try:
+        key_bytes = bytes.fromhex(key_hex)
+        if len(key_bytes) != 32:
+            raise ValueError("wrong ed25519 key size")
+        public_key = Ed25519PublicKey.from_public_bytes(key_bytes)
+    except (ValueError, TypeError) as exc:
+        raise OwnerAuthorityHold("TRUSTED_FOUNDER_PUBLIC_KEY_INVALID") from exc
+    intended_paths = tuple(r[5:] for r in resources if r.startswith("path:"))
+    if not intended_paths:
+        raise OwnerAuthorityHold("MISSING_EXACT_JOB_PATH_SCOPE")
+    return acquire_owner_authorized_lease(
+        lease_manager=lease_manager,
+        signed_policy=policy,
+        signed_ticket=ticket,
+        trusted_founder_public_key=public_key,
+        trusted_policy_sha256=sha_hex,
+        authenticated_worker_principal=assigned,
+        request_job_id=job_id,
+        request_department=ticket.get("department"),
+        request_capability=ticket.get("capability"),
+        changed_paths=intended_paths,
+        lease_resources=resources,
+        now=datetime.now(timezone.utc),
+        ttl_seconds=ttl_seconds,
+    )
+
+
+def attest_sealed_worker_proposal(
+    *,
+    lease_owner: str,
+    job_id: str,
+    trusted_worktree_root: Path,
+    independently_observed_changed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Draft final pre-publication signed-path check for original workers.
+
+    The caller MUST use actual Git/worktree readback, not worker-prompt text.
+    This is defence in depth, NOT a substitute for protected publisher/OS
+    rights: workers who can push directly can still bypass this code.
+    """
+    if lease_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+        raise OwnerAuthorityHold("UNKNOWN_MUTATION_WORKER_CLASS")
+    if not isinstance(job_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id
+    ) or ".." in job_id:
+        raise OwnerAuthorityHold("UNTRUSTED_MUTATING_JOB_ID")
+    root = SEALED_AUTHORITY_ROOT
+    _sealed_root_directory(root.parent)
+    _sealed_root_directory(root)
+    for folder in (root / "tickets", root / "tickets" / lease_owner):
+        _sealed_root_directory(folder)
+    principal = _principal_for_authenticated_uid(
+        _sealed_json(root / "principals.json"),
+        kernel_uid=os.geteuid(), lease_owner=lease_owner,
+    )
+    policy = _sealed_json(root / "policy.json")
+    ticket = _sealed_json(root / "tickets" / lease_owner / (job_id + ".json"))
+    key_text = _sealed_file(root / "founder_public_key.hex").decode("ascii").strip()
+    sha_text = _sealed_file(root / "pinned_policy_sha256.txt").decode("ascii").strip()
+    try:
+        key_data = bytes.fromhex(key_text)
+        if len(key_data) != 32:
+            raise ValueError("ed25519 key size invalid")
+        public_key = Ed25519PublicKey.from_public_bytes(key_data)
+    except (TypeError, ValueError) as exc:
+        raise OwnerAuthorityHold("TRUSTED_FOUNDER_PUBLIC_KEY_INVALID") from exc
+    signed_paths = _unique_paths(ticket.get("changed_paths"))
+    # This also independently verifies the currently pinned founder policy,
+    # valid signature, expiry, exact principal/assignment and path authority.
+    verify_owner_mutation(
+        signed_policy=policy, signed_ticket=ticket,
+        trusted_founder_public_key=public_key,
+        trusted_policy_sha256=sha_text,
+        authenticated_worker_principal=principal,
+        request_job_id=job_id,
+        request_department=ticket.get("department"),
+        request_capability=ticket.get("capability"),
+        changed_paths=signed_paths,
+        lease_resources=tuple(ticket.get("lease_resources") or ()),
+        now=datetime.now(timezone.utc),
+    )
+    return attest_actual_worktree_changes(
+        trusted_worktree_root=trusted_worktree_root,
+        signed_changed_paths=signed_paths,
+        independently_observed_changed_paths=independently_observed_changed_paths,
+    )

@@ -23,7 +23,9 @@ from empire_os.aider_model_selector import select_usable_aider_model
 from empire_os.builder_capabilities import builder_capability_ready
 from empire_os.coder import EmpireCoder
 from empire_os.coder.models import VerificationVerdict
-from empire_os.execution_lease import ExecutionLeaseError, ExecutionLeaseManager
+from empire_os.execution_lease import (
+    ExecutionLeaseError, ExecutionLeaseManager, attest_original_worker_proposal,
+)
 
 
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
@@ -411,6 +413,11 @@ def run_empire_coder_sandbox_job(
             result["status"] = "VERIFICATION_FAILED"
             return result
 
+        attest_original_worker_proposal(
+            lease_owner="empire_coder", job_id=job.job_id,
+            trusted_worktree_root=clone,
+            independently_observed_changed_paths=tuple(changed),
+        )
         proposal_branch = f"empire-coder/job-{job.job_id}"
         switched = _run(
             ["git", "switch", "-C", proposal_branch],

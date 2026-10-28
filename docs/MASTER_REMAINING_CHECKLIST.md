@@ -820,6 +820,9 @@ Truth rule: code presence is not production completion. Items below remain unche
 - [x] Astra/department queue automatic dispatch into the execution plane — LIVE VERIFIED 2026-10-02
 - [ ] Live parallel non-overlapping Hermes/Pi proof
 - [x] Live collision test proving overlapping mutation leases fail closed — LIVE VERIFIED 2026-10-02
+- [x] Agent Ownership Lock scoped REVIEW candidate: founder owns original Execution Plane; signed roles, single-use tickets, original lease marker and direct-write inventory tested in Draft PR #149. Not merged/live.
+- [x] 28 Oct pre-publication signed changed-path checks added in original Hermes, Pi and Empire Coder sandbox proposal paths, protected-marker OFF compatible; 160 tests passed offline. Not independent publisher authority.
+- [ ] Agent Ownership Lock LIVE: distinct OS/service identities, protected one-shot admission and original lease custody, founder-signed exact owner assignments, Coder structured-patch postflight, direct GitHub/shell/plugin write restrictions, safe cutover/rollback and actual live readback. HOLD: ubuntu still writes repo and leases. See docs/handoffs/AGENT_OWNER_AUTHORITY_LOCK_ORIGINAL_EXECUTION_OWNER_20261027.md, issue #146 / Draft PR #149.
 - [ ] First checklist items completed by the software factory and independently verified
 
 
