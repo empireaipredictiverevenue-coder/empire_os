@@ -1,0 +1,39 @@
+# Empire AI — Founder active release register
+
+**Updated:** 28 October 2026, 12:57 Europe/London (current original ASTRA release evidence)
+**Founder direction:** Deploy completed work; do not call a backed-up candidate DONE. Preserve original departmental ownership, test results, user/privacy rights and exact rollback. No duplicate release agent or scheduler.
+
+## LIVE — evidence verified this session
+
+| Surface | Production verification | Receipt/status | Still missing |
+|---|---|---|---|
+| US roofing / Naperville educational guide | `https://empire-ai.co.uk/roofing/naperville` **HTTP 200**, checked externally 28 Oct | Root publication receipt `/var/backups/empire-website/chicago-naperville-20261028-information-preview-published.json`, SHA-pinned HTML | Search indexation disabled; no call admission; no verified leads |
+| US roofing repair vs replacement guide | `https://empire-ai.co.uk/roofing/replacement-vs-repair` **HTTP 200**, checked externally 28 Oct | `/var/backups/empire-website/chicago-roofing-two-guides-20261028-informational-publication.json` | Search indexation disabled; no call admission |
+| US roofing installation checklist | `https://empire-ai.co.uk/roofing/installation-checklist` **HTTP 200**, checked externally 28 Oct | Same exact two-guide root receipt | Search indexation disabled; no call admission |
+| Existing `/roofing`, `/commercial`, `/predictive-revenue`, `/industries/solar` | Public HTTPS 200 | Pages exist; these checks do **not** prove latest unreleased candidate is installed | For newer candidate versions, verify exact source hash against production |
+| God’s Eye founder console | Owner's recorded status: `ORIGINAL_FOUNDER_CONSOLE_GODS_EYE_PRIVATE_ROUTE_LIVE_VERIFIED` | `/home/ubuntu/empire_releases/gods_eye_territory_review_20261027/FOUNDER_GODS_EYE_ACTUAL_FOUNDER_LIVE_RELEASE_20261027.json` | Private founder-only, do not expose publicly |
+| Awin four-application original monitor | Recorded owner status: `AWIN_FOUR_FOUNDER_APPLICATIONS_ORIGINAL_MONITOR_LIVE_VERIFIED` | `/home/ubuntu/empire_releases/awin_four_programme_release_20261027/live_verified_receipt.json` | Advertiser decisions / payment are separate |
+| Last30Days search and SEO read-only review feed | Owner produced `LAST30DAYS_SEO_INCREMENTAL_FEED_LIVE_20261027.json` and follow-up production receipts | `/home/ubuntu/empire_releases/last30days_geospatial_commercial_20261027` | Confirm all exact source-specific consumer integrations, do not misstate as a full website deployment |
+| Search Fabric geo dedup | Recorded status `SOURCE_SIDE_GEO_DEDUP_INSTALLED` | `/home/ubuntu/empire_releases/search_fabric_geo_dedup_20261027/release_receipt.json` | Other independent Search Fabric owner releases not covered by this receipt |
+
+## STILL OPEN — do not rename a finished *build* as a live *release*
+
+| Priority | Candidate | Why not safely releasable yet | Original next owner action |
+|---|---|---|---|
+| 1 | **Combined CURRENT Solar + Commercial + Predictive SaaS, original ASTRA exact 707→746 candidate** | **PRIVATE QA DONE, NOT LIVE**: 15 exact replacement HTML/RSC route payloads, 39 new brand/hashed assets, all other 692 original public files preserved; 6/6 union browser views, private 707→746→707 rollback, source export and 10/10 original-owner publisher tests PASS. Root-protected production backup, independent image-publication/copy/non-VAT owner acceptance and privileged guarded release are NOT verified. | **EXISTING ASTRA website/release owner ONLY:** use original worktree commit `0c751c87f`, exact pinned `scripts/owner_publish_brand_saas_746_20261028.py` (sha256 `5135fec1c3c59df3f57b53ea76f9fa8a3a72b780da47589de87174717a7ba0fd`); independently sign off current brand rights and copy, root backup current exact 707, release via existing guarded atomic transaction, then verify actual 746-byte inventory and 50 public HTTPS GETs. Current remote connection blocks privileged release; do not claim DONE. |
+| 2 | **Previous standalone SaaS 708 and Solar V2** | **SUPERSEDED AS DEPLOYMENT INPUTS** by above original ASTRA reviewed current-brand union; their old source baseline does not match 707 live files, and Solar V2 branding was rejected. This does NOT mark SaaS itself as live. | Do not independently deploy 700→708 SaaS publisher or superseded Solar V2. Retain review receipts as historical evidence, not a second task. |
+| 3 | **Older SaaS 670 / 672** | **SUPERSEDED AS DEPLOYMENT INPUTS**, preserved historically; no additional live release needed for their obsolete payloads. | Do not reopen older website/SaaS build; compare only against current 746 original-owner candidate if a new requirement genuinely appears. |
+| 4 | Lead Smart roofing commercial acquisition | Buyer side previously authorised original DID, but original call intake is OFF, buyer-leg/privacy/routing/stop acceptance incomplete | Existing commercial, legal/privacy and Ringba owners: close genuine acceptance/monitoring proof; no fabricated paid leads or automatic traffic |
+| 5 | Search engine indexation of three public roofing guides | Pages intentionally `noindex`; real city-specific organic demand, owner editorial review and source usefulness must be independently established | Original SEO/Search Fabric owner: evaluate pages, publish/index only where useful and compliant; use genuine GSC evidence |
+
+## Rule for completion
+**A release is DONE only when** the intended exact build/route has an owner-approved release, an authenticated production receipt, a real HTTP/API/service readback, no regressions in protected surfaces and a rollback path. Backup-only, staged-only and approval-for-review are NOT done. Private founder releases remain private.
+
+## Working notes
+- This register covers the **high-priority website/revenue/search releases checked on 28 October**. It is NOT an exhaustive audit of all 375 dirty production repository files and other agent worktrees; do not bulk-deploy unknown changes.
+- Existing public site gateway currently contains other owner's uncommitted UK-roofing edits plus surgical preview fixes; the next website owner MUST reconcile, not reset them.
+- Current isolated Naperville branch `feature/chicago-roofing-naperville-editorial-20261028` commits `1b0399084`, `31186f488`; production public gateway has additional founder-published informational-only code backed up in root receipts. Protect that code on the next owner merge.
+- Root rollback archive for pre-Naperville state: `/var/backups/empire-website/chicago-naperville-prepublish-20261028-700.tar`. Post-Naperville source and two-guide original gateway snapshots are also in `/var/backups/empire-website/`.
+- Historical preview guards for commercial recorded homeowner calls remain unchanged; informational guides have no `tel:` links, forms, or search indexation.
+
+**Next active owner milestone:** Existing ASTRA owner independently confirms already-used brand/publication rights and current Commercial non-VAT copy, creates the original root-owned protected 707 backup and signed exact manifest/operator acceptance, then runs the prepared guarded 707→746 site transaction and 50 live HTTPS readbacks. No additional website build, SaaS research, clone publisher, or agency task is needed. Current proof: `/home/ubuntu/empire_releases/empire_brand_owner_render_proof_20261027/astra_746_release_verifier_hardening_20261028T125223Z.json`. Still **NOT LIVE**.
