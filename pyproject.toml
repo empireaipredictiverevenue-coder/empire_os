@@ -14,6 +14,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+predictive-review = [
+    "cryptography==50.0.1",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24.0",

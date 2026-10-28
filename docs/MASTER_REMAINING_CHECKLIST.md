@@ -108,6 +108,15 @@ Canonical architecture:
 
 ## Predictive Cloud convergence — ACTIVE / IMPORTANT
 
+### Original authenticated Predictive Revenue / React integration — 28 October 2026
+
+- [x] **BUILT, NOT LIVE:** tenant-authorised signed evidence / existing forecast review through the original Founder API and React. Paired implementation pins: backend `f4928b148eefc08a10d08b09ba76be600a79cf8e` (PR #122), frontend `f354f962d8112beac00beb265cfe06892c1d237c` (PR #116). Full-stack fixture browser acceptance rerun: 1 passed; not real commercial evidence.
+- [ ] **BLOCKED:** approve and configure an actual tenant/company/source-purpose binding through original API/auth/source owners, then release the paired changes through existing controls. Current live company-review route returns 404; existing demo and health return 200. Resume directive does not itself grant production activation.
+- [ ] **HELD:** genuine full-source-to-React acceptance and independently verified economic prediction; no manufactured forecasts, cash, outcomes or calibration. Migrations 066–073 remain held.
+
+Detailed original checkpoint, commands, current live release paths and next action: [Predictive Revenue handoff](EMPIRE_PREDICTIVE_REVENUE_V412_HANDOFF_ADAPTATION_20261025.md#original-integration-workstream-checkpoint--28-october-2026). This scoped update is staged on the original integration review branch; reconcile it without overwriting other owners' dirty canonical checklist changes.
+
+
 Master architecture: `docs/EMPIRE_MASTER_ARCHITECTURE.md`
 
 Canonical name and hierarchy:

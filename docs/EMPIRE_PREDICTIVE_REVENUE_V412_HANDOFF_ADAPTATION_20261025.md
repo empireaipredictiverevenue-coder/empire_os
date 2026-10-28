@@ -39,3 +39,46 @@ This release adapts the user-supplied *Predictive Revenue: Institutional Framewo
 **Stage 4:** expose read-only tenant-scoped forecast/digital-twin views on the original Founder/Smart CRM API with controls for scenario vs actual. Approval of automated fulfilment, real outbound, pricing, money movement or paid acquisition remains a separate owner-reviewed step.
 
 **One EmpireOS. One EmpireDB. One Smart CRM. Predictive Revenue stays distinct from trading.**
+
+## Original integration workstream checkpoint — 28 October 2026
+
+WORKSTREAM | Predictive Cloud / Predictive Revenue / original React integration.
+OWNER | Original Astra predictive integration workstream; founder-approved isolated API/auth/frontend reconciliation. No takeover of shared dirty production files.
+SOURCE/BRANCH | `review/predictive-authorized-company-20261026`, implementation `f4928b148eefc08a10d08b09ba76be600a79cf8e`, PR [122](https://github.com/empireaipredictiverevenue-coder/empire_os/pull/122); frontend `review/predictive-snapshot-react-20261026`, `f354f962d8112beac00beb265cfe06892c1d237c`, PR [116](https://github.com/empireaipredictiverevenue-coder/empire_os/pull/116). Documentation checkpoint commits follow these implementation pins.
+DONE+PROOF | **BUILT, NOT LIVE:** original signed CRM login → fresh membership → explicit company/source/purpose grant → signed source evidence and existing issued-forecast inputs → original V5 review → Founder API → existing Next/React page. No issuance, synthetic production records or economic verification. Original full-stack Chromium acceptance rerun on 28 October: **1 passed**, one inherited Starlette deprecation warning, exit 0 (8.56s). Repeated review, wrong source, sign-out and token non-persistence covered. All business evidence in this acceptance test is isolated fixture evidence.
+IN PROGRESS | Milestone A release into existing services; real authorised company source admission remains unverified. Milestone B remains evidence-gated.
+ONE NEXT ACTION | Original API/auth/source owners reconcile the staged router factory with the pinned deployed overlay using an actual approved tenant/company/source-purpose binding; then complete the existing review/merge/release process for the exact paired revisions. Do not create a new issuer, service, source registry or forecast store.
+BLOCKER/NEEDED APPROVAL | Production activation is not granted by the 28 October resume directive (Chief of Staff §10). Original service release owner must approve the exact release and controlled restarts after binding/configuration review. Source ownership/purpose permission cannot be inferred from CRM membership, file digests or a successful fixture test. Migrations 066–073 remain held.
+TOUCHES OTHER OWNER? | Staged API/auth/frontend reconciliation is already approved. Canonical production files remain untouched. The shared master checklist is dirty; this narrowly scoped checklist addition is on the existing isolated review branch for reconciliation, not a claim that the production checklist was overwritten.
+LAST VERIFIED UTC | 2026-10-28T19:13:18.152595+00:00
+
+### Exact current live boundary
+
+Read-only checks at the checkpoint timestamp:
+- `empire-founder-dashboard-api.service` active; existing V4.9 overlay from `/home/ubuntu/empire_releases/predictive_cloud_v49_readonly_20261025`, port 8766.
+- `empire-founder-console.service` active; working directory `/home/ubuntu/empire_releases/property_birmingham_private_stage_20261022_v3/web`, port 3001.
+- Existing API `/health`: HTTP 200; `/v1/predictive-revenue/demo`: HTTP 200; `/v1/predictive-revenue/company-review`: **HTTP 404**. Thus the new authenticated connection is not mounted live. Process health is not source admission or release acceptance.
+- No production restart, migration, source grant, business-record mutation or deployment performed. Protected materializer was not modified; its historical hash was not freshly revalidated in this checkpoint.
+
+### Reproducible combined acceptance
+
+Run from the original backend review worktree:
+
+```bash
+PYTHONPATH=.:tests PYTHONDONTWRITEBYTECODE=1 \
+EMPIRE_TEST_FRONTEND_ROOT=/home/ubuntu/empire_worktrees/predictive_snapshot_react_20261026/apps/search-command-centre \
+EMPIRE_TEST_PUPPETEER_PATH=/home/ubuntu/.nvm/versions/node/v22.23.2/lib/node_modules/@wonderwhy-er/desktop-commander/node_modules/puppeteer \
+/srv/empire_os/.venv/bin/python -B -m pytest -q -p no:cacheprovider tests/test_predictive_company_browser_vertical_slice.py
+```
+
+Previously verified paired CI: backend [40750088868](https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/40750088868), 191 backend tests plus combined browser acceptance; frontend [40750025394](https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/40750025394), 54 backend, 18 Node and one Chromium test, lint/type/build checks. These are staging evidence, not live results.
+
+### Release preconditions and acceptance
+
+Reuse the deployed overlay and preserve its complete existing route/method set. Wire the existing staged `build_signed_company_review_router` through the existing Founder app factory only after original trusted verification keys, fresh canonical membership, explicit source-purpose permission and approved signed input bindings are supplied by their existing owners. Do not use the test fixture grant in deployment.
+
+Original React requires explicit `EMPIRE_API_BASE_URL`, `EMPIRE_CRM_API_BASE_URL` and exact `EMPIRE_CONSOLE_ORIGIN`. Missing origin fails closed with 503. Configuration contents are private; protected process environment inspection was unavailable, so their production presence is UNKNOWN. Review configuration through the original authorised service owner.
+
+After approved merge and release: verify actual deployed revisions; existing route compatibility; unauthenticated/expired bearer rejection; wrong tenant/source denial; an authorised genuine source yielding an evidence-backed review or explicit HOLD; repeated requests preserving original forecast identity; and the existing React page rendering that same result. Independently verified financial outcomes, model calibration and promotion remain HOLD until authentic histories exist. On failed acceptance, follow the original release owner's approved rollback procedure; do not cycle restarts.
+
+Canonical outstanding work: `docs/MASTER_REMAINING_CHECKLIST.md`, Predictive Cloud convergence. Do not mark the full prediction/outcome/calibration loop complete.
