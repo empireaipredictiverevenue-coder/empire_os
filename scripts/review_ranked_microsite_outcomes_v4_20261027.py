@@ -69,6 +69,7 @@ def run(
     *, candidate_source: Path, commercial_source: Path,
     output: Path, gsc_source: Path | None = None,
     weekly_source: Path | None = DEFAULT_ORIGINAL_WEEKLY,
+    competitive_source: Path | None = None,
 ) -> dict:
     out = output.expanduser().resolve()
     if (out == Path("/srv/empire_os")
@@ -85,11 +86,19 @@ def run(
         if gsc_source.is_symlink():
             raise ValueError("GSC bridge symlink not allowed")
         gsc = json.loads(gsc_source.read_text(encoding="utf-8"))
+    competitive = None
+    if competitive_source is not None:
+        if competitive_source.is_symlink() or not competitive_source.is_file():
+            raise ValueError("competitive dossier missing or symlinked")
+        if competitive_source.stat().st_size > 150000:
+            raise ValueError("competitive dossier exceeds review size limit")
+        competitive = json.loads(competitive_source.read_text(encoding="utf-8"))
     # The trusted owner has not supplied later outcome receipts for the model.
     # Reuse the original calibration reviewer rather than invent a pass.
     calibration = review_historical_model_calibration([])
     queue = build_ranked_microsite_queue(
-        specs, commercial=commercial, gsc=gsc, calibration=calibration)
+        specs, commercial=commercial, gsc=gsc, calibration=calibration,
+        competitive=competitive)
     if weekly_source is not None:
         path = weekly_source.expanduser().absolute()
         if path.parent != ORIGINAL_WEEKLY_ROOT:
@@ -143,6 +152,7 @@ if __name__ == "__main__":
     parser.add_argument("--candidate-source", required=True, type=Path)
     parser.add_argument("--commercial-source", required=True, type=Path)
     parser.add_argument("--gsc-bridge", type=Path)
+    parser.add_argument("--competitive-source", type=Path)
     parser.add_argument("--weekly-gsc", type=Path, default=DEFAULT_ORIGINAL_WEEKLY)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -152,6 +162,7 @@ if __name__ == "__main__":
             commercial_source=args.commercial_source,
             output=args.output,
             gsc_source=args.gsc_bridge,
+            competitive_source=args.competitive_source,
             weekly_source=args.weekly_gsc,
         ), sort_keys=True))
     except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:

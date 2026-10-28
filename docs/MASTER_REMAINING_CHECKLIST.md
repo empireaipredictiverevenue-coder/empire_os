@@ -54,6 +54,14 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 - [ ] Independently validate original source claims and exact query/window GSC intent before recommending experiments. SlopMonster pattern score is not a full editorial or originality audit.
 - [ ] Only after the original website/SEO owners publish one genuinely distinct approved useful page, measure true page performance and buyer economics through existing GSC/CRM/settlement owners.
 
+## 28 October 2026 — Original factory competitive opportunity discipline
+
+- [x] Existing V4 ranked research queue accepts optional exact-scope, dated public-alternative desk observations without treating them as verified demand, competitive gaps, buyer contracts or profit.
+- [x] Actual Manchester heat-pump incumbent review: GOV.UK service, two MoneySavingExpert guides and local council support collectively cover multiple user jobs. Candidate action changes to **`VALIDATE_DIFFERENTIATED_READER_JOB`** ahead of more SEO investment, legacy 15-point score unchanged.
+- [x] Same original V4 CLI ran read-only end to end; one private research candidate, no publishable/released pages, no active media, null payout/CAC/contribution, existing five publisher campaigns unaffected.
+- [x] Competitor URL/source scope and adversarial evidence tests plus original factory regression pass; evidence/rights and source authority preserved, no parallel ranker/agent/scheduler.
+- [ ] Produce evidence of a genuinely distinct customer task and its measurable benefit versus alternatives; verify an actual consenting buyer/product path and original cash economics before requesting any investment or publication from the existing owners.
+
 ## Current checkpoint
 
 Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State, Next-Best Action and the Account / Buyer Digital Twin are live and verified in the Founder Console.

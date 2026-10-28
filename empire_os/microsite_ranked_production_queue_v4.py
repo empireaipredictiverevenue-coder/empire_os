@@ -8,6 +8,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from hashlib import sha256
 from datetime import date, datetime, timezone
+from urllib.parse import urlsplit
+import ipaddress
+import re
 import json
 from typing import Any
 
@@ -152,12 +155,126 @@ def _executive_portfolio(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "next_review_trigger": "Independent original-source fact and exact first-party query evidence",
     }
 
+
+_COVERAGE_JOBS = frozenset({
+    "grant_eligibility", "funding_amount", "home_suitability",
+    "local_support", "planning_lookup", "cost_comparison",
+    "installer_selection", "consumer_decision_guidance",
+})
+_SOURCE_KINDS = frozenset({
+    "government_service", "public_local_authority", "consumer_guide",
+    "charity_research", "commercial_information",
+})
+
+
+def _competitive_screen(
+    packet: Mapping[str, Any], dossier: Mapping[str, Any] | None,
+    *, today: date,
+) -> dict[str, Any]:
+    """Compare documented public coverage, NEVER infer market gap or ROI.
+
+    Descriptions are desk researcher observations. A valid URL and observation
+    do not establish page content accuracy or unmet user demand.
+    """
+    result = {
+        "schema_version": "empire.microsite.competitive_desk_screen.v1",
+        "status": "COMPETITOR_COVERAGE_UNKNOWN",
+        "desk_observations_only": True,
+        "independently_verified_competitor_claims": False,
+        "competitor_coverage_not_demand": True,
+        "competitive_gap_verified": False,
+        "unique_reader_value_verified": False,
+        "customer_willingness_to_pay_verified": False,
+        "underwritten_contribution_margin_minor": None,
+        "break_even_leads": None,
+        "source_count": 0,
+        "covered_public_reader_jobs": [],
+        "sources": [],
+        "next_evidence_action": "Document actual alternative solutions for the same user job before claiming differentiation",
+    }
+    if dossier is None:
+        return result
+    if not isinstance(dossier, Mapping):
+        raise ValueError("competitive desk row must be a mapping")
+    expected={"candidate_id","market_id","keyword","observed_at","sources"}
+    if set(dossier)!=expected:
+        raise ValueError("competitive row fields must match exact original candidate scope")
+    if (dossier["candidate_id"]!=packet["id"]
+        or dossier["market_id"]!=packet["market"]["market_id"]
+        or dossier["keyword"]!=packet["keyword"]["record"]["keyword"]):
+        raise ValueError("competitive evidence candidate/market/keyword scope mismatch")
+    try:
+        checked=datetime.fromisoformat(dossier["observed_at"].replace("Z","+00:00"))
+    except (ValueError,AttributeError) as exc:
+        raise ValueError("invalid competitive observation timestamp") from exc
+    if checked.tzinfo is None or not 0 <= (today-checked.date()).days <= 30:
+        raise ValueError("competitive research needs a current time-aware desk observation")
+    sources=dossier["sources"]
+    if not isinstance(sources,list) or len(sources)>8:
+        raise ValueError("competitive desk accepts zero to eight source observations")
+    seen=set()
+    urls=[]
+    topics=set()
+    for item in sources:
+        if not isinstance(item,Mapping) or set(item)!={"url","publisher","kind","covered_jobs"}:
+            raise ValueError("competitive source has invalid fields")
+        u=item["url"]
+        if not isinstance(u,str) or not 15<=len(u)<=450:
+            raise ValueError("competitive source URL invalid")
+        split=urlsplit(u)
+        hostname=split.hostname
+        if (split.scheme!="https" or not hostname or split.username is not None
+            or split.password is not None or split.port is not None
+            or split.query or split.fragment or split.path.startswith("//")
+            or re.fullmatch(r"[a-z0-9.-]+",hostname) is None
+            or "." not in hostname or hostname.endswith(".local")
+            or hostname in ("localhost","127.0.0.1")):
+            raise ValueError("competitive source must be a direct public HTTPS URL")
+        try:
+            ipaddress.ip_address(hostname)
+        except ValueError:
+            pass
+        else:
+            raise ValueError("competitive source cannot be an IP address")
+        if u in seen:
+            raise ValueError("competitive source URL duplicated")
+        seen.add(u)
+        publisher=item["publisher"]
+        if not isinstance(publisher,str) or not 2<=len(publisher.strip())<=120:
+            raise ValueError("competitor publisher label invalid")
+        kind=item["kind"]
+        jobs=item["covered_jobs"]
+        if (kind not in _SOURCE_KINDS
+            or not isinstance(jobs,list) or not 1<=len(jobs)<=8
+            or not all(isinstance(job,str) for job in jobs)
+            or len(jobs)!=len(set(jobs)) or set(jobs)-_COVERAGE_JOBS):
+            raise ValueError("unknown public reader job/category")
+        topics.update(jobs)
+        urls.append({"url":u,"publisher":publisher.strip(),"kind":kind,
+                     "observed_jobs":sorted(jobs)})
+    return dict(
+        result,
+        status=("ESTABLISHED_ALTERNATIVES_OBSERVED_DESK_ONLY" if len(urls)>=2
+                else "ONE_ALTERNATIVE_OBSERVED_DESK_ONLY" if urls
+                else "NO_ALTERNATIVES_RECORDED_NOT_PROOF_OF_GAP"),
+        source_count=len(urls),
+        covered_public_reader_jobs=sorted(topics),
+        sources=urls,
+        next_evidence_action=(
+            "Investigate and evidence one user decision underserved by existing sources; "
+            "no unverified feature-gap or willingness-to-pay claim"
+            if urls else result["next_evidence_action"]
+        ),
+    )
+
+
 def build_ranked_microsite_queue(
     specs: Sequence[Mapping[str, Any]], *,
     commercial: Mapping[str, Any],
     gsc: Mapping[str, Any] | None = None,
     calibration: Mapping[str, Any] | None = None,
     as_of: date | None = None,
+    competitive: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     as_of = datetime.now(timezone.utc).date() if as_of is None else as_of
     if not isinstance(as_of, date) or isinstance(as_of, datetime):
@@ -210,6 +327,24 @@ def build_ranked_microsite_queue(
         if key in cal_by_key or any(not isinstance(v, str) or not v for v in key):
             raise ValueError("duplicate or invalid calibration model identity")
         cal_by_key[key] = item
+
+    if competitive is not None:
+        if (not isinstance(competitive,Mapping)
+            or set(competitive)!={"schema_version","mode","execution_authority",
+                                   "custody","candidates"}
+            or competitive["schema_version"]!="empire.microsite.competitive_desk.v1"
+            or competitive["mode"]!="OBSERVE"
+            or competitive["execution_authority"]!="none"
+            or competitive["custody"]!="RESEARCHER_DESK_OBSERVATIONS_UNVERIFIED"
+            or not isinstance(competitive["candidates"],list)):
+            raise ValueError("competitive dossier cannot confer independent evidence or authority")
+        comp_rows=competitive["candidates"]
+        comp_by_id={x.get("candidate_id"):x for x in comp_rows if isinstance(x,Mapping)}
+        if (len(comp_by_id)!=len(comp_rows) or set(comp_by_id)!=set(ids)
+                or len(comp_rows)!=len(ids)):
+            raise ValueError("competitive candidate identities must exactly match original queue")
+    else:
+        comp_by_id={}
 
     output = []
     for packet in reviews:
@@ -265,12 +400,38 @@ def build_ranked_microsite_queue(
         gaps.append("no attributed settled buyer revenue for this page")
         status = ("PRIORITIZE_EVIDENCE_REVIEW" if research_priority >= 40
                   else "NEEDS_SOURCE_RESEARCH")
+        competitive_screen=_competitive_screen(packet,comp_by_id.get(ident),today=as_of)
+        executive=_executive_screen(
+            packet, exact_gsc=exact_gsc, buyer_guidance=buyer_guidance,
+            calibrated=calibrated, today=as_of)
+        if (executive["research_desk_qualified"]
+                and competitive_screen["source_count"]>=2):
+            executive["decision"]="VALIDATE_DIFFERENTIATED_READER_JOB"
+            executive["next_best_evidence_action"]=competitive_screen["next_evidence_action"]
+            executive["next_action_owner"]="Marketing Research"
         output.append({
             "candidate_id": ident,
             "market_id": packet["market"]["market_id"],
-            "executive_screen": _executive_screen(
-                packet, exact_gsc=exact_gsc, buyer_guidance=buyer_guidance,
-                calibrated=calibrated, today=as_of),
+            "executive_screen": executive,
+            "competitive_screen": competitive_screen,
+            "commercial_underwriting": {
+                "schema_version": "empire.microsite.commercial_underwriting_readiness.v1",
+                "status": "BUYER_TERMS_AND_UNIT_ECONOMICS_UNVERIFIED",
+                "original_buyer_coverage_guidance_only": buyer_guidance,
+                "buyer_contract_accepted_for_exact_page": False,
+                "billable_event_definition_verified": False,
+                "consented_qualified_enquiry_to_buyer_join_verified": False,
+                "independently_verified_payout_minor": None,
+                "variable_fulfilment_cost_minor": None,
+                "customer_acquisition_cost_minor": None,
+                "net_contribution_minor": None,
+                "break_even_conversion_rate": None,
+                "next_commercial_validation": (
+                    "Original commercial owner to verify exact buyer acceptance, "
+                    "contract, payout, compliance, refund risk and fulfilment costs"
+                ),
+                "budget_authorized": False,
+            },
             "keyword": packet["keyword"]["record"]["keyword"],
             "area": packet["market"]["area"],
             "site_kind": packet["candidate_kind"],

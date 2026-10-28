@@ -65,6 +65,14 @@ The existing V4 ranking script was also run unchanged end-to-end against the cur
 
 Full strategy, operating states and readback: [Executive Research & Investment Discipline](PREDICTIVE_MICROSITE_EXECUTIVE_RESEARCH_DECISION_20261028.md). The site's original release/SEO/brand owner work remains outside this branch.
 
+## 28 October 2026 — Competitive reality before more pages
+
+The existing **original** V4 ranked research queue and its existing CLI now optionally ingest a bounded, explicitly researcher-observed competitive alternatives dossier. It cannot confer commercial or publication authority. The original queue returns each candidate's `competitive_screen` plus `commercial_underwriting` with exact missing buyer contract, payout, CAC and contribution evidence, all non-verified figures **null**.
+
+**Genuine current desk research:** four Manchester homeowner alternatives (GOV.UK suitability checker, two MoneySavingExpert guides, Manchester City Council energy support) already cover multiple grant, cost, suitability, installer and local-support jobs. This changed the original source-backed Manchester candidate's action from `MEASURE_FIRST_PARTY_INTENT` to **`VALIDATE_DIFFERENTIATED_READER_JOB`**, without changing legacy priority points or implying an unmet market gap. The original unchanged ranking CLI ran end-to-end: 1 private research candidate, 0 publishable, 0 approved factory pages, no economics inferred, no new services. Private original queue SHA-256 `393668c26b9e076a4e2126ac821b98efe0c633ae81c0e7985d1d0918a1bf7613`.
+
+[Verified V6 Competitive Opportunity & Commercial Underwriting Review](PREDICTIVE_MICROSITE_COMPETITIVE_COMMERCIAL_RESEARCH_V6_20261028.md). This is a source-research improvement in the original workstream, **not** a new SEO/website/release implementation.
+
 ## Remaining implementation for the current site + SEO owner
 1. Review the original provenance and upstream licence; rerun unit tests.
 2. Supply real search intent, measured demand, current dated SERP/source inputs and geographic ZIP/postcode associations with evidence. Do not guess counts.
