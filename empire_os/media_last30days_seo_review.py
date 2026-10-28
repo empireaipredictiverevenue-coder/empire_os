@@ -87,6 +87,32 @@ def _previous_snapshot(previous: Mapping[str, Any] | None, *, now: datetime, sou
     return seen
 
 
+
+def _source_publication_age(value: Any, *, now: datetime) -> tuple[int | None, str, bool]:
+    """Date-age estimate, NOT verification of the externally supplied date."""
+    if not isinstance(value, str) or len(value) < 10 or len(value) > 48:
+        return None, "UNVERIFIED_SOURCE_DATE", False
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+            issued = datetime.fromisoformat(value).replace(tzinfo=timezone.utc)
+        else:
+            issued = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if issued.tzinfo is None or issued.utcoffset() is None:
+            return None, "UNVERIFIED_SOURCE_DATE", False
+        age = (now.date() - issued.astimezone(timezone.utc).date()).days
+    except (ValueError, TypeError, OverflowError):
+        return None, "UNVERIFIED_SOURCE_DATE", False
+    if age < 0:
+        return age, "FUTURE_SOURCE_DATE_HOLD", False
+    if age > 30:
+        return age, "OUTSIDE_LAST30DAYS_SCOPE_HOLD", False
+    if age <= 7:
+        return age, "RECENT_0_TO_7_DAYS", True
+    if age <= 21:
+        return age, "ACTIVE_8_TO_21_DAYS", True
+    return age, "EXPIRING_22_TO_30_DAYS", True
+
+
 def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
                            previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if now.tzinfo is None or now.utcoffset() is None:
@@ -123,6 +149,15 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
     total = 0
     review_first_count = 0
     new_count = 0
+    fresh_review_count = 0
+    source_age_counts = {
+        "RECENT_0_TO_7_DAYS": 0,
+        "ACTIVE_8_TO_21_DAYS": 0,
+        "EXPIRING_22_TO_30_DAYS": 0,
+        "OUTSIDE_LAST30DAYS_SCOPE_HOLD": 0,
+        "UNVERIFIED_SOURCE_DATE": 0,
+        "FUTURE_SOURCE_DATE_HOLD": 0,
+    }
     unique = set()
     for topic in topics:
         if not isinstance(topic, Mapping):
@@ -162,11 +197,21 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
             if new_to_previous:
                 new_count += 1
                 topic_new += 1
+            source_age, age_band, in_last_30 = _source_publication_age(
+                row.get("published_at"), now=now,
+            )
+            source_age_counts[age_band] += 1
+            fresh_review_count += int(in_last_30)
             selected.append({
                 "source_ref": ref,
                 "source_url": row["source_url"],
                 "source_type": row.get("source_type"),
                 "published_at": row.get("published_at"),
+                "source_publication_age_days_from_unverified_metadata": source_age,
+                "source_age_band": age_band,
+                "inside_30_day_discovery_window": in_last_30,
+                "publication_date_independently_verified": False,
+                "source_must_be_checked_by_owner": True,
                 "cross_topic_reused_reference": row.get("cross_topic_reused_reference") is True,
                 "new_since_previous_refresh": new_to_previous,
                 "already_present_in_previous_snapshot_not_reviewed": (
@@ -196,6 +241,15 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
         "source_handoff_generated_at": generated.astimezone(timezone.utc).isoformat(),
         "original_source_observation_count": total,
         "review_first_unique_citation_count": review_first_count,
+        "source_age_review": {
+            "date_authority": "UNVERIFIED_PUBLIC_SOURCE_METADATA",
+            "age_calculated_in_utc_calendar_days": True,
+            "active_in_last30_days_title_matches": fresh_review_count,
+            "held_outside_window_or_invalid_date": review_first_count - fresh_review_count,
+            "source_age_bands": source_age_counts,
+            "older_citations_kept_for_audit_not_deleted": True,
+            "expiry_never_implies_source_claim_invalid": True,
+        },
         "delta_review": {
             "comparison_available": prior_refs is not None,
             "new_since_previous_refresh_count": new_count if prior_refs is not None else None,
@@ -261,6 +315,8 @@ def refresh_seo_owner_review(repo_root: Path, handoff: Mapping[str, Any],
             "status": result["status"], "owner": result["owner"],
             "path": str(OUTPUT),
             "review_first_unique_citations": result["review_first_unique_citation_count"],
+        "active_last30days_review_citations": result["source_age_review"]["active_in_last30_days_title_matches"],
+        "held_old_or_undated_citations": result["source_age_review"]["held_outside_window_or_invalid_date"],
             "new_since_previous_refresh": result["delta_review"]["new_since_previous_refresh_count"],
             "prior_snapshot_comparison_available": result["delta_review"]["comparison_available"],
             "original_reference_count": result["original_source_observation_count"],
@@ -281,6 +337,8 @@ def refresh_seo_owner_review(repo_root: Path, handoff: Mapping[str, Any],
         "owner": result["owner"],
         "path": str(OUTPUT),
         "review_first_unique_citations": result["review_first_unique_citation_count"],
+        "active_last30days_review_citations": result["source_age_review"]["active_in_last30_days_title_matches"],
+        "held_old_or_undated_citations": result["source_age_review"]["held_outside_window_or_invalid_date"],
         "new_since_previous_refresh": result["delta_review"]["new_since_previous_refresh_count"],
         "prior_snapshot_comparison_available": result["delta_review"]["comparison_available"],
         "original_reference_count": result["original_source_observation_count"],
