@@ -9,6 +9,8 @@ from empire_os import microsite_original_evidence_photos_v17 as v17
 
 def test_five_unique_image_subjects_and_reuse_rights_are_explicit():
     assert len(v17.EVIDENCE) == 5
+    assert len(v17.SOURCE_IMAGE_SHA256) == 5
+    assert len(set(v17.SOURCE_IMAGE_SHA256)) == 5
     subjects = [r[0] for r in v17.EVIDENCE]
     sources = [r[4] for r in v17.EVIDENCE]
     assert len(set(subjects)) == len(set(sources)) == 5
@@ -61,3 +63,19 @@ def test_real_offline_stage_integrity_when_present():
     for row in receipt["five_evidence_photos"]:
         assert row["source_url"].encode() in html
         assert row["license_url"].encode() in html
+
+
+def test_source_photo_mutation_never_keeps_old_license_credit(monkeypatch,tmp_path):
+    # Test the actual private source document when available; no live change.
+    base=Path("/home/ubuntu/empire_releases")
+    source=base/"chicago_original_owner_metadata_review_20261027/chicago_owner_review_export.html"
+    folder=base/"chicago_evidence_image_licence_research_20261027"
+    if not source.exists() or not folder.exists():
+        pytest.skip("Owner-private evidence absent")
+    monkeypatch.setattr(v17,"SOURCE_IMAGE_SHA256",("0"*64,)+v17.SOURCE_IMAGE_SHA256[1:])
+    with pytest.raises(ValueError,match="photograph 1 does not match"):
+        v17.enrich(source.read_bytes(),folder)
+
+
+def test_actual_photo_replaces_the_old_decorative_placeholder():
+    assert "micro::before {display:none!important}" in v17.STYLE

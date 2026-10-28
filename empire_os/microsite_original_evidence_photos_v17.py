@@ -15,9 +15,20 @@ import re
 import subprocess
 
 V16_SOURCE_SHA = "93c9f75a56b93cf4fde40656d177d734bf2814afd39ffe84bfd4d71555b15275"
+# SHA-256 of the five individually reviewed, source-licensed Wikimedia
+# thumbnails, pinned so credits cannot accidentally describe replaced bytes.
+# Exact source/photo records remain in original owner private custody.
+SOURCE_IMAGE_SHA256 = (
+    "d40063b1a52c5d90fe29ed5bd5859deab14e504cf3e9334067ebd7229732baa7",
+    "a62073736263200dae10c8619e8b89930c41e0e0722a6d136e01188db2524d47",
+    "48ed96857649cc11d3667c7ed713463e997cdb9733ca5adf462886cade8dbf1b",
+    "37eb2df6ea302335d23c4ba1bd42d5262e1bb2103848c81efe516239a4df35b7",
+    "7463157a279d1a9c38ed2fd558ca2a25388522a9963fcaf12971ee429acb6853",
+)
+
 EVIDENCE = [
     ("Roof replacement work", "Roofers at work · illustrative",
-     "Public Domain Images", "Public domain",
+     "Creator uncredited (Public Domain Images)", "Public domain",
      "https://commons.wikimedia.org/wiki/File:Roofing_contractors.jpg",
      "https://creativecommons.org/publicdomain/mark/1.0/"),
     ("Permit guidance", "Actual Chicago City Hall",
@@ -55,7 +66,7 @@ STYLE = """
 }
 #research-method .evidence-visual figcaption {
     padding:8px 11px 10px;
-    line-height:1.32;font-size:.64rem;
+    line-height:1.4;font-size:.74rem;
     color:#d4e9ff;
     background:linear-gradient(110deg,#04152af0,#0c305ae9);
     min-height:42px;
@@ -65,6 +76,10 @@ STYLE = """
     text-decoration-thickness:1px;
     text-underline-offset:2px;
 }
+/* The photographic evidence now supplies the visual cue; no decorative
+   diamond placeholder is repeated beneath each actual picture. */
+#research-method .fact .micro::before {display:none!important}
+#research-method .fact .micro {display:inline-flex;align-items:center}
 #research-method .fact {overflow:hidden}
 #research-method .fact .source {font-size:.76rem!important}
 @media(min-width:2560px) {
@@ -73,7 +88,7 @@ STYLE = """
 }
 @media(max-width:540px) {
     #research-method .evidence-visual {margin:-18px -18px 16px}
-    #research-method .evidence-visual figcaption {font-size:.75rem}
+    #research-method .evidence-visual figcaption {font-size:.78rem}
 }
 """
 
@@ -123,12 +138,14 @@ def enrich(original_html: bytes, image_dir: Path) -> tuple[bytes, dict]:
         if not path.is_file() or path.is_symlink():
             raise ValueError("Source imagery must be a regular licensed local photograph")
         original=path.read_bytes()
-        compressed=_webp(original,520,21)
+        if sha256(original).hexdigest() != SOURCE_IMAGE_SHA256[number-1]:
+            raise ValueError(f"Evidence photograph {number} does not match its reviewed licence/source identity")
+        compressed=_webp(original,570,27)
         data=base64.b64encode(compressed).decode()
         description=(
             f'<figure class="evidence-visual">'
             f'<img src="data:image/webp;base64,{data}" '
-            f'alt="{escape(label,quote=True)}" width="520" height="292" '
+            f'alt="{escape(label,quote=True)}" width="570" height="321" '
             f'loading="lazy" decoding="async">'
             f'<figcaption>{escape(label)} · '
             f'<a href="{escape(source,quote=True)}" rel="noopener noreferrer" '
