@@ -45,6 +45,9 @@ def _sealed_fixture(tmp_path, monkeypatch):
     monkeypatch.setattr(owner, "_production_repository_owner_uid", lambda: uid + 1000)
     # These two mocks are TEST ONLY: production requires immutable root ownership.
     monkeypatch.setattr(owner, "_sealed_root_directory", lambda path: None)
+    # Synthetic signed-operation tests simulate an independently controlled
+    # broker. Separate tests below exercise the real non-bypass condition.
+    monkeypatch.setattr(owner, "_attest_protected_original_lease_custody", lambda manager: None)
     def synthetic_root_file_reader(path):
         try:
             return Path(path).read_bytes()
@@ -209,3 +212,23 @@ def test_shared_production_repo_uid_cannot_be_owner_even_with_valid_ticket(tmp_p
         manager.acquire(owner="hermes", job_id="job_123",
                         resources=params["lease_resources"], ttl_seconds=600)
     assert manager.active() == []
+
+
+def test_real_worker_with_shared_lease_root_is_denied_before_signed_admission(tmp_path):
+    manager = ExecutionLeaseManager(tmp_path / "own_original_lease_files")
+    assert manager.root.stat().st_uid == os.geteuid()
+    with pytest.raises(owner.OwnerAuthorityHold,
+                       match="UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS"):
+        owner._attest_protected_original_lease_custody(manager)
+
+
+def test_missing_root_custody_rejects_original_worker(tmp_path, monkeypatch):
+    manager = ExecutionLeaseManager(tmp_path / "owned_leases")
+    monkeypatch.setattr(execution_lease, "owner_mutation_lock_active", lambda: True)
+    monkeypatch.setattr(owner, "_attest_protected_original_lease_custody",
+                        lambda manager: (_ for _ in ()).throw(
+                            owner.OwnerAuthorityHold("UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS")))
+    with pytest.raises(execution_lease.ExecutionLeaseError,
+                       match="UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS"):
+        manager.acquire(owner="hermes", job_id="job_123",
+                        resources=("path:apps/example-site/src/page.tsx",), ttl_seconds=600)

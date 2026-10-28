@@ -606,6 +606,47 @@ def _principal_for_authenticated_uid(
     return matched
 
 
+def _attest_protected_original_lease_custody(
+    lease_manager: ExecutionLeaseManager,
+) -> None:
+    """Refuse a worker that can bypass tickets by editing original lease state.
+
+    This intentionally exposes the remaining need for the ORIGINAL plane's
+    protected admission broker. Existing rootless file-backed leases cannot
+    provide a security boundary when mutating workers own the same state.
+    No live files, permissions, users or leases are changed by this check.
+    """
+    repo_root = Path("/srv/empire_os")
+    state_root = lease_manager.root
+    if not isinstance(state_root, Path):
+        raise OwnerAuthorityHold("ORIGINAL_LEASE_ROOT_UNKNOWN")
+    guarded = (repo_root, repo_root / ".git", state_root,
+               state_root / ".leases.lock", state_root / "leases.json",
+               state_root / TICKET_RECEIPT_NAME)
+    for path in guarded:
+        try:
+            info = path.lstat()
+        except FileNotFoundError as exc:
+            # Lease state files may be created only by a protected original
+            # broker. The manager-root itself must always exist.
+            if path in (repo_root, repo_root / ".git", state_root):
+                raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_MISSING") from exc
+            continue
+        except OSError as exc:
+            raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_UNREADABLE") from exc
+        if stat.S_ISLNK(info.st_mode):
+            raise OwnerAuthorityHold("ORIGINAL_PROTECTED_PATH_IS_SYMLINK")
+        if info.st_uid == os.geteuid() or os.access(path, os.W_OK, effective_ids=True):
+            raise OwnerAuthorityHold("UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS")
+    # The original file manager itself must not run under the same worker UID
+    # that can manufacture a new leases.json inside its writable root.
+    try:
+        if os.access(state_root, os.W_OK, effective_ids=True):
+            raise OwnerAuthorityHold("UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS")
+    except OSError as exc:
+        raise OwnerAuthorityHold("LEASE_CUSTODY_VERIFICATION_FAILED") from exc
+
+
 def acquire_sealed_owner_lease(
     *,
     lease_manager: ExecutionLeaseManager,
@@ -624,6 +665,7 @@ def acquire_sealed_owner_lease(
         raise OwnerAuthorityHold("TRUSTED_ORIGINAL_LEASE_MANAGER_REQUIRED")
     if lease_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
         raise OwnerAuthorityHold("UNKNOWN_MUTATION_WORKER_CLASS")
+    _attest_protected_original_lease_custody(lease_manager)
     if (
         not isinstance(job_id, str)
         or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id)

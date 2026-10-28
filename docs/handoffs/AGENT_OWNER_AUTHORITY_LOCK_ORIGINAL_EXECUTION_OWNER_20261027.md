@@ -353,3 +353,69 @@ No live owner-lock validator was installed. These facts demonstrate that
 **Result: review-code integration and synthetic dry-run PASS;
 production credentials, identity separation, direct-write controls and
 live release remain HOLD. No production activation has occurred.**
+
+## Original-plane direct-writer release gate and migration sequence
+
+The **read-only** original owner inspector now inventories write access to the
+canonical repo, Git history, source, runtime, original lease directory and
+one-use receipt. Its production probe under UID 1000 (ubuntu) returned:
+
+- Status: LOCAL_DIRECT_WRITE_BYPASS_OBSERVED
+- Writable: source_repository, git_history, source_package, runtime,
+  lease_state_directory, lease_state_file
+- External GitHub/plugin permission checks: UNKNOWN, not verified
+- Production writes performed by the probe: false
+
+This check reports local discretionary file permissions, not every systemd
+mount namespace or a complete GitHub permission audit. The candidate admission
+path now refuses protected-code or original lease state that remains writable
+by its worker caller. Consequently, the current shared-ubuntu deployment
+cannot be securely activated just by publishing a founder-signed policy.
+
+### One original execution plane; no new autonomous supervisor
+
+The original ExecutionLeaseManager, lease flock and ticket-consumption record
+must remain the sole authoritative mutation admission/ledger. Once worker
+UIDs are separated, they must **not** receive filesystem write permission to
+that ledger; a direct-writing worker can otherwise bypass ticket checks.
+
+The original-plane owner therefore needs a tightly scoped, protected
+one-shot admission helper (not another agent, timer or independent queue).
+It must be installed under root-owned **immutable release code**, NOT imported
+privileged from /srv/empire_os or worker-editable Python paths. Its invocation
+must authenticate the caller's real service UID at an OS-controlled boundary,
+validate the current founder-signed workstream/job ticket and revocation
+evidence, and serialize lease/receipt mutation through the ORIGINAL lock.
+The helper must expose tightly bounded acquire, release and readback requests;
+no arbitrary shell, Python arguments, imported plugins or caller-provided
+principal identities. Only that trusted helper may mutate the one canonical
+lease state and replay receipt. Direct connector/GitHub writers need separate
+existing-platform permissions.
+
+### Bounded release and rollback order
+
+1. Freeze new internal-write admissions; inventory and drain active original
+   leases, queues and services. Preserve verified state and rollback copies.
+2. Stage protected, root-owned helper, verification material and one migrated
+   authoritative lease state. Verify interpreter/import/code custody and
+   disallow worker-controlled environment/module loading in privilege context.
+3. Adopt separately authenticated, least-privilege Hermes, Pi and Empire
+   Coder service accounts. Keep the original role boundaries and verify
+   unprivileged read-only/observer behaviour and existing owner workflows.
+4. Prove both directions: approved signed tickets succeed and unassigned,
+   replayed, revoked, changed-path, cross-lane and direct-write requests
+   fail. Rehearse crash/recovery, concurrent lease conflict and cleanup.
+5. Review direct repository/.git/remote plugin permissions independently,
+   confirm post-worktree actual-path attestation, then enable the
+   root-custodied switch in a supervised maintenance window.
+6. Read back the real service identity, journal/ledger ownership and lease
+   outcomes; rehearse marker removal and reconciled state restoration
+   before considering the cutover complete.
+
+The current review-branch signed admission tests simulate independent
+privileged custody; they DO NOT establish that a broker exists in production.
+No privileged helper, service account changes, production signing key,
+production marker, root lease migration or direct connector lockdown
+has been installed.
+
+**Acceptance status: ORIGINAL_OWNER_DIRECT_WRITE_BOUNDARY_HOLD.**

@@ -7,8 +7,10 @@ systemd; never promotes the private candidate to production authority.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
+import stat
 from typing import Any
 
 ENTRY_POINTS = {
@@ -28,6 +30,59 @@ def _bounded_file(path: Path, limit: int) -> str | None:
         return path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None
+
+
+def _read_only_direct_write_inventory(root: Path) -> dict[str, Any]:
+    """Record direct local filesystem bypass exposure without touching files.
+
+    Does not claim to audit GitHub/connector credentials or systemd mount
+    namespace restrictions; those must be accepted independently.
+    """
+    try:
+        current_euid = os.geteuid()
+    except OSError:
+        current_euid = None
+    entries = []
+    candidates = (
+        ("source_repository", root),
+        ("git_history", root / ".git"),
+        ("source_package", root / "empire_os"),
+        ("runtime", root / "runtime"),
+        ("lease_state_directory", root / "runtime/execution_plane"),
+        ("lease_state_file", root / "runtime/execution_plane/leases.json"),
+        ("owner_ticket_receipt", root / "runtime/execution_plane/.owner_ticket_consumption.json"),
+    )
+    for role, path in candidates:
+        row: dict[str, Any] = {
+            "role": role, "exists": False, "owner_uid": None,
+            "mode_octal": None, "is_symlink": None,
+            "current_process_can_write": None,
+        }
+        try:
+            info = path.lstat()
+            row.update({
+                "exists": True, "owner_uid": info.st_uid,
+                "mode_octal": oct(stat.S_IMODE(info.st_mode)),
+                "is_symlink": stat.S_ISLNK(info.st_mode),
+                "current_process_can_write": bool(os.access(
+                    path, os.W_OK, effective_ids=True,
+                )),
+            })
+        except (OSError, ValueError):
+            pass
+        entries.append(row)
+    exposure = [x["role"] for x in entries if x["current_process_can_write"] is True]
+    return {
+        "current_effective_uid": current_euid,
+        "inspected_roles": entries,
+        "observed_direct_write_exposures": exposure,
+        "direct_write_boundary_status": (
+            "LOCAL_DIRECT_WRITE_BYPASS_OBSERVED" if exposure else
+            "LOCAL_DIRECT_WRITE_BYPASS_NOT_OBSERVED_EXTERNAL_GATES_UNKNOWN"
+        ),
+        "external_git_and_plugin_authorization_verified": False,
+        "method": "READ_ONLY_CURRENT_PROCESS_DAC_CHECK_NOT_SERVICE_NAMESPACE_ATTESTATION",
+    }
 
 
 def inspect_original_owner_integration(root: Path) -> dict[str, Any]:
@@ -76,6 +131,7 @@ def inspect_original_owner_integration(root: Path) -> dict[str, Any]:
         "status": "ORIGINAL_OWNER_INTEGRATION_HOLD",
         "mode": "READ_ONLY_STATIC_ADOPTION_CHECK",
         "worker_entry_points": rows,
+        "direct_write_custody_audit": _read_only_direct_write_inventory(root),
         "unreadable_worker_sources": missing,
         "direct_lease_entry_points": direct,
         "founder_draft_present_unapproved": draft_safe,

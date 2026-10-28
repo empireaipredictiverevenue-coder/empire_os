@@ -76,3 +76,28 @@ def test_symlinked_worker_file_is_rejected(tmp_path):
     result = inspect_original_owner_integration(tmp_path)
     assert "pi" in result["unreadable_worker_sources"]
     assert result["production_enforcement_verified"] is False
+
+
+def test_readonly_inventory_detects_direct_repo_git_and_lease_writes(tmp_path):
+    fixtures(tmp_path)
+    (tmp_path / ".git").mkdir()
+    (tmp_path / "runtime/execution_plane").mkdir(parents=True)
+    (tmp_path / "runtime/execution_plane/leases.json").write_text("[]")
+    report = inspect_original_owner_integration(tmp_path)
+    audit = report["direct_write_custody_audit"]
+    assert "git_history" in audit["observed_direct_write_exposures"]
+    assert "source_repository" in audit["observed_direct_write_exposures"]
+    assert "lease_state_file" in audit["observed_direct_write_exposures"]
+    assert audit["direct_write_boundary_status"] == "LOCAL_DIRECT_WRITE_BYPASS_OBSERVED"
+    assert audit["external_git_and_plugin_authorization_verified"] is False
+    assert report["production_enforcement_verified"] is False
+
+
+def test_readonly_inventory_does_not_create_missing_lease_state(tmp_path):
+    fixtures(tmp_path)
+    report = inspect_original_owner_integration(tmp_path)
+    row = next(x for x in report["direct_write_custody_audit"]["inspected_roles"]
+               if x["role"] == "lease_state_directory")
+    assert row["exists"] is False
+    assert not (tmp_path / "runtime").exists()
+    assert report["production_write_performed"] is False
