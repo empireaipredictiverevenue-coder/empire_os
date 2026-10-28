@@ -12,7 +12,14 @@ export async function GET(request: Request) {
   };
   const fail = (detail: string, status: number) => Response.json({ detail }, { status, headers });
   const url = new URL(request.url);
-  const expectedOrigin = process.env.EMPIRE_CONSOLE_ORIGIN?.trim() || url.origin;
+  const expectedOrigin = process.env.EMPIRE_CONSOLE_ORIGIN?.trim();
+  try {
+    const configured = new URL(expectedOrigin ?? "");
+    if (configured.origin !== expectedOrigin || configured.username || configured.password ||
+        (configured.protocol !== "https:" && !(configured.protocol === "http:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(configured.hostname))))
+      return fail("company_review_configuration_required", 503);
+  } catch { return fail("company_review_configuration_required", 503); }
   const origin = request.headers.get("origin");
   const site = request.headers.get("sec-fetch-site");
   if ((origin && origin !== expectedOrigin) || (site && site !== "same-origin" && site !== "none"))

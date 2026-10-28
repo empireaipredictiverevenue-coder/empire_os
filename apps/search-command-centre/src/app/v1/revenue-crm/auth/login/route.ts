@@ -3,7 +3,13 @@
 export async function POST(request: Request) {
   const headers = {"Cache-Control": "no-store", "Pragma": "no-cache", "Referrer-Policy": "no-referrer"};
   const fail = (status: number) => Response.json({detail: "crm_login_unavailable_or_denied"}, {status, headers});
-  const origin = process.env.EMPIRE_CONSOLE_ORIGIN?.trim() || new URL(request.url).origin;
+  const origin = process.env.EMPIRE_CONSOLE_ORIGIN?.trim();
+  try {
+    const configured = new URL(origin ?? "");
+    if (configured.origin !== origin || configured.username || configured.password ||
+        (configured.protocol !== "https:" && !(configured.protocol === "http:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(configured.hostname)))) return fail(503);
+  } catch { return fail(503); }
   if (request.headers.get("origin") !== origin) return fail(403);
   if (request.headers.get("sec-fetch-site") && request.headers.get("sec-fetch-site") !== "same-origin") return fail(403);
   if (!request.headers.get("content-type")?.startsWith("application/json")) return fail(415);

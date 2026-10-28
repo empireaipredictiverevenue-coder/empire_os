@@ -16,6 +16,9 @@ function load(relative, dependencies = {}) {
 }
 const client = load("../src/lib/founder-api.ts");
 const {GET} = load("../src/app/api/predictive-revenue/company-review/route.ts", {"@/lib/founder-api": client});
+const priorOrigin = process.env.EMPIRE_CONSOLE_ORIGIN;
+test.beforeEach(() => { process.env.EMPIRE_CONSOLE_ORIGIN = "https://console.example"; });
+test.afterEach(() => { if (priorOrigin === undefined) delete process.env.EMPIRE_CONSOLE_ORIGIN; else process.env.EMPIRE_CONSOLE_ORIGIN = priorOrigin; });
 const token = "a".repeat(60) + "." + "b".repeat(60) + ".sig";
 const base = "https://console.example/api/predictive-revenue/company-review";
 const query = "?company_scope=company&source_id=source";
@@ -67,4 +70,13 @@ test("upstream access denial and malformed evidence stay explicit and uncached",
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.ok(!(await response.text()).includes("private backend"));
  }
+});
+
+test("missing or malformed release origin cannot fall back to request headers", async t => {
+ let calls = 0; t.mock.method(global, "fetch", async () => { calls++; throw Error("must not forward"); });
+ for (const origin of [undefined, "", "https://console.example/", "http://public.example", "https://console.example/path", "https://user:password@console.example"]) {
+  if (origin === undefined) delete process.env.EMPIRE_CONSOLE_ORIGIN; else process.env.EMPIRE_CONSOLE_ORIGIN = origin;
+  assert.equal((await GET(request())).status, 503);
+ }
+ assert.equal(calls, 0);
 });

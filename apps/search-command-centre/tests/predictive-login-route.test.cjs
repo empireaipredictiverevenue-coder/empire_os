@@ -6,6 +6,9 @@ const m = new Module(file, module); m.filename = file; m.paths = module.paths;
 m._compile(ts.transpileModule(fs.readFileSync(file, "utf8"), {compilerOptions: {module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022}}).outputText, file);
 const {POST} = m.exports;
 const body = {email: "fixture@example.invalid", password: "fixture-only", tenant_id: "11111111-1111-1111-1111-111111111111"};
+const priorOrigin = process.env.EMPIRE_CONSOLE_ORIGIN;
+test.beforeEach(() => { process.env.EMPIRE_CONSOLE_ORIGIN = "https://console.example"; });
+test.afterEach(() => { if (priorOrigin === undefined) delete process.env.EMPIRE_CONSOLE_ORIGIN; else process.env.EMPIRE_CONSOLE_ORIGIN = priorOrigin; });
 const token = "a".repeat(60) + "." + "b".repeat(60) + ".sig";
 function req(overrides = {}, data = body) {return new Request("https://console.example/v1/revenue-crm/auth/login", {method: "POST", headers: {Origin: "https://console.example", "Content-Type": "application/json", ...overrides}, body: JSON.stringify(data)});}
 test("original login forwarded once, no cookies and no extra upstream fields exposed", async t => {
@@ -36,4 +39,13 @@ test("configured console origin survives internal proxy URL without trusting for
  const valid = new Request("http://localhost:3000/v1/revenue-crm/auth/login", {method: "POST", headers: {Origin: "https://console.example", "Content-Type": "application/json"}, body: JSON.stringify(body)});
  assert.equal((await POST(valid)).status, 503); // Origin accepted, upstream deliberately absent.
  assert.equal((await POST(req({Origin: "https://attacker.example", "X-Forwarded-Host": "attacker.example"}))).status, 403);
+});
+
+test("missing or malformed release origin cannot fall back to request headers", async t => {
+ let calls = 0; t.mock.method(global, "fetch", async () => { calls++; throw Error("must not forward"); });
+ for (const origin of [undefined, "", "https://console.example/", "http://public.example", "https://console.example/path", "https://user:password@console.example"]) {
+  if (origin === undefined) delete process.env.EMPIRE_CONSOLE_ORIGIN; else process.env.EMPIRE_CONSOLE_ORIGIN = origin;
+  assert.equal((await POST(req())).status, 503);
+ }
+ assert.equal(calls, 0);
 });
