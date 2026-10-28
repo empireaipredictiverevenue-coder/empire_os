@@ -38,6 +38,13 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 - [ ] Original ASTRA website owner reviews PR #148 against live production, stages/approves the exact V17 HTML, supervises first release and independently confirms GET/HEAD/deployed SHA with five incumbents preserved.
 - [ ] Original GSC/CRM/finance owners attach **real** source-bound page visits, consented enquiries, buyer acceptance and settled cash where observed. UNKNOWN remains UNKNOWN; no speculative paid or outbound activation.
 
+## 28 October 2026 — General Microsite Factory source validation (original marketing lane)
+
+- [x] Reused existing US/GB `geo_registry` anchors to enable genuinely government-owned `*.gov.uk` source links in GB research and `*.gov` in other US research; HTTPS and exact host-label checks reject lookalike domains. Existing narrow pilot host policy unaffected.
+- [x] Original `GB-MAN` private research sample reviewed with **three current official source URLs and four actionable checks**. Status `HOLD_EVIDENCE`; zero publications, unknown search demand and commercial outcomes. No site or SEO owner edits.
+- [x] Factory source/copy, ranking, commercial outcomes and keyword regressions: **169 passed**, one existing dependency warning.
+- [ ] Attach measured first-party keyword demand, independent claim/context owner review, and any authorised existing site handoff before proposing publication. Do not infer buying intent or revenue from a source-backed draft.
+
 ## Current checkpoint
 
 Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State, Next-Best Action and the Account / Buyer Digital Twin are live and verified in the Founder Console.

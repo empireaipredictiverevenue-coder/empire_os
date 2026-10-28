@@ -127,7 +127,27 @@ def _tokens(text: str) -> set[str]:
     return {w for w in re.findall(r"[a-z]{3,}", text.casefold()) if w not in STOPWORDS}
 
 
-def _fact_rows(spec: Mapping[str, Any]) -> list[dict[str, str]]:
+def _government_source_host_allowed(host: str, geo: Mapping[str, Any]) -> bool:
+    """Validate government source link geography, not the content's truth.
+
+    The original US-IL pilot contract retains its exact host allowlist.
+    Other UK/US market researchers may cite official government domains;
+    a source link still requires independent fact and scope review before
+    any publication. No URL is fetched by this check.
+    """
+    if geo["market_id"] == "US-IL":
+        return host in {
+            "chicago.gov", "www.chicago.gov", "311.chicago.gov",
+            "webapps1.chicago.gov", "idfpr.illinois.gov", "www.census.gov",
+        }
+    if geo["country_code"] == "GB":
+        return host.endswith(".gov.uk")
+    if geo["country_code"] == "US":
+        return host.endswith(".gov")
+    return False
+
+
+def _fact_rows(spec: Mapping[str, Any], geo: Mapping[str, Any]) -> list[dict[str, str]]:
     rows = spec.get("local_facts", [])
     if not isinstance(rows, list):
         raise ValueError("local_facts must be a list")
@@ -146,11 +166,7 @@ def _fact_rows(spec: Mapping[str, Any]) -> list[dict[str, str]]:
             if (parsed.scheme != "https" or parsed.username or parsed.password
                     or parsed.port is not None or parsed.query or parsed.fragment
                     or not parsed.hostname
-                    or parsed.hostname not in {
-                        "chicago.gov", "www.chicago.gov", "311.chicago.gov",
-                        "webapps1.chicago.gov", "idfpr.illinois.gov",
-                        "www.census.gov",
-                    }):
+                    or not _government_source_host_allowed(parsed.hostname, geo)):
                 raise ValueError(f"fact {n} official_url must link directly to an approved government host")
             result[-1]["official_url"] = url
         try:
@@ -466,7 +482,7 @@ def build_candidate(spec: Mapping[str, Any]) -> tuple[dict[str, Any], str]:
     record = keyword_review["record"]
     if record["territory_key"] and record["territory_key"] != geo["market_id"]:
         raise ValueError("keyword territory_key must match geographic market_id")
-    facts = _fact_rows(spec)
+    facts = _fact_rows(spec, geo)
     audience = _string(spec.get("audience"), "audience", 200)
     offer = _string(spec.get("offer"), "offer", 400)
     title = _string(spec.get("headline", f'{record["keyword"].capitalize()}: {geo["area"]}'), "headline", 160)

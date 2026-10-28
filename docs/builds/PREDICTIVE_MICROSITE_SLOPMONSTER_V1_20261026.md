@@ -48,6 +48,13 @@ Two sample previews produced locally; both **HOLD_EVIDENCE** because actual meas
 
 Six existing static pages audited: home 4/5, commercial 3/5, roofing 5/5, solar 4/5, HVAC 3/5, predictive-revenue 4/5. This shows common writing patterns only. It does not measure actual conversion, demand or trust, and valid facts such as genuine numbers may trigger the proof heuristic.
 
+## 28 October 2026 — General UK/US original government source coverage
+
+- The original factory source-link validator now accepts authentic `*.gov.uk` domains for GB geographic anchors and `*.gov` for US anchors outside the original narrow pilot. Government-host suffixes are checked with proper DNS label boundaries, the already validated original market country, HTTPS, no credentials, no alternate port, no tracking query or fragment. The original pilot's source allowlist stays as before; its owner workflow is untouched.
+- The existing `GB-MAN` sample was reviewed with three current government/council source links and four practical property research steps, through the **original** preview script. Its outcome is deliberately **`HOLD_EVIDENCE`**, zero publishable pages and unverified demand. Private research source and owner-only preview reside under `/home/ubuntu/empire_releases/predictive_microsite_uk_source_research_20261028/`.
+- Wider original source/copy/ranking/outcome + keyword test selection: **169 passed** (one pre-existing AnyIO deprecation warning). Source-host validation does **not** independently verify factual claims, permit publication, or assume commercial demand. Original SEO/website execution ownership unchanged.
+- [Exact source policy and verified UK private research brief](PREDICTIVE_MICROSITE_GOV_SOURCE_POLICY_UK_RESEARCH_20261028.md).
+
 ## Remaining implementation for the current site + SEO owner
 1. Review the original provenance and upstream licence; rerun unit tests.
 2. Supply real search intent, measured demand, current dated SERP/source inputs and geographic ZIP/postcode associations with evidence. Do not guess counts.
