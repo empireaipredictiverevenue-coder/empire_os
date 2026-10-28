@@ -117,3 +117,59 @@ def test_existing_handoff_schedule_writes_private_seo_projection(tmp_path):
     assert seo["execution_authority"]=="none"
     assert seo["owner"]=="ORIGINAL_SEARCH_INTELLIGENCE_IMPLEMENTATION_OWNER"
     assert seo["publication_authorized"] is False
+
+
+def test_one_cycle_novelty_informs_owner_without_pretending_citation_was_reviewed(tmp_path):
+    source=handoff()
+    first=refresh_seo_owner_review(tmp_path,source,now=NOW)
+    baseline=json.loads((tmp_path/OUTPUT).read_text())
+    assert baseline["delta_review"]["comparison_available"] is False
+    assert baseline["delta_review"]["new_since_previous_refresh_count"] is None
+    assert first["new_since_previous_refresh"] is None
+    # The same underlying source is refreshed later: no new citations.
+    source["generated_at"]=(NOW+timedelta(minutes=30)).isoformat()
+    source["topics"][0]["observations"].append({
+        **source["topics"][0]["observations"][0],
+        "source_ref":"last30days:source:new",
+        "source_url":"https://www.reddit.com/r/roofing/comments/new/fresh",
+    })
+    source["source_observation_count"]=3
+    source["topics"][0]["candidate_observation_count"]=3
+    updated=refresh_seo_owner_review(tmp_path,source,now=NOW+timedelta(minutes=30))
+    assert updated["new_since_previous_refresh"]==1
+    assert updated["prior_snapshot_comparison_available"] is True
+    new=json.loads((tmp_path/OUTPUT).read_text())
+    assert new["delta_review"]["new_since_previous_refresh_count"]==1
+    assert new["delta_review"]["already_present_previous_count"]==1
+    cited=new["topics"][0]["references_for_manual_review"]
+    assert [x["new_since_previous_refresh"] for x in cited]==[False,True]
+    assert all(x["candidate_type"]=="UNVERIFIED_TITLE_MATCH_FOR_EDITORIAL_REVIEW" for x in cited)
+    assert all("reviewed_at" not in x for x in cited)
+    assert new["seo_recommendation_accepted_by_owner"] is False
+    before=(tmp_path/OUTPUT).read_bytes()
+    retried=refresh_seo_owner_review(tmp_path,source,now=NOW+timedelta(minutes=30))
+    assert (tmp_path/OUTPUT).read_bytes()==before
+    assert retried["new_since_previous_refresh"]==1
+
+
+def test_stale_prior_cannot_prove_newness_and_future_prior_is_rejected():
+    previous=build_seo_owner_review(handoff(),now=NOW)
+    future=handoff()
+    future["generated_at"]=(NOW+timedelta(days=3)).isoformat()
+    result=build_seo_owner_review(future,now=NOW+timedelta(days=3),previous=previous)
+    assert result["delta_review"]["comparison_available"] is False
+    assert result["delta_review"]["new_since_previous_refresh_count"] is None
+    with pytest.raises(ValueError,match="newer_than_current"):
+        build_seo_owner_review(handoff(),now=NOW,previous={
+            **previous,"source_handoff_generated_at":(NOW+timedelta(minutes=30)).isoformat(),
+        })
+
+
+def test_existing_review_corruption_never_overwritten(tmp_path):
+    p=tmp_path/OUTPUT
+    p.parent.mkdir(parents=True)
+    p.write_text("untrusted data",encoding="utf-8")
+    p.chmod(0o600)
+    with pytest.raises(ValueError,match="unreadable_existing_private_review"):
+        refresh_seo_owner_review(tmp_path,handoff(),now=NOW)
+    assert p.read_text()=="untrusted data"

@@ -46,7 +46,49 @@ def _valid_url(value: Any) -> bool:
         return True
 
 
-def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict[str, Any]:
+
+def _previous_snapshot(previous: Mapping[str, Any] | None, *, now: datetime, source_time: datetime) -> set[tuple[str, str]] | None:
+    """One-cycle delta only: previously seen DOES NOT mean owner reviewed."""
+    if previous is None:
+        return None
+    if (not isinstance(previous, Mapping) or previous.get("schema_version") != SCHEMA
+            or previous.get("mode") != "OWNER_REVIEW_ONLY"
+            or previous.get("owner") != "ORIGINAL_SEARCH_INTELLIGENCE_IMPLEMENTATION_OWNER"
+            or previous.get("publication_authorized") is not False
+            or previous.get("automated_seo_changes_authorized") is not False
+            or previous.get("seo_recommendation_accepted_by_owner") is not False):
+        raise ValueError("untrusted_prior_review_snapshot")
+    try:
+        previous_time = datetime.fromisoformat(
+            str(previous["source_handoff_generated_at"]).replace("Z", "+00:00")
+        )
+    except (TypeError, ValueError, KeyError):
+        raise ValueError("untrusted_prior_review_timestamp") from None
+    if (previous_time.tzinfo is None or previous_time > source_time
+            or previous_time > now + timedelta(minutes=1)):
+        raise ValueError("prior_review_snapshot_newer_than_current_source")
+    # A missing/very old previous snapshot cannot establish whether material is NEW.
+    if source_time - previous_time > timedelta(days=2):
+        return None
+    topics = previous.get("topics")
+    if not isinstance(topics, list) or len(topics) > MAX_TOPICS:
+        raise ValueError("untrusted_prior_review_topics")
+    seen: set[tuple[str, str]] = set()
+    for topic in topics:
+        if not isinstance(topic, Mapping):
+            raise ValueError("untrusted_prior_review_topic")
+        rows = topic.get("references_for_manual_review")
+        if not isinstance(rows, list) or len(rows) > 30:
+            raise ValueError("untrusted_prior_review_references")
+        for row in rows:
+            if not isinstance(row, Mapping) or not isinstance(row.get("source_ref"), str) or not _valid_url(row.get("source_url")):
+                raise ValueError("untrusted_prior_review_reference")
+            seen.add((row["source_ref"], row["source_url"]))
+    return seen
+
+
+def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
+                           previous: Mapping[str, Any] | None = None) -> dict[str, Any]:
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("aware_clock_required")
     now = now.astimezone(timezone.utc)
@@ -76,9 +118,11 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict
     if (not isinstance(topics, list) or not 0 <= len(topics) <= MAX_TOPICS
             or handoff.get("topic_count") != len(topics)):
         raise ValueError("invalid_topic_count")
+    prior_refs = _previous_snapshot(previous, now=now, source_time=generated)
     review_topics = []
     total = 0
     review_first_count = 0
+    new_count = 0
     unique = set()
     for topic in topics:
         if not isinstance(topic, Mapping):
@@ -93,6 +137,7 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict
         if total > MAX_OBSERVATIONS:
             raise ValueError("too_many_citation_references")
         selected = []
+        topic_new = 0
         for row in rows:
             if not isinstance(row, Mapping):
                 raise ValueError("invalid_reference")
@@ -113,12 +158,20 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict
             if ref in unique:
                 continue
             unique.add(ref)
+            new_to_previous = ((ref, row["source_url"]) not in prior_refs) if prior_refs is not None else None
+            if new_to_previous:
+                new_count += 1
+                topic_new += 1
             selected.append({
                 "source_ref": ref,
                 "source_url": row["source_url"],
                 "source_type": row.get("source_type"),
                 "published_at": row.get("published_at"),
                 "cross_topic_reused_reference": row.get("cross_topic_reused_reference") is True,
+                "new_since_previous_refresh": new_to_previous,
+                "already_present_in_previous_snapshot_not_reviewed": (
+                    not new_to_previous if new_to_previous is not None else None
+                ),
                 "candidate_type": "UNVERIFIED_TITLE_MATCH_FOR_EDITORIAL_REVIEW",
                 "suggested_owner_validation": "READ_SOURCE_THEN_VALIDATE_GSC_SERP_AND_SEARCH_INTENT",
             })
@@ -127,6 +180,7 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict
             "topic": title,
             "original_reference_count": len(rows),
             "review_first_unverified_count": len(selected),
+            "new_since_previous_refresh_count": topic_new if prior_refs is not None else None,
             "references_for_manual_review": selected,
             "relevance_verified": False,
             "search_demand_verified": False,
@@ -142,6 +196,14 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime) -> dict
         "source_handoff_generated_at": generated.astimezone(timezone.utc).isoformat(),
         "original_source_observation_count": total,
         "review_first_unique_citation_count": review_first_count,
+        "delta_review": {
+            "comparison_available": prior_refs is not None,
+            "new_since_previous_refresh_count": new_count if prior_refs is not None else None,
+            "already_present_previous_count": (review_first_count - new_count) if prior_refs is not None else None,
+            "previously_seen_does_not_mean_human_reviewed": True,
+            "novelty_refers_only_to_previous_snapshot_not_entire_history": True,
+            "source_review_automatically_approved": False,
+        },
         "topics": review_topics,
         "owner": "ORIGINAL_SEARCH_INTELLIGENCE_IMPLEMENTATION_OWNER",
         "source_data_kind": "PUBLIC_COMMUNITY_DISCUSSION_NOT_GOOGLE_SEARCH_DATA",
@@ -169,10 +231,41 @@ def refresh_seo_owner_review(repo_root: Path, handoff: Mapping[str, Any],
     target = repo_root / OUTPUT
     if target.is_symlink() or target.parent.is_symlink():
         raise ValueError("unsafe_seo_owner_review_path")
-    result = build_seo_owner_review(handoff, now=now)
+    previous = None
+    if target.exists():
+        if not target.is_file() or target.stat().st_mode & 0o777 != 0o600:
+            raise ValueError("untrusted_existing_private_review_file")
+        try:
+            previous = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, ValueError):
+            raise ValueError("unreadable_existing_private_review_file") from None
+    result = build_seo_owner_review(handoff, now=now, previous=previous)
+    # Preserve stable evidence/novelty classification for repeated refreshes
+    # of the exact same source snapshot (e.g. retry during a Media OS run).
+    if (previous is not None and previous.get("delta_review", {}).get("comparison_available") is not None
+            and previous.get("source_handoff_generated_at") == result["source_handoff_generated_at"]
+            and previous.get("original_source_observation_count") == result["original_source_observation_count"]
+            and [
+                (v.get("source_ref"), v.get("source_url"))
+                for t in previous["topics"] for v in t["references_for_manual_review"]
+            ] == [
+                (v["source_ref"], v["source_url"])
+                for t in result["topics"] for v in t["references_for_manual_review"]
+            ]):
+        result = dict(previous)
     payload = (json.dumps(result, indent=2, sort_keys=True) + "\n").encode()
     if len(payload) > MAX_BYTES:
         raise ValueError("seo_review_payload_too_large")
+    if previous is not None and target.read_bytes() == payload:
+        return {
+            "status": result["status"], "owner": result["owner"],
+            "path": str(OUTPUT),
+            "review_first_unique_citations": result["review_first_unique_citation_count"],
+            "new_since_previous_refresh": result["delta_review"]["new_since_previous_refresh_count"],
+            "prior_snapshot_comparison_available": result["delta_review"]["comparison_available"],
+            "original_reference_count": result["original_source_observation_count"],
+            "seo_code_modified": False, "no_automatic_publishing_or_indexing": True,
+        }
     target.parent.mkdir(parents=True, exist_ok=True)
     fd, staged = tempfile.mkstemp(prefix=".seo-review-", suffix=".tmp", dir=target.parent)
     try:
@@ -188,6 +281,8 @@ def refresh_seo_owner_review(repo_root: Path, handoff: Mapping[str, Any],
         "owner": result["owner"],
         "path": str(OUTPUT),
         "review_first_unique_citations": result["review_first_unique_citation_count"],
+        "new_since_previous_refresh": result["delta_review"]["new_since_previous_refresh_count"],
+        "prior_snapshot_comparison_available": result["delta_review"]["comparison_available"],
         "original_reference_count": result["original_source_observation_count"],
         "seo_code_modified": False,
         "no_automatic_publishing_or_indexing": True,
