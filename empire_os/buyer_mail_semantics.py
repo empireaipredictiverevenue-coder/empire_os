@@ -12,6 +12,7 @@ import re
 from typing import Any, Mapping
 
 from empire_os.gmail_reply_adapter import visible_reply_text
+from empire_os.publisher_reply_signals import recognize_publisher_reply
 
 EVENT_CODES = frozenset({
     "LANDING_VISUAL_APPROVED_REPORTED",
@@ -25,6 +26,9 @@ EVENT_CODES = frozenset({
     "PUBLISHER_SPONSORED_PLACEMENTS_ONLY_REPORTED",
     "BUYER_INTERNAL_DECISION_PENDING_REPORTED",
     "ROOFING_BUYER_REVISED_COMMERCIAL_TERMS_REPORTED",
+    "PUBLISHER_ACCEPTED_OUTCOME_PILOT_REPORTED",
+    "PUBLISHER_REVENUE_SHARE_TARGET_REPORTED",
+    "PUBLISHER_SIGNED_TERMS_AND_COVERAGE_REQUIRED_REPORTED",
 })
 
 def _decode(data: Any) -> str:
@@ -187,6 +191,8 @@ def classify_visible_claims(visible: str, *, outbound: bool = False) -> list[str
         ]
         if sum(bool(re.search(pattern,text)) for pattern in groups)>=4:
             events.add("COMPLETE_BUYER_REQUIREMENTS_SENT")
+    if not outbound:
+        events.update(recognize_publisher_reply(text))
     return sorted(events)
 
 

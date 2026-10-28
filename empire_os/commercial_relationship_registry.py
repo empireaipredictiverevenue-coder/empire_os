@@ -1139,8 +1139,14 @@ def reconcile(
                               "status","source","outbound_authorized","execution_authority"} <= set(row)
                 or set(row)-{"thread_id","domain","last_buyer_reply_id",
                               "status","source","outbound_authorized","execution_authority",
-                              "reported_constraint"}):
+                              "reported_constraint","last_reply_signals"}):
             raise RelationshipEvidenceError("untrusted_unlinked_buyer_review_row")
+        signals=row.get("last_reply_signals", [])
+        if (not isinstance(signals, list) or len(signals)>4
+                or len(signals)!=len(set(signals))
+                or any(not isinstance(code,str) or code not in EVENT_CODES
+                       or not code.startswith("PUBLISHER_") for code in signals)):
+            raise RelationshipEvidenceError("untrusted_publisher_reply_signals")
         tid=row["thread_id"]
         domain=row["domain"]
         mid=row["last_buyer_reply_id"]

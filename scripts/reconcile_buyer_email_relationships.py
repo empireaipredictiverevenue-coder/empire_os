@@ -8,7 +8,7 @@ proven before ongoing mailbox collection can be marked automated.
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, datetime, timezone
 import json
 import os
 from pathlib import Path
@@ -21,6 +21,8 @@ from empire_os.commercial_relationship_registry import (
 )
 
 from empire_os.commercial_social_intent import build_social_intent_review
+from empire_os.publisher_commercial_triage import publisher_next_evidence
+from empire_os.buyer_evidence_brain import plan_evidence_work
 from empire_os.public_intent_affiliation import load_evidence as load_public_affiliation
 from empire_os.buyer_pilot_assets import (
     PARTNER_PREVIEW_DESCRIPTORS,
@@ -270,6 +272,7 @@ def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
             row.get("status")=="HOLD_PAID_PLACEMENTS_ONLY_NO_PERFORMANCE_CONTACT"
             and row.get("reported_constraint")=="SPONSORED_PLACEMENTS_ONLY_REPORTED"
         )
+        triage = publisher_next_evidence(row)
         supply.append({
             "thread_id":row["thread_id"],
             "last_reply_id":row["last_buyer_reply_id"],
@@ -281,8 +284,9 @@ def annotate_new_engaged_commercial_roles(report: dict, *, root: Path) -> None:
             ),
             "next_action":(
                 "HOLD_PERFORMANCE_PARTNERSHIP_NO_REPEAT_EMAIL" if paid_only
-                else "REVIEW_PUBLISHER_REPLY_NO_SEND"
+                else triage["next_action"]
             ),
+            "publisher_next_evidence":triage,
             "publisher_supply_accepted":False,
             "buyer_demand_verified":False,
             "outbound_authorized":False,
@@ -340,6 +344,22 @@ def build(root: Path = ROOT) -> dict:
         }
     attach_partner_inbound_requirements(result, reviewed)
     annotate_new_engaged_commercial_roles(result, root=root)
+    # Read the already existing capacity snapshot, never an alternative DB.
+    # The original Gmail evidence cycle owns the cadence for this review.
+    capacity_path = root / "runtime/buyer_capacity_readiness/latest.json"
+    capacity_source = None
+    if capacity_path.is_file() and not capacity_path.is_symlink():
+        if capacity_path.stat().st_size > 100_000:
+            raise RelationshipEvidenceError("BUYER_CAPACITY_SNAPSHOT_OVERSIZED")
+        try:
+            capacity_source = json.loads(capacity_path.read_text(encoding="utf-8"))
+        except (UnicodeError, ValueError) as exc:
+            raise RelationshipEvidenceError("BUYER_CAPACITY_SNAPSHOT_INVALID") from exc
+    result["buyer_evidence_brain"] = plan_evidence_work(
+        result["new_engaged_publisher_supply_review_queue"],
+        buyer_snapshot=capacity_source,
+        now=datetime.now(timezone.utc),
+    )
     demand_path = base / "known_company_public_demand_review_latest.json"
     if demand_path.exists():
         demand_review = _read_private(

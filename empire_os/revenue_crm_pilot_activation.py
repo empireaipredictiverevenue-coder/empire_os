@@ -144,6 +144,32 @@ def build_pilot_routers(config_path: Path) -> tuple[APIRouter, APIRouter]:
     read_router = create_revenue_crm_router(
         resolve_authenticated_read=resolver,
     )
+    # CRM owner-controlled private opt-in only. No second service/router, and
+    # no order access if the original HELD security RPC is still unavailable.
+    if os.environ.get("EMPIRE_CRM_V11_ORDER_READ_ENABLED") == "1":
+        from empire_os.crm_revenue_case_private_api import (
+            create_private_revenue_case_router,
+        )
+        from empire_os.revenue_crm_signed_auth import SignedCrmTenantVerifier
+        case_verifier = SignedCrmTenantVerifier(
+            {key_id: private_key.public_key()},
+            load_membership=verified_membership,
+        )
+        case_router = create_private_revenue_case_router(
+            resolve_authenticated_read=resolver,
+            signed_crm_verifier=case_verifier,
+            dedicated_tenant_dsns=readers,
+            load_original_membership=verified_membership,
+        )
+        # The original private service inspects direct route paths. Avoid a
+        # nested router: preserve the original single-router contract.
+        if len(case_router.routes) != 1:
+            raise ValueError("exactly one private V11 CRM read route required")
+        case_route = case_router.routes[0]
+        read_router.add_api_route(
+            case_route.path, case_route.endpoint,
+            methods=["GET"],
+        )
     return read_router, login_router
 
 
