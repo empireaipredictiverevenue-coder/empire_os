@@ -24,6 +24,20 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 
 **DONE rule:** code + tests + live runtime + canonical data + Founder surface where applicable. A file existing by itself is not completion.
 
+## 28 October 2026 — Predictive Microsite Factory / Chicago owner handoff (original workstream)
+
+**Owner:** original `agent/predictive-microsite-slopmonster-20261026`; source/research only. Original ASTRA website and SEO/media owners retain publishing/rights control. Reconciled in `docs/builds/PREDICTIVE_MICROSITE_OWNER_TO_OWNER_RELEASE_HANDOFF_20261027.md`. This is a scoped checklist update **on the original marketing branch**, not a modification of the concurrently dirty production checklist.
+
+- [x] Original private V10 citywide Chicago permit/licence research page and approved visual direction preserved; source SHA pinned `3ee2f8d08d12...`. Five original official evidence links.
+- [x] Original website owner's actual corrected V16 export and licensed-photograph V17 page reconciled by exact SHA; final V17 SHA `1ed1e468a51d...`, 387,684 bytes, five distinct credited evidence photographs.
+- [x] Original owner source→export→media chain verified by existing owner workstream (137 selected tests, browser desktop/mobile and 3840×2160 proofs). Draft ASTRA owner PR **#148** / tracked issue **#138**; do not create a competing release owner.
+- [x] 28 October real production verification: five original live campaign release HTMLs intact; proposed Chicago route HTTP **404** and original site release reader returns `None`. This is **not a publication or traffic success**.
+- [x] Original V4 research queue (2 older candidates) independently identified as separate from citywide Chicago `microsite_c4c5a13b626d293fe15c`; no source/measurement mixing.
+- [ ] Original SEO owner reviews exact Chicago citywide editorial/publication/indexation evidence (visual-design approval not repeated).
+- [ ] Original brand/media owner clears the specific orbital-A image and source-photo adaptations/attribution for public use.
+- [ ] Original ASTRA website owner reviews PR #148 against live production, stages/approves the exact V17 HTML, supervises first release and independently confirms GET/HEAD/deployed SHA with five incumbents preserved.
+- [ ] Original GSC/CRM/finance owners attach **real** source-bound page visits, consented enquiries, buyer acceptance and settled cash where observed. UNKNOWN remains UNKNOWN; no speculative paid or outbound activation.
+
 ## Current checkpoint
 
 Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State, Next-Best Action and the Account / Buyer Digital Twin are live and verified in the Founder Console.
