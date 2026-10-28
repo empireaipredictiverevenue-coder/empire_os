@@ -419,3 +419,38 @@ production marker, root lease migration or direct connector lockdown
 has been installed.
 
 **Acceptance status: ORIGINAL_OWNER_DIRECT_WRITE_BOUNDARY_HOLD.**
+
+## 28 October 2026 — resumed original owner: proposal pre-publication integration
+
+Founder Directive OS and Chief of Staff operating rules were read from the
+canonical production repository. This original review branch and GitHub
+Draft PR #149 remain the single ownership-lock development line, separate
+from website, SEO, commercial, CRM and finance implementations. The live
+master checklist has an unrelated uncommitted edit and was not changed.
+
+The existing original execution lease manager now exposes
+`attest_original_worker_proposal(...)`. With the protected owner-lock
+marker absent this is a no-op, preserving original worker behavior.
+Under enforcement it revalidates the current root-custodied signed ticket,
+pinned founder policy, authenticated service UID/job/capability, and
+exact changed-path set. It rejects symlinks, hard links, missing files and
+unexpected extra paths in a trusted worktree. This pre-publication check
+is called by the original Hermes, Pi and Empire Coder *sandbox proposal*
+workers before proposal publication (also Pi smoke completion).
+
+Synthetic acceptance covers valid exact file, extra changed file, symlink
+escape and original OFF-mode compatibility; 160 tests passed across the
+changed ownership, lease, dispatcher and original worker suites.
+
+**Remaining exact scope limit:** the non-sandbox Empire Coder
+`CoderTaskWorker` applies a structured patch to a potentially dirty
+shared workspace; a privileged independent changed-file readback is not
+yet in place. Its self-reported patch target cannot serve as security
+evidence. All three proposal-path checks remain worker-invoked
+defence-in-depth, not an independent privileged publication gateway.
+
+**Live status remains HOLD.** Production root guard/marker are absent;
+shared ubuntu service identity and direct repo/lease file write bypass
+remain. No production service, agent, timer, database, new scheduler,
+privileged helper, signing key, file ownership or live execution lease
+state was changed.

@@ -711,3 +711,64 @@ def acquire_sealed_owner_lease(
         now=datetime.now(timezone.utc),
         ttl_seconds=ttl_seconds,
     )
+
+
+def attest_sealed_worker_proposal(
+    *,
+    lease_owner: str,
+    job_id: str,
+    trusted_worktree_root: Path,
+    independently_observed_changed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Draft final pre-publication signed-path check for original workers.
+
+    The caller MUST use actual Git/worktree readback, not worker-prompt text.
+    This is defence in depth, NOT a substitute for protected publisher/OS
+    rights: workers who can push directly can still bypass this code.
+    """
+    if lease_owner not in ORIGINAL_MUTATING_LEASE_OWNERS:
+        raise OwnerAuthorityHold("UNKNOWN_MUTATION_WORKER_CLASS")
+    if not isinstance(job_id, str) or not re.fullmatch(
+        r"[A-Za-z0-9][A-Za-z0-9._-]{0,79}", job_id
+    ) or ".." in job_id:
+        raise OwnerAuthorityHold("UNTRUSTED_MUTATING_JOB_ID")
+    root = SEALED_AUTHORITY_ROOT
+    _sealed_root_directory(root.parent)
+    _sealed_root_directory(root)
+    for folder in (root / "tickets", root / "tickets" / lease_owner):
+        _sealed_root_directory(folder)
+    principal = _principal_for_authenticated_uid(
+        _sealed_json(root / "principals.json"),
+        kernel_uid=os.geteuid(), lease_owner=lease_owner,
+    )
+    policy = _sealed_json(root / "policy.json")
+    ticket = _sealed_json(root / "tickets" / lease_owner / (job_id + ".json"))
+    key_text = _sealed_file(root / "founder_public_key.hex").decode("ascii").strip()
+    sha_text = _sealed_file(root / "pinned_policy_sha256.txt").decode("ascii").strip()
+    try:
+        key_data = bytes.fromhex(key_text)
+        if len(key_data) != 32:
+            raise ValueError("ed25519 key size invalid")
+        public_key = Ed25519PublicKey.from_public_bytes(key_data)
+    except (TypeError, ValueError) as exc:
+        raise OwnerAuthorityHold("TRUSTED_FOUNDER_PUBLIC_KEY_INVALID") from exc
+    signed_paths = _unique_paths(ticket.get("changed_paths"))
+    # This also independently verifies the currently pinned founder policy,
+    # valid signature, expiry, exact principal/assignment and path authority.
+    verify_owner_mutation(
+        signed_policy=policy, signed_ticket=ticket,
+        trusted_founder_public_key=public_key,
+        trusted_policy_sha256=sha_text,
+        authenticated_worker_principal=principal,
+        request_job_id=job_id,
+        request_department=ticket.get("department"),
+        request_capability=ticket.get("capability"),
+        changed_paths=signed_paths,
+        lease_resources=tuple(ticket.get("lease_resources") or ()),
+        now=datetime.now(timezone.utc),
+    )
+    return attest_actual_worktree_changes(
+        trusted_worktree_root=trusted_worktree_root,
+        signed_changed_paths=signed_paths,
+        independently_observed_changed_paths=independently_observed_changed_paths,
+    )

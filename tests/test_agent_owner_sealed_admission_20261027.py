@@ -232,3 +232,61 @@ def test_missing_root_custody_rejects_original_worker(tmp_path, monkeypatch):
                        match="UNTRUSTED_DIRECT_LEASE_OR_REPO_WRITE_ACCESS"):
         manager.acquire(owner="hermes", job_id="job_123",
                         resources=("path:apps/example-site/src/page.tsx",), ttl_seconds=600)
+
+
+
+def test_sealed_worker_postflight_accepts_exact_changed_file(tmp_path, monkeypatch):
+    manager, params, root, _ = _sealed_fixture(tmp_path, monkeypatch)
+    worktree = tmp_path / "isolated_worktree"
+    target = worktree / "apps/example-site/src/page.tsx"
+    target.parent.mkdir(parents=True)
+    target.write_text("owner-approved edit")
+    execution_lease.attest_original_worker_proposal(
+        lease_owner="hermes", job_id="job_123",
+        trusted_worktree_root=worktree,
+        independently_observed_changed_paths=("apps/example-site/src/page.tsx",),
+    )
+
+
+def test_sealed_worker_postflight_denies_extra_file(tmp_path, monkeypatch):
+    manager, params, root, _ = _sealed_fixture(tmp_path, monkeypatch)
+    worktree = tmp_path / "isolated_worktree"
+    (worktree / "apps/example-site/src").mkdir(parents=True)
+    (worktree / "apps/example-site/src/page.tsx").write_text("allowed")
+    (worktree / "apps/example-site/src/unexpected.tsx").write_text("other lane")
+    with pytest.raises(execution_lease.ExecutionLeaseError,
+                       match="OWNER_PROPOSAL_SCOPE_BLOCKED:ACTUAL_CHANGES_NOT_EQUAL_TO_SIGNED_FILES"):
+        execution_lease.attest_original_worker_proposal(
+            lease_owner="hermes", job_id="job_123",
+            trusted_worktree_root=worktree,
+            independently_observed_changed_paths=(
+                "apps/example-site/src/page.tsx",
+                "apps/example-site/src/unexpected.tsx",
+            ),
+        )
+
+
+def test_sealed_worker_postflight_denies_symlinked_path(tmp_path, monkeypatch):
+    manager, params, root, _ = _sealed_fixture(tmp_path, monkeypatch)
+    worktree = tmp_path / "isolated_worktree"
+    target = worktree / "apps/example-site/src/page.tsx"
+    target.parent.mkdir(parents=True)
+    outside = tmp_path / "outside_agent_file"
+    outside.write_text("not allowed")
+    target.symlink_to(outside)
+    with pytest.raises(execution_lease.ExecutionLeaseError,
+                       match="OWNER_PROPOSAL_SCOPE_BLOCKED:SYMLINKED_CHANGED_PATH_DENIED"):
+        execution_lease.attest_original_worker_proposal(
+            lease_owner="hermes", job_id="job_123",
+            trusted_worktree_root=worktree,
+            independently_observed_changed_paths=("apps/example-site/src/page.tsx",),
+        )
+
+
+def test_original_worker_postflight_is_noop_when_marker_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr(execution_lease, "owner_mutation_lock_active", lambda: False)
+    execution_lease.attest_original_worker_proposal(
+        lease_owner="hermes", job_id="old_unscheduled_job",
+        trusted_worktree_root=tmp_path / "never_exists",
+        independently_observed_changed_paths=(),
+    )

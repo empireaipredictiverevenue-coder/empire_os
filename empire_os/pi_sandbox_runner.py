@@ -19,6 +19,7 @@ from typing import Any, Mapping
 from empire_os.execution_lease import (
     ExecutionLeaseError,
     ExecutionLeaseManager,
+    attest_original_worker_proposal,
 )
 
 
@@ -463,6 +464,11 @@ def run_pi_sandbox_job(
             result["status"] = "VERIFICATION_FAILED"
             return result
 
+        attest_original_worker_proposal(
+            lease_owner="pi", job_id=job.job_id,
+            trusted_worktree_root=clone,
+            independently_observed_changed_paths=tuple(changed),
+        )
         if not job.publish_proposal:
             result["status"] = "MUTATION_SMOKE_PASSED"
             result["proposal_branch"] = None

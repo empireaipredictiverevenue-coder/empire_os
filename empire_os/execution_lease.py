@@ -315,3 +315,29 @@ class ExecutionLeaseManager:
             active = self._prune(self._read(), now=now)
             self._write(active)
             return [lease.as_dict() for lease in active]
+
+
+def attest_original_worker_proposal(
+    *,
+    lease_owner: str,
+    job_id: str,
+    trusted_worktree_root: Path,
+    independently_observed_changed_paths: tuple[str, ...],
+) -> None:
+    """Original worker publication check; unchanged behaviour when OFF.
+
+    A successful check is not a grant to merge, deploy or make external calls.
+    """
+    if not owner_mutation_lock_active():
+        return
+    from empire_os.agent_owner_authority_review import (
+        OwnerAuthorityHold, attest_sealed_worker_proposal,
+    )
+    try:
+        attest_sealed_worker_proposal(
+            lease_owner=lease_owner, job_id=job_id,
+            trusted_worktree_root=trusted_worktree_root,
+            independently_observed_changed_paths=independently_observed_changed_paths,
+        )
+    except OwnerAuthorityHold as exc:
+        raise ExecutionLeaseError(f"OWNER_PROPOSAL_SCOPE_BLOCKED:{exc}") from exc

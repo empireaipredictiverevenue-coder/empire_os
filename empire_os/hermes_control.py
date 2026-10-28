@@ -27,6 +27,7 @@ from typing import Any, Iterable, Mapping
 from empire_os.execution_lease import (
     ExecutionLeaseError,
     ExecutionLeaseManager,
+    attest_original_worker_proposal,
 )
 from empire_os.execution_plane_verification import (
     plan_candidate_verification,
@@ -1900,6 +1901,11 @@ def process_job(
         elif not changed:
             result["status"] = "COMPLETED_NO_CHANGES"
         else:
+            attest_original_worker_proposal(
+                lease_owner="hermes", job_id=job.job_id,
+                trusted_worktree_root=worktree,
+                independently_observed_changed_paths=tuple(changed),
+            )
             verification = run_verification(
                 job,
                 production_repo=repo_root,
