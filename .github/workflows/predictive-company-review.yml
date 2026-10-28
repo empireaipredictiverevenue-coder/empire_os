@@ -62,7 +62,7 @@ jobs:
         env:
           REVIEW_TOKEN: ${{ github.token }}
           REVIEW_REPOSITORY: ${{ github.repository }}
-          FRONTEND_SHA: '4dcc01841074d14657459945481e47073b674a69'
+          FRONTEND_SHA: 'f354f962d8112beac00beb265cfe06892c1d237c'
         run: |
           set -eu
           mkdir "$RUNNER_TEMP/predictive-review-web"

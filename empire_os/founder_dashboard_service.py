@@ -95,6 +95,12 @@ def build_founder_dashboard_service(
             "ok": True,
             "service": "founder-dashboard-read-api",
             "read_only": True,
+            "company_review": {
+                "status": "NOT_CONFIGURED" if company_review_router_factory is None else "CONFIGURED_NOT_LIVE_VERIFIED",
+                "authenticated_source_read_verified": False,
+                "release_ready": False,
+                "note": "Process health is not authenticated company evidence or release acceptance.",
+            },
         }
 
     return service

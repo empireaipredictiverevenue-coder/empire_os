@@ -67,3 +67,14 @@ def test_bad_company_router_configuration_fails_service_construction():
     for factory in (False, lambda: None):
         with pytest.raises(ValueError):
             build_founder_dashboard_service(company_review_router_factory=factory)
+
+
+def test_process_health_never_certifies_company_source_release_readiness():
+    from fastapi.testclient import TestClient
+    from empire_os.predictive_revenue_company_timeline_v44 import create_company_review_read_router
+    for factory, expected in ((None, "NOT_CONFIGURED"), (create_company_review_read_router, "CONFIGURED_NOT_LIVE_VERIFIED")):
+        result = TestClient(build_founder_dashboard_service(company_review_router_factory=factory)).get("/health").json()
+        assert result["ok"] is True
+        assert result["company_review"]["status"] == expected
+        assert result["company_review"]["authenticated_source_read_verified"] is False
+        assert result["company_review"]["release_ready"] is False
