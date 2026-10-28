@@ -979,6 +979,54 @@ export type PredictiveRevenueDemo = {
   execution_authority?: string;
 };
 
+/** Server request adapter for the original CRM login's in-memory bearer.
+ * No token storage, token issuance, cookie inference or caller-selected tenant.
+ * Backend membership and source-purpose authorization remain authoritative.
+ */
+export async function getPredictiveCompanyReview(
+  accessToken: string,
+  companyScope: string,
+  sourceId: string,
+): Promise<FounderReadResult<Record<string, unknown>>> {
+  const failure = (reason: string, status: number | null = null) =>
+    ({ ok: false, status, data: null, reason });
+  if (typeof window !== "undefined") return failure("server_request_required");
+  if (typeof accessToken !== "string" || accessToken.length < 100 ||
+      accessToken.length > 6000 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(accessToken))
+    return failure("crm_session_required");
+  if (![companyScope, sourceId].every(value => typeof value === "string" &&
+      /^[A-Za-z0-9:@._/-]{1,128}$/.test(value)))
+    return failure("company_source_scope_required");
+  const base = apiBase();
+  if (!base) return failure("api_base_not_configured");
+  try {
+    const target = new URL(base + "/v1/predictive-revenue/company-review");
+    if (target.username || target.password || target.search || target.hash ||
+        (target.protocol !== "https:" && !(target.protocol === "http:" &&
+          ["localhost", "127.0.0.1", "[::1]"].includes(target.hostname))))
+      return failure("secure_api_origin_required");
+    target.searchParams.set("company_scope", companyScope);
+    target.searchParams.set("source_id", sourceId);
+    const response = await fetch(target.toString(), {
+      method: "GET", cache: "no-store", credentials: "omit", redirect: "error",
+      headers: { Accept: "application/json", Authorization: "Bearer " + accessToken },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) return failure("http_" + response.status, response.status);
+    const data = await response.json();
+    if (!data || Array.isArray(data) ||
+        data.schema_version !== "empire.predictive-revenue-company-export-review.v4.21" ||
+        data.company_scope !== companyScope || data.source_id !== sourceId ||
+        data.execution_authority !== "none" ||
+        data.eligible_for_training_or_live_prediction !== false ||
+        data.model_promotion_or_payment_authorized !== false)
+      return failure("invalid_company_review_contract", response.status);
+    return { ok: true, status: response.status, data, reason: null };
+  } catch {
+    return failure("company_review_unavailable");
+  }
+}
+
 export function getPredictiveRevenueDemo() {
   return getFounderRead<PredictiveRevenueDemo>(
     "/v1/predictive-revenue/demo",

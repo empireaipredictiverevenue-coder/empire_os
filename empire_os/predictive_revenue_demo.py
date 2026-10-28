@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
+from empire_os.predictive_cloud_core_jev_observer import SOURCES, _read, _recent
+
 from empire_os.predictive_revenue_private_deployment import (
     private_deployment_economics,
 )
@@ -50,6 +52,11 @@ def _int(value: Any) -> int:
         return int(value or 0)
     except (TypeError, ValueError):
         return 0
+
+
+def _optional_int(value: Any) -> int | None:
+    # Missing or malformed evidence must not become an observed zero.
+    return value if type(value) is int else None
 
 
 def _source_state(root: Path) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
@@ -139,7 +146,60 @@ def _enterprise_targets(targets: Mapping[str, Any], limit: int = 5) -> list[dict
     return rows
 
 
+def _intelligence_snapshot_evidence(root: Path, now: datetime) -> dict[str, Any]:
+    """Expose only operational metadata from original observer sources.
+
+    A digest identifies bytes, not issuer authenticity or permission to use a
+    company's evidence. This aggregate Founder view admits no tenant forecasts.
+    No service probes, inference, database access or source collection occurs.
+    """
+    rows = []
+    for name, (relative, schema, clock) in SOURCES.items():
+        raw, digest = _read(root, relative)
+        timestamp = raw.get(clock)
+        valid_clock = False
+        if isinstance(timestamp, str) and len(timestamp) <= 40:
+            try:
+                moment = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+                valid_clock = moment.utcoffset() is not None and moment <= now
+            except (ValueError, TypeError, OverflowError):
+                pass
+        if digest is None:
+            try:
+                state = "UNAVAILABLE" if (root / relative).exists() else "NO_SOURCE"
+            except OSError:
+                state = "UNAVAILABLE"
+        elif (raw.get("schema_version") != schema
+              or raw.get("mode") != "OBSERVE"
+              or raw.get("execution_authority") != "none"):
+            state = "HOLD"
+        elif not valid_clock:
+            state = "UNKNOWN"
+        elif not _recent(timestamp, now, 2 if name == "jev" else 1):
+            state = "STALE"
+        else:
+            state = "OBSERVED"
+        rows.append({
+            "source": name, "evidence_ref": relative,
+            "snapshot_digest": digest,
+            "snapshot_generated_at": timestamp if valid_clock else None,
+            "state": state,
+        })
+    return {
+        "schema_version": "empire.predictive_revenue.snapshot_evidence.v1",
+        "generated_at": now.isoformat(),
+        "scope": "SYSTEM_AGGREGATE_METADATA_ONLY",
+        "sources": rows,
+        "forecast_state": "HOLD",
+        "forecast_hold_reason": "TENANT_SCOPED_ISSUANCE_NOT_CONNECTED_TO_THIS_READ_MODEL",
+        "source_rights_verification": "UNKNOWN",
+        "economic_verification": "UNKNOWN",
+        "execution_authority": "none",
+    }
+
+
 def build_predictive_revenue_demo(root: Path) -> dict[str, Any]:
+    now = datetime.now(timezone.utc)
     payloads, sources = _source_state(root)
     revenue_os = payloads["revenue_os"]
     cloud = payloads["predictive_cloud"]
@@ -179,7 +239,7 @@ def build_predictive_revenue_demo(root: Path) -> dict[str, Any]:
 
     cloud_available = _int(cloud.get("available_component_count"))
     cloud_total = _int(cloud.get("component_count"))
-    actual_revenue_cents = _int(revenue_truth.get("recognized_revenue_cents"))
+    actual_revenue_cents = _optional_int(revenue_truth.get("recognized_revenue_cents"))
 
     astra_goals = []
     for goal in astra.get("goals") or []:
@@ -230,7 +290,7 @@ def build_predictive_revenue_demo(root: Path) -> dict[str, Any]:
         {
             "stage": "REVENUE",
             "label": "Recognized revenue",
-            "observed": actual_revenue_cents > 0,
+            "observed": actual_revenue_cents > 0 if actual_revenue_cents is not None else None,
             "value_cents": actual_revenue_cents,
             "evidence": "runtime/revenue_pulse/latest.json",
         },
@@ -252,7 +312,8 @@ def build_predictive_revenue_demo(root: Path) -> dict[str, Any]:
 
     return {
         "schema_version": "empire.predictive-revenue.demo.v1",
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": now.isoformat(),
+        "intelligence_snapshot_evidence": _intelligence_snapshot_evidence(root, now),
         "mode": "LIVE_READ_ONLY",
         "living_proof": True,
         "title": "Empire AI Predictive Revenue — Live System Demo",
@@ -412,13 +473,13 @@ def build_predictive_revenue_demo(root: Path) -> dict[str, Any]:
             "verified_payments": current_window.get("verified_payments"),
             "fulfilments": current_window.get("fulfilments"),
             "recognized_revenue_cents": actual_revenue_cents,
-            "realized_gp_cents": _int(revenue_truth.get("realized_gp_cents")),
+            "realized_gp_cents": _optional_int(revenue_truth.get("realized_gp_cents")),
             "highest_priority_blocker": pulse.get("highest_priority_blocker"),
             "pulse_state": pulse.get("pulse_state"),
             "forecast_included_in_truth": (
                 revenue_truth.get("forecast_included_in_truth")
             ),
-            "actual_revenue": actual_revenue_cents > 0,
+            "actual_revenue": actual_revenue_cents > 0 if actual_revenue_cents is not None else None,
         },
         "learning_loop": {
             "department_episode_count": memory.get("department_episode_count"),
