@@ -128,3 +128,22 @@ must still approve integration with the actual founder's owner membership,
 publish their transport guard, and obtain the independent DBA SQL release.
 No new token issuer, login, DB role, Founder Overview exposure, or outbound
 permission is introduced.
+
+
+## Original dedicated-login authority: isolated privilege-mutation proof
+
+The V11 original signed-order reader now has direct disposable PostgreSQL 18
+negative tests in `tests/test_crm_v11_scoped_reader_pg18_end_to_end.py`
+covering a *real* `session_user` and original restricted SQL query.
+
+A previously valid signed owner order is denied after each one of these
+**fixture-only** login changes: `INHERIT`, `BYPASSRLS`, `CREATEDB`,
+revoke the required `empire_revenue_crm_reader` membership, or grant
+another unrelated role. The test reverts each temporary privilege change
+and verifies the legitimate signed order read is restored.
+
+This independently tests the attestation semantics the original CRM
+transport owner is preparing, but **does not publish or replace** that
+owner's dirty production transport. The original DBA must still verify
+the real designated tenant login grants and production RPC catalogue
+with owner authority. No production role was changed or queried.

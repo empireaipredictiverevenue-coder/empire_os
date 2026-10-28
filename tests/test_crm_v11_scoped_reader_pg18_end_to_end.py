@@ -186,3 +186,57 @@ def test_original_signed_order_to_actual_bridge_and_redacted_founder_case(
     assert "fulfilment_order_id" not in display
     assert "bearer" not in display
     assert "database_writes" in display and display["database_writes"] is False
+
+
+@pytest.mark.parametrize("role_mutation,undo", [
+    (
+        "ALTER ROLE crm_fixture_a INHERIT",
+        "ALTER ROLE crm_fixture_a NOINHERIT",
+    ),
+    (
+        "ALTER ROLE crm_fixture_a BYPASSRLS",
+        "ALTER ROLE crm_fixture_a NOBYPASSRLS",
+    ),
+    (
+        "ALTER ROLE crm_fixture_a CREATEDB",
+        "ALTER ROLE crm_fixture_a NOCREATEDB",
+    ),
+    (
+        "REVOKE empire_revenue_crm_reader FROM crm_fixture_a",
+        "GRANT empire_revenue_crm_reader TO crm_fixture_a",
+    ),
+])
+def test_signed_order_blocks_privileged_or_unbound_dedicated_login(
+    pg, signed, monkeypatch, role_mutation, undo,
+):
+    """Every mutation is confined to the throwaway PostgreSQL 18 fixture."""
+    run_original_reader(pg, signed, monkeypatch)
+    try:
+        pg(sql=role_mutation)
+        with pytest.raises(
+            ProspectHandoffHold,
+            match="RESTRICTED_CRM_READER_ROLE_NOT_ATTESTED",
+        ):
+            run_original_reader(pg, signed, monkeypatch)
+    finally:
+        pg(sql=undo)
+    run_original_reader(pg, signed, monkeypatch)
+
+
+def test_signed_order_blocks_secondary_group_membership(
+    pg, signed, monkeypatch,
+):
+    """A dedicated login cannot also inherit or switch to a second role."""
+    run_original_reader(pg, signed, monkeypatch)
+    pg(sql="CREATE ROLE crm_fixture_unrelated NOLOGIN")
+    try:
+        pg(sql="GRANT crm_fixture_unrelated TO crm_fixture_a")
+        with pytest.raises(
+            ProspectHandoffHold,
+            match="RESTRICTED_CRM_READER_ROLE_NOT_ATTESTED",
+        ):
+            run_original_reader(pg, signed, monkeypatch)
+    finally:
+        pg(sql="REVOKE crm_fixture_unrelated FROM crm_fixture_a")
+        pg(sql="DROP ROLE crm_fixture_unrelated")
+    run_original_reader(pg, signed, monkeypatch)
