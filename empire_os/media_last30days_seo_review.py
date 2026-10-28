@@ -18,6 +18,7 @@ from urllib.parse import urlsplit
 
 OUTPUT = Path("runtime/media_os/last30days/seo_owner_review_latest.json")
 SCHEMA = "empire.last30days.seo_owner_review.v1"
+PROJECTION_REVISION = 2  # age-window labels added; forces one safe rebuild
 MAX_BYTES = 120_000
 MAX_TOPICS = 4
 MAX_OBSERVATIONS = 120
@@ -235,6 +236,7 @@ def build_seo_owner_review(handoff: Mapping[str, Any], *, now: datetime,
         raise ValueError("source_reference_count_mismatch")
     return {
         "schema_version": SCHEMA,
+        "projection_revision": PROJECTION_REVISION,
         "status": "REVIEW_CITATIONS_READY" if review_first_count else "NO_TITLE_MATCHED_CITATIONS",
         "mode": "OWNER_REVIEW_ONLY",
         "generated_at": now.isoformat(),
@@ -296,7 +298,8 @@ def refresh_seo_owner_review(repo_root: Path, handoff: Mapping[str, Any],
     result = build_seo_owner_review(handoff, now=now, previous=previous)
     # Preserve stable evidence/novelty classification for repeated refreshes
     # of the exact same source snapshot (e.g. retry during a Media OS run).
-    if (previous is not None and previous.get("delta_review", {}).get("comparison_available") is not None
+    if (previous is not None and previous.get("projection_revision") == PROJECTION_REVISION
+            and previous.get("delta_review", {}).get("comparison_available") is not None
             and previous.get("source_handoff_generated_at") == result["source_handoff_generated_at"]
             and previous.get("original_source_observation_count") == result["original_source_observation_count"]
             and [

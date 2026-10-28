@@ -60,3 +60,26 @@ def test_valid_age_is_approximate_metadata_never_independent_verification():
     assert r["inside_30_day_discovery_window"] is True
     assert r["publication_date_independently_verified"] is False
     assert out["gsc_queries_or_impressions_observed"] is False
+
+
+def test_new_age_projection_must_refresh_legacy_same_source_snapshot(tmp_path):
+    from empire_os.media_last30days_seo_review import refresh_seo_owner_review, OUTPUT, PROJECTION_REVISION
+    from test_media_last30days_seo_review import handoff
+    import json
+    d=handoff()
+    file=tmp_path/OUTPUT
+    file.parent.mkdir(parents=True)
+    previous=build_seo_owner_review(d,now=NOW)
+    previous.pop("projection_revision")
+    previous.pop("source_age_review")
+    for topic in previous["topics"]:
+        for row in topic["references_for_manual_review"]:
+            for key in ("source_publication_age_days_from_unverified_metadata", "source_age_band", "inside_30_day_discovery_window", "publication_date_independently_verified", "source_must_be_checked_by_owner"):
+                row.pop(key,None)
+    file.write_text(json.dumps(previous),encoding="utf-8")
+    file.chmod(0o600)
+    refresh_seo_owner_review(tmp_path,d,now=NOW)
+    got=json.loads(file.read_text())
+    assert got["projection_revision"]==PROJECTION_REVISION
+    assert got["topics"][0]["references_for_manual_review"][0]["source_age_band"]=="RECENT_0_TO_7_DAYS"
+    assert got["source_age_review"]["active_in_last30_days_title_matches"]==1
