@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from hashlib import sha256
+from datetime import date, datetime, timezone
 import json
 from typing import Any
 
@@ -15,12 +16,152 @@ from empire_os.microsite_commercial_intelligence_v3 import build_microsite_comme
 from empire_os.microsite_first_party_gsc_bridge import connect_factory_to_gsc
 
 
+
+def _executive_screen(
+    proposal: Mapping[str, Any], *, exact_gsc: bool,
+    buyer_guidance: bool, calibrated: bool, today: date,
+) -> dict[str, Any]:
+    """Investment-committee research screen, not an approval or revenue score.
+
+    The source timestamps are AUTHOR-SUPPLIED, and a valid .gov domain is
+    NOT a factual source review. Existing source owners retain all authority.
+    """
+    facts = proposal["content_evidence"]
+    source_refs = {f["source_ref"].strip().casefold() for f in facts}
+    official = len({f["official_url"] for f in facts if f.get("official_url")})
+    age_days = []
+    for fact in facts:
+        stamp = datetime.fromisoformat(fact["checked_at"].replace("Z", "+00:00"))
+        age_days.append((today - stamp.date()).days)
+    # This is an explicit internal 90-day desk-refresh heuristic, not law
+    # and not independent verification of an official claim or its accuracy.
+    date_review = bool(age_days and all(0 <= n <= 90 for n in age_days))
+    unique_utility = (
+        len(facts) >= 2 and len(source_refs) >= 2
+        and proposal["locally_useful_research_steps"] >= 3
+    )
+    near_duplicate = any(
+        "near-duplicate location-swapped" in str(x)
+        for x in proposal["blockers"]
+    )
+    source_desk = (
+        proposal["market"]["region_verified"] is True
+        and unique_utility and official >= 2 and date_review
+        and not near_duplicate and proposal["copy_audit"]["review_required"] is False
+    )
+
+    if proposal["market"]["region_verified"] is not True:
+        decision, action, owner = (
+            "SOURCE_REPAIR_FIRST", "Verify the exact area/ZIP against a governed geography source",
+            "Marketing Research")
+    elif near_duplicate:
+        decision, action, owner = (
+            "SOURCE_REPAIR_FIRST", "Replace location-swapped copy with independent original area-specific utility",
+            "Editorial Research")
+    elif not unique_utility:
+        decision, action, owner = (
+            "SOURCE_REPAIR_FIRST", "Provide two distinct attributable facts and three practical research actions",
+            "Marketing Research")
+    elif official < 2:
+        decision, action, owner = (
+            "SOURCE_REPAIR_FIRST", "Attach at least two direct official primary-source links, then verify their claims",
+            "Marketing Research")
+    elif not date_review:
+        decision, action, owner = (
+            "SOURCE_REFRESH_FIRST", "Recheck all original source facts and record accurate dates (90-day desk heuristic)",
+            "Marketing Research")
+    elif proposal["copy_audit"]["review_required"] is True:
+        decision, action, owner = (
+            "EDITORIAL_REPAIR_FIRST", "Rewrite SlopMonster-flagged wording without altering evidence claims",
+            "Editorial Research")
+    elif not exact_gsc:
+        decision, action, owner = (
+            "MEASURE_FIRST_PARTY_INTENT", "Request exact-query first-party GSC evidence for this market and reporting window",
+            "Original SEO Data Owner")
+    elif not buyer_guidance:
+        decision, action, owner = (
+            "RESEARCH_COMMERCIAL_PATH", "Verify a relevant buyer path and economics without assuming lead acceptance",
+            "Original Commercial Owner")
+    else:
+        decision, action, owner = (
+            "EVALUATE_ONE_BOUNDED_EXPERIMENT",
+            "Submit the sourced utility and observed search interest for independent owner review; no publication implied",
+            "Original Website/SEO Owner")
+
+    return {
+        "schema_version": "empire.microsite.executive_research_screen.v1",
+        "decision": decision,
+        "research_desk_qualified": source_desk,
+        "independent_source_claims_verified": False,
+        "owner_publication_authorized": False,
+        "commercial_investment_authorized": False,
+        "customer_economics_verified": False,
+        "research_evidence": {
+            "distinct_author_source_refs": len(source_refs),
+            "direct_official_source_links": official,
+            "actionable_research_steps": proposal["locally_useful_research_steps"],
+            "author_dated_within_90_days": date_review,
+            "source_dates_independently_verified": False,
+            "geography_verified": proposal["market"]["region_verified"] is True,
+            "editorial_pattern_flags": proposal["copy_audit"]["review_required"] is True,
+            "location_swap_duplicate": near_duplicate,
+            "exact_query_first_party_observed": exact_gsc,
+            "buyer_coverage_guidance_only": buyer_guidance,
+            "out_of_sample_forecast_calibrated": calibrated,
+        },
+        "next_best_evidence_action": action,
+        "next_action_owner": owner,
+        "next_action_is_research_only": True,
+        "expected_revenue_minor": None,
+        "expected_traffic": None,
+        "cost_per_acquisition": None,
+        "roi": None,
+    }
+
+
+def _executive_portfolio(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """Diversify *research attention*, never allocate budget or publish."""
+    chosen = []
+    covered_markets = set()
+    for row in rows:
+        if not row["executive_screen"]["research_desk_qualified"]:
+            continue
+        market = row["market_id"]
+        if market in covered_markets:
+            continue
+        chosen.append({
+            "candidate_id": row["candidate_id"],
+            "market_id": market,
+            "research_rank": row["research_rank"],
+            "next_evidence_action": row["executive_screen"]["next_best_evidence_action"],
+        })
+        covered_markets.add(market)
+        if len(chosen) >= 3:
+            break
+    return {
+        "schema_version": "empire.microsite.executive_research_portfolio.v1",
+        "stage": "RESEARCH_ALLOCATION_ONLY",
+        "research_desk_qualified_count": sum(
+            x["executive_screen"]["research_desk_qualified"] for x in rows),
+        "research_shortlist_max_three_markets": chosen,
+        "unique_markets_in_shortlist": len(covered_markets),
+        "publication_authorized": False,
+        "commercial_budget_authorized": False,
+        "verified_revenue_minor": None,
+        "measured_search_volume": None,
+        "next_review_trigger": "Independent original-source fact and exact first-party query evidence",
+    }
+
 def build_ranked_microsite_queue(
     specs: Sequence[Mapping[str, Any]], *,
     commercial: Mapping[str, Any],
     gsc: Mapping[str, Any] | None = None,
     calibration: Mapping[str, Any] | None = None,
+    as_of: date | None = None,
 ) -> dict[str, Any]:
+    as_of = datetime.now(timezone.utc).date() if as_of is None else as_of
+    if not isinstance(as_of, date) or isinstance(as_of, datetime):
+        raise ValueError("as_of must be an exact research review date")
     if not isinstance(specs, (list, tuple)) or not 1 <= len(specs) <= 25:
         raise ValueError("bounded original candidate list required")
     if not isinstance(commercial, Mapping) or commercial.get("schema_version") != "empire.microsite_commercial_intelligence.v3":
@@ -126,6 +267,10 @@ def build_ranked_microsite_queue(
                   else "NEEDS_SOURCE_RESEARCH")
         output.append({
             "candidate_id": ident,
+            "market_id": packet["market"]["market_id"],
+            "executive_screen": _executive_screen(
+                packet, exact_gsc=exact_gsc, buyer_guidance=buyer_guidance,
+                calibrated=calibrated, today=as_of),
             "keyword": packet["keyword"]["record"]["keyword"],
             "area": packet["market"]["area"],
             "site_kind": packet["candidate_kind"],
@@ -157,6 +302,7 @@ def build_ranked_microsite_queue(
         "queue_type": "RESEARCH_ONLY_NOT_PUBLISH_QUEUE",
         "execution_authority": "none",
         "candidate_count": len(output),
+        "executive_portfolio": _executive_portfolio(output),
         "calibrated_forecast_candidates": sum(row["model_outcome_calibration_verified"] for row in output),
         "publishable_count": 0,
         "provisional_research_points_not_roi": True,

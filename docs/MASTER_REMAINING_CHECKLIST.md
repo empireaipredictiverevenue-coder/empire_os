@@ -45,6 +45,15 @@ This is the canonical execution checklist for the remaining EmpireOS build.
 - [x] Factory source/copy, ranking, commercial outcomes and keyword regressions: **169 passed**, one existing dependency warning.
 - [ ] Attach measured first-party keyword demand, independent claim/context owner review, and any authorised existing site handoff before proposing publication. Do not infer buying intent or revenue from a source-backed draft.
 
+## 28 October 2026 — Executive-grade original microsite research prioritisation
+
+- [x] Existing V4 research queue now adds source-specific `executive_screen` with truth-bound evidence gaps, concrete next research action and owner, no fake demand/economics or publication approval.
+- [x] Existing candidate research ranking preserves backward-compatible numeric points but adds **distinct-market research shortlist ≤3**; weak/slop/source-duplicate pages cannot enter it.
+- [x] Real original research review: two older demo candidates need source repair despite 15 priority points; one Manchester official-source research candidate merits **intent measurement research only**, not launch. No verified buyer, query volume, revenue or paid allocation.
+- [x] Original V4 ranking command rerun unchanged end-to-end with the source-backed research input: one executive research candidate, `MEASURE_FIRST_PARTY_INTENT`, zero original-site approvals/publishable pages, null revenue, zero new services; **189 selected tests passed**.
+- [ ] Independently validate original source claims and exact query/window GSC intent before recommending experiments. SlopMonster pattern score is not a full editorial or originality audit.
+- [ ] Only after the original website/SEO owners publish one genuinely distinct approved useful page, measure true page performance and buyer economics through existing GSC/CRM/settlement owners.
+
 ## Current checkpoint
 
 Competitor-audience intelligence is live through Account Intelligence Brief + Claim Critic. Buyer State, Next-Best Action and the Account / Buyer Digital Twin are live and verified in the Founder Console.

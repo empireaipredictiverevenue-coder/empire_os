@@ -55,6 +55,16 @@ Six existing static pages audited: home 4/5, commercial 3/5, roofing 5/5, solar 
 - Wider original source/copy/ranking/outcome + keyword test selection: **169 passed** (one pre-existing AnyIO deprecation warning). Source-host validation does **not** independently verify factual claims, permit publication, or assume commercial demand. Original SEO/website execution ownership unchanged.
 - [Exact source policy and verified UK private research brief](PREDICTIVE_MICROSITE_GOV_SOURCE_POLICY_UK_RESEARCH_20261028.md).
 
+## 28 October 2026 — Executive-grade source/intent/portfolio decision layer
+
+The original existing V4 ranked research queue now emits a non-publishing `executive_screen` for each candidate and a market-diverse `executive_portfolio` shortlist limited to **three different markets**. It separates author-supplied source/link/check dates and actual reader utility from **observed first-party GSC intent**, targeting guidance, calibrated model forecasts and unverified commercial economics. It has deterministic next-best evidence actions and owner labels, without inventing search volume, visits, lead conversions, payout, CAC or ROI.
+
+The actual original two demo candidates were both blocked by weak source-backed usefulness, even though they tied at 15 numeric priority points; the Manchester official-source research (three direct official URLs, four research actions) qualified **for research attention only**, with next action to obtain exact first-party query evidence. The source hasn't independently established true claim accuracy, organic demand or buyer revenue. No launch, new service or paid spend. One private decision readback: `/home/ubuntu/empire_releases/predictive_microsite_uk_source_research_20261028/executive_source_quality_review_v1_20261028.json`.
+
+The existing V4 ranking script was also run unchanged end-to-end against the current private source-backed Manchester research: `MEASURE_FIRST_PARTY_INTENT`, one research-only shortlist item, **zero publishable**, verified approved factory pages zero, model calibration zero, and expected revenue null. **189 selected regressions passed.** No duplicate runtime or original website release.
+
+Full strategy, operating states and readback: [Executive Research & Investment Discipline](PREDICTIVE_MICROSITE_EXECUTIVE_RESEARCH_DECISION_20261028.md). The site's original release/SEO/brand owner work remains outside this branch.
+
 ## Remaining implementation for the current site + SEO owner
 1. Review the original provenance and upstream licence; rerun unit tests.
 2. Supply real search intent, measured demand, current dated SERP/source inputs and geographic ZIP/postcode associations with evidence. Do not guess counts.
