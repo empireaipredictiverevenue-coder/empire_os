@@ -763,6 +763,8 @@ Current reconciliation truth:
 - [ ] Phase 6 — A2A Commerce Network remaining slices
 - [ ] Phase 7 — Conversation OS remaining slices
 - [ ] Phase 8 — Revenue CRM
+  - [ ] **V11 original single-order evidence review — BUILT/TESTED, not live** (28 Oct 2026): original PR #119, branch `feature/unified-loop-live-rehearsal-20261026`, commit `875f7e7e0`; actual signed-CRM bearer → tenant-bound disposable PG18 order RPC → redacted private order HTTP view tested; selected **541 tests PASS**, one existing Starlette/anyio dependency warning. The endpoint is default-OFF; original production CRM pilot is healthy/read-only, and its V11 path has NOT been activated. Exact evidence and owner boundaries: `docs/architecture/EMPIREOS_V11_ORIGINAL_SIGNED_CRM_READER_INTEGRATION_20261027.md` and `docs/architecture/EMPIREOS_V11_CRM_OWNER_SECURITY_ACCEPTANCE_STATUS_20261027.md`.
+  - [ ] **V11 original-owner production acceptance — HELD**: original CRM transport owner must publish its existing dedicated-login attestation; CRM/DBA owner must independently approve/deploy the held restricted exact-order RPC with rollback; signed **owner** session must read one real existing tenant/order; original Founder Console owner must bind its private user session before mounting the case. Finance, buyer acceptance and fulfilment independently attest actual commercial outcomes. PR tests and source-reported `paid` are not recognised revenue. Never overwrite the original owner's dirty production transport or expose a tenant order in the general Founder Overview.
 - [ ] Phase 9 — Advertising Brain
 - [ ] Phase 10 — Predictive Cloud V3 convergence
 - [ ] Phase 11 — Experiment + Causal Engine

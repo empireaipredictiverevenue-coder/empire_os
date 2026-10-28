@@ -52,3 +52,26 @@ No database writes, payments, outbound, recognition events, trainable labels or 
 Validated in the isolated review worktree: **458 selected Python tests passed**, one existing Starlette/anyio deprecation warning, and the staged TSX component passed **strict TypeScript compilation** with the original console's installed toolchain. This is not an end-to-end browser/session test, privileged production SQL audit or live order verification. The production console still does NOT show an actual V11 order.
 
 This PR cannot certify owner approval, live authenticated order availability or production data; those remain UNKNOWN / HELD.
+
+
+## 28 October 2026 — original V11 owner cross-chat recovery checkpoint
+
+**WORKSTREAM:** V11 one exact authenticated CRM order → canonical V7–V10 revenue-evidence progress → redacted private founder case, OBSERVE only.
+
+**OWNER:** Original V11 revenue-case integration review owner. Adjacent original CRM transport, SQL/DBA, and Founder Console teams retain sole write/release authority for their assets.
+
+**SOURCE/BRANCH:** `/home/ubuntu/empire_worktrees/unified_loop_v10_reconcile_20261027` (detached review checkout), source `feature/unified-loop-live-rehearsal-20261026`, PR #119, last independently verified code commit `875f7e7e0fb4fe32ab5943305ad29edc006be727`. Source HEAD matched remote; review worktree was clean at checkpoint start.
+
+**DONE + PROOF (BUILT, not deployed):** Canonical revenue-case reducer, exact-order signed CRM bridge, restricted PostgreSQL 18 owner provenance checks, optional original first-party CRM pilot V11 read endpoint, strict redacted founder DTO, active `owner`-only membership gate, and isolated PostgreSQL privilege-mutation negative tests. Last selected regression `541 passed, 1 existing Starlette/anyio warning`; owner, viewer, analyst, operator, admin, cross-tenant, role-inheritance, bypass-RLS, CREATEDB, extra-role and role-revocation scenarios verified in disposable PG18. Original private CRM pilot `/health` reported healthy `APPROVED_READ_ONLY_PILOT` on 28 October; production V11 endpoint remains **disabled** (previous live HTTP 404), and original anonymous CRM prospect request returned 401. No actual tenant/order, paid event, recognised revenue or independent financial finality was read or certified.
+
+**IN PROGRESS:** No further V11 security feature additions authorised; only original-owner release acceptance and private founder session binding remain. The original Founder Console overview reader is general and lacks a per-user signed CRM identity at that call site: do **not** place private order details into it.
+
+**ONE NEXT ACTION:** Original CRM transport owner publishes/reviews the already-in-progress dedicated-login attestation and hands its test/grant evidence to the original DBA. After DBA review and guarded restricted-RPC release, original CRM owner validates one genuine pre-existing order under an active signed `owner` member session. Existing Founder Console owner then mounts the private DTO only on an authenticated, session-scoped route.
+
+**BLOCKER / NEEDED APPROVAL:** Original `/srv/empire_os/empire_os/revenue_crm_transport.py` still has owner-uncommitted role-attestation work; never replace it. `docs/architecture/CRM_SCOPED_LINEAGE_RPC_HELD_20261026.sql` remains **NOT A MIGRATION / DO NOT APPLY** absent original DBA security approval, rollback and grants. PR #119 had zero submitted independent reviews in GitHub as of 2026-10-28. Owner/founder authority over live private endpoint flag, DB migration, payments, recognised income and outbound is unchanged. The founder's general resume directive does not waive these specific gates.
+
+**TOUCHES OTHER OWNER?** Yes, strictly dependency/handoff only. V11 review owns its own source and records; CRM auth/transport, DBA role/RPC, general Founder Console and financial truth belong to their existing owners. No other owner source or live configuration was changed.
+
+**MASTER CHECKLIST:** A bounded, unchecked V11 BUILT/HELD checkpoint was added under `Phase 8 — Revenue CRM` in this same review branch, preserving historic Phase 8 incomplete status. The production checklist has an unrelated uncommitted Search overlap change and was **not** overwritten. Synchronise only through the existing authorised branch/owner merge controls; no direct production root edits.
+
+**LAST VERIFIED UTC:** 2026-10-28T19:17:31Z (remote source/health and local Git verification). Preserve the branch, build evidence and exact owner handoff; do not manufacture real-order data to unblock a status panel.
