@@ -376,3 +376,58 @@ def test_history_transitions_are_bounded_and_real_state_changes_only():
     assert len(source["recent_transitions"]) == 64
     assert source["items"][0]["monitored_cycles"] == 65
     assert source["items"][1]["state_age_seconds"] == 128 * 60
+
+
+
+def test_oversized_historical_done_does_not_block_pending_monitor():
+    rows, source = sources()
+    long_done = LedgerItem(
+        source="docs/MASTER_REMAINING_CHECKLIST.md",
+        line=15, section=SECTION, section_level=2,
+        item="Historical shipped-source narrative " + ("detail " * 105),
+        status="DONE",
+    )
+    source["canonical_done_count"] = 1
+    source["canonical_total_count"] = 4
+    result = build_completion_task_monitor(
+        [*rows, long_done], source, now=NOW,
+    )
+    assert result["tracked_pending_count"] == 3
+    assert result["checklist"]["checked_done"] == 1
+    assert result["unkeyable_historical_done_count"] == 1
+    assert result["unkeyable_done_not_credited_as_completion_transition"] is True
+    assert result["new_state_transition_count"] == 0
+    assert result["external_execution_performed"] is False
+
+
+def test_oversized_done_cannot_mask_a_disappeared_prior_pending_task():
+    rows, source = sources()
+    before = build_completion_task_monitor(rows, source, now=NOW)
+    oversized = LedgerItem(**{
+        **rows[0].__dict__, "status": "DONE",
+        "item": rows[0].item + (" narrative" * 100),
+    })
+    future = NOW + timedelta(minutes=5)
+    _, later = sources(
+        moment=future, tasks=(SECOND, THIRD),
+        stages=("CODE_COMPLETE_NOT_LIVE", "FOUNDER_GATE"),
+    )
+    later["items"][0]["item_id"] = source["items"][1]["item_id"]
+    later["items"][0]["checklist_line"] = rows[1].line
+    later["items"][1]["item_id"] = source["items"][2]["item_id"]
+    later["items"][1]["checklist_line"] = rows[2].line
+    later["canonical_total_count"] = 3
+    later["canonical_done_count"] = 1
+    with pytest.raises(MonitorEvidenceError, match="previous_task_disappeared_without_done"):
+        build_completion_task_monitor([oversized, *rows[1:]], later, previous=before, now=future)
+
+
+def test_oversized_pending_identity_still_fails_closed():
+    from hashlib import sha256
+    rows, source = sources()
+    invalid = LedgerItem(**{**rows[0].__dict__, "item": rows[0].item + (" more" * 130)})
+    source["items"][0]["item_id"] = "check_" + sha256(
+        f"{invalid.line}|{invalid.section}|{invalid.item}".encode()
+    ).hexdigest()[:16]
+    with pytest.raises(ValueError, match="invalid task identity"):
+        build_completion_task_monitor([invalid, *rows[1:]], source, now=NOW)

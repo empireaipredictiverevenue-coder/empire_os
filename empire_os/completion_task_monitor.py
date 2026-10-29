@@ -16,6 +16,7 @@ import tempfile
 from typing import Any, Mapping
 
 from empire_os.master_execution_ledger import LedgerItem, parse_checklist
+from empire_os.completion_task_memory import AttemptMemoryError
 
 SCHEMA = "empire.completion-task-monitor.v1"
 RECONCILIATION_SCHEMA = "empire.completion_reconciliation.v1"
@@ -265,7 +266,18 @@ def build_completion_task_monitor(
             "commercial_outcome_verified": False,
             "execution_authority": "none",
         })
-    done_keys = {_key(row) for row in done}
+    # DONE items are historical context, not work to dispatch. Some long
+    # narrative checklist rows exceed the shared attempt-memory identity
+    # bound; do not let those rows hide valid pending work. Crucially, never
+    # truncate or invent a key and never credit an unkeyable DONE row as a
+    # transition from a previously monitored pending task.
+    done_keys: set[str] = set()
+    unkeyable_historical_done_count = 0
+    for row in done:
+        try:
+            done_keys.add(_key(row))
+        except AttemptMemoryError:
+            unkeyable_historical_done_count += 1
     for key, old in previous_items.items():
         if key in done_keys:
             changed.append({
@@ -299,6 +311,8 @@ def build_completion_task_monitor(
             "total": len(checklist),
             "checked_done_is_not_independent_production_proof": True,
         },
+        "unkeyable_historical_done_count": unkeyable_historical_done_count,
+        "unkeyable_done_not_credited_as_completion_transition": True,
         "tracked_pending_count": len(items),
         "state_counts": by_state,
         "department_counts": by_department,
