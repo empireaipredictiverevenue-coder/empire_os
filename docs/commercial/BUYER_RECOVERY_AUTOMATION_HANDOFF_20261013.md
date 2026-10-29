@@ -141,3 +141,11 @@ Of those 126 archived IDs: 39 show FIRST_PARTY_NAME_AND_PHONE_OBSERVED_REVIEW_ON
 New optional CLI --prefer-verified-identity: scan up to 3,000 independently scored hot/warm v2 candidates in batches of 500; prefer only candidates with a single already-active, unambiguous identity link, and fill remaining slots from the original qualified selection. The default production mode is unchanged. Search Fabric site observations do not create or authorize identity links. Existing rights, contact, buyer and payment gates are unchanged.
 Proof: 59 scoped regression tests passed, compileall and git diff --check passed. New tests reproduce qualified-linked candidate stranded outside top window and prevent priority promotion of an ambiguous link.
 Release status: BUILT AND TESTED, NOT LIVE. Original Commercial Exchange owner must first verify exact canonical full-pool eligible-linked counts and the candidate-delta against current EmpireDB, then use existing guarded release. Do not infer verified buyer capacity or saleable inventory, and do not create another service or timer.
+
+## Founder live EmpireDB proof — 29 October 2026
+
+The founder ran the existing exact read-only 20261029 Exchange SQL from isolated branch `feature/exchange-linked-selection-20261029`. Its single aggregate result: qualified full pool **2805**, exactly-one-active-link **153**, ambiguous **0**, top-200 qualified **200**, top-200 linked **0**, linked outside top-200 **153**. Transaction explicitly ended `ROLLBACK`.
+
+This establishes **ranking-window starvation**: all 153 already active-linked qualified prospects are excluded by the current highest-score-first 200 candidate window. Historical identity evidence is not missing. It does not verify resale rights, compliant contact, buyer capacity or payment readiness.
+
+Existing source fix `5836f28fa` and diagnostic `ee26fad11` add optional `--prefer-verified-identity`; 59 existing regression tests passed again on 29 Oct. Branch stays isolated; **production not activated**. Original Commercial Exchange owner should run a source-matched protected full candidate preview, independently check its selected IDs and downstream eligibility, integrate through its existing guarded release, verify production readback and rollback. No direct site evidence to identity auto-promotion or new scheduler.
