@@ -12,7 +12,7 @@ import json
 import math
 import re
 from typing import Any, Mapping
-from urllib.parse import urlencode, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 from urllib.request import Request, urlopen
 
 from empire_os.public_intent_offer_method_bridge import SCHEMA as IDEA_SCHEMA
@@ -38,11 +38,19 @@ def _safe_window(start: date, end: date, *, today: date) -> None:
 def _owned_url(value: str) -> bool:
     try:
         p=urlsplit(value)
+        # The prior original page-only GSC owner already accepted one exact,
+        # known first-party attribution variant. Preserve this raw URL as a
+        # distinct query/page row: never aggregate variant impression counts.
+        attribution_safe = (not p.query or (
+            len(p.query) <= 100 and
+            parse_qsl(p.query, keep_blank_values=True)
+            == [("utm_source", "chatgpt.com")]
+        ))
         return (p.scheme in ("https", "http")
                 and (p.hostname or "").lower() in ("empire-ai.co.uk", "www.empire-ai.co.uk")
                 and not p.username and not p.password
                 and p.port in (None, 443 if p.scheme=="https" else 80)
-                and not p.query and not p.fragment)
+                and attribution_safe and not p.fragment)
     except ValueError:
         return False
 
@@ -152,6 +160,7 @@ def review_gsc_keyword_ideas(
         "gsc_sample_may_omit_anonymised_searches":True,
         "gsc_average_position_not_independent_serp_rank":True,
         "query_page_counts_not_sitewide_traffic":True,
+        "tracking_page_variants_retained_as_distinct_raw_rows_no_impression_summing":True,
         "estimated_search_volume":None,
         "estimated_cpc":None,
         "estimated_difficulty":None,

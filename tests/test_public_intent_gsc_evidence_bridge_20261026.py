@@ -129,3 +129,42 @@ def test_unavailable_data_fails_closed_without_zeros():
     assert x["estimated_search_volume"] is None
     assert x["observed_candidate_queries"] is None
     assert x["publishing_authorized"] is False
+
+
+def test_live_observed_attribution_variant_does_not_hold_entire_query_page_sample():
+    p=packet(keyword="commercial roof repair cost",page="https://empire-ai.co.uk/commercial?utm_source=chatgpt.com")
+    result=review(p)
+    assert result["gsc_query_page_rows"]==1
+    assert result["exactly_observed_candidate_queries"]==1
+    observed=next(x for x in result["ideas"] if x["keyword"]=="commercial roof repair cost")
+    assert observed["observed_query_page_rows"][0]["page_url"]==p["items"][0]["keys"][1]
+    assert observed["observed_query_page_rows"][0]["reported_impressions"]==10
+    assert result["tracking_page_variants_retained_as_distinct_raw_rows_no_impression_summing"] is True
+    assert result["attributed_revenue"] is None
+
+
+def test_tracked_and_canonical_rows_not_silently_summed_or_deduplicated():
+    p=packet()
+    p["items"].append({**p["items"][0],"keys":["commercial roof repair cost","https://empire-ai.co.uk/industries/roofing?utm_source=chatgpt.com"],"impressions":3,"clicks":0,"ctr":0,"position":33})
+    p["count"]=2
+    result=review(p)
+    observed=next(x for x in result["ideas"] if x["keyword"]=="commercial roof repair cost")
+    assert result["gsc_query_page_rows"]==2
+    assert len(observed["observed_query_page_rows"])==2
+    assert [x["reported_impressions"] for x in observed["observed_query_page_rows"]]==[10,3]
+    assert len({x["evidence_ref"] for x in observed["observed_query_page_rows"]})==2
+    assert observed["keyword_search_volume"] is None
+
+
+@pytest.mark.parametrize("bad_page",[
+ "https://external.example/commercial?utm_source=chatgpt.com",
+ "https://empire-ai.co.uk/commercial?utm_source=attacker.test",
+ "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com&auth=secret",
+ "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com&utm_source=chatgpt.com",
+ "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com#fragment",
+ "https://empire-ai.co.uk:444/commercial?utm_source=chatgpt.com",
+ "https://empire-ai.co.uk/commercial?utm_source=%ZZ",
+])
+def test_untrusted_attribution_url_still_rejected(bad_page):
+    with pytest.raises(KeywordGscEvidenceError,match="non_first_party"):
+        review(packet(page=bad_page))
