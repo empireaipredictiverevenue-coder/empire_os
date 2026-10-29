@@ -57,6 +57,27 @@ def test_url_aliases_remain_distinct_with_separate_receipts():
     assert len({r["evidence_ref"] for r in hvac["observed_url_aliases"]}) == 2
 
 
+def test_owned_attribution_query_does_not_block_valid_google_page_sample():
+    source = "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com"
+    d = review_gsc_priority_pages(packet([row(source, clicks=0, impressions=2, ctr=0)]), start_date=START, end_date=END)
+    assert d["returned_page_rows"] == 1
+    assert d["total_returned_property_traffic_claimed"] is None
+    assert all(page["observed_alias_count"] == 0 for page in d["priority_page_findings"])
+    assert d["publishing_authorized"] is False
+
+
+@pytest.mark.parametrize("url", [
+    "https://external.test/commercial?utm_source=chatgpt.com",
+    "https://empire-ai.co.uk/commercial?utm_source=attacker.test",
+    "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com&token=secret",
+    "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com#fragment",
+    "https://empire-ai.co.uk/commercial?utm_source=chatgpt.com&utm_source=chatgpt.com",
+])
+def test_untrusted_attribution_urls_still_fail_closed(url):
+    with pytest.raises(GscPageEvidenceError):
+        review_gsc_priority_pages(packet([row(url)]), start_date=START, end_date=END)
+
+
 def test_no_rows_does_not_assert_no_ranking_or_indexation():
     d = review_gsc_priority_pages(packet([]), start_date=START, end_date=END)
     assert len(d["priority_page_findings"]) == len(PRIORITY_PAGE_ROUTES) == 4

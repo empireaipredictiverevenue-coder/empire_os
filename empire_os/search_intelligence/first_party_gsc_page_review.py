@@ -9,7 +9,7 @@ from hashlib import sha256
 import math
 import re
 from typing import Any, Mapping
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 PROPERTY = "sc-domain:empire-ai.co.uk"
 DOMAIN = "empire-ai.co.uk"
@@ -37,8 +37,17 @@ def _owned_gsc_url(value: str) -> str:
     if (
         parsed.scheme not in {"https", "http"}
         or host not in {DOMAIN, "www." + DOMAIN}
-        or parsed.username or parsed.password or parsed.query or parsed.fragment
+        or parsed.username or parsed.password or parsed.fragment
         or (port is not None and port != (443 if parsed.scheme == "https" else 80))
+    ):
+        return ""
+    # Google's page dimension can contain an owned URL with a normal
+    # attribution query. Admit the one observed harmless variant only;
+    # preserve each original URL and its independent row digest below.
+    if parsed.query and (
+        len(parsed.query) > 100
+        or parse_qsl(parsed.query, keep_blank_values=True)
+        != [("utm_source", "chatgpt.com")]
     ):
         return ""
     return "https://" + DOMAIN + (parsed.path.rstrip("/") or "/")
