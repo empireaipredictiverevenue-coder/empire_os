@@ -259,3 +259,68 @@ def test_population_inconsistent_values_fail_closed():
     result = module.read_qualification_population_counts(Inconsistent())
     assert result["state"] == "COUNT_UNAVAILABLE"
     assert result["prospects_without_v2_record"] is None
+
+
+def test_identity_priority_recovers_qualified_linked_record_beyond_window():
+    """Previously top-two unlinked rows hid an eligible linked third row."""
+    class G(FakeGateway):
+        def query(self, table, columns='*', *, filters=(), order=(), limit=1000, offset=0):
+            if table == 'prospect_qualifications':
+                self.calls.append((table, columns, filters, order, limit, offset))
+                rows=[
+                    {'prospect_id':'p1','evidence_confidence':.98,'scored_at':'2026-10-29T00:00:00Z'},
+                    {'prospect_id':'p2','evidence_confidence':.95,'scored_at':'2026-10-29T00:00:00Z'},
+                    {'prospect_id':'p3','evidence_confidence':.85,'scored_at':'2026-10-29T00:00:00Z'},
+                ]
+                return rows[offset:offset+limit]
+            if table=='prospect_entity_links':
+                self.calls.append((table, columns, filters, order, limit, offset))
+                requested = next((f.value for f in filters if f.column=='prospect_id'), ())
+                return ([{'prospect_id':'p3','entity_id':'e3',
+                          'active':True, 'match_score':1.0,
+                          'created_at':'2026-10-29T00:00:00Z'}]
+                        if 'p3' in requested else [])
+            return super().query(table, columns, filters=filters,order=order,limit=limit,offset=offset)
+    g=G()
+    assert module.fetch_qualified_candidate_ids(g,2)==['p1','p2']
+    selected,diagnostics=module.fetch_identity_prioritized_candidate_ids(
+        g,2,scan_limit=6,page_size=2,
+    )
+    assert selected==['p3','p1']
+    assert diagnostics['eligible_active_linked_selected']==1
+    assert diagnostics['identity_is_existing_link_only'] is True
+    assert diagnostics['source_evidence_not_auto_promoted'] is True
+    assert all(call[0] in ('prospect_qualifications','prospect_entity_links') for call in g.calls)
+
+
+def test_identity_priority_does_not_promote_ambiguous_entity_links():
+    class G(FakeGateway):
+        def query(self, table, columns='*', *, filters=(), order=(), limit=1000, offset=0):
+            if table=='prospect_qualifications':
+                return [
+                    {'prospect_id':'p1','evidence_confidence':.98},
+                    {'prospect_id':'p2','evidence_confidence':.96},
+                    {'prospect_id':'p3','evidence_confidence':.85},
+                ][offset:offset+limit]
+            if table=='prospect_entity_links':
+                requested = next((f.value for f in filters if f.column=='prospect_id'), ())
+                return ([{'prospect_id':'p3','entity_id':'e3'},
+                         {'prospect_id':'p3','entity_id':'e4'}]
+                        if 'p3' in requested else [])
+            return []
+    selected,diagnostics=module.fetch_identity_prioritized_candidate_ids(
+        G(),2,scan_limit=5,page_size=2,
+    )
+    assert selected==['p1','p2']
+    assert diagnostics['eligible_active_linked_selected']==0
+    assert diagnostics['source_evidence_not_auto_promoted'] is True
+
+
+def test_exchange_cli_defaults_to_identity_first_with_explicit_rollback():
+    # The existing systemd service passes no identity flag. Its normal runs
+    # must not regress to the old rank-first 200-row starvation window.
+    args = module.parse_args(['--repo-root', '/srv/empire_os', '--limit', '200'])
+    assert args.prefer_verified_identity is True
+    assert args.limit == 200
+    assert module.parse_args(['--no-prefer-verified-identity']).prefer_verified_identity is False
+    assert module.parse_args(['--prefer-verified-identity']).prefer_verified_identity is True

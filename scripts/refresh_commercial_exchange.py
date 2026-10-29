@@ -75,6 +75,77 @@ def fetch_qualified_candidate_ids(
     return ids
 
 
+
+def fetch_identity_prioritized_candidate_ids(
+    gateway: CanonicalDataGateway,
+    limit: int,
+    *,
+    scan_limit: int = 3000,
+    page_size: int = 500,
+) -> tuple[list[str], dict[str, Any]]:
+    """Bounded identity-aware ordering over already qualified v2 prospects.
+
+    The previous 200-row window can contain only unlinked records while
+    qualified, active-linked rows are further down in the same ranked set.
+    Nothing here creates identity, boosts a score, or grants buyer authority.
+    """
+    bounded = max(1, min(int(limit), 500))
+    ceiling = max(bounded, min(int(scan_limit), 3000))
+    size = max(1, min(int(page_size), 500))
+    fallback = fetch_qualified_candidate_ids(gateway, bounded)
+    linked: list[str] = []
+    examined: set[str] = set()
+    scanned = 0
+    exhausted = False
+    for offset in range(0, ceiling, size):
+        take = min(size, ceiling - offset)
+        rows = gateway.query(
+            "prospect_qualifications",
+            "prospect_id,evidence_confidence,scored_at",
+            filters=(
+                DataFilter.eq("scoring_engine", "empire_os.lead_scoring"),
+                DataFilter.eq("scoring_version", "v2"),
+                DataFilter.eq("status", "scored"),
+                DataFilter.in_("tier", ("hot", "warm")),
+                DataFilter.gte("evidence_confidence", MIN_DECISION_CONFIDENCE),
+            ),
+            order=(
+                OrderSpec("evidence_confidence", descending=True, nulls_last=True),
+                OrderSpec("scored_at", descending=True, nulls_last=True),
+                OrderSpec("prospect_id", descending=False),
+            ),
+            limit=take,
+            offset=offset,
+        )
+        scanned += len(rows)
+        batch = []
+        for row in rows:
+            pid = str(row.get("prospect_id") or "").strip()
+            if pid and pid not in examined:
+                examined.add(pid)
+                batch.append(pid)
+        active = fetch_identity_map(gateway, batch)
+        # Respect fetch_identity_map's fail-closed ambiguity check.
+        linked.extend(pid for pid in batch if active.get(pid) is not None)
+        if len(linked) >= bounded:
+            break
+        if len(rows) < take:
+            exhausted = True
+            break
+    chosen = list(dict.fromkeys(linked + fallback))[:bounded]
+    return chosen, {
+        "identity_priority_enabled": True,
+        "qualified_rows_scanned": scanned,
+        "eligible_active_linked_seen": len(linked),
+        "eligible_active_linked_selected": sum(pid in set(linked) for pid in chosen),
+        "selected_without_active_link_priority": len(chosen) - sum(pid in set(linked) for pid in chosen),
+        "scan_limit": ceiling,
+        "scan_exhausted": exhausted,
+        "identity_is_existing_link_only": True,
+        "source_evidence_not_auto_promoted": True,
+    }
+
+
 def fetch_prospects_by_ids(
     gateway: CanonicalDataGateway,
     prospect_ids: list[str],
@@ -426,8 +497,15 @@ def build_runtime_snapshot(
     gateway: CanonicalDataGateway,
     *,
     limit: int,
+    identity_priority: bool = False,
 ) -> dict[str, Any]:
-    prospect_ids = fetch_qualified_candidate_ids(gateway, limit)
+    priority_diagnostics = None
+    if identity_priority:
+        prospect_ids, priority_diagnostics = fetch_identity_prioritized_candidate_ids(
+            gateway, limit
+        )
+    else:
+        prospect_ids = fetch_qualified_candidate_ids(gateway, limit)
     prospects = fetch_prospects_by_ids(gateway, prospect_ids)
     prospect_ids = [
         str(row.get("id") or "").strip()
@@ -476,7 +554,12 @@ def build_runtime_snapshot(
         "changes_recognized_revenue": False,
     }
     snapshot["source"] = SOURCE
-    snapshot["candidate_selection"] = "qualification_driven"
+    snapshot["candidate_selection"] = (
+        "qualification_driven_identity_priority"
+        if identity_priority else "qualification_driven"
+    )
+    if priority_diagnostics is not None:
+        snapshot["identity_priority_diagnostics"] = priority_diagnostics
     snapshot["qualification_population_census"] = read_qualification_population_counts(gateway)
     snapshot["selection_window"] = {
         "requested_limit": max(1, min(int(limit), 500)),
@@ -507,14 +590,27 @@ def build_runtime_snapshot(
     return snapshot
 
 
-def main() -> int:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", default="/srv/empire_os")
     parser.add_argument("--limit", type=int, default=200)
-    args = parser.parse_args()
+    parser.add_argument(
+        "--prefer-verified-identity", action=argparse.BooleanOptionalAction,
+        default=True,
+        help=("Prefer existing verified, unambiguous active identity links "
+              "within qualified supply (default enabled; --no-prefer-verified-identity "
+              "restores the historical rank-first selection)."),
+    )
+    return parser.parse_args(argv)
+
+
+def main() -> int:
+    args = parse_args()
 
     gateway = empiredb_gateway_from_environment()
-    snapshot = build_runtime_snapshot(gateway, limit=args.limit)
+    snapshot = build_runtime_snapshot(
+        gateway, limit=args.limit, identity_priority=args.prefer_verified_identity,
+    )
     write_exchange_snapshot(Path(args.repo_root), snapshot)
     print(json.dumps({
         "ok": True,
