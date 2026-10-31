@@ -40,3 +40,17 @@ Refresh current `git status --short`, `git worktree list`, website HTTP endpoint
 - Main historical checklist 599 done / 290 pending / 889 total, NOT 290 validated production outcomes.
 
 **Your first response:** give a compact fact-checked status, identify today's highest-impact P0 action, take it through the existing connected EmpireOS owner where safe, and use the master register to prevent work sprawl.
+
+## Founder-wide presentation standard — 31 October 2026
+
+Apply this style to **all Empire AI project chats, handoffs, visual dashboards and founder-facing reports** wherever the original approved brand and context are available. This is a presentation preference, not authority to replace live branding or rewrite other owners' UI.
+
+- **Brand:** existing Empire AI midnight/navy blue, luminous cyan and premium gold; preserve founder-approved original globe/logo and precise source palette. No unrelated logo, crown or random colour scheme.
+- **Readable status meanings:** green **DONE / independently verified**; amber/gold **IN PROGRESS / awaiting evidence**; red **BLOCKED / requires action**; neutral grey **PARKED / NOT STARTED**. Always write the status in words alongside colour so the information works without colour perception.
+- **Low-cognitive-load formatting:** one clear purpose per screen, short headings, concise sentences, high contrast, generous but efficient spacing, readable font sizes and aligned cards; no walls of text, unnecessary icons, repetitive tables or crowded controls.
+- **Show first:** current status, the three most important findings, **ONE next concrete action**, its owner and proof required. Full technical detail can follow under an optional drilldown or linked evidence.
+- **Desktop screens:** compact anchored navigation, above-the-fold key actions, no needless hero height or kilometres of scrolling; independent panel scrolling for operational consoles where appropriate. **Mobile:** proper stacking, accessible focus/touch targets, no clipped content or horizontal body overflow.
+- **Progress honesty:** distinguish LIVE, BUILT/TESTED, HELD, PARKED and REAL COMMERCIAL OUTCOME. Never use green for mere code presence or revenue estimates; keep dates/sources and meaningful blockers.
+- **Workflow:** reuse existing screens and systems, protect owner release gates, and verify against the founder-approved screenshot before changing live styling.
+
+This instruction should travel with the existing master handoff to new project chats. It does not create or change a global ChatGPT account setting.
