@@ -116,3 +116,49 @@ def test_builder_language_routes_to_builder_required(tmp_path):
     ]
     assert sum(row["item_count"] for row in evidence) == 1
     assert all(row["external_execution_allowed"] is False for row in builder)
+
+
+def test_invalid_oversized_checklist_note_held_without_crashing_valid_tasks(tmp_path):
+    from empire_os.completion_board_dispatcher import _live_rows
+    from empire_os.completion_task_memory import AttemptMemoryError, task_key
+    from pathlib import Path
+    import pytest
+    invalid = "Long status note " + ("x" * 620)
+    path = tmp_path / "docs/MASTER_REMAINING_CHECKLIST.md"
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text(
+        "# Existing\n## Current revenue evidence\n"
+        "- [ ] Verify opted-in buyer proof\n"
+        f"- [ ] {invalid}\n"
+        "- [x] Historic task completed\n"
+    )
+    with pytest.raises(AttemptMemoryError):
+        task_key("Current revenue evidence",invalid)
+    rows,done,total=_live_rows(path)
+    assert (len(rows),done,total)==(1,1,3)
+    assert rows[0]["task"]=="Verify opted-in buyer proof"
+    result=dispatch_completion_board(tmp_path,now=NOW)
+    assert result["status"]=="AVAILABLE_WITH_INVALID_IDENTITY_HOLDS"
+    assert result["invalid_task_identity_hold_count"]==1
+    assert result["invalid_task_identity_checklist_lines"]==[4]
+    assert result["invalid_task_identity_not_queued"] is True
+    assert result["canonical_total_count"]==3
+    assert result["canonical_done_count"]==1
+    assert result["source_pending_count"]==1
+    assert result["queued_packet_count"]>0
+    assert result["consequential_actions_dispatched"] is False
+    assert result["execution_authority"]=="none"
+    again=dispatch_completion_board(tmp_path,now=NOW)
+    assert again["queued_packet_count"]==0
+
+
+def test_valid_maximum_identity_text_is_not_arbitrarily_truncated(tmp_path):
+    from empire_os.completion_board_dispatcher import _live_rows
+    from empire_os.completion_task_memory import task_key
+    maximum = "a" * 600
+    path=tmp_path/"docs/MASTER_REMAINING_CHECKLIST.md"
+    path.parent.mkdir(parents=True,exist_ok=True)
+    path.write_text("# Test\n## Department\n- [ ] "+maximum+"\n")
+    rows,_,total=_live_rows(path)
+    assert total==1 and len(rows)==1
+    assert rows[0]["stable_task_key"]==task_key("Department",maximum)

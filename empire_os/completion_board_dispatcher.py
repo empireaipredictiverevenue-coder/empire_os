@@ -14,8 +14,8 @@ from empire_os.department_adapter_registry import eligible_specialist_reopen_rea
 from empire_os.founder_directives import classify_authority
 from empire_os.master_execution_ledger import parse_checklist
 from empire_os.completion_task_memory import (
-    load_attempt_memory, preflight_task, prior_completion_plan_handoffs,
-    task_key,
+    AttemptMemoryError, load_attempt_memory, preflight_task,
+    prior_completion_plan_handoffs, task_key,
 )
 
 
@@ -106,11 +106,18 @@ def _live_rows(path: Path) -> tuple[list[dict[str, Any]], int, int]:
     pending = [row for row in items if row.status == "PENDING"]
     rows: list[dict[str, Any]] = []
     for row in pending:
+        try:
+            stable_key = task_key(row.section, row.item)
+        except AttemptMemoryError:
+            # A malformed or oversized checklist note is not a task. Keep
+            # the stable identity limit; never truncate, hash an alternate
+            # identity, or crash every other department's valid reviews.
+            continue
         department, workstream = _owner_for_section(row.section)
         material = f"{row.line}|{row.section}|{row.item}"
         rows.append({
             "id": "check_" + sha256(material.encode("utf-8")).hexdigest()[:16],
-            "stable_task_key": task_key(row.section, row.item),
+            "stable_task_key": stable_key,
             "line": row.line,
             "section": row.section,
             "task": row.item,
@@ -227,6 +234,16 @@ def dispatch_completion_board(
         _atomic_write(root / OUTPUT, payload)
         return payload
 
+    # Explicitly retain evidence of source rows held by the canonical
+    # task-memory identity policy. They must NEVER enter the review queue.
+    held_invalid_lines: list[int] = []
+    for source_row in parse_checklist(source_path):
+        if source_row.status != "PENDING":
+            continue
+        try:
+            task_key(source_row.section, source_row.item)
+        except AttemptMemoryError:
+            held_invalid_lines.append(source_row.line)
     rows, done_count, total_count = _live_rows(source_path)
     source_ref = _source_ref(source_path)
     # A corrupt memory checkpoint must not silently enable repeated work.
@@ -450,11 +467,17 @@ def dispatch_completion_board(
 
     payload = {
         "schema_version": SCHEMA_VERSION,
-        "status": "AVAILABLE",
+        "status": (
+            "AVAILABLE_WITH_INVALID_IDENTITY_HOLDS"
+            if held_invalid_lines else "AVAILABLE"
+        ),
         "mode": "OBSERVE",
         "generated_at": current.isoformat(),
         "source": str(SOURCE),
         "source_ref": source_ref,
+        "invalid_task_identity_hold_count": len(held_invalid_lines),
+        "invalid_task_identity_checklist_lines": held_invalid_lines[:100],
+        "invalid_task_identity_not_queued": True,
         "canonical_total_count": total_count,
         "canonical_done_count": done_count,
         "source_pending_count": len(rows),
