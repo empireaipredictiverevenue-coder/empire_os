@@ -380,8 +380,12 @@ def _probe(
             "kind": kind,
             "target": rel,
             "passed": (
-                isinstance(left, int)
-                and isinstance(right, int)
+                # Enterprise evidence must be actual integer counts, not
+                # Python bools (True == 1 and isinstance(True, int)).
+                # Synthetic boolean "connected" values cannot certify a
+                # live count or produce a LIVE_VERIFY_DONE checkpoint.
+                type(left) is int
+                and type(right) is int
                 and left == right
                 and right > 0
             ),

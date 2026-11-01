@@ -386,3 +386,50 @@ def test_competitor_sweep_rule_requires_enabled_and_active_timer(tmp_path):
         )
         assert result["live_proof_pass_count"] == 0
         assert result["live_proof_blocked_count"] == 1
+
+
+def test_enterprise_count_probe_refuses_boolean_telemetry(tmp_path):
+    """Two true flags previously claimed matching nonzero live counts."""
+    from empire_os.completion_live_proof import _probe
+    f=tmp_path / "runtime/predictive_cloud/status_latest.json"
+    _write(f, {"available_component_count": True, "component_count": True})
+    args=("runtime/predictive_cloud/status_latest.json",
+          "available_component_count", "component_count")
+    def run():
+        return _probe(tmp_path, "json_counts_equal", args,
+                      http_get=lambda u:(0,""),
+                      systemd_probe=lambda u,m:False, now=NOW)
+    assert run()["passed"] is False
+    _write(f, {"available_component_count": 1, "component_count": True})
+    assert run()["passed"] is False
+    _write(f, {"available_component_count": True, "component_count": 1})
+    assert run()["passed"] is False
+    _write(f, {"available_component_count": 1, "component_count": 1})
+    assert run()["passed"] is True
+    _write(f, {"available_component_count": 0, "component_count": 0})
+    assert run()["passed"] is False
+
+
+def test_enterprise_false_boolean_counts_never_generate_live_completion_checkpoint(tmp_path):
+    """Protect exact ledger completion, not merely a helper return value."""
+    _write(tmp_path / "docs/MASTER_REMAINING_CHECKLIST.md",
+           "# Demo\n- [ ] Predictive Cloud API/read-model convergence\n")
+    _write(tmp_path / "runtime/predictive_cloud/status_latest.json",
+           {"available_component_count": True,
+            "component_count": True,
+            "unavailable_components": []})
+    def source(url):
+        return 200, json.dumps({"available": True})
+    held=run_completion_live_proof(tmp_path, now=NOW,
+               http_get=source,systemd_probe=lambda u,m:False)
+    assert held["live_proof_pass_count"]==0
+    assert held["live_proof_blocked_count"]==1
+    assert held["checkpoints_written"]==[]
+    _write(tmp_path / "runtime/predictive_cloud/status_latest.json",
+           {"available_component_count": 2,
+            "component_count": 2,
+            "unavailable_components": []})
+    genuine=run_completion_live_proof(tmp_path, now=NOW,
+               http_get=source,systemd_probe=lambda u,m:False)
+    assert genuine["live_proof_pass_count"]==1
+    assert len(genuine["checkpoints_written"])==1
