@@ -164,7 +164,7 @@ def test_release_requires_the_verified_published_checkout_page(monkeypatch,tmp_p
     monkeypatch.setattr(r,"ROOT",tmp_path)
     r._published_checkout_verified()
     page.write_bytes(b"buyer-page-unreviewed")
-    with pytest.raises(ValueError,match="not verified"):
+    with pytest.raises(ValueError,match="not verified|receipt absent"):
         r._published_checkout_verified()
 
 

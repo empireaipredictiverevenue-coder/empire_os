@@ -216,6 +216,81 @@ def _write_dropin()->None:
             os.unlink(temp)
 
 
+# The original October 13 manifest pins the older approved /buy HTML.
+# Later, founder-approved 747->753 and 753->756 website releases changed
+# that HTML WITHOUT replacing /buy in either scoped release. Check the two
+# original signed-off, hash-pinned release *sources*, not a new manifest or a
+# hash copied from the currently served page. This is read-only and specific
+# to /buy; unrelated future site pages cannot erase checkout evidence.
+PRICING_RELEASE_MANIFEST=Path(
+    "/srv/empire_os/docs/commercial/original_release_evidence/"
+    "RELEASE_PRICE_PINNED_MANIFEST_20261030.json"
+)
+SCOPED_RELEASE_MANIFEST=Path(
+    "/srv/empire_os/docs/commercial/original_release_evidence/"
+    "WEB_SCOPED_INTAKE_PINNED_MANIFEST_20261030.json"
+)
+PRICING_RELEASE_SHA="cd02971236fd268ead2ea261ffbea68cecda96dd7337dcb6f56774ec5c0463f7"
+SCOPED_RELEASE_SHA="46eb6eafa943fa7f58d6eeb606c264617a0084ca953fcd836ad16939e932d55b"
+APPROVED_LATER_BUY_SHA="435cd7b1fed3490998ec2ca74cd0fc68f1a6ff0a324a10adba6428def4e92552"
+
+
+def _approved_later_checkout_buy_sha256()->str:
+    """Follow two exact owner-reviewed scopes, never repin a live HTML file."""
+    from hashlib import sha256
+
+    def load_pinned(path: Path, digest: str) -> dict:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size>300000:
+            raise ValueError("later website owner receipt absent")
+        raw=path.read_bytes()
+        if sha256(raw).hexdigest()!=digest:
+            raise ValueError("later website owner receipt changed")
+        data=json.loads(raw)
+        if not isinstance(data,dict):
+            raise ValueError("later website owner receipt invalid")
+        return data
+
+    pricing=load_pinned(PRICING_RELEASE_MANIFEST,PRICING_RELEASE_SHA)
+    scoped=load_pinned(SCOPED_RELEASE_MANIFEST,SCOPED_RELEASE_SHA)
+    if (pricing.get("schema_version")!="empire.website.predictive.focused_pricing.scoped_v1"
+            or pricing.get("founder_publication_approval")!=
+                 "2026-10-30 explicit: publish the pricing"
+            or pricing.get("qa_status")!="PRIVATE_BROWSER_QA_PASS"
+            or pricing.get("customer_checkout_and_terms_remain_disabled") is not True
+            or pricing.get("no_database_checkout_card_payment_or_outbound_change") is not True
+            or pricing.get("publication_performed") is not False
+            or pricing.get("live_static_file_count")!=747
+            or pricing.get("target_static_file_count")!=753
+            or scoped.get("schema_version")!="empire.website.predictive.scoped_crm_form.v1"
+            or scoped.get("merged_browser_qa_status")!="OFFLINE_SCOPED_CRM_BROWSER_PASS"
+            or scoped.get("payment_or_binding_terms_authorized") is not False
+            or scoped.get("no_real_database_customer_or_payment_calls") is not True
+            or scoped.get("published") is not False
+            or scoped.get("live_original_file_count")!=753
+            or scoped.get("target_file_count")!=756):
+        raise ValueError("later website owner release scope unverified")
+    maps=[]
+    for document,expected_count in ((pricing,747),(scoped,753)):
+        base=document.get("live_all_sha256")
+        replacements=document.get("replace_sha256")
+        additions=document.get("add_sha256")
+        if (not all(isinstance(x,dict) for x in (base,replacements,additions))
+                or len(base)!=expected_count
+                or set(replacements)&set(additions)
+                or (set(replacements)-set(base))
+                or (set(additions)&set(base))
+                or "buy.html" in replacements
+                or "buy.html" in additions):
+            raise ValueError("later website owner hash inventory invalid")
+        maps.append({**base,**replacements,**additions})
+    if (len(maps[0])!=753 or maps[0]!=scoped["live_all_sha256"]
+            or len(maps[1])!=756
+            or pricing["live_all_sha256"].get("buy.html")!=APPROVED_LATER_BUY_SHA
+            or scoped["live_all_sha256"].get("buy.html")!=APPROVED_LATER_BUY_SHA):
+        raise ValueError("later website owner release lineage mismatch")
+    return APPROVED_LATER_BUY_SHA
+
+
 def _published_checkout_verified()->None:
     """Insist on the already-released, content-hashed buyer checkout UI."""
     from hashlib import sha256
@@ -224,8 +299,13 @@ def _published_checkout_verified()->None:
     if manifest.is_symlink() or page.is_symlink() or not manifest.is_file() or not page.is_file():
         raise ValueError("published checkout evidence absent")
     values=json.loads(manifest.read_text())
-    if sha256(page.read_bytes()).hexdigest()!=values.get("buy_sha256"):
-        raise ValueError("published checkout page not verified")
+    observed_buy_sha=sha256(page.read_bytes()).hexdigest()
+    if observed_buy_sha!=values.get("buy_sha256"):
+        # The current approved /buy HTML differs from the October 13 source.
+        # Do not accept a new hash from a mutable live file or rewrite the
+        # original manifest. Later approved release lineage must prove it.
+        if observed_buy_sha!=_approved_later_checkout_buy_sha256():
+            raise ValueError("published checkout page not verified")
     assets=values.get("assets")
     if type(assets) is not list or len(assets)>150:
         raise ValueError("published checkout asset manifest invalid")
