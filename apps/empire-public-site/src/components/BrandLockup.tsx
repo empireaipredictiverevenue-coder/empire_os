@@ -1,7 +1,7 @@
 /**
- * Founder-approved orbital-A ring artwork, separated from the low-resolution
- * reference wordmark so our own accessible typography remains crisp at every
- * viewport. The mark is an unchanged pixel crop of the authorised reference.
+ * Founder-approved blue-halo orbital-A identity (27 Oct brand board).
+ * Stored 820x160 PNG is SHA256 pinned; no re-generated logo substitute.
+ * No original native vector master has been verified.
  */
 export default function BrandLockup({ compact = false }: { compact?: boolean }) {
   return (
@@ -11,17 +11,13 @@ export default function BrandLockup({ compact = false }: { compact?: boolean }) 
       aria-label="Empire AI — Predictive Revenue Infrastructure"
     >
       <img
-        className="approved-brand-mark"
-        src="/brand/empire-orbital-a-reference-mark.webp"
-        width="86"
-        height="60"
+        className="approved-brand-reference"
+        src="/brand/empire-ai-primary-orbital-a-founder-approved.png"
+        width="820"
+        height="160"
         alt=""
         decoding="async"
       />
-      <span className="approved-brand-type" aria-hidden="true">
-        <strong>EMPIRE AI</strong>
-        <small>PREDICTIVE REVENUE INFRASTRUCTURE</small>
-      </span>
     </span>
   );
 }
