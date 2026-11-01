@@ -1,0 +1,52 @@
+{
+  "schema_version": "empire.website.buy_brand_exact_source_qa.v1",
+  "status": "BUY_BRAND_PRIVATE_BROWSER_PASS",
+  "live_site_mutated": false,
+  "real_customer_post_attempts": 0,
+  "payment_requests_created": 0,
+  "actual_revenue": false,
+  "original_source_asset_sha": "55e98ad2ae182991d95908738135779102beb81818cd7c3607a3a49e1f2aa596",
+  "missing_paths": [],
+  "results": [
+    {
+      "name": "desktop",
+      "pass": true,
+      "http": 200,
+      "headerLogo": "/brand/empire-ai-primary-orbital-a-founder-approved.png",
+      "footerLogo": "/brand/empire-ai-primary-orbital-a-founder-approved.png",
+      "headerNaturalWidth": 820,
+      "logoVisible": true,
+      "h1": "Intelligence and demand.One commercial portal.",
+      "buyFormCount": 1,
+      "walletPrompt": true,
+      "catalogueVisible": true,
+      "termsUnchecked": true,
+      "createPaymentButton": true,
+      "horizontalOverflow": false,
+      "errors": [],
+      "failed": [],
+      "blocked": [],
+      "screenshot_sha256": "9034b6b373ade4e324beca3070687544a700e3f108551c5036e7285646aad446"
+    },
+    {
+      "name": "mobile",
+      "pass": true,
+      "http": 200,
+      "headerLogo": "/brand/empire-ai-primary-orbital-a-founder-approved.png",
+      "footerLogo": "/brand/empire-ai-primary-orbital-a-founder-approved.png",
+      "headerNaturalWidth": 820,
+      "logoVisible": true,
+      "h1": "Intelligence and demand.One commercial portal.",
+      "buyFormCount": 1,
+      "walletPrompt": true,
+      "catalogueVisible": true,
+      "termsUnchecked": true,
+      "createPaymentButton": true,
+      "horizontalOverflow": false,
+      "errors": [],
+      "failed": [],
+      "blocked": [],
+      "screenshot_sha256": "f30b2d057acfb5f5d1dbe31eb08d4981675cf0794b555897014114cf01d4f8c0"
+    }
+  ]
+}

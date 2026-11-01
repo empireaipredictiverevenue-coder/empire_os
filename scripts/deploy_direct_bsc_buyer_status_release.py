@@ -233,6 +233,110 @@ SCOPED_RELEASE_MANIFEST=Path(
 PRICING_RELEASE_SHA="cd02971236fd268ead2ea261ffbea68cecda96dd7337dcb6f56774ec5c0463f7"
 SCOPED_RELEASE_SHA="46eb6eafa943fa7f58d6eeb606c264617a0084ca953fcd836ad16939e932d55b"
 APPROVED_LATER_BUY_SHA="435cd7b1fed3490998ec2ca74cd0fc68f1a6ff0a324a10adba6428def4e92552"
+# Original ASTRA/Design Studio founder horizontal mark already published on
+# Commercial. This *new* /buy page must have an independent, exact owner
+# manifest and desktop+mobile private browser QA before it is accepted.
+BUY_BRAND_RELEASE_MANIFEST=Path(
+    "/srv/empire_os/docs/commercial/original_release_evidence/"
+    "SCOPED_BUY_BRAND_MANIFEST_20261101.json"
+)
+BUY_BRAND_BROWSER_QA=Path(
+    "/srv/empire_os/docs/commercial/original_release_evidence/"
+    "BUY_BRAND_BROWSER_QA_20261101.json"
+)
+BUY_BRAND_MANIFEST_SHA="e91c7216ab336575a701105537fb850d9d682d059c570e2155d1ff04840f6554"
+BUY_BRAND_QA_SHA="01222263be3b2bff473410a9f691401a5b039486e7417973c556f459eba8e721"
+BUY_BRAND_HTML_SHA="fbdae60ae1741b43276253f3153dc0f7f7edd68a48e5df3ccaf878670e61c4dd"
+BUY_BRAND_LOGO_SHA="55e98ad2ae182991d95908738135779102beb81818cd7c3607a3a49e1f2aa596"
+BUY_BRAND_REPLACES=frozenset({
+    "buy.html", "buy.txt", "buy/__next._tree.txt",
+    "buy/__next._full.txt", "buy/__next.buy.__PAGE__.txt",
+})
+BUY_BRAND_ADDS=frozenset({
+    "_next/static/css/93002b73242723fc.css",
+    "_next/static/chunks/app/layout-ed51d8ad8107b67e.js",
+    "_next/static/chunks/app/buy/page-4e23bc78c94f5a9c.js",
+})
+
+
+def _approved_brand_buy_sha256()->str:
+    """Approve only the exact browser-reviewed newer logo/checkout HTML.
+
+    Never derive the expected checksum from the mutable published HTML and
+    never drop the original Oct 13 36 immutable-asset checks.
+    """
+    from hashlib import sha256
+    def read_pinned(path:Path,checksum:str)->dict:
+        if path.is_symlink() or not path.is_file() or path.stat().st_size>250000:
+            raise ValueError("brand owner evidence missing")
+        raw=path.read_bytes()
+        if sha256(raw).hexdigest()!=checksum:
+            raise ValueError("brand owner evidence digest drift")
+        result=json.loads(raw)
+        if not isinstance(result,dict):
+            raise ValueError("brand owner evidence invalid")
+        return result
+    m=read_pinned(BUY_BRAND_RELEASE_MANIFEST,BUY_BRAND_MANIFEST_SHA)
+    q=read_pinned(BUY_BRAND_BROWSER_QA,BUY_BRAND_QA_SHA)
+    previous=_approved_later_checkout_buy_sha256()
+    old=m.get("baseline_live_sha256")
+    changed=m.get("replace_sha256")
+    added=m.get("add_sha256")
+    if (m.get("schema_version")!="empire.website.buy_brand_design_studio_scoped_release.v1"
+            or m.get("source_brand")!="ASTRA original website owner logo already published on /commercial"
+            or m.get("owner_source_commit")!="77b8be145"
+            or m.get("brand_studio_commit")!="d72941ff7"
+            or m.get("brandlockup_source_sha256")!="8637715cbbea797fc45168312c4e084f22c050f84e9410823b63c89729a4464e"
+            or m.get("brand_asset_sha256")!=BUY_BRAND_LOGO_SHA
+            or m.get("brand_asset_ref")!="/brand/empire-ai-primary-orbital-a-founder-approved.png"
+            or m.get("source_art_reuse_only") is not True
+            or m.get("no_new_brand_asset") is not True
+            or m.get("baseline_live_count")!=758
+            or m.get("final_count")!=761
+            or m.get("unrelated_files_unchanged_count")!=753
+            or m.get("buyer_main_visible_text_unchanged") is not True
+            or m.get("founder_commercial_terms_unchanged") is not True
+            or m.get("payment_flags_unchanged") is not True
+            or m.get("checkout_runtime_unchanged") is not True
+            or m.get("publication_performed") is not False
+            or m.get("private_browser_qa_status")!="BUY_BRAND_PRIVATE_BROWSER_PASS"
+            or m.get("private_browser_qa_sha256")!=BUY_BRAND_QA_SHA
+            or not isinstance(old,dict) or len(old)!=758
+            or old.get("buy.html")!=previous
+            or not isinstance(changed,dict) or set(changed)!=BUY_BRAND_REPLACES
+            or not isinstance(added,dict) or set(added)!=BUY_BRAND_ADDS
+            or (set(changed)-set(old)) or (set(added)&set(old))
+            or changed.get("buy.html")!=BUY_BRAND_HTML_SHA
+            or len({**old,**changed,**added})!=761):
+        raise ValueError("brand owner checkout scope lineage mismatch")
+    if (q.get("schema_version")!="empire.website.buy_brand_exact_source_qa.v1"
+            or q.get("status")!="BUY_BRAND_PRIVATE_BROWSER_PASS"
+            or q.get("original_source_asset_sha")!=BUY_BRAND_LOGO_SHA
+            or q.get("real_customer_post_attempts")!=0
+            or q.get("payment_requests_created")!=0
+            or q.get("live_site_mutated") is not False
+            or q.get("missing_paths")!=[]
+            or not isinstance(q.get("results"),list)
+            or len(q["results"])!=2
+            or {r.get("name") for r in q["results"]}!={"desktop","mobile"}
+            or any(r.get("pass") is not True or r.get("headerLogo")!=m["brand_asset_ref"]
+                   or r.get("footerLogo")!=m["brand_asset_ref"]
+                   or r.get("termsUnchecked") is not True
+                   or r.get("createPaymentButton") is not True
+                   or r.get("errors") or r.get("failed") or r.get("blocked")
+                   for r in q["results"])):
+        raise ValueError("brand owner actual browser QA invalid")
+    root=ROOT/"apps/empire-public-site/out"
+    logo=root/m["brand_asset_ref"].lstrip("/")
+    if logo.is_symlink() or not logo.is_file() or sha256(logo.read_bytes()).hexdigest()!=BUY_BRAND_LOGO_SHA:
+        raise ValueError("brand owner original logo digest invalid")
+    for filename,digest in added.items():
+        asset=root/filename
+        if asset.is_symlink() or not asset.is_file() or sha256(asset.read_bytes()).hexdigest()!=digest:
+            raise ValueError("brand owner new immutable checkout asset mismatch")
+    return BUY_BRAND_HTML_SHA
+
+
 
 
 def _approved_later_checkout_buy_sha256()->str:
@@ -305,7 +409,12 @@ def _published_checkout_verified()->None:
         # Do not accept a new hash from a mutable live file or rewrite the
         # original manifest. Later approved release lineage must prove it.
         if observed_buy_sha!=_approved_later_checkout_buy_sha256():
-            raise ValueError("published checkout page not verified")
+            try:
+                approved_new_buy_sha=_approved_brand_buy_sha256()
+            except (OSError,ValueError) as exc:
+                raise ValueError("published checkout page not verified") from exc
+            if observed_buy_sha!=approved_new_buy_sha:
+                raise ValueError("published checkout page not verified")
     assets=values.get("assets")
     if type(assets) is not list or len(assets)>150:
         raise ValueError("published checkout asset manifest invalid")
