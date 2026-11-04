@@ -17,6 +17,156 @@ from empire_os.search_intelligence.search_console import (
 )
 
 
+def prepare_official_news_media_os_preview(
+    review: Mapping[str, Any], *, as_of: str,
+) -> dict[str, Any]:
+    """Translate approved *research review* items into existing MediaOS packs.
+
+    Only official primary references are accepted. This pure adapter creates
+    an unsubmitted, unverified handoff for the existing MediaOS owner; it
+    neither changes MediaOS input nor starts a scheduled NewsJack worker.
+    """
+    from empire_os.media_research_pack import (
+        MediaResearchPack, MediaResearchSource,
+    )
+
+    stamp = _timestamp(as_of)
+    if stamp is None:
+        raise ValueError("timezone-aware handoff timestamp required")
+    if (not isinstance(review, Mapping)
+            or review.get("schema_version")
+                != "empire.organic.newsjack_jev_review.v1"
+            or review.get("mode") != "OBSERVE"
+            or review.get("execution_authority") != "none"
+            or review.get("publishing_enabled") is not False
+            or review.get("outbound_enabled") is not False):
+        raise ValueError("trusted read-only NewsJack review required")
+    rows = review.get("candidates")
+    if not isinstance(rows, list) or len(rows) > 100:
+        raise ValueError("bounded NewsJack candidates required")
+    packs = []
+    seen = set()
+    held = 0
+    for row in rows:
+        if not isinstance(row, Mapping):
+            held += 1
+            continue
+        if row.get("status") not in ("RESEARCH_REVIEW", "CONTENT_BRIEF_REVIEW"):
+            held += 1
+            continue
+        signal_id = row.get("signal_id")
+        title = row.get("title")
+        sector = row.get("sector")
+        market = row.get("market")
+        url = _public_https(row.get("primary_source_url"))
+        refs = row.get("evidence_refs")
+        precision = row.get("publication_precision")
+        host = urlsplit(url).hostname if url else None
+        official = (
+            host == "www.federalregister.gov"
+            and any(
+                isinstance(ref, str) and
+                ref.startswith("federalregister:api:")
+                for ref in (refs if isinstance(refs, list) else [])
+            )
+        ) or (
+            host == "www.gov.uk"
+            and any(
+                isinstance(ref, str) and
+                ref.startswith("govuk:content_api:")
+                for ref in (refs if isinstance(refs, list) else [])
+            )
+        )
+        if (not official
+                or not isinstance(signal_id, str)
+                or not 1 <= len(signal_id) <= 128
+                or not isinstance(title, str) or not 8 <= len(title) <= 220
+                or sector not in ("solar", "roofing", "hvac", "dental", "ai")
+                or market not in ("GB", "US")
+                or not isinstance(refs, list) or not refs
+                or not all(isinstance(ref, str) and ref for ref in refs)
+                or precision not in ("instant", "day")
+                or row.get("actual_revenue") is not False
+                or row.get("publishing_enabled") is not False
+                or row.get("outbound_enabled") is not False
+                or row.get("execution_authority") != "none"):
+            held += 1
+            continue
+        # The JEV reviewer checked time/market scope; preserve day-only
+        # publication precision. Never infer exact clock time or article truth.
+        uid = signal_id + "|" + url
+        if uid in seen:
+            held += 1
+            continue
+        seen.add(uid)
+        source_ref = refs[0]
+        source = MediaResearchSource(
+            source_ref=source_ref,
+            source_type="official_news_metadata_reference",
+            observed_at=stamp.isoformat(),
+            lineage_ref=url,
+            rights_state="RESEARCH_REFERENCE_ONLY",
+        )
+        stable = sha256(uid.encode()).hexdigest()[:16]
+        research_id = "media-research:" + stable
+        pack = MediaResearchPack(
+            research_id=research_id,
+            topic=f"{sector} / {market}: {title}",
+            thesis=(
+                "Review official-source evidence independently before "
+                "drawing claims about this news development."
+            ),
+            audience=f"business operators in {market}",
+            sources=(source,),
+            claims=(),
+            empire_data_refs=tuple(refs[:8]),
+            uncertainty=(
+                "Official metadata does not independently corroborate a headline.",
+                "No buyer interest, traffic or revenue is inferred.",
+                "Publication timing and commercial-use rights require review.",
+            ),
+            generated_at=stamp.isoformat(),
+        ).as_dict()
+        pack.update({
+            "newsjack_signal_id": signal_id,
+            "publication_date": row.get("publication_date"),
+            "published_at": row.get("published_at"),
+            "publication_precision": precision,
+            "newsjack_review_status": row["status"],
+            "opportunity_key": "newsjack:" + signal_id,
+            "opportunity_class": "news_editorial_research",
+            "source_observation_count": 1,
+            "verified_claim_count": 0,
+            "claim_verification_required": True,
+            "script_ready": False,
+            "source_observations_are_verified_facts": False,
+            "automatic_script_generation_authorized": False,
+            "public_publish_authorized": False,
+            "actual_revenue": False,
+            "execution_authority": "none",
+        })
+        packs.append(pack)
+
+    return {
+        "schema_version": "empire.organic.newsjack_media_os_preview.v1",
+        "mode": "OBSERVE",
+        "generated_at": stamp.isoformat(),
+        "candidate_count": len(packs),
+        "held_count": held,
+        "research_packs": packs,
+        "target_existing_owner": "media_os.research_intake",
+        "media_os_queue_written": False,
+        "newsjack_worker_started": False,
+        "source_metadata_not_verified_claims": True,
+        "verified_claim_count": 0,
+        "script_ready_count": 0,
+        "public_publish_authorized": False,
+        "outbound_enabled": False,
+        "payment_enabled": False,
+        "execution_authority": "none",
+    }
+
+
 def signals_from_last30days_agent_export(
     export: Mapping[str, Any], *, sector: str, market: str,
 ) -> dict[str, Any]:

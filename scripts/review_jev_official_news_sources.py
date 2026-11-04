@@ -23,6 +23,10 @@ def main() -> int:
     parser.add_argument("--local-jev-shadow", action="store_true",
                         help="Use existing localhost Laya shadow classifier; no paid API")
     parser.add_argument("--include-items", action="store_true")
+    parser.add_argument(
+        "--media-os-review-preview", action="store_true",
+        help="Include claimless, unsubmitted existing-MediaOS research handoff",
+    )
     args = parser.parse_args()
 
     if args.federal_register_term:
@@ -62,6 +66,15 @@ def main() -> int:
     }
     if args.include_items:
         report["candidates"] = review["candidates"]
+    if args.media_os_review_preview:
+        from empire_os.jev_newsjack_adapters import (
+            prepare_official_news_media_os_preview,
+        )
+        report["media_os_research_preview"] = (
+            prepare_official_news_media_os_preview(
+                review, as_of=args.as_of,
+            )
+        )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 
