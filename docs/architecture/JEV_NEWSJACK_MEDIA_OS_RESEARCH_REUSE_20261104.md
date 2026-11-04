@@ -68,3 +68,50 @@ non-network CLI test.
 5. Only attribute traffic and sales from real GSC/CRM evidence.
 
 Status: **development integration verified, not production deployed**.
+
+## 4 November — additional bounded live reconciliation
+
+The public Federal Register API returned thousands of broad full-text
+matches, but the original adapter fetched only a handful of newest records,
+which were dominated by combined filing notices. The existing adapter now
+scans at most 50 records and returns at most the caller's original small
+result cap. Topic matching for multiword concepts requires the actual phrase
+(or the exact AI abbreviation for artificial intelligence). Duplicate
+government document IDs are discarded. These are **source-relevance
+improvements only**, not independent claim verification.
+
+The new pure `reconcile_official_news_media_os_intake` function consumes
+the *existing current* MediaOS research JSON envelope, compares proposed
+official news packs against the existing IDs and source URLs, holds unsafe
+or forged news metadata, and returns a claimless, no-write reconciliation
+report. It does **not** import or overwrite this old branch's
+`empire_os/media_research_bridge.py`; that file differs from the newer
+production bridge and must remain under its original owner.
+
+Manual CLI support for this current-snapshot comparison:
+
+```sh
+cd /home/ubuntu/empire_worktrees/jev_newsjack_traffic_20261018
+PYTHONDONTWRITEBYTECODE=1 /srv/empire_os/.venv/bin/python -B -m \
+  scripts.review_jev_official_news_sources \
+  --federal-register-term solar --sector solar \
+  --as-of 2026-11-04T14:17:00+00:00 --limit 8 \
+  --media-os-review-preview \
+  --media-os-current-input \
+    /srv/empire_os/runtime/media_os/input/research_pack_candidates.json
+```
+
+A real 4 November read-only canary identified one sector-specific solar
+filing from 8 October, but the current seven-day NewsJack gate held it as
+stale. The live artificial-intelligence canary found no sufficiently
+specific headline within the bounded scan. Both returned **zero new
+research packets**; existing MediaOS had five candidates, unchanged.
+
+The current MediaOS candidate input SHA256 was
+`595a645ee210c5cb05f8c05ef3205b743eb5fae9057c952457f3810bc056d013`
+before and after this specific read-only canary. This is a point-in-time
+receipt: the active MediaOS timer may rewrite the input normally later.
+
+The next owner task remains to obtain a genuinely fresh, independently
+reviewed official story, then approve a controlled same-owner intake
+of its claimless pack. Do not auto-publish or claim traffic/revenue.

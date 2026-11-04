@@ -138,3 +138,71 @@ def test_unexpected_response_and_fake_dates_fail_closed():
         fetch_json=lambda url: data,
     )
     assert all(s["publication_date"] != "2026-10-xx" for s in output["signals"])
+
+
+def test_bounded_deeper_scan_finds_specific_record_after_generic_notices():
+    from urllib.parse import parse_qs, urlsplit
+    seen = []
+    def reader(url):
+        size = int(parse_qs(urlsplit(url).query)["per_page"][0])
+        seen.append(size)
+        assert 20 <= size <= 50
+        generic = [
+            {
+                "document_number": f"2026-{10001 + i}",
+                "title": "Combined Notice of Filings",
+                "html_url": (
+                    "https://www.federalregister.gov/documents/2026/11/04/"
+                    f"2026-{10001+i}/combined-notice"
+                ),
+                "publication_date": "2026-11-04",
+                "type": "Notice",
+            }
+            for i in range(17)
+        ]
+        specific = {
+            "document_number": "2026-11099",
+            "title": "Solar Installation Technical Requirements",
+            "html_url":
+                "https://www.federalregister.gov/documents/2026/11/03/"
+                "2026-11099/solar-installation",
+            "publication_date": "2026-11-03",
+            "type": "Rule",
+        }
+        return {"results": generic + [specific]}
+
+    result = federal_register_signals(
+        term="solar", as_of="2026-11-04T14:17:00+00:00", sector="solar",
+        max_results=2, fetch_json=reader,
+    )
+    assert result["candidate_count"] == 1
+    assert result["source_records_scanned"] == 18
+    assert result["generic_or_off_topic_filtered"] == 17
+    assert 20 <= result["scan_limit"] <= 50
+    assert result["signals"][0]["title"] == "Solar Installation Technical Requirements"
+    assert result["signals"][0]["publication_date"] == "2026-11-03"
+    assert seen == [result["scan_limit"]]
+
+
+def test_multi_word_term_must_match_concept_not_individual_generic_word():
+    samples = [
+        ("2026-10110", "Super Intelligence in Operational Assessments"),
+        ("2026-10111", "Artificial Intelligence Software Deployment"),
+    ]
+    packet = {
+        "results": [{
+            "document_number": number,
+            "title": title,
+            "html_url":
+                "https://www.federalregister.gov/documents/2026/11/04/"
+                + number + "/artificial-intelligence",
+            "publication_date": "2026-11-04",
+            "type": "Rule",
+        } for number,title in samples]
+    }
+    result = federal_register_signals(
+        term="artificial intelligence", as_of="2026-11-04T14:17:00+00:00",
+        sector="ai", max_results=2, fetch_json=lambda _: packet,
+    )
+    assert result["candidate_count"] == 1
+    assert result["signals"][0]["title"] == "Artificial Intelligence Software Deployment"

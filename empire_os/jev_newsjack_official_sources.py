@@ -86,10 +86,14 @@ def federal_register_signals(
             or type(max_results) is not int
             or not 1 <= max_results <= _MAX_RESULTS):
         raise ValueError("bounded public term and max_results required")
+    # Broad Federal Register full-text searches often return generic notices
+    # ahead of sector-specific titles. Scan bounded recent records, but only
+    # return the caller-approved small count after title/URL validation.
+    scan_limit = min(50, max(20, max_results * 6))
     query_url = _US_API + "?" + urlencode({
         "conditions[term]": term.strip(),
         "order": "newest",
-        "per_page": str(max_results),
+        "per_page": str(scan_limit),
     })
     payload = fetch_json(query_url)
     results = payload.get("results")
@@ -97,7 +101,21 @@ def federal_register_signals(
         raise SourceUnavailable("official_api_results_unavailable")
     signals = []
     rejected_generic = 0
-    for record in results[:max_results]:
+    seen_numbers = set()
+    # Avoid matching "intelligence" alone for the specific concept
+    # "artificial intelligence", or "heat" alone for "heat pump".
+    topic = term.casefold().strip()
+    words = topic.split()
+    if topic == "artificial intelligence":
+        pattern = re.compile(r"\b(?:artificial[\s-]+intelligence|ai)\b", re.I)
+    elif len(words) > 1:
+        pattern = re.compile(
+            r"\b" + r"[\s-]+".join(re.escape(w) for w in words)
+            + r"s?\b", re.I,
+        )
+    else:
+        pattern = re.compile(r"\b" + re.escape(topic) + r"\b", re.I)
+    for record in results[:scan_limit]:
         if not isinstance(record, Mapping):
             continue
         number, title = record.get("document_number"), record.get("title")
@@ -116,9 +134,11 @@ def federal_register_signals(
         # A general docket filing is NOT a sector-specific editorial discovery.
         if ("combined notice of filings" in title.lower()
                 or "notice of availability" in title.lower()
-                or not any(word.lower() in title.lower() for word in term.split())):
+                or not pattern.search(title)
+                or number in seen_numbers):
             rejected_generic += 1
             continue
+        seen_numbers.add(number)
         signals.append({
             **shared, "signal_id": "federal_register:" + number,
             "title": title.strip()[:220], "primary_source_url": url,
@@ -131,11 +151,15 @@ def federal_register_signals(
                 "number": number, "title": title, "url": url, "publication_date": pub,
             })],
         })
+        if len(signals) >= max_results:
+            break
     return {
         "schema_version": "empire.organic.official_source_intake.v1",
         "mode": "OBSERVE", "source": "us_federal_register",
         "source_url": query_url, "signals": signals,
         "candidate_count": len(signals),
+        "source_records_scanned": min(len(results), scan_limit),
+        "scan_limit": scan_limit,
         "generic_or_off_topic_filtered": rejected_generic,
         "unverified_claims_not_promoted": True,
         "note": "date-only official publications; future publication dates are held",

@@ -27,7 +27,13 @@ def main() -> int:
         "--media-os-review-preview", action="store_true",
         help="Include claimless, unsubmitted existing-MediaOS research handoff",
     )
+    parser.add_argument(
+        "--media-os-current-input",
+        help="Read current existing MediaOS research JSON for deduplicated intake preview",
+    )
     args = parser.parse_args()
+    if args.media_os_current_input and not args.media_os_review_preview:
+        parser.error("--media-os-current-input requires --media-os-review-preview")
 
     if args.federal_register_term:
         packet = federal_register_signals(
@@ -75,6 +81,21 @@ def main() -> int:
                 review, as_of=args.as_of,
             )
         )
+        if args.media_os_current_input:
+            from pathlib import Path
+            from empire_os.jev_newsjack_adapters import (
+                reconcile_official_news_media_os_intake,
+            )
+            source_file = Path(args.media_os_current_input)
+            if (not source_file.is_file() or source_file.is_symlink()
+                    or source_file.stat().st_size > 2_000_000):
+                parser.error("unsafe or oversized existing MediaOS input file")
+            current = json.loads(source_file.read_text(encoding="utf-8"))
+            report["media_os_intake_reconciliation"] = (
+                reconcile_official_news_media_os_intake(
+                    current, report["media_os_research_preview"],
+                )
+            )
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 

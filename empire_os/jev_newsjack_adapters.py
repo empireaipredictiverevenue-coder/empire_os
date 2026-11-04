@@ -167,6 +167,132 @@ def prepare_official_news_media_os_preview(
     }
 
 
+def reconcile_official_news_media_os_intake(
+    current_media_research: Mapping[str, Any],
+    newsjack_preview: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Pure, source-preserving intake preview; the MediaOS owner makes writes.
+
+    The canonical MediaOS research bridge has changed since this specialist
+    branch forked. Do not import or overwrite the old bridge source. This
+    function accepts the current bridge's *produced JSON envelope* instead.
+    """
+    if (not isinstance(current_media_research, Mapping)
+            or current_media_research.get("schema_version")
+            != "empire.media.research_candidates.v1"
+            or current_media_research.get("mode") != "OBSERVE"
+            or current_media_research.get("public_publish_authorized") is not False
+            or current_media_research.get("execution_authority") != "none"):
+        raise ValueError("current owner MediaOS research snapshot required")
+    original = current_media_research.get("candidates")
+    if not isinstance(original, list) or len(original) > 100:
+        raise ValueError("bounded existing MediaOS candidate list required")
+    if (not isinstance(newsjack_preview, Mapping)
+            or newsjack_preview.get("schema_version")
+            != "empire.organic.newsjack_media_os_preview.v1"
+            or newsjack_preview.get("mode") != "OBSERVE"
+            or newsjack_preview.get("media_os_queue_written") is not False
+            or newsjack_preview.get("verified_claim_count") != 0
+            or newsjack_preview.get("public_publish_authorized") is not False
+            or newsjack_preview.get("execution_authority") != "none"):
+        raise ValueError("unsubmitted NewsJack research preview required")
+    pending = newsjack_preview.get("research_packs")
+    if not isinstance(pending, list) or len(pending) > 20:
+        raise ValueError("bounded NewsJack research preview required")
+    seen_ids, seen_urls = set(), set()
+    for row in original:
+        if (not isinstance(row, Mapping)
+                or not isinstance(row.get("research_id"), str)
+                or row.get("script_ready") is not False
+                or row.get("public_publish_authorized") is not False
+                or row.get("claims") != []):
+            raise ValueError("existing candidate is not claimless research")
+        rid = row["research_id"]
+        if rid in seen_ids:
+            raise ValueError("duplicate existing MediaOS research ID")
+        seen_ids.add(rid)
+        sources = row.get("sources")
+        if not isinstance(sources, list) or len(sources) > 40:
+            raise ValueError("unexpected existing MediaOS source shape")
+        for source in sources:
+            if not isinstance(source, Mapping):
+                raise ValueError("unexpected existing source item")
+            url = _public_https(source.get("lineage_ref"))
+            if url:
+                seen_urls.add(url)
+    proposed, held = [], []
+    for raw in pending:
+        if not isinstance(raw, Mapping):
+            held.append("invalid_preview_item")
+            continue
+        rid = raw.get("research_id")
+        refs = raw.get("sources")
+        source = refs[0] if isinstance(refs, list) and len(refs) == 1 else {}
+        url = _public_https(source.get("lineage_ref")) if isinstance(source, Mapping) else None
+        host = urlsplit(url).hostname if url else None
+        sref = source.get("source_ref") if isinstance(source, Mapping) else None
+        path = urlsplit(url).path if url else ""
+        official = (
+            host == "www.gov.uk"
+            and path.startswith(("/guidance/", "/government/", "/statistics/"))
+            and isinstance(sref, str)
+            and sref.startswith("govuk:content_api:")
+        ) or (
+            host == "www.federalregister.gov"
+            and path.startswith("/documents/")
+            and isinstance(sref, str)
+            and sref.startswith("federalregister:api:")
+        )
+        if (not official
+                or not isinstance(rid, str) or not rid.startswith("media-research:")
+                or raw.get("schema_version") != "empire.media.research_pack.v1"
+                or raw.get("mode") != "OBSERVE"
+                or raw.get("claims") != []
+                or raw.get("script_ready") is not False
+                or raw.get("claim_verification_required") is not True
+                or raw.get("verified_claim_count") != 0
+                or raw.get("source_observations_are_verified_facts") is not False
+                or raw.get("automatic_script_generation_authorized") is not False
+                or raw.get("actual_revenue") is not False
+                or raw.get("public_publish_authorized") is not False
+                or raw.get("execution_authority") != "none"
+                or source.get("rights_state") != "RESEARCH_REFERENCE_ONLY"
+                or source.get("source_type") != "official_news_metadata_reference"
+                or raw.get("opportunity_class") != "news_editorial_research"):
+            held.append("untrusted_or_unsupported_news_preview")
+            continue
+        if rid in seen_ids or url in seen_urls:
+            held.append("already_present_in_existing_research")
+            continue
+        seen_ids.add(rid)
+        seen_urls.add(url)
+        proposed.append(dict(raw))
+    digest = sha256(json.dumps(
+        {"existing": original, "proposed": proposed},
+        sort_keys=True, default=str, separators=(",", ":"),
+    ).encode()).hexdigest()
+    return {
+        "schema_version": "empire.organic.newsjack_media_os_reconciliation.v1",
+        "mode": "OBSERVE",
+        "existing_candidate_count": len(original),
+        "proposed_newsjack_candidate_count": len(pending),
+        "new_research_candidate_count": len(proposed),
+        "held_newsjack_candidate_count": len(held),
+        "hold_reasons": held,
+        "merged_preview_candidate_count": len(original) + len(proposed),
+        "merged_preview_sha256": digest,
+        "new_research_packs": proposed,
+        "target_existing_owner": "media_os.research_bridge",
+        "media_os_input_written": False,
+        "source_research_is_not_factual_verification": True,
+        "verified_claim_count": 0,
+        "script_ready_count": 0,
+        "public_publish_authorized": False,
+        "external_action_performed": False,
+        "execution_authority": "none",
+    }
+
+
 def signals_from_last30days_agent_export(
     export: Mapping[str, Any], *, sector: str, market: str,
 ) -> dict[str, Any]:
