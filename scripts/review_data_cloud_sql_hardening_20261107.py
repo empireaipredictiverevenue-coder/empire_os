@@ -52,8 +52,10 @@ REVOKE ALL ON ALL TABLES IN SCHEMA empire_data_cloud_api FROM empire_data_cloud_
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA empire_data_cloud_api FROM empire_data_cloud_meter_login;
 GRANT USAGE ON SCHEMA empire_data_cloud_api TO empire_data_cloud_meter_login;
 GRANT EXECUTE ON FUNCTION empire_data_cloud_api.authenticate(text) TO empire_data_cloud_meter_login;
-GRANT EXECUTE ON FUNCTION empire_data_cloud_api.reserve(text,text,text,text,text) TO empire_data_cloud_meter_login;
-GRANT EXECUTE ON FUNCTION empire_data_cloud_api.settle(text,bigint,text,bigint,text) TO empire_data_cloud_meter_login;
+-- Founder usage-only pilot: this runtime role MUST NOT reserve or settle.
+-- Future write-capable customer routes require a distinct DBA-reviewed role.
+REVOKE ALL ON FUNCTION empire_data_cloud_api.reserve(text,text,text,text,text) FROM empire_data_cloud_meter_login;
+REVOKE ALL ON FUNCTION empire_data_cloud_api.settle(text,bigint,text,bigint,text) FROM empire_data_cloud_meter_login;
 GRANT EXECUTE ON FUNCTION empire_data_cloud_api.usage_snapshot(text) TO empire_data_cloud_meter_login;
 ALTER DEFAULT PRIVILEGES FOR ROLE empire_data_cloud_api_owner
  IN SCHEMA empire_data_cloud_api REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;

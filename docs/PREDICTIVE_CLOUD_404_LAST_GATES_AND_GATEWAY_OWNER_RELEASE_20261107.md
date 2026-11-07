@@ -25,7 +25,7 @@
 
 ## Exact prepared SQL
 - Review-only path `docs/release_candidates/empire_data_cloud_meter_pg18_review_only_20261107.sql`.
-- SHA256 `32d4c5c680b9be8021422c9173f662175ae42b1eaef1fb82205c06e1a3684e53`.
+- SHA256 `d20b0980c5e2d1348e7e0ecdcfa3fe021fc82b6bd1983750f37b2bf9b9ad8393`.
 - Non-login, non-superuser function owner; metering role is initially **NOLOGIN** and has no direct table SELECT; scoped function EXECUTE only. Qualified DBA must independently accept the exact DDL, provision a separate securely held LOGIN/credential and confirm `session_user` from the customer API's production DB pool. Synthetic test role switching is not a production credential.
 - Original customer API candidate archive SHA256 `718e752945abd27a20ca28f168f8e20e3b7fe0011151a1a270af76cd0c090ff5`; original API package must be provided to the original owner release through hash-pinned import staging, not recreated from mocks.
 - Separate Data Cloud signing issuer/private key custody and pinned public verifier remain pending genuine production owner configuration; no CRM signing-key reuse.
@@ -45,3 +45,19 @@ The existing route assembly now accepts `usage_only=True`, which copies **only t
 **Pilot remaining real blockers:** independent DBA acceptance and approved provisioning of exact SQL and least-privileged metering LOGIN; current live protected issuer/public-key verifier and entitled founder account; owner mutation lease and original gateway rollback. The original candidate archive must be hash-staged for the serving original owner; do not substitute the synthetic test endpoint.
 
 **Current decision:** `FOUNDER_USAGE_PILOT_APPROVED_BUT_DBA_AND_LIVE_GATEWAY_INTEGRATION_PENDING`. Local restore PASS. Full commercial release remains held on distinct off-host/rights/customer terms. Do not imply live 404 fixed without actual served HTTP evidence.
+
+## DBA review defect resolved in this existing candidate (7 Nov late review)
+
+The original draft SQL `32d4c5c6...` accidentally granted the founder pilot runtime role permission to execute write-capable `reserve` and `settle` functions. The independently logged DBA *pre-review* correctly flagged this. The previous draft SHA is **superseded**, not accepted or applied.
+
+**Current exact SQL SHA256:** `d20b0980c5e2d1348e7e0ecdcfa3fe021fc82b6bd1983750f37b2bf9b9ad8393`. Its existing founder-only runtime role has `USAGE` on schema and `EXECUTE` on `authenticate` + `usage_snapshot` only; writer functions are explicitly denied. Full commercial write operations will need separate original-owner DBA role review. This is a revision of the existing SQL candidate, **not** a new production migration.
+
+**Verified real disposable PostgreSQL 18 (UTF8 matching canonical EmpireDB):**
+- The candidate compiled and the direct SQL privileges check proved write-function EXECUTE denied while two read-functions remained permitted.
+- Full isolated quota/host/cost-integrity tests passed; 3 concurrent reservations admitted and 17 rejected under the cap, run under disposable DBA-only context, **not** the founder runtime account.
+- The **original** API handler from the hash-pinned source package was mounted through the existing founder session verifier; connected to an actual disposable PostgreSQL 18 socket using the dedicated role temporarily enabled as LOGIN **only in the disposable cluster**.
+- Observed HTTP 200 for two independent credentials and a genuine SQL-backed usage snapshot; 401 with incomplete/bad credentials, 403 when founder entitlement was revoked; unrelated route remained reachable; search and audit routes were not mounted; direct DB write-function call returned permission denied.
+- Disposable PostgreSQL instance was stopped and removed on exit. **0 production DB connections, 0 production SQL, 0 production gateway restarts, 0 provider calls, 0 billing**.
+- Initial disposable cluster defaulted to `SQL_ASCII` and caused a 503 role-proof mismatch through byte-valued text; confirmed production DB uses `UTF8`, then reran with `initdb -E UTF8` and passed. The original adapter was **not rewritten** to hide a test-environment mismatch.
+
+**Exact remaining owner decisions:** independent DBA accepts new SQL digest and production credential/rollback; actual protected CRM issuer and public gateway owner activates and proves live HTTP result. The founder already approved internal usage-only pilot; off-host physical recovery remains a post-pilot milestone. No additional founder approval or new platform is needed.

@@ -15,7 +15,7 @@ def test_source_pinned_before_hardening():
 
 def test_hardened_ddl_matches_exact_source_and_sha():
     candidate=mod.render(mod.ORIGINAL.read_text())
-    assert hashlib.sha256(candidate.encode()).hexdigest()=="32d4c5c680b9be8021422c9173f662175ae42b1eaef1fb82205c06e1a3684e53"
+    assert hashlib.sha256(candidate.encode()).hexdigest()=="d20b0980c5e2d1348e7e0ecdcfa3fe021fc82b6bd1983750f37b2bf9b9ad8393"
     pinned=Path(__file__).resolve().parents[1]/"docs/release_candidates/empire_data_cloud_meter_pg18_review_only_20261107.sql"
     assert pinned.read_bytes()==candidate.encode()
     assert "CREATE ROLE empire_data_cloud_api_owner NOLOGIN" in candidate
@@ -26,6 +26,11 @@ def test_hardened_ddl_matches_exact_source_and_sha():
     assert "p_reported_cost_micros IS NULL OR p_evidence_ref IS NULL" in candidate
     assert "GRANT USAGE ON SCHEMA empire_data_cloud_api TO empire_data_cloud_meter_login;" in candidate
     assert "GRANT SELECT ON" not in candidate
+    assert "GRANT EXECUTE ON FUNCTION empire_data_cloud_api.reserve(" not in candidate
+    assert "GRANT EXECUTE ON FUNCTION empire_data_cloud_api.settle(" not in candidate
+    assert "REVOKE ALL ON FUNCTION empire_data_cloud_api.reserve(text,text,text,text,text) FROM empire_data_cloud_meter_login;" in candidate
+    assert "REVOKE ALL ON FUNCTION empire_data_cloud_api.settle(text,bigint,text,bigint,text) FROM empire_data_cloud_meter_login;" in candidate
+    assert candidate.count("GRANT EXECUTE ON FUNCTION") == 2
     assert "COMMIT;" in candidate
 
 def test_any_baseline_drift_fails_before_write():
