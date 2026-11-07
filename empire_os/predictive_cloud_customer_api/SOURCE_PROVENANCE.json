@@ -1,0 +1,22 @@
+{
+  "converted_sha256": {
+    "durable_api.py": "3f13664568feeae12cd39571ab716547a07ac15e5e806a44ac531943e59a18be",
+    "durable_store.py": "569234de9bad6ddbb232dd91fb9758f45f077da4297707963fe838181ad22fd1",
+    "empiredb_metering_adapter.py": "e958744d2d2a6b4edf58e002d23bccfd9536c5a6e94243df8d9fe53d61741d44",
+    "gateway_candidate_entrypoint.py": "78feae2ea46e23fd494c6232f49b9ed78b33ff6769d18657ccb98e30be72400c",
+    "private_api.py": "a9586b6c2363c6d4fafc5d242040d4b5f90c386b90b6387fff099b5cdf287846"
+  },
+  "customer_delivery_authorized": false,
+  "only_import_rewrites": true,
+  "original_source_sha256": {
+    "durable_api.py": "cb1822483218cd6fc276640e4b6f843869edc9030e59888c8175ef96a8f76568",
+    "durable_store.py": "569234de9bad6ddbb232dd91fb9758f45f077da4297707963fe838181ad22fd1",
+    "empiredb_metering_adapter.py": "81a108cd204a799b804a2f1d7dc33b9bc1a33b6e03efa8a5e3728aeada8a3eb2",
+    "gateway_candidate_entrypoint.py": "23e8daa3702268cccfa269cd5bda2fd2e676f0dbfd707cf8a4ceb144eb56eeb4",
+    "private_api.py": "a9586b6c2363c6d4fafc5d242040d4b5f90c386b90b6387fff099b5cdf287846"
+  },
+  "production_migration": false,
+  "public_gateway_activation": false,
+  "source_archive_sha256": "718e752945abd27a20ca28f168f8e20e3b7fe0011151a1a270af76cd0c090ff5",
+  "source_pack_sha256": "8582b01eb80fcf32359ea6c83a4a2b15859a9ee8832995562b9b0d4fcfe56ced"
+}
