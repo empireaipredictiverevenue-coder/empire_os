@@ -120,11 +120,16 @@ class DataCloudFounderAuthority(DataCloudPublicVerifier):
         return {"access_token":token,"token_type":"Bearer","expires_in":TOKEN_TTL,"scope":SCOPE}
 
 
-def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,expose_exchange:bool=False):
+def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,
+                           expose_exchange:bool=False,customer_paths:frozenset[str]|None=None):
     """Existing gateway attaches verification only; protected issuer may expose exchange."""
     if not isinstance(authority,DataCloudPublicVerifier):raise ValueError("public verifier missing")
     if expose_exchange and not isinstance(authority,DataCloudFounderAuthority):
         raise ValueError("public gateway cannot expose token issuer")
+    supported=frozenset({"/v1/data/usage","/v1/data/search","/v1/data/site-audits"})
+    allowed=supported if customer_paths is None else customer_paths
+    if not isinstance(allowed,frozenset) or not allowed or not allowed.issubset(supported):
+        raise ValueError("unexpected_customer_auth_scope")
     router=APIRouter(prefix="/v1/data/auth",tags=["data-cloud-founder-auth"])
     @router.post("/exchange")
     def exchange(authorization:str|None=Header(default=None)):
@@ -139,8 +144,7 @@ def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,expo
     @host.middleware("http")
     async def verified_session(request:Request,call_next):
         path=request.url.path
-        customer_paths=frozenset({"/v1/data/usage","/v1/data/search","/v1/data/site-audits"})
-        if path in customer_paths:
+        if path in allowed:
             state=request.scope.setdefault("state",{})
             if not isinstance(state,dict):return JSONResponse({"detail":"invalid_state"},status_code=401)
             state.pop("empire_verified_principal",None)
@@ -153,7 +157,7 @@ def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,expo
             except (ValueError,TypeError,KeyError):return JSONResponse({"detail":"invalid_data_session"},status_code=401,
                                                                         headers={"Cache-Control":"no-store"})
         response=await call_next(request)
-        if path in customer_paths or path=="/v1/data/auth/exchange":
+        if path in allowed or path=="/v1/data/auth/exchange":
             response.headers["Cache-Control"]="no-store"
             response.headers["X-Content-Type-Options"]="nosniff"
         return response

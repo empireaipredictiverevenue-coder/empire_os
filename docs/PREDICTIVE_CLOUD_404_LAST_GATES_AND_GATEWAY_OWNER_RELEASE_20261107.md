@@ -37,4 +37,11 @@
 4. Operate one authenticated, cost-capped genuine founder request with two independent tokens (CRM-verified Data Cloud session plus metered API key), inspect SQL reservation and tenant-bound usage. Verify unauthenticated 401 and held 403, idempotency 409, capped 429, provider-rights 503. Search/crawl, unauthorised source resale, paid provider requests, third-party customers and billing stay OFF.
 5. Verify served origin route and regression of unrelated gateways, return `LIVE_FOUNDER_CANARY_VERIFIED` only with real receipts; rollback atomically on any unexpected result.
 
-**Current decision:** `PRODUCTION_HOLD_OFFHOST_PHYSICAL_DR_AND_DBA_ACCEPTANCE`. Local restore PASS does not grant release authority. The founder's approval is preserved and exact implementation is staged.
+## Founder scope amendment — 7 November (usage-only pilot)
+The founder explicitly approved moving **off-host disaster recovery to a post-pilot milestone** while retaining DBA acceptance, verified local restore/rollback, founder-only identity and live HTTP checks. This supersedes the off-host prerequisite **only** for the internal `GET /v1/data/usage` pilot. Commercial/customer API, external search, site audits, billing and automated paid provider calls remain OFF and continue to require their own full approvals.
+
+The existing route assembly now accepts `usage_only=True`, which copies **only the original usage endpoint** from the exact three-route candidate. It validates `USAGE_PILOT_REQUIREMENTS` without falsely marking offhost recovery, source-rights approval or the live founder canary complete. It does **not** insert search or site-audit routes, and preserves unrelated owner gateway routes.
+
+**Pilot remaining real blockers:** independent DBA acceptance and approved provisioning of exact SQL and least-privileged metering LOGIN; current live protected issuer/public-key verifier and entitled founder account; owner mutation lease and original gateway rollback. The original candidate archive must be hash-staged for the serving original owner; do not substitute the synthetic test endpoint.
+
+**Current decision:** `FOUNDER_USAGE_PILOT_APPROVED_BUT_DBA_AND_LIVE_GATEWAY_INTEGRATION_PENDING`. Local restore PASS. Full commercial release remains held on distinct off-host/rights/customer terms. Do not imply live 404 fixed without actual served HTTP evidence.

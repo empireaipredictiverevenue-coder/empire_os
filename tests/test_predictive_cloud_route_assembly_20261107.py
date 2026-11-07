@@ -10,7 +10,8 @@ from empire_os.predictive_cloud_founder_session import (
 )
 from empire_os.predictive_cloud_gateway_attestation import verify_gateway_attestation
 from empire_os.predictive_cloud_route_assembly import (
-    attach_existing_customer_routes, CUSTOMER_ROUTES, RELEASE_REQUIREMENTS, inspect_routes,
+    attach_existing_customer_routes, CUSTOMER_ROUTES, RELEASE_REQUIREMENTS,
+    USAGE_PILOT_REQUIREMENTS, USAGE_ROUTE, inspect_routes,
 )
 from empire_os.saas_scale import TenantMembership
 from empire_os.revenue_crm_signed_auth import SignedCrmTenantVerifier
@@ -157,3 +158,62 @@ def test_live_gateway_rejects_late_mount_before_mutating_routes(components):
             attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence())
         assert inspect_routes(host)==before
         assert len(host.user_middleware)==0
+
+def test_founder_only_usage_pilot_without_deferred_offhost_dr(components):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    @host.get("/v1/data/existing-owner")
+    def existing():return {"status":"preserved"}
+    accepted={k:True for k in USAGE_PILOT_REQUIREMENTS}
+    # Deferred obligations must never be treated as prerequisites for the
+    # read-only founder pilot, and must never enable search/site audits.
+    accepted["offhost_physical_recovery_verified"]=False
+    accepted["source_egress_and_rights_reviewed"]=False
+    accepted["founder_only_pilot_verified"]=False
+    names=attach_existing_customer_routes(host,candidate(),verifier,
+                release_evidence=lambda:accepted,usage_only=True)
+    assert names==("/v1/data/usage",)
+    assert inspect_routes(host) & CUSTOMER_ROUTES==frozenset({USAGE_ROUTE})
+    with TestClient(host) as client:
+        assert client.get("/v1/data/usage").status_code==401
+        assert client.get("/v1/data/usage",headers={"X-Empire-Data-Session":token()}).status_code==200
+        assert client.get("/v1/data/existing-owner").json()=={"status":"preserved"}
+        assert client.post("/v1/data/search").status_code==404
+        assert client.post("/v1/data/site-audits").status_code==404
+        state["entitled"]=False
+        assert client.get("/v1/data/usage",headers={"X-Empire-Data-Session":token()}).status_code==403
+
+
+@pytest.mark.parametrize("missing",sorted(USAGE_PILOT_REQUIREMENTS))
+def test_usage_pilot_cannot_bypass_real_safety_checks(components,missing):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    accepted={k:True for k in USAGE_PILOT_REQUIREMENTS}
+    accepted[missing]=False
+    with pytest.raises(RuntimeError,match="release_preflight"):
+        attach_existing_customer_routes(host,candidate(),verifier,
+            release_evidence=lambda:accepted,usage_only=True)
+    assert not (inspect_routes(host) & CUSTOMER_ROUTES)
+    assert len(host.user_middleware)==0
+
+
+def test_usage_pilot_ignores_unrelated_existing_customer_routes(components):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    @host.post("/v1/data/search")
+    def owner_search():return {"separate":True}
+    attached=attach_existing_customer_routes(host,candidate(),verifier,
+        release_evidence=lambda:{k:True for k in USAGE_PILOT_REQUIREMENTS},usage_only=True)
+    assert attached==("/v1/data/usage",)
+    with TestClient(host) as client:
+        assert client.post("/v1/data/search").json()=={"separate":True}
+
+
+def test_full_customer_launch_still_requires_offhost_dr(components):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    accepted={k:True for k in RELEASE_REQUIREMENTS}
+    accepted["offhost_physical_recovery_verified"]=False
+    with pytest.raises(RuntimeError,match="release_preflight"):
+        attach_existing_customer_routes(host,candidate(),verifier,
+            release_evidence=lambda:accepted,usage_only=False)
