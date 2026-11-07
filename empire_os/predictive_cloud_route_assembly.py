@@ -26,6 +26,12 @@ RELEASE_REQUIREMENTS=frozenset({
     "production_meter_functions_verified",
     "source_egress_and_rights_reviewed",
     "rollback_preflight_verified",
+    "fresh_local_restore_receipt_verified",
+    "offhost_physical_recovery_verified",
+    "dba_sql_and_acl_acceptance_verified",
+    "existing_gateway_rollback_verified",
+    "founder_only_pilot_verified",
+    "billing_and_paid_provider_calls_disabled",
 })
 
 def inspect_routes(app:FastAPI)->frozenset[tuple[str,str]]:
@@ -57,6 +63,8 @@ def attach_existing_customer_routes(
         raise RuntimeError("data_cloud_release_preflight_failed")
     if getattr(host.state,"data_cloud_routes_attached",False):
         raise RuntimeError("data_cloud_routes_already_attached")
+    if getattr(host,"middleware_stack",None) is not None:
+        raise RuntimeError("gateway_must_be_assembled_before_startup")
     candidate=inspect_routes(original_customer_candidate)
     if candidate != CUSTOMER_ROUTES:
         raise RuntimeError("unexpected_customer_api_route_contract")
@@ -68,7 +76,10 @@ def attach_existing_customer_routes(
     # The original candidate must independently enforce metering, key binding
     # and safe-site egress. Its FastAPI middleware does not survive route copy.
     # Data session middleware is attached to this EXISTING gateway.
-    host.router.routes.extend(routes)
+    # Register the trusted verifier before adding endpoints. Starlette rejects
+    # middleware mutation after startup; the preflight above prevents a half-
+    # mounted customer API on a running gateway.
     attach_founder_session(host,public_verifier,expose_exchange=False)
+    host.router.routes.extend(routes)
     host.state.data_cloud_routes_attached=True
     return tuple(sorted(path for path,method in CUSTOMER_ROUTES))

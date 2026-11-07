@@ -114,3 +114,46 @@ def test_cannot_attach_twice(components):
     attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence())
     with pytest.raises(RuntimeError,match="already_attached"):
         attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence())
+
+def test_does_not_intercept_other_data_owner_routes(components):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    @host.get("/v1/data/other-owner-health")
+    def untouched():return {"other_owner":"preserved"}
+    attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence())
+    with TestClient(host) as client:
+        result=client.get("/v1/data/other-owner-health")
+        assert result.status_code==200,result.text
+        assert result.json()=={"other_owner":"preserved"}
+        result=client.get("/v1/data/other-owner-health",headers={"X-Empire-Data-Session":"invalid"})
+        assert result.status_code==200,result.text
+
+
+@pytest.mark.parametrize("missing",[
+    "fresh_local_restore_receipt_verified",
+    "offhost_physical_recovery_verified",
+    "dba_sql_and_acl_acceptance_verified",
+    "existing_gateway_rollback_verified",
+    "founder_only_pilot_verified",
+    "billing_and_paid_provider_calls_disabled",
+])
+def test_real_release_requirements_cannot_be_bypassed(components,missing):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    before=inspect_routes(host)
+    with pytest.raises(RuntimeError,match="release_preflight"):
+        attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence({missing:False}))
+    assert inspect_routes(host)==before
+    assert len(host.user_middleware)==0
+
+
+def test_live_gateway_rejects_late_mount_before_mutating_routes(components):
+    verifier,state,candidate,evidence,token=components
+    host=FastAPI()
+    with TestClient(host) as client:
+        assert client.get("/health").status_code==404
+        before=inspect_routes(host)
+        with pytest.raises(RuntimeError,match="before_startup"):
+            attach_existing_customer_routes(host,candidate(),verifier,release_evidence=evidence())
+        assert inspect_routes(host)==before
+        assert len(host.user_middleware)==0

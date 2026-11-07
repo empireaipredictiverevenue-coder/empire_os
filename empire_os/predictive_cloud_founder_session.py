@@ -139,7 +139,8 @@ def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,expo
     @host.middleware("http")
     async def verified_session(request:Request,call_next):
         path=request.url.path
-        if path.startswith("/v1/data/") and path!="/v1/data/auth/exchange":
+        customer_paths=frozenset({"/v1/data/usage","/v1/data/search","/v1/data/site-audits"})
+        if path in customer_paths:
             state=request.scope.setdefault("state",{})
             if not isinstance(state,dict):return JSONResponse({"detail":"invalid_state"},status_code=401)
             state.pop("empire_verified_principal",None)
@@ -152,7 +153,7 @@ def attach_founder_session(host:FastAPI,authority:DataCloudPublicVerifier,*,expo
             except (ValueError,TypeError,KeyError):return JSONResponse({"detail":"invalid_data_session"},status_code=401,
                                                                         headers={"Cache-Control":"no-store"})
         response=await call_next(request)
-        if path.startswith("/v1/data/"):
+        if path in customer_paths or path=="/v1/data/auth/exchange":
             response.headers["Cache-Control"]="no-store"
             response.headers["X-Content-Type-Options"]="nosniff"
         return response
