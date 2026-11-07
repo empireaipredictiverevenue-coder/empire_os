@@ -145,9 +145,11 @@ def identity_preflight() -> dict:
         raise RuntimeError("read_only_function_acl_not_verified")
     if postgres("SELECT (SELECT count(*) FROM empire_data_cloud_api.tenants),(SELECT count(*) FROM empire_data_cloud_api.api_keys),(SELECT count(*) FROM empire_data_cloud_api.usage_requests);") != "0|0|0":
         raise RuntimeError("pilot_database_admissions_already_present")
-    founders = postgres("""SELECT user_id::text||'|'||tenant_id::text
+    founders = postgres("""SELECT subject::text||'|'||tenant_id::text
         FROM public.empire_crm_tenant_memberships
-        WHERE role='owner' AND status='active' ORDER BY user_id;""").splitlines()
+        WHERE role='owner' AND status='active'
+          AND revoked_at IS NULL AND (valid_until IS NULL OR valid_until>now())
+        ORDER BY subject;""").splitlines()
     if len(founders) != 1 or "|" not in founders[0]:
         raise RuntimeError("exact_one_existing_active_crm_owner_required")
     actor, tenant = founders[0].split("|", 1)
@@ -467,11 +469,19 @@ def main():
     parser=argparse.ArgumentParser()
     mode=parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--inspect-read-only",action="store_true")
+    mode.add_argument("--preflight-read-only",action="store_true")
     mode.add_argument("--apply-founder-approved",action="store_true")
     mode.add_argument("--rollback-founder-approved",action="store_true")
     args=parser.parse_args()
     if args.inspect_read_only:
         inspect()
+    elif args.preflight_read_only:
+        pre = identity_preflight()
+        print("FOUNDER_ONLY_ACTIVATION_PREFLIGHT_PASS=true")
+        print("ACTIVE_FOUNDER_COUNT=1")
+        print("DB_MIGRATION_ALREADY_APPLIED=true")
+        print("SERVICE_BASELINES_VERIFIED=true")
+        print("PRODUCTION_WRITES=0; RESTARTS=0; SECRETS_ISSUED=0")
     elif args.apply_founder_approved:
         # Single execution lock for the existing founder-approved Data Cloud
         # domain; fail closed if another activation attempt is in progress.

@@ -117,3 +117,18 @@ def test_original_source_provenance_is_preserved():
     assert manifest["only_import_rewrites"] is True
     assert manifest["public_gateway_activation"] is False
     assert manifest["production_migration"] is False
+
+
+
+def test_actual_existing_crm_owner_column_and_preflight_safe_mode():
+    src = SCRIPT.read_text()
+    assert "SELECT subject::text||'|'||tenant_id::text" in src
+    assert "FROM public.empire_crm_tenant_memberships" in src
+    assert "ORDER BY subject;" in src
+    assert "SELECT user_id::text" not in src
+    assert "revoked_at IS NULL" in src
+    assert "(valid_until IS NULL OR valid_until>now())" in src
+    assert 'mode.add_argument("--preflight-read-only"' in src
+    assert 'elif args.preflight_read_only:' in src
+    assert 'pre = identity_preflight()' in src
+    assert 'PRODUCTION_WRITES=0; RESTARTS=0; SECRETS_ISSUED=0' in src
