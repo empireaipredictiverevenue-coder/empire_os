@@ -61,3 +61,17 @@ The original draft SQL `32d4c5c6...` accidentally granted the founder pilot runt
 - Initial disposable cluster defaulted to `SQL_ASCII` and caused a 503 role-proof mismatch through byte-valued text; confirmed production DB uses `UTF8`, then reran with `initdb -E UTF8` and passed. The original adapter was **not rewritten** to hide a test-environment mismatch.
 
 **Exact remaining owner decisions:** independent DBA accepts new SQL digest and production credential/rollback; actual protected CRM issuer and public gateway owner activates and proves live HTTP result. The founder already approved internal usage-only pilot; off-host physical recovery remains a post-pilot milestone. No additional founder approval or new platform is needed.
+
+## Founder-approved bounded activation — existing services only
+
+Founder explicitly approved private credential provisioning and guarded restart of the existing CRM issuer and public gateway. The migration has already been independently verified on production PostgreSQL 18.6; **DO NOT rerun the DDL**. Original production metering privileges are read-only: `authenticate` and `usage_snapshot` permitted, `reserve` and `settle` denied.
+
+An additive, versioned operator command is staged in this SAME review PR:
+`scripts/activate_data_cloud_founder_usage_20261107.py`.
+It verifies the exact reviewed source/restore receipts, existing single owner identity, empty new metering tables, unmodified owner systemd overlay chain, current CRM private membership configuration, and both services' original health. On successful checks it provisions only a separate randomly generated API key and least-privilege metering LOGIN, fresh separate Data Cloud Ed25519 signer via **private CRM systemd LoadCredential**, approved founder tenant, and **only** the original customer GET `/v1/data/usage` in the existing port-80 app; existing private CRM gets only POST `/v1/data/auth/exchange`. No new service, account system, searching, site audit, billing or paid provider. The existing runtime package, base entrypoint and other owners' drop-ins are preserved.
+
+The public process receives only the separate Data Cloud public verification key and restricted meter DB credential, **not** the private Data Cloud signing key. The founder's existing CRM login/membership reader remains the identity authority. The installer stores secrets in private OS paths, never the repository or output. It installs only additive owner-scoped versioned systemd overlays. On any failure it removes only those two new overlays, restarts the original two services and disables the pilot meter login/key/tenant. The schema stays intact.
+
+A real live **operator-signed loopback canary** is tested with genuine PostgreSQL metering and real founder membership, but **is not a substitute for independently verifying the founder's actual CRM login-to-exchange flow**. That final first-party login test remains required before calling the overall pilot verified. The original web route and HTTP 200 are not claimed live until the installer produces its private release receipt. Off-host physical DR remains a post-pilot milestone.
+
+**Execution:** run the installed exact reviewed script once as the authorised root operator with `--apply-founder-approved`. Its `--inspect-read-only` and `--rollback-founder-approved` modes share the same current service architecture. Report only the redacted receipt and live origin status; never paste API keys, signers, passwords, tokens or DSNs into chat.
