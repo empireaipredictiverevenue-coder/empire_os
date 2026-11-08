@@ -181,6 +181,15 @@ def identity_preflight(*, resuming: bool = False) -> dict:
         raise RuntimeError("baseline_service_health_failed")
     if http("/v1/data/usage",80)[0] != 404 or http("/v1/data/auth/exchange",8783)[0] != 404:
         raise RuntimeError("existing_owner_data_route_collision")
+    # EmpireDB revokes database CONNECT from PUBLIC. The pilot currently
+    # owns no CONNECT grant; its only missing authority must be this single
+    # database privilege. Never silently broaden CREATE or TEMP privileges.
+    current_db_acl=postgres("""SELECT
+        has_database_privilege('empire_data_cloud_meter_login','empiredb','CONNECT'),
+        has_database_privilege('empire_data_cloud_meter_login','empiredb','CREATE'),
+        has_database_privilege('empire_data_cloud_meter_login','empiredb','TEMPORARY');""")
+    if current_db_acl!="f|f|f":
+        raise RuntimeError("founder_pilot_database_privilege_drift")
     if postgres("SHOW listen_addresses;") != "127.0.0.1":
         raise RuntimeError("meter_loopback_postgresql_not_available")
     loopback=postgres("SELECT count(*) FROM pg_hba_file_rules WHERE type='host' AND address='127.0.0.1' AND auth_method='scram-sha-256' AND error IS NULL;")
@@ -302,6 +311,17 @@ ExecStart=/srv/empire_os/.venv/bin/uvicorn data_cloud_private_entrypoint_2026110
     atomic_file(PUB_OVERLAY,pub.encode(),0o644)
 
 
+def verify_meter_database_connect_only():
+    # EmpireDB explicitly revokes CONNECT from PUBLIC. This one role gets
+    # precisely CONNECT, never CREATE or TEMPORARY, with no new table grants.
+    acl=postgres("""SELECT
+      has_database_privilege('empire_data_cloud_meter_login','empiredb','CONNECT'),
+      has_database_privilege('empire_data_cloud_meter_login','empiredb','CREATE'),
+      has_database_privilege('empire_data_cloud_meter_login','empiredb','TEMPORARY');""")
+    if acl!="t|f|f":
+        raise RuntimeError("meter_database_connect_only_grant_not_verified")
+
+
 def admit_db(pre: dict,password:str,key:str):
     # Password is cryptographically random URL-safe characters, not user input.
     if not re.fullmatch(r"[A-Za-z0-9_-]{32,128}",password):
@@ -316,6 +336,7 @@ def admit_db(pre: dict,password:str,key:str):
 SET LOCAL lock_timeout='5s';
 SET LOCAL statement_timeout='30s';
 ALTER ROLE empire_data_cloud_meter_login LOGIN PASSWORD '{password}';
+GRANT CONNECT ON DATABASE empiredb TO empire_data_cloud_meter_login;
 INSERT INTO empire_data_cloud_api.tenants
  (tenant_id,active,held,monthly_request_cap,monthly_cost_cap_micros,
  search_cost_ceiling_micros,audit_cost_ceiling_micros,allowed_operations,allowed_hosts)
@@ -325,6 +346,7 @@ INSERT INTO empire_data_cloud_api.api_keys(token_sha256,tenant_id,active,expires
 COMMIT;
 """
     postgres(statements)
+    verify_meter_database_connect_only()
     # Prove actual password authentication as the dedicated restricted login.
     import psycopg
     with psycopg.connect(dbname="empiredb",user="empire_data_cloud_meter_login",
@@ -366,6 +388,7 @@ def hold_database():
          UPDATE empire_data_cloud_api.api_keys SET active=false
               WHERE tenant_id='{tenant}' AND token_sha256='{token_hash}';
          ALTER ROLE empire_data_cloud_meter_login NOLOGIN;
+         REVOKE CONNECT ON DATABASE empiredb FROM empire_data_cloud_meter_login;
          COMMIT;""")
         return True
     except Exception:
@@ -566,7 +589,9 @@ def resume_existing_database(pre:dict,cfg:dict,key:str):
       UPDATE empire_data_cloud_api.api_keys SET active=true
          WHERE token_sha256='{digest_key}' AND tenant_id='{tenant}' AND active=false;
       ALTER ROLE empire_data_cloud_meter_login LOGIN;
+      GRANT CONNECT ON DATABASE empiredb TO empire_data_cloud_meter_login;
       COMMIT;""")
+    verify_meter_database_connect_only()
     import psycopg
     with psycopg.connect(dbname="empiredb",user="empire_data_cloud_meter_login",
                          host="127.0.0.1",port=5432,password=cfg["meter_password"],

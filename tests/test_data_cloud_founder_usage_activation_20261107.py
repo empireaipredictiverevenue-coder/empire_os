@@ -324,3 +324,61 @@ def test_rollback_removes_only_our_two_overlays_and_restores_services(
     assert calls==["hold",("systemctl","daemon-reload"),
         ("systemctl","restart",install_module.CRM_SVC),
         ("systemctl","restart",install_module.PUB_SVC)]
+
+
+def test_existing_database_connect_is_the_only_added_database_privilege():
+    source = SCRIPT.read_text()
+    connect_grant = "GRANT CONNECT ON DATABASE empiredb TO empire_data_cloud_meter_login;"
+    connect_revoke = "REVOKE CONNECT ON DATABASE empiredb FROM empire_data_cloud_meter_login;"
+    assert source.count(connect_grant) == 2  # original admission and exact resume
+    assert source.count(connect_revoke) == 1  # fail-closed rollback
+    assert source.count("verify_meter_database_connect_only()") == 3
+    assert "founder_pilot_database_privilege_drift" in source
+    assert "ALTER ROLE empire_data_cloud_meter_login LOGIN;" in source
+    assert "GRANT ALL ON DATABASE" not in source
+    assert "GRANT CREATE ON DATABASE" not in source
+    assert "GRANT TEMPORARY ON DATABASE" not in source
+
+
+@pytest.mark.parametrize(
+    ("acl","allowed"),
+    [
+        ("t|f|f",True),
+        ("f|f|f",False),
+        ("t|t|f",False),
+        ("t|f|t",False),
+        ("t|t|t",False),
+    ],
+)
+def test_meter_db_grant_reader_fails_closed_on_extra_privileges(
+    install_module,monkeypatch,acl,allowed
+):
+    monkeypatch.setattr(install_module,"postgres",lambda sql:acl)
+    if allowed:
+        install_module.verify_meter_database_connect_only()
+    else:
+        with pytest.raises(RuntimeError,match="meter_database_connect_only_grant_not_verified"):
+            install_module.verify_meter_database_connect_only()
+
+
+def test_resume_does_not_connect_when_exact_db_acl_is_wrong(install_module,monkeypatch):
+    import psycopg
+    calls=[]
+    def sql_runner(sql):
+        calls.append(sql)
+        if sql.startswith("BEGIN;"):
+            return ""
+        return "f|f|f"
+    monkeypatch.setattr(install_module,"postgres",sql_runner)
+    monkeypatch.setattr(
+        psycopg,"connect",
+        lambda **kwargs:pytest.fail("driver_connect_must_follow_exact_db_acl_check"),
+    )
+    with pytest.raises(RuntimeError,match="meter_database_connect_only_grant_not_verified"):
+        install_module.resume_existing_database(
+            {"tenant":"11111111-2222-4333-8444-555555555555"},
+            {"meter_password":"synthetic-only"}, "synthetic-only-test-key",
+        )
+    assert len(calls)==2
+    assert "GRANT CONNECT ON DATABASE empiredb TO empire_data_cloud_meter_login;" in calls[0]
+    assert "ALTER ROLE empire_data_cloud_meter_login LOGIN;" in calls[0]
