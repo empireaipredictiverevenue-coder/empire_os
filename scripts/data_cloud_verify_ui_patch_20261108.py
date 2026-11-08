@@ -134,8 +134,23 @@ def build_verified_routes(app: FastAPI) -> None:
     original_js = _pinned(CRM_ASSETS / JS_NAME, PINNED_JS_SHA)
     # Preserve the already verified original handler HTTP/CSP/cache headers.
     originals = {}
+    # The live CRM uses FastAPI 0.12x lazy _IncludedRouter nodes for the
+    # original read router. app.router.routes does not contain those leaves.
+    # Resolve them WITHOUT altering any original owner router or handler.
+    original_routes = []
+    for outer in app.router.routes:
+        if (type(outer).__module__, type(outer).__name__) == (
+            "fastapi.routing", "_IncludedRouter"
+        ):
+            nested = getattr(outer, "original_router", None)
+            leaves = getattr(nested, "routes", None)
+            if not isinstance(leaves, list):
+                raise RuntimeError("original_lazy_crm_router_contract_changed")
+            original_routes.extend(leaves)
+        else:
+            original_routes.append(outer)
     for path in (HTML_PATH, JS_PATH):
-        routes = [route for route in app.router.routes
+        routes = [route for route in original_routes
                   if getattr(route, "path", None) == path
                   and getattr(route, "methods", set()) == {"GET"}]
         if len(routes) != 1:

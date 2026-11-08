@@ -69,7 +69,12 @@ def test_scoped_overlay_rollback_restores_original_service(monkeypatch,tmp_path)
     other.write_bytes(b"never touch")
     monkeypatch.setattr(m,"OVERLAY",overlay)
     called=[]
-    monkeypatch.setattr(m,"run",lambda args:called.append(tuple(args)) or "")
+    def systemd(args):
+        if "-p" in args and "ExecStart" in args:
+            return m.EXISTING_ENTRYPOINT
+        called.append(tuple(args))
+        return ""
+    monkeypatch.setattr(m,"run",systemd)
     monkeypatch.setattr(m,"fetch",lambda path,method="GET":(200,""))
     assert m.rollback_only_additive_overlay(m.sha(b"temporary-test-overlay")) is True
     assert not overlay.exists()
@@ -131,3 +136,64 @@ def test_readback_fails_if_data_exchange_unprotected(monkeypatch):
     ))
     with pytest.raises(RuntimeError,match="original_private_issuer_exchange_auth_regressed"):
         m.verify_live(after_restart=False)
+
+
+def test_resume_is_scoped_to_exact_failed_ui_frozen_patch():
+    s=SRC.read_text()
+    assert 'OLD_PATCH_SHA="fdb6fb78b41079df8fa9e7eaee2fef03ba0c4ef6436575787f50e7eb8a5f1721"' in s
+    assert 'ORIGINAL_ENTRYPOINT_SHA="52f0cee04a7236426053eb38273e920a398bd87257cb4f0bb0ac1b0156f19624"' in s
+    assert 'PATCH_BACKUP=Path("/etc/empire-data-cloud-founder-20261107/verify-ui-patch-before-lazy-router-fix.py")' in s
+    assert 'def preflight(*, resuming:bool=False)' in s
+    assert 'def repair_exact_original_staged_patch():' in s
+    assert 'if resuming:' in s
+    assert 'repair_exact_original_staged_patch()' in s
+    assert 'mode=0o444' not in s or 'atomic_install(RELEASE/name,(SRC/name).read_bytes(),0o444)' in s
+    assert '--resume-preflight-read-only' in s
+    assert '--resume-founder-approved' in s
+
+
+def test_resume_rejects_unknown_old_image_without_any_mutation(monkeypatch,tmp_path):
+    stage=tmp_path/"release"
+    stage.mkdir()
+    (stage/m.SOURCES[1]).write_bytes(b"unexpected foreign code")
+    monkeypatch.setattr(m,"RELEASE",stage)
+    monkeypatch.setattr(m,"PATCH_BACKUP",tmp_path/"root_only"/"original.py")
+    with pytest.raises(RuntimeError,match="original_ui_patch_preimage_not_recognised"):
+        m.repair_exact_original_staged_patch()
+    assert (stage/m.SOURCES[1]).read_bytes()==b"unexpected foreign code"
+
+
+def test_resume_preflight_requires_exact_failed_release_inventory(monkeypatch,tmp_path):
+    # Fail-closed when original approved review source is not in place.
+    monkeypatch.setattr(m,"ROOT",tmp_path/"absent")
+    monkeypatch.setattr(m.os,"geteuid",lambda:0)
+    with pytest.raises(RuntimeError,match="current_review_branch_missing"):
+        m.preflight(resuming=True)
+
+
+def test_rollback_waits_for_original_private_service_after_delayed_restart(monkeypatch,tmp_path):
+    overlay=tmp_path/"verify-ui.conf"
+    overlay.write_bytes(b"known staged version")
+    monkeypatch.setattr(m,"OVERLAY",overlay)
+    calls=[]
+    states=iter([0,0,200])
+    def fake_fetch(path,method="GET"):
+        return next(states,200),""
+    def fake_run(args):
+        calls.append(tuple(args))
+        return m.EXISTING_ENTRYPOINT if "ExecStart" in args else ""
+    monkeypatch.setattr(m,"fetch",fake_fetch)
+    monkeypatch.setattr(m,"run",fake_run)
+    monkeypatch.setattr(m.time,"sleep",lambda t:None)
+    assert m.rollback_only_additive_overlay(m.sha(b"known staged version")) is True
+    assert not overlay.exists()
+    assert ("systemctl","restart",m.SERVICE) in calls
+
+
+def test_live_real_app_lazy_router_detection_is_explicit():
+    p=(ROOT/"scripts/data_cloud_verify_ui_patch_20261108.py").read_text()
+    assert '"fastapi.routing", "_IncludedRouter"' in p
+    assert 'getattr(outer, "original_router", None)' in p
+    assert 'original_routes.extend(leaves)' in p
+    assert "app.router.routes.insert(0" in p
+    assert "original_lazy_crm_router_contract_changed" in p

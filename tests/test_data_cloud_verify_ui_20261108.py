@@ -140,3 +140,43 @@ def test_no_active_service_or_original_crm_asset_mutations():
     assert "os.system(" not in SOURCE.read_text()
     assert "systemctl" not in SOURCE.read_text()
     assert "CREATE TABLE" not in SOURCE.read_text()
+
+
+def test_live_fastapi_lazy_included_router_original_browser_routes_supported():
+    # Matches the real CRM service's include_router route graph, which
+    # contains _IncludedRouter nodes rather than flattened API leaves.
+    from fastapi import APIRouter
+    app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None)
+    router=APIRouter(prefix="/v1/revenue-crm")
+    html_asset=(m.CRM_ASSETS/m.HTML_NAME).read_text().replace(
+        "/v1/revenue-crm/journeys/designer.js",
+        "/v1/revenue-crm/journeys/entry.js",
+    )
+    js_asset=(m.CRM_ASSETS/m.JS_NAME).read_bytes()
+
+    @router.get("/journeys/entry")
+    def browser_crm_entry():
+        return HTMLResponse(html_asset,headers={
+            "Cache-Control":"no-store",
+            "Content-Security-Policy":"default-src 'none'; script-src 'self'",
+        })
+
+    @router.get("/journeys/entry.js")
+    def browser_crm_entry_script():
+        return Response(js_asset,media_type="text/javascript",
+                        headers={"Cache-Control":"no-store"})
+
+    app.include_router(router)
+    assert not any(getattr(r,"path",None)==m.HTML_PATH for r in app.router.routes)
+    assert any(type(r).__name__=="_IncludedRouter" for r in app.router.routes)
+    m.build_verified_routes(app)
+    with TestClient(app) as client:
+        p=client.get(m.HTML_PATH)
+        j=client.get(m.JS_PATH)
+        assert p.status_code==200
+        assert j.status_code==200
+        assert p.text.count('id="verify-data-cloud"')==1
+        assert "function verifyDataCloudExchange" in j.text
+        assert p.headers["cache-control"]=="no-store"
+        assert "script-src 'self'" in p.headers["content-security-policy"]
+    assert len(router.routes)==2
