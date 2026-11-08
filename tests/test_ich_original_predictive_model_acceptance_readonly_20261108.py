@@ -41,9 +41,14 @@ def fixtures():
         "source_admission_state":"UNVERIFIED_LOCAL_SNAPSHOT_ONLY",
         "execution_authority":"none"
     }
-    status={"mode":"OBSERVE","framework_operational":False,
-            "customer_forecast_verified":False,
-            "commercial_prediction_authorized":False,"execution_authority":"none"}
+    status={"schema_version":"empire.predictive_cloud.status.v2",
+            "mode":"OBSERVE", "execution_authority":"none",
+            "component_count":3,"available_component_count":3,
+            "components":{name:{"available":True,"mode":"OBSERVE",
+                                "freshness":"fresh","execution_authority":"none"}
+                          for name in ("future_trend_intelligence",
+                                       "predictive_cloud_formula",
+                                       "predictive_intelligence")}}
     v4={k:False for k in ("real_source_rights_verified",
                          "production_tenant_source_admitted",
                          "live_consumer_activated","commercial_prediction_authorized")}
@@ -108,3 +113,29 @@ def test_fixed_corporate_record_sha_and_read_only_original_source():
     for prohibited in ("CREATE TABLE","CREATE ROLE","INSERT INTO","UPDATE public",
                        "DELETE FROM","ALTER SYSTEM","service restart"):
         assert prohibited not in source
+
+
+@pytest.mark.parametrize("tamper",[
+    "component_count_mismatch","missing_model_component",
+    "model_component_stale","model_component_exec",
+    "status_v1_schema","component_count_authority_spoof",
+])
+def test_status_v2_never_conflates_available_components_with_predictions(tamper):
+    f=fixtures()
+    status=f["status"]
+    if tamper=="component_count_mismatch":
+        status["component_count"]=4
+    elif tamper=="missing_model_component":
+        del status["components"]["predictive_cloud_formula"]
+        status["component_count"]=2
+        status["available_component_count"]=2
+    elif tamper=="model_component_stale":
+        status["components"]["predictive_intelligence"]["freshness"]="stale"
+    elif tamper=="model_component_exec":
+        status["components"]["future_trend_intelligence"]["execution_authority"]="execute_bounded"
+    elif tamper=="status_v1_schema":
+        status["schema_version"]="empire.predictive_cloud.status.v1"
+    elif tamper=="component_count_authority_spoof":
+        status["commercial_prediction_authorized"]=True
+    with pytest.raises(RuntimeError):
+        m.audit(**f)

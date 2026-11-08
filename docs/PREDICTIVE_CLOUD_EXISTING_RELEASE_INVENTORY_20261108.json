@@ -1,0 +1,559 @@
+{
+  "billing_or_provider_calls": false,
+  "commits_performed_by_inventory": false,
+  "customer_forecasts_enabled": false,
+  "enabled_scheduled_jobs": [
+    {
+      "active": "active",
+      "last_trigger": "Sun 2026-11-08 22:36:55 UTC",
+      "unit": "empire-predictive-cloud-materializer.timer",
+      "unit_file": "enabled"
+    },
+    {
+      "active": "active",
+      "last_trigger": "Sun 2026-11-08 22:38:24 UTC",
+      "unit": "empire-predictive-intelligence.timer",
+      "unit_file": "enabled"
+    },
+    {
+      "active": "active",
+      "last_trigger": "Sun 2026-11-08 22:35:08 UTC",
+      "unit": "empire-opportunity-loop.timer",
+      "unit_file": "enabled"
+    },
+    {
+      "active": "active",
+      "last_trigger": "Sun 2026-11-08 22:35:45 UTC",
+      "unit": "empire-revenue-pulse.timer",
+      "unit_file": "enabled"
+    }
+  ],
+  "historical_branch_count": 76,
+  "historical_predictive_branches": [
+    {
+      "branch": "agent/data-cloud-canonical-request-compat-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1d2d06ca5"
+    },
+    {
+      "branch": "agent/data-cloud-execution-bus-repository-v2",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "bd5844754"
+    },
+    {
+      "branch": "agent/data-cloud-infrastructure-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "59882593b"
+    },
+    {
+      "branch": "agent/data-cloud-market-pricing-repository-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "39fbffc06"
+    },
+    {
+      "branch": "agent/data-cloud-runtime-vendor-boundary-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "2cf088c14"
+    },
+    {
+      "branch": "agent/data-cloud-runtime-vendor-wave2-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "a8141029f"
+    },
+    {
+      "branch": "agent/data-cloud-runtime-vendor-wave3-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "8ec5f1341"
+    },
+    {
+      "branch": "agent/data-cloud-wave4",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "f51b67be4"
+    },
+    {
+      "branch": "agent/predictive-cloud-autoresearch-canonical-merge-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "fc646ea82"
+    },
+    {
+      "branch": "agent/predictive-cloud-autoresearch-integration-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "f12d6d7d4"
+    },
+    {
+      "branch": "agent/predictive-microsite-slopmonster-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "d0260a7b5"
+    },
+    {
+      "branch": "agent/trading-predictive-cloud-shadow-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "87e20fdcf"
+    },
+    {
+      "branch": "feature/crm-predictive-sales-readiness-20261018",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "15629e778"
+    },
+    {
+      "branch": "feature/data-cloud-psql-observer-20261015",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1f506e6cf"
+    },
+    {
+      "branch": "feature/empire-data-cloud-v1",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1d2d06ca5"
+    },
+    {
+      "branch": "feature/media-predictive-demo-ui-readability-20261015",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "543dd6817"
+    },
+    {
+      "branch": "feature/predictive-authorized-company-review-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "62c6ec64a"
+    },
+    {
+      "branch": "feature/predictive-cloud-asof-evidence-gate-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "d003762ed"
+    },
+    {
+      "branch": "feature/predictive-cloud-executive-department-feed-20261023",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "282df8aef"
+    },
+    {
+      "branch": "feature/predictive-cloud-founder-session-20261107",
+      "classification": "ORIGINAL_OWNER_BRANCH_REVIEW_NOT_PROOF_OF_DEPLOYMENT",
+      "head": "393878cca"
+    },
+    {
+      "branch": "feature/predictive-cloud-seven-lens-20261107",
+      "classification": "ORIGINAL_OWNER_BRANCH_REVIEW_NOT_PROOF_OF_DEPLOYMENT",
+      "head": "0e8242182"
+    },
+    {
+      "branch": "feature/predictive-cloud-usage-review-20261107",
+      "classification": "ORIGINAL_OWNER_BRANCH_REVIEW_NOT_PROOF_OF_DEPLOYMENT",
+      "head": "76158c48a"
+    },
+    {
+      "branch": "feature/predictive-consent-release-20261013",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "06d3a0a5e"
+    },
+    {
+      "branch": "feature/predictive-conversion-v2-20261013",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "5a9fe0af8"
+    },
+    {
+      "branch": "feature/predictive-crypto-personal-proof-20261022",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "759ddd2aa"
+    },
+    {
+      "branch": "feature/predictive-decision-control-20261018",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "aa55ef91f"
+    },
+    {
+      "branch": "feature/predictive-edge-depin-governance-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "bffdc7e48"
+    },
+    {
+      "branch": "feature/predictive-market-history-latency-20261022",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "fc0a8fb99"
+    },
+    {
+      "branch": "feature/predictive-needs-outcome-validation-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "e8c4ee170"
+    },
+    {
+      "branch": "feature/predictive-revenue-brain-bridge-20261023",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "7799779fb"
+    },
+    {
+      "branch": "feature/predictive-revenue-source-contract-20261018",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1c8b28b07"
+    },
+    {
+      "branch": "feature/predictive-revenue-v3-profit-council-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "fdd077d26"
+    },
+    {
+      "branch": "feature/predictive-revenue-v31-source-fidelity-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "318b0c665"
+    },
+    {
+      "branch": "feature/predictive-revenue-v32-outcome-provenance-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "69bec1104"
+    },
+    {
+      "branch": "feature/predictive-revenue-v33-finance-proof-workpack-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "dd12e8f72"
+    },
+    {
+      "branch": "feature/predictive-revenue-v34-transaction-proof-quad-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1ba914510"
+    },
+    {
+      "branch": "feature/predictive-revenue-v36-universal-evidence-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1a6ad1587"
+    },
+    {
+      "branch": "feature/predictive-revenue-v37-walkforward-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "aa805a95b"
+    },
+    {
+      "branch": "feature/predictive-revenue-v38-signal-forecast-freeze-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "528f07c75"
+    },
+    {
+      "branch": "feature/predictive-revenue-v39-unified-architecture-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "b8915949c"
+    },
+    {
+      "branch": "feature/predictive-revenue-v4-swarm-20261024",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "c22763be8"
+    },
+    {
+      "branch": "feature/predictive-revenue-v40-original-signal-tape-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "b0f2f4936"
+    },
+    {
+      "branch": "feature/predictive-revenue-v42-first-party-gsc-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "5ddbbd5bf"
+    },
+    {
+      "branch": "feature/predictive-revenue-v43-offline-outcome-join-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "099f2a54c"
+    },
+    {
+      "branch": "feature/predictive-snapshot-react-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "f414abd15"
+    },
+    {
+      "branch": "feature/seo-predictive-roofing-content-pilot-20261022",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "1616fd294"
+    },
+    {
+      "branch": "integration/crm-predictive-autonomy-20261018",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "9a7224ead"
+    },
+    {
+      "branch": "release/predictive-cloud-core-jev-guard-observer-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "9255ef1d6"
+    },
+    {
+      "branch": "release/predictive-cloud-journal-observability-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "125706350"
+    },
+    {
+      "branch": "release/predictive-cloud-runtime-observability-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "b973256da"
+    },
+    {
+      "branch": "release/predictive-cloud-source-admission-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "954c61ed6"
+    },
+    {
+      "branch": "release/predictive-cloud-v410-held-source-rights-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "afa0d6455"
+    },
+    {
+      "branch": "release/predictive-cloud-v48-shadow-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "164d6a030"
+    },
+    {
+      "branch": "release/predictive-cloud-v49-activation-gate-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "b405ba78b"
+    },
+    {
+      "branch": "release/predictive-cloud-v49-readonly-api-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "91a0aa9c5"
+    },
+    {
+      "branch": "release/predictive-revenue-v411-source-gate-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "ba6e85a8c"
+    },
+    {
+      "branch": "release/predictive-revenue-v412-currency-fix-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "1bd62df09"
+    },
+    {
+      "branch": "release/predictive-revenue-v412-forecast-twin-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "7954b63b9"
+    },
+    {
+      "branch": "release/predictive-revenue-v413-evidence-calibration-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "f097eabec"
+    },
+    {
+      "branch": "release/predictive-revenue-v414-backtest-evidence-hold-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "e93feb876"
+    },
+    {
+      "branch": "release/predictive-revenue-v415-bsc-cash-evidence-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "041c5e406"
+    },
+    {
+      "branch": "release/predictive-revenue-v416-reversal-observation-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "0e8036547"
+    },
+    {
+      "branch": "release/predictive-revenue-v417-tenant-order-cohort-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "e3da10f1e"
+    },
+    {
+      "branch": "release/predictive-revenue-v418-complete-gtm-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "606cc9047"
+    },
+    {
+      "branch": "release/predictive-revenue-v419-source-lineage-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "853f10faf"
+    },
+    {
+      "branch": "release/predictive-revenue-v420-3pillar-proof-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "9cd664c8d"
+    },
+    {
+      "branch": "release/predictive-revenue-v421-dual-entry-reconciliation-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "2315a65d5"
+    },
+    {
+      "branch": "release/predictive-revenue-v421-forecast-freeze-custody-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "2711d3afa"
+    },
+    {
+      "branch": "release/predictive-revenue-v421-reconciliation-calibration-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "e68d49cd4"
+    },
+    {
+      "branch": "release/predictive-revenue-v421-statement-chain-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "4cdd1729b"
+    },
+    {
+      "branch": "release/predictive-revenue-v421-statement-integrity-held-20261025",
+      "classification": "HISTORICAL_RELEASE_BRANCH_REVIEW_REQUIRED",
+      "head": "83241b5b4"
+    },
+    {
+      "branch": "release/predictive-v49-live-acceptance-20261025",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "eab07d487"
+    },
+    {
+      "branch": "review/autoresearch-seo-predictive-handoff-20261028",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "6bcf3bc9c"
+    },
+    {
+      "branch": "review/gods-eye-predictive-research-join-20261027",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "692d4f70f"
+    },
+    {
+      "branch": "review/predictive-authorized-company-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "ae70f2f0b"
+    },
+    {
+      "branch": "review/predictive-snapshot-react-20261026",
+      "classification": "OTHER_PREDICTIVE_BRANCH_SCOPE_REVIEW_REQUIRED",
+      "head": "f354f962d"
+    }
+  ],
+  "live_protected_http": [
+    {
+      "method": "GET",
+      "path": "/v1/predictive-cloud/status",
+      "port": 8766,
+      "status": 200,
+      "surface": "Original Predictive Cloud status"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/predictive-cloud/v4/shadow-readiness",
+      "port": 8766,
+      "status": 200,
+      "surface": "Original Predictive V4 HELD admission review"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/founder-data-products",
+      "port": 8766,
+      "status": 200,
+      "surface": "Original Founder Data Products"
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "port": 8783,
+      "status": 200,
+      "surface": "Founder CRM health"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/predictive-cloud/source-rights/verify",
+      "port": 8783,
+      "status": 401,
+      "surface": "Original source-rights verify requires CRM bearer"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/data/usage",
+      "port": 80,
+      "status": 401,
+      "surface": "Data Cloud usage requires auth"
+    }
+  ],
+  "live_services": [
+    {
+      "active": "active",
+      "unit": "empire-revenue-crm-pilot.service",
+      "unit_file": "disabled"
+    },
+    {
+      "active": "active",
+      "unit": "empire-public-gateway.service",
+      "unit_file": "enabled"
+    },
+    {
+      "active": "active",
+      "unit": "empire-search-intelligence-api.service",
+      "unit_file": "enabled"
+    }
+  ],
+  "observed_at_utc": "2026-11-08T22:38:31.622433+00:00",
+  "original_model_readiness": {
+    "analysis_executed": false,
+    "forecast_claim_authorized": false,
+    "independent_source_admitted": false,
+    "matched_outcome_count": 0,
+    "minimum_terminal_samples": 20,
+    "prediction_ready": false,
+    "probability_ready_product_count": 0,
+    "verified_terminal_outcomes": 0
+  },
+  "original_status_component_health": {
+    "available_component_count": 28,
+    "component_count": 28,
+    "mode": "OBSERVE",
+    "not_forecast_readiness": true,
+    "schema_version": "empire.predictive_cloud.status.v2",
+    "stale_components": [
+      "founder_directives"
+    ]
+  },
+  "priority_release_decisions": [
+    {
+      "action": "PRESERVE_ALREADY_DEPLOYED",
+      "component": "Original Predictive Cloud API / status",
+      "state": "LIVE_READ_ONLY"
+    },
+    {
+      "action": "PRESERVE_ALREADY_DEPLOYED",
+      "component": "Predictive Cloud materializer + intelligence + opportunity scheduler",
+      "state": "ACTIVE_TIMERS"
+    },
+    {
+      "action": "PRESERVE_SECURITY_GATES",
+      "component": "Existing Founder CRM Data Cloud auth + source rights",
+      "state": "LIVE_HELD_RESEARCH_ONLY"
+    },
+    {
+      "action": "NO_CUSTOMER_SEARCH_AUDIT_OR_SETTLEMENT",
+      "component": "Existing Data Cloud customer-usage private API",
+      "state": "LIVE_SCOPED_USAGE_ONLY"
+    },
+    {
+      "action": "RECONCILE_WITH_ORIGINAL_AGENTOS_REVIEW_BEFORE_DEPLOY",
+      "component": "Seven Lens 20261107 cross-owner Agent OS",
+      "state": "STAGED_SEPARATE_OWNER"
+    },
+    {
+      "action": "DO_NOT_OVERRIDE_INSTALLED_066_OR_GENUINE_TENANT_BINDING",
+      "component": "Legacy source-admission branch 20261025",
+      "state": "HISTORIC_UNMERGED_UNRECONCILED"
+    },
+    {
+      "action": "DO_NOT_COUNT_AS_VERIFIED_FORECAST",
+      "component": "Synthetic V4.12 scenario/cash twin and model calibration",
+      "state": "RESEARCH_SHADOW_ONLY"
+    },
+    {
+      "action": "SOURCE_RIGHTS_REVIEW_AND_REAL_OUTCOME_COHORT",
+      "component": "Commercial source admission + customer forecast",
+      "state": "HELD_REQUIRED_EVIDENCE"
+    }
+  ],
+  "production_changes": false,
+  "production_shared_checkout": {
+    "active_branch": "agent/data-cloud-wave4",
+    "bulk_commit_safe": false,
+    "dirty_paths": 429,
+    "head": "f51b67be4",
+    "other_agent_changes_must_be_preserved": true
+  },
+  "schema_version": "empire.predictive_cloud.existing_release_inventory.v1",
+  "scope": "EXISTING_PREDICTIVE_CLOUD_RELEASE_RECONCILIATION_ONLY",
+  "services_restarted": false,
+  "source_of_truth": "read_only_current_empireos_git_systemd_http_and_runtime_snapshots",
+  "source_tenant_evidence": {
+    "authenticated_http200_server_receipt_extracted": false,
+    "external_redistribution_or_forecasting_authorized": false,
+    "founder_browser_acceptance": "FOUNDER_REPORTED_SIGNED_CRM_PASSED",
+    "official_source": "ICH SERVICES LTD Companies House 02745893",
+    "official_source_digest": "31787934624aac98439d48603641951d910e6df96880de9dafe4e35cb2614b5d",
+    "original_crm_tenant_binding_verified": true,
+    "state": "PENDING_HELD"
+  }
+}

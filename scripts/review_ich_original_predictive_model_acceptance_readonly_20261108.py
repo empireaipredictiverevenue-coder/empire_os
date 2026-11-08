@@ -80,12 +80,32 @@ def audit(*,packet:dict,rights:dict,trend:dict,formula:dict,
         raise RuntimeError("unverified_probability_or_outcome_promoted")
     for model in (status,v4):
         if type(model) is not dict:raise RuntimeError("original_cloud_status_not_a_mapping")
-    if (status.get("mode")!="OBSERVE"
-        or status.get("framework_operational") is not False
-        or status.get("customer_forecast_verified") is not False
-        or status.get("commercial_prediction_authorized") is not False
-        or status.get("execution_authority")!="none"):
-        raise RuntimeError("original_predictive_cloud_runtime_inconsistent")
+    # Canonical Predictive Cloud STATUS.v2 is a component availability
+    # inventory, NOT the earlier synthetic top-level forecast-readiness
+    # summary. Never infer forecast authority from component count or
+    # "available". That authority is checked from live original materializer
+    # snapshots and the V4 shadow source-admission endpoint below.
+    components=status.get("components")
+    if (status.get("schema_version")!="empire.predictive_cloud.status.v2"
+        or status.get("mode")!="OBSERVE"
+        or status.get("execution_authority")!="none"
+        or type(components) is not dict
+        or status.get("component_count")!=len(components)
+        or not 0 <= status.get("available_component_count",-1) <= len(components)):
+        raise RuntimeError("original_predictive_cloud_v2_component_status_inconsistent")
+    for name in ("future_trend_intelligence","predictive_cloud_formula",
+                 "predictive_intelligence"):
+        component=components.get(name)
+        if (type(component) is not dict
+            or component.get("available") is not True
+            or component.get("freshness")!="fresh"
+            or component.get("mode")!="OBSERVE"
+            or component.get("execution_authority")!="none"):
+            raise RuntimeError("original_predictive_cloud_v2_model_component_not_safe")
+    if any(status.get(key) is True for key in (
+        "customer_forecast_verified","commercial_prediction_authorized",
+        "framework_operational")):
+        raise RuntimeError("original_predictive_cloud_v2_forecast_permission_spoofed")
     if any(v4.get(k) is not False for k in (
         "real_source_rights_verified",
         "production_tenant_source_admitted",
