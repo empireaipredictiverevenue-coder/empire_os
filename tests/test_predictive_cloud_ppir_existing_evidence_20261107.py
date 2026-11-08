@@ -133,3 +133,28 @@ def test_naive_audit_clock_rejected():
     a,b=inputs()
     with pytest.raises(ppir.EvidenceHold,match="clock"):
         ppir.audit_evidence(a,b,now=datetime(2026,11,7,20,30))
+
+
+def test_raw_search_result_cohort_does_not_claim_source_policy_admission():
+    # ZipRecruiter-like job-board results can appear in old research artifacts.
+    # This independent PPIR reviewer must never infer that such raw results
+    # passed the separately owned Search Fabric source-admission policy.
+    discovery, ledger = inputs()
+    row = deepcopy(discovery["entries"][0])
+    row["website"] = "https://ziprecruiter.com"
+    row["domain"] = "ziprecruiter.com"
+    row["search_title_unverified"] = "Synthetic job directory listing"
+    discovery["entries"].append(row)
+
+    result = ppir.audit_evidence(discovery, ledger, now=NOW)
+    precision = result["precision"]
+    assert precision["candidates_observed"] == 2  # raw observations, not eligible businesses
+    assert precision["raw_candidate_count_is_not_source_policy_admission"] is True
+    assert precision["source_policy_eligible_research_rows"] is None
+    assert precision["source_policy_rejected_research_rows"] is None
+    assert precision["source_policy_review_status"] == "NOT_ASSESSED_BY_PPIR_AUDIT"
+    assert precision["independently_verified_entity_count_in_this_artifact"] == 0
+    assert result["readiness"]["raw_discovery_results_are_not_customer_admission"] is True
+    assert "original_search_fabric_source_policy_admission_for_fixed_cohort" in result["readiness"]["next_required_evidence"]
+    assert result["readiness"]["external_data_delivery_authorized"] is False
+    assert result["revenue"]["verified_attributable_revenue"] is None

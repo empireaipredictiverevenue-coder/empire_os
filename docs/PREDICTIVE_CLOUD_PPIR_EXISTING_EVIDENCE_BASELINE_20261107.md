@@ -35,3 +35,17 @@
 5. Only when source rights, qualified customer willingness to pay, accepted terms and attributable fulfilment are verified should the Revenue pillar count realized gross profit. Reuse Smart CRM, commercial usage metering and original Data Product catalogue, not a parallel SaaS or billing system.
 
 **Release state:** `BENCHMARK_FOUNDATION_VERIFIED; PERFORMANCE_AND_REVENUE_UNPROVEN; CUSTOMER_API_RELEASE_HELD`.
+
+## 8 November 2026 — source admission reconciliation: four RAW ≠ four admitted
+
+**Live read-only replay, no paid provider call:** the private `runtime/search/decodo_service_business_discovery.json` contains 4 recently observed search-result domain rows. The original Search Fabric owner module `empire_os/search_fabric/decodo_service_customer_admission.py` was executed **read-only** against exactly those 4 rows, using its existing `domain`, `service_query` and `NON_COMPANY_RESULT_TITLE` policy; it returned **2** `PASS_RESEARCH_ONLY` and **2** rejected:
+- `kahnmechanical.com`: research admission policy pass (not independently verified legal entity, buyer, prospect, contact, customer or licensed output).
+- `ich-services.co.uk`: research admission policy pass with the same restrictions.
+- `cedur.com`: rejected as `non_company_result_title` on the specific search-result row; this does **not** assert that the website itself is not a business.
+- `ziprecruiter.com`: rejected as `untrusted_or_excluded_source_domain` and `non_company_result_title` (job-board result).
+
+Two current publicly retrieved company-website pages independently showed relevant **first-party service claims** at `https://www.kahnmechanical.com/` (commercial HVAC, Dallas–Fort Worth) and `https://ich-services.co.uk/` (UK facilities-management and M&E services). These are site claims and **do not prove legal entity identity, intent to buy, service quality, advertising consent, source redistribution rights or predictive model uplift**. The current provider source licence/re-use right is **still unverified**. Do not create contacts, CRM identities, outreach permissions or customer-facing predictions on this observation alone.
+
+**Narrow original PPIR script correction:** `scripts/review_predictive_cloud_ppir_existing_evidence_20261107.py` retains the four **raw** results for historical accuracy but explicitly adds `raw_candidate_count_is_not_source_policy_admission=true`, `source_policy_eligible_research_rows=null`, `source_policy_rejected_research_rows=null` and `source_policy_review_status=NOT_ASSESSED_BY_PPIR_AUDIT`. The script does **not copy or reimplement** another owner's source-admission rules; the above 2/2 result is a separate *actual original-policy* read-only check. A test includes a synthetic job-board result and proves the auditor cannot infer source eligibility, verified customer, revenue, licensing or output permission. Independent source admission remains a required evidence step.
+
+This is a PPIR **accuracy repair**, not new customer data ingestion or a production API release. Confirmed status: customer usage API authenticated, source search/audit routes held, Predictive Cloud V4 shadow readiness reports `real_source_rights_verified=false`, `production_tenant_source_admitted=false`, `live_consumer_activated=false`; original product remains OBSERVE. No original live Search Fabric files, Predictive Fabric bridge, services, PostgreSQL objects, credentials or provider calls were modified.

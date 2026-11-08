@@ -137,6 +137,14 @@ def audit_evidence(
         "precision":{
             "candidates_observed":len(rows),
             "unique_candidate_domains":len(seen),
+            # Counts above describe unverified RAW search-result observations.
+            # Admission must be reviewed by the original Search Fabric policy.
+            # This independent audit intentionally does not duplicate that
+            # owner policy or promote source results to eligible businesses.
+            "raw_candidate_count_is_not_source_policy_admission":True,
+            "source_policy_eligible_research_rows":None,
+            "source_policy_rejected_research_rows":None,
+            "source_policy_review_status":"NOT_ASSESSED_BY_PPIR_AUDIT",
             "fresh_search_result_candidates":fresh,
             "stale_search_result_candidates":stale,
             "search_provenance_present":search_provenance,
@@ -173,7 +181,9 @@ def audit_evidence(
             "paid_provider_calls_made_by_audit":0,
             "production_changes":False,
             "benchmark_validated":False,
+            "raw_discovery_results_are_not_customer_admission":True,
             "next_required_evidence":[
+                "original_search_fabric_source_policy_admission_for_fixed_cohort",
                 "first_party_identity_truth_labels_for_fixed_candidate_cohort",
                 "per_request_provider_receipts_cost_and_latency_with_attribution",
                 "paired_independent_intelligence_baseline_and_outcome_labels",
