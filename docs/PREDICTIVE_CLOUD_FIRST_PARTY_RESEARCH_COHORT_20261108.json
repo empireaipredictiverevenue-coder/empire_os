@@ -1,0 +1,174 @@
+{
+  "schema_version": "empire.predictive_cloud.first_party_research_cohort.v1",
+  "assembled_at_utc": "2026-11-08T17:50:00+00:00",
+  "mode": "RESEARCH_ONLY",
+  "execution_authority": "none",
+  "raw_source_artifact": "/srv/empire_os/runtime/search/decodo_service_business_discovery.json",
+  "raw_source_candidates": 4,
+  "original_search_fabric_policy_review": {
+    "module": "empire_os.search_fabric.decodo_service_customer_admission",
+    "eligible_research_only": 2,
+    "rejected": 2,
+    "checked_against_existing_source": true,
+    "notes": "Policy result is for these exact historical raw search records, not an assertion of independent legal-company verification."
+  },
+  "records": [
+    {
+      "domain": "kahnmechanical.com",
+      "research_policy": "PASS_RESEARCH_ONLY",
+      "subject": "Kahn Mechanical",
+      "country": "US",
+      "observed_business_facts": [
+        {
+          "claim": "Commercial and industrial HVAC and mechanical services across Dallas-Fort Worth",
+          "source_kind": "first_party_business_website",
+          "source_url": "https://www.kahnmechanical.com/about-us/",
+          "verification_state": "FIRST_PARTY_SELF_DESCRIPTION"
+        },
+        {
+          "claim": "Founded in 1974",
+          "source_kind": "first_party_business_website",
+          "source_url": "https://www.kahnmechanical.com/about-us/",
+          "verification_state": "FIRST_PARTY_SELF_DESCRIPTION"
+        },
+        {
+          "claim": "Texas contractor licence TACL A16607C, as published by the company",
+          "source_kind": "first_party_business_website",
+          "source_url": "https://www.kahnmechanical.com/about-us/certifications/",
+          "verification_state": "COMPANY_CLAIM_REGULATOR_NOT_CHECKED"
+        }
+      ],
+      "independent_texas_regulator_snapshot": {
+        "source_kind": "official_texas_regulatory_open_data",
+        "source_url": "https://data.texas.gov/resource/7358-krk7.json?%24where=license_number%20%3D%20%2716607%27%20AND%20license_type%20%3D%20%27A%2FC%20Contractor%27&%24limit=5",
+        "portal_url": "https://data.texas.gov/dataset/TDLR-All-Licenses/7358-krk7",
+        "business_name": "KAHN A/C & HEATING COMPANY A TEXAS CORP",
+        "license_type": "A/C Contractor",
+        "license_number": "16607",
+        "business_county": "DALLAS",
+        "license_expiration_date": "2027-04-12",
+        "dataset_last_updated": "2026-09-19",
+        "verified_from_official_dataset": true,
+        "current_license_status_verified": false,
+        "business_brand_to_legal_entity_link_verified": false,
+        "customer_redistribution_rights_verified": false
+      },
+      "public_register_match": false,
+      "independent_legal_identity_verified": false,
+      "contact_consent_verified": false,
+      "customer_demand_verified": false,
+      "source_redistribution_rights_verified": false,
+      "customer_delivery_authorized": false,
+      "next_check": "Independent state regulator licence and actual legal-entity match; written customer-use rights if redistributing site-derived content"
+    },
+    {
+      "domain": "ich-services.co.uk",
+      "research_policy": "PASS_RESEARCH_ONLY",
+      "subject": "ICH Services Ltd",
+      "country": "UK",
+      "observed_business_facts": [
+        {
+          "claim": "First-party site says ICH offers UK-wide facilities management, mechanical and electrical design/installation, planned maintenance",
+          "source_kind": "first_party_business_website",
+          "source_url": "https://ich-services.co.uk/",
+          "verification_state": "FIRST_PARTY_SELF_DESCRIPTION"
+        },
+        {
+          "claim": "First-party site says former name Industrial & Commercial Heating and origins in 1992; footer states Union Bridge Works, Roker Lane, Pudsey LS28 9LE",
+          "source_kind": "first_party_business_website",
+          "source_url": "https://ich-services.co.uk/about-us/",
+          "verification_state": "FIRST_PARTY_SELF_DESCRIPTION"
+        },
+        {
+          "claim": "ICH SERVICES LTD is active company 02745893, incorporated 9 September 1992, registered address Union Bridge Works Roker Lane Pudsey LS28 9LE",
+          "source_kind": "official_uk_company_register",
+          "source_url": "https://find-and-update.company-information.service.gov.uk/company/02745893",
+          "verification_state": "INDEPENDENT_OFFICIAL_REGISTER_RECORD"
+        },
+        {
+          "claim": "Official SIC 43210 electrical installation; 43220 plumbing, heat and air-conditioning installation; 81100 combined facilities support activities",
+          "source_kind": "official_uk_company_register",
+          "source_url": "https://find-and-update.company-information.service.gov.uk/company/02745893",
+          "verification_state": "INDEPENDENT_OFFICIAL_REGISTER_RECORD"
+        },
+        {
+          "claim": "Original registered corporate name in 1993 was INDUSTRIAL AND COMMERCIAL HEATING LTD, aligning with site historical description",
+          "source_kind": "official_uk_company_register",
+          "source_url": "https://find-and-update.company-information.service.gov.uk/company/02745893",
+          "verification_state": "NAME_HISTORY_CROSS_CHECKED"
+        }
+      ],
+      "public_register_match": true,
+      "website_register_cross_correlated_by": [
+        "business_name",
+        "predecessor_name",
+        "registered_address",
+        "business_activity"
+      ],
+      "independent_legal_identity_verified": true,
+      "website_control_cryptographically_verified": false,
+      "contact_consent_verified": false,
+      "customer_demand_verified": false,
+      "source_redistribution_rights_verified": false,
+      "customer_delivery_authorized": false,
+      "next_check": "Owner confirms website relationship and original first-party content rights, assess register reuse/data protection for intended customer fields"
+    },
+    {
+      "domain": "cedur.com",
+      "research_policy": "REJECTED",
+      "rejection_reasons": [
+        "non_company_result_title"
+      ],
+      "independent_legal_identity_verified": false,
+      "customer_delivery_authorized": false,
+      "notes": "Rejected against the exact original search-result title. This is not a claim that CeDUR is not a real business."
+    },
+    {
+      "domain": "ziprecruiter.com",
+      "research_policy": "REJECTED",
+      "rejection_reasons": [
+        "untrusted_or_excluded_source_domain",
+        "non_company_result_title"
+      ],
+      "independent_legal_identity_verified": false,
+      "customer_delivery_authorized": false,
+      "notes": "Excluded generic job board result; not an observed contractor."
+    }
+  ],
+  "source_rights": [
+    {
+      "source": "Companies House UK public register",
+      "guidance_url": "https://www.gov.uk/guidance/companies-house-data-products",
+      "copyright_guidance_url": "https://www.gov.uk/government/publications/companies-house-accreditation-to-information-fair-traders-scheme/public-task-copyright-and-crown-copyright",
+      "public_register_reuse_policy": "PUBLIC_REGISTER_REUSE_PERMITTED_SUBJECT_TO_LAW",
+      "personal_data_review_required": true,
+      "source_attribution_required_where_applicable": true,
+      "provider_contract_override_required": false,
+      "customer_delivery_authorized_by_this_review": false
+    },
+    {
+      "source": "Decodo",
+      "license_url": "https://decodo.com/legal/license-agreement",
+      "license_last_updated": "2025-06-16",
+      "own_commercial_use_broadly_described": true,
+      "competing_product_restriction_present": true,
+      "third_party_rights_necessary": true,
+      "account_specific_written_exception_observed": false,
+      "customer_data_redistribution_authorized": false,
+      "approved_paid_calls": 0
+    }
+  ],
+  "provenance_controls": {
+    "source_page_sha256_captured": false,
+    "source_urls_retained": true,
+    "actual_fetch_timestamps_individually_attested": false,
+    "contains_pii": false,
+    "buyer_identity_or_intent_inferred": false,
+    "licensed_decodo_output_claimed": false,
+    "source_admitted_into_predictive_cloud": false,
+    "postgres_mutation": false,
+    "customer_api_change": false,
+    "paid_provider_calls": false
+  },
+  "next_release_gate": "ORIGINAL_SEARCH_FABRIC_SOURCE_RIGHTS_OWNER_AND_PREDICTIVE_SOURCE_ADMISSION"
+}
