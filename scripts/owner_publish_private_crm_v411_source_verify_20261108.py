@@ -63,11 +63,11 @@ def http(path,*,method="GET",expected=None):
         with urlopen(req,timeout=4) as r:
             status=r.status
             body=r.read(180000)
-            headers=dict(r.headers.items())
+            headers={key.lower(): value for key,value in r.headers.items()}
     except HTTPError as e:
         status=e.code
         body=e.read(2048)
-        headers=dict(e.headers.items())
+        headers={key.lower(): value for key,value in e.headers.items()}
     if expected is not None and status!=expected:
         raise RuntimeError("CRM_"+path.replace("/","_")+"_unexpected_http_status")
     return status,body,headers
@@ -112,7 +112,7 @@ def preflight():
     for path,sha in ((HTML,HTML_SHA),(JS,JS_SHA)):
         status,data,headers=http(path,expected=200)
         if (hashlib.sha256(data).hexdigest()!=sha
-            or headers.get("Cache-Control")!="no-store"):
+            or headers.get("cache-control")!="no-store"):
             raise RuntimeError("original_protected_crm_ui_changed")
     if http(REV,method="POST")[0]!=404:
         raise RuntimeError("original_new_route_collision")
@@ -231,8 +231,8 @@ def apply():
             or b'id="verify-data-cloud"' not in html
             or b'verifyPredictiveSource' not in js
             or b'verifyDataCloudExchange' not in js
-            or headers.get("Cache-Control")!="no-store"
-            or jsheaders.get("Cache-Control")!="no-store"
+            or headers.get("cache-control")!="no-store"
+            or jsheaders.get("cache-control")!="no-store"
             or cmd(["systemctl","is-active",UNIT])!="active"):
             raise RuntimeError("original_crm_or_source_route_postrelease_failed")
         if cmd(["systemctl","show",UNIT,"--value","-p","MainPID"])==pre["old_service_pid"]:

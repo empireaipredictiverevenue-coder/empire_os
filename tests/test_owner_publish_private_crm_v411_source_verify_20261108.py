@@ -67,7 +67,8 @@ def test_original_browser_assets_must_remain_sha_pinned():
     assert len(mod.HTML_SHA)==64 and len(mod.JS_SHA)==64
     assert mod.HTML_SHA=="1d86ce33e8f7b4edb63a52a14ccf76f0f7dfc617a2763173eceaa845ab849282"
     assert mod.JS_SHA=="7f50fa36289a7539a33e7b058038c4373b9d64e556f2f5c751fb3932c707be6f"
-    assert '"Cache-Control")!="no-store"' in SOURCE.read_text()
+    assert '"cache-control")!="no-store"' in SOURCE.read_text()
+    assert "key.lower(): value" in SOURCE.read_text()
 
 
 def test_pre_restart_failed_release_does_not_restart_healthy_crm(monkeypatch):
