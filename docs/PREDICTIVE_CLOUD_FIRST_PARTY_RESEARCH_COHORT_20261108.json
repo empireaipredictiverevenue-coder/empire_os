@@ -111,7 +111,41 @@
       "customer_demand_verified": false,
       "source_redistribution_rights_verified": false,
       "customer_delivery_authorized": false,
-      "next_check": "Owner confirms website relationship and original first-party content rights, assess register reuse/data protection for intended customer fields"
+      "next_check": "Owner confirms website relationship and original first-party content rights, assess register reuse/data protection for intended customer fields",
+      "official_uk_source_observation": {
+        "schema_version": "empire.predictive_cloud.official_source_research.v1",
+        "source_kind": "independent_uk_public_company_register",
+        "source_url": "https://find-and-update.company-information.service.gov.uk/company/02745893",
+        "official_response_sha256": "19272fb537c8fddfd389fd9d760b3e52f2164258401693f1aa05f700e5ca2053",
+        "official_response_bytes": 37460,
+        "source_observed_at_utc": "2026-11-08T18:12:01.473944+00:00",
+        "source_evidence_digest": "31787934624aac98439d48603641951d910e6df96880de9dafe4e35cb2614b5d",
+        "public_register_fields": {
+          "company_number": "02745893",
+          "company_name": "ICH SERVICES LTD",
+          "company_status": "Active",
+          "incorporation_date": "1992-09-09",
+          "registered_address": "Union Bridge Works, Roker Lane, Pudsey, LS28 9LE",
+          "sic_codes": [
+            "43210",
+            "43220",
+            "81100"
+          ]
+        },
+        "permitted_purpose_candidate": "PRIVATE_PREDICTIVE_RESEARCH_ONLY",
+        "source_reuse_policy_url": "https://www.gov.uk/government/publications/companies-house-accreditation-to-information-fair-traders-scheme/public-task-copyright-and-crown-copyright",
+        "public_register_reuse_policy": "REUSE_PERMITTED_SUBJECT_TO_APPLICABLE_LAW",
+        "personal_data_in_this_observation": false,
+        "source_rights_document_has_been_owner_attested": false,
+        "original_signed_crm_tenant_bound": false,
+        "restricted_empiredb_rights_reader_verified": false,
+        "production_source_admitted": false,
+        "redis_publish_authorized": false,
+        "customer_forecast_verified": false,
+        "customer_delivery_authorized": false,
+        "paid_provider_call": false,
+        "execution_authority": "none"
+      }
     },
     {
       "domain": "cedur.com",
@@ -144,6 +178,17 @@
       "personal_data_review_required": true,
       "source_attribution_required_where_applicable": true,
       "provider_contract_override_required": false,
+      "customer_delivery_authorized_by_this_review": false,
+      "public_register_reuse_policy_verified_against_gov_uk": true,
+      "exact_product_customer_publication_approved": false
+    },
+    {
+      "source": "Texas TDLR open-data licence register",
+      "portal_url": "https://data.texas.gov/dataset/TDLR-All-Licenses/7358-krk7",
+      "dataset_last_updated": "2026-09-19",
+      "dataset_license_listing": "unspecified",
+      "source_license_for_external_resale_verified": false,
+      "public_readable": true,
       "customer_delivery_authorized_by_this_review": false
     },
     {
@@ -168,7 +213,8 @@
     "source_admitted_into_predictive_cloud": false,
     "postgres_mutation": false,
     "customer_api_change": false,
-    "paid_provider_calls": false
+    "paid_provider_calls": false,
+    "independent_uk_public_register_response_sha256_captured": true
   },
   "next_release_gate": "ORIGINAL_SEARCH_FABRIC_SOURCE_RIGHTS_OWNER_AND_PREDICTIVE_SOURCE_ADMISSION"
 }
