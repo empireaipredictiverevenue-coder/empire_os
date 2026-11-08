@@ -132,3 +132,195 @@ def test_actual_existing_crm_owner_column_and_preflight_safe_mode():
     assert 'elif args.preflight_read_only:' in src
     assert 'pre = identity_preflight()' in src
     assert 'PRODUCTION_WRITES=0; RESTARTS=0; SECRETS_ISSUED=0' in src
+
+
+def test_meter_connections_follow_existing_loopback_scram_hba():
+    original = SCRIPT.read_text()
+    public = ENTRYPOINTS[0].read_text()
+    assert 'host="127.0.0.1",port=5432,password=password' in original
+    assert 'host="127.0.0.1",' in public
+    assert 'meter_loopback_scram_hba_not_verified' in original
+    assert 'meter_loopback_postgresql_not_available' in original
+    assert 'host="/var/run/postgresql",port=5432,password=password' not in original
+
+
+def test_resume_requires_exact_disabled_existing_admission():
+    text = SCRIPT.read_text()
+    assert 'identity_preflight(resuming=True)' in text
+    assert 'SELECT active,held,monthly_request_cap,monthly_cost_cap_micros' in text
+    assert 'rolled_back_tenant_not_held' in text
+    assert 'rolled_back_key_not_exactly_disabled_or_expired' in text
+    assert 'rolled_back_meter_role_not_disabled' in text
+    assert 'data_cloud_signing_credential_missing' not in text
+    assert 'resumed_existing_founder_credentials":True' in text
+    assert '--resume-preflight-read-only' in text
+    assert '--resume-founder-approved' in text
+
+
+def test_resume_preflight_fails_before_writes_when_state_invalid(install_module, monkeypatch):
+    actions = []
+    monkeypatch.setattr(install_module, "resume_preflight",
+                        lambda: (_ for _ in ()).throw(RuntimeError("unexpected_state")))
+    monkeypatch.setattr(install_module, "repair_exact_frozen_public_wrapper",
+                        lambda: actions.append("unwanted_mutation"))
+    with pytest.raises(RuntimeError, match="unexpected_state"):
+        install_module.resume()
+    assert actions == []
+
+
+def test_resume_failed_operation_rolls_back_original_services(install_module, monkeypatch):
+    actions=[]
+    monkeypatch.setattr(install_module, "resume_preflight",
+                        lambda: ({"actor":"founder","tenant":"test"}, {}, "existing-key"))
+    monkeypatch.setattr(install_module, "repair_exact_frozen_public_wrapper",
+                        lambda: (_ for _ in ()).throw(RuntimeError("frozen_image_drift")))
+    monkeypatch.setattr(install_module, "clean_failed_release",
+                        lambda: actions.append("rollback") or True)
+    with pytest.raises(RuntimeError, match="frozen_image_drift"):
+        install_module.resume()
+    assert actions == ["rollback"]
+
+
+def test_resume_happy_path_uses_existing_key_and_one_original_service_chain(
+    install_module, monkeypatch
+):
+    events = []
+    pre={"actor":"founder","tenant":"test"}
+    cfg={"meter_password":"stored-not-output"}
+    monkeypatch.setattr(install_module, "resume_preflight",
+                        lambda: (pre,cfg,"preexisting-test-key"))
+    monkeypatch.setattr(install_module, "repair_exact_frozen_public_wrapper",
+                        lambda: events.append("reconcile_exact_wrapper"))
+    monkeypatch.setattr(install_module, "resume_existing_database",
+                        lambda p,c,k: events.append(("reactivate_only",k)))
+    monkeypatch.setattr(install_module, "record_verified_evidence",
+                        lambda p: events.append("owner_evidence"))
+    monkeypatch.setattr(install_module, "environment_path",
+                        lambda svc: "/existing/owner/env")
+    monkeypatch.setattr(install_module, "install_overlays",
+                        lambda pub,priv: events.append("additive_overlays"))
+    monkeypatch.setattr(install_module, "run",
+                        lambda args: events.append(tuple(args)) or "")
+    monkeypatch.setattr(install_module, "verify_service_route",
+                        lambda path,port,status: True)
+    monkeypatch.setattr(install_module, "canary",
+                        lambda p,key: events.append(("live_canary",key)))
+    monkeypatch.setattr(install_module, "atomic_file",
+                        lambda path,data,mode,**kw: events.append("receipt"))
+    monkeypatch.setattr(install_module, "clean_failed_release",
+                        lambda: pytest.fail("unexpected rollback in happy path"))
+    install_module.resume()
+    assert events[0] == "reconcile_exact_wrapper"
+    assert events[1] == ("reactivate_only","preexisting-test-key")
+    assert events[2] == "owner_evidence"
+    assert events[3] == "additive_overlays"
+    assert ("live_canary","preexisting-test-key") in events
+    assert events[-1] == "receipt"
+    assert not any("CREATE ROLE" in str(e) or "INSERT INTO" in str(e) for e in events)
+
+
+def test_rollback_updates_only_original_key_and_tenant(install_module,monkeypatch,tmp_path):
+    from dataclasses import dataclass
+    from uuid import UUID
+    tenant="11111111-2222-4333-8444-555555555555"
+    runtime=tmp_path/"runtime"
+    runtime.mkdir()
+    original=tmp_path/"root-only"
+    original.mkdir()
+    (runtime/"runtime.json").write_text(json.dumps({
+        "owner_tenant_id":tenant,
+        "scope":"FOUNDER_ONLY_USAGE_NO_PROVIDERS",
+        "release_version":1,
+    }))
+    (original/"founder-api-key.secret").write_text("synthetic-test-key-with-safe-length-001")
+    monkeypatch.setattr(install_module,"RUNTIME",runtime)
+    monkeypatch.setattr(install_module,"ROOT_ONLY",original)
+    calls=[]
+    monkeypatch.setattr(install_module,"postgres",lambda sql:calls.append(sql) or "")
+    assert install_module.hold_database() is True
+    assert len(calls)==1
+    statement=calls[0]
+    assert "SET held=true,active=false\n              WHERE tenant_id=" in statement
+    assert "SET active=false\n              WHERE tenant_id=" in statement
+    assert "ALTER ROLE empire_data_cloud_meter_login NOLOGIN;" in statement
+    assert "UPDATE empire_data_cloud_api.tenants SET held=true,active=false;" not in statement
+    assert "UPDATE empire_data_cloud_api.api_keys SET active=false;" not in statement
+    assert tenant in statement
+
+
+def test_resume_preexisting_evidence_same_identity_reused(install_module,monkeypatch,tmp_path):
+    from hashlib import sha256
+    baseline={
+        "public_service_preimage_sha":sha256(b"pub-original").hexdigest(),
+        "crm_service_preimage_sha":sha256(b"crm-original").hexdigest(),
+    }
+    monkeypatch.setattr(
+        install_module, "run",
+        lambda args: "pub-original" if install_module.PUB_SVC in args else "crm-original",
+    )
+    previous=tmp_path/"RELEASE_EVIDENCE.json"
+    evidence={
+        "mode":"FOUNDER_ONLY_USAGE_NO_PROVIDERS",
+        "source_sql_sha256":install_module.SRC_SHA,
+        "public_service_preimage_sha256":baseline["public_service_preimage_sha"],
+        "crm_service_preimage_sha256":baseline["crm_service_preimage_sha"],
+        "verified_requirements":{key:True for key in (
+            "owner_lease_verified","founder_only_path_verified",
+            "signed_data_session_verified","production_meter_role_verified",
+            "production_meter_functions_verified","rollback_preflight_verified",
+            "fresh_local_restore_receipt_verified",
+            "dba_sql_and_acl_acceptance_verified",
+            "existing_gateway_rollback_verified",
+            "billing_and_paid_provider_calls_disabled"
+        )},
+    }
+    previous.write_text(json.dumps(evidence))
+    previous.chmod(0o600)
+    monkeypatch.setattr(install_module,"RUNTIME",tmp_path)
+    monkeypatch.setattr(install_module,"UBUNTU",type("U",(),{
+        "pw_uid":__import__("os").geteuid(),"pw_gid":__import__("os").getegid(),
+    })())
+    monkeypatch.setattr(install_module,"atomic_file",
+                        lambda *args,**kwargs: pytest.fail("should reuse verified evidence"))
+    install_module.record_verified_evidence(baseline)
+    evidence["source_sql_sha256"]="unexpected-drift"
+    previous.write_text(json.dumps(evidence))
+    with pytest.raises(RuntimeError,match="earlier_release_evidence_mismatch"):
+        install_module.record_verified_evidence(baseline)
+
+
+
+def test_failed_db_auth_does_not_restart_unmodified_owner_services(
+    install_module,monkeypatch,tmp_path
+):
+    # The first failed attempt restarted both unrelated services even though
+    # their drop-ins were never installed. Never repeat that churn.
+    calls=[]
+    monkeypatch.setattr(install_module,"PUB_OVERLAY",tmp_path/"public.conf")
+    monkeypatch.setattr(install_module,"CRM_OVERLAY",tmp_path/"private.conf")
+    monkeypatch.setattr(install_module,"hold_database",lambda:calls.append("hold") or True)
+    monkeypatch.setattr(install_module,"run",lambda args:calls.append(tuple(args)) or "")
+    assert install_module.clean_failed_release() is True
+    assert calls==["hold"]
+
+
+def test_rollback_removes_only_our_two_overlays_and_restores_services(
+    install_module,monkeypatch,tmp_path
+):
+    calls=[]
+    pub=tmp_path/"founder-public.conf"
+    private=tmp_path/"founder-private.conf"
+    pub.write_text("scoped")
+    private.write_text("scoped")
+    other=tmp_path/"other-owners.conf"
+    other.write_text("keep me")
+    monkeypatch.setattr(install_module,"PUB_OVERLAY",pub)
+    monkeypatch.setattr(install_module,"CRM_OVERLAY",private)
+    monkeypatch.setattr(install_module,"hold_database",lambda:calls.append("hold") or True)
+    monkeypatch.setattr(install_module,"run",lambda args:calls.append(tuple(args)) or "")
+    assert install_module.clean_failed_release() is True
+    assert not pub.exists() and not private.exists()
+    assert other.read_text()=="keep me"
+    assert calls==["hold",("systemctl","daemon-reload"),
+        ("systemctl","restart",install_module.CRM_SVC),
+        ("systemctl","restart",install_module.PUB_SVC)]

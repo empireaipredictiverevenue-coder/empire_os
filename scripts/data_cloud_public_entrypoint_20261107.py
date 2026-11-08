@@ -77,7 +77,7 @@ def meter_connection():
     return psycopg.connect(
         dbname="empiredb",
         user="empire_data_cloud_meter_login",
-        host="/var/run/postgresql",
+        host="127.0.0.1",
         port=5432,
         password=meter_password,
         connect_timeout=3,
