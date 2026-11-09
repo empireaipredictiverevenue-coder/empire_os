@@ -50,3 +50,26 @@ The wrapper requires positive provider-availability evidence, validates known up
 **Observed real backend proof:** via existing EmpireOS-owned search_public_web and existing _quality_filter in a read-only isolated invocation, the search 'python programming language' returned **3** filtered results; upstream recorded bing_html, collector identity empire_search_fabric_public, and fresh evidence timestamp. This proved the **collector-to-original-customer-formatter path**, not a live authenticated customer transaction. All new HTTP-path tests use a synthetic metering store and an injected fetcher; no production SQL write or gateway change.
 
 **No external supplier agreement required:** the software is our first-party collection stack, though individual upstream pages and downstream uses still have source-specific rules. The actual customer POST is still not mounted in production. The original owner must wire the approved source-use callbacks and already-existing metering/gateway route before claiming customer access.
+
+## Scoped founder first-party search release assembly — 9 November 2026
+
+The existing original gateway route assembler now supports an **opt-in search_pilot** scope: only GET /v1/data/usage and POST /v1/data/search. POST /v1/data/site-audits remains UNMOUNTED in this limited release. The code reuses the original signed founder Data Cloud verifier, original customer API and existing EmpireDB metering interface; no new router/service, role, migration or supplier dependency was created.
+
+Original usage-only and full three-route behavior remains unchanged. Search pilot requires the existing usage-pilot acceptance and two additional directly relevant facts: **source_egress_and_rights_reviewed** (actual first-party public collection source-use review, not a supplier contract) and **production_meter_write_functions_verified** (dedicated login can call existing reserve and settle functions). It does not require another unrelated site-audit rollout or off-host physical recovery exercise. Boolean evidence from isolated tests is TEST-ONLY, not actual operational approval. Actual read-only production inspection on 9 Nov confirms dedicated meter login has authenticated usage read permissions but not reserve/settle EXECUTE; search pilot is therefore not eligible for live activation today. No privileges were altered.
+
+A new end-to-end isolated signed-session test exercises the real existing gateway assembler and original Data Cloud search API with a valid synthetic signed founder session, authenticated tenant, controlled first-party collector output, synthetic quota reservations and settlement, proof of no-store/nosniff headers, rejection of no session, and revocation of founder access. Tests also verify that missing actual write-function grants or source-use evidence prevents mounting ANY route, and that usage-only and search_pilot cannot accidentally be enabled together.
+
+This is **tested/committed software**, not a claim of production installation. The current production GET usage endpoint remains protected, while search/site-audit POST endpoints remain unmounted. No extra backup work, paid provider, external supplier or production mutation was performed.
+
+## Current production meter readback, without any write — 9 November 2026
+
+Independent read-only EmpireDB verification against the ORIGINAL schema, no migrations:
+
+- Existing dedicated login empire_data_cloud_meter_login: EXECUTE authenticate = TRUE; usage_snapshot = TRUE; reserve = FALSE; settle = FALSE.
+- Existing Data Cloud tenants: 1 total, 1 active and not held, **0 active search-entitled**. Site audit remains 0 active entitled.
+- Existing Data Cloud keys: 1 active (key contents and tenant identity not queried or printed).
+- Existing public gateway: GET /v1/data/usage responds 401 to unauthenticated requests; POST /v1/data/search and POST /v1/data/site-audits remain 404 (not mounted).
+
+This identifies the **smallest actual original-owner activation delta** for a *founder-only first-party search pilot*: (a) review the existing meter reserve/settle stored-function ACLs under the dedicated login, (b) explicitly enable the search operation on the appropriate existing active tenant, and (c) use the existing gateway owner's search_pilot=True route selection and first-party source policy callbacks with a verified rollback. No table migration, new data vendor, new service or off-host recovery project is necessary for this restricted pilot. These actions are NOT executed by this review branch; there has been no production entitlement expansion. Do not label test-fixture booleans as actual DBA or owner approvals.
+
+Search pilot only mounts usage + search; site audits remain 404 until separately designed and accepted. All real revenue, billing, customer output and supplier spend remain unproven and are NOT asserted by this release candidate.

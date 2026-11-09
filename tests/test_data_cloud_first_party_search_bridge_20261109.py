@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 from empire_os.predictive_cloud_customer_api import gateway_candidate_entrypoint as owner
 from empire_os.predictive_cloud_customer_api import durable_api
 from empire_os.predictive_cloud_customer_api.durable_store import ActiveTenant
+from tests.test_predictive_cloud_route_assembly_20261107 import components
 
 TOKEN = "synthetic-first-party-search-client-token"
 QUERY = "roofing suppliers chicago"
@@ -214,3 +215,98 @@ def test_existing_relevance_filter_failure_never_leaks_raw_results(monkeypatch):
     assert response.status_code == 503
     assert "Real first-party parser fixture" not in response.text
     assert meter.settlements[0][0] == "provider_error"
+
+
+def test_existing_signed_gateway_full_customer_search_chain(monkeypatch, components):
+    """Real signed Data Cloud session + original mount + owned collector contract.
+
+    Synthetic first-party rows/meter and explicit TEST-ONLY release evidence.
+    Does not assert any production permission, identity, or deployment.
+    """
+    from fastapi import FastAPI
+    from empire_os.predictive_cloud_route_assembly import (
+        SEARCH_PILOT_REQUIREMENTS, attach_existing_customer_routes,
+    )
+    verifier, state, candidate, evidence, signed_session = components
+    meter = LocalMeter()
+    # The existing CRM founder test verifier validates the same synthetic
+    # tenant as the synthetic canonical Data Cloud meter.
+    meter.tenant = ActiveTenant(
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", 20, 10000, 500, 500,
+        frozenset({"search"}), frozenset(),
+    )
+    observed = []
+
+    def original_collector(query, *, num):
+        observed.append(("fetch", query, num))
+        return ObservedRows([{
+            "title": "Python official documentation",
+            "link": "https://docs.python.org/3/",
+            "snippet": "Programming language reference",
+            "engine": "bing_html",
+        }])
+
+    def source_preflight(tenant_id, source_id, query, limit):
+        observed.append(("preflight", tenant_id, source_id))
+        return tenant_id == meter.tenant.tenant_id and source_id == SOURCE
+
+    def output_check(tenant_id, source_id, payload):
+        observed.append(("output", tenant_id, source_id))
+        return tenant_id == meter.tenant.tenant_id and payload["source_id"] == SOURCE
+
+    monkeypatch.setattr(owner, "EmpireDbMeteringStore", lambda factory: meter)
+    customer = owner.create_gateway_candidate_app(
+        connect_factory=lambda: None,
+        enable_first_party_search=True,
+        first_party_public_fetch=original_collector,
+        first_party_quality_filter=lambda rows, query, limit: rows[:limit],
+        source_request_preflight=source_preflight,
+        source_output_check=output_check,
+    )
+    host = FastAPI()
+
+    @host.get("/existing")
+    def original_route():
+        return {"untouched": True}
+
+    selected = attach_existing_customer_routes(
+        host, customer, verifier,
+        release_evidence=lambda: {k: True for k in SEARCH_PILOT_REQUIREMENTS},
+        search_pilot=True,
+    )
+    assert selected == ("/v1/data/search", "/v1/data/usage")
+    request = {
+        "Authorization": "Bearer " + TOKEN,
+        "X-Empire-Data-Session": signed_session(),
+        "Idempotency-Key": "original-first-party-test-0001",
+    }
+    with TestClient(host) as client:
+        assert client.get("/existing").json() == {"untouched": True}
+        assert client.post("/v1/data/site-audits").status_code == 404
+        assert client.post(
+            "/v1/data/search",
+            headers={"Authorization": "Bearer " + TOKEN},
+            json={"query": QUERY, "limit": 2},
+        ).status_code == 401
+        response = client.post(
+            "/v1/data/search", headers=request,
+            json={"query": QUERY, "limit": 2},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["results"][0]["source"]["source_id"] == SOURCE
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-content-type-options"] == "nosniff"
+        assert observed == [
+            ("preflight", meter.tenant.tenant_id, SOURCE),
+            ("fetch", QUERY, 2),
+            ("output", meter.tenant.tenant_id, SOURCE),
+        ]
+        assert len(meter.reserves) == 1
+        assert meter.settlements[0][0] == "completed"
+        state["entitled"] = False
+        blocked = client.post(
+            "/v1/data/search", headers=request,
+            json={"query": QUERY, "limit": 2},
+        )
+        assert blocked.status_code == 403
+        assert len(meter.reserves) == 1

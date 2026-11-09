@@ -217,3 +217,60 @@ def test_full_customer_launch_still_requires_offhost_dr(components):
     with pytest.raises(RuntimeError,match="release_preflight"):
         attach_existing_customer_routes(host,candidate(),verifier,
             release_evidence=lambda:accepted,usage_only=False)
+
+
+def test_search_pilot_uses_existing_gateway_without_unrelated_site_audit_or_offhost_gate(components):
+    from empire_os.predictive_cloud_route_assembly import SEARCH_PILOT_REQUIREMENTS
+    verifier, state, candidate, evidence, token = components
+    host = FastAPI()
+    approved = {k: True for k in SEARCH_PILOT_REQUIREMENTS}
+    # Full-release requirements are not silently asserted for this limited scope.
+    approved["offhost_physical_recovery_verified"] = False
+    approved["founder_only_pilot_verified"] = False
+    chosen = attach_existing_customer_routes(
+        host, candidate(), verifier,
+        release_evidence=lambda: approved, search_pilot=True,
+    )
+    assert chosen == ("/v1/data/search", "/v1/data/usage")
+    assert inspect_routes(host) & CUSTOMER_ROUTES == frozenset({
+        USAGE_ROUTE, ("/v1/data/search", "POST"),
+    })
+    with TestClient(host) as client:
+        assert client.post("/v1/data/site-audits").status_code == 404
+        assert client.post("/v1/data/search").status_code == 401
+        assert client.get(
+            "/v1/data/usage",
+            headers={"X-Empire-Data-Session": token()},
+        ).status_code == 200
+
+
+@pytest.mark.parametrize("missing", [
+    "production_meter_write_functions_verified",
+    "source_egress_and_rights_reviewed",
+])
+def test_search_pilot_real_missing_evidence_fails_before_route_mount(components, missing):
+    from empire_os.predictive_cloud_route_assembly import SEARCH_PILOT_REQUIREMENTS
+    verifier, state, candidate, evidence, token = components
+    host = FastAPI()
+    release = {k: True for k in SEARCH_PILOT_REQUIREMENTS}
+    release[missing] = False
+    before = inspect_routes(host)
+    with pytest.raises(RuntimeError, match="release_preflight"):
+        attach_existing_customer_routes(
+            host, candidate(), verifier,
+            release_evidence=lambda: release, search_pilot=True,
+        )
+    assert inspect_routes(host) == before
+    assert len(host.user_middleware) == 0
+
+
+def test_search_pilot_and_usage_only_cannot_be_combined(components):
+    verifier, state, candidate, evidence, token = components
+    host = FastAPI()
+    with pytest.raises(RuntimeError, match="invalid_pilot_scope"):
+        attach_existing_customer_routes(
+            host, candidate(), verifier,
+            release_evidence=evidence(),
+            search_pilot=True, usage_only=True,
+        )
+    assert not hasattr(host.state, "data_cloud_routes_attached")
