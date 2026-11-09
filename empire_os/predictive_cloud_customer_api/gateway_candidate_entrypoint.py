@@ -19,8 +19,10 @@ def create_gateway_candidate_app(
 ) -> FastAPI:
     """Requires trusted ASGI principal + separate API key for all routes.
 
-    No search adapter is exposed: third-party customer-output rights are
-    unverified. Site audit requires separately reviewed connect-time egress.
+    No customer search adapter is mounted by default: the existing self-hosted
+    Search Fabric route needs owner-approved source-use and egress controls,
+    not a mandatory third-party supplier contract. Site audit requires
+    separately reviewed connect-time egress.
     """
     return create_metered_private_app(
         store=EmpireDbMeteringStore(connect_factory),

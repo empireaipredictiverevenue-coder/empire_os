@@ -231,9 +231,12 @@ def create_metered_private_app(
     # Fixed trusted supplier/collector identity; never taken from request JSON.
     search_source_id: str | None = None,
     site_adapter: Callable[[str], Mapping[str, Any]] | None = None,
+    # Legacy configuration field; means source-specific customer output policy
+    # was reviewed by the operator, NOT that a third-party supplier contract is
+    # mandatory. EmpireOS can supply its own collector using Search Fabric.
     licensed_search_output: bool = False,
-    # Existing owner must supply an independently evidenced provider/source
-    # entitlement check. Boolean enablement alone is insufficient.
+    # Existing owner must supply the actual source-use policy/entitlement
+    # review (including target-site access and privacy where applicable).
     source_rights_check: Callable[[str, str, Mapping[str, Any]], bool] | None = None,
     # Must authorize the planned query BEFORE reserving quota or calling a
     # potentially chargeable provider. The output check still runs afterward.
@@ -324,7 +327,7 @@ def create_metered_private_app(
         if "search" not in policy.permitted_operations:
             raise HTTPException(403, "search_not_entitled")
         if not licensed_search_output:
-            raise HTTPException(403, "source_resale_rights_unverified")
+            raise HTTPException(403, "customer_source_use_not_approved")
         if type(search_source_id) is not str or not _SEARCH_SOURCE_ID_RE.fullmatch(search_source_id):
             raise HTTPException(503, "trusted_search_source_id_unconfigured")
         if source_rights_check is None:

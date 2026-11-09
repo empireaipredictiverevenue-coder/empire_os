@@ -137,7 +137,7 @@ def test_explicit_customer_rights_flag_false_prevents_preflight_and_provider():
     api, calls = build(lambda _q, _n: True, licensed=False)
     response = _search(api)
     assert response.status_code == 403
-    assert "source_resale_rights_unverified" in response.text
+    assert "customer_source_use_not_approved" in response.text
     assert calls["preflight"] == calls["adapter"] == calls["reserve"] == 0
 
 

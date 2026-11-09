@@ -4,8 +4,8 @@
 
 ## Previously unsafe contract
 
-- The request-side supplier rights gate originally saw query/limit but not the authenticated tenant or supplier identity. A provider switch could execute outside the customer's authorized source.
-- The result-side rights gate originally saw payload only. A licence for one tenant or supplier could mistakenly govern another.
+- The request-side source-use gate originally saw query/limit but not the authenticated tenant or configured collector identity. A collector switch could execute outside the customer's intended source-use policy.
+- The result-side source-use gate originally saw payload only. A policy for one tenant or collected source could mistakenly govern another.
 - Search response assembly stamped current retrieval time without retaining actual source observation time, allowing cached evidence to masquerade as fresh.
 - Raw provider URLs could be HTTP, credential-bearing or internal, and degraded provider responses could be mistaken for genuine zero-hit results.
 
@@ -22,7 +22,7 @@ Original explicit research-only/NO_RESALE flags retain precedence over any permi
 - `SOURCE_PROVENANCE.json` retains the original source archive hash and pins this exact changed `durable_api.py` SHA.
 - **NO** changes to production routes, live EmpireDB schema, protected keys, provider spending, billing, restart, outreach, or deployment.
 
-**Operational truth:** founder `GET /v1/data/usage` was previously verified live; customer search and site-audit POSTs are still NOT mounted (404). Only an original owner with independently verified supplier redistribution permissions, source-specific entitlement, DBA rights for meter reservation and guarded release acceptance may turn on customer search. A passing synthetic callback is not licence evidence.
+**Operational truth:** founder `GET /v1/data/usage` was previously verified live; customer search and site-audit POSTs are still NOT mounted (404). No external supplier agreement is required to operate our own collector. Customer search release requires the existing authenticated-tenant and source-use controls, appropriate compliance with actual target-site terms/privacy obligations (not an assumed supplier contract), the original metering and gateway owner checks, and real integration tests. A passing synthetic callback is not live deployment evidence.
 
 ## Source cost integrity closure — 9 November 2026
 
@@ -32,4 +32,10 @@ The original `run_operation` now sends the **authenticated tenant, operation, an
 
 For source archive accuracy, the original candidate source archive SHA stays fixed and unchanged, but `only_import_rewrites` is now explicitly **false** because hardening genuinely changed the converted module. The candidate provenance test was updated to enforce this truthful state and exact converted file digest.
 
-Still held: no live supplier contract or independent cost ledger reconciler was provided by the original operator; this source review cannot self-attest either or enable customer routes.
+There is **no universal supplier-contract blocker** for this first-party collector. Cost reconciliation is required only if an adapter reports externally charged costs; the existing no-receipt path correctly records unknown external cost as NULL and does not prevent an internal no-paid-provider operation. Actual customer routes still require owner-controlled metering/gateway admission and valid, source-specific use policy; no assertion is made that a hypothetical supplier contract or invoice is needed.
+
+## Founder correction — first-party self-collection, not supplier dependency
+
+**Corrected 9 November 2026:** EmpireOS already owns Search Fabric and direct public-search collectors. Data Cloud is a first-party acquisition/intelligence API; it does **not** require a Decodo, Smartproxy, scraping-data vendor or resale supplier contract as a prerequisite. The `search_source_id` identifies our configured collector and underlying evidence lineage. The existing gateway-factory default of no customer search adapter is an owner-controlled release setting, not proof that a supplier must be procured. The legacy `licensed_search_output` internal configuration name means operator review of proposed customer output; it must not be interpreted as a mandatory vendor contract. Specific external-site access and output use still must respect actual terms, robots, privacy, and other applicable obligations, evaluated based on the actual source and intended use.
+
+**Evidence distinction:** internal Search Fabric is already implemented; this PR fixes tenant/source provenance and actual-cost accounting. It does not establish a completed customer deployment. Live customer search POST remains unmounted, and the existing dedicated meter role lacks `reserve`/`settle` grants, so production write-capable customer transactions cannot currently run. No third-party licence search should be used as a generic deployment gate.
