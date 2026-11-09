@@ -30,6 +30,8 @@ class SearchReaderPostgresTests(unittest.TestCase):
         cls.sql('CREATE DATABASE crm_search_fixture', db='postgres')
         cls.sql(f"""
           CREATE ROLE empiredb_migrator NOLOGIN;
+          CREATE ROLE empiredb_app NOLOGIN;
+          CREATE ROLE empiredb_readonly NOLOGIN;
           CREATE ROLE empire_revenue_crm_reader NOLOGIN NOINHERIT;
           CREATE ROLE crm_a LOGIN NOINHERIT;
           CREATE ROLE crm_b LOGIN NOINHERIT;
@@ -104,6 +106,12 @@ class SearchReaderPostgresTests(unittest.TestCase):
               SELECT 1 FROM seo_sites s WHERE s.id=site_id
                 AND s.tenant_key=current_setting('app.tenant_key',true)));
         """)
+        cls.sql("""
+          ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator IN SCHEMA public
+            GRANT SELECT,INSERT,UPDATE,DELETE ON TABLES TO empiredb_app;
+          ALTER DEFAULT PRIVILEGES FOR ROLE empiredb_migrator IN SCHEMA public
+            GRANT SELECT ON TABLES TO empiredb_readonly;
+        """)
         cls.sql((ROOT/'migrations/empiredb/proposals/crm_search_evidence_reader.sql').read_text())
 
     @classmethod
@@ -151,6 +159,22 @@ class SearchReaderPostgresTests(unittest.TestCase):
 
     def test_forged_tenant_settings_do_not_grant_access(self):
         self.read(prospect=Q, site=Z, prefix=f"SET LOCAL app.tenant_id='{U}'; SET LOCAL app.tenant_key='key-b';", error=True)
+
+    def test_inherited_defaults_removed_only_from_new_binding_table(self):
+        for role in ('empiredb_app', 'empiredb_readonly'):
+            for privilege in ('SELECT','INSERT','UPDATE','DELETE'):
+                self.assertEqual(self.sql(
+                    f"SELECT has_table_privilege('{role}', "
+                    f"'public.crm_search_site_bindings','{privilege}')"), 'f')
+            self.sql(f'SET ROLE {role}; SELECT * FROM crm_search_site_bindings', error=True)
+        # Existing defaults must remain available to unrelated future tables.
+        self.assertEqual(self.sql("""
+          SELECT count(*) FROM pg_default_acl d
+          CROSS JOIN LATERAL aclexplode(d.defaclacl) a
+          WHERE d.defaclrole='empiredb_migrator'::regrole
+            AND d.defaclnamespace='public'::regnamespace AND d.defaclobjtype='r'
+            AND a.grantee IN ('empiredb_app'::regrole,'empiredb_readonly'::regrole)
+        """), '5')
 
     def test_direct_table_access_and_binding_writes_denied(self):
         for table in ('crm_search_site_bindings','tenant_business_entity_bindings',

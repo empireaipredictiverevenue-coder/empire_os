@@ -93,6 +93,8 @@ CREATE TABLE public.crm_search_site_bindings (
 );
 REVOKE ALL ON public.crm_search_site_bindings FROM PUBLIC;
 REVOKE ALL ON public.crm_search_site_bindings FROM empire_revenue_crm_reader;
+-- Remove observed inherited defaults on this object only.
+REVOKE ALL ON public.crm_search_site_bindings FROM empiredb_app, empiredb_readonly;
 COMMENT ON TABLE public.crm_search_site_bindings IS
   'Explicit evidence-backed CRM search scope. Empty on installation; no automatic domain matches.';
 

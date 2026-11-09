@@ -236,3 +236,25 @@ f989749d437f7e47377eca1cdf6a801c2de6cb2081c63a1a1ffcde8fdffeae44
 The original bounded founder approval remains applicable. The replacement
 candidate retains all guards and the single-transaction installation. Use its
 new checksum; do not retry the superseded candidate.
+
+## Default-ACL correction after final guard rejection — 2026-11-09
+
+Founder capture shows the text-array candidate passed schema and policy guards,
+then failed its final ACL guard. Subsequent catalog confirms both new objects
+are absent. The transaction rolled back. Observed migrator defaults in public:
+empiredb_app SELECT/INSERT/UPDATE/DELETE and empiredb_readonly SELECT on tables.
+
+Candidate now explicitly revokes all table privileges from those two roles on
+crm_search_site_bindings only. No ALTER DEFAULT PRIVILEGES is performed by the
+migration. Existing database defaults and existing objects remain unchanged.
+The final unexpected-ACL guard remains in place.
+
+Fixture now reproduces those five default grants. Twenty HTTP/PostgreSQL tests
+passed with zero skips (2.761s), including explicit denial of both generic
+roles on the binding table and preservation of all five default grants.
+git diff --check passed. No production application or restart performed.
+
+Replacement SQL SHA256:
+8dd86492653b3e844b0251013fd461d4f2bc8f9d52487d270e51deffc5450ac6
+Use this checksum for the already-approved bounded migration. Bindings remain
+empty; authenticated HTTP mount and genuine founder-session proof remain pending.
