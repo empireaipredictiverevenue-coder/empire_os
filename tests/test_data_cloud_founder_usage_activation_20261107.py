@@ -39,7 +39,10 @@ def test_public_data_cloud_key_and_real_original_route():
     assert "from linkedin_browser_ui_entrypoint import app" in text
     assert "DataCloudPublicVerifier" in text
     assert "create_gateway_candidate_app" in text
-    assert "usage_only=True" in text
+    # Original founder usage remains the default unless a separately guarded
+    # first-party search pilot is explicitly enabled.
+    assert "usage_only=not search_enabled" in text
+    assert "search_pilot=search_enabled" in text
     assert "RELEASE_EVIDENCE.json" in text
     assert "verified_requirements" in text
     assert "Ed25519PrivateKey" not in text
