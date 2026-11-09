@@ -45,10 +45,10 @@ class SearchReaderPostgresTests(unittest.TestCase):
             valid_from timestamptz,valid_until timestamptz);
           CREATE TABLE seo_backlink_observations(
             id uuid,site_id uuid,source_url text,target_url text,anchor_text text,rel text,
-            source text,provenance jsonb,observed_at timestamptz);
+            source text,provenance text[],observed_at timestamptz);
           CREATE TABLE seo_ai_visibility_observations(
             id uuid,site_id uuid,query text,engine text,cited_url text,source_url text,
-            citation_position integer,mention_text text,provenance jsonb,observed_at timestamptz);
+            citation_position integer,mention_text text,provenance text[],observed_at timestamptz);
           CREATE FUNCTION empire_current_tenant_id() RETURNS uuid LANGUAGE sql STABLE
             SECURITY DEFINER SET search_path='' AS $$
             SELECT CASE session_user WHEN 'crm_a' THEN '{T}'::uuid
@@ -174,12 +174,12 @@ class SearchReaderPostgresTests(unittest.TestCase):
     def test_observations_scoped_and_truncation_explicit(self):
         self.sql(f"""
           INSERT INTO seo_backlink_observations VALUES
-            ('{P}','{S}','https://source.example','https://a.example',NULL,NULL,'fixture','["fixture:1"]',now()),
-            ('{Q}','{S}','https://source2.example','https://a.example',NULL,NULL,'fixture','["fixture:2"]',now()),
-            ('{E}','{Z}','https://secret.example','https://b.example',NULL,NULL,'fixture','["fixture:foreign"]',now());
+            ('{P}','{S}','https://source.example','https://a.example',NULL,NULL,'fixture',ARRAY['fixture:1'],now()),
+            ('{Q}','{S}','https://source2.example','https://a.example',NULL,NULL,'fixture',ARRAY['fixture:2'],now()),
+            ('{E}','{Z}','https://secret.example','https://b.example',NULL,NULL,'fixture',ARRAY['fixture:foreign'],now());
           INSERT INTO seo_ai_visibility_observations VALUES
-            ('{P}','{S}','roofing','fixture-engine','https://a.example',NULL,1,NULL,'["fixture:c"]',now()),
-            ('{Q}','{S}','different','fixture-engine','https://a.example',NULL,1,NULL,'["fixture:other"]',now());
+            ('{P}','{S}','roofing','fixture-engine','https://a.example',NULL,1,NULL,ARRAY['fixture:c'],now()),
+            ('{Q}','{S}','different','fixture-engine','https://a.example',NULL,1,NULL,ARRAY['fixture:other'],now());
         """)
         data=json.loads(self.read(limit=1))
         self.assertEqual(data['status'], 'CONNECTED_OBSERVATIONS')

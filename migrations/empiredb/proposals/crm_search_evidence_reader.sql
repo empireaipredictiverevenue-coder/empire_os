@@ -30,13 +30,13 @@ BEGIN
       ('seo_backlink_observations','id','uuid'),('seo_backlink_observations','site_id','uuid'),
       ('seo_backlink_observations','source_url','text'),('seo_backlink_observations','target_url','text'),
       ('seo_backlink_observations','anchor_text','text'),('seo_backlink_observations','rel','text'),
-      ('seo_backlink_observations','source','text'),('seo_backlink_observations','provenance','jsonb'),
+      ('seo_backlink_observations','source','text'),('seo_backlink_observations','provenance','text[]'),
       ('seo_backlink_observations','observed_at','timestamp with time zone'),
       ('seo_ai_visibility_observations','id','uuid'),('seo_ai_visibility_observations','site_id','uuid'),
       ('seo_ai_visibility_observations','query','text'),('seo_ai_visibility_observations','engine','text'),
       ('seo_ai_visibility_observations','cited_url','text'),('seo_ai_visibility_observations','source_url','text'),
       ('seo_ai_visibility_observations','citation_position','integer'),
-      ('seo_ai_visibility_observations','mention_text','text'),('seo_ai_visibility_observations','provenance','jsonb'),
+      ('seo_ai_visibility_observations','mention_text','text'),('seo_ai_visibility_observations','provenance','text[]'),
       ('seo_ai_visibility_observations','observed_at','timestamp with time zone')
     ) AS required(table_name,column_name,type_name)
     LEFT JOIN pg_catalog.pg_attribute a

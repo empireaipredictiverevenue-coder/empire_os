@@ -214,3 +214,25 @@ NOT LIVE. Apply uses one transaction and ON_ERROR_STOP; any guard failure
 rolls back the whole database delta. No restart is part of this database step.
 The authenticated route release must follow confirmed database installation
 and fresh current-release reconciliation; shared dirty auth/transport unchanged.
+
+## Provenance type correction after failed live preflight — 2026-11-09
+
+Founder ran candidate SHA256 9c232e5ac7d8712da87eba0b244e7e2b46187516f086f0b3a425c678afddca02.
+It failed at the initial schema guard, before grants or object creation.
+Follow-up catalog capture confirms the new binding table and reader are absent.
+Actual observation provenance columns are text[], not the assumed jsonb.
+All other source columns required by the reader match the supplied catalog.
+
+Corrected only the two provenance type expectations in the candidate SQL.
+Updated both SQL and HTTP/database fixtures to store native text arrays and
+insert ARRAY literals. Existing to_jsonb row serialization produces the JSON
+arrays expected by the adapter; no production column conversion is needed.
+Nineteen HTTP/PostgreSQL integration tests passed, zero skips (2.652 seconds).
+git diff --check passed. No live migration, restart or route deployment occurred.
+
+Replacement candidate SHA256:
+f989749d437f7e47377eca1cdf6a801c2de6cb2081c63a1a1ffcde8fdffeae44
+
+The original bounded founder approval remains applicable. The replacement
+candidate retains all guards and the single-transaction installation. Use its
+new checksum; do not retry the superseded candidate.

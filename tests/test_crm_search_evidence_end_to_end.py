@@ -30,7 +30,7 @@ class SearchEvidenceEndToEndTests(fixture.SearchReaderPostgresTests):
         self.sql(f"""
           INSERT INTO seo_ai_visibility_observations VALUES
             ('{fixture.P}','{fixture.S}','roofing','fixture-engine','https://a.example/guide',
-             NULL,1,NULL,'["fixture:real-db-citation"]',now());
+             NULL,1,NULL,ARRAY['fixture:real-db-citation'],now());
         """)
         with self.client() as client:
             response = self.request(client)
