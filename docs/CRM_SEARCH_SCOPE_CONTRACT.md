@@ -70,8 +70,9 @@ migration number is reserved. It creates an empty, inactive-by-default explicit
 binding table and a restricted reader, owned by the existing migrator role.
 It pins the approved base URL and search tenant key and checks current CRM
 scope within the database statement. Runtime callers receive EXECUTE only.
-The function sets row_security=off to raise if RLS would silently filter its
-owner's read; this does not grant BYPASSRLS. Missing privileges remain errors.
+The revised function uses row_security=on with explicit session-tenant/site
+policies. An exact effective-policy contract check rejects policy drift instead
+of reporting silently filtered rows as empty evidence. No BYPASSRLS is granted.
 
 The candidate has been exercised in a temporary PostgreSQL 18 cluster with
 real tenant A/B and unbound login sessions. Fixtures are isolated synthetic
@@ -164,3 +165,52 @@ precondition differs, stop before mutation and reconcile the exact delta.
 The new SQL rollback may run only while no binding history exists; otherwise
 preserve evidence and review recovery. This is a code/tested proposal, not
 production migration approval or a claim of live functionality.
+
+## Founder-approved release: live ACL reconciliation — 2026-11-09
+
+Founder explicitly approved the bounded migration and authenticated CRM route
+release, conditional on preflight. Approval persists; no binding provisioning,
+outreach, collection or payments are included. Desktop Commander rejected the
+sudo PostgreSQL preflight as "Command not allowed"; no alternate execution
+route was used. Founder supplied two read-only catalog captures instead.
+
+Observed in those captures: both trusted functions are stable SECURITY DEFINER,
+owned by empiredb_migrator with empty search_path; session_user determines
+tenant identity. New table/function are absent. All three SEO tables are owned
+by postgres, have RLS enabled, and lack effective SELECT for migrator.
+Migrator is nonsuperuser, no BYPASSRLS, inherits empiredb_tenant_reader only.
+Existing SEO policies target empire_search_reader using app.tenant_key.
+
+Root cause in candidate: the old fixture owned SEO tables as migrator and did
+not reproduce production ACL/RLS. Passing its 15 tests did not prove readiness
+against the live source ownership contract. Fixture corrected to independent
+administrator ownership, enabled RLS and existing legacy search policies.
+
+Smallest candidate delta:
+- grant migrator SELECT on only the three source tables, constrained by added
+  policies using trusted session tenant plus current, identity-pinned bindings;
+- preserve existing search policies and all roles' BYPASSRLS attributes;
+- temporarily grant site-id REFERENCES for FK creation, restore prior effective
+  absence before commit, preserve pre-existing reference permission;
+- reader uses row_security=on and checks exact applicable policy definitions,
+  roles, command and enabled RLS, rejecting added or changed applicable policies;
+- migration validates source column types, baseline SELECT absence, RLS, trusted
+  function owners, default ACL exposure and empty bindings transactionally;
+- rollback removes only this function/table, three new policies and SELECT
+  grants; refuses to destroy any populated binding history.
+
+Validation: 19 combined HTTP/PostgreSQL tests passed, zero skips, in isolated
+PostgreSQL 18; git diff --check passed. Includes legacy reader preservation,
+forced RLS isolation, disabled RLS rejection, altered policy rejection,
+unexpected public policy rejection, revoked source privilege, and all previous
+HTTP/tenant/binding/query/rollback cases. Tests supply fixture HTTP identities;
+genuine signed founder-session verification remains a live acceptance step.
+
+Candidate SHA256:
+9c232e5ac7d8712da87eba0b244e7e2b46187516f086f0b3a425c678afddca02
+Path: migrations/empiredb/proposals/crm_search_evidence_reader.sql
+
+NOT LIVE. Apply uses one transaction and ON_ERROR_STOP; any guard failure
+rolls back the whole database delta. No restart is part of this database step.
+The authenticated route release must follow confirmed database installation
+and fresh current-release reconciliation; shared dirty auth/transport unchanged.

@@ -74,6 +74,36 @@ class SearchReaderPostgresTests(unittest.TestCase):
             ('{T}','{E}',true,'owned','fixture:a',now()-interval '1 day',NULL),
             ('{U}','{F}',true,'owned','fixture:b',now()-interval '1 day',NULL);
         """)
+        # Match production: source tables owned by an independent administrator,
+        # RLS enabled, no SELECT for migrator, legacy policies only for search.
+        owner = getpass.getuser()
+        cls.sql(f"""
+          CREATE ROLE empire_search_reader NOLOGIN NOINHERIT;
+          CREATE ROLE empiredb_tenant_reader NOLOGIN;
+          GRANT empiredb_tenant_reader TO empiredb_migrator;
+          ALTER TABLE seo_sites OWNER TO "{owner}";
+          ALTER TABLE seo_backlink_observations OWNER TO "{owner}";
+          ALTER TABLE seo_ai_visibility_observations OWNER TO "{owner}";
+          ALTER TABLE tenant_business_entity_bindings OWNER TO "{owner}";
+          GRANT SELECT ON tenant_business_entity_bindings TO empiredb_migrator;
+          ALTER TABLE prospect_entity_links ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE seo_sites ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE seo_backlink_observations ENABLE ROW LEVEL SECURITY;
+          ALTER TABLE seo_ai_visibility_observations ENABLE ROW LEVEL SECURITY;
+          GRANT SELECT ON seo_sites,seo_backlink_observations,
+            seo_ai_visibility_observations TO empire_search_reader;
+          CREATE POLICY empire_search_reader_select ON seo_sites
+            FOR SELECT TO empire_search_reader
+            USING (tenant_key=current_setting('app.tenant_key',true));
+          CREATE POLICY seo_backlinks_reader_scope ON seo_backlink_observations
+            FOR SELECT TO empire_search_reader USING (EXISTS (
+              SELECT 1 FROM seo_sites s WHERE s.id=site_id
+                AND s.tenant_key=current_setting('app.tenant_key',true)));
+          CREATE POLICY seo_ai_visibility_reader_scope ON seo_ai_visibility_observations
+            FOR SELECT TO empire_search_reader USING (EXISTS (
+              SELECT 1 FROM seo_sites s WHERE s.id=site_id
+                AND s.tenant_key=current_setting('app.tenant_key',true)));
+        """)
         cls.sql((ROOT/'migrations/empiredb/proposals/crm_search_evidence_reader.sql').read_text())
 
     @classmethod
@@ -164,14 +194,41 @@ class SearchReaderPostgresTests(unittest.TestCase):
         for limit in (0,101):
             self.read(limit=limit,error=True)
 
-    def test_rls_filtering_raises_instead_of_claiming_empty_evidence(self):
-        self.sql('ALTER TABLE seo_backlink_observations ENABLE ROW LEVEL SECURITY; '
-                 'ALTER TABLE seo_backlink_observations FORCE ROW LEVEL SECURITY;')
+    def test_rls_contract_drift_raises_instead_of_empty_evidence(self):
+        self.sql('ALTER POLICY crm_search_bound_backlinks ON seo_backlink_observations USING (false)')
         try:
             self.read(error=True)
         finally:
-            self.sql('ALTER TABLE seo_backlink_observations NO FORCE ROW LEVEL SECURITY; '
-                     'ALTER TABLE seo_backlink_observations DISABLE ROW LEVEL SECURITY;')
+            self.sql('ALTER POLICY crm_search_bound_backlinks ON seo_backlink_observations '
+                     'USING (site_id IN (SELECT s.id FROM public.seo_sites s))')
+
+    def test_disabled_rls_is_rejected(self):
+        self.sql('ALTER TABLE seo_sites DISABLE ROW LEVEL SECURITY')
+        try:
+            self.read(error=True)
+        finally:
+            self.sql('ALTER TABLE seo_sites ENABLE ROW LEVEL SECURITY')
+
+    def test_unexpected_applicable_policy_is_rejected(self):
+        self.sql('CREATE POLICY unexpected_public_access ON seo_sites FOR SELECT TO PUBLIC USING (true)')
+        try:
+            self.read(error=True)
+        finally:
+            self.sql('DROP POLICY unexpected_public_access ON seo_sites')
+
+    def test_legacy_search_policy_is_preserved(self):
+        result = self.sql("BEGIN READ ONLY; SET LOCAL ROLE empire_search_reader; "
+                          "SET LOCAL app.tenant_key='key-a'; "
+                          "SELECT tenant_key FROM seo_sites; ROLLBACK;")
+        self.assertEqual(result, 'key-a')
+
+    def test_forced_rls_remains_tenant_scoped(self):
+        self.sql('ALTER TABLE seo_backlink_observations FORCE ROW LEVEL SECURITY')
+        try:
+            self.assertEqual(json.loads(self.read())['status'], 'CONNECTED_NO_OBSERVATIONS')
+            self.read(prospect=Q, site=Z, error=True)
+        finally:
+            self.sql('ALTER TABLE seo_backlink_observations NO FORCE ROW LEVEL SECURITY')
 
     def test_rollback_preserves_provisioned_bindings(self):
         rollback=(ROOT/'migrations/empiredb/proposals/crm_search_evidence_reader_rollback.sql').read_text()
