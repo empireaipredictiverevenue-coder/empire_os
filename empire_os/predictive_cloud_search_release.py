@@ -16,6 +16,11 @@ from empire_os.predictive_cloud_route_assembly import SEARCH_PILOT_REQUIREMENTS
 FLAG = "FOUNDER_APPROVED_FIRST_PARTY_SEARCH_20261109"
 SCOPE = "FOUNDER_ONLY_FIRST_PARTY_SEARCH_NO_PAID_API"
 # All executable extension sources are pinned, including the original collector.
+_TRUSTED_EXISTING_ROOTS = (
+    Path("/srv/empire_os"),
+    Path("/opt/empire-ai/data-cloud-founder-pilot-20261107"),
+)
+
 REQUIRED_FILES = frozenset({
     "data_cloud_public_entrypoint_20261107.py",
     "empire_os/predictive_cloud_search_release.py",
@@ -85,7 +90,29 @@ def load_search_release(path: Path, *, expected_sha256: str, release: Path,
             except Exception:
                 fail()
             if running_path != target.resolve():
-                fail()
+                # Earlier original gateway owners may have loaded the SAME
+                # approved source bytes before Data Cloud extends the package
+                # path. A path mismatch alone does not mean code drift.
+                # Allow only exact independently-pinned bytes at the two
+                # established original EmpireOS locations.
+                matching_origin = False
+                for base in _TRUSTED_EXISTING_ROOTS:
+                    previous = (base / relative).resolve()
+                    if running_path != previous:
+                        continue
+                    # Never accept an arbitrary, redirected or world-writable
+                    # path just because it advertises a familiar module name.
+                    if (
+                        not previous.is_file()
+                        or any(part.is_symlink() for part in (base / relative, *(base / relative).parents))
+                        or previous.stat().st_mode & 0o002
+                        or hashlib.sha256(previous.read_bytes()).hexdigest() != digest
+                    ):
+                        fail()
+                    matching_origin = True
+                    break
+                if not matching_origin:
+                    fail()
 
     def request_allowed(tenant_id, source_id, query, limit):
         return (tenant_id == tenant and source_id == FIRST_PARTY_SEARCH_SOURCE

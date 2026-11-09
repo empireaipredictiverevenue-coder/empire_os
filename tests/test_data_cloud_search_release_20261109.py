@@ -173,3 +173,45 @@ def test_original_entrypoint_preserves_upstream_app_and_issuer(monkeypatch, tmp_
         assert client.get("/v1/data/usage").status_code == 401
         assert client.post("/v1/data/search", json={"query": "roofing"}).status_code == (401 if search_enabled else 404)
         assert client.post("/v1/data/site-audits").status_code == 404
+
+
+def test_old_owner_preloaded_identical_source_bytes_are_accepted(monkeypatch, tmp_path):
+    receipt = receipt_tree(tmp_path)
+    old_owner_root = tmp_path / "original-owner"
+    module_name = "empire_os/search_fabric/public_fallback.py"
+    original = tmp_path / module_name
+    fallback = old_owner_root / module_name
+    fallback.parent.mkdir(parents=True, exist_ok=True)
+    fallback.write_bytes(original.read_bytes())
+    fallback.chmod(0o444)
+    monkeypatch.setattr(release, "_TRUSTED_EXISTING_ROOTS", (old_owner_root,))
+    monkeypatch.setattr(
+        release, "_imported_module_path",
+        lambda qualified: (
+            fallback.resolve()
+            if qualified == "empire_os.search_fabric.public_fallback"
+            else (tmp_path / (qualified.replace(".", "/") + ".py")).resolve()
+        ),
+    )
+    verified, _, _ = load(tmp_path, receipt)
+    assert verified == receipt["verified_requirements"]
+
+
+def test_preloaded_old_owner_with_changed_source_bytes_fails(monkeypatch, tmp_path):
+    receipt = receipt_tree(tmp_path)
+    old_owner_root = tmp_path / "original-owner"
+    module_name = "empire_os/search_fabric/public_fallback.py"
+    fallback = old_owner_root / module_name
+    fallback.parent.mkdir(parents=True, exist_ok=True)
+    fallback.write_bytes(b"unexpected changed code")
+    monkeypatch.setattr(release, "_TRUSTED_EXISTING_ROOTS", (old_owner_root,))
+    monkeypatch.setattr(
+        release, "_imported_module_path",
+        lambda qualified: (
+            fallback.resolve()
+            if qualified == "empire_os.search_fabric.public_fallback"
+            else (tmp_path / (qualified.replace(".", "/") + ".py")).resolve()
+        ),
+    )
+    with pytest.raises(RuntimeError, match="first_party_search_release_not_verified"):
+        load(tmp_path, receipt)

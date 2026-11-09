@@ -28,11 +28,11 @@ BASE = '900b0ee6d4c08266f8ff39e97bd846f210a40457'
 BRANCH = 'feature/data-cloud-source-provenance-review-20261109'
 CANONICAL = Path('/srv/empire_os')
 OLD = Path('/opt/empire-ai/data-cloud-founder-pilot-20261107')
-NEW = Path('/opt/empire-ai/data-cloud-founder-search-20261109-v1')
-STATE = Path('/var/lib/empire-data-cloud-search-owner-20261109')
+NEW = Path('/opt/empire-ai/data-cloud-founder-search-20261109-v2')
+STATE = Path('/var/lib/empire-data-cloud-search-owner-20261109-v2')
 RECEIPT = STATE / 'OWNER_RECEIPT.json'
 JOURNAL = STATE / 'JOURNAL.json'
-OVERLAY = Path('/etc/systemd/system/empire-public-gateway.service.d/zzzzzzzzzzzz-data-cloud-founder-search-20261109.conf')
+OVERLAY = Path('/etc/systemd/system/empire-public-gateway.service.d/zzzzzzzzzzzz-data-cloud-founder-search-20261109-v2.conf')
 SERVICE = 'empire-public-gateway.service'
 CRM = 'empire-revenue-crm-pilot.service'
 OLD_SHA = 'c233b9011fb015991841d2e94c4fbfe99e2d71d30beb01c9cc4929df1b7259ac'
@@ -165,7 +165,10 @@ def source(release_commit):
         actual = protected(ROOT / name, root=False,
                            source_uid=pwd.getpwnam('ubuntu').pw_uid)
         blob = run(['git', '-C', str(ROOT), 'hash-object', '--stdin'], actual)
-        require(blob == run(['git', '-C', str(ROOT), 'rev-parse', BASE + ':' + name]),
+        # The external owner receipt pins the exact clean release commit,
+        # while BASE separately remains an immutable ancestor. Security fixes
+        # after BASE must not create an impossible self-referential commit pin.
+        require(blob == run(['git', '-C', str(ROOT), 'rev-parse', release_commit + ':' + name]),
                 'source_hash_changed')
         files[name.removeprefix('scripts/')] = actual
     for name, digest in COLLECTOR.items():
