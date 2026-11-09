@@ -84,6 +84,7 @@ ROLLBACK;
     return result
 
 def main():
+    raise RuntimeError("WITHDRAWN: violates frozen CRM checksum; do not deploy")
     parser = argparse.ArgumentParser()
     parser.add_argument("--preflight-readonly", action="store_true")
     parser.add_argument("--apply-founder-approved", action="store_true")

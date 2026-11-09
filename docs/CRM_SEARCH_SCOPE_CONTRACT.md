@@ -293,3 +293,51 @@ NOT EXECUTED. The founder must run the bounded publisher through the existing
 terminal because the remote tool rejected privileged database access. The
 existing release approval stands. A genuine signed founder-session acceptance
 check remains required after unsigned runtime verification.
+
+## Failed in-place route release, verified recovery, additive replacement
+
+The founder executed the former publisher. Database preflight passed. Its
+in-place API replacement caused the original LinkedIn entrypoint to reject
+pinned_crm_work_queue_release_drift. Service failed after systemd retries.
+Original API and growth files were restored from the scoped backup; added
+adapter removed. Independent remote checks confirmed active/running, zero
+restarts since recovery, health 200 and unsigned prospect access 401, with
+original SHA256 values restored. Database migration remains installed.
+The former publisher now refuses execution unconditionally (WITHDRAWN).
+
+Root cause: tests imported the API with deployed dependencies but omitted the
+whole startup chain's frozen-source hash checks. That verification was
+insufficient for production release. Do not change or disable those guards.
+
+Replacement package proposals/crm_search_additive_20261109 imports the entire
+original entrypoint first, then attaches only the new route. It reuses the
+existing signed CRM authenticator, account-bound membership and dedicated
+tenant transport using already-validated configuration held in memory.
+No existing empire_os file, HTML/JS, auth guard or service credential changes.
+The growth builder/adapter are packaged versions of the existing implementation;
+no second runtime, collector or authority is introduced.
+
+Validation:
+- 21 isolated PostgreSQL/HTTP tests passed (3.563s), zero skips, with original
+  deployed API/transport unchanged and previous route objects preserved.
+- Full original startup and additive startup rehearsed using the existing
+  service configuration in a separate process; values neither printed nor saved.
+- Python audit hook prohibited file mutations, network connects/binds and
+  subprocess creation throughout imports and in-process HTTP checks.
+- Original health200/prospect401/search404 and additive health200/prospect401/
+  search401 all passed. Existing LinkedIn and Data Cloud guards executed.
+- Exact rollback routine tested against isolated files/service doubles:
+  removes only its own new override, leaves neighbor config intact, reloads,
+  restores original entrypoint and requires health200/prospect401/search404.
+  This is not a claim of a live rollback of the new candidate.
+
+New publisher: proposals/activate_crm_search_additive_20261109.py
+SHA256 e59d928f1177c6fdbaba3c8694a39243b4f8b236925f364f1f813177e0dcb342
+
+It checks database body/ACLs/zero bindings, original hashes and candidate
+hashes; rehearses the full chain before mutation and again from root-owned
+candidate files; creates one new systemd override for this SAME CRM service.
+On runtime smoke failure it removes that override and verifies original
+service recovery. No DB writes or original source replacements. Explicit
+apply flag includes rollback. NOT EXECUTED. Signed-founder acceptance and
+genuine scope bindings remain outstanding after successful route installation.
