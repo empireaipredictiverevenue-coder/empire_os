@@ -1,12 +1,21 @@
 {
   "converted_sha256": {
-    "durable_api.py": "3f13664568feeae12cd39571ab716547a07ac15e5e806a44ac531943e59a18be",
+    "durable_api.py": "5bc24c245c70150b2e9d252f75fc569cacbf973106a4895b0a4a9a9d2b0de03f",
     "durable_store.py": "569234de9bad6ddbb232dd91fb9758f45f077da4297707963fe838181ad22fd1",
     "empiredb_metering_adapter.py": "e958744d2d2a6b4edf58e002d23bccfd9536c5a6e94243df8d9fe53d61741d44",
     "gateway_candidate_entrypoint.py": "78feae2ea46e23fd494c6232f49b9ed78b33ff6769d18657ccb98e30be72400c",
     "private_api.py": "a9586b6c2363c6d4fafc5d242040d4b5f90c386b90b6387fff099b5cdf287846"
   },
   "customer_delivery_authorized": false,
+  "local_security_hardening": {
+    "external_provider_calls_authorized": false,
+    "live_release_authorized": false,
+    "search_output_rights_tenant_bound": true,
+    "search_rejects_stale_cached_or_degraded_provider_outputs": true,
+    "search_result_public_https_only": true,
+    "search_source_preflight_tenant_bound": true,
+    "search_supplier_identity_bound_pre_and_post_request": true
+  },
   "only_import_rewrites": true,
   "original_source_sha256": {
     "durable_api.py": "cb1822483218cd6fc276640e4b6f843869edc9030e59888c8175ef96a8f76568",
