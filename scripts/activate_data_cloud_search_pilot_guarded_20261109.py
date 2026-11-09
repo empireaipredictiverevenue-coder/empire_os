@@ -97,6 +97,10 @@ def encode(value):
 
 def run(args, data=None):
     # An explicit clean environment prevents inherited PGPASSWORD/PGSERVICE etc.
+    # A privileged publisher loses sudo's SUDO_UID in this clean environment;
+    # tell Git to trust ONLY our fixed, pinned existing source worktree.
+    if args and args[0] == 'git':
+        args = ['git', '-c', 'safe.directory=' + str(ROOT), *args[1:]]
     result = subprocess.run(args, input=data, capture_output=True, timeout=45,
                             env={'PATH': '/usr/sbin:/usr/bin:/sbin:/bin', 'LC_ALL': 'C',
                                  'PYTHONDONTWRITEBYTECODE': '1'})

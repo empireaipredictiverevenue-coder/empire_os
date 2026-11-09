@@ -215,3 +215,20 @@ def test_journal_stale_interrupted_checkpoint_is_recoverable(monkeypatch, tmp_pa
     assert owner.JOURNAL.read_text().find("recovered") >= 0
     owner.checkpoint({"phase": "still-recoverable"})
     assert "still-recoverable" in owner.JOURNAL.read_text()
+
+
+def test_privileged_git_source_uses_only_exact_worktree_safe_directory(monkeypatch):
+    observed = []
+    class Result:
+        returncode = 0
+        stdout = b"369b53cd614d8e91c47f57bdf5c5ff46548471f6\n"
+    def stub(argv, **kwargs):
+        observed.append((argv, kwargs))
+        return Result()
+    monkeypatch.setattr(owner.subprocess, "run", stub)
+    out = owner.run(["git", "-C", str(owner.ROOT), "rev-parse", "HEAD"])
+    assert len(out) == 40
+    command, options = observed[0]
+    assert command[:3] == ["git", "-c", "safe.directory=" + str(owner.ROOT)]
+    assert "SUDO_UID" not in options["env"]
+    assert "PGPASSWORD" not in options["env"]
