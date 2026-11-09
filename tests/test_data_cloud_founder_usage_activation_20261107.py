@@ -114,7 +114,10 @@ def test_original_source_provenance_is_preserved():
     assert manifest["source_archive_sha256"] == (
         "718e752945abd27a20ca28f168f8e20e3b7fe0011151a1a270af76cd0c090ff5"
     )
-    assert manifest["only_import_rewrites"] is True
+    # The original archive remains immutable, but the converted customer API
+    # has since been deliberately hardened. It is no longer import-only.
+    assert manifest["only_import_rewrites"] is False
+    assert manifest["local_security_hardening"]["independent_provider_invoice_receipt_verifier_required"] is True
     assert manifest["public_gateway_activation"] is False
     assert manifest["production_migration"] is False
 

@@ -25,7 +25,8 @@ def build(preflight=None, *, output_rights=True, licensed=True,
           preflight_source_tenant=None, output_source_tenant=None,
           configured_source=SOURCE_ID, observed_source=None,
           observed_hours_ago=0, source_state="RESULTS",
-          operational_status="HEALTHY", result_link="https://example.org"):
+          operational_status="HEALTHY", result_link="https://example.org",
+          provider_cost_receipt=None, cost_receipt_verifier=None):
     calls = {"adapter": 0, "reserve": 0, "settle": 0, "preflight": 0, "output_check": 0}
     tenant = ActiveTenant(
         authenticated_tenant, 5, 10000, 500, 500,
@@ -46,10 +47,11 @@ def build(preflight=None, *, output_rights=True, licensed=True,
             assert policy is tenant and reservation_id == 17
             calls["settle"] += 1
             calls["settlement_state"] = state
+            calls["settlement_kwargs"] = kwargs
 
     def adapter(query, limit):
         calls["adapter"] += 1
-        return {
+        response = {
             "source_id": observed_source if observed_source is not None else configured_source,
             "source_observed_at": (
                 datetime.now(timezone.utc) - timedelta(hours=observed_hours_ago)
@@ -59,6 +61,9 @@ def build(preflight=None, *, output_rights=True, licensed=True,
             "organic": [{"title": "Example Service", "link": result_link}]
                 if source_state == "RESULTS" else [],
         }
+        if provider_cost_receipt is not None:
+            response["provider_cost_receipt"] = provider_cost_receipt
+        return response
 
     def preflight_wrapper(tenant_id, source_id, query, limit):
         calls["preflight"] += 1
@@ -88,6 +93,7 @@ def build(preflight=None, *, output_rights=True, licensed=True,
         store=OfflineMeter(), search_adapter=adapter,
         search_source_id=configured_source,
         licensed_search_output=licensed, source_rights_check=output_check,
+        cost_receipt_verifier=cost_receipt_verifier,
         source_request_preflight=preflight_wrapper if preflight is not None else None,
     )
     return api, calls
@@ -281,3 +287,116 @@ def test_healthy_source_can_report_genuine_zero_hits_not_provider_outage():
         "status": "no_results", "results": [], "buyer_intent_verified": False,
     }
     assert calls["settlement_state"] == "completed"
+
+
+# A provider can claim cost receipt "verified": true; that is not independent
+# evidence of actual spend. The gateway must supply an outside reconciler.
+COST_CLAIM = {
+    "verified": True, "actual_usd_micros": 1534,
+    "source_ref": "provider-claimed-receipt-001",
+}
+
+
+def test_unverified_provider_cost_claim_cannot_be_booked_as_actual_spend():
+    api, calls = build(
+        lambda _q, _n: True,
+        provider_cost_receipt=COST_CLAIM,
+    )
+    response = _search(api)
+    assert response.status_code == 503
+    assert calls["adapter"] == calls["reserve"] == 1
+    assert calls["settlement_state"] == "provider_error"
+    assert calls["settlement_kwargs"].get("actual_usd_micros") is None
+    assert "provider-claimed-receipt" not in response.text
+
+
+def test_no_provider_cost_receipt_means_unknown_actual_not_zero():
+    api, calls = build(lambda _q, _n: True)
+    response = _search(api)
+    assert response.status_code == 200
+    assert calls["settlement_state"] == "completed"
+    assert calls["settlement_kwargs"]["actual_usd_micros"] is None
+    assert calls["settlement_kwargs"]["cost_source_ref"] is None
+
+
+def test_only_independent_cost_verifier_outputs_reach_meter():
+    verified_calls = []
+    def verify(tenant, operation, source, receipt):
+        verified_calls.append((tenant, operation, source, receipt))
+        return 1500, "independently-reconciled-ledger-0001"
+    api, calls = build(
+        lambda _q, _n: True,
+        provider_cost_receipt=COST_CLAIM,
+        cost_receipt_verifier=verify,
+    )
+    response = _search(api)
+    assert response.status_code == 200
+    assert len(verified_calls) == 1
+    assert verified_calls[0][:3] == (
+        "synthetic-local-tenant", "search", SOURCE_ID,
+    )
+    assert verified_calls[0][3] == COST_CLAIM
+    assert calls["settlement_state"] == "completed"
+    assert calls["settlement_kwargs"]["actual_usd_micros"] == 1500
+    assert calls["settlement_kwargs"]["cost_source_ref"] == (
+        "independently-reconciled-ledger-0001"
+    )
+    assert "provider-claimed-receipt" not in response.text
+
+
+@pytest.mark.parametrize("result", [
+    None,
+    False,
+    True,
+    (True, "fake"),
+    ("1534", "ref"),
+    (-1, "ref"),
+    (10**13, "ref"),
+    (1534, ""),
+    (1534, "line\nbreak"),
+    [1534, "ref"],
+])
+def test_untrusted_or_invalid_cost_reconciler_result_blocks_actual_claim(result):
+    api, calls = build(
+        lambda _q, _n: True,
+        provider_cost_receipt=COST_CLAIM,
+        cost_receipt_verifier=lambda *_: result,
+    )
+    response = _search(api)
+    assert response.status_code == 503
+    assert calls["settlement_state"] == "provider_error"
+
+
+@pytest.mark.parametrize("receipt", [
+    {"verified": True, "actual_usd_micros": True, "source_ref": "ref"},
+    {"verified": True, "actual_usd_micros": -1, "source_ref": "ref"},
+    {"verified": False, "actual_usd_micros": 1, "source_ref": "ref"},
+    {"verified": True, "actual_usd_micros": 2, "source_ref": " "},
+])
+def test_malformed_provider_cost_claim_rejected_before_external_reconciler(receipt):
+    verifier_calls = []
+    def verify(*arguments):
+        verifier_calls.append(arguments)
+        return 50, "reviewed"
+    api, calls = build(
+        lambda _q, _n: True,
+        provider_cost_receipt=receipt,
+        cost_receipt_verifier=verify,
+    )
+    response = _search(api)
+    assert response.status_code == 503
+    assert calls["settlement_state"] == "provider_error"
+    assert verifier_calls == []
+
+
+def test_independent_cost_verification_outage_remains_held():
+    def unavailable(*_):
+        raise RuntimeError("invoice reader unavailable")
+    api, calls = build(
+        lambda _q, _n: True,
+        provider_cost_receipt=COST_CLAIM,
+        cost_receipt_verifier=unavailable,
+    )
+    response = _search(api)
+    assert response.status_code == 503
+    assert calls["settlement_state"] == "provider_error"

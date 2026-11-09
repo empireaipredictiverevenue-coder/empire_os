@@ -75,23 +75,47 @@ def _fingerprint(operation: str, payload: Mapping[str, Any]) -> str:
     return sha256(content.encode()).hexdigest()
 
 
-def _trusted_actual_cost(payload: Mapping[str, Any]) -> tuple[int | None, str | None]:
-    """Only a provider adapter may supply signed/verified cost evidence.
+def _trusted_actual_cost(
+    payload: Mapping[str, Any], *, tenant_id: str, operation: str,
+    source_id: str,
+    receipt_verifier: Callable[
+        [str, str, str, Mapping[str, Any]], tuple[int, str] | None
+    ] | None,
+) -> tuple[int | None, str | None]:
+    """Return independently reconciled actual cost, never a provider claim.
 
-    Fixture contract: a trusted upstream adapter must validate cost against
-    its invoice/call receipt before labelling it verified. Unverified amounts
-    never become 'actual' usage or billing claims.
+    Provider responses are untrusted. A "verified": true field inside their
+    own JSON is NOT evidence that an actual invoice was paid or reconciled.
+    The owning operator must supply a separate receipt verifier, bound to
+    authenticated tenant, operation and trusted supplier identity. Only its
+    independently derived amount and reference may reach the meter.
     """
     receipt = payload.get("provider_cost_receipt")
     if receipt is None:
-        return None, None
-    if (not isinstance(receipt, Mapping) or receipt.get("verified") is not True or
-            type(receipt.get("actual_usd_micros")) is not int or
-            receipt["actual_usd_micros"] < 0 or
-            not isinstance(receipt.get("source_ref"), str) or
-            not receipt["source_ref"].strip()):
-        raise ValueError("invalid verified provider cost receipt")
-    return receipt["actual_usd_micros"], receipt["source_ref"].strip()
+        return None, None  # Actual cost unknown, not zero; billing remains off.
+    if (
+        not isinstance(receipt, Mapping)
+        or receipt.get("verified") is not True
+        or type(receipt.get("actual_usd_micros")) is not int
+        or not 0 <= receipt["actual_usd_micros"] <= 10**12
+        or type(receipt.get("source_ref")) is not str
+        or not 1 <= len(receipt["source_ref"].strip()) <= 256
+        or not callable(receipt_verifier)
+    ):
+        raise ValueError("independent_provider_cost_receipt_not_proven")
+    try:
+        verified = receipt_verifier(tenant_id, operation, source_id, receipt)
+    except Exception:
+        raise ValueError("independent_provider_cost_verification_failed") from None
+    if (
+        type(verified) is not tuple or len(verified) != 2
+        or type(verified[0]) is not int or not 0 <= verified[0] <= 10**12
+        or type(verified[1]) is not str
+        or not 1 <= len(verified[1].strip()) <= 256
+        or any(c in verified[1] for c in "\r\n\x00")
+    ):
+        raise ValueError("independent_provider_cost_verification_unavailable")
+    return verified[0], verified[1].strip()
 
 
 def _format_search(payload: Mapping[str, Any], limit: int, source_id: str) -> dict[str, Any]:
@@ -214,6 +238,10 @@ def create_metered_private_app(
     # Must authorize the planned query BEFORE reserving quota or calling a
     # potentially chargeable provider. The output check still runs afterward.
     source_request_preflight: Callable[[str, str, str, int], bool] | None = None,
+    # Must use separately reconciled provider invoice/call evidence.
+    cost_receipt_verifier: Callable[
+        [str, str, str, Mapping[str, Any]], tuple[int, str] | None
+    ] | None = None,
     site_adapter_egress_reviewed: bool = False,
     # Customer may submit only an independently approved site. Tenant host
     # allowlisting is necessary but NOT sufficient proof of ownership/consent.
@@ -254,6 +282,7 @@ def create_metered_private_app(
             raise _http_error(exc) from exc
 
     def run_operation(policy: ActiveTenant, reservation_id: int, token_hash: str,
+                      operation: str, source_id: str,
                       adapter: Callable[[], Mapping[str, Any]],
                       formatter: Callable[[Mapping[str, Any]], dict[str, Any]]) -> dict[str, Any]:
         try:
@@ -261,7 +290,10 @@ def create_metered_private_app(
             if not isinstance(payload, Mapping):
                 raise ValueError("invalid adapter payload")
             response = formatter(payload)
-            amount, ref = _trusted_actual_cost(payload)
+            amount, ref = _trusted_actual_cost(
+                payload, tenant_id=policy.tenant_id, operation=operation,
+                source_id=source_id, receipt_verifier=cost_receipt_verifier,
+            )
         except Exception as exc:
             try:
                 store.settle(policy, reservation_id, "provider_error", token_hash=token_hash)
@@ -309,7 +341,8 @@ def create_metered_private_app(
             raise HTTPException(403, "source_request_rights_not_authorized")
         rid = reserve(policy, token_hash, "search", idempotency_key,
                       {"query": req.query, "limit": req.limit})
-        return run_operation(policy, rid, token_hash, lambda: search_adapter(req.query, req.limit),
+        return run_operation(policy, rid, token_hash, "search", search_source_id,
+                             lambda: search_adapter(req.query, req.limit),
                              lambda data: _licensed_search_formatter(
                                  data, req.limit, policy.tenant_id, search_source_id, source_rights_check))
 
@@ -333,7 +366,8 @@ def create_metered_private_app(
             raise HTTPException(403, "site_ownership_not_verified")
         rid = reserve(policy, token_hash, "site_audit", idempotency_key, {"url": url},
                       target_host=urlsplit(url).hostname)
-        return run_operation(policy, rid, token_hash, lambda: site_adapter(url),
+        return run_operation(policy, rid, token_hash, "site_audit", "first_party_site_probe",
+                             lambda: site_adapter(url),
                              lambda data: _format_audit(data, url))
 
     return app

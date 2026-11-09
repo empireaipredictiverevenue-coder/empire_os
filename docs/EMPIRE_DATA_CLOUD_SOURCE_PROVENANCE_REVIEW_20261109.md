@@ -23,3 +23,13 @@ Original explicit research-only/NO_RESALE flags retain precedence over any permi
 - **NO** changes to production routes, live EmpireDB schema, protected keys, provider spending, billing, restart, outreach, or deployment.
 
 **Operational truth:** founder `GET /v1/data/usage` was previously verified live; customer search and site-audit POSTs are still NOT mounted (404). Only an original owner with independently verified supplier redistribution permissions, source-specific entitlement, DBA rights for meter reservation and guarded release acceptance may turn on customer search. A passing synthetic callback is not licence evidence.
+
+## Source cost integrity closure — 9 November 2026
+
+One additional defect was discovered and repaired in the same original API. Previously, a provider's own JSON field `provider_cost_receipt.verified=true` and claimed cost could be promoted directly to an `actual_usd_micros` ledger entry. That is **not independent evidence** of a provider invoice or settled cost. An external provider, upstream aggregator or compromised adapter could mark its own amounts verified.
+
+The original `run_operation` now sends the **authenticated tenant, operation, and gateway-selected source identity** into an optional separately supplied `cost_receipt_verifier`. The verifier must independently reconcile against an owner-controlled invoice/call ledger and return its own actual amount/reference tuple; only that tuple reaches the existing metering settle call. A provider's claimed number is never copied as trusted actual. With no receipt, cost remains **unknown (NULL), not $0**. With an unverified, malformed or un-reconcilable receipt, the request is settled as a held provider error and does not return customer data; no billing is enabled. Tests cover false `verified:true`, mismatch, negative/malformed receipts, independent resolver outage and exact trusted amount/reference continuity.
+
+For source archive accuracy, the original candidate source archive SHA stays fixed and unchanged, but `only_import_rewrites` is now explicitly **false** because hardening genuinely changed the converted module. The candidate provenance test was updated to enforce this truthful state and exact converted file digest.
+
+Still held: no live supplier contract or independent cost ledger reconciler was provided by the original operator; this source review cannot self-attest either or enable customer routes.
