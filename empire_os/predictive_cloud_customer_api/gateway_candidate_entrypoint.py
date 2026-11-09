@@ -110,6 +110,9 @@ def create_gateway_candidate_app(
         search_adapter=adapter,
         search_source_id=FIRST_PARTY_SEARCH_SOURCE if adapter is not None else None,
         licensed_search_output=adapter is not None,
+        # Only this exact first-party direct public HTML adapter uses a
+        # verifiable zero *paid search API* fee; infrastructure cost is NOT 0.
+        first_party_direct_public_no_paid_fee=adapter is not None,
         source_rights_check=source_output_check if adapter is not None else None,
         source_request_preflight=source_request_preflight if adapter is not None else None,
         site_adapter=site_adapter,

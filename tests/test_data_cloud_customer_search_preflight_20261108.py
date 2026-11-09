@@ -26,7 +26,8 @@ def build(preflight=None, *, output_rights=True, licensed=True,
           configured_source=SOURCE_ID, observed_source=None,
           observed_hours_ago=0, source_state="RESULTS",
           operational_status="HEALTHY", result_link="https://example.org",
-          provider_cost_receipt=None, cost_receipt_verifier=None):
+          provider_cost_receipt=None, cost_receipt_verifier=None,
+          first_party_zero_fee_flag=False):
     calls = {"adapter": 0, "reserve": 0, "settle": 0, "preflight": 0, "output_check": 0}
     tenant = ActiveTenant(
         authenticated_tenant, 5, 10000, 500, 500,
@@ -94,6 +95,7 @@ def build(preflight=None, *, output_rights=True, licensed=True,
         search_source_id=configured_source,
         licensed_search_output=licensed, source_rights_check=output_check,
         cost_receipt_verifier=cost_receipt_verifier,
+        first_party_direct_public_no_paid_fee=first_party_zero_fee_flag,
         source_request_preflight=preflight_wrapper if preflight is not None else None,
     )
     return api, calls
@@ -400,3 +402,31 @@ def test_independent_cost_verification_outage_remains_held():
     response = _search(api)
     assert response.status_code == 503
     assert calls["settlement_state"] == "provider_error"
+
+
+def test_free_public_fee_cannot_be_claimed_for_other_search_sources():
+    api, calls = build(
+        lambda _q, _n: True,
+        configured_source="approved_provider_fixture",
+        first_party_zero_fee_flag=True,
+    )
+    response = _search(api)
+    assert response.status_code == 200
+    assert calls["settlement_state"] == "completed"
+    assert calls["settlement_kwargs"]["actual_usd_micros"] is None
+    assert calls["settlement_kwargs"]["cost_source_ref"] is None
+
+
+def test_free_public_fee_does_not_override_cost_receipt_provenance():
+    # A direct first-party route cannot silently discard a received paid
+    # provider cost claim and book a trusted zero.
+    api, calls = build(
+        lambda _q, _n: True,
+        configured_source="empire_search_fabric_public",
+        first_party_zero_fee_flag=True,
+        provider_cost_receipt=COST_CLAIM,
+    )
+    response = _search(api)
+    assert response.status_code == 503
+    assert calls["settlement_state"] == "provider_error"
+    assert calls["settlement_kwargs"].get("actual_usd_micros") is None

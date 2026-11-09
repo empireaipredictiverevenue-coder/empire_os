@@ -73,3 +73,18 @@ Independent read-only EmpireDB verification against the ORIGINAL schema, no migr
 This identifies the **smallest actual original-owner activation delta** for a *founder-only first-party search pilot*: (a) review the existing meter reserve/settle stored-function ACLs under the dedicated login, (b) explicitly enable the search operation on the appropriate existing active tenant, and (c) use the existing gateway owner's search_pilot=True route selection and first-party source policy callbacks with a verified rollback. No table migration, new data vendor, new service or off-host recovery project is necessary for this restricted pilot. These actions are NOT executed by this review branch; there has been no production entitlement expansion. Do not label test-fixture booleans as actual DBA or owner approvals.
 
 Search pilot only mounts usage + search; site audits remain 404 until separately designed and accepted. All real revenue, billing, customer output and supplier spend remain unproven and are NOT asserted by this release candidate.
+
+
+## Original PG18 cost settlement mismatch closed — 9 November 2026
+
+A direct read-only inspection of the **ACTUAL deployed** empire_data_cloud_api.settle SQL exposed a critical integration defect: it deliberately sets tenants.held=true when p_reported_cost_micros / p_evidence_ref are NULL, even if state='provider_error'. Prior API code reported unknown cost as NULL for every first-party HTTP search and passed NULL for every provider_error. Therefore granting search entitlement and mounting the route before this fix would have held the founder's tenant after the first successful FREE search or first failed source fetch. The existing API unit mocks did not exercise real PG18 SQL semantics.
+
+**Minimal fix in existing original Data Cloud API, no SQL migration:** only when the original gateway factory explicitly selects our own direct-public Search Fabric adapter with no paid search API, the trusted operator supplies first_party_direct_public_no_paid_fee=True and the API settles **external paid search API fee 0** with the stable provenance reference empire_fabric_direct_public_no_paid_api_v1. This zero is NOT the full infrastructure, CPU, bandwidth, payroll, or other business cost. Both an accepted public-search result and a failed free fetch use this same provider-fee evidence. Any unexpected provider_cost_receipt in this route disables the free assumption and follows the stricter independent-reconciliation path. For third-party/unknown providers, no free claim is inferred; missing/uncertain costs remain held by the existing PG18 ledger.
+
+**Independent source SQL verification:** a new disposable Unix-socket-only PostgreSQL 18 process compiled the original exact, unchanged 2026-11-07 review SQL, seeded only synthetic tenants/keys inside its isolated DB, and demonstrated:
+- completed + 0 external paid search fee/reference => completed, tenant not held
+- provider_error + 0 external paid search fee/reference => provider_error, tenant not held
+- provider_error + NULL cost and NULL evidence => cost_integrity_hold, tenant held as originally designed
+- No production DB connection, SQL change, role grant, migration, customer request or secret. Disposable isolated cluster stopped on exit.
+
+This is a confirmed code/SQL contract repair in the already approved first-party product path, not an attempt to lower the existing DB cost safety policy. The original production search route remains unmounted; customer-API release/permissions remain with the original existing gateway and DBA owner.

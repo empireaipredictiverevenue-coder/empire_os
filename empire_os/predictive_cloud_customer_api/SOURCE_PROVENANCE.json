@@ -1,9 +1,9 @@
 {
   "converted_sha256": {
-    "durable_api.py": "e7ef86de0d4b9215fd9c2c89eb20b7fde91289f2dd305b856f545b06b7eab3b8",
+    "durable_api.py": "296cb87a81885ae841583808df2ee0f087927e2ec9950829ecd60e4697c58ca4",
     "durable_store.py": "569234de9bad6ddbb232dd91fb9758f45f077da4297707963fe838181ad22fd1",
     "empiredb_metering_adapter.py": "e958744d2d2a6b4edf58e002d23bccfd9536c5a6e94243df8d9fe53d61741d44",
-    "gateway_candidate_entrypoint.py": "26a88c11986cd785cd531a991850993cba2c3fa4eb02e4b5b14ffbfd0656aa09",
+    "gateway_candidate_entrypoint.py": "acf8401035f1a1bb3dd9f6713ed99f01f0fc14045efc541aff608e1bcaed400e",
     "private_api.py": "a9586b6c2363c6d4fafc5d242040d4b5f90c386b90b6387fff099b5cdf287846"
   },
   "customer_delivery_authorized": false,
@@ -11,7 +11,9 @@
     "external_provider_calls_authorized": false,
     "first_party_customer_gateway_default_still_disabled": true,
     "first_party_existing_relevance_filter_required": true,
+    "first_party_free_fetch_failure_settles_without_false_tenant_hold": true,
     "first_party_search_fabric_direct_public_adapter_staged": true,
+    "first_party_zero_paid_api_fee_verified_against_unchanged_isolated_pg18_sql": true,
     "independent_provider_invoice_receipt_verifier_required": true,
     "live_release_authorized": false,
     "no_implicit_paid_decodo_provider_calls": true,
@@ -22,7 +24,8 @@
     "search_result_public_https_only": true,
     "search_source_preflight_tenant_bound": true,
     "search_supplier_identity_bound_pre_and_post_request": true,
-    "self_hosted_collector_does_not_require_external_supplier_contract": true
+    "self_hosted_collector_does_not_require_external_supplier_contract": true,
+    "unknown_or_unreconciled_paid_provider_cost_hold_preserved": true
   },
   "only_import_rewrites": false,
   "original_source_sha256": {

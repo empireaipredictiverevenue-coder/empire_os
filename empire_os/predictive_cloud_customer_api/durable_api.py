@@ -21,6 +21,8 @@ from .private_api import AuditRequest, SearchRequest, parse_safe_http_url
 
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$")
 _SEARCH_SOURCE_ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{2,63}$")
+_FIRST_PARTY_PUBLIC_SOURCE = "empire_search_fabric_public"
+_FIRST_PARTY_NO_PAID_API_FEE_REF = "empire_fabric_direct_public_no_paid_api_v1"
 
 
 # The existing Scrapling Revenue Data Fabric produces OFFLINE_REVIEW_ONLY
@@ -251,6 +253,9 @@ def create_metered_private_app(
     cost_receipt_verifier: Callable[
         [str, str, str, Mapping[str, Any]], tuple[int, str] | None
     ] | None = None,
+    # Trusted original-owner config only, paired with the direct no-key
+    # public Search Fabric HTTP adapter (never a paid/cached provider).
+    first_party_direct_public_no_paid_fee: bool = False,
     site_adapter_egress_reviewed: bool = False,
     # Customer may submit only an independently approved site. Tenant host
     # allowlisting is necessary but NOT sufficient proof of ownership/consent.
@@ -294,18 +299,43 @@ def create_metered_private_app(
                       operation: str, source_id: str,
                       adapter: Callable[[], Mapping[str, Any]],
                       formatter: Callable[[Mapping[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+        no_paid_api = (
+            first_party_direct_public_no_paid_fee is True
+            and operation == "search"
+            and source_id == _FIRST_PARTY_PUBLIC_SOURCE
+        )
         try:
             payload = adapter()
             if not isinstance(payload, Mapping):
                 raise ValueError("invalid adapter payload")
             response = formatter(payload)
-            amount, ref = _trusted_actual_cost(
-                payload, tenant_id=policy.tenant_id, operation=operation,
-                source_id=source_id, receipt_verifier=cost_receipt_verifier,
-            )
+            # The direct public-HTML collector incurs no paid search API fee.
+            # Distinguish THAT verified external-provider fee (0) from all
+            # EmpireOS infrastructure, bandwidth and labour costs (unknown).
+            # The live PG18 meter intentionally holds tenants on NULL cost.
+            if no_paid_api and "provider_cost_receipt" not in payload:
+                amount, ref = 0, _FIRST_PARTY_NO_PAID_API_FEE_REF
+            else:
+                if no_paid_api and "provider_cost_receipt" in payload:
+                    no_paid_api = False  # suspicious cost claim -> fail closed
+                amount, ref = _trusted_actual_cost(
+                    payload, tenant_id=policy.tenant_id, operation=operation,
+                    source_id=source_id, receipt_verifier=cost_receipt_verifier,
+                )
         except Exception as exc:
             try:
-                store.settle(policy, reservation_id, "provider_error", token_hash=token_hash)
+                if no_paid_api:
+                    # A failed FREE fetch has no paid-provider fee either.
+                    # Always give the original SQL sufficient cost evidence
+                    # to avoid spuriously holding the entire founder tenant.
+                    store.settle(
+                        policy, reservation_id, "provider_error",
+                        actual_usd_micros=0,
+                        cost_source_ref=_FIRST_PARTY_NO_PAID_API_FEE_REF,
+                        token_hash=token_hash,
+                    )
+                else:
+                    store.settle(policy, reservation_id, "provider_error", token_hash=token_hash)
             except Exception:
                 pass  # Reservation stays consumed and requires operator recovery.
             raise HTTPException(503, "upstream_or_cost_evidence_unavailable") from exc

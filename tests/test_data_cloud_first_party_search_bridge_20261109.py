@@ -126,7 +126,12 @@ def test_existing_gateway_first_party_fetch_full_customer_response(monkeypatch):
     assert calls["output"] == [("synthetic-tenant-one", SOURCE, SOURCE)]
     assert calls["fetch"] == len(meter.reserves) == len(meter.settlements) == 1
     assert meter.settlements[0][0] == "completed"
-    assert meter.settlements[0][1]["actual_usd_micros"] is None
+    # The original PG18 SQL holds the whole tenant on NULL cost. A directly
+    # observed public fetch is verified free of *paid search API* charges.
+    assert meter.settlements[0][1]["actual_usd_micros"] == 0
+    assert meter.settlements[0][1]["cost_source_ref"] == (
+        "empire_fabric_direct_public_no_paid_api_v1"
+    )
     assert response.headers["cache-control"] == "no-store"
 
 
@@ -155,6 +160,7 @@ def test_result_rights_failure_never_returns_customer_data(monkeypatch):
     assert "Real first-party parser fixture" not in response.text
     assert calls["fetch"] == 1
     assert meter.settlements[0][0] == "provider_error"
+    assert meter.settlements[0][1]["actual_usd_micros"] == 0
 
 
 def test_healthy_zero_result_is_not_an_outage(monkeypatch):
@@ -167,6 +173,7 @@ def test_healthy_zero_result_is_not_an_outage(monkeypatch):
     }
     assert calls["fetch"] == 1
     assert meter.settlements[0][0] == "completed"
+    assert meter.settlements[0][1]["actual_usd_micros"] == 0
 
 
 def test_failed_source_retrieval_is_not_a_genuine_zero_result(monkeypatch):
@@ -175,6 +182,7 @@ def test_failed_source_retrieval_is_not_a_genuine_zero_result(monkeypatch):
     assert response.status_code == 503
     assert calls["fetch"] == 1
     assert meter.settlements[0][0] == "provider_error"
+    assert meter.settlements[0][1]["actual_usd_micros"] == 0
 
 
 @pytest.mark.parametrize("rows", [
