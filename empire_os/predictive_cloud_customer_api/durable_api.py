@@ -173,13 +173,19 @@ def _format_search(payload: Mapping[str, Any], limit: int, source_id: str) -> di
             normalized_url = safe_https_url(url)
         except Exception:
             raise ValueError("unsafe_search_result_url") from None
+        source = {
+            "url": normalized_url, "source_id": source_id,
+            "retrieved_at": timestamp, "observed_at": observed_at,
+            "evidence_type": "public_search",
+        }
+        # Transparency: EmpireOS owns the collection code, but an individual
+        # observation may originate from a public search-engine result page.
+        upstream = result.get("engine")
+        if type(upstream) is str and re.fullmatch(r"[a-z][a-z0-9_]{2,40}", upstream):
+            source["upstream_engine"] = upstream
         results.append({
             "title": title, "url": normalized_url, "snippet": snippet,
-            "source": {
-                "url": normalized_url, "source_id": source_id,
-                "retrieved_at": timestamp, "observed_at": observed_at,
-                "evidence_type": "public_search",
-            },
+            "source": source,
         })
     return {
         "status": "results" if results else "no_results",
