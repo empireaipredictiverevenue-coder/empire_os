@@ -137,3 +137,30 @@ reconcile the reviewed mount/reader with that owner's current branch and
 transport changes, verify current live catalog/RLS/owner prerequisites, and
 prepare the explicitly gated migration and code release. No authority to merge
 another owner's unfinished work is implied by passing these tests.
+
+## Current transport compatibility — 2026-11-09
+
+The previously unresolved transport difference is now tested. The shared
+transport adds CRM_LOGIN_AUTHORITY_SQL and checks dedicated login membership
+and privileges before SET LOCAL ROLE. Without changing that file, loaded its
+exact source (SHA256 853f3bcd9d69be07685c6cf7db0c20578a9b6a4471f6afe8772108ab79728a9a)
+into the isolated integration suite. All 15 HTTP/PostgreSQL checks passed, with
+zero skips. No transport modification is required for this search integration.
+The presence of uncommitted transport changes is not itself evidence of an
+active conflicting operator; persistent ownership must still be reconciled
+before modifying shared release files.
+
+Bounded production proposal, NOT executed: install only the reviewed search
+binding/reader migration, add the search-evidence adapter and mount to the
+existing authenticated CRM release, retain the existing transport and auth,
+and verify unsigned rejection plus a genuine signed founder session. Leave
+site bindings empty/inactive until genuine scope evidence is provisioned.
+No observation collection, outreach, publication or payment activation.
+
+Before apply, original CRM/DB release owner must confirm current migration
+ordering, prerequisite function definitions/owners, effective privileges,
+source schema/RLS compatibility, current release identity and rollback. If any
+precondition differs, stop before mutation and reconcile the exact delta.
+The new SQL rollback may run only while no binding history exists; otherwise
+preserve evidence and review recovery. This is a code/tested proposal, not
+production migration approval or a claim of live functionality.
