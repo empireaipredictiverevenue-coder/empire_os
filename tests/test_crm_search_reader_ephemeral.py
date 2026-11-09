@@ -64,6 +64,8 @@ class SearchReaderPostgresTests(unittest.TestCase):
               AND (b.valid_until IS NULL OR b.valid_until>CURRENT_TIMESTAMP) $$;
           REVOKE ALL ON FUNCTION empire_current_tenant_id() FROM PUBLIC;
           REVOKE ALL ON FUNCTION empire_crm_prospect_authorized(uuid) FROM PUBLIC;
+          -- Existing CRM040 prerequisite; needed by the real transport.
+          GRANT EXECUTE ON FUNCTION empire_current_tenant_id() TO empire_revenue_crm_reader;
           INSERT INTO business_entities VALUES ('{E}'),('{F}');
           INSERT INTO seo_sites VALUES ('{S}','key-a','https://a.example'),('{Z}','key-b','https://b.example');
           INSERT INTO prospect_entity_links VALUES

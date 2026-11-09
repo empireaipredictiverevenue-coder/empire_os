@@ -88,7 +88,7 @@ The exact mount is docs/patches/crm_search_authenticated_mount.patch, tested on
 server commit 68a1aafbe89c19566821c66e8d12b9ef8abe3b8f in isolated worktree
 /home/ubuntu/empire_worktrees/crm_search_http_20261025. Eight HTTP tests pass
 with test-double database responses; the ten real PostgreSQL reader tests run
-separately. A combined HTTP-to-real-database test remains required.
+separately. A combined HTTP-to-real-database test has now passed; see the 2026-11-09 checkpoint below.
 
 The GitHub base inspected at 3ca194c051906780e66029c23758f7492a964fd9 still lacks
 the authenticated CRM API. Do not apply the mount there or replace its API with
@@ -104,3 +104,36 @@ drop provisioned bindings; recovery with real binding history needs review.
 Shared /srv/empire_os has concurrent edits including CRM transport; do not
 overwrite them. This checkpoint is a separate draft scope-validation slice,
 not a claim that the account evidence reader or wider SEO programme is complete.
+
+## 2026-11-09 verification checkpoint
+
+PR #105 remained open/unmerged at 2af2b31a1b1b21eeab608abffe7c6b02f5f0d416.
+Observed shared checkout HEAD: f51b67be47d76c836816f5a6c0c71f1b8157c799.
+The active CRM service working directory is
+/opt/empire-ai/crm-pilot-releases/smart-crm-work-queue-20261104v1.
+The shared API still exposes the supplied-data preview and does not mount this
+stored-evidence route. The shared transport has uncommitted changes owned
+outside this bounded verification task; they were not modified or staged.
+
+Added tests/test_crm_search_evidence_end_to_end.py. Actual run: 15 tests passed,
+zero skips, using the existing isolated authenticated-API worktree and a fresh
+PostgreSQL 18 Unix-socket cluster. Five combined HTTP/database cases plus ten
+inherited SQL cases executed. The real PostgresRevenueCrmRepository connects
+as tenant A/B database LOGINs; its _fetch_all method is not mocked. The tests
+verify stored citation analysis, binding revocation between HTTP requests,
+tenant-B own scope, cross-tenant denial, HTTP/database tenant mismatch,
+missing-login rejection and source privilege failure returning sanitized 503.
+The fixture now includes the existing CRM040 EXECUTE prerequisite for the
+trusted tenant resolver, so the real transport can perform its own check.
+
+Limits: the HTTP authentication callback supplies isolated fixture identities;
+this does not test founder cookies, signature verification or the live gateway.
+Fixtures use minimal schemas and fixture-only source records. The temporary
+cluster was shut down and removed. The HTTP mount remains an isolated patch;
+no production migration, grant, binding, restart or deployment was performed.
+
+Release dependency belongs to the existing authenticated CRM integration owner:
+reconcile the reviewed mount/reader with that owner's current branch and
+transport changes, verify current live catalog/RLS/owner prerequisites, and
+prepare the explicitly gated migration and code release. No authority to merge
+another owner's unfinished work is implied by passing these tests.
