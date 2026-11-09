@@ -84,7 +84,27 @@ def meter_connection():
     )
 
 
-candidate = create_gateway_candidate_app(connect_factory=meter_connection)
+search_flag = os.environ.get("EMPIRE_DATA_CLOUD_FOUNDER_SEARCH_RELEASE", "")
+search_enabled = bool(search_flag)
+search_evidence = None
+search_options = {}
+if search_enabled:
+    from empire_os.predictive_cloud_search_release import FLAG, load_search_release
+    if search_flag != FLAG:
+        raise RuntimeError("unexpected_first_party_search_release_flag")
+    search_evidence, request_policy, output_policy = load_search_release(
+        CONFIG.parent / "SEARCH_RELEASE_EVIDENCE.json",
+        expected_sha256=os.environ.get("EMPIRE_DATA_CLOUD_SEARCH_RECEIPT_SHA256", ""),
+        release=RELEASE, owner=owner, tenant=tenant,
+    )
+    search_options = dict(
+        enable_first_party_search=True,
+        source_request_preflight=request_policy,
+        source_output_check=output_policy,
+    )
+candidate = create_gateway_candidate_app(
+    connect_factory=meter_connection, **search_options,
+)
 
 
 def actual_release_evidence():
@@ -103,8 +123,9 @@ def actual_release_evidence():
 
 
 attached = attach_existing_customer_routes(
-    app, candidate, verifier, usage_only=True,
-    release_evidence=actual_release_evidence,
+    app, candidate, verifier, usage_only=not search_enabled,
+    search_pilot=search_enabled,
+    release_evidence=(lambda: search_evidence) if search_enabled else actual_release_evidence,
 )
-if attached != ("/v1/data/usage",):
+if attached != (("/v1/data/search", "/v1/data/usage") if search_enabled else ("/v1/data/usage",)):
     raise RuntimeError("unexpected_founder_pilot_route_mount")

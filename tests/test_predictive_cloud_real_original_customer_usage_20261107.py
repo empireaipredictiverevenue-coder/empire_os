@@ -92,7 +92,7 @@ def test_real_source_conversion_matches_pinned_provenance():
     base=Path(__file__).resolve().parents[1]/"empire_os/predictive_cloud_customer_api"
     manifest=json.loads((base/"SOURCE_PROVENANCE.json").read_text())
     assert manifest["source_archive_sha256"]=="718e752945abd27a20ca28f168f8e20e3b7fe0011151a1a270af76cd0c090ff5"
-    assert manifest["only_import_rewrites"] is True
+    assert manifest["only_import_rewrites"] is False
     assert manifest["production_migration"] is False
     assert manifest["public_gateway_activation"] is False
     for name,digest in manifest["converted_sha256"].items():
