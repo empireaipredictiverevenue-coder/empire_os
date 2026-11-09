@@ -258,3 +258,38 @@ Replacement SQL SHA256:
 8dd86492653b3e844b0251013fd461d4f2bc8f9d52487d270e51deffc5450ac6
 Use this checksum for the already-approved bounded migration. Bindings remain
 empty; authenticated HTTP mount and genuine founder-session proof remain pending.
+
+## Database commit and current-runtime route preparation — 2026-11-09
+
+Founder terminal capture confirms SHA256 8dd86492653b3e844b0251013fd461d4f2bc8f9d52487d270e51deffc5450ac6 passed every migration guard and COMMIT.
+This is founder-reported installation evidence; independent catalog readback is
+included in the prepared route publisher before it can modify any source file.
+
+Read-only service inspection confirms active service on port 8783, working
+directory /opt/empire-ai/crm-pilot-releases/smart-crm-work-queue-20261104v1,
+entrypoint private_crm_original_v411_source_entrypoint_20261108:app.
+Preserve current Data Cloud and LinkedIn overlays, auth and transport.
+
+Staged exactly three files in the owned worktree:
+proposals/crm_search_release_20261109/
+- revenue_crm_api.py: current deployed API plus six-line authenticated mount
+- revenue_crm_search_growth.py: tested evidence-reference deduplication
+- revenue_crm_search_evidence_api.py: existing tested restricted reader adapter
+
+All 20 combined HTTP/PostgreSQL tests passed using this staged API/growth/adapter
+and the actual deployed CRM dependencies/transport, zero skips (2.696s).
+Publisher database readback SQL separately passed against the isolated fixture.
+Publisher checks source hashes, runtime identity, installed reader body/ACLs and
+zero bindings before changes. It backs up only the two replaced files, installs
+three pinned files, restarts this one existing service, checks unsigned 401 and
+writes an explicit receipt with signed_founder_session_verified=false.
+No database writes, bindings, outbound or financial activation are included.
+No automatic rollback/retry is attempted on failure; preserve the scoped backup.
+
+Publisher SHA256:
+3b5d35724a0325df9207047d9f47adab7c231fc8de02b808f10f7a2256b574b0
+
+NOT EXECUTED. The founder must run the bounded publisher through the existing
+terminal because the remote tool rejected privileged database access. The
+existing release approval stands. A genuine signed founder-session acceptance
+check remains required after unsigned runtime verification.
