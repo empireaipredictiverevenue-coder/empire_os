@@ -57,6 +57,83 @@ def source(root, rows=None, *, index_age=timedelta(hours=1), executive_age=timed
     return ddir / "latest.json", edir / "executive_latest.json"
 
 
+def research_source(root, *, findings=0, age=timedelta(minutes=2),
+                    corrupt=False, mismatch=False):
+    directory = root / "runtime/opportunity_radar"
+    directory.mkdir(parents=True, exist_ok=True)
+    finished = NOW - age
+    started = finished - timedelta(minutes=2)
+    step_names = (
+        "opportunity_radar", "opportunity_research", "opportunity_evidence_normalizer",
+        "opportunity_factory_intake", "opportunity_quant_review",
+        "opportunity_value_scoring", "opportunity_evidence_router",
+        "opportunity_ai_planner",
+    )
+    loop = {
+        "schema_version": "empire.predictive_cloud.opportunity_loop.v2",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "automatic_external_execution_allowed": False,
+        "ok": True, "finished_at": finished.isoformat(),
+        "steps": [{"step": name, "ok": True} for name in step_names],
+        "radar_candidate_count": 22, "research_observation_count": findings,
+        "research_new_observation_count": findings,
+        "research_degraded_query_count": 15,
+    }
+    research = {
+        "schema_version": "empire.opportunity_research_batch.v2",
+        "mode": "OBSERVE", "execution_authority": "none",
+        "outreach_enabled": False, "generated_at": started.isoformat(),
+        "observation_count": findings + (1 if mismatch else 0),
+        "new_observation_count": findings,
+    }
+    if corrupt:
+        loop["execution_authority"] = "production"
+    (directory / "loop_latest.json").write_text(json.dumps(loop))
+    (directory / "research_latest.json").write_text(json.dumps(research))
+
+
+@pytest.mark.parametrize("findings,expected", [
+    (0, "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS"),
+    (3, "RESEARCH_SOURCE_REVIEW_REQUIRED"),
+])
+def test_owned_opportunity_research_handoff_never_dispatches_browser(tmp_path, findings, expected):
+    source(tmp_path)
+    research_source(tmp_path, findings=findings)
+    output = build_continuity_review(tmp_path, as_of=NOW)
+    status = output["research_execution"]
+    assert status["status"] == expected
+    assert status["loop_completed"] is True
+    assert status["candidate_count"] == 22
+    assert status["new_observation_count"] == findings
+    assert status["degraded_query_count"] == 15
+    assert status["browser_dispatched"] is False
+    assert status["commercial_authority"] == "none"
+    if findings == 0:
+        assert status["browser_handoff"] == "HELD_NO_VALIDATED_PUBLIC_SOURCE"
+    else:
+        assert status["browser_handoff"] == "ORIGINAL_OWNER_VERIFY_SOURCE_URLS_FIRST"
+
+
+@pytest.mark.parametrize("case,expected", [
+    ("stale", "RESEARCH_RECEIPT_STALE_OR_INCONSISTENT"),
+    ("tampered", "NO_VERIFIED_RESEARCH_RECEIPT"),
+    ("mismatch", "RESEARCH_COUNTERS_UNVERIFIED"),
+])
+def test_research_handoff_rejects_stale_tampered_and_contradictory_receipts(tmp_path, case, expected):
+    source(tmp_path)
+    research_source(tmp_path, age=timedelta(hours=3) if case == "stale" else timedelta(minutes=2),
+                    corrupt=case == "tampered", mismatch=case == "mismatch")
+    output = build_continuity_review(tmp_path, as_of=NOW)
+    assert output["research_execution"]["status"] == expected
+    assert output["research_execution"]["browser_dispatched"] is False
+
+
+def test_missing_research_has_no_browser_handoff(tmp_path):
+    source(tmp_path)
+    output = build_continuity_review(tmp_path, as_of=NOW)
+    assert output["research_execution"]["status"] == "NO_VERIFIED_RESEARCH_RECEIPT"
+
+
 def test_reuses_canonical_evidence_and_respects_approval_and_completion(tmp_path):
     source(tmp_path)
     report = build_continuity_review(tmp_path, as_of=NOW)

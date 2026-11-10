@@ -142,6 +142,73 @@ def _prior_states(previous: Mapping[str, Any] | None, now: datetime) -> dict[str
     return dict(states)
 
 
+def summarize_existing_research(repo_root: Path, now: datetime) -> dict[str, Any]:
+    """Adjudicate original Opportunity Loop receipts; never launch browser work."""
+    report = {
+        "owner": "EXISTING_OPPORTUNITY_LOOP_AND_JEV_OWNERS",
+        "source_ref": "runtime/opportunity_radar/loop_latest.json",
+        "status": "NO_VERIFIED_RESEARCH_RECEIPT",
+        "loop_completed": False,
+        "candidate_count": None,
+        "new_observation_count": None,
+        "degraded_query_count": None,
+        "browser_handoff": "HELD_NO_VALIDATED_PUBLIC_SOURCE",
+        "browser_dispatched": False,
+        "commercial_authority": "none",
+    }
+    loop = _read_json(repo_root / "runtime/opportunity_radar/loop_latest.json")
+    research = _read_json(repo_root / "runtime/opportunity_radar/research_latest.json")
+    if not loop or not research:
+        return report
+    if (loop.get("schema_version") != "empire.predictive_cloud.opportunity_loop.v2"
+            or research.get("schema_version") != "empire.opportunity_research_batch.v2"
+            or loop.get("mode") != "OBSERVE" or research.get("mode") != "OBSERVE"
+            or loop.get("execution_authority") != "none"
+            or research.get("execution_authority") != "none"
+            or loop.get("automatic_external_execution_allowed") is not False
+            or research.get("outreach_enabled") is not False):
+        return report
+    finished = _time(loop.get("finished_at"))
+    researched = _time(research.get("generated_at"))
+    if (finished is None or researched is None
+            or not timedelta(0) <= now - finished <= timedelta(minutes=60)
+            or researched > finished or finished - researched > timedelta(minutes=20)):
+        report["status"] = "RESEARCH_RECEIPT_STALE_OR_INCONSISTENT"
+        return report
+    names = (
+        "opportunity_radar", "opportunity_research",
+        "opportunity_evidence_normalizer", "opportunity_factory_intake",
+        "opportunity_quant_review", "opportunity_value_scoring",
+        "opportunity_evidence_router", "opportunity_ai_planner",
+    )
+    steps = loop.get("steps")
+    completed = (loop.get("ok") is True and isinstance(steps, list)
+                 and [r.get("step") for r in steps if isinstance(r, dict)] == list(names)
+                 and len(steps) == len(names)
+                 and all(r.get("ok") is True for r in steps))
+    report["loop_completed"] = completed
+    counts = ("radar_candidate_count", "research_observation_count",
+              "research_new_observation_count", "research_degraded_query_count")
+    if (not all(type(loop.get(k)) is int and 0 <= loop[k] <= 100000 for k in counts)
+            or type(research.get("observation_count")) is not int
+            or type(research.get("new_observation_count")) is not int
+            or loop["research_observation_count"] != research["observation_count"]
+            or loop["research_new_observation_count"] != research["new_observation_count"]):
+        report["status"] = "RESEARCH_COUNTERS_UNVERIFIED"
+        return report
+    report["candidate_count"] = loop["radar_candidate_count"]
+    report["new_observation_count"] = loop["research_new_observation_count"]
+    report["degraded_query_count"] = loop["research_degraded_query_count"]
+    if not completed:
+        report["status"] = "RESEARCH_LOOP_INCOMPLETE"
+    elif loop["research_observation_count"] == 0:
+        report["status"] = "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS"
+    else:
+        report["status"] = "RESEARCH_SOURCE_REVIEW_REQUIRED"
+        report["browser_handoff"] = "ORIGINAL_OWNER_VERIFY_SOURCE_URLS_FIRST"
+    return report
+
+
 def build_continuity_review(
     repo_root: Path,
     *,
@@ -172,6 +239,7 @@ def build_continuity_review(
         "directive_evidence": ("UNAVAILABLE" if rows is None else
                                "FRESH_INDEX" if index_fresh else "PERSISTED_INDEX_REVIEW"),
         "astra_evidence": executive["status"],
+        "research_execution": summarize_existing_research(root, now),
         "active_count_in_latest_window": None,
         "observed_states": {},
         "top_three_follow_ups": [],
