@@ -151,39 +151,44 @@ def test_ooo_variants_wait(classification):
 
 
 @pytest.mark.parametrize("classification", ["wrong_person", "referral", "not_the_right_person"])
-def test_wrong_person_variants_research(classification):
+def test_unverified_wrong_person_label_cannot_trigger_new_outreach(classification):
     plan = base_plan(replies=[{"reply_id": "x", "classification": classification}])
-    assert plan["action_type"] == "RESEARCH"
+    assert plan["action_type"] == "WAIT"
+    assert "authenticated_same_thread_person_bound_reply" in plan["missing_evidence"]
 
 
 @pytest.mark.parametrize("classification", ["interest", "question", "objection", "pricing_question"])
-def test_real_reply_stops_nurture_and_hands_to_closer(classification):
+def test_unverified_positive_label_cannot_trigger_closer(classification):
     plan = base_plan(replies=[{"reply_id": "x", "classification": classification}])
-    assert plan["relationship_stage"] == "CONVERSATION"
-    assert plan["action_type"] == "HANDOFF_TO_CLOSER"
-
-
-def test_unknown_real_reply_stops_nurture_and_waits_for_classification():
-    plan = base_plan(replies=[{"reply_id": "x", "classification": "other"}])
-    assert plan["relationship_stage"] == "ENGAGED"
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
     assert plan["action_type"] == "WAIT"
-    assert "reply_classification_review" in plan["missing_evidence"]
+    assert "authenticated_same_thread_person_bound_reply" in plan["missing_evidence"]
+
+
+def test_unverified_unclassified_reply_waits_for_authentication():
+    plan = base_plan(replies=[{"reply_id": "x", "classification": "other"}])
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
+    assert plan["action_type"] == "WAIT"
+    assert "authenticated_same_thread_person_bound_reply" in plan["missing_evidence"]
 
 
 def test_bounce_does_not_fake_engagement():
     plan = base_plan(replies=[{"reply_id": "x", "classification": "bounce"}])
-    assert plan["action_type"] == "DRAFT_RAPPORT_TOUCH"
+    assert plan["action_type"] == "WAIT"
+    assert plan["cta_allowed"] is False
 
 
-def test_touch_two_requires_new_value():
+def test_touch_two_can_draft_new_value_without_reply_but_not_sales():
     history = sent(1)
     plan = base_plan(history=history, ev=[evidence("e2", "Intercept Roofing & Construction added a project gallery.")])
     assert plan["relationship_stage"] == "RAPPORT_STARTED"
     assert plan["action_type"] == "DRAFT_VALUE_TOUCH"
     assert plan["evidence_refs"] == ["e2"]
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
 
 
-def test_touch_three_is_nurture_not_hard_cta():
+def test_touch_three_may_nurture_with_new_value_but_no_cta():
     history = sent(2, value_count=1)
     plan = base_plan(history=history, ev=[evidence("e3", "Intercept Roofing & Construction highlights commercial maintenance.")])
     assert plan["relationship_stage"] == "RAPPORT_BUILDING"
@@ -191,16 +196,16 @@ def test_touch_three_is_nurture_not_hard_cta():
     assert plan["cta_allowed"] is False
 
 
-def test_touch_four_can_be_soft_conversation_opener_after_verified_value_sequence():
+def test_touch_four_stays_value_only_without_buyer_signal():
     history = sent(3, value_count=2)
     plan = base_plan(history=history, ev=[evidence("e4", "Intercept Roofing & Construction publishes a Nashville service area.")])
     assert plan["relationship_stage"] == "VALUE_ESTABLISHED"
-    assert plan["action_type"] == "DRAFT_SOFT_CONVERSATION_OPENER"
-    assert plan["cta_allowed"] is True
+    assert plan["action_type"] == "DRAFT_NURTURE_TOUCH"
+    assert plan["cta_allowed"] is False
     assert plan["execution_authority"] == "none"
 
 
-def test_no_new_evidence_prevents_followup():
+def test_no_new_evidence_prevents_followup_without_fabrication():
     history = sent(1)
     plan = base_plan(history=history, ev=[evidence("old-1")])
     assert plan["action_type"] == "RESEARCH"
@@ -334,7 +339,7 @@ def test_safe_first_touch_passes_copy_gate():
     assert review["send_enabled"] is False
 
 
-def test_soft_conversation_opener_allowed_only_after_value_established():
+def test_soft_conversation_opener_denied_without_verified_buyer_signal():
     history = sent(3, value_count=2)
     plan = base_plan(history=history, ev=[evidence("e4", "Intercept Roofing & Construction publishes a Nashville service area.")])
     body = (
@@ -345,8 +350,8 @@ def test_soft_conversation_opener_allowed_only_after_value_established():
         account=account(), plan=plan, subject="Intercept Roofing & Construction",
         body=body, used_evidence_refs=["e4"],
     )
-    assert plan["cta_allowed"] is True
-    assert "PREMATURE_CTA" not in review["blockers"]
+    assert plan["cta_allowed"] is False
+    assert "PREMATURE_CTA" in review["blockers"]
 
 
 def test_astra_cannot_override_deterministic_gate():
@@ -385,11 +390,13 @@ def test_planner_never_grants_terms_payment_or_revenue_authority():
     assert plan["automated_nurture_allowed"] is False
 
 
-def test_commercial_ready_never_becomes_a_sender():
+def test_self_declared_commercial_ready_without_reply_is_held():
     a = account(commercial_ready=True)
     plan = plan_outbound_account(a, evidence=[evidence()])
-    assert plan["relationship_stage"] == "COMMERCIAL_READY"
-    assert plan["action_type"] == "HANDOFF_TO_CLOSER"
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
+    assert plan["action_type"] == "WAIT"
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
     assert plan["execution_authority"] == "none"
 
 
@@ -433,22 +440,22 @@ def test_astra_wrapper_is_advisory_and_uses_outbound_gate():
     assert plan["astra_director"]["recommendation_accepted"] is False
     assert plan["execution_authority"] == "none"
 
-def test_canonical_positive_reply_hands_to_closer():
+def test_unbound_positive_reply_cannot_trigger_closer():
     plan = base_plan(replies=[{"reply_id": "x", "classification": "positive"}])
-    assert plan["relationship_stage"] == "CONVERSATION"
-    assert plan["action_type"] == "HANDOFF_TO_CLOSER"
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
+    assert plan["action_type"] == "WAIT"
 
 
-def test_canonical_later_reply_stops_nurture_without_closer_handoff():
+def test_unbound_later_reply_stops_nurture_without_closer_handoff():
     plan = base_plan(replies=[{"reply_id": "x", "classification": "later"}])
-    assert plan["relationship_stage"] == "ENGAGED"
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
     assert plan["action_type"] == "WAIT"
     assert plan["execution_authority"] == "none"
 
 
-def test_canonical_negative_reply_stops_nurture_without_closer_handoff():
+def test_unbound_negative_reply_stops_nurture_without_closer_handoff():
     plan = base_plan(replies=[{"reply_id": "x", "classification": "negative"}])
-    assert plan["relationship_stage"] == "ENGAGED"
+    assert plan["relationship_stage"] == "COLD_VERIFIED"
     assert plan["action_type"] == "WAIT"
     assert plan["execution_authority"] == "none"
 
@@ -553,8 +560,8 @@ def test_value_established_still_blocks_hard_cta(cta):
         body=body,
         used_evidence_refs=["e4"],
     )
-    assert plan["action_type"] == "DRAFT_SOFT_CONVERSATION_OPENER"
-    assert plan["cta_allowed"] is True
+    assert plan["action_type"] == "DRAFT_NURTURE_TOUCH"
+    assert plan["cta_allowed"] is False
     assert "PREMATURE_CTA" in review["blockers"]
 
 
@@ -566,7 +573,7 @@ def test_value_established_still_blocks_hard_cta(cta):
         "If this is something you're actively looking at, I can show you what we're seeing.",
     ],
 )
-def test_value_established_allows_soft_conversation_openers(cta):
+def test_value_without_authenticated_reply_blocks_soft_conversation_openers(cta):
     history = sent(3, value_count=2)
     plan = base_plan(
         history=history,
@@ -586,8 +593,8 @@ def test_value_established_allows_soft_conversation_openers(cta):
         body=body,
         used_evidence_refs=["e4"],
     )
-    assert plan["action_type"] == "DRAFT_SOFT_CONVERSATION_OPENER"
-    assert "PREMATURE_CTA" not in review["blockers"]
+    assert plan["action_type"] == "DRAFT_NURTURE_TOUCH"
+    assert "PREMATURE_CTA" in review["blockers"]
 
 
 
@@ -613,3 +620,52 @@ def test_real_named_decision_maker_still_passes_existing_rapport_plan():
     assert plan["contact_route"]=="company_routed"
     assert plan["person_bound"] is False
     assert plan["execution_authority"]=="none"
+
+
+def test_forged_plan_flags_cannot_authorise_price_or_cta_in_prospect_draft():
+    # An optimiser or advisor must never grant its own commercial authority.
+    plan = dict(base_plan())
+    plan.update(
+        relationship_stage="COMMERCIAL_READY",
+        action_type="DRAFT_SOFT_CONVERSATION_OPENER",
+        cta_allowed=True,
+        price_allowed=True,
+    )
+    body = (
+        safe_body() +
+        "\n\nIf useful, happy to show you what we're seeing. "
+        "Our pilot is £2,500."
+    )
+    review = review_outbound_draft(
+        account=account(), plan=plan, subject="Intercept Roofing & Construction",
+        body=body, used_evidence_refs=["e1"],
+    )
+    assert review["eligible"] is False
+    assert "PREMATURE_CTA" in review["blockers"]
+    assert "PREMATURE_PRICE" in review["blockers"]
+    assert "PREMATURE_OFFER" in review["blockers"]
+    assert review["execution_authority"] == "none"
+
+
+def test_unpriced_pilot_pitch_is_still_a_commercial_offer_before_buyer_signal():
+    plan = base_plan()
+    review = review_outbound_draft(
+        account=account(), plan=plan, subject="Intercept Roofing & Construction",
+        body=safe_body() + "\n\nOur pilot provides a source-backed review.",
+        used_evidence_refs=["e1"],
+    )
+    assert "PREMATURE_OFFER" in review["blockers"]
+    assert review["eligible"] is False
+
+
+def test_unverified_account_cannot_infer_buyer_signal_from_advisor_flags():
+    plan = plan_outbound_account(
+        account(commercial_ready=True, cta_allowed=True, price_allowed=True),
+        history=sent(4, value_count=3),
+        evidence=[evidence("e5")],
+        astra_recommendation="HANDOFF_TO_CLOSER",
+    )
+    assert plan["action_type"] == "WAIT"
+    assert plan["cta_allowed"] is False
+    assert plan["price_allowed"] is False
+    assert plan["execution_authority"] == "none"

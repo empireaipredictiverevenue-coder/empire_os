@@ -132,7 +132,10 @@ def test_explicit_verified_product_request_unlocks_review_not_send():
     )
     p=planning(history=sent(),replies=[verified])
     assert p["relationship_stage"]=="COMMERCIAL_READY"
-    assert p["price_allowed"] is True
+    # A verified purchase request reaches the human closer; the prospect
+    # outbound plan itself never grants pricing or send authority.
+    assert p["price_allowed"] is False
+    assert "intent_cta_review" in p
     assert p["action_type"]=="HANDOFF_TO_CLOSER"
     assert p["execution_authority"]=="none"
     assert p["deliverability_check_required"] is False

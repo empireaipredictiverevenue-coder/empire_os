@@ -106,7 +106,8 @@ PRICE_PATTERN = re.compile(
 # A product pitch is still a pitch without a dollar amount. Keep the
 # rapport-first copy guard independent of whether a price is quoted.
 PRODUCT_PITCH_PATTERN = re.compile(
-    r"(?:\bwe offer\b|\bwe sell\b|\bour (?:service|product|audit)\b|"
+    r"(?:\bwe offer\b|\bwe sell\b|\bour (?:service|product|audit|pilot|assessment)\b|"
+    r"\b(?:paid (?:pilot|assessment)|pilot proposal|pilot programme|pilot program)\b|"
     r"\b(?:technical search audit|search opportunity map|competitor search gap)\b|"
     r"\bcheckout\b|(?:https?://)?(?:www\.)?empire-ai\.co\.uk/buy\b)",
     flags=re.IGNORECASE,
@@ -373,8 +374,10 @@ def _result(
         "BLOCK": "block",
     }.get(action, "unknown")
 
-    cta_allowed = action == "DRAFT_SOFT_CONVERSATION_OPENER" and stage == "VALUE_ESTABLISHED"
-    price_allowed = stage == "COMMERCIAL_READY"
+    # Outbound plans are not commercial authority: any later CTA belongs
+    # exclusively to the separate authenticated buyer-reply/closer reviewer.
+    cta_allowed = False
+    price_allowed = False
 
     recommended = _text(astra_recommendation).upper() or None
     return {
@@ -487,26 +490,38 @@ def plan_outbound_account(
             touch_number=touch_number, used_evidence_refs=used_refs,
             astra_recommendation=astra_recommendation,
         )
-    # Optional stricter founder policy for a genuine first-sale relationship.
-    # A send, a label alone, or an unbound mail event NEVER advances rapport.
-    # Existing lanes keep their established policy unless explicitly opted in.
-    if account.get("verified_reply_required_for_followup") is True:
-        authenticated = tuple(
-            row for row in r
-            if row.get("provider_authenticated") is True
-            and row.get("same_thread_verified") is True
-            and row.get("counterpart_identity_verified") is True
-            and bool(_text(row.get("reply_id")))
+    # Real replies need provider, thread and counterpart proof. Value-only
+    # follow-ups may still be drafted without replies, but never gain CTA or
+    # pricing authority from sent-count, flags, or model recommendations.
+    authenticated = tuple(
+        row for row in r
+        if row.get("provider_authenticated") is True
+        and row.get("same_thread_verified") is True
+        and row.get("counterpart_identity_verified") is True
+        and bool(_text(row.get("reply_id")))
+    )
+    if r and (not authenticated or r[-1] is not authenticated[-1]):
+        return _result(
+            account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
+            action="WAIT",
+            reason="unverified_reply_must_not_advance_first_sale",
+            touch_number=touch_number, used_evidence_refs=used_refs,
+            missing_evidence=("authenticated_same_thread_person_bound_reply",),
+            astra_recommendation=astra_recommendation,
         )
-        if r and (not authenticated or r[-1] is not authenticated[-1]):
-            return _result(
-                account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
-                action="WAIT",
-                reason="unverified_reply_must_not_advance_first_sale",
-                touch_number=touch_number, used_evidence_refs=used_refs,
-                missing_evidence=("authenticated_same_thread_person_bound_reply",),
-                astra_recommendation=astra_recommendation,
-            )
+    # An account-level commercial_ready flag cannot itself establish buyer
+    # interest. Only authenticated inbound evidence can enter the closer.
+    if account.get("commercial_ready") is True and not authenticated:
+        return _result(
+            account=account, stage="RAPPORT_STARTED" if sent else "COLD_VERIFIED",
+            action="WAIT", reason="commercial_ready_flag_not_buyer_signal",
+            touch_number=touch_number, used_evidence_refs=used_refs,
+            missing_evidence=("authenticated_buyer_signal",),
+            astra_recommendation=astra_recommendation,
+        )
+    # Keep the previously authorised stricter no-unanswered-followup
+    # requirement for first-sale accounts which explicitly selected it.
+    if account.get("verified_reply_required_for_followup") is True:
         if authenticated:
             verified_signal = _reply_signal(authenticated)
             if verified_signal == "commercial":
@@ -685,8 +700,8 @@ def plan_outbound_account(
         action = "HANDOFF_TO_CLOSER"
         reason = "canonical_commercial_ready_state_requires_existing_closer"
     elif stage == "VALUE_ESTABLISHED":
-        action = "DRAFT_SOFT_CONVERSATION_OPENER"
-        reason = "sufficient_prior_value_touches_allow_a_soft_conversation_opener"
+        action = "DRAFT_NURTURE_TOUCH"
+        reason = "value_touches_are_not_a_buyer_signal_only_new_value_allowed"
     elif stage == "RAPPORT_BUILDING":
         action = "DRAFT_NURTURE_TOUCH"
         reason = "rapport_is_building_and_next_touch_must_add_new_value"
@@ -813,7 +828,9 @@ def review_outbound_draft(
         if personal_greeting or "your email" in lower:
             blockers.append("ROLE_INBOX_PERSONHOOD_CLAIM")
 
-    cta_allowed = bool(plan.get("cta_allowed"))
+    # This reviewer is for outbound prospect drafts, not authenticated reply
+    # responses. Never trust plan-supplied CTA/price flags or stage labels.
+    cta_allowed = False
     action_type = _text(plan.get("action_type"))
     has_soft_cta = SOFT_CTA_PATTERN.search(clean_body) is not None
     has_hard_cta = HARD_CTA_PATTERN.search(clean_body) is not None
@@ -834,7 +851,7 @@ def review_outbound_draft(
     ):
         blockers.append("PREMATURE_CTA")
 
-    price_allowed = bool(plan.get("price_allowed"))
+    price_allowed = False
     if not price_allowed and PRICE_PATTERN.search(clean_body):
         blockers.append("PREMATURE_PRICE")
     if not price_allowed and PRODUCT_PITCH_PATTERN.search(clean_body):
