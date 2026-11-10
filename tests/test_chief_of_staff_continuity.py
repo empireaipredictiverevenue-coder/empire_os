@@ -57,7 +57,7 @@ def source(root, rows=None, *, index_age=timedelta(hours=1), executive_age=timed
     return ddir / "latest.json", edir / "executive_latest.json"
 
 
-def research_source(root, *, findings=0, age=timedelta(minutes=2),
+def research_source(root, *, findings=0, degraded=15, age=timedelta(minutes=2),
                     corrupt=False, mismatch=False):
     directory = root / "runtime/opportunity_radar"
     directory.mkdir(parents=True, exist_ok=True)
@@ -77,7 +77,7 @@ def research_source(root, *, findings=0, age=timedelta(minutes=2),
         "steps": [{"step": name, "ok": True} for name in step_names],
         "radar_candidate_count": 22, "research_observation_count": findings,
         "research_new_observation_count": findings,
-        "research_degraded_query_count": 15,
+        "research_degraded_query_count": degraded,
     }
     research = {
         "schema_version": "empire.opportunity_research_batch.v2",
@@ -92,20 +92,21 @@ def research_source(root, *, findings=0, age=timedelta(minutes=2),
     (directory / "research_latest.json").write_text(json.dumps(research))
 
 
-@pytest.mark.parametrize("findings,expected", [
-    (0, "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS"),
-    (3, "RESEARCH_SOURCE_REVIEW_REQUIRED"),
+@pytest.mark.parametrize("findings,degraded,expected", [
+    (0, 15, "SEARCH_PROVIDER_DEGRADED_NO_RESULTS"),
+    (0, 0, "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS"),
+    (3, 15, "RESEARCH_SOURCE_REVIEW_REQUIRED"),
 ])
-def test_owned_opportunity_research_handoff_never_dispatches_browser(tmp_path, findings, expected):
+def test_owned_opportunity_research_handoff_never_dispatches_browser(tmp_path, findings, degraded, expected):
     source(tmp_path)
-    research_source(tmp_path, findings=findings)
+    research_source(tmp_path, findings=findings, degraded=degraded)
     output = build_continuity_review(tmp_path, as_of=NOW)
     status = output["research_execution"]
     assert status["status"] == expected
     assert status["loop_completed"] is True
     assert status["candidate_count"] == 22
     assert status["new_observation_count"] == findings
-    assert status["degraded_query_count"] == 15
+    assert status["degraded_query_count"] == degraded
     assert status["browser_dispatched"] is False
     assert status["commercial_authority"] == "none"
     if findings == 0:

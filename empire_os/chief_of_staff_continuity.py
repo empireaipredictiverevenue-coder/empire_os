@@ -202,7 +202,9 @@ def summarize_existing_research(repo_root: Path, now: datetime) -> dict[str, Any
     if not completed:
         report["status"] = "RESEARCH_LOOP_INCOMPLETE"
     elif loop["research_observation_count"] == 0:
-        report["status"] = "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS"
+        report["status"] = ("SEARCH_PROVIDER_DEGRADED_NO_RESULTS"
+                            if report["degraded_query_count"] > 0
+                            else "RESEARCH_LOOP_COMPLETE_ZERO_RESULTS")
     else:
         report["status"] = "RESEARCH_SOURCE_REVIEW_REQUIRED"
         report["browser_handoff"] = "ORIGINAL_OWNER_VERIFY_SOURCE_URLS_FIRST"
