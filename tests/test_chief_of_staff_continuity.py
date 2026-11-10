@@ -90,7 +90,7 @@ def test_proactive_change_is_deduplicated(tmp_path):
     assert build_continuity_review(tmp_path, as_of=NOW, previous=changed)["changed_attention"] == []
 
 
-@pytest.mark.parametrize("corruption", ["invalid_json", "wrong_mode", "execution_on", "stale", "duplicate", "wrong_authority"])
+@pytest.mark.parametrize("corruption", ["invalid_json", "wrong_mode", "execution_on", "ancient", "duplicate", "wrong_authority"])
 def test_canonical_input_fails_closed(tmp_path, corruption):
     index, _ = source(tmp_path)
     data = json.loads(index.read_text())
@@ -101,8 +101,8 @@ def test_canonical_input_fails_closed(tmp_path, corruption):
             data["execution_mode"] = "LIVE"
         elif corruption == "execution_on":
             data["automatic_production_execution"] = True
-        elif corruption == "stale":
-            data["observed_at"] = (NOW - timedelta(days=4)).isoformat()
+        elif corruption == "ancient":
+            data["observed_at"] = (NOW - timedelta(days=366)).isoformat()
         elif corruption == "duplicate":
             data["latest"].append(dict(data["latest"][0]))
             data["directive_count"] += 1
@@ -113,6 +113,19 @@ def test_canonical_input_fails_closed(tmp_path, corruption):
     assert result["status"] == "EVIDENCE_HOLD"
     assert result["top_three_follow_ups"] == []
     assert result["changed_attention"] == []
+
+
+def test_old_persisted_directives_continue_without_claiming_freshness(tmp_path):
+    source(tmp_path, index_age=timedelta(days=4))
+    report = build_continuity_review(tmp_path, as_of=NOW)
+    assert report["directive_evidence"] == "PERSISTED_INDEX_REVIEW"
+    assert report["status"] == "REVIEW_WITH_PERSISTED_DIRECTIVES"
+    assert report["active_count_in_latest_window"] == 2
+    assert report["changed_attention"] == []
+    tick = run_tick(tmp_path, as_of=NOW)
+    assert tick["status"] == "REVIEW_WITH_PERSISTED_DIRECTIVES"
+    assert (tmp_path / "runtime/chief_of_staff/continuity_latest.json").is_file()
+    assert run_tick(tmp_path, as_of=NOW)["changed_attention"] == []
 
 
 def test_astora_stale_holds_all_followup_and_deltas(tmp_path):

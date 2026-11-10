@@ -19,6 +19,7 @@ SCHEMA = "empire.chief_of_staff.continuity.v1"
 DIRECTIVES_SCHEMA = "empire.founder_directives.v1"
 MAX_SIZE = 750_000
 MAX_AGE = timedelta(hours=72)
+MAX_PERSISTED_AGE = timedelta(days=365)
 ID_RE = re.compile(r"^directive_[a-f0-9]{32}$")
 ACTIVE = frozenset({
     "captured", "planning", "planned", "implementation_ready", "implementing",
@@ -84,7 +85,7 @@ def _index(index: Mapping[str, Any] | None, now: datetime) -> list[dict[str, Any
     if index.get("execution_mode") != "OBSERVE" or index.get("automatic_production_execution") is not False:
         return None
     stamp = _time(index.get("observed_at"))
-    if stamp is None or not timedelta(0) <= now - stamp <= MAX_AGE:
+    if stamp is None or not timedelta(0) <= now - stamp <= MAX_PERSISTED_AGE:
         return None
     rows = index.get("latest")
     count = index.get("directive_count")
@@ -156,7 +157,10 @@ def build_continuity_review(
     executive = read_executive_founder_status(
         root / "runtime/astra/executive_latest.json", as_of=now
     )
-    rows = _index(_read_json(root / "runtime/founder_directives/latest.json"), now)
+    directives = _read_json(root / "runtime/founder_directives/latest.json")
+    rows = _index(directives, now)
+    source_stamp = _time(directives.get("observed_at")) if directives else None
+    index_fresh = source_stamp is not None and now - source_stamp <= MAX_AGE
     baseline = _prior_states(previous, now)
     result = {
         "schema_version": SCHEMA,
@@ -165,7 +169,8 @@ def build_continuity_review(
         "execution_authority": "none",
         "source_of_truth": "existing_founder_directives_and_astra",
         "status": "EVIDENCE_HOLD",
-        "directive_evidence": "UNAVAILABLE" if rows is None else "FRESH_INDEX",
+        "directive_evidence": ("UNAVAILABLE" if rows is None else
+                               "FRESH_INDEX" if index_fresh else "PERSISTED_INDEX_REVIEW"),
         "astra_evidence": executive["status"],
         "active_count_in_latest_window": None,
         "observed_states": {},
@@ -207,7 +212,8 @@ def build_continuity_review(
             if baseline.get(r["directive_id"]) != r["status"]
         ]
         result["changed_attention"] = changed[:3]
-    result["status"] = ("REVIEW_ONLY" if executive["status"] == "REVIEW_ONLY_NO_RELEASE_AUTHORITY"
+    result["status"] = ("REVIEW_WITH_PERSISTED_DIRECTIVES" if not index_fresh else
+                        "REVIEW_ONLY" if executive["status"] == "REVIEW_ONLY_NO_RELEASE_AUTHORITY"
                         else "REVIEW_WITH_OPERATIONAL_EVIDENCE_HOLD")
     return result
 
@@ -237,7 +243,8 @@ def run_tick(repo_root: Path, *, as_of: datetime | None = None) -> dict[str, Any
         previous = _read_json(file)
         # Existing file becoming corrupt is not an alert opportunity.
         report = build_continuity_review(repo_root, as_of=as_of, previous=previous)
-        if report["status"] not in {"REVIEW_ONLY", "REVIEW_WITH_OPERATIONAL_EVIDENCE_HOLD"}:
+        if report["status"] not in {"REVIEW_ONLY", "REVIEW_WITH_OPERATIONAL_EVIDENCE_HOLD",
+                                    "REVIEW_WITH_PERSISTED_DIRECTIVES"}:
             return report
         temp = folder / (".continuity." + uuid4().hex + ".tmp")
         try:
