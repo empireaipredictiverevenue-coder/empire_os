@@ -7,7 +7,8 @@ from empire_os.search_intelligence.search_console import (
     GoogleSearchConsoleAdapter, SearchConsoleUnavailable,
 )
 from empire_os.search_intelligence.owned_url_inspection import (
-    URLS, SITE, INSPECTION_ENDPOINT, parse_inspection, inspect_fixed_urls,
+    URLS, ROOFING_GUIDE_URLS, SITE, INSPECTION_ENDPOINT,
+    parse_inspection, inspect_fixed_urls, inspect_published_roofing_guides,
 )
 from scripts.inspect_owned_gsc_indexed_version_readonly import write_private_once
 
@@ -146,3 +147,51 @@ def test_reject_symlink_output(tmp_path):
     with pytest.raises(ValueError, match="private_report"):
         write_private_once({}, link, root=tmp_path)
     assert outside.read_text() == "original"
+
+
+
+def test_published_roofing_guides_use_original_adapter_with_two_exact_urls(tmp_path):
+    adapter,calls=fake_adapter(tmp_path)
+    packet=inspect_published_roofing_guides(
+        adapter,now=lambda:datetime(2026,11,11,22,0,tzinfo=timezone.utc))
+    assert packet["schema_version"]=="empire.search.owned_roofing_guide_index_inspection.v1"
+    assert packet["status"]=="ROOFING_GUIDES_INDEXED_VERSION_INSPECTION_RECORDED"
+    assert packet["count"]==2
+    assert [x[2]["inspectionUrl"] for x in calls]==list(ROOFING_GUIDE_URLS)
+    assert all(x[0]==INSPECTION_ENDPOINT and x[2]["siteUrl"]==SITE for x in calls)
+    assert [x["url"] for x in packet["items"]]==list(ROOFING_GUIDE_URLS)
+    assert packet["google_live_test_performed"] is False
+    assert packet["google_indexing_request_sent"] is False
+    assert packet["website_changed"] is False
+    assert "test-token" not in str(packet)
+    assert "secret-inspection-link" not in str(packet)
+
+
+def test_original_five_index_inspections_are_unchanged_after_roofing_addition(tmp_path):
+    adapter,calls=fake_adapter(tmp_path)
+    result=inspect_fixed_urls(adapter)
+    assert result["count"]==5
+    assert [x[2]["inspectionUrl"] for x in calls]==list(URLS)
+
+
+def test_roofing_index_inspection_rejects_wrong_property_before_auth(tmp_path):
+    adapter,calls=fake_adapter(tmp_path,property="sc-domain:not-empire.example")
+    with pytest.raises(SearchConsoleUnavailable,match="property"):
+        inspect_published_roofing_guides(adapter)
+    assert calls==[]
+
+
+def test_roofing_index_canonical_restricted_to_exact_owned_guides():
+    packet={"inspectionResult":{"indexStatusResult":{
+        "verdict":"PASS",
+        "googleCanonical":ROOFING_GUIDE_URLS[0],
+        "userCanonical":ROOFING_GUIDE_URLS[0],
+        "inspectionResultLink":"https://hidden.google.example/private",
+        "referringUrls":["https://irrelevant.example/referral"],
+    }}}
+    r=parse_inspection(ROOFING_GUIDE_URLS[0],packet)
+    assert r["googleCanonical"]==ROOFING_GUIDE_URLS[0]
+    assert r["userCanonical"]==ROOFING_GUIDE_URLS[0]
+    assert "inspectionResultLink" not in r and "referringUrls" not in r
+    with pytest.raises(SearchConsoleUnavailable,match="out_of_scope"):
+        parse_inspection(ROOFING_GUIDE_URLS[0]+"?tracking=unsafe",packet)

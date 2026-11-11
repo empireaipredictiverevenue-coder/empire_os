@@ -24,7 +24,7 @@ from .local_visibility import (
     analyse_local_grid,
 )
 from .metadata import generate_metadata
-from .owned_url_inspection import inspect_fixed_urls
+from .owned_url_inspection import inspect_fixed_urls, inspect_published_roofing_guides
 from .models import SearchOpportunity, SearchPage
 from .performance import lighthouse_parser_status, parse_lighthouse_report
 from .quality import ContentQualityEvaluator
@@ -505,6 +505,47 @@ def create_search_router(
                 raise HTTPException(
                     status_code=503, detail="gsc_indexed_version_inspection_unavailable",
                     headers={"Cache-Control": "no-store"},
+                ) from None
+
+    # Separately scoped two-guide inspection. The existing five-page Google
+    # indexed-version reader and its cache remain untouched.
+    roofing_guides_index_lock = Lock()
+    roofing_guides_index_cached = None
+    roofing_guides_index_cache_until = 0.0
+
+    @router.get("/search-console/indexed-version/roofing-guides")
+    def search_console_roofing_guides_indexed_version(response: Response):
+        """Only the two founder-published, exact owned U.S. roofing guides.
+
+        Same original server-side Google adapter and endpoint as five-page
+        reader; independent bounded 6-hour cache, no indexing submission,
+        no arbitrary URL input and no second Google credential integration.
+        """
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        nonlocal roofing_guides_index_cached, roofing_guides_index_cache_until
+        with roofing_guides_index_lock:
+            clock = monotonic()
+            if (roofing_guides_index_cached is not None
+                    and clock < roofing_guides_index_cache_until):
+                return roofing_guides_index_cached
+            if clock < roofing_guides_index_cache_until:
+                raise HTTPException(
+                    status_code=503,
+                    detail="gsc_roofing_guides_indexed_version_unavailable",
+                    headers={"Cache-Control":"no-store"},
+                )
+            roofing_guides_index_cache_until = clock + 300.0
+            try:
+                roofing_guides_index_cached = inspect_published_roofing_guides(
+                    search_console)
+                roofing_guides_index_cache_until = monotonic() + 6 * 3600.0
+                return roofing_guides_index_cached
+            except Exception:
+                raise HTTPException(
+                    status_code=503,
+                    detail="gsc_roofing_guides_indexed_version_unavailable",
+                    headers={"Cache-Control":"no-store"},
                 ) from None
 
     @router.get("/search-console/observations")
