@@ -578,3 +578,46 @@ def test_omniroute_selector_skips_degraded_health_candidate(monkeypatch, tmp_pat
 
     assert model == "openrouter/cohere/north-mini-code:free"
     assert probed == ["openrouter/cohere/north-mini-code:free"]
+
+
+def test_omniroute_selector_filters_unhealthy_before_four_model_limit(monkeypatch, tmp_path):
+    """Prevent degraded top-four candidates masking a healthy free model."""
+    from empire_os import hermes_control
+
+    degraded = (
+        "openrouter/openrouter/free",
+        "openrouter/cohere/north-mini-code:free",
+        "openrouter/nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "openrouter/nvidia/nemotron-3-super-120b-a12b:free",
+    )
+    healthy = "openrouter/poolside/laguna-s-2.1:free"
+    paid = "openrouter/z-ai/glm-5.3-flash"
+    health = tmp_path / "model_health.json"
+    health.write_text(json.dumps({
+        "schema_version": "model_health.v1",
+        "models": {
+            "openrouter:" + model.split("/", 1)[1]:
+                {"status": "degraded", "samples": 6, "failures": 6}
+            for model in degraded
+        },
+    }))
+    monkeypatch.setenv("LLM_HEALTH_PATH", str(health))
+    monkeypatch.setenv("LLM_RECEIPT_PATH", str(tmp_path / "receipts.jsonl"))
+    monkeypatch.delenv("EMPIRE_HERMES_MODEL_CANDIDATES", raising=False)
+    monkeypatch.delenv("EMPIRE_HERMES_ALLOW_PAID_MODELS", raising=False)
+    monkeypatch.setattr(hermes_control, "_fetch_omniroute_catalog",
+                        lambda **kwargs: (*degraded, healthy, paid))
+    attempted = []
+    def fake_probe(*, model, **kwargs):
+        attempted.append(model)
+        return (model == healthy, "ok" if model == healthy else "unexpected")
+    monkeypatch.setattr(hermes_control, "_probe_omniroute_model", fake_probe)
+
+    selected, attempts = hermes_control._select_omniroute_model({
+        "OPENAI_BASE_URL": "http://127.0.0.1:20128/v1",
+        "OPENAI_API_KEY": "test-only",
+    })
+    assert selected == healthy
+    assert attempted == [healthy]
+    assert all(model not in attempted for model in (*degraded, paid))
+    assert attempts[0]["ok"] == "true"

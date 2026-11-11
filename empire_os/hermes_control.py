@@ -1112,25 +1112,6 @@ def _select_omniroute_model(
         base_url=base_url,
         api_key=api_key,
     )
-    if catalog:
-        candidates = _rank_catalog_candidates(
-            catalog,
-            preferred,
-            allow_paid=allow_paid,
-        )
-    else:
-        candidates = tuple(
-            model
-            for model in preferred
-            if allow_paid or _is_zero_cost_model(model)
-        )
-
-    if not candidates:
-        raise HermesControlError(
-            "OmniRoute has no eligible zero-cost Hermes model candidates; "
-            "paid inference remains disabled"
-        )
-
     health_path = Path(os.environ.get(
         "LLM_HEALTH_PATH",
         "/srv/empire_os/runtime/llm/model_health.json",
@@ -1154,6 +1135,25 @@ def _select_omniroute_model(
             samples = 0
         status = str(evidence.get("status") or "unknown").strip().lower()
         return not (status == "degraded" and samples >= 5)
+
+    if catalog:
+        candidates = _rank_catalog_candidates(
+            (model for model in catalog if candidate_is_healthy(model)),
+            preferred,
+            allow_paid=allow_paid,
+        )
+    else:
+        candidates = tuple(
+            model
+            for model in preferred
+            if allow_paid or _is_zero_cost_model(model)
+        )
+
+    if not candidates:
+        raise HermesControlError(
+            "OmniRoute has no eligible zero-cost Hermes model candidates; "
+            "paid inference remains disabled"
+        )
 
     candidates = tuple(model for model in candidates if candidate_is_healthy(model))
     if not candidates:
