@@ -36,6 +36,20 @@ It **does not** give any agent authority to reassign another agent's work.
    verification, commit only owned files, report tested versus live outcomes,
    pass any cross-owner dependency to its owner, and **stop**. Do not invent
    the next assignment or reopen completed founder/buyer decisions.
+6. **Automation prompt is configuration, not a work log.** An existing
+   scheduled task has one accountable instruction owner: the founder-designated
+   executive coordinator or the founder's explicitly reassigned owner.
+   Specialist agents must put new research, customer evidence, SEO metrics,
+   release receipts and project handoffs in their ORIGINAL owner-controlled
+   source files, not append them to a shared automation prompt. They must not
+   reschedule, retitle, replace or expand another owner's task instructions.
+   Report a needed instruction change read-only to the owning coordinator.
+   When an authorised coordinator updates an automation, reconcile its current
+   prompt and prior evidence, preserve the task ID/schedule/enabled state,
+   archive material replaced instructions privately and read back the result.
+   Existing schedules and customer/revenue priorities are not revoked by this
+   rule. Platform-level access controls are separate and are NOT proven by
+   this policy alone.
 
 This instruction is a shared operating policy, not evidence that every agent
 runtime enforces it. Automated end-to-end coverage must be verified separately
