@@ -66,12 +66,12 @@ def _time(raw: Any) -> datetime | None:
         return None
 
 
-def _read_json(path: Path) -> Mapping[str, Any] | None:
+def _read_json(path: Path, *, byte_cap: int = MAX_SIZE) -> Mapping[str, Any] | None:
     try:
         if path.is_symlink() or not path.is_file():
             return None
         size = path.stat().st_size
-        if not 0 < size <= MAX_SIZE:
+        if not 0 < size <= byte_cap:
             return None
         data = json.loads(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else None
@@ -211,6 +211,104 @@ def summarize_existing_research(repo_root: Path, now: datetime) -> dict[str, Any
     return report
 
 
+def summarize_first_party_commercial_evidence(repo_root: Path, now: datetime) -> dict[str, Any]:
+    """Truthful Source Fabric/Scout readback. Observations never become buyers."""
+    report = {
+        "owner": "EXISTING_SEARCH_FABRIC_AND_BUYER_SCOUT",
+        "source_fabric_state": "SOURCE_EVIDENCE_UNAVAILABLE",
+        "first_party_prospects_observed": None,
+        "first_party_name_corroborated": None,
+        "first_party_name_and_phone_corroborated": None,
+        "historical_false_positive_name_flags": None,
+        "readiness_state": "SCOUT_READINESS_UNAVAILABLE",
+        "reviewed_candidates": None,
+        "review_ready_candidates": None,
+        "top_holding_reasons": [],
+        "full_customer_qualification_proven": False,
+        "outreach_authorized": False,
+        "automatic_promotion": False,
+    }
+    catalog = _read_json(
+        repo_root / "runtime/search_fabric_evidence/source_evidence_catalog_v61.json",
+        byte_cap=8_000_000,
+    )
+    if (catalog
+            and catalog.get("schema_version") == "empire.search_fabric.original_evidence_memory.v61"
+            and catalog.get("mode") == "READ_ONLY_FIRST_PARTY_SEARCH_EVIDENCE_MEMORY"
+            and catalog.get("buyer_outreach_or_revenue_triggered") is False
+            and catalog.get("source_rights_or_contact_authorization_assumed") is False
+            and catalog.get("prospect_data_updates") == 0
+            and catalog.get("legal_entity_merges") == 0):
+        stamp = _time(catalog.get("last_cycle_at_utc"))
+        rows = catalog.get("prospects")
+        total = catalog.get("distinct_prospects_observed")
+        if (stamp is not None and timedelta(0) <= now - stamp <= timedelta(hours=2)
+                and type(total) is int and 0 <= total <= 50000
+                and isinstance(rows, dict) and len(rows) == total
+                and all(isinstance(v, dict)
+                        and v.get("automatic_original_record_promotion_authorized") is False
+                        and v.get("contact_permission_verified") is False
+                        and v.get("source_resale_rights_verified") is False
+                        for v in rows.values())):
+            accepted_name = {
+                "FIRST_PARTY_NAME_AND_PHONE_OBSERVED_REVIEW_ONLY",
+                "FIRST_PARTY_BUSINESS_NAME_OBSERVED_REVIEW_ONLY",
+            }
+            named = sum(v.get("research_status") in accepted_name for v in rows.values())
+            names_phones = sum(
+                v.get("research_status") == "FIRST_PARTY_NAME_AND_PHONE_OBSERVED_REVIEW_ONLY"
+                for v in rows.values()
+            )
+            historical_false_flags = sum(
+                v.get("observed_name") is True
+                and v.get("research_status") not in accepted_name
+                for v in rows.values()
+            )
+            report["source_fabric_state"] = (
+                "FIRST_PARTY_RESEARCH_OBSERVED_NOT_QUALIFIED"
+                if total > 0 else "FIRST_PARTY_RESEARCH_CURRENT_ZERO"
+            )
+            report["first_party_prospects_observed"] = total
+            report["first_party_name_corroborated"] = named
+            report["first_party_name_and_phone_corroborated"] = names_phones
+            report["historical_false_positive_name_flags"] = historical_false_flags
+    readiness = _read_json(
+        repo_root / "runtime/buyer_acquisition/review_readiness_latest.json"
+    )
+    if (readiness
+            and readiness.get("schema_version") == "empire.buyer_scout_review_readiness.v1"
+            and readiness.get("mode") == "OBSERVE"
+            and readiness.get("execution_authority") == "none"
+            and readiness.get("database_write_performed") is False
+            and readiness.get("outbound_sent") is False):
+        stamp = _time(readiness.get("generated_at"))
+        count = readiness.get("candidate_count")
+        ready = readiness.get("review_ready_count")
+        blocked = readiness.get("blocked_count")
+        reasons = readiness.get("blocked_reason_counts")
+        if (stamp is not None and timedelta(0) <= now - stamp <= timedelta(hours=2)
+                and all(type(v) is int and 0 <= v <= 10000
+                        for v in (count, ready, blocked))
+                and count == ready + blocked
+                and isinstance(reasons, dict) and len(reasons) <= 30
+                and all(isinstance(k, str)
+                        and re.fullmatch(r"[a-z_]{1,64}", k)
+                        and type(v) is int and 0 <= v <= blocked
+                        for k, v in reasons.items())
+                and sum(reasons.values()) == blocked):
+            report["readiness_state"] = (
+                "ZERO_REVIEW_READY" if ready == 0
+                else "REVIEW_READY_REQUIRES_ORIGINAL_OWNER_VERIFICATION"
+            )
+            report["reviewed_candidates"] = count
+            report["review_ready_candidates"] = ready
+            report["top_holding_reasons"] = [
+                {"reason": key, "count": value}
+                for key, value in sorted(reasons.items(), key=lambda x: (-x[1], x[0]))[:3]
+            ]
+    return report
+
+
 def build_continuity_review(
     repo_root: Path,
     *,
@@ -242,6 +340,7 @@ def build_continuity_review(
                                "FRESH_INDEX" if index_fresh else "PERSISTED_INDEX_REVIEW"),
         "astra_evidence": executive["status"],
         "research_execution": summarize_existing_research(root, now),
+        "first_party_commercial_evidence": summarize_first_party_commercial_evidence(root, now),
         "active_count_in_latest_window": None,
         "observed_states": {},
         "top_three_follow_ups": [],
