@@ -34,6 +34,7 @@ def test_invalid_site_limits_hold(daily,total):
         op.proposed(old_control(),"2026-10-20T08:00",7,daily,total)
 
 def test_preview_never_writes_anything(tmp_path,monkeypatch):
+    monkeypatch.setattr(op,"PROJECT_ROOT",tmp_path)
     config=tmp_path/"control.json"
     config.write_text(json.dumps(old_control()))
     monkeypatch.setattr(op,"CONFIG",config)
@@ -45,6 +46,7 @@ def test_preview_never_writes_anything(tmp_path,monkeypatch):
     assert config.read_bytes()==before
 
 def test_stage_writes_disabled_window_not_an_active_pilot(tmp_path,monkeypatch):
+    monkeypatch.setattr(op,"PROJECT_ROOT",tmp_path)
     config=tmp_path/"control.json"
     config.write_text(json.dumps(old_control()))
     monkeypatch.setattr(op,"CONFIG",config)
@@ -64,6 +66,7 @@ def test_stage_writes_disabled_window_not_an_active_pilot(tmp_path,monkeypatch):
     assert json.loads(config.read_text())["enabled"] is False
 
 def test_existing_ledger_prevents_new_campaign_staging(tmp_path,monkeypatch):
+    monkeypatch.setattr(op,"PROJECT_ROOT",tmp_path)
     config=tmp_path/"control.json"
     config.write_text(json.dumps(old_control()))
     ledger=tmp_path/"site_handoffs.json"
@@ -85,6 +88,10 @@ def test_activation_installs_stop_timer_before_enabling_calls(tmp_path,monkeypat
     monkeypatch.setattr(op,"datetime",Frozen)
     config=tmp_path/"control.json"
     c=op.proposed(old_control(),"2026-10-20T08:00",7,20,140)
+    # Historical synthetic October scenario: it is not the new November
+    # instruction and must keep the original, independently scoped source.
+    c["founder_authority_ref"]="docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    c.pop("fresh_founder_opening_hours_restart_ref",None)
     config.write_text(json.dumps(c))
     monkeypatch.setattr(op,"CONFIG",config)
     monkeypatch.setattr(op,"founder_full_campaign_approved",lambda root:True)
@@ -122,6 +129,8 @@ def test_activation_fails_closed_without_fresh_source(tmp_path,monkeypatch):
             return now if tz is None else now.astimezone(tz)
     monkeypatch.setattr(op,"datetime",Frozen)
     c=op.proposed(old_control(),"2026-10-20T08:00",7,20,140)
+    c["founder_authority_ref"]="docs/evidence/lead_smart_full_campaign_founder_directive_20261020.json"
+    c.pop("fresh_founder_opening_hours_restart_ref",None)
     cfg=tmp_path/"control"
     cfg.write_text(json.dumps(c))
     monkeypatch.setattr(op,"CONFIG",cfg)
