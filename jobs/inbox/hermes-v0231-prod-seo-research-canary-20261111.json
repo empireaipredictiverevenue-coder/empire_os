@@ -1,0 +1,13 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-v0231-prod-seo-research-canary-20261111",
+  "kind": "code_task",
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "allowed_paths": [],
+  "lease_resources": [],
+  "pytest_targets": [],
+  "max_runtime_seconds": 180,
+  "ai_behavior_change": false,
+  "prompt": "Founder-authorised read-only production version acceptance. Inspect exactly the already verified first-party SEO audit /home/ubuntu/empire_releases/seo_native_sales_preview_20261108/seo-audit-2026-11-11.json and, optionally, one GET of our public owned https://empire-ai.co.uk/buy page. Return the actual low-severity finding code with the evidence timestamp and a brief assessment of whether more text by itself would improve commercial SEO. The correct analysis must distinguish observed crawler output from GSC performance and actual buyer enquiries. Identify one minimal owner-reviewed next action. Do not access private CRM/customer content, secrets, Obsidian notes or other systems; do not send any message, create a file, update Git, run systemctl, make payments, publish, deploy or modify production. No paid model use. If a source fails, report unavailable; no invented data. No more than 120 words."
+}
