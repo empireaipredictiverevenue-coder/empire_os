@@ -1,5 +1,20 @@
 # Original Search Intelligence owner — second Google Search Console property
 
+**11 November 2026 — updated at 21:03 UTC: second endpoint is LIVE, but the existing service account's NSH Google permission remains unverified/unavailable.** The earlier 404/restart hold below is preserved as historical audit evidence and is **superseded** by the root-operator activation receipt.
+
+## Final activation update — do not repeat the restart
+
+The founder ran the original guarded root-owner script with `--apply`; its terminal receipt read `LIVE_SECOND_PROPERTY_ROUTE_VERIFIED`, service PID `344397`, `original_property_preserved=true`, `nsh_access_available=false`, `permission_or_provider_unavailable=true`, rollback copy `/var/backups/empire-search-intelligence/nsh_gsc_service_original_20261111.py`. Independent live HTTP verification at 21:02 UTC confirmed original `/v1/search/search-console/status` returns HTTP 200 `sc-domain:empire-ai.co.uk` available, original `/pages` HTTP 200, and new `/v1/search/search-console/national-storm-hub/status` HTTP 200 `sc-domain:nationalstormhub.com` but `available=false`; new NSH `/pages` returns **503**, correctly fail-closed. Do not claim NSH GSC metrics, property grant or Google indexation from the new API.
+
+The service account permission/Google API cause was not distinguishable from the generic unavailable status. Commit `ec54795e1` adds **read-only diagnostic** `scripts/diagnose_nsh_gsc_service_account_access_20261111.py`, merged into original `/srv/empire_os` (34/34 Search Intelligence focused tests PASS). This utility reads only the existing protected service-account credential metadata (`client_email`), obtains an existing read-only token, calls Google's official `sites.list`, and prints a sanitized provider HTTP status plus exact primary/NSH permission levels, never the key, token, other properties or raw response. Unprivileged preflight deliberately returns `ADMIN_READ_ONLY_DIAGNOSTIC_REQUIRED` and changes nothing. Only a pre-authorized root operator can run:
+
+```bash
+sudo /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/diagnose_nsh_gsc_service_account_access_20261111.py
+```
+
+If `NSH_NOT_GRANTED_TO_EXISTING_SERVICE_ACCOUNT`, use the reported service-account email in the founder's verified **Google Search Console** property `sc-domain:nationalstormhub.com` → **Settings → Users and permissions → Add user**, grant **Restricted** read-only access. Do not change the original Empire AI grant, set up a duplicate API key/service account or confer unnecessary Owner permissions. Then query the already-running `/national-storm-hub/status` and `/pages` endpoints. If the diagnostic shows HTTP 403/API failure, investigate that exact result without making speculative ACL changes. This is a Google property authority dependency, not a reason for a second service restart or renewed founder internal approval.
+
+
 **11 November 2026 — code installed/tested, production service still running prior process.**
 
 ## Scope and actual proof
