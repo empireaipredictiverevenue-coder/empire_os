@@ -1,0 +1,13 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-seo-evidence-research-20261111",
+  "kind": "code_task",
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "allowed_paths": [],
+  "lease_resources": [],
+  "pytest_targets": [],
+  "max_runtime_seconds": 180,
+  "ai_behavior_change": false,
+  "prompt": "Read-only SEO research canary for the existing Empire AI Search Fabric / Hermes Oracle owner. Examine the genuine first-party SEO audit at /home/ubuntu/empire_releases/seo_native_sales_preview_20261108/seo-audit-2026-11-11.json without changing any file. Focus only on the low-severity short_primary_content_review finding for https://empire-ai.co.uk/buy. If permitted, perform one read-only GET on that owned public page to verify visible content. Explain whether the finding merits an editorial improvement, what buyer intent needs independent verification, what source evidence is missing, and the narrowest next action for the existing SEO and MediaOS owners. Never infer traffic, search ranking, lead demand, customers or revenue from word count. Do not publish, send, spend, install, modify code, save data, alter auth, run systemctl, or change production. Return a short source-labelled finding and no more than three owner-reviewed next steps. If any required source cannot be read, say unavailable instead of inventing."
+}
