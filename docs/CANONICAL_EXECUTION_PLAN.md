@@ -7,6 +7,60 @@ This document controls execution sequencing from 2026-09-23 onward. Blueprint
 v6 remains the architecture and historical roadmap reference, but parallel work
 recorded there does not override this execution order.
 
+## Standing Founder delegation — 11 November 2026
+
+**Founder decision (in chat, 11 November 2026):** Stop repeated approval
+bureaucracy across Empire AI. The founder expressly authorised replacing the
+additional *internal* independent-review gate with founder-led review for
+bounded informational releases, and authorised the existing six National Storm
+Hub SEO pages. This decision applies to the current EmpireOS departments and
+existing delegated owners; it is not a new agent, queue, dashboard or runtime.
+
+**Execute within standing authority instead of asking again.** Where an action
+is within a known founder-approved product, design, owner, previously accepted
+scope or existing recurring operation, the designated canonical owner may
+inspect, repair, test, verify, commit, and complete reversible, low-risk work,
+including fact-checked informational-page corrections and technical SEO
+releases, without fresh founder approval in each chat, worker or phase.
+Existing approvals remain valid until specifically revoked or materially
+changed. Security checks, source provenance, verified live rendering, evidence,
+rollback and one canonical owner are execution duties, **not a second manual
+approval chain**. Do not create substitute signoffs or a new committee.
+
+**Founder-led review is sufficient** for routine information-only publication
+where the founder has already approved scope, the actual visitor/data flows
+are documented and materially unchanged, the candidate is tested, there is a
+rollback and no external contractual or statutory independent signoff is
+required. Record founder scope/risk acceptance and the precise deployed hashes;
+never falsely represent that an independent solicitor/reviewer signed off.
+An older internal `independent_signoff=false` flag can be superseded with a
+new, source-linked founder delegation decision **only for such bounded cases**;
+retain the historical false value and give the release evidence its own
+explicitly scoped authorization record. Do not silently edit historical
+receipts or set `independent_signoff=true` without evidence.
+
+**Keep meaningful controls:** payments, trading/funds, new paid subscriptions,
+automated/external outbound messages and calls, binding customer terms,
+public posting outside a previously agreed publishing scope, personal/tenant
+data use or disclosure, authentication/permissions, destructive writes,
+production database migrations, security posture changes and material
+infrastructure restarts/deployments need the authority the founder or law
+actually requires. The founder's already explicit approval for one bounded
+release permits the smallest necessary guarded restart/deployment and rollback;
+it is not blanket authority for unrelated production changes. Never switch
+off security, consent or tenant isolation to simplify execution.
+
+**Operate, don't loop:** retrieve existing approvals and evidence first;
+prepare a bounded diff; run tests and check actual UI/real workflows; use
+existing service controls, preserving rollback; publish or close within the
+recorded authorization; report Completed / Evidence / Outstanding. Escalate
+only a genuine missing legal fact, material risk or new protected action.
+An unresolved but disclosed non-blocking legal/commercial risk must not be
+artificially described as an unspecified new signature requirement. When
+existing code enforces a superseded non-legal signature gate, the canonical
+owner must implement and test the narrow policy change openly rather than
+bypass the runtime covertly or keep asking the founder again.
+
 ## Permanent closeout sequence
 
 Every phase follows the same mandatory sequence:
