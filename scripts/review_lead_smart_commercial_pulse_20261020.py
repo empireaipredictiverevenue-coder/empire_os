@@ -10,12 +10,15 @@ import argparse
 from datetime import datetime,timedelta,timezone
 import hashlib
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
 from typing import Any,Callable
 from urllib.parse import urlencode
 from urllib.request import urlopen,Request
+
+from empire_os.lead_smart_operating_hours import fifty_state_hours_overlap
 
 ROOT=Path("/srv/empire_os")
 CONTROL=ROOT/"runtime/revenue/lead_smart/pilot/approved_control.json"
@@ -25,6 +28,218 @@ OUT=ROOT/"runtime/revenue/lead_smart/commercial_pulse/latest.json"
 GSC="http://127.0.0.1:8771/v1/search/search-console/pages"
 CANONICAL="https://empire-ai.co.uk/roofing"
 MAX_BYTES=200000
+
+MAX_ZIP_JOURNAL_BYTES=512 * 1024
+ZIP_JOURNAL_UNIT="empire-public-gateway.service"
+ZIP_JOURNAL_PATTERN=re.compile(
+    r'"POST /roofing/coverage-check HTTP/1\.[01]" ([1-5][0-9]{2})\b'
+)
+
+
+def zip_check_http_request_observation(
+    *, now:datetime, runner:Callable=subprocess.run,
+)->dict[str,Any]:
+    """Operational gateway request counts only, never real visitor conversion.
+
+    The source is the EXISTING public gateway journal. No cookies, addresses,
+    property ZIPs, bodies, identifiers or raw log lines are returned/stored.
+    Operator tests and bots cannot be excluded, so these are HTTP REQUESTS
+    and must never be represented as unique homeowner sessions or enquiries.
+    """
+    base={
+        "schema_version":"empire.lead_smart.zip_http_operational_observation.v1",
+        "source":"EXISTING_PUBLIC_GATEWAY_JOURNAL",
+        "source_unit":ZIP_JOURNAL_UNIT,
+        "window_hours":24,
+        "http_post_requests":None,
+        "http_200_guidance_responses":None,
+        "http_4xx_responses":None,
+        "http_5xx_responses":None,
+        "http_other_responses":None,
+        "raw_addresses_or_property_zips_exported":False,
+        "additional_analytics_collector_enabled":False,
+        "includes_operator_tests_or_bots_possible":True,
+        "unique_homeowner_visitors_verified":False,
+        "source_attribution_verified":False,
+        "eligibility_or_contact_consent_verified":False,
+        "buyer_accepted_calls_verified":False,
+        "settled_revenue_verified":False,
+    }
+    if not isinstance(now,datetime) or now.tzinfo is None:
+        return {**base,"status":"HTTP_JOURNAL_CLOCK_UNVERIFIED"}
+    clock=now.astimezone(timezone.utc)
+    if clock > datetime.now(timezone.utc)+timedelta(minutes=2):
+        return {**base,"status":"HTTP_JOURNAL_FUTURE_CLOCK_HELD"}
+    start=clock-timedelta(hours=24)
+    command=[
+        "journalctl","--unit="+ZIP_JOURNAL_UNIT,
+        "--since="+start.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "--until="+clock.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "--no-pager","--output=cat",
+        "--grep=POST /roofing/coverage-check",
+    ]
+    try:
+        result=runner(command,capture_output=True,text=True,
+                      timeout=12,check=False)
+        output=result.stdout
+        if (result.returncode!=0 or type(output) is not str
+                or len(output.encode("utf-8"))>MAX_ZIP_JOURNAL_BYTES):
+            return {**base,"status":"HTTP_JOURNAL_UNAVAILABLE_OR_UNBOUNDED"}
+        codes=[]
+        for row in output.splitlines():
+            if not row.strip():
+                continue
+            matches=list(ZIP_JOURNAL_PATTERN.finditer(row))
+            # One exact normalized Uvicorn request log per journal row.
+            if len(matches)!=1:
+                return {**base,"status":"HTTP_JOURNAL_LOG_FORMAT_UNVERIFIED"}
+            codes.append(int(matches[0].group(1)))
+        return {
+            **base,
+            "status":"HTTP_REQUEST_COUNTS_ONLY_NOT_VISITORS",
+            "http_post_requests":len(codes),
+            "http_200_guidance_responses":sum(n==200 for n in codes),
+            "http_4xx_responses":sum(400<=n<500 for n in codes),
+            "http_5xx_responses":sum(500<=n<600 for n in codes),
+            "http_other_responses":sum(not (
+                n==200 or 400<=n<600) for n in codes),
+        }
+    except (OSError,ValueError,UnicodeError,subprocess.SubprocessError):
+        return {**base,"status":"HTTP_JOURNAL_UNAVAILABLE_OR_UNBOUNDED"}
+
+
+ROOFING_PAGE_PATTERN=re.compile(
+    r'"GET /roofing(?:\?[^" ]{1,2048})? HTTP/1\.[01]" ([1-5][0-9]{2})\b'
+)
+ROOFING_GUIDE_PATTERN=re.compile(
+    r'"GET /roofing/(?:installation-checklist|replacement-vs-repair)'
+    r'(?:\?[^" ]{1,2048})? HTTP/1\.[01]" ([1-5][0-9]{2})\b'
+)
+
+
+def roofing_content_http_request_observation(
+    *, now:datetime, runner:Callable=subprocess.run,
+)->dict[str,Any]:
+    """Count only existing gateway GET requests; not visitor sessions.
+
+    This is deliberately independent of the analytics consent/collection
+    pipeline. No IP, referrer, request query or request log line is returned.
+    CDN cache hits are not observed; bots and operator tests are included.
+    Never derive a page-to-ZIP conversion rate from these HTTP totals.
+    """
+    base={
+        "schema_version":"empire.lead_smart.roofing_http_content_observation.v1",
+        "status":"HTTP_JOURNAL_UNAVAILABLE_OR_UNBOUNDED",
+        "source":"EXISTING_PUBLIC_GATEWAY_JOURNAL",
+        "source_unit":ZIP_JOURNAL_UNIT,
+        "window_hours":24,
+        "landing_get_requests":None,
+        "guide_get_requests":None,
+        "http_200_responses":None,
+        "http_4xx_responses":None,
+        "http_5xx_responses":None,
+        "raw_addresses_queries_or_referrers_exported":False,
+        "includes_operator_tests_or_bots_possible":True,
+        "cdn_cache_hits_unobserved":True,
+        "unique_homeowner_visitors_verified":False,
+        "source_attribution_verified":False,
+        "consented_sessions_verified":False,
+        "landing_to_zip_conversion_verified":False,
+        "buyer_accepted_calls_verified":False,
+        "settled_revenue_verified":False,
+        "additional_analytics_collector_enabled":False,
+    }
+    if not isinstance(now,datetime) or now.tzinfo is None:
+        return {**base,"status":"HTTP_JOURNAL_CLOCK_UNVERIFIED"}
+    clock=now.astimezone(timezone.utc)
+    if clock>datetime.now(timezone.utc)+timedelta(minutes=2):
+        return {**base,"status":"HTTP_JOURNAL_FUTURE_CLOCK_HELD"}
+    start=clock-timedelta(hours=24)
+    command=[
+        "journalctl","--unit="+ZIP_JOURNAL_UNIT,
+        "--since="+start.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "--until="+clock.strftime("%Y-%m-%d %H:%M:%S UTC"),
+        "--no-pager","--output=cat",
+        r"--grep=GET /roofing( HTTP|\?|/(installation-checklist|replacement-vs-repair))",
+    ]
+    try:
+        result=runner(command,capture_output=True,text=True,
+                      timeout=12,check=False)
+        output=result.stdout
+        if (result.returncode!=0 or type(output) is not str
+                or len(output.encode("utf-8"))>MAX_ZIP_JOURNAL_BYTES):
+            return base
+        types=[]
+        codes=[]
+        for row in output.splitlines():
+            if not row.strip():
+                continue
+            landing=ROOFING_PAGE_PATTERN.findall(row)
+            guide=ROOFING_GUIDE_PATTERN.findall(row)
+            if len(landing)+len(guide)!=1:
+                return {**base,"status":"HTTP_JOURNAL_LOG_FORMAT_UNVERIFIED"}
+            types.append("landing" if landing else "guide")
+            codes.append(int((landing or guide)[0]))
+        return {
+            **base,
+            "status":"HTTP_REQUEST_COUNTS_ONLY_NOT_VISITORS",
+            "landing_get_requests":types.count("landing"),
+            "guide_get_requests":types.count("guide"),
+            "http_200_responses":sum(code==200 for code in codes),
+            "http_4xx_responses":sum(400<=code<500 for code in codes),
+            "http_5xx_responses":sum(500<=code<600 for code in codes),
+        }
+    except (OSError,ValueError,UnicodeError,subprocess.SubprocessError):
+        return base
+
+
+def buyer_hours_and_campaign_window(*, now:datetime,
+                                    control:dict[str,Any]) -> dict[str,Any]:
+    """Current conservative clock overlap, never proof of an accepting buyer.
+
+    Actual Ringba routing, caller-origin verification, recording governance,
+    revised buyer terms and founder release all remain separate authorities.
+    The read-only pulse MUST NOT imply that an open clock enables a call.
+    """
+    if now.tzinfo is None:
+        raise ValueError("timezone_aware_clock_required")
+    utc=now.astimezone(timezone.utc)
+    overlap=fifty_state_hours_overlap(now=utc)
+    state="INVALID_WINDOW_HELD"
+    try:
+        start=datetime.fromisoformat(str(control.get("starts_at","")))
+        end=datetime.fromisoformat(str(control.get("ends_at","")))
+        if (start.tzinfo is not None and end.tzinfo is not None
+                and start < end):
+            start=start.astimezone(timezone.utc)
+            end=end.astimezone(timezone.utc)
+            state=("NOT_STARTED" if utc < start else
+                   "EXPIRED" if utc >= end else "IN_WINDOW")
+    except (TypeError,ValueError,OverflowError):
+        pass
+    return {
+        "schema_version":"empire.lead_smart.hours_and_campaign_observation.v1",
+        "mode":"READ_ONLY_NEVER_CALL_AUTHORITY",
+        "evaluated_at_utc":utc.isoformat(),
+        "source_refs":["gmail:1a12229d9d3ffe75",
+                       "gmail:1a15ea2dfa8c46b1"],
+        "reported_weekday_local_hours":"08:00-18:00",
+        "reported_weekend_local_hours":"10:00-16:00",
+        "reported_timezone_policy":"CALLER_LOCAL_NOT_UNIVERSAL_CHICAGO",
+        "all_fifty_state_reported_clocks_in_window":
+            overlap["all_reported_windows_open"],
+        "campaign_window_state":state,
+        "campaign_config_switch_enabled":control.get("enabled") is True,
+        "specific_callers_timezone_verified":False,
+        "current_buyer_capacity_verified":False,
+        "current_buyer_offer_terms_verified":False,
+        "buyer_route_and_ani_verified":False,
+        "independent_recording_compliance_verified":False,
+        "actual_live_call_authorized":False,
+        "fresh_founder_campaign_window_authorized":False,
+        "consumer_call_traffic_enabled_by_observation":False,
+    }
+
 
 def read_json(path:Path)->dict[str,Any]:
     if path.is_symlink() or not path.is_file() or path.stat().st_size>MAX_BYTES:
@@ -94,7 +309,10 @@ def ringba_proof()->dict[str,Any]:
                 "provider_token_read_by_unprivileged_process":False}
 
 def pulse(*, now:datetime|None=None,provider_reader:Callable=ringba_proof,
-          gsc_reader:Callable=gsc_pages,control_path:Path=CONTROL,
+          gsc_reader:Callable=gsc_pages,
+          zip_request_reader:Callable=zip_check_http_request_observation,
+          content_request_reader:Callable=roofing_content_http_request_observation,
+          control_path:Path=CONTROL,
           ledger_path:Path=LEDGER,tracking_path:Path=TRACKING)->dict[str,Any]:
     clock=now or datetime.now(timezone.utc)
     if clock.tzinfo is None:raise ValueError("timezone_aware_clock_required")
@@ -128,12 +346,16 @@ def pulse(*, now:datetime|None=None,provider_reader:Callable=ringba_proof,
         "campaign_mode":config.get("mode"),
         "site_handoff_switch_enabled":config.get("enabled") is True,
         "campaign_expires_at":config.get("ends_at"),
+        "buyer_hours_and_campaign_window":
+            buyer_hours_and_campaign_window(now=clock,control=config),
         "daily_site_handoff_limit":config.get("max_daily_site_handoffs"),
         "total_site_handoff_limit":config.get("max_site_handoffs"),
         "site_handoffs_recorded":total,
         "site_handoffs_today":currentday,
         "handoff_metric":"consent-acknowledged dial-link admissions; NOT connected calls",
         "google_search_console":gsc,
+        "zip_check_http_operational_requests":zip_request_reader(now=clock),
+        "roofing_content_http_operational_requests":content_request_reader(now=clock),
         "ringba":provider_reader(),
         "tracking_assignment_observed_at":tracking.get("verified_at"),
         "actual_connected_homeowner_calls_verified":False,
