@@ -27,6 +27,13 @@ TRACKING=ROOT/"runtime/revenue/lead_smart/ringba/tracking_verification/latest.js
 OUT=ROOT/"runtime/revenue/lead_smart/commercial_pulse/latest.json"
 GSC="http://127.0.0.1:8771/v1/search/search-console/pages"
 CANONICAL="https://empire-ai.co.uk/roofing"
+# Both source-reviewed guides were first published at the original website
+# owner release on 11 Nov 2026; metrics before this date are prepublication.
+GUIDE_PUBLICATION_DATE="2026-11-11"
+GUIDES=(
+    "https://empire-ai.co.uk/roofing/installation-checklist",
+    "https://empire-ai.co.uk/roofing/replacement-vs-repair",
+)
 MAX_BYTES=200000
 
 MAX_ZIP_JOURNAL_BYTES=512 * 1024
@@ -270,13 +277,48 @@ def gsc_pages(start:str,end:str)->dict[str,Any]:
             or type(record.get("impressions")) is not int):
             continue
         rows.append(record)
+    guides=[]
+    for url in GUIDES:
+        matched=[]
+        for record in doc["items"]:
+            if not isinstance(record,dict):
+                continue
+            if record.get("keys") not in ([url],[url+"/"]):
+                continue
+            clicks=record.get("clicks")
+            impressions=record.get("impressions")
+            if (type(clicks) is not int or type(impressions) is not int
+                    or clicks<0 or impressions<0):
+                raise ValueError("gsc_guide_row_invalid")
+            matched.append(record)
+        guides.append({
+            "url":url,
+            "status":"PAGE_ROW_OBSERVED" if matched else "NO_REPORTED_PAGE_ROW",
+            # Missing GSC row is UNKNOWN, not proven zero traffic/indexation.
+            "clicks":sum(x["clicks"] for x in matched) if matched else None,
+            "impressions":sum(x["impressions"] for x in matched) if matched else None,
+            "indexed_in_google_verified":False,
+            "unique_human_visitors_verified":False,
+        })
     return {"status":"PAGE_ROW_OBSERVED" if rows else "NO_REPORTED_PAGE_ROW",
             "period_start":start,"period_end":end,
             "source_state":doc["data_state"],
             "clicks":sum(x["clicks"] for x in rows),
             "impressions":sum(x["impressions"] for x in rows),
             "indexed_in_google_verified":False,
-            "unique_human_visitors_verified":False}
+            "unique_human_visitors_verified":False,
+            "guide_observations":{
+                "schema_version":"empire.lead_smart.gsc_guide_page_observations.v1",
+                "publication_date_utc":GUIDE_PUBLICATION_DATE,
+                "gsc_period_end_precedes_guide_publication":
+                    end<GUIDE_PUBLICATION_DATE,
+                "source_state":doc["data_state"],
+                "status":"PAGE_DIMENSION_GUIDES_REVIEWED",
+                "pages":guides,
+                "google_indexation_verified":False,
+                "consented_enquiries_verified":False,
+                "real_sales_verified":False,
+            }}
 
 def ringba_proof()->dict[str,Any]:
     # Existing root-owned key NEVER enters this script or its environment.
@@ -354,6 +396,19 @@ def pulse(*, now:datetime|None=None,provider_reader:Callable=ringba_proof,
         "site_handoffs_today":currentday,
         "handoff_metric":"consent-acknowledged dial-link admissions; NOT connected calls",
         "google_search_console":gsc,
+        "google_search_console_guides":gsc.get("guide_observations",{
+            "schema_version":"empire.lead_smart.gsc_guide_page_observations.v1",
+            "status":"NO_VERIFIED_GUIDE_PAGE_EVIDENCE",
+            "publication_date_utc":GUIDE_PUBLICATION_DATE,
+            "pages":[{"url":url,"status":"EVIDENCE_UNAVAILABLE",
+                      "clicks":None,"impressions":None,
+                      "indexed_in_google_verified":False,
+                      "unique_human_visitors_verified":False}
+                     for url in GUIDES],
+            "google_indexation_verified":False,
+            "consented_enquiries_verified":False,
+            "real_sales_verified":False,
+        }),
         "zip_check_http_operational_requests":zip_request_reader(now=clock),
         "roofing_content_http_operational_requests":content_request_reader(now=clock),
         "ringba":provider_reader(),

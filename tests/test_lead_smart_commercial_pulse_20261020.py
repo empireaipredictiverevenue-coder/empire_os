@@ -261,3 +261,85 @@ def test_roofing_html_observation_never_claims_a_consented_funnel(tmp_path):
     assert metric["consented_sessions_verified"] is False
     assert metric["landing_to_zip_conversion_verified"] is False
     assert report["settled_revenue_verified"] is False
+
+
+
+def test_guide_gsc_rows_use_same_original_page_reader_without_revenue_claims(monkeypatch):
+    from io import BytesIO
+    from datetime import datetime
+    packet={
+        "available":True,"site_url":"sc-domain:empire-ai.co.uk",
+        "data_state":"final",
+        "items":[
+            {"keys":[mod.CANONICAL],"clicks":1,"impressions":9},
+            {"keys":[mod.GUIDES[0]],"clicks":2,"impressions":18},
+            {"keys":[mod.GUIDES[1]],"clicks":0,"impressions":4},
+        ],
+    }
+    seen=[]
+    class Response:
+        status=200
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,n):return json.dumps(packet).encode()
+    def fake_open(req,timeout):
+        seen.append((req.full_url,timeout))
+        return Response()
+    monkeypatch.setattr(mod,"urlopen",fake_open)
+    result=mod.gsc_pages("2026-11-11","2026-11-20")
+    assert len(seen)==1
+    assert "search-console/pages?" in seen[0][0]
+    assert result["clicks"]==1 and result["impressions"]==9
+    guides=result["guide_observations"]
+    assert guides["status"]=="PAGE_DIMENSION_GUIDES_REVIEWED"
+    assert guides["gsc_period_end_precedes_guide_publication"] is False
+    assert [(x["clicks"],x["impressions"]) for x in guides["pages"]]==[(2,18),(0,4)]
+    assert all(x["indexed_in_google_verified"] is False for x in guides["pages"])
+    assert guides["consented_enquiries_verified"] is False
+    assert guides["real_sales_verified"] is False
+
+
+def test_missing_guide_rows_before_release_are_unknown_not_zero(monkeypatch):
+    packet={"available":True,"site_url":"sc-domain:empire-ai.co.uk",
+            "data_state":"final",
+            "items":[{"keys":[mod.CANONICAL],"clicks":0,"impressions":2}]}
+    class Response:
+        status=200
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,n):return json.dumps(packet).encode()
+    monkeypatch.setattr(mod,"urlopen",lambda *args,**kwargs:Response())
+    d=mod.gsc_pages("2026-10-28","2026-11-10")
+    assert d["guide_observations"]["gsc_period_end_precedes_guide_publication"] is True
+    assert all(x["status"]=="NO_REPORTED_PAGE_ROW" for x in d["guide_observations"]["pages"])
+    assert all(x["impressions"] is None and x["clicks"] is None
+               for x in d["guide_observations"]["pages"])
+    assert d["indexed_in_google_verified"] is False
+    assert d["impressions"]==2
+
+
+def test_invalid_guide_metrics_fail_closed_on_source_corruption(monkeypatch):
+    packet={"available":True,"site_url":"sc-domain:empire-ai.co.uk",
+            "data_state":"final","items":[
+                {"keys":[mod.GUIDES[0]],"clicks":-1,"impressions":30}]}
+    class Response:
+        status=200
+        def __enter__(self):return self
+        def __exit__(self,*args):return False
+        def read(self,n):return json.dumps(packet).encode()
+    monkeypatch.setattr(mod,"urlopen",lambda *args,**kwargs:Response())
+    with pytest.raises(ValueError,match="gsc_guide_row_invalid"):
+        mod.gsc_pages("2026-11-11","2026-11-20")
+
+
+def test_gsc_outage_does_not_invent_guide_traffic_or_crm_sales(tmp_path):
+    def down(*args):raise RuntimeError("provider_outage")
+    report=make_report(base(tmp_path,enabled=False),gsc=down)
+    guides=report["google_search_console_guides"]
+    assert guides["status"]=="NO_VERIFIED_GUIDE_PAGE_EVIDENCE"
+    assert len(guides["pages"])==2
+    assert all(x["impressions"] is None for x in guides["pages"])
+    assert guides["consented_enquiries_verified"] is False
+    assert guides["real_sales_verified"] is False
+    assert report["site_handoffs_recorded"]==0
+    assert report["settled_revenue_verified"] is False
