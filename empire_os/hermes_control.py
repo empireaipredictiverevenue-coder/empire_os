@@ -1999,6 +1999,29 @@ def run_worker(
         base_branch=DEFAULT_BASE_BRANCH,
         remote=remote,
     )
+    # Same original worker and control branch: admit at most one bounded,
+    # zero-edit SEO research task from today's verified first-party audit.
+    # A missing/invalid source must never block unrelated approved jobs.
+    try:
+        from empire_os.hermes_seo_intake import reconcile_seo_intake
+
+        seo_intake = reconcile_seo_intake(
+            repo_root, publish=True, control_branch=control_branch,
+        )
+        if seo_intake.get("status") == "RESEARCH_JOB_QUEUED":
+            fetch_control_refs(
+                repo_root, control_branch=control_branch,
+                base_branch=DEFAULT_BASE_BRANCH, remote=remote,
+            )
+    except Exception as exc:
+        seo_intake = {
+            "schema_version": "empire.hermes.seo_research_intake.v1",
+            "status": "HELD",
+            "reason_code": type(exc).__name__,
+            "published_count": 0,
+            "execution_authority": "none",
+            "public_publish_authorized": False,
+        }
     paths = list_pending_job_paths(
         repo_root,
         control_branch=control_branch,
@@ -2063,6 +2086,7 @@ def run_worker(
         "already_completed_count": skipped,
         "processed_count": len(processed),
         "processed": processed,
+        "seo_intake": seo_intake,
         "invalid_job_count": len(invalid_jobs),
         "invalid_jobs": invalid_jobs,
         "external_commercial_action_performed": False,
