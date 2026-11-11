@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
 from test_commercial_buyer_source_health import fixtures
 from test_commercial_full_ops_cycle_sandbox import _load_ops, _configure_sandbox
@@ -9,6 +10,13 @@ from test_commercial_full_ops_cycle_sandbox import _load_ops, _configure_sandbox
 
 def _buyer_sources(root):
     buyer, scout = fixtures()
+    # The canonical fixtures deliberately use 20 October for fixed-clock
+    # unit tests. This live Ops integration test runs on the real clock, so
+    # fresh synthetic source dates must match its runtime. No production
+    # buyer record or freshness policy is altered by this sandbox setup.
+    fixture_clock = datetime.now(timezone.utc).isoformat()
+    buyer["observed_at"] = fixture_clock
+    scout["generated_at"] = fixture_clock
     p = root / "runtime/buyer_capacity_readiness/latest.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(buyer))
