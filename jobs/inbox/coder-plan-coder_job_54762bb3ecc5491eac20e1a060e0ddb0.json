@@ -1,0 +1,14 @@
+{
+  "ai_behavior_change": false,
+  "allowed_paths": [],
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "created_at": "2026-11-11T04:35:29.378003+00:00",
+  "job_id": "coder-plan-coder_job_54762bb3ecc5491eac20e1a060e0ddb0",
+  "kind": "code_task",
+  "lease_resources": [],
+  "max_runtime_seconds": 600,
+  "prompt": "Produce a concise advisory implementation PLAN ONLY for the following EmpireOS task. Do not edit files, emit deployment commands, perform production actions, contact external parties, mutate databases, move funds, or expand authority. Identify affected modules, focused tests, main risks, dependencies, and approval gates.\n\nTASK:\nPLAN ONLY: research this SPECIFIC public Find a Tender notice, not a broad industry hypothesis. Inspect the original notice, linked buyer tender documents, amendments, buyer identity, published deadline and lot eligibility. State independent verification as UNKNOWN until original issuer proof is read. Identify existing EmpireOS supplier matching and official intelligence components, evidence gaps and owner gates. Do NOT email, contact, bid, register, submit forms, write CRM, accept terms, change production, spend money or recognize revenue. Keep Croydon and ESNEFT separate by OCID. OCID=ocds-h6vhtk-07b8d1; notice_id=106783-2026; notice_tags=['award', 'contract']; deadline_as_published_unverified=None; title=255 - BGLZ PV solar panels; official_evidence_refs=['https://www.find-tender.service.gov.uk/Notice/106783-2026']; research_evidence_urls=[]; factory_blockers=['offer_key_required', 'distribution_path_required', 'independent_evidence_required', 'buyer_intent_normalized_score_required', 'demand_normalized_score_required', 'urgency_normalized_score_required', 'margin_potential_normalized_score_required', 'distribution_strength_normalized_score_required', 'data_advantage_normalized_score_required', 'fulfilment_readiness_normalized_score_required', 'build_complexity_normalized_score_required']; execution_authority=none.",
+  "pytest_targets": [],
+  "schema_version": "empire.hermes.control_job.v1"
+}
