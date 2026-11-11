@@ -1,0 +1,13 @@
+{
+  "schema_version": "empire.hermes.control_job.v1",
+  "job_id": "hermes-seo-evidence-research-20261111-r2",
+  "kind": "code_task",
+  "authority": "observe",
+  "base_branch": "agent/data-cloud-wave4",
+  "allowed_paths": [],
+  "lease_resources": [],
+  "pytest_targets": [],
+  "max_runtime_seconds": 180,
+  "ai_behavior_change": false,
+  "prompt": "This is one retry after correcting the free-model health selection order; the earlier immutable research attempt failed before model execution. Read-only task for original Hermes Oracle and SEO owners: inspect genuine first-party audit /home/ubuntu/empire_releases/seo_native_sales_preview_20261108/seo-audit-2026-11-11.json and optionally the owned public https://empire-ai.co.uk/buy page using GET only. Confirm the recorded finding, assess actual buyer value and what additional buyer-intent evidence is required. Provide at most three source-labelled, owner-reviewed next actions. Do not equate short copy with a ranking failure. Do not alter files, code, apps, Git refs, data, deployments, systemd, credentials or services; do not send, pay, publish, or recognise revenue. If a source cannot be read, explicitly say unavailable instead of guessing. This job is OBSERVE with zero editable paths and zero mutation leases."
+}
