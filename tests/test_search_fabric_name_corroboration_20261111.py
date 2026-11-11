@@ -1,8 +1,9 @@
 """Regression: name-not-corroborated must never become evidence of identity."""
 import uuid
+from datetime import datetime, timezone
 from hashlib import sha256
 import pytest
-from empire_os.search_fabric.automated_source_recovery_v60 import classify_site
+from empire_os.search_fabric.automated_source_recovery_v60 import classify_site, source_recovery_cycle, SCHEMA
 from empire_os.search_fabric.source_evidence_memory_v61 import validate_observation, reconcile
 
 
@@ -77,6 +78,30 @@ def test_corroborated_name_without_phone_is_not_phone_evidence():
     assert row['observed_phone_last_ten'] is False
     with pytest.raises(ValueError,match='UNSAFE'):
         validate_observation(packet(result['research_status'],False,False))
+
+
+def test_original_recovery_pipeline_records_mismatch_without_name_corrob_or_contact():
+    uid=str(uuid.uuid4())
+    now=datetime(2026,11,11,10,0,tzinfo=timezone.utc)
+    row={'id':uid,'website':'https://acme-roofing.test/',
+         'business_name':'Acme Roofing', 'phone':None,'niche':'roofing',
+         'has_acquisition':False,'has_entity_link':False,'v2_scored':False}
+    prior={'schema_version':SCHEMA,'next_cursor':None,
+           'domain_attempts':{},'cycles':0}
+    report,state=source_recovery_cycle(
+        rows=[row],state=prior,now=now,max_verify=1,
+        probe=lambda site,**options: {
+            'ok':True,'final_url':site,
+            'business_names':['Different Roofing Company'],'phones':[]},
+        permission_check=lambda site:True,
+        clock=lambda:0,time_budget_seconds=100)
+    assert report['official_sites_attempted']==1
+    evidence=report['review_only_prospect_evidence'][0]
+    assert evidence['research_status']=='FIRST_PARTY_NAME_NOT_CORROBORATED'
+    assert evidence['first_party_company_name_correlated'] is False
+    saved=reconcile(history=None,report=report,cycle=1)
+    assert saved['prospects'][uid]['observed_name'] is False
+    assert saved['buyer_outreach_or_revenue_triggered'] is False
 
 
 def test_other_holds_are_never_name_proof():
