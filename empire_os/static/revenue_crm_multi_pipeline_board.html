@@ -28,6 +28,18 @@ main{max-width:1780px;margin:auto;padding:29px clamp(16px,3.5vw,50px) 64px}
   <div class="brand"><div class="mark" aria-hidden="true">◈</div><div><div class="overline">EmpireOS / Smart CRM</div><div class="brand-title">Commercial Pipeline Control</div></div></div>
   <div class="header-right"><span class="eyebrow">Tenant-scoped · Read only</span><a href="/v1/revenue-crm/journeys/designer">Journey Designer</a></div>
 </header>
+<section id="crm-auth-shell" aria-label="Existing CRM sign-in" style="max-width:1780px;margin:18px auto 0;padding:0 clamp(16px,3.5vw,50px)">
+  <form id="crm-sign-in-form" class="panel" autocomplete="on">
+    <div class="toolbar" style="margin:0">
+      <div class="control"><label for="crm-login-email">CRM email</label><input id="crm-login-email" type="email" maxlength="254" autocomplete="username" placeholder="Approved CRM member" required></div>
+      <div class="control"><label for="crm-login-password">CRM password</label><input id="crm-login-password" type="password" maxlength="256" autocomplete="current-password" required></div>
+      <div class="control"><label for="crm-login-tenant">Existing tenant</label><input id="crm-login-tenant" type="text" readonly value="708efd4b-53b2-43d7-961d-1cecab67f17a"></div>
+      <button type="submit" id="crm-sign-in-button" class="action">Sign in</button>
+      <button type="button" id="crm-logout" class="action" disabled>Sign out</button>
+    </div>
+    <p role="status" id="crm-auth-status" style="font-size:12px;color:var(--muted);margin:13px 0 0">Sign in using the existing short-lived founder CRM login. No password or token is stored in the browser.</p>
+  </form>
+</section>
 <main>
 <div class="intro">
  <div><h1>Every revenue motion. One command view.</h1><p>Separate service customers, SaaS deals, lead buyers, publishers and all other Empire AI opportunities. Stages reflect evidence, not activity claims. Market and niche remain filters.</p></div>

@@ -453,14 +453,9 @@ def create_revenue_crm_router(
 
     @router.get("/pipelines/view", response_class=HTMLResponse)
     def multi_pipeline_view(request: Request):
-        # The founder's existing request-scoped authentication is required.
-        if resolve_authenticated_read is None:
-            raise HTTPException(status_code=503, detail="authenticated_crm_scope_required")
-        repo = require_repository(request)
-        if not isinstance(repo, PostgresRevenueCrmRepository):
-            raise HTTPException(status_code=503, detail="authenticated_crm_read_unavailable")
-        # Prove actual tenant reader is usable before sending the UI shell.
-        guarded_crm_read(lambda: repo.prospects(limit=1))
+        # Login shell contains zero customer data and is safe to render
+        # unsigned, like the existing private CRM login. The JSON endpoint
+        # ALWAYS requires the existing signed, tenant-bound Bearer login.
         asset = Path(__file__).resolve().parent / "static" / "revenue_crm_multi_pipeline_board.html"
         return HTMLResponse(content=asset.read_text(encoding="utf-8"), headers={
             "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff",
@@ -473,11 +468,7 @@ def create_revenue_crm_router(
 
     @router.get("/pipelines/board.js")
     def multi_pipeline_javascript(request: Request):
-        if resolve_authenticated_read is None:
-            raise HTTPException(status_code=503, detail="authenticated_crm_scope_required")
-        repo = require_repository(request)
-        if not isinstance(repo, PostgresRevenueCrmRepository):
-            raise HTTPException(status_code=503, detail="authenticated_crm_read_unavailable")
+        # Static login JavaScript has no customer fields, bearer or secrets.
         asset = Path(__file__).resolve().parent / "static" / "revenue_crm_multi_pipeline_board.js"
         return Response(content=asset.read_bytes(), media_type="text/javascript", headers={
             "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff",

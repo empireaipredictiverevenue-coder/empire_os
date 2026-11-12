@@ -4,6 +4,66 @@
  const root='/v1/revenue-crm/pipelines/board';
  const $=id=>document.getElementById(id);
  const state={data:null,pipeline:'',search:'',industry:'',sort:'stalled',busy:false};
+ let sessionBearer=null,sessionUntil=0,sessionGeneration=0,expiryTimer=null;
+ function clearPrivateUi(message){
+  sessionGeneration++;
+  sessionBearer=null;sessionUntil=0;
+  if(expiryTimer!==null){clearTimeout(expiryTimer);expiryTimer=null}
+  state.data=null;state.search='';state.industry='';
+  $('board').replaceChildren();$('overview').replaceChildren();
+  for(const id of ['pipeline','search','industry','sort','refresh'])$(id).disabled=true;
+  for(const id of ['metric-lanes','metric-records','metric-unassigned','metric-buyers'])$(id).textContent='—';
+  $('crm-logout').disabled=true;
+  $('crm-login-password').value='';
+  $('crm-auth-status').textContent=message||'Signed out. No CRM records loaded.';
+  if(!$('detail').hidden)$('detail').hidden=true;
+  status(message||'Sign in to the existing CRM to load private records.',false);
+ }
+ async function crmLogin(event){
+  event.preventDefault();
+  const email=$('crm-login-email').value.trim();
+  const password=$('crm-login-password').value;
+  const tenant=$('crm-login-tenant').value;
+  $('crm-login-password').value='';
+  if(location.protocol!=='https:'&&!['127.0.0.1','localhost'].includes(location.hostname)){
+   clearPrivateUi('Use the existing secure HTTPS CRM URL.');return;
+  }
+  if(!/^[^\s@]+@[^\s@]+[.][^\s@]+$/.test(email)||password.length<1||password.length>256||
+     !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(tenant)){
+    clearPrivateUi('Check your existing CRM sign-in details.');return;
+  }
+  clearPrivateUi('Checking the existing CRM member login…');
+  const generation=sessionGeneration;
+  $('crm-sign-in-button').disabled=true;
+  try{
+   const r=await fetch('/v1/revenue-crm/auth/login',{
+    method:'POST',cache:'no-store',credentials:'omit',redirect:'error',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email,password,tenant_id:tenant})
+   });
+   if(generation!==sessionGeneration)throw Error('Sign-in superseded');
+   if(!r.ok)throw Error('CRM login denied');
+   const result=await r.json();
+   if(result.token_type!=='Bearer'||result.scope!=='crm:read'||
+      typeof result.access_token!=='string'||
+      result.access_token.length<100||result.access_token.length>6000||
+      !Number.isInteger(result.expires_in)||result.expires_in<1||result.expires_in>900){
+      throw Error('Untrusted CRM sign-in response');
+   }
+   sessionBearer=result.access_token;
+   sessionUntil=Date.now()+result.expires_in*1000;
+   const active=sessionGeneration;
+   expiryTimer=setTimeout(()=>{
+     if(active===sessionGeneration)clearPrivateUi('CRM token expired. Sign in again.');
+   },result.expires_in*1000);
+   $('crm-logout').disabled=false;
+   $('crm-auth-status').textContent='Signed in. Token held in memory only.';
+   await load();
+  }catch(e){
+   clearPrivateUi('Existing CRM sign-in denied or unavailable.');
+  }finally{$('crm-sign-in-button').disabled=false}
+ }
+
  const el=(tag,cls,txt)=>{
   const node=document.createElement(tag);
   if(cls)node.className=cls;
@@ -129,12 +189,18 @@
   for(const id of ['pipeline','search','industry','sort','refresh'])$(id).disabled=false;
  }
  async function load(){
+  if(!sessionBearer||Date.now()>=sessionUntil){clearPrivateUi('Sign in to load private CRM records.');return}
   if(state.busy)return;
   state.busy=true;$('refresh').disabled=true;
   status('Refreshing authenticated CRM evidence…');
   try{
-   const r=await fetch(root+'?limit=500',{cache:'no-store',credentials:'same-origin',
-     headers:{'Accept':'application/json'}});
+   const bearer=sessionBearer;
+   const r=await fetch(root+'?limit=500',{cache:'no-store',credentials:'omit',redirect:'error',
+     headers:{'Accept':'application/json','Authorization':'Bearer '+bearer}});
+   if(sessionBearer!==bearer||Date.now()>=sessionUntil){
+     clearPrivateUi('CRM session changed. Sign in again.');return;
+   }
+   if(r.status===401){clearPrivateUi('CRM authentication ended. Sign in again.');return}
    if(!r.ok)throw Error(r.status===401?'Authenticated CRM sign-in required':
      'CRM source unavailable (HTTP '+r.status+')');
    const board=await r.json();
@@ -154,8 +220,14 @@
  $('industry').addEventListener('change',e=>{state.industry=e.target.value;render()});
  $('sort').addEventListener('change',e=>{state.sort=e.target.value;render()});
  $('refresh').addEventListener('click',load);
+ $('crm-sign-in-form').addEventListener('submit',crmLogin);
+ $('crm-logout').addEventListener('click',()=>clearPrivateUi('Signed out. No CRM records loaded.'));
+ document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='hidden'&&Date.now()>=sessionUntil&&sessionBearer)
+   clearPrivateUi('CRM session expired.');
+ });
  $('close').addEventListener('click',()=>{$('detail').hidden=true;$('pipeline').focus()});
  $('detail').addEventListener('click',e=>{if(e.target===$('detail'))$('detail').hidden=true});
  document.addEventListener('keydown',e=>{if(e.key==='Escape')$('detail').hidden=true});
- load();
+ clearPrivateUi('Sign in to load tenant-bound CRM records.');
 })();

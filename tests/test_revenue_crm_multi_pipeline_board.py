@@ -183,10 +183,15 @@ def test_private_crm_board_returns_real_tenant_bound_rows_only():
 def test_private_board_auth_fails_closed_for_spoof_headers_or_wrong_tenant():
     app=_app(None)
     client=TestClient(app)
-    for endpoint in ("board","view","board.js"):
-        r=client.get("/v1/revenue-crm/pipelines/"+endpoint,
-           headers={"X-Tenant-ID":TENANT_A,"Authorization":"Bearer fake"})
-        assert r.status_code==401
+    r=client.get("/v1/revenue-crm/pipelines/board",
+         headers={"X-Tenant-ID":TENANT_A,"Authorization":"Bearer fake"})
+    assert r.status_code==401
+    # The static sign-in shell and script expose no account data; even an
+    # unauthenticated visitor can retrieve them but cannot load CRM rows.
+    for path in ("view","board.js"):
+        shell=client.get("/v1/revenue-crm/pipelines/"+path)
+        assert shell.status_code==200
+        assert "Demo Roofing Contractor" not in shell.text
     app.state.verified_tenant=TENANT_B
     assert client.get("/v1/revenue-crm/pipelines/board").status_code==503
 
