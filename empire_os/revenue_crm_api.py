@@ -417,6 +417,72 @@ def create_revenue_crm_router(
                 status_code=503, detail="authenticated_crm_read_unavailable",
             ) from None
 
+    @router.get("/pipelines/board")
+    def multi_pipeline_board(
+        request: Request,
+        pipeline: str | None = Query(default=None, max_length=64),
+        limit: int = Query(default=200, ge=1, le=500),
+    ):
+        """Pipedrive-style view on EXISTING authenticated tenant-scoped CRM rows.
+
+        Source-of-truth statuses are not edited here; no implicit stage changes,
+        buyer identity promotion, send approval, payment or duplicate CRM.
+        """
+        if resolve_authenticated_read is None:
+            raise HTTPException(status_code=503, detail="authenticated_crm_scope_required")
+        repo = require_repository(request)
+        if not isinstance(repo, PostgresRevenueCrmRepository):
+            raise HTTPException(status_code=503, detail="authenticated_crm_read_unavailable")
+        from empire_os.revenue_crm_multi_pipeline import (
+            PipelineProjectionError, build_multi_pipeline_board,
+        )
+        prospects = guarded_crm_read(lambda: repo.prospects(limit=limit))
+        buyers = guarded_crm_read(lambda: repo.buyers(limit=limit))
+        try:
+            result = build_multi_pipeline_board(
+                prospects, buyers,
+                authenticated_tenant_id=repo.tenant_id,
+                now=datetime.now(timezone.utc),
+                pipeline=pipeline,
+            )
+        except PipelineProjectionError:
+            raise HTTPException(
+                status_code=503, detail="crm_pipeline_source_invalid"
+            ) from None
+        return result
+
+    @router.get("/pipelines/view", response_class=HTMLResponse)
+    def multi_pipeline_view(request: Request):
+        # The founder's existing request-scoped authentication is required.
+        if resolve_authenticated_read is None:
+            raise HTTPException(status_code=503, detail="authenticated_crm_scope_required")
+        repo = require_repository(request)
+        if not isinstance(repo, PostgresRevenueCrmRepository):
+            raise HTTPException(status_code=503, detail="authenticated_crm_read_unavailable")
+        # Prove actual tenant reader is usable before sending the UI shell.
+        guarded_crm_read(lambda: repo.prospects(limit=1))
+        asset = Path(__file__).resolve().parent / "static" / "revenue_crm_multi_pipeline_board.html"
+        return HTMLResponse(content=asset.read_text(encoding="utf-8"), headers={
+            "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff",
+            "Content-Security-Policy":(
+                "default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; "
+                "connect-src 'self'; base-uri 'none'; object-src 'none'; "
+                "form-action 'none'; frame-ancestors 'none'"
+            ),
+        })
+
+    @router.get("/pipelines/board.js")
+    def multi_pipeline_javascript(request: Request):
+        if resolve_authenticated_read is None:
+            raise HTTPException(status_code=503, detail="authenticated_crm_scope_required")
+        repo = require_repository(request)
+        if not isinstance(repo, PostgresRevenueCrmRepository):
+            raise HTTPException(status_code=503, detail="authenticated_crm_read_unavailable")
+        asset = Path(__file__).resolve().parent / "static" / "revenue_crm_multi_pipeline_board.js"
+        return Response(content=asset.read_bytes(), media_type="text/javascript", headers={
+            "Cache-Control":"no-store", "X-Content-Type-Options":"nosniff",
+        })
+
     @router.get("/department-kanban")
     def authenticated_department_kanban(
         request: Request,

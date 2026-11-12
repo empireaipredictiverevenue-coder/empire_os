@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Empire AI · Commercial Pipelines</title>
+<style>
+:root{color-scheme:dark;--bg:#06101d;--base:#0b1728;--panel:#102039;--hover:#152b49;--stroke:#25405f;--text:#eef5ff;--muted:#a5b8d1;--cyan:#66dbff;--gold:#d8b875;--green:#84e9c0;--orange:#eec18b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 70% -30%,#173453,#06101d 58%);font-family:Inter,system-ui,-apple-system,sans-serif;color:var(--text);min-height:100vh}
+button,input,select{font:inherit;color:inherit}button{cursor:pointer}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:3px}
+header{padding:28px clamp(18px,4vw,58px) 26px;border-bottom:1px solid var(--stroke);display:flex;justify-content:space-between;align-items:center;gap:22px;background:#081529c9}
+.brand{display:flex;gap:14px;align-items:center}.mark{width:45px;height:45px;display:grid;place-items:center;border:1px solid #4b8dab;border-radius:13px;background:linear-gradient(145deg,#193954,#0c1c33);color:var(--gold);font-weight:800;font-size:22px}
+.overline{font-size:10px;color:var(--gold);font-weight:750;letter-spacing:.22em;text-transform:uppercase}.brand-title{font-size:23px;font-weight:750;letter-spacing:-.04em;margin-top:2px}
+.header-right{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;border:1px solid #38617b;padding:8px 11px;border-radius:99px;color:var(--cyan)}.header-right a{color:var(--muted);font-size:13px}
+main{max-width:1780px;margin:auto;padding:29px clamp(16px,3.5vw,50px) 64px}
+.intro{display:flex;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:25px}.intro h1{font-size:clamp(26px,2.7vw,38px);margin:0 0 6px;letter-spacing:-.045em}.intro p{color:var(--muted);line-height:1.55;max-width:750px;margin:0;font-size:14px}
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:11px;margin-bottom:24px}.metric{padding:20px;border:1px solid var(--stroke);border-radius:13px;background:linear-gradient(160deg,#14263c,#0c1b30)}.metric span{display:block;font-size:12px;color:var(--muted)}.metric strong{display:block;font-size:27px;letter-spacing:-.04em;margin:6px 0}.metric em{display:block;font-style:normal;font-size:11px;color:var(--gold)}
+.panel{background:#101f34c9;border:1px solid var(--stroke);border-radius:17px;padding:21px}.toolbar{display:flex;gap:14px;align-items:end;flex-wrap:wrap;margin-bottom:16px}.control{display:grid;gap:7px;min-width:170px;flex:1}.control label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.09em;font-weight:650}.control select,.control input{width:100%;border:1px solid #3a5373;background:#09192c;border-radius:9px;padding:11px 12px;font-size:13px;min-height:43px}.control.primary{min-width:250px;flex:2}.action{border:1px solid #3c6988;background:#163657;padding:11px 16px;min-height:43px;border-radius:9px;font-weight:650;font-size:13px}.action:hover{background:#21496b}
+.status{font-size:12px;color:var(--muted);padding:12px 14px;background:#0a192e;border:1px solid #26445d;border-radius:10px;margin-bottom:17px}.status.error{color:#ffc1c1;border-color:#824f56}.status strong{color:var(--green)}.overview{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}.pill{border:1px solid #37516b;background:#0b1a2e;border-radius:7px;padding:8px 11px;font-size:11px;color:var(--muted)}.pill b{color:var(--text);font-weight:700}
+.board-wrap{overflow:auto;padding-bottom:16px}.board{display:flex;gap:13px;min-height:445px;align-items:stretch;width:max-content;min-width:100%}.column{border:1px solid #2a435f;background:#0b192c;border-radius:11px;min-width:270px;max-width:270px;flex:1;padding:13px 11px;display:flex;flex-direction:column}.column-head{display:flex;justify-content:space-between;align-items:center;gap:8px;border-bottom:1px solid #2b425b;padding:4px 3px 12px;margin-bottom:11px;font-size:13px;font-weight:700}.count{background:#223d58;border-radius:7px;color:#d0e5ff;font-weight:700;font-size:11px;padding:3px 8px}.cards{display:flex;flex-direction:column;gap:9px}.deal{border:1px solid #2d4c6c;border-radius:11px;background:linear-gradient(165deg,#163048,#102439);padding:14px;text-align:left;width:100%}.deal:hover{border-color:#68b8d5;background:var(--hover)}.deal-head{font-size:14px;font-weight:760;display:block;line-height:1.35}.deal-meta{font-size:11px;color:var(--muted);display:block;line-height:1.4;margin-top:7px}.deal-next{margin-top:11px;border-top:1px solid #2b415a;padding-top:10px;color:#c5dff2;font-size:11px;line-height:1.4;display:block}.mini-chip{color:var(--gold);border:1px solid #695c45;border-radius:5px;font-size:10px;padding:2px 5px;margin-top:9px;display:inline-block}.mini-chip.alert{border-color:#8b614a;color:var(--orange)}.empty{padding:21px 10px;color:#7e96b2;font-size:12px;text-align:center;line-height:1.5}
+.notes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.note{border:1px solid #26415a;background:#0a1b30;border-radius:11px;padding:17px;font-size:12px;color:var(--muted);line-height:1.6}.note b{color:var(--text)}
+#detail[hidden]{display:none}.detail{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:20;padding:18px}.dialog{max-width:550px;width:100%;background:#101e33;border:1px solid #3d6487;border-radius:17px;padding:26px;box-shadow:0 22px 60px #0008}.dialog h2{margin:0 0 12px;font-size:22px}.dialog dl{display:grid;grid-template-columns:145px 1fr;gap:9px;font-size:13px}.dialog dt{color:var(--muted)}.dialog dd{margin:0;overflow-wrap:anywhere}.dialog footer{margin-top:25px;text-align:right}
+@media(max-width:760px){header{padding:18px;align-items:start}.brand-title{font-size:20px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.notes{grid-template-columns:1fr}.panel{padding:15px}.column{min-width:250px;max-width:250px}.dialog dl{grid-template-columns:110px 1fr}}
+@media(max-width:400px){.header-right a{display:none}.metric{padding:14px}.metric strong{font-size:24px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><div class="mark" aria-hidden="true">◈</div><div><div class="overline">EmpireOS / Smart CRM</div><div class="brand-title">Commercial Pipeline Control</div></div></div>
+  <div class="header-right"><span class="eyebrow">Tenant-scoped · Read only</span><a href="/v1/revenue-crm/journeys/designer">Journey Designer</a></div>
+</header>
+<main>
+<div class="intro">
+ <div><h1>Every revenue motion. One command view.</h1><p>Separate service customers, SaaS deals, lead buyers, publishers and all other Empire AI opportunities. Stages reflect evidence, not activity claims. Market and niche remain filters.</p></div>
+</div>
+<div class="metrics">
+ <div class="metric"><span>Commercial pipelines</span><strong id="metric-lanes">—</strong><em>Distinct buying processes</em></div>
+ <div class="metric"><span>CRM records in view</span><strong id="metric-records">—</strong><em>Authenticated source only</em></div>
+ <div class="metric"><span>Unassigned prospects</span><strong id="metric-unassigned">—</strong><em>Need explicit pipeline classification</em></div>
+ <div class="metric"><span>Buyer account records</span><strong id="metric-buyers">—</strong><em>Not signed buyer contracts</em></div>
+</div>
+<div class="panel">
+ <div class="toolbar">
+  <div class="control primary"><label for="pipeline">Sales process</label><select id="pipeline" aria-label="Select pipeline" disabled></select></div>
+  <div class="control"><label for="search">Find company</label><input id="search" type="search" maxlength="100" placeholder="Search visible cards…" disabled></div>
+  <div class="control"><label for="industry">Industry</label><select id="industry" disabled><option value="">All industries</option></select></div>
+  <div class="control"><label for="sort">Sort cards</label><select id="sort" disabled><option value="stalled">Stalled first</option><option value="name">Company A–Z</option></select></div>
+  <button type="button" class="action" id="refresh" disabled>Refresh evidence</button>
+ </div>
+ <div role="status" aria-live="polite" id="status" class="status">Checking authenticated tenant records…</div>
+ <div id="overview" class="overview" aria-label="Selected pipeline overview"></div>
+ <div class="board-wrap" tabindex="0" aria-label="Sales pipeline stage columns"><div id="board" class="board"></div></div>
+ <div class="notes">
+  <div class="note"><b>What the board shows</b> — Existing tenant-bound CRM prospect and buyer records, stage evidence and suggested human next activities. A proposal, pay-rate or buyer account is not money collected.</div>
+  <div class="note"><b>What it will not do</b> — No synthetic prospects, automatic pipeline assignment from industry, outbound emails, live drag-to-save, payments or unsanctioned pipeline stage writes. Those require verified owner actions and canonical transaction records.</div>
+ </div>
+</div>
+</main>
+<div id="detail" class="detail" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title"><h2 id="detail-title">Record evidence</h2><dl id="detail-data"></dl><footer><button id="close" type="button" class="action">Close</button></footer></section></div>
+<script src="/v1/revenue-crm/pipelines/board.js" defer></script>
+</body>
+</html>
