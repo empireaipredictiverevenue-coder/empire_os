@@ -530,6 +530,24 @@ def score_profile(
     }
 
 
+
+def contact_action_gate(*, state: str, gmail_snapshot_fresh: bool) -> str:
+    """Independent contact workflow gate; research rank never grants outreach."""
+    if state in {
+        "ALREADY_CONTACTED", "WORKSPACE_SENT_ALREADY_CONTACTED",
+        "PERSONAL_GMAIL_SENT_ALREADY_CONTACTED",
+        "EXISTING_CONVERSATION_PARTIAL_BOUNCE",
+        "WORKSPACE_RECIPROCAL_THREAD_OBSERVED", "FOUNDER_FORM_SUBMITTED",
+    }:
+        return "EXISTING_RELATIONSHIP_NO_COLD_OUTREACH"
+    if state == "DELIVERY_HOLD":
+        return "DELIVERY_HOLD_NO_SEND"
+    if state == "DISCOVERED_NO_CONFIRMED_CONTACT":
+        return ("VERIFY_CONTACT_AND_FRESH_SUPPRESSION"
+                if gmail_snapshot_fresh else "STALE_MAILBOX_SUPPRESSION_RECHECK")
+    return "UNKNOWN_CONTACT_HISTORY_FAIL_CLOSED"
+
+
 def main() -> int:
 
     discovery = json.loads(
@@ -588,6 +606,10 @@ def main() -> int:
         item["contact_history"] = contact
         item["outreach_status"] = contact["state"]
         item["outbound_authorized"] = False
+        item["contact_action_gate"] = contact_action_gate(
+            state=contact["state"],
+            gmail_snapshot_fresh=contact_context["gmail_snapshot_fresh"],
+        )
 
     candidates.sort(
         key=lambda item: (
@@ -650,6 +672,24 @@ def main() -> int:
 
         "status_counts":
             counts,
+
+        # Status is a research-fit ranking, not contact or send authority.
+        "status_semantics": "RESEARCH_PRIORITY_NOT_OUTREACH_PERMISSION",
+        "ready_research_contact_gate_counts": {
+            state: sum(
+                1 for item in candidates
+                if item["status"] == "READY_TO_APPROACH"
+                and item["contact_action_gate"] == state
+            )
+            for state in sorted({
+                item["contact_action_gate"]
+                for item in candidates if item["status"] == "READY_TO_APPROACH"
+            })
+        },
+        "outbound_approved_candidate_count": sum(
+            1 for item in candidates
+            if item["outbound_authorized"] is True
+        ),
 
         "contact_history_gate_enabled": True,
         "contact_history_source": contact_context["source"],

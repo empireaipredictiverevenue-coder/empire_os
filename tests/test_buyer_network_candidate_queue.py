@@ -263,3 +263,31 @@ def test_durable_sites_require_current_source_owner_and_no_unrelated_snippets():
         {**base,'governance':{**base['governance'],'outbound':True}},now_epoch=now)
     assert not verified_first_party_snapshot_results(
         {**base,'results':base['results']*2},now_epoch=now)
+
+
+
+def test_contact_action_gate_requires_independent_live_suppression():
+    mod = module()
+    assert mod.contact_action_gate(
+        state="DISCOVERED_NO_CONFIRMED_CONTACT",
+        gmail_snapshot_fresh=False,
+    ) == "STALE_MAILBOX_SUPPRESSION_RECHECK"
+    assert mod.contact_action_gate(
+        state="DISCOVERED_NO_CONFIRMED_CONTACT",
+        gmail_snapshot_fresh=True,
+    ) == "VERIFY_CONTACT_AND_FRESH_SUPPRESSION"
+    for state in (
+        "ALREADY_CONTACTED", "WORKSPACE_SENT_ALREADY_CONTACTED",
+        "PERSONAL_GMAIL_SENT_ALREADY_CONTACTED",
+        "EXISTING_CONVERSATION_PARTIAL_BOUNCE",
+        "WORKSPACE_RECIPROCAL_THREAD_OBSERVED", "FOUNDER_FORM_SUBMITTED",
+    ):
+        assert mod.contact_action_gate(
+            state=state, gmail_snapshot_fresh=True,
+        ) == "EXISTING_RELATIONSHIP_NO_COLD_OUTREACH"
+    assert mod.contact_action_gate(
+        state="DELIVERY_HOLD", gmail_snapshot_fresh=True,
+    ) == "DELIVERY_HOLD_NO_SEND"
+    assert mod.contact_action_gate(
+        state="UNRECOGNISED", gmail_snapshot_fresh=True,
+    ) == "UNKNOWN_CONTACT_HISTORY_FAIL_CLOSED"
