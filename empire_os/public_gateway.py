@@ -1171,10 +1171,20 @@ def favicon():
 @app.head("/roofing")
 @app.get("/roofing")
 def roofing_page():
-    path = _site_html_path("roofing")
-    if path is None:
-        return JSONResponse({"error": "roofing_page_unavailable"}, status_code=404)
-    return FileResponse(path, media_type="text/html", headers={"Cache-Control": "no-store"})
+    # DesignOS's founder-rejected old visual remains available for continuity,
+    # but unreviewed changes to its HTML/RSC/client/CSS must fail closed.
+    # Never confuse this legacy byte freeze with founder visual approval.
+    from empire_os.website_designos_roofing_guard import frozen_roofing_page_body
+    body = frozen_roofing_page_body(SITE_OUT)
+    if body is None:
+        return JSONResponse(
+            {"error": "roofing_designos_visual_release_hold"},
+            status_code=404,
+            headers={"Cache-Control": "no-store"},
+        )
+    # Serve the exact checked bytes, not an asynchronously re-opened file.
+    return Response(content=body, media_type="text/html",
+                    headers={"Cache-Control": "no-store"})
 
 @app.head("/privacy")
 @app.get("/privacy")
