@@ -20,13 +20,13 @@ main{max-width:1780px;margin:auto;padding:29px clamp(16px,3.5vw,50px) 64px}
 .notes{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px}.note{border:1px solid #26415a;background:#0a1b30;border-radius:11px;padding:17px;font-size:12px;color:var(--muted);line-height:1.6}.note b{color:var(--text)}
 #detail[hidden]{display:none}.detail{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:20;padding:18px}.dialog{max-width:550px;width:100%;background:#101e33;border:1px solid #3d6487;border-radius:17px;padding:26px;box-shadow:0 22px 60px #0008}.dialog h2{margin:0 0 12px;font-size:22px}.dialog dl{display:grid;grid-template-columns:145px 1fr;gap:9px;font-size:13px}.dialog dt{color:var(--muted)}.dialog dd{margin:0;overflow-wrap:anywhere}.dialog footer{margin-top:25px;text-align:right}
 @media(max-width:760px){header{padding:18px;align-items:start}.brand-title{font-size:20px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.notes{grid-template-columns:1fr}.panel{padding:15px}.column{min-width:250px;max-width:250px}.dialog dl{grid-template-columns:110px 1fr}}
-@media(max-width:400px){.header-right a{display:none}.metric{padding:14px}.metric strong{font-size:24px}}
+@media(max-width:400px){header{flex-wrap:wrap}.header-right{width:100%;justify-content:space-between}.header-right a{display:inline-flex;font-size:12px}.metric{padding:14px}.metric strong{font-size:24px}}
 </style>
 </head>
 <body>
 <header>
   <div class="brand"><div class="mark" aria-hidden="true">◈</div><div><div class="overline">EmpireOS / Smart CRM</div><div class="brand-title">Commercial Pipeline Control</div></div></div>
-  <div class="header-right"><span class="eyebrow">Tenant-scoped · Read only</span><a href="/v1/revenue-crm/journeys/designer">Journey Designer</a></div>
+  <div class="header-right"><span class="eyebrow">Tenant-scoped · Read only</span><a href="/v1/revenue-crm/journeys/entry">Journey Designer</a></div>
 </header>
 <section id="crm-auth-shell" aria-label="Existing CRM sign-in" style="max-width:1780px;margin:18px auto 0;padding:0 clamp(16px,3.5vw,50px)">
   <form id="crm-sign-in-form" class="panel" autocomplete="on">

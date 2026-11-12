@@ -39,7 +39,7 @@ PINS={
  "entrypoint.py":"e7fc29a14df78c04bd23bb47ead795a8b0cbfa627a82238f5d03aed8ee7bf978",
  "mount.py":"1b298133a0360f2f971600d8b3671f8bf00c2d8bb8b9055fe62472dd4344df31",
  "revenue_crm_multi_pipeline.py":"e43ab94c86cdb7b444f543473fa51d21e4f15869ef050f89768ae6da841756c7",
- "revenue_crm_multi_pipeline_board.html":"35f600ac8263120c51ce2ab87ba8b42875d1c6361dc44424aa28195eb0effbdc",
+ "revenue_crm_multi_pipeline_board.html":"17604568ae596a47c23387c2b75ee72ab66d80545864118b42af2e1d2957dad8",
  "revenue_crm_multi_pipeline_board.js":"4b53dae73d2602bc98c24a8494bc42dbbc10b9f90f8d04721d4e4effc3ce60db",
 }
 REHEARSAL_PIN="7330b3c2d6aa5119ae7dcab7165f4bc18cdcd8840e598842c348126236bde4bb"

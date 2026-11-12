@@ -212,6 +212,10 @@ def test_static_script_fails_closed_and_contains_no_contact_actions():
     html=(folder/"revenue_crm_multi_pipeline_board.html").read_text()
     js=(folder/"revenue_crm_multi_pipeline_board.js").read_text()
     assert "defer" in html and 'board.js' in html
+    assert 'href="/v1/revenue-crm/journeys/entry"' in html
+    assert 'href="/v1/revenue-crm/journeys/designer"' not in html
+    assert '@media(max-width:400px){header{flex-wrap:wrap}' in html
+    assert '.header-right a{display:inline-flex;font-size:12px}' in html
     assert "textContent" in js
     for disallowed in ("localStorage","eval(","innerHTML","fetch('/api/send","window.location.href="):
         assert disallowed not in js
