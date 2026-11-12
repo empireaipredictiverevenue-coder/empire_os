@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import GSCHistory from "./gsc-history";
+import UnifiedAssets from "./unified-assets";
 import { connection } from "next/server";
 import { readdir, readFile, lstat } from "node:fs/promises";
 import path from "node:path";
@@ -115,6 +118,12 @@ export default async function SEOOperationsPage() {
         </div>
         <span className="rounded-full border border-sky-400/25 bg-sky-400/10 px-4 py-2 text-xs font-semibold text-sky-200">Daily original owner · Read-only execution</span>
       </header>
+      <Suspense fallback={<p role="status" className="mt-7 text-sm text-slate-300">Reading daily GSC history…</p>}>
+        <GSCHistory />
+      </Suspense>
+      <Suspense fallback={<p role="status" className="mt-7 text-sm text-slate-300">Reading search assets and private activity…</p>}>
+        <UnifiedAssets />
+      </Suspense>
       <SEOWorkbench visibility={visibility} visibilityReason={visibilityReason}
         jobs={board?.actions ?? []} resolved={board?.resolved_existing_owner_actions ?? 0}
         liveChecks={board?.read_only_technical_tests_executed ?? 0}
