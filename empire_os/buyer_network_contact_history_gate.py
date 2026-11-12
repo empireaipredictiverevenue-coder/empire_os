@@ -151,6 +151,19 @@ def load_context(registry_path: Path = REGISTRY, external_path: Path = EXTERNAL_
             key = domain_key(identity)
             if key:
                 relationships[key] = item
+    # The same LeadSwitch publisher site is on the verified branded
+    # join.leadswitchmedia.com subdomain, while the original personal Gmail
+    # SENT/relationship registry identifies leadswitchmedia.com. Never treat
+    # that subdomain as a new cold prospect when its parent has documented
+    # outbound. Keep explicit subdomain opt-outs, bounces and conversations.
+    parent = relationships.get("leadswitchmedia.com") or {}
+    subdomain = relationships.get("join.leadswitchmedia.com") or {}
+    if (parent.get("last_outbound_at") or parent.get("gmail_thread_ids")) and not (
+            subdomain.get("do_not_pursue") or subdomain.get("last_inbound_at")
+            or subdomain.get("bounced_addresses") or subdomain.get("last_outbound_at")
+            or subdomain.get("gmail_thread_ids")):
+        relationships["join.leadswitchmedia.com"] = dict(parent)
+
     observations: dict[str, dict] = {}
     for item in external["observations"]:
         if isinstance(item, dict):

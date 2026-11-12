@@ -241,3 +241,49 @@ def test_prior_gmail_hold_never_supersedes_a_canonical_suppression(tmp_path):
                      tmp_path/"no-workspace.json")
     assert review("aceleads.co.uk",ctx)["state"]=="DO_NOT_PURSUE"
     assert review("aceleads.co.uk",ctx)["outbound_authorized"] is False
+
+
+
+def test_exact_leadswitch_official_subdomain_inherits_existing_suppression(tmp_path):
+    # A branded first-party subdomain is not a second never-contacted company.
+    ctx = make_context(tmp_path, [{
+        "entity_key": "leadswitchmedia.com",
+        "identity_domains": ["leadswitchmedia.com"],
+        "gmail_thread_ids": ["original-personal-gmail-thread"],
+        "last_outbound_at": "2026-09-25T19:06:09+00:00",
+        "stage": "CONTACTED_AWAITING_RESPONSE",
+    }, {
+        "entity_key": "join.leadswitchmedia.com",
+        "identity_domains": ["join.leadswitchmedia.com"],
+        "stage": "RESEARCH_ONLY",
+    }])
+    parent = review("leadswitchmedia.com", ctx)
+    subdomain = review("join.leadswitchmedia.com", ctx)
+    assert parent["state"] == "ALREADY_CONTACTED"
+    assert subdomain["state"] == parent["state"]
+    assert subdomain["outbound_authorized"] is False
+    assert subdomain["thread_count"] == parent["thread_count"]
+    assert subdomain["last_outbound_at"] == parent["last_outbound_at"]
+    assert review("other.leadswitchmedia.com", ctx)["state"] == "UNKNOWN_HISTORY"
+    assert review("unrelated.com", ctx)["state"] == "UNKNOWN_HISTORY"
+
+    # The exact bridge never weakens explicit domain-specific opt-outs.
+    ctx = make_context(tmp_path, [{
+        "entity_key": "leadswitchmedia.com",
+        "gmail_thread_ids": ["old-thread"],
+        "last_outbound_at": "2026-09-25",
+    }, {
+        "entity_key": "join.leadswitchmedia.com",
+        "do_not_pursue": True,
+    }])
+    assert review("join.leadswitchmedia.com", ctx)["state"] == "DO_NOT_PURSUE"
+
+    # And the bridge is not invented without a confirmed original send.
+    ctx = make_context(tmp_path, [{
+        "entity_key": "leadswitchmedia.com",
+        "stage": "RESEARCH_ONLY",
+    }, {
+        "entity_key": "join.leadswitchmedia.com",
+        "stage": "RESEARCH_ONLY",
+    }])
+    assert review("join.leadswitchmedia.com", ctx)["state"] == "DISCOVERED_NO_CONFIRMED_CONTACT"
