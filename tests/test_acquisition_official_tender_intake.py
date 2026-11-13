@@ -166,3 +166,35 @@ def test_bad_or_non_gbp_original_tender_values_never_count_as_estimates(amount,c
     assert result["records"][0]["published_estimated_value_gbp"] is None
     assert result["records"][0]["bid_eligibility_verified"] is False
     assert result["outbound_authorized"] is False
+
+
+
+def test_business_growth_public_framework_is_review_only_not_a_qualified_buyer():
+    notice=example_notice(
+        title="Glasgow Business Growth Framework - Phase 4",
+        deadline="2026-12-15T12:00:00Z",
+    )
+    result=review_official_releases(
+        source="contracts_finder",
+        package=pack(notice),catalog=CATA,now=NOW,
+    )
+    assert result["explicit_current_service_requests"]==1
+    record=result["records"][0]
+    assert record["review_status"]=="SERVICE_SCOPE_NEEDS_INDEPENDENT_FIT_REVIEW"
+    assert record["candidate_product_code"] is None
+    assert record["product_fit_verified"] is False
+    assert record["contact_permission_cleared"] is False
+    assert record["bid_eligibility_verified"] is False
+    assert result["outbound_authorized"] is False
+
+
+@pytest.mark.parametrize("lookback_days",[-1,0,22,True,1.5,"5"])
+def test_official_source_rejects_unbounded_or_ambiguous_lookback(tmp_path,lookback_days):
+    from empire_os.acquisition_official_tender_intake import run_manual_official_intake
+    with pytest.raises(ValueError,match="lookback"):
+        run_manual_official_intake(
+            repo=tmp_path,now=NOW,
+            lookback_days=lookback_days,
+            fetch=lambda url: pack(example_notice()),
+            save=False,
+        )

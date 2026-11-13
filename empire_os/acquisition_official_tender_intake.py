@@ -31,7 +31,7 @@ MAX_RELEASES = 100
 SERVICE_TITLE = re.compile(
     r"\b(?:digital marketing|marketing services|media (?:planning|buying)|"
     r"GDPR data audit|investment land guide|technical seo|search engine optimi[sz]ation|"
-    r"market research|competitor search|web analytics|search marketing|"
+    r"market research|business growth|competitor search|web analytics|search marketing|"
     r"SEO audit|advertising services)\b", re.I,
 )
 PAID_TRAFFIC = re.compile(
@@ -313,6 +313,7 @@ def run_manual_official_intake(
     now: datetime | None=None,
     fetch: Callable[[str],Mapping]=_fetch_package,
     save: bool=True,
+    lookback_days: int=21,
 ) -> dict:
     """Explicit founder-triggered OBSERVE run, never a background task.
 
@@ -322,12 +323,14 @@ def run_manual_official_intake(
     current=(now or datetime.now(timezone.utc))
     if current.tzinfo is None or current.utcoffset() is None:
         raise ValueError("timezone-aware run required")
+    if type(lookback_days) is not int or not 1 <= lookback_days <= 21:
+        raise ValueError("bounded official source lookback required")
     current=current.astimezone(timezone.utc)
     catalog_path=repo/"runtime/commercial_catalog/latest.json"
     catalog=json.loads(catalog_path.read_text(encoding="utf-8"))
     if not isinstance(catalog,Mapping):
         raise ValueError("canonical catalog snapshot required")
-    start=current-timedelta(days=21)
+    start=current-timedelta(days=lookback_days)
     reviews=[]
     page_counts={}
     for source in ("contracts_finder","find_a_tender"):
