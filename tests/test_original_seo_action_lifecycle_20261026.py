@@ -431,3 +431,64 @@ def test_no_verified_google_state_never_gets_promoted_or_invented():
     result=build_seo_action_lifecycle(w,d,observed_at=NOW)
     assert result["actions"][0]["reason_code"]=="RELEVANT_HISTORICAL_404"
     assert result["revenue_first_original_owner_focus"]["google_unknown_exact_buyer_entry_urls"]==[]
+
+
+
+def test_weekly_homeowner_demand_is_review_only_and_does_not_open_calls():
+    weekly, daily, journey, release = sources()
+    homeowner = action("/roofing", "HOMEOWNER_LOW_SEARCH_EXPOSURE", "P2_HOMEOWNER_DEMAND")
+    homeowner["buyer_route_or_call_activation_authorized"] = False
+    weekly["actions"].append(homeowner)
+    result = build_seo_action_lifecycle(
+        weekly, daily, buyer_journey=journey, aeo_release=release, observed_at=NOW
+    )
+    row = next(row for row in result["actions"] if row["url"] == BASE + "/roofing")
+    assert row["state"] == "prioritised"
+    assert row["stage"]["publish_eligible"] is False
+    assert row["earned_revenue_verified"] is False
+    assert result["automated_publication_authorized"] is False
+    assert result["outbound_sent"] is False
+    for invalid in (
+        {**homeowner, "url": BASE + "/commercial"},
+        {**homeowner, "reason_code": "UNREVIEWED_PRIORITY"},
+        {**homeowner, "buyer_route_or_call_activation_authorized": True},
+        {key: value for key, value in homeowner.items()
+         if key != "buyer_route_or_call_activation_authorized"},
+    ):
+        weekly["actions"][-1] = invalid
+        with pytest.raises(SEOActionHeld, match="UNTRUSTED_HOMEOWNER_SEO_ACTION"):
+            build_seo_action_lifecycle(
+                weekly, daily, buyer_journey=journey, aeo_release=release, observed_at=NOW
+            )
+    weekly["actions"][-1] = {**homeowner, "priority": "P2_UNKNOWN"}
+    with pytest.raises(SEOActionHeld, match="UNKNOWN_ORIGINAL_ACTION_PRIORITY"):
+        build_seo_action_lifecycle(weekly, daily, observed_at=NOW)
+
+
+
+def test_daily_lifecycle_recovers_after_missing_day_without_reusing_stale_evidence(tmp_path):
+    from datetime import timedelta
+    root = tmp_path / "original_owner"
+    root.mkdir(mode=0o700)
+    current = datetime(2026, 11, 13, 21, 30, tzinfo=timezone.utc)
+    stale = datetime(2026, 11, 11, 0, 0, tzinfo=timezone.utc)
+    receipt = root / "seo-actions-2026-11-11.json"
+    prior = {"schema_version": "empire.search.seo_action_lifecycle.v1",
+             "observed_at": stale.isoformat(), "actions": [],
+             "weekly_source_as_of": "2026-11-11"}
+    receipt.write_text(json.dumps(prior))
+    receipt.chmod(0o600)
+    assert operator._previous_receipt(root, current) is None
+    # Fresh observations may still be carried into the next 48-hour window.
+    fresh = datetime(2026, 11, 12, 20, 0, tzinfo=timezone.utc)
+    newer = root / "seo-actions-2026-11-12.json"
+    newer.write_text(json.dumps({**prior, "observed_at": fresh.isoformat()}))
+    newer.chmod(0o600)
+    assert operator._previous_receipt(root, current)["observed_at"] == fresh.isoformat()
+    # Malformed or mismatched-date evidence must never be bypassed as stale.
+    newer.write_text(json.dumps({**prior, "observed_at": "not-a-time"}))
+    with pytest.raises(SEOActionHeld, match="CLOCK_INVALID"):
+        operator._previous_receipt(root, current)
+    newer.write_text(json.dumps({**prior, "observed_at": stale.isoformat()}))
+    with pytest.raises(SEOActionHeld, match="SOURCE_DATE_MISMATCH"):
+        operator._previous_receipt(root, current)

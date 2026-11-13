@@ -132,6 +132,16 @@ def _previous_receipt(root: Path, now: datetime) -> dict | None:
         previous = _trusted_json(path)
         if previous.get("schema_version") != "empire.search.seo_action_lifecycle.v1":
             raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_SCHEMA_UNTRUSTED")
+        try:
+            observed = datetime.fromisoformat(previous["observed_at"])
+        except (KeyError, ValueError, TypeError) as exc:
+            raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_CLOCK_INVALID") from exc
+        if observed.tzinfo is None or observed.astimezone(timezone.utc).date() != earlier:
+            raise SEOActionHeld("PREVIOUS_SEO_LIFECYCLE_SOURCE_DATE_MISMATCH")
+        # An authentic but expired snapshot must not block a fresh daily run.
+        # It cannot be reused for technical evidence or carried-forward states.
+        if now - observed > timedelta(hours=48):
+            return None
         return previous
     return None
 

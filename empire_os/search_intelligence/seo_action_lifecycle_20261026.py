@@ -35,6 +35,7 @@ PRIORITY = {
     "P0_TECHNICAL": 0, "P1_TECHNICAL": 1, "P1_CRITICAL_PAGE": 2,
     "P2_CTR_OPPORTUNITY": 3, "P2_INTERNAL_LINKS": 4,
     "P2_ORIGINAL_CONTENT_REVIEW": 5, "P2_CONTENT_EVIDENCE": 6,
+    "P2_HOMEOWNER_DEMAND": 5,  # Existing weekly roofing demand source; review only.
     "P3_MEASURE_AND_IMPROVE": 7,
 }
 FIXED_AEO = {
@@ -254,6 +255,14 @@ def build_seo_action_lifecycle(
         priority = source.get("priority")
         if priority not in PRIORITY:
             raise SEOActionHeld("UNKNOWN_ORIGINAL_ACTION_PRIORITY")
+        if priority == "P2_HOMEOWNER_DEMAND" and (
+            path != "/roofing" or code not in {
+                "HOMEOWNER_GSC_EVIDENCE_MISSING",
+                "HOMEOWNER_OBSERVED_IMPRESSIONS_NO_CLICKS",
+                "HOMEOWNER_LOW_SEARCH_EXPOSURE",
+            } or source.get("buyer_route_or_call_activation_authorized") is not False
+        ):
+            raise SEOActionHeld("UNTRUSTED_HOMEOWNER_SEO_ACTION")
         if (source.get("website_change_authorized") is not False
             or source.get("publication_authorized") is not False):
             raise SEOActionHeld("ACTION_EXCEEDS_ORIGINAL_AUTHORITY")
