@@ -58,6 +58,35 @@ def evaluate_executive_plan(repo_root: str | Path) -> dict[str, Any]:
                 if str(ref).strip()
             )
 
+    # A renewed executive plan can carry an equivalent unresolved work item
+    # from the previous plan. Reconcile only identities explicitly returned
+    # by this plan's existing dispatcher and still present in its queue.
+    dispatch = _read(root / "runtime/astra/department_dispatch_latest.json")
+    if plan_id and dispatch.get("plan_id") == plan_id:
+        for forwarded in dispatch.get("items") or []:
+            if (not isinstance(forwarded, Mapping)
+                    or forwarded.get("carried_forward_from_previous_plan") is not True):
+                continue
+            step_id = str(forwarded.get("step_id") or "").strip()
+            if not step_id or step_id in work_by_step:
+                continue
+            try:
+                work_id = str(forwarded.get("work_id") or "")
+                path = queue._find_path(work_id)
+                if path is None:
+                    continue
+                row = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError):
+                continue
+            if (row.get("id") != work_id or row.get("step_id") != step_id
+                    or row.get("target_component") != forwarded.get("target_component")
+                    or row.get("action") != forwarded.get("action")
+                    or row.get("status") not in {"READY", "RUNNING", "REVIEW", "BLOCKED", "FAILED"}):
+                continue
+            work_by_step[step_id] = row
+            statuses[row["status"]] += 1
+            evidence_refs.extend(str(ref) for ref in row.get("result_evidence_refs") or [] if str(ref).strip())
+
     eligible_steps = [
         row for row in (executive.get("plan") or [])
         if isinstance(row, Mapping)
