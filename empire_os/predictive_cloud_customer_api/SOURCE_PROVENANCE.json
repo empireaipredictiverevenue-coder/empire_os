@@ -3,7 +3,7 @@
     "durable_api.py": "296cb87a81885ae841583808df2ee0f087927e2ec9950829ecd60e4697c58ca4",
     "durable_store.py": "569234de9bad6ddbb232dd91fb9758f45f077da4297707963fe838181ad22fd1",
     "empiredb_metering_adapter.py": "e958744d2d2a6b4edf58e002d23bccfd9536c5a6e94243df8d9fe53d61741d44",
-    "gateway_candidate_entrypoint.py": "acf8401035f1a1bb3dd9f6713ed99f01f0fc14045efc541aff608e1bcaed400e",
+    "gateway_candidate_entrypoint.py": "1e0dc217fe7aa52c471974c8b6f4ddf6a45477f9dcdaaddd86e7dc2f85658cd2",
     "private_api.py": "a9586b6c2363c6d4fafc5d242040d4b5f90c386b90b6387fff099b5cdf287846"
   },
   "customer_delivery_authorized": false,

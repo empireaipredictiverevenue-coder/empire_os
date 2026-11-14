@@ -51,7 +51,7 @@ def _first_party_search_adapter(
             if type(row) is not dict:
                 raise ValueError("first_party_search_row_invalid")
             if type(row.get("engine")) is not str or row["engine"] not in {
-                "bing_html", "brave_web", "google_html",
+                "bing_html", "duckduckgo_html", "brave_web", "google_html",
             }:
                 raise ValueError("first_party_search_underlying_engine_unknown")
             safe_rows.append(row)

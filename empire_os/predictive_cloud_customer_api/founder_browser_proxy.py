@@ -27,7 +27,7 @@ ROUTE = "/v1/data/founder/search"
 UPSTREAM = "http://127.0.0.1:80/v1/data/search"
 SOURCE = "empire_search_fabric_public"
 CREDENTIAL_NAME = "empire-data-cloud-founder-api-key"
-ENGINE_IDS = frozenset({"bing_html", "google_html", "brave_web"})
+ENGINE_IDS = frozenset({"bing_html", "duckduckgo_html", "google_html", "brave_web"})
 PRIVATE_HEADERS = {
     "Cache-Control": "no-store",
     "Pragma": "no-cache",
