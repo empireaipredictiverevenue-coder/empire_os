@@ -500,6 +500,11 @@ def search_public_web(
             }),
         ),
         (
+            "duckduckgo_html",
+            "https://html.duckduckgo.com/html/?"
+            + urllib.parse.urlencode({"q": query}),
+        ),
+        (
             "brave_web",
             "https://search.brave.com/search?"
             + urllib.parse.urlencode({
@@ -537,9 +542,12 @@ def search_public_web(
         if not page:
             continue
 
+        confirmed_empty = False
         if provider == "bing_html":
-            # Single owned parser, not a second scraping implementation.
-            # An access shell without organic blocks returns no rows.
+            # Reuse the original Search Fabric parser and quality gate.
+            # A structurally valid Bing result list can be an unrelated
+            # Wikipedia/access shell; parsed rows alone are NOT evidence
+            # that this query actually returned usable results.
             from .search import _parse_bing_html
             parsed = _parse_bing_html(page)[:max(20, min(int(num) * 4, 40))]
             parsed = [
@@ -547,33 +555,57 @@ def search_public_web(
                 for row in parsed
                 if isinstance(row, dict)
             ]
-            # Parsed organic rows prove that the search provider responded.
-            # A clearly rendered Bing no-results block is also operational.
-            # An unknown access/help shell is NOT provider evidence.
             lowered = page.lower()
-            if parsed or ('id="b_results"' in lowered and
-                          ('class="b_no"' in lowered or 'b_no' in lowered)):
-                provider_available = True
+            confirmed_empty = (
+                'id="b_results"' in lowered
+                and ('class="b_no"' in lowered or 'b_no' in lowered)
+            )
+        elif provider == "duckduckgo_html":
+            # Reuse the EXISTING original DDG parser/redirect decoder;
+            # exclude sponsored ad clicks and DDG internal tracking URLs.
+            from .search import _parse_duckduckgo_html
+            parsed = []
+            for row in _parse_duckduckgo_html(page)[:max(20, min(int(num) * 4, 40))]:
+                url = str(row.get("link") or "")
+                try:
+                    dest = urllib.parse.urlsplit(url)
+                    host = (dest.hostname or "").lower().rstrip(".")
+                except ValueError:
+                    continue
+                if (
+                    dest.scheme != "https"
+                    or not host
+                    or host == "duckduckgo.com"
+                    or host.endswith(".duckduckgo.com")
+                    or dest.username is not None
+                    or dest.password is not None
+                ):
+                    continue
+                parsed.append({**row, "engine": "duckduckgo_html"})
         else:
             parsed = parse_public_search_html(
                 page,
                 provider=provider,
-                limit=max(
-                    20,
-                    min(
-                        int(num) * 4,
-                        40,
-                    ),
-                ),
+                limit=max(20, min(int(num) * 4, 40)),
             )
 
-        if parsed:
+        if confirmed_empty:
+            # Genuine Bing no-results pages are operational, even if
+            # the remaining sources also have no matching results.
             provider_available = True
-            rows.extend(parsed)
-            # A usable owned-provider response is enough for one bounded
-            # recovery attempt. Avoid unnecessary requests to rate-limited
-            # alternative endpoints.
-            if provider == "bing_html":
+
+        if parsed:
+            from .search import _quality_filter
+
+            # Keep the ORIGINAL relevance threshold. Do not stop after
+            # irrelevant organic rows; try the next already-authorised
+            # public source instead of misreporting Wikipedia homepages.
+            relevant = _quality_filter(parsed, query, min(max(int(num), 1), 20))
+            if relevant:
+                provider_available = True
+                rows.extend(relevant)
+                # The first source with qualified evidence is sufficient.
+                # Avoid more public requests and preserve bounded egress.
                 break
 
     unique: list[dict[str, Any]] = []
