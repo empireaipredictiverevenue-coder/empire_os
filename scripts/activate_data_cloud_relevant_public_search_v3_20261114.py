@@ -61,6 +61,15 @@ def cmd(args, *, binary=False):
     return res.stdout if binary else res.stdout.decode().strip()
 
 
+def service_active(unit):
+    res = subprocess.run(
+        ["systemctl", "is-active", unit],
+        capture_output=True, timeout=5,
+        env={"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LC_ALL": "C"},
+    )
+    return res.returncode == 0 and res.stdout.strip() == b"active"
+
+
 def git(folder, *args, binary=False):
     return cmd(["git", "-c", "safe.directory=" + str(folder),
                 "-C", str(folder), *args], binary=binary)
@@ -102,7 +111,7 @@ def approve_source(commit):
             "provenance_sha": sha((DATA / PROVENANCE).read_bytes())}
 
 
-def baseline():
+def baseline(*, resume=False):
     assert_true(cmd(["systemctl", "is-active", SERVICE]) == "active"
                 and cmd(["systemctl", "is-active", CRM]) == "active",
                 "original_gateway_or_crm_inactive")
@@ -122,7 +131,13 @@ def baseline():
     pythonpath = pythonpaths[0]
     assert_true("/opt/empire-ai/search-fabric-owned-20261113v2" in pythonpath
                 and str(V2) in pythonpath, "original_release_path_changed")
-    assert_true(not V3.exists() and not STATE.exists(), "v3_release_already_present")
+    if resume:
+        assert_true(V3.is_dir() and STATE.is_dir() and JOURNAL.is_file(),
+                    "reviewed_v3_rollback_artifacts_not_present")
+        assert_true(json.loads(JOURNAL.read_bytes()).get("phase") == "rolled_back",
+                    "original_v3_release_not_safely_rolled_back")
+    else:
+        assert_true(not V3.exists() and not STATE.exists(), "v3_release_already_present")
     old_receipt = json.loads(pinned_file(ORIGINAL_RECEIPT, owner=0))
     assert_true(
         old_receipt.get("scope") == "FOUNDER_ONLY_FIRST_PARTY_SEARCH_NO_PAID_API"
@@ -154,8 +169,11 @@ def set_frozen(relative, contents):
 
 
 def stage(pre, sources, commit):
-    STATE.mkdir(mode=0o700)
-    STATE.chmod(0o700)
+    # Original public gateway runs as ubuntu. Its already-approved source
+    # receipt is root-owned, read-only 0444 under a traversable 0755 dir;
+    # preserve that exact custody, not a root-private path the service cannot read.
+    STATE.mkdir(mode=0o755)
+    STATE.chmod(0o755)
     shutil.copytree(V2, V3, symlinks=False)
     assert_true(V3.stat().st_uid == 0 and not V3.is_symlink(),
                 "v3_frozen_tree_ownership_changed")
@@ -198,7 +216,7 @@ def stage(pre, sources, commit):
         f.write(raw)
         f.flush()
         os.fsync(f.fileno())
-    RECEIPT.chmod(0o400)
+    RECEIPT.chmod(0o444)
     digest = sha(raw)
     assert_true(sha(RECEIPT.read_bytes()) == digest,
                 "new_source_receipt_digest_mismatch")
@@ -231,7 +249,7 @@ def http(path, *, port=80, method="GET"):
 
 def smoke():
     for _ in range(18):
-        if cmd(["systemctl", "is-active", SERVICE]) == "active" and http("/") == 200:
+        if service_active(SERVICE) and http("/") == 200:
             break
         time.sleep(1)
     else:
@@ -279,10 +297,82 @@ def rollback():
 
 def smoke_old():
     for _ in range(15):
-        if http("/") == 200 and cmd(["systemctl", "is-active", SERVICE]) == "active":
+        if http("/") == 200 and service_active(SERVICE):
             return True
         time.sleep(1)
     raise RuntimeError("previous_gateway_not_recovered_after_rollback")
+
+
+def verify_previous_v3(pre, sources):
+    """Prove staged bytes and prior rollback BEFORE modifying receipt custody."""
+    payload = json.loads(RECEIPT.read_bytes())
+    controlled = payload.get("controlled_source_refresh", {})
+    assert_true(
+        payload.get("scope") == pre["old_receipt"].get("scope")
+        and payload.get("owner_actor_id") == pre["old_receipt"].get("owner_actor_id")
+        and payload.get("owner_tenant_id") == pre["old_receipt"].get("owner_tenant_id")
+        and controlled.get("search_fabric_owner_commit") == SOURCE_COMMIT
+        and controlled.get("source_sha256") == sources["source_sha"]
+        and controlled.get("paid_provider_calls_authorized") is False,
+        "staged_v3_receipt_or_scope_changed",
+    )
+    for name, digest in payload["files"].items():
+        assert_true(
+            sha(pinned_file(V3 / name, owner=0)) == digest,
+            "staged_v3_source_hash_changed",
+        )
+    assert_true(sha(pinned_file(V3 / SOURCE_FILE, owner=0)) == SOURCE_SHA,
+                "staged_v3_collector_changed")
+    assert_true(sha(pinned_file(V3 / ADAPTER, owner=0)) == sources["adapter_sha"],
+                "staged_v3_customer_adapter_changed")
+    assert_true(sha(pinned_file(V3 / PROVENANCE, owner=0)) == sources["provenance_sha"],
+                "staged_v3_source_receipt_changed")
+    entry = pinned_file(V3 / ENTRY, owner=0)
+    assert_true(str(V3).encode() in entry and str(RECEIPT).encode() in entry,
+                "staged_v3_entrypoint_changed")
+    assert_true(STATE.stat().st_uid == 0 and RECEIPT.stat().st_uid == 0,
+                "staged_v3_root_custody_changed")
+    return sha(RECEIPT.read_bytes())
+
+
+def resume_original_v3(pre, sources, commit):
+    """Resume SAME previously failed frozen bytes after correcting receipt ACL."""
+    digest = verify_previous_v3(pre, sources)
+    # The public gateway service user is ubuntu, as for the previous
+    # founder-only receipt. The protected receipt is nonsecret and SHA-pinned.
+    assert_true(STATE.stat().st_mode & 0o777 == 0o700,
+                "staged_v3_state_preimage_changed")
+    assert_true(RECEIPT.stat().st_mode & 0o777 == 0o400,
+                "staged_v3_receipt_preimage_changed")
+    STATE.chmod(0o755)
+    RECEIPT.chmod(0o444)
+    assert_true(sha(RECEIPT.read_bytes()) == digest,
+                "resume_did_not_preserve_signed_receipt_bytes")
+    line = ('[Service]\n'
+            '# Preserve the current original owned-index gateway ExecStart.\n'
+            'Environment="PYTHONPATH=' + str(V3) + ':' + pre["pythonpath"] + '"\n'
+            'Environment="PYTHONDONTWRITEBYTECODE=1"\n'
+            'Environment="EMPIRE_DATA_CLOUD_SEARCH_RECEIPT_SHA256=' + digest + '"\n')
+    fd = os.open(OVERLAY, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
+    with os.fdopen(fd, "w") as output:
+        output.write(line)
+        output.flush()
+        os.fsync(output.fileno())
+    assert_true(
+        cmd(["systemctl", "show", SERVICE, "-p", "ExecStart", "--value"])
+        == pre["execution"],
+        "original_gateway_owner_changed_during_resume",
+    )
+    journal({"phase": "resuming", "previous_phase": "rolled_back",
+             "source_commit": commit, "receipt_sha256": digest,
+             "utc": int(time.time())})
+    cmd(["systemctl", "daemon-reload"])
+    cmd(["systemctl", "restart", SERVICE])
+    checks = smoke()
+    journal({"phase": "active", "previous_phase": "rolled_back",
+             "source_commit": commit, "receipt_sha256": digest,
+             "verification": checks, "utc": int(time.time())})
+    return checks
 
 
 def main():
@@ -290,6 +380,8 @@ def main():
     actions = parser.add_mutually_exclusive_group(required=True)
     actions.add_argument("--preflight", action="store_true")
     actions.add_argument("--apply-founder-approved", action="store_true")
+    actions.add_argument("--resume-preflight", action="store_true")
+    actions.add_argument("--resume-founder-approved", action="store_true")
     actions.add_argument("--rollback", action="store_true")
     parser.add_argument("--source-commit")
     args = parser.parse_args()
@@ -299,6 +391,20 @@ def main():
         print("SEARCH_SOURCE_V3_ROLLBACK_PASS")
         return
     sources = approve_source(args.source_commit)
+    if args.resume_preflight or args.resume_founder_approved:
+        pre = baseline(resume=True)
+        verify_previous_v3(pre, sources)
+        if args.resume_preflight:
+            print("SEARCH_SOURCE_V3_ROLLBACK_RECOVERY_PREFLIGHT_PASS")
+            return
+        try:
+            report = resume_original_v3(pre, sources, args.source_commit)
+            print("FOUNDER_SEARCH_FABRIC_ORIGINAL_V3_RELEASE_ACTIVE")
+            print(json.dumps(report, sort_keys=True))
+        except Exception:
+            rollback()
+            raise RuntimeError("guarded_v3_resume_failed_and_rolled_back")
+        return
     pre = baseline()
     if args.preflight:
         print("SEARCH_SOURCE_V3_READONLY_PREFLIGHT_PASS")

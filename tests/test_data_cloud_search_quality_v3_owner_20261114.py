@@ -55,3 +55,25 @@ def test_single_owner_release_restricts_meter_and_billing_changes():
     assert "supplier" not in source.lower()
     assert "paid_provider_calls_authorized" in source
     assert '"source_id") == "empire_search_fabric_public"' in source
+
+
+
+def test_transient_systemd_start_does_not_abort_guarded_health_poll(monkeypatch):
+    class Result:
+        returncode = 3
+        stdout = b"activating\n"
+
+    monkeypatch.setattr(owner.subprocess, "run", lambda *args, **kwargs: Result())
+    assert owner.service_active(owner.SERVICE) is False
+
+
+def test_staged_receipt_custody_matches_original_public_service():
+    # The gateway user is ubuntu; the original pinned receipt was 0444 in
+    # root-owned 0755 directory. This is intentionally *not* root-secret.
+    source = PATH.read_text()
+    assert "STATE.chmod(0o755)" in source
+    assert "RECEIPT.chmod(0o444)" in source
+    assert "resume_previous_v3" not in source  # owner function is resume_original_v3
+    assert "def verify_previous_v3" in source
+    assert "def resume_original_v3" in source
+    assert "guarded_v3_resume_failed_and_rolled_back" in source
