@@ -619,6 +619,15 @@ def run_cycle(
                 "execution_authority": "none",
             }
 
+    # The Guardian is independent assurance: its critical result cannot be
+    # hidden by green runtime repair checks or by a legacy-debt release gate.
+    # Fixture roots are noncanonical and deliberately do not run this audit.
+    if root == ROOT and (
+        guardian_status.get("status") != "HEALTHY"
+        or guardian_status.get("release_gate") != "NO_NEW_VIOLATION"
+    ):
+        degraded = True
+
     payload = {
         "schema_version": "empire.reliability-agent.v1",
         "observed_at": before.observed_at,

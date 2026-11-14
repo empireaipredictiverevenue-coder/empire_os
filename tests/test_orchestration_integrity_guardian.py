@@ -81,3 +81,50 @@ def test_readonly_report_writes_no_queue_files(tmp_path):
     assert json.loads(p.read_text())["schema_version"]==r["schema_version"]
     assert not (tmp_path/"runtime/departments/work").exists()
     assert r["release_gate"] == "REJECT"  # no invented healthy empty queue
+
+
+def test_reliability_health_reflects_independent_guardian(monkeypatch, tmp_path):
+    from datetime import datetime, timezone
+    from empire_os import reliability_agent as reliability
+    from empire_os import orchestration_integrity_guardian as guardian
+
+    now = datetime(2026, 11, 14, 23, 0, tzinfo=timezone.utc)
+    root = tmp_path.resolve()
+    monkeypatch.setattr(reliability, "ROOT", root)
+    monkeypatch.setattr(reliability, "STATE_PATH", root / "runtime/reliability_agent/state.json")
+    monkeypatch.setattr(reliability, "LATEST_PATH", root / "runtime/reliability_agent/latest.json")
+    monkeypatch.setattr(reliability, "DATA_CLOUD_LATEST_PATH", root / "runtime/data_cloud/health_latest.json")
+    monkeypatch.setattr(reliability, "plan_actions", lambda _observation: [])
+    observation = reliability.ReliabilityObservation(
+        observed_at=now.isoformat(),
+        supabase_egress_contained=False,
+        supabase_guard_state="healthy",
+        recovery_snapshot_exists=True,
+        recovery_seed_count=1,
+        recovery_snapshot_age_seconds=10,
+        recovery_heartbeat_exists=True,
+        recovery_heartbeat_age_seconds=10,
+        recovery_heartbeat_state="HEALTHY",
+    )
+    monkeypatch.setattr(reliability, "observe", lambda *_args, **_kwargs: observation)
+
+    def guardian_result(status, release_gate="NO_NEW_VIOLATION"):
+        monkeypatch.setattr(guardian, "run_guardian", lambda *_args, **_kwargs: {
+            "status": status,
+            "release_gate": release_gate,
+            "finding_count": 4 if status == "CRITICAL" else 0,
+        })
+        return reliability.run_cycle(root, now=now)
+
+    critical = guardian_result("CRITICAL")
+    assert critical["status"] == "DEGRADED"
+    assert critical["orchestration_integrity_guardian"]["release_gate"] == "NO_NEW_VIOLATION"
+    assert guardian_result("HEALTHY")["status"] == "HEALTHY"
+    assert guardian_result("HEALTHY", "REJECT")["status"] == "DEGRADED"
+
+    def unavailable(*_args, **_kwargs):
+        raise RuntimeError("audit failed")
+    monkeypatch.setattr(guardian, "run_guardian", unavailable)
+    unavailable_report = reliability.run_cycle(root, now=now)
+    assert unavailable_report["status"] == "DEGRADED"
+    assert unavailable_report["orchestration_integrity_guardian"]["status"] == "AUDIT_UNAVAILABLE"
