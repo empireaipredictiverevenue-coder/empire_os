@@ -1,2 +1,4 @@
 .next/
 out/
+# Historical and candidate builds, never original source.
+out.*/
