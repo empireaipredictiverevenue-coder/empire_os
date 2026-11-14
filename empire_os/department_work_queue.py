@@ -150,6 +150,7 @@ class DepartmentWorkQueue:
         step: Mapping[str, Any],
         priority: int = 50,
         reopen_blocked_reasons: tuple[str, ...] = (),
+        coalesce_across_plans_seconds: int = 0,
     ) -> tuple[DepartmentWorkItem, bool]:
         plan = self._safe(str(plan_id or ""))
         step_id = self._safe(str(step.get("step_id") or ""))
@@ -224,6 +225,42 @@ class DepartmentWorkQueue:
                     existing.replace(destination)
                     return self._load(destination), True
                 return current, False
+            # ASTRA is a recurring executive planner: a new plan ID must not
+            # multiply the *same unresolved task* on every refresh.
+            # Never collapse completed work, changed evidence, tenant, authority
+            # or goals. A bounded window guarantees later reconsideration.
+            window = max(0, min(int(coalesce_across_plans_seconds), 3600))
+            if window:
+                cutoff = datetime.now(timezone.utc) - timedelta(seconds=window)
+                for folder in (self.ready, self.running, self.blocked, self.failed):
+                    for old_path in folder.glob("*.json"):
+                        try:
+                            current = self._load(old_path)
+                            created = datetime.fromisoformat(current.created_at)
+                        except (OSError, ValueError, TypeError, KeyError):
+                            continue
+                        if created.tzinfo is None or created < cutoff:
+                            continue
+                        if (current.status is DepartmentWorkStatus.BLOCKED
+                                and current.error in reopen_blocked_reasons):
+                            continue
+                        if (
+                            current.step_id == item.step_id
+                            and current.target_component == item.target_component
+                            and current.action == item.action
+                            and current.goal_key == item.goal_key
+                            and current.authority == item.authority
+                            and current.department_keys == item.department_keys
+                            and current.tenant_id == item.tenant_id
+                            and current.decision_identity == item.decision_identity
+                            and current.commercial_decision_provenance == item.commercial_decision_provenance
+                            and current.evidence_refs == item.evidence_refs
+                            and current.intelligence_request == item.intelligence_request
+                            and current.memory_query == item.memory_query
+                            and current.success_condition == item.success_condition
+                            and current.rationale == item.rationale
+                        ):
+                            return current, False
             self._write(self.ready / f"{work_id}.json", item)
         return item, True
 

@@ -36,6 +36,11 @@ from empire_os.sb import request_json
 
 
 SAFE_COMMANDS = {
+    # Reuse the canonical status routine and reject false health completion.
+    "ops_sentinel": (
+        "scripts/build_predictive_cloud_status.py",
+        "runtime:predictive_cloud:status_latest",
+    ),
     "commercial_product_catalog": (
         "scripts/refresh_commercial_product_catalog.py",
         "runtime:commercial_product_catalog",
@@ -881,6 +886,38 @@ def _run_one_department_work_impl(
             "queue_counts": queue.counts(),
             "execution_authority": "none",
         }
+
+    if item.target_component == "ops_sentinel":
+        # The status script can succeed while its measured components are
+        # unhealthy. Completing the *job* would falsely satisfy ASTRA's goal.
+        try:
+            health = json.loads(completed.stdout)
+            unhealthy = (
+                type(health.get("component_count")) is not int
+                or type(health.get("available_component_count")) is not int
+                or health["component_count"] != health["available_component_count"]
+                or bool(health.get("unavailable_components"))
+                or bool(health.get("stale_components"))
+                or bool(health.get("unknown_freshness_components"))
+            )
+        except (ValueError, TypeError, KeyError, AttributeError):
+            health = {"status": "invalid_status_snapshot"}
+            unhealthy = True
+        if unhealthy:
+            held = queue.block(
+                item, "predictive_cloud_components_unhealthy",
+                {**result, "health": health},
+            )
+            return {
+                "ok": True,
+                "state": "BLOCKED",
+                "work_id": held.id,
+                "target_component": held.target_component,
+                "blocker": held.error,
+                "health": health,
+                "queue_counts": queue.counts(),
+                "execution_authority": "none",
+            }
 
     done = queue.complete(
         item,

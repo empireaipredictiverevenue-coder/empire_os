@@ -1,0 +1,488 @@
+{
+  "decision": "DO_NOT_DELETE_REPEATS_UNTIL_INPUT_OUTPUT_DEPENDENCIES_VERIFIED",
+  "distinct_python_scripts": 47,
+  "duplicate_call_slots": 10,
+  "generated_at": "2026-11-14T22:47:48.958875+00:00",
+  "hooks": [
+    {
+      "command": "-/srv/empire_os/.venv/bin/python -B /home/ubuntu/empire_releases/contractor_jev_shadow_v6_8aaf95dc1/run_contractor_research_once.py --official-research-approved",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/00-contractor-jev-shadow-v6.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 1,
+      "script": "/home/ubuntu/empire_releases/contractor_jev_shadow_v6_8aaf95dc1/run_contractor_research_once.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_network_runtime_bridge.py --auto-observe",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/50-buyer-network-runtime.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 2,
+      "script": "/srv/empire_os/scripts/run_buyer_network_runtime_bridge.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_buyer_network_discovery_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/60-buyer-network-discovery.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 3,
+      "script": "/srv/empire_os/scripts/run_buyer_network_discovery_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_founder_mailbox_inprocess_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/60-passive-reply-observer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 4,
+      "script": "/srv/empire_os/scripts/run_founder_mailbox_inprocess_observer.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_network_discovery_recovery.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/65-buyer-network-discovery-recovery.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 5,
+      "script": "/srv/empire_os/scripts/materialize_buyer_network_discovery_recovery.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_network_contextual_evidence.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/66-buyer-network-contextual-evidence.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 6,
+      "script": "/srv/empire_os/scripts/materialize_buyer_network_contextual_evidence.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_entity_type_detection.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/66z-entity-type-detection.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 7,
+      "script": "/srv/empire_os/scripts/run_entity_type_detection.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_truth_quality_control.py --stage input",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/67-truth-quality-input.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 8,
+      "script": "/srv/empire_os/scripts/run_truth_quality_control.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_entity_type_overlay.py --target backlog",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/67z-entity-type-backlog.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 9,
+      "script": "/srv/empire_os/scripts/apply_entity_type_overlay.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_canonical_identity_resolution.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/68-canonical-identity-pre.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 10,
+      "script": "/srv/empire_os/scripts/run_canonical_identity_resolution.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_canonical_identity_overlay.py --target backlog",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/68-canonical-identity-pre.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 11,
+      "script": "/srv/empire_os/scripts/apply_canonical_identity_overlay.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/probe_buyer_network_direct_sites.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/69-buyer-network-direct-site-verification.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 12,
+      "script": "/srv/empire_os/scripts/probe_buyer_network_direct_sites.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_entity_type_detection.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/69y-entity-type-refresh.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 13,
+      "script": "/srv/empire_os/scripts/run_entity_type_detection.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_canonical_identity_resolution.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/69z-canonical-identity-refresh.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 14,
+      "script": "/srv/empire_os/scripts/run_canonical_identity_resolution.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_network_candidate_queue.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/70-buyer-network-candidate-queue.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 15,
+      "script": "/srv/empire_os/scripts/materialize_buyer_network_candidate_queue.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_campaign_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/70-campaign-runtime-observer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 16,
+      "script": "/srv/empire_os/scripts/run_campaign_runtime_observer.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_entity_type_overlay.py --target queue",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/72-entity-type-queue.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 17,
+      "script": "/srv/empire_os/scripts/apply_entity_type_overlay.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_agent_tasks_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/75-agent-tasks-runtime-observer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 18,
+      "script": "/srv/empire_os/scripts/run_agent_tasks_runtime_observer.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_canonical_identity_overlay.py --target queue",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/75-canonical-identity-queue.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 19,
+      "script": "/srv/empire_os/scripts/apply_canonical_identity_overlay.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_network_founder_shortlist.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/80-buyer-network-founder-shortlist.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 20,
+      "script": "/srv/empire_os/scripts/materialize_buyer_network_founder_shortlist.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/materialize_buyer_network_founder_review_packets.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/85-buyer-network-founder-review.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 21,
+      "script": "/srv/empire_os/scripts/materialize_buyer_network_founder_review_packets.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_truth_quality_control.py --stage output",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/86-truth-quality-output.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 22,
+      "script": "/srv/empire_os/scripts/run_truth_quality_control.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_architecture_gap_radar.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87-architecture-gap-radar.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 23,
+      "script": "/srv/empire_os/scripts/run_architecture_gap_radar.py"
+    },
+    {
+      "command": "-/bin/bash -c 'set -a; [ -f /etc/empiredb.env ] && . /etc/empiredb.env; set +a; cd /srv/empire_os; exec /srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_consent_suppression_control.py'",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87x-consent-suppression-control.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 24,
+      "script": "/srv/empire_os/scripts/run_consent_suppression_control.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_consent_suppression_governor_shadow.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87x5-consent-governor-shadow.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 25,
+      "script": "/srv/empire_os/scripts/run_consent_suppression_governor_shadow.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_consent_suppression_outcome_linkage.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87x7-consent-outcome-linkage.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 26,
+      "script": "/srv/empire_os/scripts/run_consent_suppression_outcome_linkage.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_economic_memory_control.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87x9-economic-memory-control.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 27,
+      "script": "/srv/empire_os/scripts/run_economic_memory_control.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/complete_economic_memory_controls.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87x95-economic-memory-completion.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 28,
+      "script": "/srv/empire_os/scripts/complete_economic_memory_controls.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/discover_runtime_control_evidence.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87y-runtime-control-discovery.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 29,
+      "script": "/srv/empire_os/scripts/discover_runtime_control_evidence.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/adjudicate_runtime_control_evidence.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/87z-runtime-control-adjudication.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 30,
+      "script": "/srv/empire_os/scripts/adjudicate_runtime_control_evidence.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_detection_fabric.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/88-global-detection-fabric.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 31,
+      "script": "/srv/empire_os/scripts/run_detection_fabric.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_runtime_control_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/88z-runtime-control-bindings.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 32,
+      "script": "/srv/empire_os/scripts/apply_runtime_control_bindings.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_conversations_replies_control.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/89-conversations-replies-control.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 33,
+      "script": "/srv/empire_os/scripts/run_conversations_replies_control.py"
+    },
+    {
+      "command": "-/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_conversations_replies_identity_bridge.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/89z-conversations-replies-identity-bridge.conf",
+      "failure_ignored_by_systemd": true,
+      "order": 34,
+      "script": "/srv/empire_os/scripts/run_conversations_replies_identity_bridge.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_campaign_output_outcome_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 35,
+      "script": "/srv/empire_os/scripts/run_campaign_output_outcome_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_campaign_measured_outcome_resolver.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 36,
+      "script": "/srv/empire_os/scripts/run_campaign_measured_outcome_resolver.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_detection_fabric.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 37,
+      "script": "/srv/empire_os/scripts/run_detection_fabric.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_campaign_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 38,
+      "script": "/srv/empire_os/scripts/promote_campaign_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_campaign_measured_controls.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 39,
+      "script": "/srv/empire_os/scripts/promote_campaign_measured_controls.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_runtime_control_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/95-campaign-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 40,
+      "script": "/srv/empire_os/scripts/apply_runtime_control_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_agent_tasks_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/96-agent-tasks-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 41,
+      "script": "/srv/empire_os/scripts/promote_agent_tasks_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_runtime_control_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/96-agent-tasks-binding-promotion.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 42,
+      "script": "/srv/empire_os/scripts/apply_runtime_control_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_campaign_measured_outcome_resolver.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 43,
+      "script": "/srv/empire_os/scripts/run_campaign_measured_outcome_resolver.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_opportunity_quarantine_control.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 44,
+      "script": "/srv/empire_os/scripts/run_opportunity_quarantine_control.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_predictive_revenue_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 45,
+      "script": "/srv/empire_os/scripts/run_predictive_revenue_runtime_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_leads_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 46,
+      "script": "/srv/empire_os/scripts/run_leads_runtime_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_people_contacts_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 47,
+      "script": "/srv/empire_os/scripts/run_people_contacts_runtime_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_products_offers_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 48,
+      "script": "/srv/empire_os/scripts/run_products_offers_runtime_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/run_orders_payments_revenue_runtime_observer.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 49,
+      "script": "/srv/empire_os/scripts/run_orders_payments_revenue_runtime_observer.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/finalize_runtime_control_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 50,
+      "script": "/srv/empire_os/scripts/finalize_runtime_control_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_predictive_revenue_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 51,
+      "script": "/srv/empire_os/scripts/promote_predictive_revenue_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_leads_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 52,
+      "script": "/srv/empire_os/scripts/promote_leads_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_people_contacts_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 53,
+      "script": "/srv/empire_os/scripts/promote_people_contacts_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_products_offers_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 54,
+      "script": "/srv/empire_os/scripts/promote_products_offers_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/promote_orders_payments_revenue_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 55,
+      "script": "/srv/empire_os/scripts/promote_orders_payments_revenue_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/reconcile_materialized_runtime_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 56,
+      "script": "/srv/empire_os/scripts/reconcile_materialized_runtime_bindings.py"
+    },
+    {
+      "command": "/srv/empire_os/.venv/bin/python /srv/empire_os/scripts/apply_runtime_control_bindings.py",
+      "drop_in": "/etc/systemd/system/empire-department-cycle.service.d/99-runtime-binding-finalizer.conf",
+      "failure_ignored_by_systemd": false,
+      "order": 57,
+      "script": "/srv/empire_os/scripts/apply_runtime_control_bindings.py"
+    }
+  ],
+  "migration_acceptance": [
+    "prove which post-hooks read or mutate which canonical data",
+    "retain ordered dependencies and idempotency for repeated scripts with different arguments",
+    "verify job leases, bounded retry and independent completion evidence",
+    "prove exact live workflow before decommissioning each hook",
+    "keep existing wiring until controlled migration and rollback ready"
+  ],
+  "owner": "engineering / existing ASTRA and Reliability Agent",
+  "repeated_script_groups": [
+    {
+      "calls": 4,
+      "positions": [
+        32,
+        40,
+        42,
+        57
+      ],
+      "script": "/srv/empire_os/scripts/apply_runtime_control_bindings.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        7,
+        13
+      ],
+      "script": "/srv/empire_os/scripts/run_entity_type_detection.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        8,
+        22
+      ],
+      "script": "/srv/empire_os/scripts/run_truth_quality_control.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        9,
+        17
+      ],
+      "script": "/srv/empire_os/scripts/apply_entity_type_overlay.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        10,
+        14
+      ],
+      "script": "/srv/empire_os/scripts/run_canonical_identity_resolution.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        11,
+        19
+      ],
+      "script": "/srv/empire_os/scripts/apply_canonical_identity_overlay.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        31,
+        37
+      ],
+      "script": "/srv/empire_os/scripts/run_detection_fabric.py"
+    },
+    {
+      "calls": 2,
+      "positions": [
+        36,
+        43
+      ],
+      "script": "/srv/empire_os/scripts/run_campaign_measured_outcome_resolver.py"
+    }
+  ],
+  "schema_version": "empire.orchestration.existing_service_hook_inventory.v1",
+  "scope": "read_only_observation",
+  "script_count": 57,
+  "service_config_altered": false,
+  "source": "live:systemd:cat:empire-department-cycle.service"
+}
