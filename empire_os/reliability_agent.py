@@ -591,6 +591,34 @@ def run_cycle(
         or runtime_degraded
     )
 
+    # Independent organisational assurance. This new Guardian audits ASTRA
+    # but rides the existing Reliability Agent loop: no duplicate scheduler
+    # or 58th ExecStartPost hook. Its failure never authorises a repair.
+    guardian_status: dict[str, Any] = {
+        "status": "NOT_CANONICAL_RUNTIME",
+        "release_gate": "REJECT",
+        "finding_count": None,
+        "execution_authority": "none",
+    }
+    if root == ROOT:
+        try:
+            from empire_os.orchestration_integrity_guardian import run_guardian
+            guardian = run_guardian(root, now=current)
+            guardian_status = {
+                "status": guardian["status"],
+                "release_gate": guardian["release_gate"],
+                "finding_count": guardian["finding_count"],
+                "report": "runtime/orchestration_integrity/latest.json",
+                "execution_authority": "none",
+            }
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
+            guardian_status = {
+                "status": "AUDIT_UNAVAILABLE",
+                "release_gate": "REJECT",
+                "reason_code": type(exc).__name__,
+                "execution_authority": "none",
+            }
+
     payload = {
         "schema_version": "empire.reliability-agent.v1",
         "observed_at": before.observed_at,
@@ -603,6 +631,7 @@ def run_cycle(
         "verified_action_count": verified_count,
         "failed_action_count": len(failures),
         "after": asdict(after),
+        "orchestration_integrity_guardian": guardian_status,
         "status": "DEGRADED" if degraded else "HEALTHY",
         "operating_state": (
             "SUPABASE_CONTAINED_LOCAL_RECOVERY"
