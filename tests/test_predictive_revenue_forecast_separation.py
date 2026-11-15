@@ -188,3 +188,31 @@ def test_no_ripgrep_falls_back_without_losing_records(tmp_path, monkeypatch):
     assert result["source_prefilter"] == "python_exhaustive_fallback"
     assert result["structural_forecast_records"] == 1
     assert result["fast_prefilter_failed_or_unavailable"] is True
+
+
+def test_recent_restricted_source_preflight_drives_specific_reasoning(tmp_path):
+    runtime = tmp_path / "runtime"
+    (runtime / "predictive_revenue_control").mkdir(parents=True)
+    timestamp = "2026-11-15T14:00:00+00:00"
+    (runtime / "predictive_revenue_control" / "authenticated_source_preflight_latest.json").write_text(
+        json.dumps({
+            "schema_version": "empire.predictive_revenue.authenticated_source_preflight.v1",
+            "generated_at": timestamp,
+            "mode": "OBSERVE", "execution_authority": "none",
+            "model_calibration_ready": False,
+            "independently_verified_forecast_actual_pairs": 0,
+            "customer_revenue_amount_verified": False,
+            "registry_restricted_read_attempted": False,
+            "census_restricted_read_attempted": False,
+            "registry_source_status": "CANONICAL_TENANT_SCOPE_UNAVAILABLE",
+            "census_source_status": "CANONICAL_TENANT_SCOPE_UNAVAILABLE",
+        })
+    )
+    got = audit_runtime(runtime, now=datetime(2026, 11, 15, 15, tzinfo=timezone.utc))
+    assert got["restricted_source_preflight_observation"]["report_is_secondary_evidence"]
+    assert got["decision_support"]["recommended_next_action"] == (
+        "RESTORE_EXISTING_RESTRICTED_REGISTRY_READER_SESSION"
+    )
+    assert got["decision_support"]["forecast_accuracy_confidence"] is None
+    assert got["forecast_accuracy_measurable"] is False
+    assert got["independently_verified_customer_outcome_pairs"] == 0

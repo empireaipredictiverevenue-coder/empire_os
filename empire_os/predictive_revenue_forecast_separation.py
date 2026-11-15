@@ -173,7 +173,42 @@ def _existing_jev_observation(runtime: Path, clock: datetime) -> dict[str, Any]:
     }
 
 
-def _evidence_decision(report: dict[str, Any], jev: dict[str, Any]) -> dict[str, Any]:
+def _restricted_source_preflight_observation(runtime: Path, clock: datetime) -> dict[str, Any]:
+    """Read only the safe outcome of the existing restricted source probe.
+
+    This is status context, not authentication, independent custody or actuals.
+    A caller-editable JSON file never upgrades source confidence.
+    """
+    from empire_os.predictive_cloud_core_jev_observer import _read, _recent
+    relative = "runtime/predictive_revenue_control/authenticated_source_preflight_latest.json"
+    payload, _ = _read(runtime.parent, relative)
+    valid = bool(
+        payload.get("schema_version") ==
+            "empire.predictive_revenue.authenticated_source_preflight.v1"
+        and payload.get("execution_authority") == "none"
+        and payload.get("mode") == "OBSERVE"
+        and _recent(payload.get("generated_at"), clock, 2)
+        and payload.get("model_calibration_ready") is False
+        and payload.get("independently_verified_forecast_actual_pairs") == 0
+        and payload.get("customer_revenue_amount_verified") is False
+    )
+    if not valid:
+        return {"status": "NO_FRESH_RESTRICTED_SOURCE_PREFLIGHT",
+                "report_is_secondary_evidence": True,
+                "actuals_admitted": False}
+    return {
+        "status": "RESTRICTED_SOURCE_PREFLIGHT_OBSERVED",
+        "registry_source_status": str(payload.get("registry_source_status"))[:100],
+        "census_source_status": str(payload.get("census_source_status"))[:100],
+        "registry_restricted_read_attempted": payload.get("registry_restricted_read_attempted") is True,
+        "census_restricted_read_attempted": payload.get("census_restricted_read_attempted") is True,
+        "report_is_secondary_evidence": True,
+        "actuals_admitted": False,
+    }
+
+
+def _evidence_decision(report: dict[str, Any], jev: dict[str, Any],
+                       source_preflight: dict[str, Any] | None = None) -> dict[str, Any]:
     """Typed evidence-first reasoning; recommendation, never autonomous action.
 
     This uses EmpireOS's existing decision state vocabulary. No signal is
@@ -192,7 +227,13 @@ def _evidence_decision(report: dict[str, Any], jev: dict[str, Any]) -> dict[str,
         reasons.append("SOURCE_FINANCIAL_PROOFS_NOT_ADMITTED")
     if not jev["research_signal_available"]:
         reasons.append("JEV_RESEARCH_SOURCE_UNAVAILABLE_OR_STALE")
-    if "ORIGINAL_FORECAST_REGISTRY_NOT_AUTHENTICATED" in reasons:
+    source = source_preflight or {}
+    if (source.get("status") == "RESTRICTED_SOURCE_PREFLIGHT_OBSERVED"
+            and source.get("registry_restricted_read_attempted") is False):
+        action = "RESTORE_EXISTING_RESTRICTED_REGISTRY_READER_SESSION"
+        why = "No canonical tenant-bound registry session was available in this execution context."
+        reasons.append("RESTRICTED_REGISTRY_READER_SESSION_NOT_CONFIGURED")
+    elif "ORIGINAL_FORECAST_REGISTRY_NOT_AUTHENTICATED" in reasons:
         action = "VERIFY_EXISTING_TENANT_BOUND_FORECAST_REGISTRY"
         why = "A timestamped original source must exist before valid backtesting."
     elif "NO_INDEPENDENT_CUSTOMER_OUTCOME_PAIRS" in reasons:
@@ -311,6 +352,7 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         else None
     )
     jev = _existing_jev_observation(runtime, clock)
+    preflight = _restricted_source_preflight_observation(runtime, clock)
     report = {
         "schema_version": SCHEMA,
         "generated_at": clock.isoformat(),
@@ -349,7 +391,8 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         "execution_authority": "none",
     }
     report["jev_evidence_observation"] = jev
-    report["decision_support"] = _evidence_decision(report, jev)
+    report["restricted_source_preflight_observation"] = preflight
+    report["decision_support"] = _evidence_decision(report, jev, preflight)
     return report
 
 
