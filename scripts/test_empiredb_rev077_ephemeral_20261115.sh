@@ -184,7 +184,7 @@ print("SOURCE_CANDIDATE_NOT_SETTLED_CASH_OR_CALIBRATION=PASS")
 PY
 # Original registered forecast reader and census source preflight together.
 PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_INTEGRATION'
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from empire_os.predictive_revenue_tenant_registry_inspector import inspect_tenant_bound_predictive_registry
 from empire_os.predictive_revenue_source_preflight import review_authenticated_sources
 now=datetime.now(timezone.utc)
@@ -196,6 +196,10 @@ for name,tenant in (
     inventory=inspect_tenant_bound_predictive_registry(
       dsn=dsn,tenant_id=tenant,as_of=now,limit=10)
     assert inventory['observed_row_count']==1,inventory
+    historical=inspect_tenant_bound_predictive_registry(
+      dsn=dsn,tenant_id=tenant,as_of=now-timedelta(minutes=2),limit=10)
+    assert historical['observed_row_count']==0,historical
+    assert historical['status']=='REGISTRY_EMPTY_COVERAGE_UNKNOWN_HOLD',historical
     assert inventory['source_rows_are_complete_census'] is False,inventory
     assert inventory['original_forecast_immutable_registration_verified'] is False,inventory
     assert inventory['customer_delivery_enabled'] is False,inventory
@@ -299,6 +303,18 @@ with psycopg.connect('dbname=empiredb user=census_a') as connection:
                 cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
             else:raise AssertionError('source day/horizon did not fail closed')
 print('BACKDATED_AND_NONPROSPECTIVE_FORECASTS_DENIED=PASS')
+with psycopg.connect('dbname=empiredb user=census_a') as connection:
+    with connection.cursor() as cursor:
+        cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+        try:
+            cursor.execute(query,(
+                'empire_baseline','v3',observed,7,14,12345.5,0.8,0.75,'up','f'*64,
+            ))
+        except Error as exc:
+            assert exc.sqlstate=='P0001',exc
+            connection.rollback()
+        else:raise AssertionError('fractional cents passed the registration contract')
+print('FRACTIONAL_CENTS_REGISTRATION_DENIED=PASS')
 PY_REGISTRATION
 # Only a dedicated role can call the original DB registration function.
 # Even role members cannot change the registry table by bypassing the RPC.

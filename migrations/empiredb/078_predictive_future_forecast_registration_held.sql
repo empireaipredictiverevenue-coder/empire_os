@@ -114,8 +114,11 @@ BEGIN
     OR p_direction IS NULL THEN
     RAISE EXCEPTION 'REV078_MODEL_METADATA_INVALID';
  END IF;
+ -- Existing EmpireDB registry reader admits only exact INTEGER cents.
+ -- Fractional cents would register but fail on the original reader.
  IF p_predicted_value_cents IS NULL OR p_predicted_value_cents<0
     OR p_predicted_value_cents>1000000000000000
+    OR p_predicted_value_cents<>pg_catalog.trunc(p_predicted_value_cents)
     OR p_r_squared IS NULL OR p_r_squared<0 OR p_r_squared>1
     OR p_evidence_confidence IS NULL OR p_evidence_confidence<0
     OR p_evidence_confidence>1 THEN

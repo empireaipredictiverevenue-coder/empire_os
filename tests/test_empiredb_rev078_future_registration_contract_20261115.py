@@ -29,6 +29,7 @@ def test_forecast_time_is_generated_only_by_database():
     assert "p_observed_through+p_horizon_days<=utc_day" in source
     assert "generated_at" in source
     assert "p_source_evidence_sha256" in source
+    assert "p_predicted_value_cents<>pg_catalog.trunc(p_predicted_value_cents)" in source
     assert "'independent_timestamp_custody',false" in source
     assert "'original_source_authentication',false" in source
     assert "'independent_financial_actuals',false" in source
@@ -59,3 +60,12 @@ def test_isolated_test_calls_original_readers_and_denials():
     syntax = subprocess.run(["bash", "-n", str(RUNNER)],
                             capture_output=True, text=True, timeout=3)
     assert syntax.returncode == 0
+
+
+def test_original_tenant_reader_filters_historical_as_of_at_database_source():
+    from empire_os.predictive_revenue_tenant_registry_inspector import (
+        SCOPED_SQL,
+    )
+    assert "AND generated_at <= %s" in SCOPED_SQL
+    assert "WHERE dimension_key = %s AND metric = %s" in SCOPED_SQL
+    assert "ORDER BY generated_at DESC,id DESC LIMIT %s" in SCOPED_SQL
