@@ -30,3 +30,20 @@ Implemented `empire_os/predictive_revenue_source_preflight.py`, invoked through 
 Source preflight on the EmpireOS host at 2026-11-15T14:43 UTC: the ordinary `ubuntu` execution session did not have an explicit canonical tenant identity, registry-reader DSN or independent census-reader DSN. The preflight returned `CANONICAL_TENANT_SCOPE_UNAVAILABLE` for each source, with no DB attempt. The audit now includes that status as **secondary evidence** and chooses `RESTORE_EXISTING_RESTRICTED_REGISTRY_READER_SESSION` rather than claiming an empty database. The authenticated session, origin custody, independent daily revenue finality, calibration cohorts and verified customer forecast-error metrics remain unproven.
 
 The first live source-read step must run under the *already authorized* owner/DBA restricted reader sessions. Never extract secrets from running services, elevate the unprivileged CLI, disable RLS, backfill fabricated events or use caller-set tenant identity as authentication. Only then can the existing 12+ mature cohort scorecard be attempted against genuinely independent customer outcomes.
+
+## 15 November: authoritative original database catalogue verification
+
+The existing `predictive_revenue_forecast_origin.py` confirms that the old `predictive_forecasts` table definition was found in the Supabase migration tree, not verified in first-party EmpireDB. The existing REV052 proof authenticates **only the single-event read function and dedicated role**; it does not certify the registry table, FORCE RLS, registry reader role, or completed-day census function.
+
+The smallest source-owner action is now implemented as `scripts/probe_predictive_original_source_catalog_readonly.py --read-only`: a root-only, single transaction `BEGIN READ ONLY` query through the *original existing* `pg()` Postgres peer helper. It outputs only schema-fixed booleans indicating presence and policy of the exact registry and day-census objects, plus prior single-event capability. It executes no DDL, SELECT from revenue tables, finance report, role change, restart, or customer read. Non-root sessions return `EXPLICIT_ROOT_READ_ONLY_SESSION_REQUIRED` without attempting the DB.
+
+Founder/DBA operator command on the original host, **only in an authorised root-capable SSH session**, if desired:
+
+```sh
+cd /srv/empire_os
+sudo timeout --signal=INT --kill-after=5s 30s \
+  /srv/empire_os/.venv/bin/python -B -m scripts.probe_predictive_original_source_catalog_readonly --read-only
+printf 'EXIT_CODE=%s\\n' "$?"
+```
+
+Do not enter or print credentials. Review boolean results: if either `forecast_registry_table_exists`, `forecast_registry_force_rls`, `forecast_registry_reader_role_safe` or `restricted_day_census_function_exists` is false, there is **no authenticated source pair to calibrate from**; source ownership must determine the original deployed architecture and approve any restoration separately. Even if all catalogue fields pass, forecast timestamps, tenant read, actual outcome completeness, independent financial finality and baseline out-of-sample score remain unverified. No migration or source entitlement changes are authorized by this probe.
