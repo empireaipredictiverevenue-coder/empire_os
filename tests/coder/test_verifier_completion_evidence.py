@@ -138,7 +138,8 @@ def test_coder_orchestrator_stops_false_completion_at_approval_gate(repo):
     assert blocked.status is TaskStatus.BLOCKED
     assert blocked.phase is TaskPhase.REPAIR
 
-    (repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+    coder.read_for_patch(task.id, "app.py")
+    coder.patch_exact(task.id, "app.py", "VALUE = 1", "VALUE = 2")
     genuine_candidate = coder.verify(
         task.id, changed_files=("app.py",), commands=commands,
     )
@@ -161,4 +162,140 @@ def test_git_status_only_is_not_a_substantive_verification(repo):
     assert any(
         check.name == "substantive_validation_present" and not check.passed
         for check in report.checks
+    )
+
+
+def test_preexisting_dirty_file_is_not_credited_to_new_task(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+
+    (repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+    coder = EmpireCoder(repo)
+    task = coder.create_task("Claim existing dirty work")
+    report = coder.verify(
+        task.id, changed_files=("app.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.FAIL
+    assert any(
+        c.name == "task_patch_provenance:app.py" and not c.passed
+        for c in report.checks
+    )
+
+
+def test_patch_owned_by_another_task_cannot_be_reused(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+
+    coder = EmpireCoder(repo)
+    original = coder.create_task("Original patch owner")
+    coder.read_for_patch(original.id, "app.py")
+    coder.patch_exact(original.id, "app.py", "VALUE = 1", "VALUE = 2")
+    impersonator = coder.create_task("Different task claims first task's work")
+    report = coder.verify(
+        impersonator.id, changed_files=("app.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.FAIL
+    assert any(
+        c.name == "task_patch_provenance:app.py" and not c.passed
+        for c in report.checks
+    )
+
+
+def test_post_patch_unrecorded_change_invalidates_provenance(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+
+    coder = EmpireCoder(repo)
+    task = coder.create_task("Modify then verify")
+    coder.read_for_patch(task.id, "app.py")
+    coder.patch_exact(task.id, "app.py", "VALUE = 1", "VALUE = 2")
+    (repo / "app.py").write_text("VALUE = 3\n", encoding="utf-8")
+    report = coder.verify(
+        task.id, changed_files=("app.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.FAIL
+    assert any(
+        c.name == "task_patch_provenance:app.py" and not c.passed
+        for c in report.checks
+    )
+
+
+def test_noop_patch_does_not_justify_prior_dirty_change(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+
+    (repo / "app.py").write_text("VALUE = 2\n", encoding="utf-8")
+    coder = EmpireCoder(repo)
+    task = coder.create_task("Attempt to take credit by no-op")
+    coder.read_for_patch(task.id, "app.py")
+    coder.patch_exact(task.id, "app.py", "VALUE = 2", "VALUE = 2")
+    report = coder.verify(
+        task.id, changed_files=("app.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.FAIL
+    assert any(
+        c.name == "changed_file:app.py" and c.passed for c in report.checks
+    )
+    assert any(
+        c.name == "task_patch_provenance:app.py" and not c.passed
+        for c in report.checks
+    )
+
+
+def test_test_command_that_changes_candidate_invalidates_verification(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+
+    coder = EmpireCoder(repo)
+    task = coder.create_task("Patch and independently validate the same bytes")
+    coder.read_for_patch(task.id, "app.py")
+    coder.patch_exact(task.id, "app.py", "VALUE = 1", "VALUE = 2")
+    (repo / "tests/test_smoke.py").write_text(
+        "from pathlib import Path\n"
+        "def test_mutating_candidate():\n"
+        "    Path('app.py').write_text('VALUE = 3\\n')\n"
+        "    assert True\n",
+        encoding="utf-8",
+    )
+    report = coder.verify(
+        task.id, changed_files=("app.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.FAIL
+    assert any(c.name.startswith("command:") and c.passed for c in report.checks)
+    assert any(
+        c.name == "candidate_stable_after_checks:app.py" and not c.passed
+        for c in report.checks
+    )
+
+
+def test_governed_structured_file_creation_has_task_provenance(repo):
+    from empire_os.coder.orchestrator import EmpireCoder
+    from empire_os.coder.structured_patch import (
+        PatchOperation, StructuredPatchCandidate, StructuredPatchProposal,
+    )
+
+    coder = EmpireCoder(repo)
+    task = coder.create_task("Create verified candidate file")
+    proposal = StructuredPatchProposal(
+        operation=PatchOperation.CREATE_FILE,
+        target_path="created_by_task.py",
+        new_text="VALUE = 42\n",
+        rationale="exercise existing create-file patch engine",
+    )
+    validation = coder.structured_patch_validator.validate(proposal)
+    assert validation.valid
+    candidate = StructuredPatchCandidate(
+        candidate_texts=("candidate 1", "candidate 2"),
+        critique="checked", synthesized_text="validated",
+        proposal=proposal, validation=validation,
+    )
+    coder.apply_structured_patch(task.id, candidate)
+    report = coder.verify(
+        task.id, changed_files=("created_by_task.py",),
+        commands=((sys.executable, "-m", "pytest", "-q", "tests/test_smoke.py"),),
+    )
+    assert report.verdict is VerificationVerdict.PASS
+    assert any(
+        c.name == "task_patch_provenance:created_by_task.py" and c.passed
+        for c in report.checks
     )

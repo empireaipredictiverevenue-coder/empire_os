@@ -1140,6 +1140,8 @@ class EmpireCoder:
             task_id=task_id,
             changed_files=files,
             commands=commands,
+            patch_events=self.audit.read_task(task_id),
+            require_task_provenance=True,
         )
         task.verification_status = report.verdict
         if report.verdict is VerificationVerdict.FAIL:
