@@ -264,6 +264,22 @@ for login in ('census_a','census_b'):
                 assert exc.sqlstate=='23505',exc
                 connection.rollback()
             else:raise AssertionError('duplicate registration was allowed')
+    # A different recent source observation for the SAME target/horizon
+    # must not create a second potentially cherry-picked prediction.
+    with psycopg.connect('dbname=empiredb user='+login) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+            try:
+                cursor.execute(query,(
+                    'empire_baseline','v1',observed-timedelta(days=1),7,14,
+                    99999,0.8,0.75,'up','f'*64,
+                ))
+            except Error as exc:
+                assert exc.sqlstate=='23505',exc
+                connection.rollback()
+            else:
+                raise AssertionError('alternate source day permitted forecast replay')
+    print('SAME_TARGET_ALTERNATE_SOURCE_REPLAY_DENIED_'+login+'=PASS')
     # The original reader observes the newly registered row ONLY for own tenant.
     with psycopg.connect('dbname=empiredb user='+login) as connection:
         with connection.cursor() as cursor:
@@ -272,6 +288,10 @@ for login in ('census_a','census_b'):
             cursor.execute('SELECT forecast_key,evidence,generated_at FROM public.predictive_forecasts WHERE forecast_key=%s',(key,))
             records=cursor.fetchall()
             assert len(records)==1,records
+            assert records[0][1]['horizon_basis']=='registration_utc_day'
+            assert records[0][1]['observed_through_utc']==observed.isoformat()
+            assert records[0][1]['target_utc_date']==(
+                records[0][2].date()+timedelta(days=7)).isoformat()
             assert records[0][1]['independent_timestamp_custody'] is False
             assert records[0][1]['original_source_authentication'] is False
             assert records[0][1]['independent_financial_actuals'] is False
@@ -292,7 +312,7 @@ print('UNBOUND_TENANT_FORECAST_REFUSED=PASS')
 with psycopg.connect('dbname=empiredb user=census_a') as connection:
     with connection.cursor() as cursor:
         cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
-        for day,horizon in ((now.date(),7),(observed,1)):
+        for day,horizon in ((now.date(),7),(observed,0),(observed,366)) :
             try:
                 cursor.execute(query,(
                     'empire_baseline','v2',day,horizon,14,12345,0.8,0.75,'up','f'*64,
@@ -302,7 +322,30 @@ with psycopg.connect('dbname=empiredb user=census_a') as connection:
                 connection.rollback()
                 cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
             else:raise AssertionError('source day/horizon did not fail closed')
-print('BACKDATED_AND_NONPROSPECTIVE_FORECASTS_DENIED=PASS')
+print('INVALID_OBSERVATION_DAY_OR_HORIZON_DENIED=PASS')
+# A valid 1-day forecast may use an older but still recent observation.
+# Previous implementation rejected this as nonprospective because it
+# incorrectly measured horizon from the observation day.
+with psycopg.connect('dbname=empiredb user=census_a') as connection:
+    with connection.cursor() as cursor:
+        cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+        older=now.date()-timedelta(days=2)
+        cursor.execute(query,(
+            'empire_baseline','older_1day',older,1,14,11000,0.8,0.75,'up','f'*64,
+        ))
+        registration_ref,registered_at=cursor.fetchone()
+with psycopg.connect('dbname=empiredb user=census_a') as connection:
+    with connection.cursor() as cursor:
+        cursor.execute('SET TRANSACTION READ ONLY')
+        cursor.execute('SET LOCAL ROLE empire_predictive_registry_reader')
+        cursor.execute('SELECT evidence FROM public.predictive_forecasts WHERE forecast_key=%s',
+                       (registration_ref,))
+        evidence=cursor.fetchone()[0]
+        assert evidence['observed_through_utc']==older.isoformat()
+        assert evidence['target_utc_date']==(
+            registered_at.date()+timedelta(days=1)).isoformat()
+        assert evidence['horizon_basis']=='registration_utc_day'
+print('ONE_DAY_HORIZON_FROM_REGISTRATION_NOT_STALE_SOURCE=PASS')
 with psycopg.connect('dbname=empiredb user=census_a') as connection:
     with connection.cursor() as cursor:
         cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')

@@ -26,7 +26,11 @@ def test_forecast_time_is_generated_only_by_database():
     source = SQL.read_text()
     assert "clock_at := pg_catalog.clock_timestamp()" in source
     assert "p_observed_through>=utc_day" in source
-    assert "p_observed_through+p_horizon_days<=utc_day" in source
+    assert "target_day := utc_day+p_horizon_days" in source
+    assert "p_observed_through+p_horizon_days<=utc_day" not in source
+    assert "'horizon_basis','registration_utc_day'" in source
+    assert "|| target_day::text || ':' || p_horizon_days::text" in source
+    assert "|| p_observed_through::text || ':' || p_horizon_days::text" not in source
     assert "generated_at" in source
     assert "p_source_evidence_sha256" in source
     assert "p_predicted_value_cents<>pg_catalog.trunc(p_predicted_value_cents)" in source

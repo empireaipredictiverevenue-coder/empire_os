@@ -101,8 +101,10 @@ BEGIN
     OR p_observed_through>=utc_day THEN
     RAISE EXCEPTION 'REV078_RECENT_COMPLETED_SOURCE_DAY_REQUIRED';
  END IF;
+ -- Horizon is measured from the DB registration UTC date, consistent
+ -- with existing enterprise_forecast_shadow_scorecard issuance semantics.
+ -- Observed-through is *input freshness*, never the prediction clock.
  IF p_horizon_days IS NULL OR p_horizon_days NOT BETWEEN 1 AND 365
-    OR p_observed_through+p_horizon_days<=utc_day
     OR p_sample_count IS NULL OR p_sample_count NOT BETWEEN 7 AND 120 THEN
     RAISE EXCEPTION 'REV078_PROSPECTIVE_FORECAST_HORIZON_REQUIRED';
  END IF;
@@ -128,12 +130,14 @@ BEGIN
     OR p_source_evidence_sha256 !~ '^[0-9a-f]{64}$' THEN
     RAISE EXCEPTION 'REV078_BOUNDED_SOURCE_FINGERPRINT_REQUIRED';
  END IF;
- target_day := p_observed_through+p_horizon_days;
- -- Deterministic identity prevents replay under alternate caller refs,
- -- while unique constraint makes concurrent repetitions fail closed.
+ target_day := utc_day+p_horizon_days;
+ -- There is only ONE first registered forecast for a given tenant,
+ -- model/version, target UTC day and horizon. Source observation date
+ -- cannot be varied to submit competing predictions for the same outcome.
+ -- Unique forecast_key prevents concurrent replacements or replay.
  key := 'efr:' || pg_catalog.md5(
      trusted::text || ':' || p_model_name || ':' || p_model_version || ':'
-     || p_observed_through::text || ':' || p_horizon_days::text
+     || target_day::text || ':' || p_horizon_days::text
  );
  INSERT INTO public.predictive_forecasts(
     forecast_key,model_name,model_version,metric,dimension_key,
@@ -149,6 +153,7 @@ BEGIN
        'source_evidence_sha256',p_source_evidence_sha256,
        'observed_through_utc',p_observed_through::text,
        'target_utc_date',target_day::text,
+       'horizon_basis','registration_utc_day',
        'db_registration_clock',true,
        'independent_timestamp_custody',false,
        'original_source_authentication',false,
