@@ -93,7 +93,14 @@ INSERT INTO public.predictive_forecasts(
 SQL_REGISTRY
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/077_predictive_daily_revenue_census_native_held.sql"
-echo REV076_PLUS_REV077_DISPOSABLE_DDL=PASS
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
+ -f "$root/migrations/empiredb/078_predictive_future_forecast_registration_held.sql"
+echo REV076_REV077_REV078_DISPOSABLE_DDL=PASS
+if psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
+ -f "$root/migrations/empiredb/078_predictive_future_forecast_registration_held.sql" >/dev/null 2>&1; then
+ echo REV078_DUPLICATE_RELEASE_ALLOWED; exit 10
+fi
+echo REV078_REAPPLY_DENIED=PASS
 if psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/077_predictive_daily_revenue_census_native_held.sql" >/dev/null 2>&1; then
  echo UNSAFE_DUPLICATE_MIGRATION_ALLOWED; exit 5
@@ -203,6 +210,111 @@ for name,tenant in (
     print('ORIGINAL_TENANT_READER_AND_PREFLIGHT_'+name+'=PASS')
 print('INTEGRATED_REGISTRY_CENSUS_STILL_NOT_CALIBRATION=PASS')
 PY_INTEGRATION
+# REV078: only DB-clock prospective registration through a dedicated
+# synthetic tenant session. No login/membership installed by production DDL.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
+ -c "GRANT empire_predictive_forecast_registrar TO census_a,census_b,census_unbound"
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_REGISTRATION'
+from datetime import datetime,timedelta,timezone
+import psycopg
+from psycopg import Error
+now=datetime.now(timezone.utc)
+observed=(now.date()-timedelta(days=1))
+signature="public.register_predictive_revenue_forecast_v1"
+placeholder="%s::text,%s::text,%s::date,%s::integer,%s::integer,%s::numeric,%s::numeric,%s::numeric,%s::text,%s::text"
+query=f"SELECT * FROM {signature}({placeholder})"
+for login in ('census_a','census_b'):
+    with psycopg.connect('dbname=empiredb user='+login) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+            cursor.execute(query,(
+                'empire_baseline','v1',observed,7,14,12345,0.8,0.75,'up','f'*64,
+            ))
+            row=cursor.fetchone()
+            assert len(row)==2,row
+            assert row[0].startswith('efr:')
+            assert row[1].tzinfo is not None
+            assert abs((datetime.now(timezone.utc)-row[1]).total_seconds()) < 60
+            key=row[0]
+    # The first registration committed before we intentionally force errors.
+    # A denied statement inside the first transaction would roll back its
+    # source insert and invalidate the unique/replay assertion.
+    with psycopg.connect('dbname=empiredb user='+login) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+            try:
+                cursor.execute('SELECT count(*) FROM public.predictive_forecasts')
+            except Error as exc:
+                assert exc.sqlstate == '42501',exc
+                connection.rollback()
+            else:raise AssertionError('registrar obtained direct SELECT')
+    # An identical model/source-day/horizon must not create a second row.
+    with psycopg.connect('dbname=empiredb user='+login) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+            try:
+                cursor.execute(query,(
+                    'empire_baseline','v1',observed,7,14,99999,0.8,0.75,'up','f'*64,
+                ))
+            except Error as exc:
+                assert exc.sqlstate=='23505',exc
+                connection.rollback()
+            else:raise AssertionError('duplicate registration was allowed')
+    # The original reader observes the newly registered row ONLY for own tenant.
+    with psycopg.connect('dbname=empiredb user='+login) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute('SET TRANSACTION READ ONLY')
+            cursor.execute('SET LOCAL ROLE empire_predictive_registry_reader')
+            cursor.execute('SELECT forecast_key,evidence,generated_at FROM public.predictive_forecasts WHERE forecast_key=%s',(key,))
+            records=cursor.fetchall()
+            assert len(records)==1,records
+            assert records[0][1]['independent_timestamp_custody'] is False
+            assert records[0][1]['original_source_authentication'] is False
+            assert records[0][1]['independent_financial_actuals'] is False
+            assert records[0][1]['calibration_authorized'] is False
+    print('FUTURE_ONLY_REGISTRATION_'+login+'=PASS')
+with psycopg.connect('dbname=empiredb user=census_unbound') as connection:
+    with connection.cursor() as cursor:
+        cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+        try:
+            cursor.execute(query,(
+                'empire_baseline','v1',observed,7,14,12345,0.8,0.75,'up','f'*64,
+            ))
+        except Error as exc:
+            assert exc.sqlstate=='P0001',exc
+            connection.rollback()
+        else:raise AssertionError('unbound tenant created a prediction')
+print('UNBOUND_TENANT_FORECAST_REFUSED=PASS')
+with psycopg.connect('dbname=empiredb user=census_a') as connection:
+    with connection.cursor() as cursor:
+        cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+        for day,horizon in ((now.date(),7),(observed,1)):
+            try:
+                cursor.execute(query,(
+                    'empire_baseline','v2',day,horizon,14,12345,0.8,0.75,'up','f'*64,
+                ))
+            except Error as exc:
+                assert exc.sqlstate=='P0001',exc
+                connection.rollback()
+                cursor.execute('SET LOCAL ROLE empire_predictive_forecast_registrar')
+            else:raise AssertionError('source day/horizon did not fail closed')
+print('BACKDATED_AND_NONPROSPECTIVE_FORECASTS_DENIED=PASS')
+PY_REGISTRATION
+# Only a dedicated role can call the original DB registration function.
+# Even role members cannot change the registry table by bypassing the RPC.
+if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \
+ -c "BEGIN; SET LOCAL ROLE empire_predictive_forecast_registrar; INSERT INTO public.predictive_forecasts(forecast_key,model_name,model_version,metric,dimension_key,horizon_days,sample_count,predicted_value,r_squared,evidence_confidence,direction,source) VALUES ('forged','forged','v1','recognized_revenue_cents','tenant:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',7,14,100,0.8,0.8,'up','forged'); ROLLBACK;" >/dev/null 2>&1; then
+ echo REV078_REGISTRAR_DIRECT_TABLE_INSERT_ALLOWED; exit 11
+fi
+if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \
+ -c "BEGIN; SET LOCAL ROLE empire_predictive_forecast_registrar; DELETE FROM public.predictive_forecasts; ROLLBACK;" >/dev/null 2>&1; then
+ echo REV078_REGISTRAR_DIRECT_TABLE_DELETE_ALLOWED; exit 12
+fi
+if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \
+ -c "BEGIN; SET LOCAL ROLE empire_predictive_forecast_registrar; UPDATE public.predictive_forecasts SET predicted_value=0; ROLLBACK;" >/dev/null 2>&1; then
+ echo REV078_REGISTRAR_DIRECT_TABLE_UPDATE_ALLOWED; exit 13
+fi
+echo REGISTRAR_DIRECT_WRITE_AND_REWRITE_DENIED=PASS
 # Duplicate recognized events for one order cannot count twice as income.
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "INSERT INTO public.commercial_events(id,event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload) SELECT 'aaaa1111-aaaa-4111-8111-aaaaaaaaaaaa',event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload FROM public.commercial_events WHERE id='77777777-7777-4777-8777-777777777777'"
 PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PYTEST_DUP'
