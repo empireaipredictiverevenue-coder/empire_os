@@ -145,6 +145,33 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
                 if _first(row, ACTUAL_KEYS) is not None:
                     counts["structural_forecast_with_claimed_actual"] += 1
     structural = counts["structural_forecast"]
+    # Reuse the FIRST-PARTY finance reader for missing original outcome
+    # provenance. It reads only source snapshots, never EmpireDB or a bank.
+    # Do not derive an authenticated customer actual from this secondary report.
+    finance_status = "FINANCE_READINESS_SOURCE_UNAVAILABLE"
+    finance_gap_codes: list[str] = []
+    try:
+        from empire_os.enterprise_finance_evidence_readiness import (
+            review_finance_source_readiness,
+        )
+        finance = review_finance_source_readiness(runtime.parent, as_of=clock)
+        requirements = finance.get("independent_finance_evidence_requirements")
+        if (finance.get("schema_version") ==
+                "empire.enterprise_finance_source_readiness.v1"
+                and finance.get("execution_authority") == "none"
+                and finance.get("actual_recognised_revenue_independently_verified") is False
+                and isinstance(requirements, list)
+                and finance.get("required_proofs_not_admitted_count") == len(requirements)):
+            codes = [x.get("evidence_gap") for x in requirements
+                     if isinstance(x, dict) and
+                     x.get("status") == "NO_INDEPENDENT_PROOF_ADMITTED"]
+            if len(codes) == len(requirements) and all(
+                isinstance(code, str) and len(code) <= 100 for code in codes
+            ):
+                finance_status = finance["status"]
+                finance_gap_codes = codes
+    except (ValueError, TypeError, OSError, KeyError, ImportError):
+        pass
     # Secondary service reports can describe holds, but cannot act as
     # independent database, tenant or financial signing authorities.
     status_file = runtime / "predictive_cloud" / "status_latest.json"
@@ -179,6 +206,9 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         "reported_customer_forecast_verified_from_status": reported_customer_forecast,
         "registry_table_and_tenant_reader_checked_by_this_audit": False,
         "canonical_customer_outcome_reader_checked_by_this_audit": False,
+        "original_finance_source_readiness_status": finance_status,
+        "original_independent_finance_gaps_not_admitted": len(finance_gap_codes),
+        "original_independent_finance_gap_codes": finance_gap_codes,
         "numeric_prediction_operational_records": counts["operational"],
         "structural_forecasts_with_claimed_actuals":
             counts["structural_forecast_with_claimed_actual"],

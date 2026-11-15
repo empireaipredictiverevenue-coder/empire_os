@@ -103,3 +103,22 @@ def test_registry_shape_only_remains_unverified_even_with_claimed_actual(tmp_pat
     assert result["reported_registry_authentication_from_status"] is False
     assert result["reported_customer_forecast_verified_from_status"] is False
     assert result["forecast_accuracy_measurable"] is False
+
+
+def test_uses_existing_finance_proof_gap_reader_without_promoting_actuals(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "registry.json").write_text(json.dumps({
+        **REGISTRY,
+        "customer_forecast_verified": True,
+        "actual_revenue": True,
+    }))
+    report = audit_runtime(runtime)
+    assert report["registry_shaped_unverified_records"] == 1
+    assert report["original_independent_finance_gaps_not_admitted"] == 7
+    assert "FORECAST_OUTCOME_CALIBRATION" in report[
+        "original_independent_finance_gap_codes"
+    ]
+    assert report["independently_verified_customer_outcome_pairs"] == 0
+    assert report["forecast_origin_verified"] is False
+    assert report["customer_revenue_verified"] is False
