@@ -67,3 +67,39 @@ def test_missing_runtime_fails_closed(tmp_path):
         assert "missing" in str(exc)
     else:
         assert False
+
+REGISTRY = {
+    "forecast_key": "tenant-alpha:2026-11-01:recognized_revenue_cents",
+    "dimension_key": "tenant:alpha",
+    "metric": "recognized_revenue_cents",
+    "generated_at": "2026-11-01T10:00:00+00:00",
+    "horizon_days": 7,
+    "sample_count": 14,
+    "predicted_value": 9000,
+}
+
+
+def test_existing_registry_row_format_is_not_customer_verification():
+    assert classify_record(REGISTRY) == "registry_shape_unverified"
+    assert classify_record({**REGISTRY, "dimension_key": "global"}) == "forecast_like_incomplete"
+    assert classify_record({**REGISTRY, "predicted_value": True}) == "operational"
+    assert classify_record({**REGISTRY, "sample_count": 0}) == "forecast_like_incomplete"
+
+
+def test_registry_shape_only_remains_unverified_even_with_claimed_actual(tmp_path):
+    runtime = tmp_path / "runtime"
+    (runtime / "predictive_cloud").mkdir(parents=True)
+    (runtime / "registry.json").write_text(json.dumps({
+        **REGISTRY, "actual_cents": 7000, "actual_verified": True,
+    }))
+    (runtime / "predictive_cloud" / "status_latest.json").write_text(json.dumps({
+        "original_frozen_forecast_registry_authenticated_by_status": False,
+        "customer_forecast_verified": False,
+    }))
+    result = audit_runtime(runtime)
+    assert result["registry_shaped_unverified_records"] == 1
+    assert result["structural_forecasts_with_claimed_actuals"] == 1
+    assert result["independently_verified_customer_outcome_pairs"] == 0
+    assert result["reported_registry_authentication_from_status"] is False
+    assert result["reported_customer_forecast_verified_from_status"] is False
+    assert result["forecast_accuracy_measurable"] is False

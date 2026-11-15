@@ -15,7 +15,8 @@ from typing import Any, Iterator
 
 SCHEMA = "empire.predictive_revenue.forecast_evidence_separation.v1"
 PREDICTION_KEYS = ("predicted_revenue_cents", "predicted_cents",
-                   "predicted_value_cents", "forecast_revenue_cents")
+                   "predicted_value_cents", "forecast_revenue_cents",
+                   "predicted_value")
 IDENTITY_KEYS = ("forecast_ref", "forecast_id", "prediction_id")
 ISSUED_KEYS = ("forecast_registered_at", "forecast_generated_at", "issued_at")
 ACTUAL_KEYS = ("actual_cents", "recognized_revenue_cents")
@@ -58,6 +59,24 @@ def classify_record(row: dict[str, Any]) -> str:
     if not (type(amount) in (int, float)
             and math.isfinite(amount) and amount >= 0):
         return "operational"
+    # Existing Predictive Cloud V3 registry uses forecast_key, dimension_key,
+    # generated_at and predicted_value, not the report-side forecast_ref form.
+    # Matching this shape is NOT proof that PostgreSQL rows or RLS exist.
+    if "predicted_value" in row:
+        key = row.get("forecast_key")
+        scope = row.get("dimension_key")
+        registered = _stamp(row.get("generated_at"))
+        horizon = row.get("horizon_days")
+        samples = row.get("sample_count")
+        if (isinstance(key, str) and bool(key.strip())
+                and isinstance(scope, str) and scope.startswith("tenant:")
+                and len(scope) > len("tenant:")
+                and registered is not None
+                and row.get("metric") == "recognized_revenue_cents"
+                and type(horizon) is int and 1 <= horizon <= 365
+                and type(samples) is int and samples > 0):
+            return "registry_shape_unverified"
+        return "forecast_like_incomplete"
     identifier = _first(row, IDENTITY_KEYS)
     issued = _stamp(_first(row, ISSUED_KEYS))
     target = _day(row.get("target_day") or row.get("target_utc_date"))
@@ -121,11 +140,30 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
                 continue
             kind = classify_record(row)
             counts[kind] += 1
-            if kind == "structural_forecast":
+            if kind in ("structural_forecast", "registry_shape_unverified"):
                 # Caller-asserted actuals cannot establish independent custody.
                 if _first(row, ACTUAL_KEYS) is not None:
                     counts["structural_forecast_with_claimed_actual"] += 1
     structural = counts["structural_forecast"]
+    # Secondary service reports can describe holds, but cannot act as
+    # independent database, tenant or financial signing authorities.
+    status_file = runtime / "predictive_cloud" / "status_latest.json"
+    try:
+        source_status = json.loads(status_file.read_text())
+        if type(source_status) is not dict:
+            source_status = {}
+    except (OSError, UnicodeDecodeError, ValueError):
+        source_status = {}
+    reported_registry_attestation = (
+        source_status.get("original_frozen_forecast_registry_authenticated_by_status")
+        if type(source_status.get("original_frozen_forecast_registry_authenticated_by_status")) is bool
+        else None
+    )
+    reported_customer_forecast = (
+        source_status.get("customer_forecast_verified")
+        if type(source_status.get("customer_forecast_verified")) is bool
+        else None
+    )
     return {
         "schema_version": SCHEMA,
         "generated_at": clock.isoformat(),
@@ -135,7 +173,12 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         "inaccessible_or_oversized_files": inaccessible,
         "scanned_json_nodes": scanned_nodes,
         "structural_forecast_records": structural,
+        "registry_shaped_unverified_records": counts["registry_shape_unverified"],
         "forecast_like_incomplete_records": counts["forecast_like_incomplete"],
+        "reported_registry_authentication_from_status": reported_registry_attestation,
+        "reported_customer_forecast_verified_from_status": reported_customer_forecast,
+        "registry_table_and_tenant_reader_checked_by_this_audit": False,
+        "canonical_customer_outcome_reader_checked_by_this_audit": False,
         "numeric_prediction_operational_records": counts["operational"],
         "structural_forecasts_with_claimed_actuals":
             counts["structural_forecast_with_claimed_actual"],
