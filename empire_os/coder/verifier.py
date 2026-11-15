@@ -1,6 +1,7 @@
 """Independent verification stage for Empire Coder."""
 from __future__ import annotations
 
+from hashlib import sha256
 from pathlib import Path
 from typing import Iterable
 
@@ -9,9 +10,32 @@ from .models import (
     VerificationReport,
     VerificationVerdict,
 )
-from .policy import resolve_workspace
+from .policy import PolicyError, resolve_path, resolve_workspace
 from .runner import SafeCommandRunner
 from .security import scan_paths
+
+
+def _is_substantive_check(argv: tuple[str, ...]) -> bool:
+    """Do not confuse a successful Git status with behavioural validation."""
+    if not argv:
+        return False
+    exe = Path(argv[0]).name.lower()
+    if exe in {"pytest", "ruff", "mypy", "pyright"}:
+        return True
+    if exe in {"python", "python3"}:
+        return len(argv) >= 3 and argv[1] == "-m" and argv[2] in {
+            "pytest", "py_compile", "compileall",
+        }
+    if exe == "node":
+        return len(argv) >= 2 and argv[1] == "--check"
+    if exe in {"npm", "pnpm", "yarn"}:
+        return (len(argv) >= 2 and argv[1] == "test") or (
+            len(argv) >= 3 and argv[1] == "run" and argv[2] in {
+                "test", "test:unit", "test:integration", "lint",
+                "typecheck", "check", "build:check",
+            }
+        )
+    return False
 
 
 class Verifier:
@@ -27,12 +51,63 @@ class Verifier:
         commands: Iterable[Iterable[str]] = (),
         objective_terms: Iterable[str] = (),
     ) -> VerificationReport:
-        files = tuple(dict.fromkeys(str(p) for p in changed_files))
+        files = tuple(dict.fromkeys(str(p).strip() for p in changed_files if str(p).strip()))
+        steps = tuple(tuple(str(arg) for arg in command) for command in commands)
         checks: list[VerificationCheck] = []
         reasons: list[str] = []
         warnings: list[str] = []
+        safe_files: list[str] = []
 
-        security = scan_paths(self.workspace, files)
+        # A successful Git command does not prove that an agent changed anything.
+        # Check every claimed file against this worktree, not an unrelated diff.
+        if not files:
+            checks.append(VerificationCheck("claimed_changes_present", False,
+                                            output="no changed files supplied"))
+        for file in files:
+            try:
+                raw = Path(file)
+                if raw.is_absolute() or ".." in raw.parts or not raw.parts:
+                    raise PolicyError("expected a repository-relative file path")
+                target = resolve_path(self.workspace, raw, allow_missing=True)
+                if target == self.workspace or target.is_dir():
+                    raise PolicyError("expected a file, not a directory")
+                relative = target.relative_to(self.workspace).as_posix()
+            except (PolicyError, ValueError, OSError, RuntimeError) as exc:
+                checks.append(VerificationCheck(
+                    f"changed_file:{file}", False, output=f"invalid claimed file: {exc}",
+                ))
+                continue
+            safe_files.append(relative)
+            status = self.runner.run(
+                ("git", "status", "--porcelain=v1", "--untracked-files=all", "--", relative),
+                task_id=task_id,
+            )
+            changed = status.returncode == 0 and bool(status.stdout.strip())
+            digest = "deleted_or_missing"
+            if target.is_file():
+                try:
+                    digest = sha256(target.read_bytes()).hexdigest()
+                except OSError:
+                    changed = False
+                    digest = "unreadable"
+            checks.append(VerificationCheck(
+                f"changed_file:{relative}", changed, status.argv, status.returncode,
+                f"git_status={status.stdout.strip()}; sha256={digest}",
+            ))
+
+        # Verification of a candidate requires observed test/check execution;
+        # an empty command list cannot advance a task to approval.
+        checks.append(VerificationCheck(
+            "verification_commands_present", bool(steps),
+            output=f"{len(steps)} explicit verification command(s)",
+        ))
+        checks.append(VerificationCheck(
+            "substantive_validation_present",
+            any(_is_substantive_check(command) for command in steps),
+            output="tests, lint, typecheck or syntax verification required",
+        ))
+
+        security = scan_paths(self.workspace, safe_files)
         critical = [f for f in security if f.severity in {"critical", "high"}]
         checks.append(VerificationCheck(
             "security_scan",
@@ -55,7 +130,7 @@ class Verifier:
         ))
 
         diff = self.runner.run(
-            ("git", "diff", "--check"),
+            ("git", "diff", "--check", "--", *safe_files),
             task_id=task_id,
         )
         checks.append(VerificationCheck(
@@ -65,8 +140,17 @@ class Verifier:
             diff.returncode,
             diff.stdout or diff.stderr,
         ))
+        staged_diff = self.runner.run(
+            ("git", "diff", "--cached", "--check", "--", *safe_files),
+            task_id=task_id,
+        )
+        checks.append(VerificationCheck(
+            "git_staged_diff_check", staged_diff.returncode == 0,
+            staged_diff.argv, staged_diff.returncode,
+            staged_diff.stdout or staged_diff.stderr,
+        ))
 
-        for command in commands:
+        for command in steps:
             result = self.runner.run(
                 tuple(command),
                 task_id=task_id,
