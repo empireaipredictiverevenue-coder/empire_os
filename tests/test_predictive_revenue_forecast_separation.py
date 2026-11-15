@@ -122,3 +122,69 @@ def test_uses_existing_finance_proof_gap_reader_without_promoting_actuals(tmp_pa
     assert report["independently_verified_customer_outcome_pairs"] == 0
     assert report["forecast_origin_verified"] is False
     assert report["customer_revenue_verified"] is False
+
+
+def test_jev_existing_research_is_context_not_revenue_ground_truth(tmp_path):
+    runtime = tmp_path / "runtime"
+    (runtime / "jev_client_pain_discovery").mkdir(parents=True)
+    at = datetime(2026, 11, 15, 14, tzinfo=timezone.utc)
+    (runtime / "jev_client_pain_discovery" / "aggregate_latest.json").write_text(
+        json.dumps({
+            "schema_version": "empire.jev.client_pain_production_observe.v1",
+            "status": "CLIENT_PAIN_DISCOVERY_OWNER_REVIEW_ONLY",
+            "generated_at_utc": "2026-11-14T20:00:00Z",
+            "mode": "OBSERVE", "execution_authority": "none",
+            "model_calls": 0, "database_writes": False, "crm_writes": False,
+        })
+    )
+    report = audit_runtime(runtime, now=at)
+    assert report["jev_evidence_observation"]["research_signal_available"] is True
+    assert report["jev_evidence_observation"]["model_calls_verified"] == 0
+    assert report["decision_support"]["state"] == "GATHER_EVIDENCE"
+    assert report["decision_support"]["recommended_next_action"] == (
+        "VERIFY_EXISTING_TENANT_BOUND_FORECAST_REGISTRY"
+    )
+    assert report["decision_support"]["forecast_accuracy_confidence"] is None
+    assert report["decision_support"]["automated_action_executed"] is False
+    assert report["independently_verified_customer_outcome_pairs"] == 0
+    assert report["forecast_accuracy_measurable"] is False
+    # Replacing independent financial proof with a JEV model-call count fails.
+    path = runtime / "jev_client_pain_discovery" / "aggregate_latest.json"
+    row = json.loads(path.read_text())
+    row["model_calls"] = 1
+    path.write_text(json.dumps(row))
+    assert audit_runtime(runtime, now=at)["jev_evidence_observation"][
+        "research_signal_available"] is False
+
+
+def test_rg_permission_error_keeps_partial_coverage_visible(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from empire_os import predictive_revenue_forecast_separation as unit
+
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    first = runtime / "existing.json"
+    first.write_text(json.dumps(BASE))
+    monkeypatch.setattr(unit.shutil, "which", lambda _: "/bin/rg")
+    monkeypatch.setattr(unit.subprocess, "run", lambda *a, **kw: SimpleNamespace(
+        returncode=2, stdout=(str(first).encode() + b"\0"), stderr=b"denied"
+    ))
+    result = audit_runtime(runtime)
+    assert result["source_prefilter"] == "ripgrep_partial"
+    assert result["fast_prefilter_failed_or_unavailable"] is True
+    assert result["source_scan_exhaustive"] is False
+    assert result["source_scan_complete_enough_for_absence_claim"] is False
+    assert result["structural_forecast_records"] == 1
+    assert result["independently_verified_customer_outcome_pairs"] == 0
+
+
+def test_no_ripgrep_falls_back_without_losing_records(tmp_path, monkeypatch):
+    from empire_os import predictive_revenue_forecast_separation as unit
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "one.json").write_text(json.dumps(BASE))
+    monkeypatch.setattr(unit.shutil, "which", lambda _: None)
+    result = audit_runtime(runtime)
+    assert result["source_prefilter"] == "python_exhaustive_fallback"
+    assert result["structural_forecast_records"] == 1
+    assert result["fast_prefilter_failed_or_unavailable"] is True

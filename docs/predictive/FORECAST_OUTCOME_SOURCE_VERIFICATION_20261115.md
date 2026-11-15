@@ -14,3 +14,11 @@ Original real source results reviewed:
 Next verifiable source path: reuse `inspect_tenant_bound_predictive_registry` for a count-only trusted-tenant RLS inventory; independently verify immutable forecast existence *before* target outcomes; use existing restricted `read_recognized_revenue_event` plus a complete mature-day, settlement and refund census; then evaluate exact tenant/horizon/metric pairs with the existing V4.14 baseline and enterprise forecast scorecard. No imputed zero actuals, no training, no outbound and no customer accuracy claims until these proofs exist.
 
 Status: source-format separation implemented, independently verified forecast/outcome calibration not yet supported by available genuine evidence.
+
+## 15 November: speed, precision and JEV reasoning enhancement
+
+The scanner now uses the installed ripgrep as a fast candidate-file prefilter and runs the **same** conservative forecast classifiers. The initial full original run took ~90 seconds; the updated 15 Nov live run took **7.32 seconds** (about 12x faster). It examined 132,869 nested nodes from selected runtime files. The system explicitly reports `source_prefilter=ripgrep_partial`, `fast_prefilter_failed_or_unavailable=true` and `source_scan_exhaustive=false` because permissions prevent exhaustive runtime-file coverage. Consequently, zero found forecast records **cannot prove** none exist elsewhere.
+
+The audit reuses the original JEV Cloud observer's identity/freshness/schema/read-only contract. The currently fresh JEV research snapshot is available, with **zero model calls**. It is research evidence, not model output or financial truth. The separate `decision_support` section uses the existing EmpireOS `DecisionState` and `CandidateType` vocabulary to choose `VERIFY_EXISTING_TENANT_BOUND_FORECAST_REGISTRY` and explain the evidence gaps. It never executes the recommendation or invents confidence, actual revenue, forecast accuracy or calibration readiness.
+
+Focused regression: **62 tests passed** covering forecast evidence separation, original JEV signal composition, Predictive Cloud/JEV observer, V4.21 forecast custody and original predictive registry. Independent customer forecast-to-outcome pairs remain zero observed; model calibration and promotion remain held.

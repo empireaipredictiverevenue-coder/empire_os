@@ -11,6 +11,9 @@ from datetime import datetime, date, timezone
 from pathlib import Path
 import json
 import math
+import os
+import shutil
+import subprocess
 from typing import Any, Iterator
 
 SCHEMA = "empire.predictive_revenue.forecast_evidence_separation.v1"
@@ -106,6 +109,121 @@ def _nodes(value: Any) -> Iterator[dict[str, Any]]:
             pending.extend(item)
 
 
+def _candidate_paths(runtime: Path) -> tuple[list[Path], str, bool]:
+    """Use the existing host ripgrep where available; never silently trust gaps.
+
+    A failed prefilter degrades to the original exhaustive Python scan.
+    This is selection only: classification and financial gates are unchanged.
+    """
+    exe = shutil.which("rg")
+    if exe:
+        command = [exe, "--files-with-matches", "--null", "--text", "--hidden",
+                   "--no-ignore", "--ignore-case", "--no-messages", "-e",
+                   "predicted", "-e", "forecast", "--glob", "*.json"]
+        for excluded in ("tests", "fixtures", "docs", "control_plane",
+                         "predictive_revenue_control", "worker_code"):
+            command.extend(("--glob", f"!**/{excluded}/**"))
+        command.append(str(runtime))
+        try:
+            result = subprocess.run(command, capture_output=True, timeout=45,
+                                    check=False)
+            if result.returncode in (0, 1, 2) and (
+                result.returncode != 2 or result.stdout
+            ):
+                # ripgrep exit 2 commonly indicates some unreadable files.
+                # Retain observable matches, but ALWAYS flag the incomplete
+                # scan; do not waste ~90s silently falling back and hiding
+                # that the original file population was not fully readable.
+                incomplete = result.returncode == 2
+                return ([Path(os.fsdecode(f)) for f in
+                         result.stdout.split(b"\0") if f],
+                        "ripgrep_partial" if incomplete else "ripgrep",
+                        incomplete)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    # Exact fallback; never imply the fast prefilter covered unreadable rows.
+    return list(runtime.rglob("*.json")), "python_exhaustive_fallback", True
+
+
+def _existing_jev_observation(runtime: Path, clock: datetime) -> dict[str, Any]:
+    """Reuse the existing Cloud/JEV observer's source contract, not a model.
+
+    Research observations cannot certify forecasts, buyers or accuracy.
+    """
+    from empire_os.predictive_cloud_core_jev_observer import SOURCES, _read, _recent
+
+    row, digest = _read(runtime.parent, SOURCES["jev"][0])
+    valid = bool(
+        digest and row.get("schema_version") == SOURCES["jev"][1]
+        and row.get("mode") == "OBSERVE"
+        and row.get("execution_authority") == "none"
+        and _recent(row.get(SOURCES["jev"][2]), clock, 2)
+        and row.get("status") == "CLIENT_PAIN_DISCOVERY_OWNER_REVIEW_ONLY"
+        and type(row.get("model_calls")) is int and row["model_calls"] == 0
+        and row.get("database_writes") is False
+        and row.get("crm_writes") is False
+    )
+    return {
+        "research_signal_available": valid,
+        "research_source": SOURCES["jev"][0],
+        "research_source_digest_sha256": digest if valid else None,
+        "model_calls_verified": 0 if valid else None,
+        "forecast_or_customer_outcome_authority": False,
+        "truth_class": "OBSERVED" if valid else "UNVERIFIED",
+    }
+
+
+def _evidence_decision(report: dict[str, Any], jev: dict[str, Any]) -> dict[str, Any]:
+    """Typed evidence-first reasoning; recommendation, never autonomous action.
+
+    This uses EmpireOS's existing decision state vocabulary. No signal is
+    transformed into a numerical probability without calibrated labels.
+    """
+    from empire_os.real_world_decision_intelligence import CandidateType, DecisionState
+
+    reasons: list[str] = []
+    if report["fast_prefilter_failed_or_unavailable"] or report["inaccessible_or_oversized_files"]:
+        reasons.append("RUNTIME_INVENTORY_COVERAGE_INCOMPLETE")
+    if not report["forecast_origin_verified"]:
+        reasons.append("ORIGINAL_FORECAST_REGISTRY_NOT_AUTHENTICATED")
+    if report["independently_verified_customer_outcome_pairs"] == 0:
+        reasons.append("NO_INDEPENDENT_CUSTOMER_OUTCOME_PAIRS")
+    if report["original_independent_finance_gaps_not_admitted"]:
+        reasons.append("SOURCE_FINANCIAL_PROOFS_NOT_ADMITTED")
+    if not jev["research_signal_available"]:
+        reasons.append("JEV_RESEARCH_SOURCE_UNAVAILABLE_OR_STALE")
+    if "ORIGINAL_FORECAST_REGISTRY_NOT_AUTHENTICATED" in reasons:
+        action = "VERIFY_EXISTING_TENANT_BOUND_FORECAST_REGISTRY"
+        why = "A timestamped original source must exist before valid backtesting."
+    elif "NO_INDEPENDENT_CUSTOMER_OUTCOME_PAIRS" in reasons:
+        action = "VERIFY_EXISTING_TENANT_CUSTOMER_OUTCOMES"
+        why = "Without mature, financially reconciled actuals, accuracy is unknowable."
+    else:
+        action = "INDEPENDENTLY_REVIEW_FORECAST_CALIBRATION"
+        why = "Use the existing enterprise scorecard and original baseline after source admission."
+    return {
+        "schema_version": "empire.predictive_revenue.evidence_decision.v1",
+        "state": DecisionState.GATHER_EVIDENCE.value,
+        "candidate_type": CandidateType.GATHER_EVIDENCE.value,
+        "recommended_next_action": action,
+        "rationale": why,
+        "reason_codes": reasons,
+        "forecast_accuracy_confidence": None,
+        "calibration_ready": False,
+        "assessment": "INSUFFICIENT_INDEPENDENT_LABELLED_CUSTOMER_EVIDENCE",
+        "jev_research_signal_available": jev["research_signal_available"],
+        "jev_cannot_replace_financial_ground_truth": True,
+        "alternatives_considered": [
+            "USE_EXISTING_TENANT_REGISTRY_READER",
+            "USE_EXISTING_REVENUE_EVENT_AND_DAY_CENSUS_READERS",
+            "WAIT_FOR_12_PLUS_MATURE_HORIZON_MATCHED_CUSTOMER_PAIRS",
+        ],
+        "reasoning_trace_is_deterministic": True,
+        "automated_action_executed": False,
+        "execution_authority": "none",
+    }
+
+
 def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, Any]:
     if not runtime.is_dir():
         raise ValueError("runtime directory missing")
@@ -114,7 +232,8 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
     files = 0
     inaccessible = 0
     scanned_nodes = 0
-    for path in runtime.rglob("*.json"):
+    paths, prefilter, prefilter_failed = _candidate_paths(runtime)
+    for path in paths:
         # Existing observer exclusions: no control proofs feeding their own inputs.
         relative = path.relative_to(runtime)
         if any(part in {"tests", "fixtures", "docs", "control_plane",
@@ -191,7 +310,8 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         if type(source_status.get("customer_forecast_verified")) is bool
         else None
     )
-    return {
+    jev = _existing_jev_observation(runtime, clock)
+    report = {
         "schema_version": SCHEMA,
         "generated_at": clock.isoformat(),
         "mode": "OBSERVE",
@@ -199,6 +319,10 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         "scanned_runtime_json_files": files,
         "inaccessible_or_oversized_files": inaccessible,
         "scanned_json_nodes": scanned_nodes,
+        "source_prefilter": prefilter,
+        "fast_prefilter_failed_or_unavailable": prefilter_failed,
+        "source_scan_exhaustive": not prefilter_failed and inaccessible == 0,
+        "source_scan_complete_enough_for_absence_claim": False,
         "structural_forecast_records": structural,
         "registry_shaped_unverified_records": counts["registry_shape_unverified"],
         "forecast_like_incomplete_records": counts["forecast_like_incomplete"],
@@ -224,6 +348,9 @@ def audit_runtime(runtime: Path, *, now: datetime | None = None) -> dict[str, An
         "production_mutation": False,
         "execution_authority": "none",
     }
+    report["jev_evidence_observation"] = jev
+    report["decision_support"] = _evidence_decision(report, jev)
+    return report
 
 
 def write_report(runtime: Path, output: Path) -> dict[str, Any]:
