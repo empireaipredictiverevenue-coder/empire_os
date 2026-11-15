@@ -58,12 +58,15 @@ def verify_daily_census_row(
     total=_positive_int(amount)
     broken=_positive_int(invalid_global)
     scoped_broken=_positive_int(invalid_tenant)
-    if (scoped>count or broken>count or scoped_broken>broken
-        or scoped+broken>count or (scoped==0)!=(total==0)):
-        raise CanonicalRevenueEvidenceUnavailable("DAY_CENSUS_ACCOUNTING_CONTRADICTION")
-    # Unknown/malformed records make tenant completeness undecidable.
-    # No day with zero events is certified from an unsealed ledger view.
-    candidate=(count>0 and scoped>0 and broken==0 and scoped_broken==0)
+    # REV077 contract is tenant-scoped: never expose global event counts to
+    # an ordinary reader. Invalid/unmapped global records fail in SQL before
+    # a row is returned. Refuse old global-counting functions on readback.
+    if (scoped!=count or broken!=0 or scoped_broken!=0
+        or (scoped==0)!=(total==0)):
+        raise CanonicalRevenueEvidenceUnavailable("DAY_CENSUS_UNSCOPED_OR_INCOMPLETE")
+    # An internally consistent source day is still NOT settled cash or an
+    # independently admitted customer outcome for model calibration.
+    candidate=(scoped>0)
     return {
         "schema_version":"empire.predictive_revenue.daily_census_candidate.v1",
         "status":("DAY_SOURCE_CENSUS_CANDIDATE" if candidate else
@@ -71,11 +74,12 @@ def verify_daily_census_row(
         "mode":"OBSERVE",
         "observed_utc_date":day_utc.isoformat(),
         "read_snapshot_at":queried_at.isoformat(),
-        "global_event_count":count,
+        "global_event_count":None,
+        "global_counts_disclosed_to_tenant":False,
         "tenant_event_count":scoped,
         "tenant_candidate_amount_cents":total if candidate else None,
-        "unknown_or_invalid_global_event_count":broken,
-        "unknown_or_invalid_tenant_event_count":scoped_broken,
+        "unknown_or_invalid_global_event_count":None,
+        "unknown_or_invalid_tenant_event_count":None,
         "missing_or_hidden_rows_independently_excluded":False,
         "ledger_backfill_finality_attested":False,
         "tenant_authorization_proven":False,

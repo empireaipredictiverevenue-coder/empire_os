@@ -75,9 +75,25 @@ INSERT INTO public.commercial_events(
  ('99999999-9999-4999-8999-999999999999','revenue_recognized','2026-11-10T12:00:00Z',
  NULL,NULL,NULL,777,'{"actual_revenue":true}');
 SQL
+# Verify exact REV076 + REV077 coexist in one original EmpireDB-like cluster.
+# All forecast fixture inserts are synthetic and fixture-admin only.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
+ -f "$root/migrations/empiredb/076_predictive_forecast_registry_native_held.sql"
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb <<'SQL_REGISTRY'
+GRANT empire_predictive_registry_reader TO census_a,census_b,census_unbound;
+INSERT INTO public.predictive_forecasts(
+  forecast_key,model_name,model_version,metric,dimension_key,
+  horizon_days,sample_count,predicted_value,r_squared,
+  evidence_confidence,direction,source
+) VALUES
+  ('fixture:a:2026-11-10','empire','fixture-v1','recognized_revenue_cents',
+   'tenant:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',7,14,14000,0.7,0.8,'up','synthetic_fixture'),
+  ('fixture:b:2026-11-10','empire','fixture-v1','recognized_revenue_cents',
+   'tenant:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',7,14,21000,0.7,0.8,'up','synthetic_fixture');
+SQL_REGISTRY
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/077_predictive_daily_revenue_census_native_held.sql"
-echo REV077_DISPOSABLE_DDL=PASS
+echo REV076_PLUS_REV077_DISPOSABLE_DDL=PASS
 if psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/077_predictive_daily_revenue_census_native_held.sql" >/dev/null 2>&1; then
  echo UNSAFE_DUPLICATE_MIGRATION_ALLOWED; exit 5
@@ -87,25 +103,25 @@ echo REV077_DUPLICATE_FAIL_CLOSED=PASS
 PGHOST="$PGHOST" PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY'
 from datetime import datetime, date, timezone
 from empire_os.predictive_revenue_daily_census import read_daily_revenue_census
+from empire_os.predictive_revenue_canonical_reader import CanonicalRevenueEvidenceUnavailable
 at=datetime.now(timezone.utc)
 day=date(2026,11,10)
 for user,tenant,amount in (
     ("census_a","aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",12345),
     ("census_b","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",20000),
 ):
-    row=read_daily_revenue_census(
-        day_utc=day, tenant_id=tenant, as_of=at,
-        dsn="dbname=empiredb user="+user, require_session_tenant_binding=True,
-    )
-    assert row["global_event_count"]==3,row
-    assert row["tenant_event_count"]==1,row
-    assert row["unknown_or_invalid_global_event_count"]==1,row
-    assert row["tenant_candidate_amount_cents"] is None,row
-    assert row["status"]=="DAY_CENSUS_INCOMPLETE_HOLD",row
-    assert row["eligible_for_revenue_forecast_calibration"] is False,row
-    assert row["database_session_tenant_identity_matched"] is True,row
-    print("RESTRICTED_SOURCE_"+user+"=PASS")
-print("UNMAPPED_GLOBAL_RECORD_BLOCKS_CALIBRATION=PASS")
+    try:
+        read_daily_revenue_census(
+            day_utc=day, tenant_id=tenant, as_of=at,
+            dsn="dbname=empiredb user="+user,
+            require_session_tenant_binding=True,
+        )
+    except CanonicalRevenueEvidenceUnavailable as error:
+        assert str(error)=="DAY_CENSUS_READ_FAILED",str(error)
+    else:
+        raise AssertionError("unmapped global event must block source day")
+    print("GLOBAL_INVALID_SOURCE_BLOCKS_"+user+"=PASS")
+print("UNMAPPED_GLOBAL_RECORD_DENIED_WITH_NO_COUNTS=PASS")
 PY
 if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \
  -c "BEGIN READ ONLY; SET LOCAL ROLE empire_predictive_revenue_evidence_reader; SELECT count(*) FROM public.commercial_events; ROLLBACK;" >/dev/null 2>&1; then
@@ -134,13 +150,134 @@ r=read_daily_revenue_census(
   require_session_tenant_binding=True)
 assert r["status"]=="DAY_SOURCE_CENSUS_CANDIDATE",r
 assert r["tenant_candidate_amount_cents"]==12345,r
-assert r["global_event_count"]==2,r
+assert r["global_event_count"] is None,r
+assert r["unknown_or_invalid_global_event_count"] is None,r
+assert r["global_counts_disclosed_to_tenant"] is False,r
+assert r["tenant_event_count"]==1,r
 assert r["daily_revenue_census_verified"] is False,r
 assert r["ledger_backfill_finality_attested"] is False,r
 assert r["tenant_authorization_proven"] is False,r
 assert r["eligible_for_revenue_forecast_calibration"] is False,r
+assert r["execution_authority"]=="none",r
+for user,tenant,expected in (
+    ("census_a","aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",12345),
+    ("census_b","bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",20000),
+):
+    item=read_daily_revenue_census(
+        day_utc=date(2026,11,10),tenant_id=tenant,
+        as_of=datetime.now(timezone.utc),
+        dsn="dbname=empiredb user="+user,
+        require_session_tenant_binding=True)
+    assert item["tenant_event_count"]==1,item
+    assert item["tenant_candidate_amount_cents"]==expected,item
+    assert item["global_event_count"] is None,item
+    assert item["global_counts_disclosed_to_tenant"] is False,item
+    print("PRIVATE_CANDIDATE_"+user+"=PASS")
 print("SOURCE_CANDIDATE_NOT_SETTLED_CASH_OR_CALIBRATION=PASS")
 PY
+# Original registered forecast reader and census source preflight together.
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_INTEGRATION'
+from datetime import datetime,timezone
+from empire_os.predictive_revenue_tenant_registry_inspector import inspect_tenant_bound_predictive_registry
+from empire_os.predictive_revenue_source_preflight import review_authenticated_sources
+now=datetime.now(timezone.utc)
+for name,tenant in (
+  ('census_a','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+  ('census_b','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+):
+    dsn='dbname=empiredb user='+name
+    inventory=inspect_tenant_bound_predictive_registry(
+      dsn=dsn,tenant_id=tenant,as_of=now,limit=10)
+    assert inventory['observed_row_count']==1,inventory
+    assert inventory['source_rows_are_complete_census'] is False,inventory
+    assert inventory['original_forecast_immutable_registration_verified'] is False,inventory
+    assert inventory['customer_delivery_enabled'] is False,inventory
+    preflight=review_authenticated_sources(
+      tenant_id=tenant,registry_dsn=dsn,census_dsn=dsn,as_of=now)
+    assert preflight['registry_reader_authenticated_session'] is True,preflight
+    assert preflight['census_reader_authenticated_session'] is True,preflight
+    assert preflight['registry_scoped_rows_observed']==1,preflight
+    assert preflight['independently_verified_forecast_actual_pairs']==0,preflight
+    assert preflight['model_calibration_ready'] is False,preflight
+    assert preflight['customer_revenue_amount_verified'] is False,preflight
+    print('ORIGINAL_TENANT_READER_AND_PREFLIGHT_'+name+'=PASS')
+print('INTEGRATED_REGISTRY_CENSUS_STILL_NOT_CALIBRATION=PASS')
+PY_INTEGRATION
+# Duplicate recognized events for one order cannot count twice as income.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "INSERT INTO public.commercial_events(id,event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload) SELECT 'aaaa1111-aaaa-4111-8111-aaaaaaaaaaaa',event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload FROM public.commercial_events WHERE id='77777777-7777-4777-8777-777777777777'"
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PYTEST_DUP'
+from datetime import date,datetime,timezone
+from empire_os.predictive_revenue_daily_census import read_daily_revenue_census
+from empire_os.predictive_revenue_canonical_reader import CanonicalRevenueEvidenceUnavailable
+try:
+    read_daily_revenue_census(
+      day_utc=date(2026,11,10),
+      tenant_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      as_of=datetime.now(timezone.utc),
+      dsn="dbname=empiredb user=census_a",
+      require_session_tenant_binding=True)
+except CanonicalRevenueEvidenceUnavailable as e:
+    assert str(e)=="DAY_CENSUS_READ_FAILED",str(e)
+else:
+    raise AssertionError("duplicate recognition not blocked")
+print("DUPLICATE_ORDER_RECOGNITION_BLOCKED=PASS")
+PYTEST_DUP
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "DELETE FROM public.commercial_events WHERE id='aaaa1111-aaaa-4111-8111-aaaaaaaaaaaa'"
+# Settlement after the forecast target day cannot be counted as a day-close.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "UPDATE public.fulfilment_orders SET settled_at='2026-11-12T00:00:00Z' WHERE id='33333333-3333-4333-8333-333333333333'"
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PYTEST_LATE'
+from datetime import date,datetime,timezone
+from empire_os.predictive_revenue_daily_census import read_daily_revenue_census
+from empire_os.predictive_revenue_canonical_reader import CanonicalRevenueEvidenceUnavailable
+try:
+    read_daily_revenue_census(
+      day_utc=date(2026,11,10),
+      tenant_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      as_of=datetime.now(timezone.utc),
+      dsn="dbname=empiredb user=census_a",
+      require_session_tenant_binding=True)
+except CanonicalRevenueEvidenceUnavailable as e:
+    assert str(e)=="DAY_CENSUS_READ_FAILED",str(e)
+else:
+    raise AssertionError("late-settled outcome not blocked")
+print("POST_TARGET_SETTLEMENT_BLOCKED=PASS")
+PYTEST_LATE
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "UPDATE public.fulfilment_orders SET settled_at='2026-11-09T00:00:00Z' WHERE id='33333333-3333-4333-8333-333333333333'"
+# Cross-day duplicate recognition on the same order is also excluded.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "INSERT INTO public.commercial_events(id,event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload) SELECT 'bbbb1111-bbbb-4111-8111-bbbbbbbbbbbb',event_type,'2026-11-09T12:00:00Z',fulfilment_order_id,buyer_id,product_id,amount_cents,payload FROM public.commercial_events WHERE id='77777777-7777-4777-8777-777777777777'"
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_CROSS_DAY'
+from datetime import date,datetime,timezone
+from empire_os.predictive_revenue_daily_census import read_daily_revenue_census
+from empire_os.predictive_revenue_canonical_reader import CanonicalRevenueEvidenceUnavailable
+try:
+    read_daily_revenue_census(day_utc=date(2026,11,10),
+      tenant_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      as_of=datetime.now(timezone.utc),dsn="dbname=empiredb user=census_a",
+      require_session_tenant_binding=True)
+except CanonicalRevenueEvidenceUnavailable as e:
+    assert str(e)=="DAY_CENSUS_READ_FAILED",str(e)
+else:raise AssertionError('cross-day duplicate was counted as revenue')
+print('CROSS_DAY_DUPLICATE_RECOGNITION_BLOCKED=PASS')
+PY_CROSS_DAY
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "DELETE FROM public.commercial_events WHERE id='bbbb1111-bbbb-4111-8111-bbbbbbbbbbbb'"
+# Revenue event timestamp before settlement, even within the same day,
+# must not be accepted as a source observation at event time.
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "UPDATE public.fulfilment_orders SET settled_at='2026-11-10T18:00:00Z' WHERE id='33333333-3333-4333-8333-333333333333'"
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_PRE_SETTLE'
+from datetime import date,datetime,timezone
+from empire_os.predictive_revenue_daily_census import read_daily_revenue_census
+from empire_os.predictive_revenue_canonical_reader import CanonicalRevenueEvidenceUnavailable
+try:
+    read_daily_revenue_census(day_utc=date(2026,11,10),
+      tenant_id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      as_of=datetime.now(timezone.utc),dsn="dbname=empiredb user=census_a",
+      require_session_tenant_binding=True)
+except CanonicalRevenueEvidenceUnavailable as e:
+    assert str(e)=="DAY_CENSUS_READ_FAILED",str(e)
+else:raise AssertionError('pre-settlement recognition was counted as revenue')
+print('PRE_SETTLEMENT_RECOGNITION_BLOCKED=PASS')
+PY_PRE_SETTLE
+psql -X -v ON_ERROR_STOP=1 -q -d empiredb -c "UPDATE public.fulfilment_orders SET settled_at='2026-11-09T00:00:00Z' WHERE id='33333333-3333-4333-8333-333333333333'"
 # A later source FORCE RLS change can hide rows from the definer. Detect
 # ownership/policy drift at query time rather than emitting false totals.
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb \

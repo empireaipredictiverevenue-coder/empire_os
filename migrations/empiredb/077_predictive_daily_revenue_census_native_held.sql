@@ -87,6 +87,9 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = ''
 AS $reader$
 DECLARE
   trusted_tenant uuid;
+  safe_tenant_count bigint;
+  safe_tenant_amount bigint;
+  invalid_source_count bigint;
 BEGIN
   trusted_tenant := public.empire_current_tenant_id();
   IF trusted_tenant IS NULL OR p_tenant IS NULL
@@ -114,10 +117,14 @@ BEGIN
     RAISE EXCEPTION 'REV077_GLOBAL_LEDGER_VISIBILITY_UNPROVEN';
   END IF;
 
-  RETURN QUERY
+  -- Full ledger inspection stays inside this SECURITY DEFINER function.
+  -- Never return other tenants' event counts or global invalid counts.
+  -- An incomplete source returns only a generic failure, not a count.
   WITH source AS MATERIALIZED (
     SELECT
       e.amount_cents AS amount,
+      COUNT(*) OVER (PARTITION BY e.fulfilment_order_id)
+        AS order_recognition_count,
       eb.org_id = trusted_tenant AS belongs_to_tenant,
       (
         e.payload->>'actual_revenue'='true'
@@ -128,6 +135,18 @@ BEGIN
         AND o.product_id=e.product_id
         AND o.state IN ('settled','outcome_captured')
         AND o.settled_at IS NOT NULL
+        -- A subsequent settlement cannot validate an earlier day as of its
+        -- original close. Independent bank finality is still NOT attested.
+        AND o.settled_at < ((p_day + 1)::timestamp AT TIME ZONE 'UTC')
+        AND o.settled_at <= e.occurred_at
+        -- The same order must not be recognized again on another date.
+        -- An index on commercial_events(fulfilment_order_id) already exists.
+        AND NOT EXISTS (
+          SELECT 1 FROM public.commercial_events another
+          WHERE another.fulfilment_order_id=e.fulfilment_order_id
+            AND another.event_type='revenue_recognized'
+            AND another.id<>e.id
+        )
         AND o.price_cents>0
         AND e.amount_cents>0
         AND e.amount_cents=o.price_cents
@@ -149,17 +168,30 @@ BEGIN
       AND e.occurred_at < ((p_day + 1)::timestamp AT TIME ZONE 'UTC')
   )
   SELECT
+    COUNT(*) FILTER (
+      WHERE valid AND order_recognition_count=1
+        AND belongs_to_tenant IS TRUE)::bigint,
+    COALESCE(SUM(amount) FILTER (
+      WHERE valid AND order_recognition_count=1
+        AND belongs_to_tenant IS TRUE),0)::bigint,
+    COUNT(*) FILTER (
+      WHERE NOT valid OR order_recognition_count<>1)::bigint
+  INTO safe_tenant_count, safe_tenant_amount, invalid_source_count
+  FROM source;
+
+  IF invalid_source_count<>0 THEN
+    -- Nothing about other tenants or the malformed source count is returned.
+    RAISE EXCEPTION 'REV077_SOURCE_DAY_INCOMPLETE';
+  END IF;
+  RETURN QUERY SELECT
     p_day::date,
     trusted_tenant::text,
-    COUNT(*)::bigint,
-    COUNT(*) FILTER (WHERE valid AND belongs_to_tenant IS TRUE)::bigint,
-    COALESCE(SUM(amount) FILTER (
-      WHERE valid AND belongs_to_tenant IS TRUE),0)::bigint,
-    COUNT(*) FILTER (WHERE NOT valid)::bigint,
-    COUNT(*) FILTER (
-      WHERE NOT valid AND belongs_to_tenant IS TRUE)::bigint,
-    pg_catalog.transaction_timestamp()
-  FROM source;
+    safe_tenant_count,
+    safe_tenant_count,
+    safe_tenant_amount,
+    0::bigint,
+    0::bigint,
+    pg_catalog.transaction_timestamp();
 END;
 $reader$;
 

@@ -38,6 +38,9 @@ def test_source_candidate_never_claims_settlement_or_model_calibration():
     )
     assert got["status"] == "DAY_SOURCE_CENSUS_CANDIDATE"
     assert got["tenant_candidate_amount_cents"] == 12345
+    assert got["global_event_count"] is None
+    assert got["unknown_or_invalid_global_event_count"] is None
+    assert got["global_counts_disclosed_to_tenant"] is False
     assert got["daily_revenue_census_verified"] is False
     assert got["ledger_backfill_finality_attested"] is False
     assert got["tenant_authorization_proven"] is False
@@ -47,14 +50,12 @@ def test_source_candidate_never_claims_settlement_or_model_calibration():
 
 def test_global_orphan_revenue_event_holds_even_valid_tenant():
     as_of = datetime(2026, 11, 15, 12, tzinfo=timezone.utc)
-    got = verify_daily_census_row(
-        _row(snapshot_at=as_of, broken=1),
-        day_utc=DAY, tenant_id=TENANT, as_of=as_of,
-    )
-    assert got["status"] == "DAY_CENSUS_INCOMPLETE_HOLD"
-    assert got["tenant_candidate_amount_cents"] is None
-    assert got["unknown_or_invalid_global_event_count"] == 1
-    assert got["eligible_for_revenue_forecast_calibration"] is False
+    with pytest.raises(CanonicalRevenueEvidenceUnavailable,
+                       match="DAY_CENSUS_UNSCOPED_OR_INCOMPLETE"):
+        verify_daily_census_row(
+            _row(snapshot_at=as_of, broken=1),
+            day_utc=DAY, tenant_id=TENANT, as_of=as_of,
+        )
 
 
 class _Cursor:
@@ -123,3 +124,12 @@ def test_read_completion_does_not_accept_far_future_snapshot():
             dsn="fixture-only", connect_factory=lambda *_a, **_k: _Conn(reader),
             require_session_tenant_binding=True,
         )
+
+
+def test_old_global_count_contract_rejected_without_disclosing_other_tenants():
+    at=datetime(2026,11,15,12,tzinfo=timezone.utc)
+    with pytest.raises(CanonicalRevenueEvidenceUnavailable,
+                       match="DAY_CENSUS_UNSCOPED_OR_INCOMPLETE"):
+        verify_daily_census_row(
+            (DAY,TENANT,2,1,12345,0,0,at),
+            day_utc=DAY,tenant_id=TENANT,as_of=at)
