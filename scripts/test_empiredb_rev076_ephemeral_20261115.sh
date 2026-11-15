@@ -23,6 +23,10 @@ ALTER FUNCTION public.empire_current_tenant_id() OWNER TO empiredb_migrator;
 REVOKE ALL ON FUNCTION public.empire_current_tenant_id() FROM PUBLIC;
 SQL
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb -f "$root/migrations/empiredb/076_predictive_forecast_registry_native_held.sql"
+if psql -X -v ON_ERROR_STOP=1 -q -d empiredb -f "$root/migrations/empiredb/076_predictive_forecast_registry_native_held.sql" >/dev/null 2>&1; then
+  echo UNREVIEWED_DUPLICATE_MIGRATION_ALLOWED; exit 6
+fi
+echo REAPPLY_FAIL_CLOSED=PASS
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb <<'SQL'
 CREATE ROLE tenant_a LOGIN NOINHERIT;
 CREATE ROLE tenant_b LOGIN NOINHERIT;

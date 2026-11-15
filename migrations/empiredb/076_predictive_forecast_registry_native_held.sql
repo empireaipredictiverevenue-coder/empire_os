@@ -23,6 +23,9 @@ BEGIN
   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='empiredb_migrator') THEN
     RAISE EXCEPTION 'REV076_MIGRATOR_OWNER_REQUIRED';
   END IF;
+  IF NOT pg_catalog.has_schema_privilege('empiredb_migrator','public','CREATE') THEN
+    RAISE EXCEPTION 'REV076_MIGRATOR_SCHEMA_CREATE_PERMISSION_REQUIRED';
+  END IF;
   IF NOT EXISTS(SELECT 1 FROM pg_catalog.pg_proc p
     WHERE p.oid=pg_catalog.to_regprocedure('public.empire_current_tenant_id()')
       AND p.prosecdef IS TRUE AND p.provolatile='s'
