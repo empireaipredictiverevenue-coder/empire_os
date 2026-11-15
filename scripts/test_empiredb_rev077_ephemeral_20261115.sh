@@ -359,6 +359,58 @@ with psycopg.connect('dbname=empiredb user=census_a') as connection:
         else:raise AssertionError('fractional cents passed the registration contract')
 print('FRACTIONAL_CENTS_REGISTRATION_DENIED=PASS')
 PY_REGISTRATION
+# The actual internal EmpireDB adapter must invoke REV078 through the
+# trusted authenticated session and return no tenant/customer source fields.
+PYTHONPATH="$root" /srv/empire_os/.venv/bin/python - <<'PY_NATIVE_ADAPTER'
+from datetime import datetime,timedelta,timezone
+from empire_os.predictive_registry_transport import (
+    EmpireDbProspectiveForecastRegistration,
+    PredictiveRegistryTransportError,
+)
+from empire_os.predictive_revenue_tenant_registry_inspector import (
+    inspect_tenant_bound_predictive_registry,
+)
+now=datetime.now(timezone.utc)
+for login,tenant in (
+    ('census_a','aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
+    ('census_b','bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
+):
+    dsn='dbname=empiredb user='+login
+    registrar=EmpireDbProspectiveForecastRegistration(dsn,enabled=True)
+    receipt=registrar.register(
+      tenant_id=tenant,model_name='empire_baseline',
+      model_version='native_adapter_v1',
+      observed_through=now.date()-timedelta(days=1),
+      horizon_days=7,sample_count=14,predicted_cents=12345,
+      r_squared=0.8,evidence_confidence=0.75,
+      direction='up',source_evidence_sha256='a'*64)
+    assert receipt['status']=='DB_REGISTERED_SOURCE_EVIDENCE_UNVERIFIED',receipt
+    assert receipt['registration_write_committed'] is True,receipt
+    assert receipt['database_tenant_session_matched'] is True,receipt
+    assert receipt['original_source_authenticated'] is False,receipt
+    assert receipt['independent_timestamp_custody_verified'] is False,receipt
+    assert receipt['financial_actuals_verified'] is False,receipt
+    assert receipt['calibration_authorized'] is False,receipt
+    assert tenant not in str(receipt),receipt
+    inventory=inspect_tenant_bound_predictive_registry(
+      dsn=dsn,tenant_id=tenant,as_of=datetime.now(timezone.utc),limit=20)
+    assert inventory['observed_row_count']==(4 if login=='census_a' else 3),inventory
+    print('NATIVE_RESTRICTED_ADAPTER_'+login+'=PASS')
+    try:
+        registrar.register(
+          tenant_id='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' if login=='census_a'
+             else 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          model_name='empire_baseline',model_version='cross_tenant',
+          observed_through=now.date()-timedelta(days=1),
+          horizon_days=7,sample_count=14,predicted_cents=12345,
+          r_squared=0.8,evidence_confidence=0.75,
+          direction='up',source_evidence_sha256='a'*64)
+    except PredictiveRegistryTransportError as error:
+        assert str(error)=='native tenant-bound registration unavailable',error
+    else:
+        raise AssertionError('cross-tenant adapter input was accepted')
+print('NATIVE_INTERNAL_ADAPTER_DENIES_CROSS_TENANT=PASS')
+PY_NATIVE_ADAPTER
 # Only a dedicated role can call the original DB registration function.
 # Even role members cannot change the registry table by bypassing the RPC.
 if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \

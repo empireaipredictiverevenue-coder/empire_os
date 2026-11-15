@@ -53,6 +53,10 @@ CREATE ROLE empire_predictive_forecast_registrar
  NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
  NOREPLICATION NOBYPASSRLS;
 GRANT USAGE ON SCHEMA public TO empire_predictive_forecast_registrar;
+-- The private adapter checks the same trusted session_user -> tenant
+-- identity before invoking the definer; never grant source-table SELECT.
+GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
+ TO empire_predictive_forecast_registrar;
 SET LOCAL ROLE empiredb_migrator;
 
 -- Because registry is FORCE RLS, owner also needs a strict INSERT policy;
