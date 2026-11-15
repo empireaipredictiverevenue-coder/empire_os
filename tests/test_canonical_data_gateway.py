@@ -220,3 +220,31 @@ def test_gateway_exposes_neutral_query_and_conflict_semantics():
         "business_entities",
         ("id",),
     )
+
+
+def test_production_gateway_refuses_explicit_supabase_legacy_even_with_secrets():
+    from empire_os.canonical_data_gateway import DataGatewayUnavailable
+
+    with pytest.raises(DataGatewayUnavailable, match="retired for production"):
+        gateway_from_environment({
+            "EMPIRE_DATA_BACKEND": "supabase_legacy",
+            "SUPABASE_URL": "https://not-real.example",
+            "SUPABASE_SERVICE_KEY": "not-real-key",
+        })
+
+
+def test_historical_rollback_simulation_stays_explicit_no_runtime_provider():
+    calls = []
+
+    def factory(_env):
+        calls.append(True)
+        return FakeProvider()
+
+    gateway = gateway_from_environment(
+        {"EMPIRE_DATA_BACKEND": "supabase_legacy"},
+        legacy_provider_factory=factory,
+    )
+    assert calls == [True]
+    assert gateway.backend is DataBackend.SUPABASE_LEGACY
+    assert gateway.snapshot().dual_write_enabled is False
+    assert gateway.snapshot().write_fallback_enabled is False

@@ -378,20 +378,15 @@ def gateway_from_environment(
             expected_backend=DataBackend.EMPIREDB,
         )
 
+    # Historic rollback diagnostics can explicitly inject a legacy stub.
+    # Normal EmpireOS production constructors are never allowed to bootstrap
+    # a vendor endpoint from SUPABASE_* environment credentials again.
     if legacy_provider_factory is None:
-        from empire_os.data_backends.supabase_legacy import (
-            SupabaseLegacyConfig,
-            SupabaseLegacyProvider,
+        raise DataGatewayUnavailable(
+            "Supabase legacy backend retired for production EmpireOS runtime; "
+            "canonical EmpireDB required"
         )
-
-        provider = SupabaseLegacyProvider(
-            SupabaseLegacyConfig(
-                url=str(source.get("SUPABASE_URL") or ""),
-                service_key=str(source.get("SUPABASE_SERVICE_KEY") or ""),
-            )
-        )
-    else:
-        provider = legacy_provider_factory(source)
+    provider = legacy_provider_factory(source)
 
     return CanonicalDataGateway(
         provider,
