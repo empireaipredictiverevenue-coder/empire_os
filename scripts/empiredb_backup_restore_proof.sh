@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# RETIRED: this historic offline proof stops the live PostgreSQL 18 cluster
+# and PgBouncer. EmpireDB is now the canonical production database; running
+# these operations would cause an unauthorised outage. Preserve the original
+# body below as auditable recovery history, but never execute it in place.
+# Recovery proof must use a separately owned, isolated restored DB instance.
+printf '%s\n' 'EMPIREDB_OFFLINE_RESTORE_PROOF_RETIRED_CANONICAL_INSTANCE'
+exit 78
+
 # EmpireDB pgBackRest backup/restore proof.
 # Root-run only. Uses an encrypted LOCAL repository for mechanical restore proof.
 # It deliberately does NOT enable archive_mode or change the canonical backend.
