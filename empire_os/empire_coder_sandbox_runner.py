@@ -476,7 +476,7 @@ def run_empire_coder_codex_local_candidate(
         env["PYTHONPATH"] = str(clone)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
         cmd = [
-            cli, "exec", "-C", str(clone), "-s", "workspace-write",
+            cli, "exec", "--ephemeral", "-C", str(clone), "-s", "workspace-write",
             "-c", "approval_policy=never",
             "-c", "model_reasoning_effort=medium", "-",
         ]

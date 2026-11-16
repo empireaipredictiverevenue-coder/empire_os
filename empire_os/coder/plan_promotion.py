@@ -244,7 +244,7 @@ def _existing_promotion_keys(queue: LocalJobQueue) -> set[str]:
     keys: set[str] = set()
     for directory in (
         queue.pending, queue.running, queue.delegated,
-        queue.completed, queue.failed,
+        queue.awaiting_approval, queue.completed, queue.failed,
     ):
         for path in directory.glob("*.json"):
             try:

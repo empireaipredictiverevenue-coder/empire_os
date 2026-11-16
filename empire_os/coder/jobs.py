@@ -27,6 +27,7 @@ class JobStatus(str, Enum):
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     DELEGATED = "DELEGATED"
+    AWAITING_APPROVAL = "AWAITING_APPROVAL"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
@@ -76,6 +77,7 @@ class LocalJobQueue:
         self.pending = self.root / "pending"
         self.running = self.root / "running"
         self.delegated = self.root / "delegated"
+        self.awaiting_approval = self.root / "awaiting_approval"
         self.completed = self.root / "completed"
         self.failed = self.root / "failed"
         for directory in (
@@ -83,6 +85,7 @@ class LocalJobQueue:
             self.pending,
             self.running,
             self.delegated,
+            self.awaiting_approval,
             self.completed,
             self.failed,
         ):
@@ -459,6 +462,22 @@ class LocalJobQueue:
         result: dict[str, Any] | None = None,
     ) -> CoderJob:
         packet = dict(result or {})
+        # Completing an isolated candidate is never equivalent to completing
+        # implementation. Only hold_candidate_for_approval may finish this
+        # specific queue lane successfully.
+        if (
+            job.kind is JobKind.IMPLEMENT
+            and job.payload.get("execution_mode") == "ISOLATED_CANDIDATE_ONLY"
+        ):
+            return self.fail(
+                job, "isolated_implementation_requires_founder_review",
+                result={
+                    "candidate_status": "INVALID_DIRECT_COMPLETION",
+                    "implementation_verified": False,
+                    "task_completed": False,
+                    "founder_release_required": True,
+                },
+            )
         if job.kind is JobKind.VERIFY:
             verification = packet.get("verification")
             verdict = (
@@ -472,6 +491,31 @@ class LocalJobQueue:
         return self._finish(
             job,
             status=JobStatus.COMPLETED,
+            result=packet,
+            error=None,
+        )
+
+    def hold_candidate_for_approval(
+        self,
+        job: CoderJob,
+        result: dict[str, Any],
+    ) -> CoderJob:
+        """Store a verified isolated *proposal*, never completed implementation."""
+        packet = dict(result or {})
+        if (
+            job.kind is not JobKind.IMPLEMENT
+            or job.payload.get("execution_mode") != "ISOLATED_CANDIDATE_ONLY"
+            or packet.get("candidate_status") != "LOCAL_PROPOSAL_READY"
+            or packet.get("candidate_verification_passed") is not True
+            or packet.get("implementation_verified") is not False
+            or packet.get("task_completed") is not False
+            or packet.get("founder_release_required") is not True
+            or not packet.get("proposal_sha256")
+        ):
+            raise JobQueueError("isolated_candidate_approval_evidence_required")
+        return self._finish(
+            job,
+            status=JobStatus.AWAITING_APPROVAL,
             result=packet,
             error=None,
         )
@@ -496,6 +540,7 @@ class LocalJobQueue:
             self.pending,
             self.running,
             self.delegated,
+            self.awaiting_approval,
             self.completed,
             self.failed,
         ):
@@ -559,6 +604,7 @@ class LocalJobQueue:
             if not current.exists():
                 name = f"{self._safe_id(job.id)}.json"
                 for directory in (
+                    self.awaiting_approval,
                     self.completed,
                     self.failed,
                     self.pending,
@@ -580,8 +626,9 @@ class LocalJobQueue:
             job.retry_after = None
             job.updated_at = utc_now()
             target_dir = (
-                self.completed
-                if status is JobStatus.COMPLETED
+                self.completed if status is JobStatus.COMPLETED
+                else self.awaiting_approval
+                if status is JobStatus.AWAITING_APPROVAL
                 else self.failed
             )
             self._write(current, job)

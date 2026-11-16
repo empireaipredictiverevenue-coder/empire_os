@@ -17,6 +17,16 @@ WORKTREE="$REPO/runtime/hermes_control/worker_code"
 
 cd "$REPO"
 
+# Reuse THIS existing network-capable Hermes timer for the approval-gated
+# Empire Coder isolated IMPLEMENT queue. The generic Coder worker remains
+# unchanged and cannot claim these jobs. A candidate is not a live release.
+echo "=== GOVERNED CODER ISOLATED IMPLEMENT HANDOFF ==="
+if ! PYTHONPATH="$REPO" "$REPO/.venv/bin/python" \
+  "$REPO/scripts/run_coder_isolated_implement_drain.py" \
+  --repo-root "$REPO" --max-jobs 1; then
+    echo "coder_isolated_candidate_handoff=failed_observe_job_receipt" >&2
+fi
+
 echo "=== HERMES RESIDENT CODE SYNC ==="
 git fetch "$REMOTE" "$BRANCH"
 
