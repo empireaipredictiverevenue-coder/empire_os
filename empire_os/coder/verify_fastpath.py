@@ -1,11 +1,22 @@
 """Deterministic no-model verification lane for queued VERIFY jobs."""
 from __future__ import annotations
 import os, subprocess, sys, time
+from pathlib import Path, PurePosixPath
 from typing import Any
 from .jobs import JobKind, LocalJobQueue
 
 def _valid_test(path: str) -> bool:
-    return path.startswith("tests/") and path.endswith(".py")
+    """Allow only a repository test path; never pass traversal to pytest."""
+    if not isinstance(path, str) or "\\" in path:
+        return False
+    parts = PurePosixPath(path).parts
+    return (
+        len(parts) >= 2
+        and parts[0] == "tests"
+        and all(part not in {".", "..", ""} for part in parts)
+        and path.endswith(".py")
+        and not path.startswith("/")
+    )
 
 def drain_verify_jobs(
     queue: LocalJobQueue,
@@ -22,8 +33,19 @@ def drain_verify_jobs(
     child_env.pop("PYTEST_ADDOPTS",None)
     child_env["PYTHONDONTWRITEBYTECODE"]="1"
     for candidate in queue.list_pending(kind=JobKind.VERIFY)[:bounded]:
+        # Candidate implementation verification belongs to the task-aware
+        # worker, which checks patch audit hashes and founder approval gates.
+        # The fast-path may run tests, but must never certify a code change.
+        if candidate.payload.get("changed_files"):
+            skipped.append({"job_id": candidate.id, "reason": "task_provenance_verifier_required"})
+            continue
         tests=[str(v).strip() for v in (candidate.payload.get("tests") or ()) if str(v).strip()]
-        if not tests or any(not _valid_test(t) for t in tests):
+        if not tests or any(
+            not _valid_test(t)
+            or not (Path(root) / t).resolve().is_relative_to(root)
+            or not (Path(root) / t).is_file()
+            for t in tests
+        ):
             skipped.append({"job_id":candidate.id,"reason":"valid_repository_tests_required"})
             continue
         claimed=queue.claim_specific(candidate.id,worker_id=worker_id,lease_seconds=max(120,timeout+60))
@@ -48,7 +70,10 @@ def drain_verify_jobs(
         result={
             "kind":"VERIFY",
             "verification":{
-                "verdict":"PASS" if passed else "FAIL",
+                "verdict":"TESTS_ONLY" if passed else "FAIL",
+                "scope":"TEST_EXECUTION_ONLY",
+                "implementation_verified":False,
+                "task_completed":False,
                 "checks":[
                     {"name":"pytest","passed":py.returncode==0,"returncode":py.returncode,"tests":tests,
                      "output_tail":((py.stdout or "")+"\n"+(py.stderr or ""))[-8000:]},
@@ -60,6 +85,9 @@ def drain_verify_jobs(
                 "warnings":[],
             },
             "tests":tests,
+            "implementation_verified":False,
+            "task_completed":False,
+            "verification_scope":"TEST_EXECUTION_ONLY",
             "changed_files_inferred":False,
             "model_inference":False,
             "production_mutation":False,
