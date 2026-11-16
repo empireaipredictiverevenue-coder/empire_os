@@ -34,7 +34,7 @@ The existing CRM diagnostic now includes `POST /v1/revenue-crm/predictive-diagno
 
 The CSV is bounded to 32 KB and is neither persisted nor registered. The response labels the input customer-provided and unverified; it does not establish original-system authentication, financial finality or calibration eligibility. The preview cannot create an EmpireDB forecast record, customer delivery or execution authority. The native REV077/REV078 producer remains the path for authentic first-party source data and prospective native registration; a customer-provided CSV is not substituted for that evidence.
 
-The pinned CRM release wrapper is advanced to a new versioned release and verifies exact hashes for the API, preview model adapter and UI, as well as the added route. Focused isolated verification covers authenticated tenant binding, unauthenticated rejection, strict input validation and absence of database writes. Production activation, if released, reuses the same CRM process, loopback listener, identity, credentials and read-only database role; no migration or role change is involved.
+The pinned CRM release wrapper is advanced to a new versioned release and verifies exact hashes for the API, preview model adapter and UI, as well as the added route. Focused isolated verification covers authenticated tenant binding, unauthenticated rejection, strict input validation and absence of database writes. It was released in the existing CRM process at 2026-11-16 21:38 UTC on the same loopback listener, identity, credentials and read-only database role; no migration or role change was involved.
 
 ## 30-day scheduled forecast window
 
