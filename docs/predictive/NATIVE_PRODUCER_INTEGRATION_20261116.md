@@ -338,3 +338,48 @@ their ownership and reconcile through the existing owner before modifying
 them. A customer-released diagnostic and empirical revenue/accuracy claims
 require real customer source evidence; this pre-sales business has no sales
 history. Newscitations/research cannot supply that evidence.
+# Actual pinned Founder release reconciliation — 18:45 UTC
+
+The founder approved deployment of `bda992059` and one restart of the existing
+Founder API. The canonical source file was atomically installed after exact
+old-byte comparison, and only that service restarted at 18:42:30 UTC. Health
+and enterprise report guard checks passed, but the status response remained
+unchanged: this was NOT successful activation of the new HTTP reader.
+
+Correction to the preceding inspection: the running service imports
+`agentos_existing_founder_overlay:app`, which follows the original versioned
+release chain. Its actual status API is in
+`/home/ubuntu/empire_releases/property_birmingham_private_stage_20261022_v3/api/empire_os/predictive_cloud_status_api.py`,
+SHA256 `69c5824cb491bb2ff3c26c3b0b5351637987c50ff0b83732f4c156705915c863`.
+Unlike the canonical repository copy inspected first, this actual pinned
+reader ALREADY bounds reads, checks the complete component inventory and
+freshness consistency, filters private fields and projects outcome audit
+metadata. Those stronger safeguards MUST remain. The live cache header gap
+is confirmed; the repository's weak reader is not the active production one.
+
+Prepared a narrowly scoped wrapper using the EXISTING versioned release
+mechanism. It imports the exact hash-pinned original AgentOS composite,
+preserves all 87 routes and their IAM dependencies, adds the reviewed finite
+JSON/regular-file/path checks before the ORIGINAL strong status reader, and
+sets no-store/nosniff only on the existing Cloud status response. The original
+public-field allowlist and outcome projection remain authoritative. Original
+immutable release files were not changed. No second app/service/listener.
+
+Staged at
+`/opt/empire-ai/founder-read-releases/predictive-status-integrity-20261116v1/api`.
+The launcher preserves every current process argument except the app module
+and its reviewed app directory; it preserves the unit's environment and
+permissions. Production systemd launch configuration has NOT been changed.
+
+In-process checks on the actual composite release passed: health, Cloud
+status and enterprise JSON/HTML/Markdown return 200; status has the new
+snapshot_state plus cache headers; report guards retain their headers;
+all 87 routes unchanged. Isolated fixtures verify private-field filtering,
+component-attestation rejection and nonfinite rejection without production
+records. No network listener was started for these checks.
+
+Activation needs a second restart of only the same Founder API, because the
+first approved restart was spent on the canonical-source-only deployment.
+Do not silently count it as a completed deployment or bypass the pinned
+release. Original startup can be restored by removing only this new launcher
+drop-in and reloading/restarting that same service if activation fails.
