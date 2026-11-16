@@ -235,27 +235,30 @@ def _validate_governed_intake(
     )
 
 
-def _existing_promotion(
-    queue: LocalJobQueue,
-    key: str,
-) -> bool:
+def _existing_promotion_keys(queue: LocalJobQueue) -> set[str]:
+    """Index existing promotions ONCE per cycle, not once per PLAN.
+
+    The live Coder queue contains tens of thousands of VERIFY jobs. Reopening
+    them for each candidate made the 15-second owner cycle take 55 seconds.
+    """
+    keys: set[str] = set()
     for directory in (
-        queue.pending,
-        queue.running,
-        queue.delegated,
-        queue.completed,
-        queue.failed,
+        queue.pending, queue.running, queue.delegated,
+        queue.completed, queue.failed,
     ):
         for path in directory.glob("*.json"):
             try:
-                packet = json.loads(path.read_text(encoding="utf-8"))
+                raw = path.read_text(encoding="utf-8")
+                if '"plan_promotion_key"' not in raw:
+                    continue
+                packet = json.loads(raw)
             except (OSError, json.JSONDecodeError):
                 continue
             payload = packet.get("payload") or {}
-            if payload.get("plan_promotion_key") == key:
-                return True
-    return False
-
+            key = payload.get("plan_promotion_key")
+            if isinstance(key, str) and key:
+                keys.add(key)
+    return keys
 
 def _validate_contract(
     contract: Mapping[str, Any],
@@ -366,6 +369,15 @@ def run_plan_promotion_cycle(
             continue
         candidates.append((str(packet.get("updated_at") or ""), packet))
 
+    promoted_keys = (
+        _existing_promotion_keys(queue)
+        if any(
+            isinstance((packet.get("payload") or {}).get("promotion_contract"), Mapping)
+            for _, packet in candidates
+        )
+        else set()
+    )
+
     def promotion_priority(row: tuple[str, dict[str, Any]]) -> tuple[int, str]:
         timestamp, job = row
         payload = job.get("payload") or {}
@@ -382,11 +394,17 @@ def run_plan_promotion_cycle(
     # A genuine completed, scoped request must not be buried beneath 160
     # more recent advisory-only plans, which cannot grant write authority.
     for _, job in sorted(candidates, key=promotion_priority, reverse=True):
+        payload = dict(job.get("payload") or {})
+        contract = payload.get("promotion_contract")
+        # Already-promoted plans do not occupy the bounded scan budget.
+        if (
+            isinstance(contract, Mapping)
+            and _promotion_key(str(job.get("id")), contract) in promoted_keys
+        ):
+            continue
         if scanned >= bounded:
             break
         scanned += 1
-        payload = dict(job.get("payload") or {})
-        contract = payload.get("promotion_contract")
         if not isinstance(contract, Mapping):
             held.append({
                 "plan_job_id": job.get("id"),
@@ -421,7 +439,7 @@ def run_plan_promotion_cycle(
             continue
 
         key = _promotion_key(str(job.get("id")), contract)
-        if _existing_promotion(queue, key):
+        if key in promoted_keys:
             continue
 
         next_payload = {
@@ -469,6 +487,7 @@ def run_plan_promotion_cycle(
             payload=next_payload,
             priority=int(job.get("priority") or 50),
         )
+        promoted_keys.add(key)
         promoted.append({
             "source_plan_job_id": job.get("id"),
             "promoted_job_id": next_job.id,

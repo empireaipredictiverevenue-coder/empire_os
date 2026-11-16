@@ -301,3 +301,44 @@ def test_existing_owner_prioritizes_authorized_plan_over_newer_advisory_noise(tm
     assert len(pending) == 1
     assert pending[0].kind is JobKind.IMPLEMENT
     assert pending[0].payload["execution_mode"] == "ISOLATED_CANDIDATE_ONLY"
+
+
+def test_already_promoted_plans_do_not_consume_bounded_scan_slots(tmp_path):
+    root = workspace(tmp_path)
+    verify = {"kind": "VERIFY", "changed_files": ["empire_os/x.py"],
+              "tests": ["tests/test_x.py"]}
+    queue, older = _completed_plan(root, promotion_contract=verify)
+    _, newer = _completed_plan(root, promotion_contract=verify)
+
+    first = run_plan_promotion_cycle(root, max_jobs=1)
+    assert first["promoted_count"] == 1
+    assert first["promoted"][0]["source_plan_job_id"] == newer.id
+    second = run_plan_promotion_cycle(root, max_jobs=1)
+    assert second["promoted_count"] == 1
+    assert second["promoted"][0]["source_plan_job_id"] == older.id
+    third = run_plan_promotion_cycle(root, max_jobs=1)
+    assert third["promoted_count"] == 0
+    assert third["scanned_count"] == 0
+    assert len(queue.list_pending()) == 2
+
+
+def test_promotion_key_index_built_only_once_per_cycle(tmp_path, monkeypatch):
+    import empire_os.coder.plan_promotion as module
+
+    root = workspace(tmp_path)
+    for _ in range(4):
+        _completed_plan(root, promotion_contract={
+            "kind": "VERIFY", "changed_files": ["empire_os/x.py"],
+            "tests": ["tests/test_x.py"],
+        })
+    observed = []
+    original = module._existing_promotion_keys
+
+    def indexed(queue):
+        observed.append(True)
+        return original(queue)
+
+    monkeypatch.setattr(module, "_existing_promotion_keys", indexed)
+    result = run_plan_promotion_cycle(root, max_jobs=4)
+    assert result["promoted_count"] == 4
+    assert len(observed) == 1
