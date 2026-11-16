@@ -343,7 +343,8 @@ class EmpireDbProspectiveForecastRegistration:
                  model_version: str, observed_through: 'date',
                  horizon_days: int, sample_count: int, predicted_cents: int,
                  r_squared: float, evidence_confidence: float,
-                 direction: str, source_evidence_sha256: str) -> dict[str, Any]:
+                 direction: str, source_evidence_sha256: str,
+                 expected_registration_day: 'date | None' = None) -> dict[str, Any]:
         import math
         import re
         from datetime import date, datetime, timezone, timedelta
@@ -352,6 +353,8 @@ class EmpireDbProspectiveForecastRegistration:
         try:
             if type(tenant_id) is not str or str(UUID(tenant_id)) != tenant_id:
                 raise ValueError('canonical tenant required')
+            if expected_registration_day is not None and type(expected_registration_day) is not date:
+                raise ValueError('expected UTC registration date required')
             if (type(observed_through) is not date
                 or type(horizon_days) is not int or not 1 <= horizon_days <= 365
                 or type(sample_count) is not int or not 7 <= sample_count <= 120
@@ -412,6 +415,11 @@ class EmpireDbProspectiveForecastRegistration:
                         or type(when) is not datetime or when.utcoffset() is None):
                         raise ValueError('invalid trusted registration receipt')
                     utc_when = when.astimezone(timezone.utc)
+                    # Check before leaving the connection/committing. A
+                    # midnight rollover must roll back, not leave an immutable
+                    # record whose target differs from the model origin day.
+                    if expected_registration_day is not None and utc_when.date() != expected_registration_day:
+                        raise ValueError('registration UTC day changed')
                     now = datetime.now(timezone.utc)
                     if utc_when > now+timedelta(seconds=5) or utc_when < now-timedelta(seconds=60):
                         raise ValueError('registered timestamp outside live read window')

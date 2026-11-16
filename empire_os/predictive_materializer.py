@@ -260,6 +260,7 @@ def produce_native_revenue_forecast(
                 forbidden_session_users=(existing["reader_session_user"],),
             ).register(tenant_id=tenant, **expected,
                        observed_through=date.fromisoformat(rows[-1]["observed_date"]),
+                       expected_registration_day=now.date(),
                        source_evidence_sha256=digest)
             result["registration_write_committed"] = receipt["registration_write_committed"]
             result["registration_commit_state"] = "COMMITTED"

@@ -203,3 +203,13 @@ service-group 0440 or service-owned 0400 layouts, while rejecting additional
 users/groups, writable or world-readable variants. This does not
 weaken original vault custody. The added regression brings the focused total
 to **77 passed**.
+
+Final registration-clock hardening checks the expected issuance UTC date against
+the returned DB timestamp **inside** the registrar transaction. A midnight
+rollover therefore rolls back before commit rather than leaving an immutable
+forecast for a target day inconsistent with its model origin. Actual original
+REV078 SQL in the isolated fixture verified that refusal leaves zero rows.
+Final focused suite: **79 passed**, with one existing Starlette deprecation
+warning. The exact service-user ACL was positively verified in the real
+systemd service namespace using the service UID and a read-only invocation;
+original readers authenticated and correctly held on empty source history.

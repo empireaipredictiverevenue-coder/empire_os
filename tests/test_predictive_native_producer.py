@@ -326,3 +326,17 @@ def test_actual_systemd_named_user_acl_is_exact_and_excludes_other_users():
     wrong_group=list(entries);wrong_group[2]=(4,4,sentinel)
     assert not _service_credential_metadata_safe(info,acl(wrong_group))
     assert not _service_credential_metadata_safe(info,b'bad')
+
+
+def test_registration_origin_day_change_rolls_back_before_commit(source, cluster):
+    from datetime import datetime,timezone
+    from empire_os.predictive_registry_transport import EmpireDbProspectiveForecastRegistration, PredictiveRegistryTransportError
+    today=datetime.now(timezone.utc).date()
+    with pytest.raises(PredictiveRegistryTransportError):
+        EmpireDbProspectiveForecastRegistration(source['writer_dsn'],enabled=True).register(
+            tenant_id=TENANT,model_name='isolated-rollover',model_version='v1',
+            observed_through=today-timedelta(days=1),horizon_days=1,sample_count=7,
+            predicted_cents=900,r_squared=1.0,evidence_confidence=0.2,direction='up',
+            source_evidence_sha256='a'*64,expected_registration_day=today-timedelta(days=1))
+    with psycopg.connect(cluster[0]) as c:
+        assert c.execute('SELECT count(*) FROM public.predictive_forecasts').fetchone() == (0,)
