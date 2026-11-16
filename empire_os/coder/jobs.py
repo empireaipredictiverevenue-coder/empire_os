@@ -441,10 +441,21 @@ class LocalJobQueue:
         job: CoderJob,
         result: dict[str, Any] | None = None,
     ) -> CoderJob:
+        packet = dict(result or {})
+        if job.kind is JobKind.VERIFY:
+            verification = packet.get("verification")
+            verdict = (
+                str(verification.get("verdict") or "").upper()
+                if isinstance(verification, dict) else ""
+            )
+            if verdict not in {"PASS", "PASS_WITH_WARNINGS", "TESTS_ONLY"}:
+                return self.fail(
+                    job, "verification_verdict_not_successful", result=packet,
+                )
         return self._finish(
             job,
             status=JobStatus.COMPLETED,
-            result=dict(result or {}),
+            result=packet,
             error=None,
         )
 
