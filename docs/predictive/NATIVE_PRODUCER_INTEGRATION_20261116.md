@@ -213,3 +213,34 @@ Final focused suite: **79 passed**, with one existing Starlette deprecation
 warning. The exact service-user ACL was positively verified in the real
 systemd service namespace using the service UID and a read-only invocation;
 original readers authenticated and correctly held on empty source history.
+
+## Live scheduled acceptance — 17:52:23 UTC
+
+The original normal department-cycle invocation (not a manually written
+receipt) generated `predictive_revenue_runtime_latest.json` at
+**2026-11-16T17:52:23.432660+00:00** with:
+
+- `native_reader_credential_delivery=SYSTEMD_SERVICE_SCOPED`;
+- `source_preflight_origin=LIVE_ORIGINAL_RESTRICTED_READERS`;
+- original registry reader authenticated, scoped registered rows **0**;
+- producer `AUTHENTICATED_SOURCE_DAY_EMPTY_OR_INCOMPLETE`;
+- source reader called, one authenticated source day read before stopping on
+  the earliest empty input day; independent earlier live reads verified all
+  seven completed dates 9–15 November have zero qualifying events;
+- model not called, registration not attempted, no forecast write;
+- outcome readiness `NO_MATURE_NATIVE_FORECASTS`, calibration unauthorized.
+
+The existing timer and hook placement were unchanged; no service restart,
+HBA change, schema migration, synthetic production data, financial recognition
+or outbound occurred. The department cycle still exits at its original
+promotion gate because held/empty forecast evidence is not promotable; the
+observer executed successfully before that gate. This restriction was not
+suppressed or bypassed.
+
+Technical activation is complete. No additional deployment approval is pending
+for this approved delta. Genuine first-party qualifying history and later
+independently final financial outcomes remain business/evidence dependencies;
+they cannot be manufactured by connecting the database. Actual production
+forecast registration/readback is not claimed at N=0. The real native insert
+and independent exact restricted readback are verified only in the isolated
+PostgreSQL integration tests until legitimate source inputs exist.
