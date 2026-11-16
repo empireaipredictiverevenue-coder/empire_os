@@ -195,8 +195,11 @@ attributes and FORCE RLS. Both original and new persistent credential vaults
 remain root-owned 0700/0600.
 
 Actual service-namespace verification found systemd 259 delivers credentials as
-root:service-group 0440 inside its private read-only mount. The adapter was
-corrected to accept exactly that managed layout (or service-owned 0400), while
-rejecting wrong-group, writable or world-readable variants. This does not
+root:root 0440 plus an exact named service-user read ACL inside its private
+read-only mount. The 0440 group mode represents the ACL mask, not group access.
+The adapter now verifies the exact five-entry ACL: root read, service UID read,
+no group access, read mask and no other access. It also accepts protected
+service-group 0440 or service-owned 0400 layouts, while rejecting additional
+users/groups, writable or world-readable variants. This does not
 weaken original vault custody. The added regression brings the focused total
 to **77 passed**.

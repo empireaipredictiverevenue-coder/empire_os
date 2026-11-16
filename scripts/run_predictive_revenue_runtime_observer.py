@@ -37,14 +37,38 @@ GOVERNANCE = {
 }
 
 
-def _service_credential_metadata_safe(info) -> bool:
-    """systemd 259 uses root:service-group 0440 on its read-only mount."""
+def _service_credential_metadata_safe(info, acl: bytes | None = None) -> bool:
+    """Accept only systemd's protected owner/group or exact service-user ACL."""
     import stat
+    import struct
     mode = stat.S_IMODE(info.st_mode)
-    return stat.S_ISREG(info.st_mode) and (
+    if not stat.S_ISREG(info.st_mode):
+        return False
+    if (
         (info.st_uid == os.geteuid() and mode == 0o400)
         or (info.st_uid == 0 and mode == 0o440 and info.st_gid == os.getegid())
-    )
+    ):
+        return True
+    # systemd 259 may use root:root + user:<service-uid>:r--. The 0440
+    # group mode is then the POSIX ACL mask; the root group has no access.
+    if info.st_uid != 0 or info.st_gid != 0 or mode != 0o440 or not isinstance(acl, bytes):
+        return False
+    if len(acl) != 44 or struct.unpack_from("<I", acl)[0] != 2:
+        return False
+    entries = [struct.unpack_from("<HHI", acl, i) for i in range(4, 44, 8)]
+    sentinel = 0xffffffff
+    return set(entries) == {
+        (1, 4, sentinel), (2, 4, os.geteuid()), (4, 0, sentinel),
+        (16, 4, sentinel), (32, 0, sentinel),
+    }
+
+
+def _credential_fd_safe(fd: int) -> bool:
+    try:
+        acl = os.getxattr(fd, "system.posix_acl_access")
+    except OSError:
+        acl = None
+    return _service_credential_metadata_safe(os.fstat(fd), acl)
 
 
 def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
@@ -66,7 +90,7 @@ def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
     fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
         info = os.fstat(fd)
-        if not _service_credential_metadata_safe(info):
+        if not _credential_fd_safe(fd):
             raise ValueError("private service credential required")
         content = os.read(fd, 4097)
         if len(content) > 4096:
@@ -89,7 +113,7 @@ def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
                      os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
         try:
             info = os.fstat(fd)
-            if not _service_credential_metadata_safe(info):
+            if not _credential_fd_safe(fd):
                 raise ValueError("private writer credential required")
             content = os.read(fd, 4097)
             if len(content) > 4096:

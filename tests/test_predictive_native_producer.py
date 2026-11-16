@@ -310,3 +310,19 @@ def test_actual_systemd_root_service_group_credential_layout():
     assert not _service_credential_metadata_safe(info(0o460))
     assert not _service_credential_metadata_safe(info(0o440, gid=os.getegid()+1))
     assert not _service_credential_metadata_safe(info(0o640))
+
+
+def test_actual_systemd_named_user_acl_is_exact_and_excludes_other_users():
+    import stat,struct
+    from types import SimpleNamespace
+    from scripts.run_predictive_revenue_runtime_observer import _service_credential_metadata_safe
+    info=SimpleNamespace(st_mode=stat.S_IFREG|0o440,st_uid=0,st_gid=0)
+    sentinel=0xffffffff
+    entries=[(1,4,sentinel),(2,4,os.geteuid()),(4,0,sentinel),(16,4,sentinel),(32,0,sentinel)]
+    def acl(items):return struct.pack('<I',2)+b''.join(struct.pack('<HHI',*x) for x in items)
+    assert _service_credential_metadata_safe(info,acl(entries))
+    wrong_user=list(entries);wrong_user[1]=(2,4,os.geteuid()+1)
+    assert not _service_credential_metadata_safe(info,acl(wrong_user))
+    wrong_group=list(entries);wrong_group[2]=(4,4,sentinel)
+    assert not _service_credential_metadata_safe(info,acl(wrong_group))
+    assert not _service_credential_metadata_safe(info,b'bad')
