@@ -110,3 +110,14 @@ sudo /home/ubuntu/.docker/cli-plugins/docker-compose \
 
 No `-v`, no image prune, no force-removal of other projects. Named volumes
 and the prepared fixture remain intact.
+
+## 2026-11-16 21:47 UTC launch failure and correction
+
+- Root-authorized launch returned `COMPOSE_UP_EXIT_CODE=1` before any containers were created.
+- Exact error: `the --mount option requires BuildKit`; Compose warned that the Docker CLI Buildx plugin was missing and fell back to the classic builder.
+- Confirmed NVIDIA Dockerfile uses BuildKit-only `RUN --mount=type=cache` for dependency synchronization.
+- Installed official Docker Buildx `v0.39.0` in `/home/ubuntu/.docker/cli-plugins/docker-buildx`, user-scoped; verified release SHA256 `5fb31a097304fbf6dd4038649a0decf32c2b9510e4047acd7d68b9d700c46194`.
+- Updated pre-existing operator launcher `runtime/nvidia_ontology_eval/launch_and_capture.sh` to export `DOCKER_CONFIG=/home/ubuntu/.docker`, enable `DOCKER_BUILDKIT=1`, and verify hashes of Compose and Buildx before invoking privileged plugins.
+- Retested: Buildx v0.39.0 is detected under a simulated root HOME, shell passes `bash -n`, Compose configuration passes, and both binary hashes pass.
+- The NVIDIA application containers are **not yet running** after this correction. A founder-controlled rerun of `sudo bash /srv/empire_os/runtime/nvidia_ontology_eval/launch_and_capture.sh` is required because the connected remote shell lacks Docker socket privileges.
+- Do not report a full NVIDIA runtime or natural-language agent until container health, HTTP, model configuration, and MCP are tested.
