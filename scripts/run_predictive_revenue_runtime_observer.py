@@ -1,681 +1,174 @@
 #!/usr/bin/env python3
+"""Predictive Revenue OBSERVE: distinguish registered forecasts from research.
+
+Original observer (preserved in git history at 3d564d115) scanned every
+runtime JSON file for keyword fragments, then treated buyer/marketing/research
+nodes as forecasts. That was not a source-of-truth or an authenticated query.
+
+This narrow observer reads ONLY the original authenticated-source preflight.
+It does not admit forecasts merely because a JSON artifact claims provenance.
+Actual forecast registration and outcome validation remain owned by the
+existing private PostgreSQL tenant readers; no runtime-file shortcut exists.
+"""
 from __future__ import annotations
 
-import json
-import os
-from empire_os.runtime_evidence_prefilter import may_contain_key
-from collections import defaultdict
 from datetime import datetime, timezone
+import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 ROOT = Path("/srv/empire_os")
-
-OUT = (
-    ROOT
-    / "runtime/predictive_revenue_control/"
-      "predictive_revenue_runtime_latest.json"
+OUT_REL = "runtime/predictive_revenue_control/predictive_revenue_runtime_latest.json"
+PREFLIGHT_REL = (
+    "runtime/predictive_revenue_control/authenticated_source_preflight_latest.json"
 )
-
-IDENTITY_KEYS = (
-    "predictive_revenue_id",
-    "prediction_id",
-    "opportunity_id",
-    "campaign_id",
-    "product_id",
-    "offer_id",
-    "buyer_id",
-    "lead_id",
+PREFLIGHT_SCHEMA = "empire.predictive_revenue.authenticated_source_preflight.v1"
+MAX_SOURCE_AGE_SECONDS = 1800
+CONTROL_NAMES = (
+    "canonical_identity", "conflict_detection", "duplicate_detection",
+    "entity_classification", "input_quality", "output_quality", "quarantine",
 )
-
-INPUT_KEYS = (
-    "predictive_revenue_inputs",
-    "revenue_inputs",
-    "inputs",
-    "signals",
-    "signal",
-    "demand",
-    "intent",
-    "baseline",
-    "audience",
-    "market",
-    "niche",
-)
-
-OUTPUT_KEYS = (
-    "predicted_revenue",
-    "predictive_revenue",
-    "predicted_revenue_cents",
-    "expected_revenue",
-    "expected_revenue_cents",
-    "expected_canonical_revenue_contribution_cents",
-    "prediction_status",
-    "revenue_prediction",
-    "forecast_revenue",
-)
-
-EVIDENCE_KEYS = (
-    "predictive_revenue_evidence_refs",
-    "evidence_refs",
-    "evidence",
-    "source_refs",
-    "provenance",
-)
-
-MARKERS = (
-    "predictive_revenue",
-    "predicted_revenue",
-    "prediction_status",
-    "expected_canonical_revenue_contribution_cents",
-    "revenue_prediction",
-    "forecast_revenue",
-)
+GOVERNANCE = {
+    "prediction_mutation": False,
+    "db_write": False,
+    "outbound": False,
+    "action_authority_granted": False,
+}
 
 
-def present(v: Any) -> bool:
-    # Zero is valid.
-    return v not in (None, "", [], {})
-
-
-def atomic(payload):
-    OUT.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-
-    tmp = OUT.with_suffix(".tmp")
-
-    tmp.write_text(
-        json.dumps(
-            payload,
-            indent=2,
-            sort_keys=True,
-            default=str,
-        ) + "\n",
-        encoding="utf-8",
-    )
-
-    tmp.replace(OUT)
-
-
-def excluded(path: Path) -> bool:
-    rel = (
-        "/"
-        + str(
-            path.relative_to(ROOT)
-        ).replace("\\", "/")
-        + "/"
-    ).casefold()
-
-    return any(
-        part in rel
-        for part in (
-            "/tests/",
-            "/fixtures/",
-            "/docs/",
-            "/control_plane/",
-            "/predictive_revenue_control/",
-            "/worker_code/",
-        )
-    )
-
-
-def first(row, names):
-    for name in names:
-        if present(row.get(name)):
-            return row[name]
-
-    return None
-
-
-def predictive_record(row):
-    if not isinstance(row, dict):
-        return False
-
-    keys = [
-        str(k).casefold()
-        for k in row.keys()
-    ]
-
-    return any(
-        marker in key
-        for marker in MARKERS
-        for key in keys
-    )
-
-
-def output_signature(row):
-    values = {}
-
-    for key in OUTPUT_KEYS:
-        if key in row and present(row[key]):
-            values[key] = row[key]
-
-    return json.dumps(
-        values,
-        sort_keys=True,
-        default=str,
-    )
-
-
-observations = []
-
-
-def walk(
-    value,
-    *,
-    source,
-    path,
-    inherited,
-):
-    if isinstance(value, dict):
-
-        context = dict(
-            inherited
-        )
-
-        local_identity = first(
-            value,
-            IDENTITY_KEYS,
-        )
-
-        if present(local_identity):
-            context[
-                "identity"
-            ] = str(
-                local_identity
-            )
-
-            context[
-                "identity_source"
-            ] = path
-
-        if any(
-            present(value.get(k))
-            for k in INPUT_KEYS
-        ):
-            context[
-                "has_input"
-            ] = True
-
-        if any(
-            present(value.get(k))
-            for k in EVIDENCE_KEYS
-        ):
-            context[
-                "has_evidence"
-            ] = True
-
-        if predictive_record(value):
-
-            has_output = any(
-                present(value.get(k))
-                for k in OUTPUT_KEYS
-            )
-
-            observations.append({
-                "source":
-                    source,
-
-                "path":
-                    path,
-
-                "identity":
-                    context.get(
-                        "identity"
-                    ),
-
-                "identity_source":
-                    context.get(
-                        "identity_source"
-                    ),
-
-                "has_input":
-                    bool(
-                        context.get(
-                            "has_input"
-                        )
-                    ),
-
-                "has_evidence":
-                    bool(
-                        context.get(
-                            "has_evidence"
-                        )
-                    ),
-
-                "has_output":
-                    has_output,
-
-                "output_signature":
-                    output_signature(
-                        value
-                    ),
-
-                "output_keys":
-                    sorted(
-                        key
-                        for key
-                        in OUTPUT_KEYS
-                        if key in value
-                        and present(
-                            value[key]
-                        )
-                    ),
-            })
-
-        for key, child in value.items():
-            walk(
-                child,
-                source=source,
-                path=(
-                    f"{path}.{key}"
-                ),
-                inherited=context,
-            )
-
-    elif isinstance(value, list):
-
-        for i, child in enumerate(value):
-            walk(
-                child,
-                source=source,
-                path=(
-                    f"{path}[{i}]"
-                ),
-                inherited=inherited,
-            )
-
-
-for file in ROOT.joinpath(
-    "runtime"
-).rglob("*.json"):
-
-    if excluded(file):
-        continue
-
+def _load_bounded_preflight(path: Path) -> dict[str, Any] | None:
+    """Only local original preflight; refuse symlinks, oversize or malformed."""
     try:
-        if os.environ.get("EMPIRE_RUNTIME_EVIDENCE_PREFILTER") == "OBSERVE_V1_APPROVED":
-            source_bytes = file.read_bytes()
-            if not may_contain_key(source_bytes, MARKERS, casefold=True):
-                continue
-            data = json.loads(source_bytes.decode("utf-8"))
-        else:
-            data = json.loads(file.read_text())
-    except Exception:
-        continue
+        if path.is_symlink() or not path.is_file() or path.stat().st_size > 32768:
+            return None
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, ValueError):
+        return None
+    return raw if isinstance(raw, dict) else None
 
-    walk(
-        data,
-        source=str(
-            file.relative_to(ROOT)
-        ),
-        path="$",
-        inherited={
-            "identity": None,
-            "identity_source": None,
-            "has_input": False,
-            "has_evidence": False,
-        },
+
+def _utc(raw: Any) -> datetime | None:
+    if not isinstance(raw, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
+
+
+def evaluate_original_source(
+    source: Mapping[str, Any] | None, *,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    """A verified transport status is NOT a verified forecast row.
+
+    A positive aggregate source count cannot establish row identity, predicted
+    amount, input provenance, or pre-outcome timestamp custody. Never
+    synthesize a registered forecast, pass a candidate, or label verified.
+    """
+    now = now or datetime.now(timezone.utc)
+    if now.utcoffset() is None:
+        raise ValueError("aware current time required")
+    now = now.astimezone(timezone.utc)
+    source = source if isinstance(source, Mapping) else {}
+    observed = _utc(source.get("generated_at"))
+    fresh = bool(
+        observed is not None
+        and 0 <= (now - observed).total_seconds() <= MAX_SOURCE_AGE_SECONDS
     )
-
-
-candidate_count = len(
-    observations
-)
-
-resolved_identity = [
-    row
-    for row in observations
-    if row["identity"]
-]
-
-with_input = [
-    row
-    for row in observations
-    if row["has_input"]
-]
-
-with_output = [
-    row
-    for row in observations
-    if row["has_output"]
-]
-
-with_evidence = [
-    row
-    for row in observations
-    if row["has_evidence"]
-]
-
-
-# Fail-closed quality evaluation.
-for row in observations:
-    reasons = []
-
-    if not row["identity"]:
-        reasons.append(
-            "identity_unresolved"
-        )
-
-    if not row["has_input"]:
-        reasons.append(
-            "input_missing"
-        )
-
-    if not row["has_output"]:
-        reasons.append(
-            "output_missing"
-        )
-
-    if not row["has_evidence"]:
-        reasons.append(
-            "evidence_missing"
-        )
-
-    row["quality_reasons"] = (
-        reasons
+    schema_ok = source.get("schema_version") == PREFLIGHT_SCHEMA
+    source_mode_ok = source.get("mode") == "OBSERVE"
+    registry_auth = (
+        fresh and schema_ok and source_mode_ok
+        and source.get("registry_reader_authenticated_session") is True
+        and source.get("original_restricted_registry_reader_reused") is True
     )
+    count = source.get("registry_scoped_rows_observed")
+    count_valid = type(count) is int and 0 <= count <= 100000
+    scoped_count = count if registry_auth and count_valid else None
 
-    row["quality_decision"] = (
-        "QUARANTINE"
-        if reasons
-        else "PASS"
-    )
+    if not source:
+        status = "ORIGINAL_REGISTRY_PREFLIGHT_MISSING"
+    elif not schema_ok or not source_mode_ok:
+        status = "ORIGINAL_REGISTRY_PREFLIGHT_CONTRACT_INVALID"
+    elif not fresh:
+        status = "ORIGINAL_REGISTRY_PREFLIGHT_STALE"
+    elif not registry_auth or not count_valid:
+        status = "ORIGINAL_REGISTRY_READER_UNAUTHENTICATED"
+    elif count == 0:
+        status = "AUTHENTICATED_REGISTRY_EMPTY_NO_FORECASTS"
+    else:
+        status = "REGISTERED_ROWS_REQUIRE_CASE_LEVEL_FORECAST_VALIDATION"
 
-
-passed = [
-    row
-    for row in observations
-    if row["quality_decision"]
-        == "PASS"
-]
-
-quarantined = [
-    row
-    for row in observations
-    if row["quality_decision"]
-        == "QUARANTINE"
-]
-
-
-# --------------------------------------------------
-# EXACT IDENTITY / DUPLICATE / CONFLICT CONTROLS
-# --------------------------------------------------
-
-by_identity = defaultdict(
-    list
-)
-
-for row in resolved_identity:
-    by_identity[
-        row["identity"]
-    ].append(row)
-
-
-duplicate_identities = sorted(
-    identity
-    for identity, rows
-    in by_identity.items()
-    if len(rows) > 1
-)
-
-
-conflicts = []
-
-for identity, rows in by_identity.items():
-
-    signatures = {
-        row[
-            "output_signature"
-        ]
-        for row in rows
-        if row[
-            "output_signature"
-        ]
-        != "{}"
+    # Previous 1247 matches were nested research fields, not 1247 actual
+    # forecast records. A valid source must come through the original private
+    # tenant-bound reader with row-by-row issuance and outcome custody.
+    return {
+        "schema_version": "empire-predictive-revenue-contextual-runtime-v3",
+        "generated_at": now.isoformat(),
+        "lane": "predictive_revenue",
+        "mode": "OBSERVE",
+        "status": status,
+        "source_scope": "ORIGINAL_TENANT_BOUND_EMPIREDB_REGISTRY_ONLY",
+        "classification_contract": "ORIGINAL_AUTHENTICATED_FORECAST_ROW_REQUIRED",
+        "source_preflight_artifact": PREFLIGHT_REL,
+        "source_preflight_fresh": fresh,
+        "original_registry_reader_authenticated": bool(registry_auth),
+        "original_registry_scoped_rows_reported": scoped_count,
+        "registered_forecast_rows_independently_inspected": False,
+        "research_runtime_json_scanned_as_forecast_candidates": False,
+        "research_records_released_or_deleted": False,
+        "candidate_count": 0,
+        "identity_resolved_count": 0,
+        "identity_unresolved_count": 0,
+        "input_present_count": 0,
+        "output_present_count": 0,
+        "evidence_present_count": 0,
+        "passed_count": 0,
+        "quarantined_count": 0,
+        "duplicate_identity_count": 0,
+        "duplicate_identities": [],
+        "conflict_count": 0,
+        "conflicts": [],
+        "runtime_verified_controls": [],
+        "runtime_unverified_controls": list(CONTROL_NAMES),
+        "real_forecast_qualifications_verified": False,
+        "genuine_forecast_outcome_pairs_verified": False,
+        "model_calibration_authorized": False,
+        "commercial_authority": "none",
+        "execution_authority": "none",
+        "governance": dict(GOVERNANCE),
     }
 
-    if len(signatures) > 1:
-        conflicts.append({
-            "identity":
-                identity,
 
-            "observation_count":
-                len(rows),
-
-            "distinct_output_count":
-                len(signatures),
-        })
-
-
-# Controls prove that the resolver/evaluator executes
-# across the detected real runtime population.
-#
-# An unresolved identity, duplicate, conflict or bad input
-# is a detected condition — not evidence that the control
-# itself is missing.
-
-identity_control_effective = (
-    candidate_count > 0
-    and len(resolved_identity) > 0
-)
-
-input_control_effective = (
-    candidate_count > 0
-    and len(with_input) > 0
-)
-
-duplicate_control_effective = (
-    identity_control_effective
-)
-
-conflict_control_effective = (
-    identity_control_effective
-)
+def run(*, root: Path = ROOT, now: datetime | None = None,
+        write: bool = True) -> dict[str, Any]:
+    output = root / OUT_REL
+    source = _load_bounded_preflight(root / PREFLIGHT_REL)
+    report = evaluate_original_source(source, now=now)
+    if write:
+        # Original runtime-observer output only; never alter sources, registry,
+        # control-plane bindings, customer data or external services.
+        output.parent.mkdir(parents=True, exist_ok=True)
+        tmp = output.with_suffix(".tmp")
+        tmp.write_text(
+            json.dumps(report, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp.replace(output)
+    return report
 
 
-proof = {
-    "entity_classification":
-        candidate_count > 0,
-
-    "canonical_identity":
-        identity_control_effective,
-
-    "duplicate_detection":
-        duplicate_control_effective,
-
-    "input_quality":
-        input_control_effective,
-
-    "output_quality":
-        len(with_output) > 0,
-
-    "conflict_detection":
-        conflict_control_effective,
-
-    "quarantine":
-        candidate_count > 0
-        and (
-            len(passed)
-            + len(quarantined)
-            == candidate_count
-        ),
-}
-
-
-verified = [
-    control
-    for control, ok
-    in proof.items()
-    if ok
-]
-
-unverified = [
-    control
-    for control, ok
-    in proof.items()
-    if not ok
-]
-
-
-payload = {
-    "schema_version":
-        "empire-predictive-revenue-contextual-runtime-v2",
-
-    "generated_at":
-        datetime.now(
-            timezone.utc
-        ).isoformat(),
-
-    "lane":
-        "predictive_revenue",
-
-    "mode":
-        "OBSERVE",
-
-    "status":
-        (
-            "VERIFIED_RUNTIME"
-            if verified
-            else "NO_RUNTIME_PROOF"
-        ),
-
-    "candidate_count":
-        candidate_count,
-
-    "identity_resolved_count":
-        len(
-            resolved_identity
-        ),
-
-    "identity_unresolved_count":
-        candidate_count
-        - len(
-            resolved_identity
-        ),
-
-    "input_present_count":
-        len(with_input),
-
-    "output_present_count":
-        len(with_output),
-
-    "evidence_present_count":
-        len(with_evidence),
-
-    "passed_count":
-        len(passed),
-
-    "quarantined_count":
-        len(quarantined),
-
-    "duplicate_identity_count":
-        len(
-            duplicate_identities
-        ),
-
-    "duplicate_identities":
-        duplicate_identities[
-            :100
-        ],
-
-    "conflict_count":
-        len(conflicts),
-
-    "conflicts":
-        conflicts[:100],
-
-    "runtime_verified_controls":
-        verified,
-
-    "runtime_unverified_controls":
-        unverified,
-
-    "governance": {
-        "prediction_mutation":
-            False,
-
-        "db_write":
-            False,
-
-        "outbound":
-            False,
-
-        "action_authority_granted":
-            False,
-    },
-}
-
-atomic(payload)
-
-print(
-    "STATUS:",
-    payload["status"],
-)
-
-print(
-    "CANDIDATES:",
-    candidate_count,
-)
-
-print(
-    "IDENTITY_RESOLVED:",
-    len(resolved_identity),
-)
-
-print(
-    "IDENTITY_UNRESOLVED:",
-    payload[
-        "identity_unresolved_count"
-    ],
-)
-
-print(
-    "INPUT_PRESENT:",
-    len(with_input),
-)
-
-print(
-    "OUTPUT_PRESENT:",
-    len(with_output),
-)
-
-print(
-    "EVIDENCE_PRESENT:",
-    len(with_evidence),
-)
-
-print(
-    "PASSED:",
-    len(passed),
-)
-
-print(
-    "QUARANTINED:",
-    len(quarantined),
-)
-
-print(
-    "DUPLICATE_IDENTITIES:",
-    len(
-        duplicate_identities
-    ),
-)
-
-print(
-    "CONFLICTS:",
-    len(conflicts),
-)
-
-print(
-    "VERIFIED:",
-    ",".join(verified)
-    or "none",
-)
-
-print(
-    "UNVERIFIED:",
-    ",".join(unverified)
-    or "none",
-)
+if __name__ == "__main__":
+    result = run()
+    print(json.dumps({
+        "status": result["status"],
+        "candidate_count": result["candidate_count"],
+        "quarantined_count": result["quarantined_count"],
+        "original_registry_scoped_rows_reported":
+            result["original_registry_scoped_rows_reported"],
+        "research_runtime_json_scanned_as_forecast_candidates": False,
+        "mode": result["mode"],
+        "database_writes": False,
+    }, sort_keys=True))

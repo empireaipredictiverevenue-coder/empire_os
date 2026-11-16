@@ -66,7 +66,12 @@ def test_valid_proof_never_touches_production(tmp_path, lane):
     # Live canonical bindings can legitimately change under concurrent agents.
     # The entrypoint runs only against the disposable tmp_path fixture.
     result, _, _ = run_isolated(tmp_path, lane, lambda d: None)
-    if lane == 'campaigns' and 'FAIL: promotion incomplete: action_authority' in result.stderr:
+    proof = json.loads((ROOT / LANES[lane][1]).read_text())
+    if lane == 'predictive_revenue' and proof.get('status') != 'VERIFIED_RUNTIME':
+        # Source-scope correction: unsupported research detections must NOT
+        # recreate old verified controls or modify canonical bindings.
+        assert result.returncode != 0
+    elif lane == 'campaigns' and 'FAIL: promotion incomplete: action_authority' in result.stderr:
         # An incomplete canonical baseline must fail closed, not be manufactured by the test.
         assert result.returncode != 0
     else:
