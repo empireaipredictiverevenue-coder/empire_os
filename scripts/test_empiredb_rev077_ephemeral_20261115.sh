@@ -39,8 +39,9 @@ CREATE FUNCTION public.empire_current_tenant_id() RETURNS uuid
  AS $$SELECT tenant_id FROM public.empire_tenant_role_bindings
  WHERE role_name=session_user AND active LIMIT 1$$;
 REVOKE ALL ON FUNCTION public.empire_current_tenant_id() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
- TO empire_predictive_revenue_evidence_reader;
+-- Match production REV052: this role deliberately has NO direct EXECUTE
+-- on the trusted tenant resolver. REV077 must validate session_user inside
+-- the original SECURITY DEFINER census function.
 -- REV051 prior installation is separately tested. Only existence required here.
 CREATE FUNCTION public.read_predictive_revenue_event_v1(uuid,text)
  RETURNS integer LANGUAGE sql STABLE SECURITY DEFINER SET search_path=''
@@ -96,6 +97,11 @@ psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
 psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/078_predictive_future_forecast_registration_held.sql"
 echo REV076_REV077_REV078_DISPOSABLE_DDL=PASS
+if psql -X -v ON_ERROR_STOP=1 -qAt -U census_a -d empiredb \
+ -c "BEGIN READ ONLY; SET LOCAL ROLE empire_predictive_revenue_evidence_reader; SELECT public.empire_current_tenant_id(); ROLLBACK;" >/dev/null 2>&1; then
+ echo REV052_DIRECT_TENANT_RESOLVER_PERMISSION_LEAK; exit 16
+fi
+echo ORIGINAL_CENSUS_ROLE_CANNOT_DIRECTLY_RESOLVE_TENANT=PASS
 if psql -X -v ON_ERROR_STOP=1 -q -d empiredb \
  -f "$root/migrations/empiredb/078_predictive_future_forecast_registration_held.sql" >/dev/null 2>&1; then
  echo REV078_DUPLICATE_RELEASE_ALLOWED; exit 10

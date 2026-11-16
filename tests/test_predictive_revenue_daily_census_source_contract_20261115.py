@@ -73,7 +73,7 @@ class _Cursor:
         self.calls.append((sql, params))
 
     def fetchone(self):
-        return (TENANT,)
+        return ("empiredb", "on", "synthetic_tenant_login")
 
     def fetchall(self):
         return [self.row]
@@ -109,6 +109,10 @@ def test_reader_verifies_at_read_completion_not_before_query():
     assert got["eligible_for_revenue_forecast_calibration"] is False
     assert any("SET TRANSACTION READ ONLY" in sql for sql, _ in reader.calls)
     assert any("SET LOCAL ROLE empire_predictive_revenue_evidence_reader" in sql
+               for sql, _ in reader.calls)
+    assert any("current_setting('transaction_read_only')" in sql
+               for sql, _ in reader.calls)
+    assert all("SELECT public.empire_current_tenant_id()" not in sql
                for sql, _ in reader.calls)
 
 

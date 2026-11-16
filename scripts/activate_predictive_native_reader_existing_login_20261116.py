@@ -186,7 +186,27 @@ def validate_authenticated_result(result: dict)->dict:
         or result.get("model_calibration_ready") is not False
         or result.get("customer_release_authorized") is not False
         or result.get("database_writes") is not False):
-        raise ActivationHold("NATIVE_READER_POSTGRANT_TENANT_AUTHENTICATION_UNVERIFIED")
+        # Only bounded internal enum statuses, never role IDs, SQL errors,
+        # tenant identity, passfile contents or customer/source payloads.
+        allowed_registry = {
+            "REGISTRY_EMPTY_COVERAGE_UNKNOWN_HOLD",
+            "TENANT_BOUND_REGISTRY_ROWS_OBSERVED_UNVERIFIED",
+            "REGISTRY_READ_BOUND_REACHED_HOLD",
+            "REGISTRY_RESTRICTED_READ_OR_POLICY_FAILED",
+            "DEDICATED_REGISTRY_CREDENTIAL_UNAVAILABLE",
+        }
+        allowed_census = {
+            "DAY_CENSUS_INCOMPLETE_HOLD",
+            "DAY_SOURCE_CENSUS_CANDIDATE",
+            "CENSUS_RESTRICTED_READ_OR_POLICY_FAILED",
+            "DEDICATED_CENSUS_CREDENTIAL_UNAVAILABLE",
+        }
+        registry = result.get("registry_source_status")
+        census = result.get("census_source_status")
+        stage = ("REGISTRY=" + (registry if registry in allowed_registry else "UNKNOWN")
+                 + ",CENSUS=" + (census if census in allowed_census else "UNKNOWN"))
+        raise ActivationHold(
+            "NATIVE_READER_POSTGRANT_TENANT_AUTHENTICATION_UNVERIFIED:" + stage)
     return result
 
 

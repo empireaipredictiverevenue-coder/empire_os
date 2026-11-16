@@ -157,3 +157,15 @@ def test_nonroot_cannot_execute_grant(monkeypatch, capsys):
     monkeypatch.setattr(a.os,"geteuid",lambda:1000)
     assert a.main(["--apply-founder-approved"])==2
     assert "EXPLICIT_FOUNDER_ROOT_OPERATOR_REQUIRED" in capsys.readouterr().out
+
+
+def test_failed_source_read_reports_stage_codes_not_db_errors_or_credentials():
+    broken=success_source()
+    broken["census_reader_authenticated_session"]=False
+    broken["census_source_status"]="CENSUS_RESTRICTED_READ_OR_POLICY_FAILED"
+    with pytest.raises(a.ActivationHold,match="CENSUS=CENSUS_RESTRICTED_READ_OR_POLICY_FAILED"):
+        a.validate_authenticated_result(broken)
+    broken["census_source_status"]="secret:password=private_customer_info"
+    with pytest.raises(a.ActivationHold,match="CENSUS=UNKNOWN") as raised:
+        a.validate_authenticated_result(broken)
+    assert "private_customer_info" not in str(raised.value)

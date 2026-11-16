@@ -121,14 +121,24 @@ def read_daily_revenue_census(
                 cursor.execute("SET LOCAL statement_timeout = '4000ms'")
                 cursor.execute("SET LOCAL ROLE "+READ_ROLE)
                 if require_session_tenant_binding:
-                    # Existing trusted resolver binds PostgreSQL session_user.
-                    # A tenant query parameter or caller-set GUC is NEVER proof.
-                    cursor.execute("SELECT public.empire_current_tenant_id()")
-                    binding=cursor.fetchone()
-                    if (type(binding) not in (tuple,list) or len(binding)!=1
-                        or not binding[0] or str(binding[0])!=tenant_id):
+                    # The original REV052 evidence role intentionally has
+                    # NO direct EXECUTE on empire_current_tenant_id(). The
+                    # REV077 SECURITY DEFINER census function performs the
+                    # trusted session_user -> tenant check itself, then
+                    # returns a tenant-scoped result checked below.
+                    # Validate the authenticated session and read-only DB,
+                    # not a forbidden direct call to the tenant resolver.
+                    cursor.execute(
+                        "SELECT current_database(),"
+                        "current_setting('transaction_read_only'),session_user"
+                    )
+                    identity=cursor.fetchone()
+                    if (type(identity) not in (tuple,list) or len(identity)!=3
+                        or identity[0]!="empiredb" or identity[1]!="on"
+                        or not isinstance(identity[2],str)
+                        or not identity[2] or identity[2]==READ_ROLE):
                         raise CanonicalRevenueEvidenceUnavailable(
-                            "CENSUS_SESSION_TENANT_NOT_AUTHENTICATED")
+                            "CENSUS_CANONICAL_SESSION_NOT_AUTHENTICATED")
                 cursor.execute(CENSUS_SQL,(day_utc,tenant_id))
                 rows=cursor.fetchall()
     except Exception:
