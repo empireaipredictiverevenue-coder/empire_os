@@ -237,6 +237,73 @@ def evaluate_original_source(
     }
 
 
+def review_newsjack_research(root: Path, env: Mapping[str, str], *, now: datetime) -> dict[str, Any]:
+    """Read original MediaOS references through the original JEV adapter.
+
+    This is research context, never a native revenue-model observation or a
+    commercial scope assertion. Runs on this observer's existing schedule.
+    """
+    result = {
+        "status": "DISABLED", "source": "runtime/media_os/last30days/research_handoff_latest.json",
+        "research_only": True, "revenue_model_input_authorized": False,
+        "forecast_registered": False, "database_writes": False,
+        "lookback_days": 30, "topics": [],
+    }
+    if env.get("EMPIRE_PREDICTIVE_NEWSJACK_RESEARCH_ENABLED") != "1":
+        return result
+    result["status"] = "SOURCE_OR_ADAPTER_UNAVAILABLE_HOLD"
+    sector = env.get("EMPIRE_PREDICTIVE_NEWSJACK_RESEARCH_SECTOR", "")
+    market = env.get("EMPIRE_PREDICTIVE_NEWSJACK_RESEARCH_MARKET", "")
+    if sector not in ("ai", "roofing", "solar", "hvac", "dental") or market not in ("GB", "US"):
+        result["status"] = "EXPLICIT_RESEARCH_SCOPE_REQUIRED"
+        return result
+    try:
+        from hashlib import sha256
+        from empire_os.jev_newsjack_adapters import signals_from_last30days_research_handoff
+        from empire_os.jev_newsjack_traffic import review_newsjack_jev_traffic
+        path = root / result["source"]
+        if (path.resolve() != path.absolute() or not path.is_file()
+                or not 0 < path.stat().st_size <= 250000):
+            return result
+        raw = path.read_bytes()
+        if len(raw) > 250000:
+            return result
+        handoff = json.loads(raw)
+        if not isinstance(handoff, dict) or not isinstance(handoff.get("topics"), list):
+            return result
+        # Only the existing approved feed topics; do not invent news queries.
+        # Scope below is operator research selection, never proven geography.
+        from empire_os.media_last30days_cycle import APPROVED_TOPICS
+        topics = []
+        for row in handoff["topics"]:
+            if not isinstance(row, dict) or row.get("topic") not in APPROVED_TOPICS:
+                raise ValueError("unapproved research topic")
+            topic = row["topic"]
+            expected_sector = "roofing" if topic == "AI lead generation for roofing contractors" else "ai"
+            if sector != expected_sector:
+                topics.append({"topic": topic, "status": "OUTSIDE_CONFIGURED_RESEARCH_SECTOR"})
+                continue
+            intake = signals_from_last30days_research_handoff(
+                handoff, topic=topic, sector=sector, market=market, as_of=now.isoformat())
+            review = review_newsjack_jev_traffic(
+                intake["signals"], as_of=now.isoformat(),
+                approved_sectors=[sector], approved_markets=[market])
+            topics.append({
+                "topic": topic, "status": "ORIGINAL_JEV_RESEARCH_REVIEWED",
+                "mapped_count": intake["mapped_count"], "rejected_count": intake["rejected_count"],
+                "duplicate_count": intake["duplicate_count"], "status_counts": review["status_counts"],
+                "source_references": [s["evidence_refs"][0] for s in intake["signals"]],
+            })
+        result.update(status="ORIGINAL_LAST30DAYS_NEWSJACK_RESEARCH_REVIEWED",
+                      source_generated_at=handoff["generated_at"], source_sha256=sha256(raw).hexdigest(),
+                      research_sector=sector, research_market=market,
+                      research_scope_verified=False, topics=topics)
+    except Exception:
+        # Never export source text, raw exception messages or provider data.
+        result["status"] = "SOURCE_OR_ADAPTER_UNAVAILABLE_HOLD"
+    return result
+
+
 def run(*, root: Path = ROOT, now: datetime | None = None,
         write: bool = True,
         producer_environment: Mapping[str, str] | None = None) -> dict[str, Any]:
@@ -294,6 +361,8 @@ def run(*, root: Path = ROOT, now: datetime | None = None,
         report["governance"]["prediction_mutation"] = native["registration_attempted"]
         report["governance"]["db_write"] = native["registration_commit_state"] in (
             "UNKNOWN", "COMMITTED", "EXACT_RECORD_PRESENT")
+    report["newsjack_research"] = review_newsjack_research(
+        root, env, now=now or datetime.now(timezone.utc))
     if write:
         # Original output path only; no second scheduler or receipt registry.
         output.parent.mkdir(parents=True, exist_ok=True)
