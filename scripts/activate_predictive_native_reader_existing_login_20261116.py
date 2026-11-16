@@ -9,7 +9,7 @@ original source preflight report after a real SCRAM-authenticated DB session.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import json
 import os
 from pathlib import Path
@@ -253,16 +253,117 @@ def apply(*, read_sql=pg, verify=authenticated_readback,
     }
 
 
+def _safe_error_category(exc: Exception) -> str:
+    """Never expose actual DB exception strings, credentials or source rows."""
+    sqlstate=getattr(exc,"sqlstate",None)
+    if sqlstate=="42501":return "SQL_PERMISSION_DENIED_42501"
+    if sqlstate=="42883":return "SQL_FUNCTION_MISSING_42883"
+    if sqlstate=="42P01":return "SQL_RELATION_MISSING_42P01"
+    if sqlstate=="P0001":return "SOURCE_DAY_INCOMPLETE_OR_TENANT_REJECTED_P0001"
+    lowered=str(exc).lower()
+    if "no password supplied" in lowered:
+        return "PGPASS_NO_MATCHING_PASSWORD"
+    if "password authentication failed" in lowered:
+        return "SCRAM_PASSWORD_REJECTED"
+    if "pg_hba.conf" in lowered or "peer authentication failed" in lowered:
+        return "PG_HBA_AUTH_RULE_REJECTED"
+    if "connection refused" in lowered or "no such file or directory" in lowered:
+        return "PG_SOCKET_NOT_ACCESSIBLE"
+    if sqlstate is not None:return "SQLSTATE_OTHER"
+    return "CLIENT_DB_CONNECTION_OR_SOURCE_READ_UNAVAILABLE"
+
+
+def diagnose_readonly(*, path_provider=protected_credential_path,
+                      catalog_reader=read_catalog, connect_factory=None)->dict:
+    """Root-only, original vault, no grant, source mutation or credentials out."""
+    import psycopg
+    from psycopg.conninfo import make_conninfo
+    stage="ORIGINAL_VAULT_CHECK"
+    steps={
+        "original_root_vault_valid":False,
+        "passfile_target_matches":False,
+        "scram_authenticated_login":False,
+        "canonical_read_only_transaction":False,
+        "original_restricted_census_role_set":False,
+        "original_rev077_census_query_executed":False,
+    }
+    membership=False
+    try:
+        passfile=path_provider()
+        steps["original_root_vault_valid"]=True
+        # Do not print line contents, password length or hashes. This
+        # structural metadata check uses only the four public connection
+        # selectors, not the credential itself.
+        stage="ORIGINAL_PGPASS_TARGET"
+        with passfile.open("r",encoding="utf-8") as handle:
+            lines=handle.read(8193).splitlines()
+        target=[line.split(":",4)[:4] for line in lines if line and not line.startswith("#")]
+        steps["passfile_target_matches"]=any(
+            prefix==["/var/run/postgresql","5432","empiredb",LOGIN]
+            for prefix in target
+        )
+        if not steps["passfile_target_matches"]:
+            return {"status":"ORIGINAL_READER_DIAGNOSTIC_HOLD",
+                "stage":"ORIGINAL_PGPASS_TARGET","failure":"PGPASS_TARGET_MISMATCH",
+                "observations":steps,"database_writes":False}
+        stage="ORIGINAL_CATALOGUE_READ"
+        membership=catalog_reader()["existing_membership"]
+        stage="ORIGINAL_SCRAM_CONNECTION"
+        dsn=make_conninfo(host="/var/run/postgresql",port=5432,
+            dbname="empiredb",user=LOGIN,passfile=str(passfile),connect_timeout=5)
+        connect_factory=connect_factory or psycopg.connect
+        with connect_factory(dsn) as connection:
+            steps["scram_authenticated_login"]=True
+            with connection.cursor() as cursor:
+                stage="CANONICAL_READER_TRANSACTION"
+                cursor.execute("SET TRANSACTION READ ONLY")
+                cursor.execute("SELECT current_database(),session_user,"
+                    "current_setting('transaction_read_only')")
+                row=cursor.fetchone()
+                if row!=("empiredb",LOGIN,"on"):
+                    raise ActivationHold("ORIGINAL_READ_ONLY_SESSION_IDENTITY_DRIFT")
+                steps["canonical_read_only_transaction"]=True
+                stage="ORIGINAL_REV052_CENSUS_ROLE"
+                cursor.execute("SET LOCAL ROLE " + ROLE)
+                steps["original_restricted_census_role_set"]=True
+                stage="ORIGINAL_REV077_SOURCE_DAY"
+                cursor.execute(
+                    "SELECT day_utc,scope_tenant_id,global_event_count,"
+                    "valid_tenant_event_count,tenant_amount_cents,"
+                    "global_invalid_count,tenant_invalid_count,snapshot_at "
+                    "FROM public.read_predictive_revenue_day_v1(%s::date,%s::text)",
+                    ((datetime.now(timezone.utc).date()-timedelta(days=1)),TENANT))
+                row=cursor.fetchone()
+                if row is None or len(row)!=8 or row[1]!=TENANT:
+                    raise ActivationHold("CENSUS_SCOPED_RESULT_UNVERIFIED")
+                steps["original_rev077_census_query_executed"]=True
+    except Exception as exc:
+        return {"status":"ORIGINAL_READER_DIAGNOSTIC_HOLD",
+            "stage":stage,"failure":_safe_error_category(exc),
+            "observations":steps,"registry_role_currently_granted":membership,
+            "database_writes":False}
+    return {"status":"ORIGINAL_READER_DIAGNOSTIC_PASSED",
+        "stage":"COMPLETED","failure":None,
+        "observations":steps,"registry_role_currently_granted":membership,
+        "database_writes":False,
+        "independent_financial_actuals_verified":False}
+
+
 def main(argv: list[str]|None=None)->int:
     parser=argparse.ArgumentParser()
     mode=parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--preflight",action="store_true")
+    mode.add_argument("--diagnose-readonly",action="store_true")
     mode.add_argument("--apply-founder-approved",action="store_true")
     args=parser.parse_args(argv)
     if os.geteuid()!=0 or Path.cwd().resolve()!=ROOT:
         print(json.dumps({"status":"EXPLICIT_FOUNDER_ROOT_OPERATOR_REQUIRED"}))
         return 2
     try:
+        if args.diagnose_readonly:
+            observation=diagnose_readonly()
+            print(json.dumps(observation,sort_keys=True))
+            return 0 if observation["status"]=="ORIGINAL_READER_DIAGNOSTIC_PASSED" else 2
         protected_credential_path()
         state=read_catalog()
         if args.preflight:
