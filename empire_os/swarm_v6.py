@@ -7,7 +7,6 @@ accept terms, fulfil work, or recognize revenue.
 """
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
@@ -16,22 +15,27 @@ from typing import Any
 
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
-from empire_os.coder.worker import CoderTaskWorker
+from empire_os.coder.verify_fastpath import drain_verify_jobs
 
 
 @dataclass(frozen=True)
 class SwarmLane:
     key: str
     role: str
-    changed_files: tuple[str, ...]
+    reviewed_files: tuple[str, ...]
     tests: tuple[str, ...]
+
+    @property
+    def changed_files(self) -> tuple[str, ...]:
+        """Legacy QA lane selection, not evidence that a task patched these files."""
+        return self.reviewed_files
 
 
 LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="revenue_payments",
         role="Revenue / Payments specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/commercial_terms_materializer.py",
             "empire_os/commercial_terms_readiness.py",
             "empire_os/bsc_payment_evidence.py",
@@ -47,7 +51,7 @@ LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="closer_outreach",
         role="Closer / Outreach specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/closer_reply_worker.py",
             "empire_os/closer_reply_draft.py",
             "empire_os/buyer_capacity_intake.py",
@@ -67,7 +71,7 @@ LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="growth_conversion",
         role="Growth / Conversion specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/conversion_intelligence.py",
             "empire_os/conversion_runtime.py",
             "empire_os/advertising_landing_feedback.py",
@@ -87,7 +91,7 @@ LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="search_opportunity",
         role="Search / Opportunity specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/search_intelligence/attribution.py",
             "empire_os/search_intelligence/attribution_review.py",
             "empire_os/search_intelligence/scoring.py",
@@ -103,7 +107,7 @@ LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="platform_saas",
         role="Platform / SaaS specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/saas_readiness.py",
             "empire_os/saas_usage_billing.py",
             "empire_os/enterprise_readiness.py",
@@ -119,7 +123,7 @@ LANES: tuple[SwarmLane, ...] = (
     SwarmLane(
         key="integration_qa",
         role="Integration / QA specialist",
-        changed_files=(
+        reviewed_files=(
             "empire_os/astra_dispatcher.py",
             "empire_os/founder_dashboard.py",
             "empire_os/circuit_breaker.py",
@@ -146,32 +150,6 @@ def _count_jobs(queue: LocalJobQueue) -> dict[str, int]:
     }
 
 
-def _worker_once(
-    workspace: Path,
-    runtime_root: Path,
-) -> dict[str, Any]:
-    coder = EmpireCoder(workspace, runtime_root=runtime_root)
-    queue = LocalJobQueue(workspace, runtime_root=runtime_root)
-    job = CoderTaskWorker(coder, queue).run_once()
-    if job is None:
-        return {"status": "idle"}
-    result = job.result if isinstance(job.result, dict) else {}
-    verification = (
-        result.get("verification")
-        if isinstance(result.get("verification"), dict)
-        else {}
-    )
-    return {
-        "job_id": job.id,
-        "task_id": job.task_id,
-        "status": job.status.value,
-        "error": job.error,
-        "verdict": verification.get("verdict"),
-        "model_inference": result.get("model_inference"),
-        "production_mutation": result.get("production_mutation"),
-    }
-
-
 def run_swarm_cycle(
     workspace: str | Path = "/srv/empire_os",
     *,
@@ -194,10 +172,10 @@ def run_swarm_cycle(
         for lane in LANES:
             task = coder.create_task(
                 (
-                    f"Swarm V6 lane {lane.key}: deterministically verify "
-                    f"{lane.role} against the current Blueprint and launch "
-                    "checkpoint. Report repository evidence only. Do not "
-                    "mutate production."
+                    f"Swarm V6 lane {lane.key}: run observation-only tests "
+                    f"for {lane.role} against existing repository code. "
+                    "This is NOT implementation evidence or a changed-file "
+                    "claim. Do not mutate production."
                 ),
                 blueprint_path="docs/BLUEPRINT_V6.md",
             )
@@ -207,7 +185,9 @@ def run_swarm_cycle(
                 payload={
                     "swarm_lane": lane.key,
                     "swarm_role": lane.role,
-                    "changed_files": list(lane.changed_files),
+                    "reviewed_files": list(lane.reviewed_files),
+                    "verification_scope": "TEST_EXECUTION_ONLY",
+                    "implementation_authority": "NONE",
                     "tests": list(lane.tests),
                 },
             )
@@ -222,24 +202,30 @@ def run_swarm_cycle(
 
     executions: list[dict[str, Any]] = []
     if execute_verify:
-        worker_count = max(1, min(int(max_workers), 6))
-        with ThreadPoolExecutor(max_workers=worker_count) as pool:
-            futures = [
-                pool.submit(_worker_once, root, runtime)
-                for _ in range(len(LANES))
-            ]
-            for future in as_completed(futures):
-                executions.append(future.result())
+        # Reuse the dedicated deterministic fast-path rather than allowing
+        # Swarm to consume unrelated work or claim implementation evidence.
+        review = drain_verify_jobs(
+            queue, max_jobs=max(1, min(int(max_workers), len(LANES))),
+        )
+        executions = [
+            {"job_id": row["job_id"], "status": "TESTS_ONLY", "task_id": row["task_id"]}
+            for row in review["completed"]
+        ] + [
+            {"job_id": row["job_id"], "status": "FAILED", "reason": row["reason"]}
+            for row in review["failed"]
+        ]
 
     after = _count_jobs(queue)
     payload = {
         "schema_version": "empire.swarm.v6",
         "observed_at": _now(),
-        "mode": "INTERNAL_VERIFY",
+        "mode": "OBSERVE_TESTS_ONLY",
         "commander": "astra",
         "lanes": [asdict(lane) for lane in LANES],
         "queued": queued,
         "executions": executions,
+        "implementation_assignments": [],
+        "implementation_authority_source": "EXPLICIT_EXECUTION_PLANE_ONLY",
         "queue_before": before,
         "queue_after": after,
         "authority": {

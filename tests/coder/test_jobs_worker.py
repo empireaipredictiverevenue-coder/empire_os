@@ -17,6 +17,28 @@ def workspace(tmp_path):
     return tmp_path
 
 
+def test_general_worker_reserves_observation_only_verify_for_fastpath(tmp_path):
+    root = workspace(tmp_path)
+    queue = LocalJobQueue(root)
+    review = queue.enqueue(
+        task_id="review-only", kind=JobKind.VERIFY,
+        payload={"verification_scope": "TEST_EXECUTION_ONLY", "tests": ["tests/test_ok.py"]},
+        priority=100,
+    )
+    implementation = queue.enqueue(
+        task_id="real-patch", kind=JobKind.VERIFY,
+        payload={"changed_files": ["empire_os/example.py"], "tests": ["tests/test_ok.py"]},
+        priority=20,
+    )
+    claimed = queue.claim_next(kind=JobKind.VERIFY)
+    assert claimed.id == implementation.id
+    assert queue.get(review.id).status is JobStatus.PENDING
+    assert queue.claim_next(kind=JobKind.VERIFY) is None
+    assert queue.claim_next() is None
+    allowed_fastpath = queue.claim_specific(review.id, worker_id="coder-verify-fastpath")
+    assert allowed_fastpath.id == review.id
+
+
 def test_queue_enqueue_claim_complete_and_reload(tmp_path):
     root = workspace(tmp_path)
     queue = LocalJobQueue(root)

@@ -189,6 +189,13 @@ class LocalJobQueue:
                 candidate = self._load_path(source)
                 if kind is not None and candidate.kind is not kind:
                     continue
+                # Observation-only Swarm jobs belong to the dedicated
+                # test fast-path, never the task-aware implementation worker.
+                if (
+                    candidate.kind is JobKind.VERIFY
+                    and candidate.payload.get("verification_scope") == "TEST_EXECUTION_ONLY"
+                ):
+                    continue
                 retry_after = self._parse_ts(candidate.retry_after)
                 if retry_after is not None and retry_after > now:
                     continue
