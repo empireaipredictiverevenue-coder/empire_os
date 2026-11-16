@@ -1,7 +1,10 @@
 """Empire Coder governed engineering orchestrator."""
 from __future__ import annotations
 
+import hashlib
+import json
 import os
+import subprocess
 import time
 from pathlib import Path
 from typing import Iterable
@@ -1160,6 +1163,128 @@ class EmpireCoder:
             data=report.as_dict(),
         )
         return report
+
+    def reconcile_approved_live_commit(
+        self,
+        task_id: str,
+        *,
+        commit_sha: str,
+        founder_approved: bool,
+        approval_reference: str,
+        release_receipt: str | Path,
+    ) -> dict:
+        """Close one Coder approval gate only after verifying the exact live commit.
+
+        The caller must supply a specific founder authorisation. A passing
+        test, commit, receipt or queued task cannot grant that authorisation.
+        """
+        self._require(Capability.READ_REPO)
+        if not founder_approved or not str(approval_reference or "").strip():
+            raise EmpireCoderError("explicit_founder_approval_required")
+        task = self.store.load(task_id)
+        if (
+            task.status is not TaskStatus.AWAITING_APPROVAL
+            or task.verification_status is not VerificationVerdict.PASS
+            or "candidate_commit" not in task.pending_approval
+        ):
+            raise EmpireCoderError("task_not_verified_and_awaiting_candidate_commit")
+        sha = str(commit_sha or "").strip().lower()
+        if len(sha) != 40 or any(c not in "0123456789abcdef" for c in sha):
+            raise EmpireCoderError("full_commit_sha_required")
+
+        receipt_base = (
+            self.workspace / "runtime/execution_plane/coder_proposals"
+        ).resolve()
+        receipt_path = Path(release_receipt).resolve()
+        if receipt_path.parent != receipt_base or not receipt_path.is_file():
+            raise EmpireCoderError("release_receipt_not_in_governed_runtime")
+        try:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise EmpireCoderError("invalid_release_receipt") from exc
+        if (
+            receipt.get("live_task_id") != task_id
+            or receipt.get("live_commit") != sha
+            or receipt.get("approval_source") != approval_reference
+            or receipt.get("independent_verdict") != "PASS"
+            or receipt.get("scoped_live_entrypoint_canary") != "PASS"
+            or receipt.get("scheduled_service_last_readback")
+            != "SUCCESS_AFTER_LIVE_COMMIT"
+        ):
+            raise EmpireCoderError("release_receipt_evidence_mismatch")
+
+        def git(*args: str) -> subprocess.CompletedProcess[bytes]:
+            return subprocess.run(
+                ("git", *args), cwd=self.workspace, capture_output=True,
+                check=False, timeout=15,
+            )
+
+        if git("cat-file", "-t", sha).stdout.strip() != b"commit":
+            raise EmpireCoderError("candidate_commit_not_found")
+        if git("merge-base", "--is-ancestor", sha, "HEAD").returncode != 0:
+            raise EmpireCoderError("candidate_commit_not_in_current_history")
+        changed_result = git(
+            "diff-tree", "--root", "--no-commit-id", "--name-only", "-r", sha
+        )
+        if changed_result.returncode:
+            raise EmpireCoderError("commit_diff_unavailable")
+        committed = set(changed_result.stdout.decode().splitlines())
+        patch_events = [
+            event for event in self.audit.read_task(task_id)
+            if event.get("event") in (
+                "patch_applied", "symbol_patch_applied", "structured_patch_applied"
+            )
+        ]
+        task_hashes = {
+            event["data"]["path"]: event["data"]["after_sha256"]
+            for event in patch_events
+            if isinstance(event.get("data"), dict)
+            and event["data"].get("path")
+            and event["data"].get("after_sha256")
+        }
+        if not committed or committed != set(task_hashes):
+            raise EmpireCoderError("commit_paths_do_not_match_task_patch_audit")
+        if committed != set(receipt.get("scoped_paths") or ()):
+            raise EmpireCoderError("receipt_paths_do_not_match_commit")
+        for rel in sorted(committed):
+            path = (self.workspace / rel).resolve()
+            if not path.is_relative_to(self.workspace) or not path.is_file():
+                raise EmpireCoderError("committed_file_path_unsafe")
+            contents = path.read_bytes()
+            digest = hashlib.sha256(contents).hexdigest()
+            if (
+                digest != task_hashes[rel]
+                or digest != (receipt.get("hashes_sha256") or {}).get(rel)
+            ):
+                raise EmpireCoderError("committed_file_hash_mismatch")
+            committed_file = git("show", f"{sha}:{rel}")
+            if committed_file.returncode or committed_file.stdout != contents:
+                raise EmpireCoderError("committed_file_not_equal_to_live_source")
+            if git("status", "--porcelain", "--", rel).stdout.strip():
+                raise EmpireCoderError("committed_file_has_unreviewed_changes")
+
+        task.pending_approval.remove("candidate_commit")
+        task.decisions.append(
+            f"founder_approved_candidate_commit:{sha}:{approval_reference}"
+        )
+        if not task.pending_approval:
+            task.status = TaskStatus.COMPLETED
+        self.store.save(task)
+        record = {
+            "commit": sha,
+            "status": task.status.value,
+            "task_id": task_id,
+            "approved_by_founder_reference": approval_reference,
+            "verified_paths": sorted(committed),
+            "release_receipt": str(receipt_path),
+            "independent_verdict": "PASS",
+            "live_canary": "PASS",
+            "production_authority_expanded": False,
+        }
+        self._record_and_sync(
+            task_id=task_id, event="approved_live_commit_reconciled", data=record
+        )
+        return record
 
     def doctor(self) -> dict:
         state = self.worktrees.inspect()

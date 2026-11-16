@@ -455,3 +455,144 @@ def test_sandbox_model_health_recovers_malformed_private_cache(tmp_path):
     assert health.excluded_routes() == ()
     health.record_failure("llama_cpp", "tiny", "TimeoutError")
     assert ("llama_cpp", "tiny") in health.excluded_routes()
+
+
+def _codex_local_git_repo(tmp_path):
+    import subprocess
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(("git", "init", "-q", str(root)), check=True)
+    subprocess.run(
+        ("git", "branch", "-M", "agent/data-cloud-wave4"),
+        cwd=root, check=True,
+    )
+    (root / "app.py").write_text("VALUE = 1\n")
+    (root / "tests").mkdir()
+    (root / "tests/test_app.py").write_text(
+        "from app import VALUE\n\ndef test_value():\n    assert VALUE == 2\n"
+    )
+    subprocess.run(("git", "add", "app.py", "tests/test_app.py"), cwd=root, check=True)
+    subprocess.run(
+        ("git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "commit", "-qm", "baseline"), cwd=root, check=True,
+    )
+    return root
+
+
+def _fake_codex(tmp_path, *, changed_path="app.py", body="VALUE = 2"):
+    cli = tmp_path / "fake-codex"
+    cli.write_text(
+        "#!/usr/bin/env python3\n"
+        "from pathlib import Path\n"
+        "import sys\n"
+        "if sys.argv[1:3] == ['login','status']:\n"
+        "    print('Logged in using ChatGPT')\n"
+        "    sys.exit(0)\n"
+        f"Path({changed_path!r}).write_text({(body + chr(10))!r})\n"
+        "print('edited candidate')\n"
+    )
+    cli.chmod(0o700)
+    return cli
+
+
+def _codex_job(*, paths=("app.py",), tests=("tests/test_app.py",), job_id="codex-test"):
+    return EmpireCoderSandboxJob(
+        job_id=job_id,
+        objective="Change app VALUE from 1 to 2 so the test passes.",
+        department="engineering",
+        capability="backend_code",
+        allowed_paths=paths,
+        lease_resources=("path:app.py",),
+        pytest_targets=tests,
+        max_runtime_seconds=200,
+    )
+
+
+def test_codex_local_candidate_isolated_scoped_verified_and_never_pushed(
+    tmp_path, monkeypatch,
+):
+    import hashlib
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    cli = _fake_codex(tmp_path)
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(cli))
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(), work_root=tmp_path / "isolated",
+    )
+    assert result["status"] == "LOCAL_PROPOSAL_READY", result
+    assert result["verification_passed"] is True
+    assert result["changed_paths"] == ["app.py"]
+    assert result["production_mutation"] is False
+    assert result["production_deploy"] is False
+    assert result["founder_gate_required"] is True
+    patch = Path(result["proposal_patch"])
+    assert patch.exists()
+    assert hashlib.sha256(patch.read_bytes()).hexdigest() == result["proposal_sha256"]
+    assert (root / "app.py").read_text() == "VALUE = 1\n"
+    assert not list((tmp_path / "isolated").glob("*"))
+    assert not list((root / "runtime/execution_plane/leases").glob("*.json")) if (
+        root / "runtime/execution_plane/leases"
+    ).is_dir() else True
+
+
+def test_codex_local_candidate_refuses_unapproved_paths(tmp_path, monkeypatch):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    cli = _fake_codex(tmp_path, changed_path="other.py")
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(cli))
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(), work_root=tmp_path / "isolated",
+    )
+    assert result["status"] == "PATH_POLICY_FAILED"
+    assert result["reason"] == "model_changed_unapproved_path"
+    assert result["proposal_patch"] is None
+    assert not (root / "other.py").exists()
+
+
+def test_codex_local_candidate_fails_closed_without_real_tests(tmp_path, monkeypatch):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    monkeypatch.setattr(
+        module, "_local_codex_binary",
+        lambda: (_ for _ in ()).throw(AssertionError("Codex should not run")),
+    )
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(tests=()), work_root=tmp_path / "isolated",
+    )
+    assert result["status"] == "HELD"
+    assert result["reason"] == "required_tests_required"
+
+
+def test_codex_local_candidate_missing_login_or_binary_fails_closed(
+    tmp_path, monkeypatch,
+):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: None)
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(), work_root=tmp_path / "isolated",
+    )
+    assert result["status"] == "HELD"
+    assert result["reason"] == "codex_cli_not_installed"
+
+
+def test_codex_local_candidate_preserves_existing_workspace(tmp_path, monkeypatch):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    cli = _fake_codex(tmp_path)
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(cli))
+    existing = tmp_path / "isolated/codex-codex-test"
+    existing.mkdir(parents=True)
+    (existing / "other_agent.txt").write_text("preserve")
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(), work_root=tmp_path / "isolated",
+    )
+    assert result["status"] == "HELD"
+    assert result["reason"] == "isolated_clone_already_exists"
+    assert (existing / "other_agent.txt").read_text() == "preserve"

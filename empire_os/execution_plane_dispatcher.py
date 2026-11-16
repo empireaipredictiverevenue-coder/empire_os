@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import json
+import subprocess
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -32,6 +33,7 @@ from empire_os.coder.jobs import JobKind, LocalJobQueue
 from empire_os.empire_coder_sandbox_runner import (
     EmpireCoderSandboxJob,
     run_empire_coder_sandbox_job,
+    run_empire_coder_codex_local_candidate,
 )
 from empire_os.completion_task_memory import preflight_checklist_source
 from empire_os.hermes_control import (
@@ -83,6 +85,7 @@ class ExecutionRequest:
     max_runtime_seconds: int = 900
     traceparent: str | None = None
     ai_behavior_change: bool = False
+    allow_stale_base_local_fallback: bool = False
 
     def validate(self) -> None:
         if not self.request_id.strip():
@@ -102,6 +105,16 @@ class ExecutionRequest:
             raise ValueError("unsupported risk class")
         if self.risk_class == "consequential":
             raise ValueError("consequential work requires domain authority gate")
+        if self.allow_stale_base_local_fallback and (
+            self.authority != "internal_write"
+            or self.capability not in MUTATING_CODE_CAPABILITIES
+            or self.risk_class not in {"low", "medium"}
+            or not self.required_tests
+        ):
+            raise ValueError(
+                "local Codex fallback requires explicit bounded code scope, "
+                "internal_write and real required tests"
+            )
         if self.base_branch not in ALLOWED_BASE_BRANCHES:
             raise ValueError(
                 "base_branch is outside the governed branch allowlist"
@@ -213,6 +226,44 @@ def _write_request(
     return path
 
 
+def _hermes_source_base_mismatch(
+    root: Path, branch: str,
+) -> dict[str, str] | None:
+    """Do not publish code tasks from a stale remote into a different tree.
+
+    Non-Git test workspaces have no remote source to compare. A genuine Git
+    checkout with a missing/changed tracked remote fails closed.
+    """
+    if not (root / ".git").exists():
+        return None
+
+    def read_ref(ref: str) -> str | None:
+        try:
+            result = subprocess.run(
+                ("git", "rev-parse", "--verify", ref),
+                cwd=root, text=True, capture_output=True,
+                timeout=10, check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return result.stdout.strip() if result.returncode == 0 else None
+
+    current = read_ref("HEAD")
+    local = read_ref(f"refs/heads/{branch}")
+    remote = read_ref(f"refs/remotes/origin/{branch}")
+    if current and local and remote and current == local == remote:
+        return None
+    return {
+        "reason": (
+            "remote_base_unavailable" if not remote
+            else "remote_base_diverged_from_live_source"
+        ),
+        "source_base_verified": False,
+        "local_branch_matches_head": str(bool(current and local == current)),
+        "remote_matches_head": str(bool(current and remote == current)),
+    }
+
+
 def dispatch_execution_request(
     repo_root: str | Path,
     request: ExecutionRequest,
@@ -293,6 +344,62 @@ def dispatch_execution_request(
     worker = routing.worker_key
 
     if worker == "hermes":
+        mismatch = (
+            _hermes_source_base_mismatch(root, request.base_branch)
+            if request.authority == "internal_write"
+            and request.capability in MUTATING_CODE_CAPABILITIES
+            else None
+        )
+        if mismatch is not None:
+            if not request.allow_stale_base_local_fallback:
+                return {
+                    **base,
+                    "status": "HELD_STALE_REMOTE_BASE",
+                    "worker": "hermes",
+                    "reason": mismatch["reason"],
+                    "source_base_readback": mismatch,
+                    "fallback_requires_explicit_authorisation": True,
+                }
+            if mismatch["local_branch_matches_head"] != "True":
+                return {
+                    **base,
+                    "status": "HELD_LOCAL_SOURCE_NOT_CURRENT",
+                    "worker": "empire_coder",
+                    "source_base_readback": mismatch,
+                }
+            candidate = run_empire_coder_codex_local_candidate(
+                root,
+                EmpireCoderSandboxJob(
+                    job_id=request.request_id,
+                    objective=request.objective,
+                    department=request.department,
+                    capability=request.capability,
+                    allowed_paths=request.allowed_paths,
+                    lease_resources=request.lease_resources,
+                    pytest_targets=request.required_tests,
+                    base_branch=request.base_branch,
+                    max_runtime_seconds=request.max_runtime_seconds,
+                ),
+            )
+            return {
+                **base,
+                "status": candidate.get("status"),
+                "worker": "empire_coder",
+                "runtime_fallback": {
+                    "from": "hermes",
+                    "to": "empire_coder",
+                    "reason": mismatch["reason"],
+                    "mode": "ISOLATED_LOCAL_CANDIDATE_ONLY",
+                    "external_push": False,
+                    "production_deploy": False,
+                },
+                "worker_result": candidate,
+                "proposal_gate": {
+                    "candidate_gate_passed": False,
+                    "founder_release_review_required": True,
+                    "independent_live_verification_required": True,
+                },
+            }
         payload = {
             "schema_version": HERMES_SCHEMA_VERSION,
             "job_id": request.request_id,

@@ -305,3 +305,137 @@ def test_observe_hermes_dispatch_preserves_zero_mutation_scope(
     assert captured["job"].allowed_paths == ()
     assert captured["job"].lease_resources == ()
     assert result["execution_authority"] == "none"
+
+
+def _stale_hermes_repo(tmp_path):
+    import subprocess
+
+    root = tmp_path / "repo"
+    root.mkdir()
+    subprocess.run(("git", "init", "-q", str(root)), check=True)
+    subprocess.run(
+        ("git", "branch", "-M", "agent/data-cloud-wave4"), cwd=root, check=True,
+    )
+    (root / "app.py").write_text("VALUE = 1\n")
+    (root / "tests").mkdir()
+    (root / "tests/test_app.py").write_text("def test_value():\n    assert True\n")
+    subprocess.run(("git", "add", "app.py", "tests/test_app.py"), cwd=root, check=True)
+    subprocess.run(
+        ("git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "commit", "-qm", "base"), cwd=root, check=True,
+    )
+    old = subprocess.check_output(
+        ("git", "rev-parse", "HEAD"), cwd=root, text=True,
+    ).strip()
+    subprocess.run(
+        ("git", "update-ref", "refs/remotes/origin/agent/data-cloud-wave4", old),
+        cwd=root, check=True,
+    )
+    (root / "app.py").write_text("VALUE = 2\n")
+    subprocess.run(("git", "add", "app.py"), cwd=root, check=True)
+    subprocess.run(
+        ("git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+         "commit", "-qm", "current"), cwd=root, check=True,
+    )
+    return root
+
+
+def _stale_code_request(*, allow=False, tests=("tests/test_app.py",)):
+    return ExecutionRequest(
+        request_id="stale-root-code",
+        capability="backend_code",
+        department="engineering",
+        objective="Bounded implementation using current source",
+        authority="internal_write",
+        risk_class="low",
+        source_ref="founder-approved-stale-base-test",
+        allowed_paths=("app.py",),
+        lease_resources=("path:app.py",),
+        required_tests=tests,
+        allow_stale_base_local_fallback=allow,
+    )
+
+
+def test_stale_hermes_base_holds_without_explicit_local_route(tmp_path, monkeypatch):
+    import empire_os.execution_plane_dispatcher as module
+
+    root = _stale_hermes_repo(tmp_path)
+    monkeypatch.setattr(
+        module, "publish_control_job",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not publish")),
+    )
+    result = dispatch_execution_request(root, _stale_code_request())
+    assert result["status"] == "HELD_STALE_REMOTE_BASE"
+    assert result["worker"] == "hermes"
+    assert result["fallback_requires_explicit_authorisation"] is True
+    assert result["source_base_readback"]["remote_matches_head"] == "False"
+    assert result["production_deploy"] is False
+
+
+def test_explicit_authorised_stale_base_uses_existing_local_codex_candidate(
+    tmp_path, monkeypatch,
+):
+    import empire_os.execution_plane_dispatcher as module
+
+    root = _stale_hermes_repo(tmp_path)
+    called = []
+
+    def candidate(_root, job):
+        called.append((_root, job))
+        return {
+            "status": "LOCAL_PROPOSAL_READY",
+            "proposal_patch": "/tmp/isolated-only.patch",
+            "verification_passed": True,
+            "production_mutation": False,
+            "production_deploy": False,
+            "execution_authority": "none",
+        }
+
+    monkeypatch.setattr(module, "run_empire_coder_codex_local_candidate", candidate)
+    monkeypatch.setattr(
+        module, "publish_control_job",
+        lambda *_a, **_k: (_ for _ in ()).throw(AssertionError("must not publish")),
+    )
+    result = dispatch_execution_request(root, _stale_code_request(allow=True))
+    assert result["worker"] == "empire_coder"
+    assert result["status"] == "LOCAL_PROPOSAL_READY"
+    assert result["runtime_fallback"]["from"] == "hermes"
+    assert result["runtime_fallback"]["external_push"] is False
+    assert result["proposal_gate"]["candidate_gate_passed"] is False
+    assert result["proposal_gate"]["founder_release_review_required"] is True
+    assert result["production_deploy"] is False
+    assert called[0][1].allowed_paths == ("app.py",)
+    assert called[0][1].pytest_targets == ("tests/test_app.py",)
+
+
+def test_local_codex_fallback_rejects_inferred_write_authority():
+    with pytest.raises(ValueError, match="local Codex fallback"):
+        ExecutionRequest(
+            request_id="bad-observe", capability="backend_code",
+            department="engineering", objective="plan only",
+            authority="observe", allow_stale_base_local_fallback=True,
+            required_tests=("tests/test_app.py",),
+        ).validate()
+    with pytest.raises(ValueError, match="local Codex fallback"):
+        _stale_code_request(allow=True, tests=()).validate()
+
+
+def test_matching_hermes_remote_still_uses_original_owner(tmp_path, monkeypatch):
+    import subprocess
+    import empire_os.execution_plane_dispatcher as module
+
+    root = _stale_hermes_repo(tmp_path)
+    now = subprocess.check_output(("git", "rev-parse", "HEAD"), cwd=root, text=True).strip()
+    subprocess.run(
+        ("git", "update-ref", "refs/remotes/origin/agent/data-cloud-wave4", now),
+        cwd=root, check=True,
+    )
+    observed = []
+    monkeypatch.setattr(
+        module, "publish_control_job",
+        lambda _r, packet: observed.append(packet) or {"published": True},
+    )
+    result = dispatch_execution_request(root, _stale_code_request(allow=True))
+    assert result["status"] == "QUEUED"
+    assert result["worker"] == "hermes"
+    assert observed[0]["base_branch"] == "agent/data-cloud-wave4"

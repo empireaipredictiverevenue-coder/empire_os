@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
+from hashlib import sha256
+import json
 import fcntl
 import os
 from pathlib import Path
@@ -16,6 +18,7 @@ import re
 import shutil
 import signal
 import subprocess
+import sys
 import threading
 import time
 from typing import Any, Mapping
@@ -340,6 +343,240 @@ def _changed_paths(clone: Path) -> list[str]:
             continue
         changed.append(value)
     return sorted(dict.fromkeys(changed))
+
+
+def _local_codex_binary() -> str | None:
+    """Discover an installed, authenticated ChatGPT Codex CLI without installing."""
+    found = shutil.which("codex")
+    if found:
+        return found
+    versions = Path.home() / ".nvm/versions/node"
+    matches = sorted(versions.glob("v*/bin/codex"), reverse=True)
+    return str(matches[0]) if matches else None
+
+
+def run_empire_coder_codex_local_candidate(
+    repo_root: str | Path,
+    job: EmpireCoderSandboxJob,
+    *,
+    lease_manager: ExecutionLeaseManager | None = None,
+    work_root: str | Path = DEFAULT_WORK_ROOT,
+) -> dict[str, Any]:
+    """Use existing Codex CLI to produce a bounded LOCAL proposal, never a push.
+
+    This is the existing Coder sandbox's fallback when Hermes' remote base
+    does not contain current original code. The result is not live or approved.
+    """
+    job.validate()
+    root = Path(repo_root).resolve()
+    started = time.monotonic()
+    result: dict[str, Any] = {
+        "schema_version": "empire.coder.codex-local-proposal.v1",
+        "job_id": job.job_id,
+        "status": "HELD",
+        "changed_paths": [],
+        "proposal_patch": None,
+        "proposal_sha256": None,
+        "verification_passed": False,
+        "founder_gate_required": True,
+        "production_mutation": False,
+        "production_deploy": False,
+        "external_send": False,
+        "payment_action": False,
+        "revenue_recognition": False,
+        "execution_authority": "none",
+    }
+    if not job.pytest_targets:
+        result["reason"] = "required_tests_required"
+        return result
+    cli = _local_codex_binary()
+    if not cli:
+        result["reason"] = "codex_cli_not_installed"
+        return result
+    check = _run([cli, "login", "status"], cwd=root, timeout=20)
+    if check.returncode or "logged in" not in check.stdout.lower():
+        result["reason"] = "codex_cli_not_authenticated"
+        return result
+    # Never base isolated edits on a different local working branch.
+    head = _run(["git", "rev-parse", "HEAD"], cwd=root)
+    requested_branch = _run(
+        ["git", "rev-parse", f"refs/heads/{job.base_branch}"], cwd=root,
+    )
+    if (
+        head.returncode or requested_branch.returncode
+        or head.stdout.strip() != requested_branch.stdout.strip()
+    ):
+        result["reason"] = "source_branch_not_current_head"
+        return result
+
+    proposals = root / "runtime/execution_plane/coder_proposals"
+    proposals.mkdir(parents=True, exist_ok=True)
+    target = proposals / f"{job.job_id}.patch"
+    if target.exists():
+        result["reason"] = "existing_candidate_requires_readback"
+        return result
+    manager = lease_manager or ExecutionLeaseManager(
+        root / "runtime/execution_plane"
+    )
+    try:
+        lease = manager.acquire(
+            owner="empire_coder_codex_local",
+            job_id=job.job_id,
+            resources=job.lease_resources,
+            ttl_seconds=job.max_runtime_seconds + 300,
+        )
+    except ExecutionLeaseError:
+        result["reason"] = "execution_lease_conflict"
+        return result
+
+    base = Path(work_root).resolve()
+    clone = base / f"codex-{job.job_id}"
+    owns_clone = False
+    try:
+        base.mkdir(parents=True, exist_ok=True)
+        if clone.exists() or clone.is_symlink():
+            result["reason"] = "isolated_clone_already_exists"
+            return result
+        owns_clone = True
+        copied = _run(
+            ["git", "clone", "--no-hardlinks", "--single-branch", "--branch",
+             job.base_branch, str(root), str(clone)], cwd=base, timeout=120,
+        )
+        if copied.returncode:
+            result["reason"] = "isolated_clone_failed"
+            return result
+        bounded_paths = "\n".join(f"- {p}" for p in job.allowed_paths)
+        bounded_tests = "\n".join(f"- {p}" for p in job.pytest_targets)
+        prompt = (
+            "You are the existing Empire Coder engineering operator. Work ONLY "
+            "inside this isolated Git clone. The production EmpireOS checkout "
+            "is not your workspace. Do not push, publish, deploy, restart "
+            "services, spend money, send messages, run migrations, touch "
+            "production databases, or change authority. Do not commit. "
+            "Implement the smallest real code correction for the task. "
+            "Do not modify any path outside the exact allowlist. "
+            "No new platforms. Stop if tests or scope are unclear.\n"
+            f"ALLOWED EDIT PATHS:\n{bounded_paths}\n"
+            f"REQUIRED TESTS:\n{bounded_tests}\n"
+            f"OBJECTIVE:\n{job.objective}\n"
+        )
+        elapsed = int(time.monotonic() - started)
+        remaining = max(1, job.max_runtime_seconds - elapsed)
+        if remaining < 90:
+            result["reason"] = "insufficient_model_time_budget"
+            return result
+        env = {
+            key: os.environ[key] for key in (
+                "HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL",
+                "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY",
+            ) if key in os.environ
+        }
+        env["PYTHONPATH"] = str(clone)
+        env["PYTHONDONTWRITEBYTECODE"] = "1"
+        cmd = [
+            cli, "exec", "-C", str(clone), "-s", "workspace-write",
+            "-c", "approval_policy=never",
+            "-c", "model_reasoning_effort=medium", "-",
+        ]
+        try:
+            process = subprocess.run(
+                cmd, cwd=str(clone), env=env, input=prompt,
+                text=True, capture_output=True, timeout=max(1, remaining),
+                check=False,
+            )
+        except subprocess.TimeoutExpired:
+            result["reason"] = "codex_model_timeout"
+            return result
+        if process.returncode:
+            result["reason"] = "codex_cli_execution_failed"
+            return result
+        changed = _changed_paths(clone)
+        result["changed_paths"] = changed
+        if not changed:
+            result["reason"] = "model_made_no_file_changes"
+            return result
+        if any(not _path_allowed(path, job.allowed_paths) for path in changed):
+            result["status"] = "PATH_POLICY_FAILED"
+            result["reason"] = "model_changed_unapproved_path"
+            return result
+        for path in changed:
+            current = (clone / path).resolve()
+            if not current.is_relative_to(clone) or not current.is_file():
+                result["status"] = "PATH_POLICY_FAILED"
+                result["reason"] = "model_modified_unsafe_file"
+                return result
+        diff = _run(["git", "diff", "--check"], cwd=clone)
+        if diff.returncode:
+            result["reason"] = "candidate_git_diff_check_failed"
+            return result
+        elapsed = int(time.monotonic() - started)
+        remaining = job.max_runtime_seconds - elapsed
+        if remaining <= 0:
+            result["reason"] = "tests_time_budget_exceeded"
+            return result
+        python = root / ".venv/bin/python"
+        if not python.is_file():
+            python = Path(sys.executable)
+        tested = _run(
+            [str(python), "-m", "pytest", "-q", "-p", "no:cacheprovider",
+             *job.pytest_targets],
+            cwd=clone,
+            env={
+                "PATH": "/usr/local/bin:/usr/bin:/bin",
+                "HOME": "/var/tmp",
+                "PYTHONPATH": str(clone),
+                "PYTHONDONTWRITEBYTECODE": "1",
+            },
+            timeout=min(240, remaining),
+        )
+        result["verification_passed"] = tested.returncode == 0
+        if tested.returncode:
+            result["status"] = "VERIFICATION_FAILED"
+            result["reason"] = "required_tests_failed"
+            return result
+        if _changed_paths(clone) != changed:
+            result["reason"] = "tests_mutated_candidate_files"
+            result["verification_passed"] = False
+            return result
+        for path in changed:
+            if _run(["git", "add", "--", path], cwd=clone).returncode:
+                result["reason"] = "proposal_staging_failed"
+                return result
+        if _run(["git", "diff", "--cached", "--check"], cwd=clone).returncode:
+            result["reason"] = "proposal_staged_diff_check_failed"
+            return result
+        committed = _run(
+            ["git", "-c", "user.name=Empire Coder",
+             "-c", "user.email=coder@empire-ai.co.uk", "commit",
+             "-m", f"Local candidate: {job.job_id}"], cwd=clone,
+        )
+        if committed.returncode:
+            result["reason"] = "isolated_commit_failed"
+            return result
+        patch = subprocess.run(
+            ["git", "format-patch", "-1", "--stdout"],
+            cwd=clone, capture_output=True, check=False, timeout=15,
+        )
+        if patch.returncode or not patch.stdout:
+            result["reason"] = "local_patch_export_failed"
+            return result
+        temp = target.with_suffix(".patch.tmp")
+        temp.write_bytes(patch.stdout)
+        os.chmod(temp, 0o600)
+        os.replace(temp, target)
+        result.update({
+            "status": "LOCAL_PROPOSAL_READY",
+            "proposal_patch": str(target),
+            "proposal_sha256": sha256(patch.stdout).hexdigest(),
+            "verification_passed": True,
+            "reason": None,
+        })
+        return result
+    finally:
+        manager.release(lease.lease_id)
+        if owns_clone and clone.exists():
+            shutil.rmtree(clone)
+
 
 
 def run_empire_coder_sandbox_job(
