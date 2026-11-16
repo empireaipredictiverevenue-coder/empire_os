@@ -28,6 +28,14 @@ Live after restart: diagnostic page and script returned 200 with `no-store`; ano
 
 The native forecast registry remains empty. No customer forecast, recognized revenue, calibration result or source completeness is claimed.
 
+## Customer-provided 30-day history preview
+
+The existing CRM diagnostic now includes `POST /v1/revenue-crm/predictive-diagnostic/customer-history/forecast-preview`. An authenticated CRM user can submit exactly 30 contiguous completed UTC daily rows (`date,revenue_minor_units,currency_code`) and select a 1–365 day horizon. The endpoint reuses the current tenant-bound CRM reader, checks its read-only database tenant binding, validates a single currency and computes an in-memory preview through the existing daily materializer and V3 directional model.
+
+The CSV is bounded to 32 KB and is neither persisted nor registered. The response labels the input customer-provided and unverified; it does not establish original-system authentication, financial finality or calibration eligibility. The preview cannot create an EmpireDB forecast record, customer delivery or execution authority. The native REV077/REV078 producer remains the path for authentic first-party source data and prospective native registration; a customer-provided CSV is not substituted for that evidence.
+
+The pinned CRM release wrapper is advanced to a new versioned release and verifies exact hashes for the API, preview model adapter and UI, as well as the added route. Focused isolated verification covers authenticated tenant binding, unauthenticated rejection, strict input validation and absence of database writes. Production activation, if released, reuses the same CRM process, loopback listener, identity, credentials and read-only database role; no migration or role change is involved.
+
 ## 30-day scheduled forecast window
 
 The existing runtime observer already invokes the original private producer. Its default was seven consecutive completed UTC days, shorter than the requested 30-day history. The established observer now explicitly requests 30 days and the producer reports both the required window and the number of authenticated days read. It still stops on the first empty, incomplete or invalid day; it does not impute zero or bridge gaps. A 30-day isolated PostgreSQL fixture verifies model execution, native registration, exact independent readback and replay prevention. This source change is committed for review but has not been activated in production. Production source remains empty, so no customer forecast was produced.

@@ -7,7 +7,10 @@
   generation++;bearer=null;expiresAt=0;
   if(timer!==null){clearTimeout(timer);timer=null}
   $('password').value='';$('logout').disabled=true;$('signin').disabled=false;
+  $('history-preview-button').disabled=true;$('history-file').value='';
   summary.hidden=true;$('metrics').replaceChildren();$('priorities').replaceChildren();$('flags').replaceChildren();
+  $('history-result').hidden=true;$('history-result').replaceChildren();
+  $('history-status').textContent='Sign in before uploading a file. Nothing is uploaded before you submit.';
   $('status').textContent=message;$('status').classList.toggle('error',error);
   $('auth-status').textContent='Credentials and the short-lived token stay in memory for this page only.';
  }
@@ -87,11 +90,60 @@
       !Number.isInteger(result.expires_in)||result.expires_in<1||result.expires_in>900)throw Error('Invalid CRM sign-in response');
    bearer=result.access_token;expiresAt=Date.now()+result.expires_in*1000;
    const active=generation;$('logout').disabled=false;
+   $('history-preview-button').disabled=false;
    $('auth-status').textContent='Signed in. Token held in memory only.';
    timer=setTimeout(()=>{if(active===generation)clear('CRM token expired. Sign in again.')},result.expires_in*1000);
    await refresh(active);
   }catch(_){clear('Existing CRM sign-in or diagnostic unavailable.',true)}
   finally{$('signin').disabled=false}
+ });
+ $('history-upload').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const file=$('history-file').files?.[0];
+  if(!bearer||Date.now()>=expiresAt){clear('CRM session expired. Sign in again.');return}
+  if(!file||file.size<1||file.size>32768){$('history-status').textContent='Choose a CSV file no larger than 32 KB.';return}
+  const token=bearer,active=generation;
+  $('history-preview-button').disabled=true;$('history-result').hidden=true;
+  $('history-status').textContent='Validating the private 30-day history preview…';
+  try{
+   const csv=await file.text();
+   if(active!==generation||token!==bearer)throw Error('CRM session changed');
+   const horizon=$('horizon').value;
+   const response=await fetch('/v1/revenue-crm/predictive-diagnostic/customer-history/forecast-preview?horizon_days='+encodeURIComponent(horizon),{
+    method:'POST',cache:'no-store',credentials:'omit',redirect:'error',
+    headers:{'Accept':'application/json','Content-Type':'text/csv','Authorization':'Bearer '+token},body:csv
+   });
+   if(active!==generation||token!==bearer||Date.now()>=expiresAt){clear('CRM session expired or changed. Sign in again.');return}
+   if(response.status===401){clear('CRM authentication ended. Sign in again.');return}
+   if(!response.ok){
+    const issue=await response.json().catch(()=>({}));
+    const safe=new Set(['history_csv_schema_or_row_count_invalid','history_csv_row_invalid_or_incomplete','history_currency_mixed_or_missing','history_upload_size_invalid','history_csv_invalid','forecast_horizon_invalid']);
+    $('history-status').textContent=safe.has(issue.detail)?'CSV rejected: '+issue.detail.replaceAll('_',' '):'History preview unavailable. Check the CSV format and CRM session.';
+    return;
+   }
+   const result=await response.json();
+   if(result?.schema_version!=='empire.predictive_revenue.customer_history_preview.v1'||
+      result?.status!=='CUSTOMER_PROVIDED_HISTORY_PREVIEW_UNVERIFIED'||
+      result?.history_days_required!==30||result?.history_days_observed!==30||
+      result?.tenant_bound_request_authenticated!==true||result?.original_source_system_authenticated!==false||
+      result?.upload_persisted!==false||result?.forecast_registered!==false||
+      result?.calibration_authorized!==false)throw Error('History preview contract unavailable');
+   $('history-status').textContent='Preview only · customer-provided source not independently verified · file not saved or registered.';
+   const value=document.createElement('div');value.className='metric';
+   const amount=document.createElement('b');amount.textContent=result.forecast_available&&Number.isSafeInteger(result.predicted_revenue_minor_units)?String(result.predicted_revenue_minor_units):'Unavailable';
+   const label=document.createElement('span');label.textContent='Forecast revenue ('+String(result.currency_code)+' minor units) at '+String(result.forecast_horizon_days)+' days';
+   value.append(amount,label);
+   const details=document.createElement('div');details.className='metric';
+   const sample=document.createElement('b');sample.textContent=String(result.model_sample_count);
+   const sampleLabel=document.createElement('span');sampleLabel.textContent='Daily observations, '+String(result.observed_from_utc)+' to '+String(result.observed_through_utc);
+   details.append(sample,sampleLabel);
+   $('history-result').replaceChildren(value,details);$('history-result').hidden=false;
+  }catch(_){
+   if(active===generation)$('history-status').textContent='History preview unavailable. No file was saved.';
+  }finally{
+   $('history-file').value='';
+   if(active===generation&&bearer)$('history-preview-button').disabled=false;
+  }
  });
  $('logout').addEventListener('click',()=>clear('Signed out. No CRM diagnostic loaded.'));
  document.addEventListener('visibilitychange',()=>{

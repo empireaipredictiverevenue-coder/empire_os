@@ -25,6 +25,18 @@
  <h2 style="margin-top:24px">Review priorities</h2><div id="priorities"></div>
  <p class="note">This is a bounded CRM view, not a complete tenant census. It does not certify financial outcomes, calculate conversion rates or enable customer delivery.</p>
 </div></section>
+<section class="panel" aria-labelledby="history-title">
+ <h2 id="history-title">Customer history forecast preview</h2>
+ <p class="muted">Upload your own daily revenue history for a private, in-memory preview. The file must contain the last 30 completed UTC dates with one currency throughout. Use minor units (for example, pence for GBP). This preview is not saved, registered or calibrated, and the source has not been independently verified.</p>
+ <p class="note">CSV columns: <code>date,revenue_minor_units,currency_code</code></p>
+ <form id="history-upload" class="row">
+  <div class="control"><label for="history-file">30-day CSV</label><input id="history-file" type="file" accept=".csv,text/csv" required></div>
+  <div class="control"><label for="horizon">Forecast horizon</label><select id="horizon"><option value="7">7 days</option><option value="30" selected>30 days</option><option value="90">90 days</option></select></div>
+  <button id="history-preview-button" type="submit" disabled>Preview forecast</button>
+ </form>
+ <div id="history-status" class="status" aria-live="polite">Sign in before uploading a file. Nothing is uploaded before you submit.</div>
+ <div id="history-result" class="grid" hidden></div>
+</section>
 <footer>Source: your existing authenticated EmpireDB CRM reader. No CRM row details are exported to this diagnostic.</footer>
 </main><script src="/v1/revenue-crm/predictive-diagnostic/app.js" defer></script>
 </body></html>

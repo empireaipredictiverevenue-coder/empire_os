@@ -12,7 +12,7 @@ import stat
 import sys
 from pathlib import Path
 
-RELEASE = Path("/opt/empire-ai/predictive-enterprise-crm-20261116-v1")
+RELEASE = Path("/opt/empire-ai/predictive-enterprise-crm-20261116-v2")
 CURRENT_BROWSER = Path("/opt/empire-ai/data-cloud-founder-browser-20261113-v1")
 MULTI_PIPELINE = Path("/opt/empire-ai/crm-multi-pipeline-20261112")
 
@@ -48,13 +48,14 @@ if not _pinned_directory(EXTENSION):
     raise RuntimeError("predictive_crm_extension_not_pinned")
 REVIEWED_SHA256 = {
     "predictive_revenue_crm_diagnostic_adapter.py": "15ca4264942f0eea70a33ecd6b922f62a169fe5208ff94c654713a3542022ebc",
-    "predictive_revenue_crm_diagnostic_api.py": "f51f783df8076c2590232e60395ee05834f3c988948eb93f047d8199de2321f0",
+    "predictive_revenue_crm_diagnostic_api.py": "84e3986d482cd9fd6005b30441942165d26394dd3e7b384118b047c81294dd75",
+    "predictive_revenue_customer_history.py": "c33dab72c398df1db0b6b7399bd98a7d89252d1808c1ea536cb64d74821e231d",
     "predictive_revenue_enterprise_report.py": "cc5b3cd138eecd80628e3b4899247f9c8d300ecd8578a8a1e006cb991cedc721",
     "predictive_revenue_product_workbench.py": "88e9c8260198a2d4f32828e4289768e0b8324bed68227535d4332d11297f213e",
     "predictive_revenue_diagnostic_intelligence.py": "2c65551161ee4b3706d6bcf809e69cd0c501d5bb2f5974ab95eafed1835f5527",
     "predictive_revenue_scientific_readiness.py": "ed8a150f2a99e1a28c89245142d02ec1ccf210651fe1476846d2c341f1980212",
-    "predictive_revenue_crm_diagnostic_ui/index.html": "94ef36b115cab8ff75a0b950b826c65ad60dc57e2182489dc5ffb7507b9e6d80",
-    "predictive_revenue_crm_diagnostic_ui/app.js": "bc191da86cd5b88d918ae1076f86ec3ece5982266b33a5a4888e7e70b359ff74",
+    "predictive_revenue_crm_diagnostic_ui/index.html": "2b689420a93bd3dcd9eb29e0fdb111c6485186c8412efe4d8b955ba3b4c632e0",
+    "predictive_revenue_crm_diagnostic_ui/app.js": "6a4895b835da9bd119f23f910be8192b1c2e5798bec77e97cd790b7dcb43a0d3",
 }
 for relative, expected_sha256 in REVIEWED_SHA256.items():
     file = EXTENSION / relative
@@ -89,6 +90,7 @@ EXPECTED = {
     ("GET", "/v1/revenue-crm/predictive-diagnostic/markdown"),
     ("GET", "/v1/revenue-crm/predictive-diagnostic/app"),
     ("GET", "/v1/revenue-crm/predictive-diagnostic/app.js"),
+    ("POST", "/v1/revenue-crm/predictive-diagnostic/customer-history/forecast-preview"),
 }
 actual = {
     (method, route.path)
