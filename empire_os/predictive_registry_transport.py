@@ -218,6 +218,7 @@ class RpcPredictiveRegistryRepository:
 # particular, never connect public /forecast/register caller-supplied points
 # to this restricted tenant-bound capability.
 NATIVE_FORECAST_REGISTRAR_ROLE = 'empire_predictive_forecast_registrar'
+NATIVE_FORECAST_WRITER_LOGIN = 'empire_predictive_forecast_login'
 NATIVE_FORECAST_REGISTER_SQL = (
     'SELECT registration_ref,registered_at '
     'FROM public.register_predictive_revenue_forecast_v1('
@@ -260,6 +261,52 @@ END;
 $guard$;
 GRANT empire_predictive_forecast_registrar TO {writer_login}
  WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+COMMIT;
+"""
+
+
+def prepare_native_writer_login(*, tenant_id: str, scram: str) -> str:
+    """Founder-approved missing writer only; reuse original tenant bindings.
+
+    Preparation only. Accept a derived SCRAM verifier, never a plaintext
+    password. The operator keeps the password in root/systemd custody.
+    """
+    import re
+    from uuid import UUID
+    if (type(tenant_id) is not str or str(UUID(tenant_id)) != tenant_id
+            or type(scram) is not str
+            or not re.fullmatch(r"SCRAM-SHA-256\$4096:[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+:[A-Za-z0-9+/=]+", scram)):
+        raise ValueError("canonical tenant and derived SCRAM verifier required")
+    login = NATIVE_FORECAST_WRITER_LOGIN
+    return f"""BEGIN;
+SET LOCAL lock_timeout='3s';
+SET LOCAL statement_timeout='5s';
+DO $guard$
+BEGIN
+ IF current_database()<>'empiredb' OR pg_is_in_recovery()
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND rolsuper)
+    OR to_regrole('{login}') IS NOT NULL
+    OR EXISTS(SELECT 1 FROM public.empire_tenant_role_bindings WHERE role_name='{login}')
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{NATIVE_FORECAST_REGISTRAR_ROLE}'
+       AND NOT rolcanlogin AND NOT rolinherit AND NOT rolsuper AND NOT rolbypassrls)
+    OR NOT EXISTS(SELECT 1 FROM public.empire_tenant_role_bindings b
+       JOIN pg_roles r ON r.rolname=b.role_name
+       WHERE b.active AND b.tenant_id='{tenant_id}'::uuid
+         AND nullif(btrim(b.evidence_ref),'') IS NOT NULL
+         AND pg_has_role(r.rolname,'empire_predictive_registry_reader','MEMBER')
+         AND pg_has_role(r.rolname,'empire_predictive_revenue_evidence_reader','MEMBER'))
+ THEN RAISE EXCEPTION 'DEDICATED_WRITER_PREREQUISITES_CHANGED'; END IF;
+END;
+$guard$;
+CREATE ROLE {login} LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE
+ NOREPLICATION NOBYPASSRLS PASSWORD '{scram}';
+ALTER ROLE {login} SET statement_timeout='4000ms';
+GRANT CONNECT ON DATABASE empiredb TO {login};
+GRANT {NATIVE_FORECAST_REGISTRAR_ROLE} TO {login}
+ WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+INSERT INTO public.empire_tenant_role_bindings(role_name,tenant_id,active,evidence_ref)
+ VALUES ('{login}','{tenant_id}'::uuid,true,
+ 'founder:approved-PR165-native-producer-activation-20261116');
 COMMIT;
 """
 

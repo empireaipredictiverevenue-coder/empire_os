@@ -144,3 +144,42 @@ census without financial promotion. Original reader/authentication and
 materializer regression tests are included. Production SQL files are unchanged.
 
 Final focused verification: **73 passed** (including 13 native integration checks); one existing Starlette/AnyIO deprecation warning. Python syntax/compilation and `git diff --check` passed. This is isolated engineering evidence, not customer activity.
+
+## Founder-approved activation follow-through, 16 November
+
+The founder explicitly instructed execution of the outstanding deployment and
+credential/writer configuration. Fresh original-reader authentication at
+17:25 UTC confirmed registry rows 0 and all seven completed dates 9–15 November
+with zero qualifying tenant events, each `DAY_CENSUS_INCOMPLETE_HOLD`. This is
+now a live seven-day source observation, not inference from the old receipt.
+The native registrar had zero role members; no existing restricted predictive
+writer candidate was present for the original tenant.
+
+The bounded additional activation prepares one dedicated forecast login using
+the original NOINHERIT/SCRAM/tenant-binding pattern. It receives only membership
+of the existing native registrar, CONNECT, a four-second statement timeout, and
+one active original tenant binding carrying the founder approval reference.
+No schema migration, tenant creation, generic app privilege or reader-write
+grant is included. Existing loopback SCRAM authentication avoids any HBA change.
+`prepare_native_writer_login` was verified on disposable PostgreSQL before live
+use; only a derived SCRAM verifier enters its SQL, never a plaintext password.
+
+`deploy/systemd/empire-department-cycle-predictive-native.conf` delivers the
+original reader and separate writer through systemd's private read-only
+per-service credential mount. The original root reader vault stays unchanged;
+no credential is stored in application source or Environment values. The
+observer validates the credential mount/path/file protections and uses the
+original source identity, without a reader-to-writer fallback. It refreshes
+source preflight through the original restricted readers in memory on each
+existing scheduled invocation, rather than treating a stale root receipt as a
+fresh database query.
+
+The existing hook, timer, promotion gate and other department steps are
+preserved. A live department-cycle `exit-code` failure was traced to
+`promote_predictive_revenue_runtime_bindings.py`, which correctly refuses held
+source evidence; this is not proof that the observer did not execute, and no
+speculative hook relocation or scheduler redesign is applied.
+
+Focused regressions after the activation adapter: **76 passed**. Added checks
+cover unmanaged credential refusal, sanitized missing-credential holds and
+creation/duplicate denial of the dedicated writer with exactly one capability.

@@ -37,6 +37,68 @@ GOVERNANCE = {
 }
 
 
+def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
+    """Consume only systemd's read-only per-service credential mount.
+
+    The original root vault is never chmodded, persisted into Environment or
+    copied into the application tree. The service manager delivers it to the
+    founder-approved existing department-cycle identity. No writer fallback.
+    """
+    import stat
+    from psycopg.conninfo import make_conninfo
+    from scripts.provision_revenue_event_evidence_login_20261018 import LOGIN, TENANT
+    directory = Path(env.get("CREDENTIALS_DIRECTORY", ""))
+    if (str(directory) != "/run/credentials/empire-department-cycle.service"
+            or directory.resolve() != directory
+            or not os.statvfs(directory).f_flag & os.ST_RDONLY):
+        raise ValueError("systemd credential mount required")
+    path = directory / "predictive-revenue-reader"
+    fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+    try:
+        info = os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0, os.geteuid())
+                or stat.S_IMODE(info.st_mode) & 0o077):
+            raise ValueError("private service credential required")
+        content = os.read(fd, 4097)
+        if len(content) > 4096:
+            raise ValueError("bounded original credential required")
+    finally:
+        os.close(fd)
+    lines = content.decode("ascii").splitlines()
+    prefix = f"/var/run/postgresql:5432:empiredb:{LOGIN}:"
+    if len(lines) != 1 or not lines[0].startswith(prefix) or not lines[0][len(prefix):]:
+        raise ValueError("original reader credential required")
+    dsn = make_conninfo(host="/var/run/postgresql", port=5432, dbname="empiredb",
+                       user=LOGIN, password=lines[0][len(prefix):], connect_timeout=5)
+    configuration = {"EMPIRE_PREDICTIVE_TENANT_ID": TENANT,
+                     "EMPIRE_PREDICTIVE_CENSUS_DSN": dsn,
+                     "EMPIRE_PREDICTIVE_REGISTRY_READER_DSN": dsn}
+    # Optional independently provisioned writer; never reuse the reader.
+    if env.get("EMPIRE_PREDICTIVE_NATIVE_REGISTRATION_ENABLED") == "1":
+        from empire_os.predictive_registry_transport import NATIVE_FORECAST_WRITER_LOGIN
+        fd = os.open(directory / "predictive-revenue-writer",
+                     os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
+        try:
+            info = os.fstat(fd)
+            if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0, os.geteuid())
+                    or stat.S_IMODE(info.st_mode) & 0o077):
+                raise ValueError("private writer credential required")
+            content = os.read(fd, 4097)
+            if len(content) > 4096:
+                raise ValueError("bounded writer credential required")
+        finally:
+            os.close(fd)
+        lines = content.decode("ascii").splitlines()
+        prefix = f"127.0.0.1:5432:empiredb:{NATIVE_FORECAST_WRITER_LOGIN}:"
+        if len(lines) != 1 or not lines[0].startswith(prefix) or not lines[0][len(prefix):]:
+            raise ValueError("dedicated writer credential required")
+        configuration["EMPIRE_PREDICTIVE_REGISTRAR_DSN"] = make_conninfo(
+            host="127.0.0.1", port=5432, dbname="empiredb",
+            user=NATIVE_FORECAST_WRITER_LOGIN, password=lines[0][len(prefix):],
+            connect_timeout=5)
+    return configuration
+
+
 def _load_bounded_preflight(path: Path) -> dict[str, Any] | None:
     """Only local original preflight; refuse symlinks, oversize or malformed."""
     try:
@@ -152,8 +214,30 @@ def run(*, root: Path = ROOT, now: datetime | None = None,
     # Existing department-cycle hook remains the sole scheduled entry point.
     # Activation is a separate owner/founder deployment decision. Never use
     # runtime JSON or public request points as observations/credentials.
-    env = producer_environment or {}
+    env = dict(producer_environment or {})
     if env.get("EMPIRE_PREDICTIVE_NATIVE_SOURCE_ENABLED") == "1":
+        if not env.get("EMPIRE_PREDICTIVE_CENSUS_DSN") or not env.get("EMPIRE_PREDICTIVE_REGISTRY_READER_DSN"):
+            try:
+                for key, value in _service_reader_configuration(env).items():
+                    env.setdefault(key, value)
+                report["native_reader_credential_delivery"] = "SYSTEMD_SERVICE_SCOPED"
+            except Exception:
+                report["native_reader_credential_delivery"] = "SERVICE_SCOPED_CREDENTIAL_UNAVAILABLE"
+        if (env.get("EMPIRE_PREDICTIVE_TENANT_ID")
+                and env.get("EMPIRE_PREDICTIVE_CENSUS_DSN")
+                and env.get("EMPIRE_PREDICTIVE_REGISTRY_READER_DSN")):
+            from empire_os.predictive_revenue_source_preflight import review_authenticated_sources
+            live_source = review_authenticated_sources(
+                tenant_id=env["EMPIRE_PREDICTIVE_TENANT_ID"],
+                registry_dsn=env["EMPIRE_PREDICTIVE_REGISTRY_READER_DSN"],
+                census_dsn=env["EMPIRE_PREDICTIVE_CENSUS_DSN"],
+                as_of=datetime.now(timezone.utc),
+            )
+            delivery = report.get("native_reader_credential_delivery")
+            report = evaluate_original_source(live_source, now=datetime.now(timezone.utc))
+            report["source_preflight_origin"] = "LIVE_ORIGINAL_RESTRICTED_READERS"
+            if delivery:
+                report["native_reader_credential_delivery"] = delivery
         from empire_os.predictive_materializer import produce_native_revenue_forecast
         native = produce_native_revenue_forecast(
             tenant_id=env.get("EMPIRE_PREDICTIVE_TENANT_ID", ""),

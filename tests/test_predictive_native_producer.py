@@ -261,3 +261,37 @@ def test_mature_native_records_reach_census_but_never_invent_finality(source, cl
     assert r['authenticated_candidate_outcome_days'] == 1
     assert r['financially_final_forecast_outcome_pairs'] == 0
     assert not r['scorecard_executed'] and not r['calibration_authorized']
+
+
+def test_service_credentials_refuse_unmanaged_directory():
+    from scripts.run_predictive_revenue_runtime_observer import _service_reader_configuration
+    with pytest.raises(ValueError):
+        _service_reader_configuration({'CREDENTIALS_DIRECTORY':'/tmp/fake-credentials'})
+
+
+def test_missing_service_credentials_is_sanitized_and_never_registers(tmp_path):
+    r = run(root=tmp_path, write=False, producer_environment={
+        'EMPIRE_PREDICTIVE_NATIVE_SOURCE_ENABLED':'1',
+        'CREDENTIALS_DIRECTORY':'/tmp/fake-credentials'})
+    assert r['native_reader_credential_delivery'] == 'SERVICE_SCOPED_CREDENTIAL_UNAVAILABLE'
+    assert r['native_producer']['status'] == 'NATIVE_SOURCE_CONFIGURATION_HOLD'
+    assert not r['native_producer']['registration_attempted']
+
+
+def test_approved_missing_writer_provision_uses_only_existing_capability(cluster):
+    from empire_os.predictive_registry_transport import prepare_native_writer_login, NATIVE_FORECAST_WRITER_LOGIN
+    from scripts.provision_crm_dedicated_logins import scram_verifier
+    verifier = scram_verifier('isolated-test-password-not-production')
+    with psycopg.connect(cluster[0], autocommit=True) as c:
+        c.execute('ALTER TABLE public.empire_tenant_role_bindings ADD COLUMN IF NOT EXISTS evidence_ref text')
+        c.execute("UPDATE public.empire_tenant_role_bindings SET evidence_ref='isolated-fixture'")
+        c.execute(prepare_native_writer_login(tenant_id=TENANT, scram=verifier))
+        flags = c.execute('SELECT rolcanlogin,rolinherit,rolsuper,rolbypassrls,rolcreatedb,rolcreaterole,rolreplication FROM pg_roles WHERE rolname=%s',(NATIVE_FORECAST_WRITER_LOGIN,)).fetchone()
+        assert flags == (True,False,False,False,False,False,False)
+        assert c.execute('SELECT count(*) FROM pg_auth_members WHERE member=to_regrole(%s)',(NATIVE_FORECAST_WRITER_LOGIN,)).fetchone() == (1,)
+        assert c.execute('SELECT tenant_id::text FROM public.empire_tenant_role_bindings WHERE role_name=%s',(NATIVE_FORECAST_WRITER_LOGIN,)).fetchone() == (TENANT,)
+        with pytest.raises(psycopg.Error):
+            c.execute(prepare_native_writer_login(tenant_id=TENANT, scram=verifier))
+        c.execute('ROLLBACK')
+    with pytest.raises(ValueError):
+        prepare_native_writer_login(tenant_id=TENANT, scram='plaintext-password')
