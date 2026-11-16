@@ -96,3 +96,53 @@ remote file capability.
 
 All real customer routing, revenue, tenant binding, outbound and deployment
 gates remain unchanged. This integration only ingests synthetic fixtures.
+
+
+## 2026-11-16 model activation canary — timeout mismatch, narrowly corrected
+
+- Founder ran the guarded NVIDIA local model activation at 22:41:43 UTC.
+  The system returned `NVIDIA_LOCAL_MODELS_ROLLOUT_HELD`.
+- Verified direct server readback: `ISOLATED_LOCAL_MODEL_CONFIG_PASS`;
+  `CONTAINER_TO_GATEWAY_EMBEDDING_PASS_768_DIM`; backend synthetic chat
+  canary raised `TimeoutError` at the previous 60-second request timeout.
+  `ACTIVATION_EXIT_CODE=14`. No Docker service was recreated or model
+  environment applied.
+- NVIDIA Docker database, migrations, backend, ingestion and frontend
+  remained healthy. Health API returned `status: ok`.
+- The host was under significant CPU contention (load roughly 9); direct
+  OpenAI-compatible requests to local Ollama and the already-running
+  first-party llama.cpp endpoint both returned synthetic `OK` in roughly
+  5 seconds, and a gateway request returned exactly `OK` in 7.6 seconds.
+  This shows model and gateway functionality but does **not** prove why the
+  single Docker request was slow.
+- The gateway's own request timeout is 180 seconds, while the container
+  canary used only 60 seconds. When the canary disconnected, the gateway
+  logged `BrokenPipeError`. The mismatch was real; changing it does not
+  guarantee consistently low latency under load.
+- Made the smallest bounded repair inside the existing guarded activation
+  script: outer command timeout now 190 seconds; backend model request
+  timeout 170 seconds; the synthetic chat canary requires the expected
+  `OK` rather than merely any non-empty output. On failure, the script
+  remains fail-closed and does not change the containers.
+- Preserved the previous launcher in the private runtime as
+  `activate_local_models_and_capture.pre-timeout-repair-20261116.sh`.
+  The existing runtime launch path is now a symlink to single tracked
+  source `scripts/activate_nvidia_ontology_local_models_and_capture_20261116.sh`
+  so future changes can be reviewed and tested.
+- Added `tests/test_nvidia_model_activation_guard_20261116.py` to
+  protect the single-project scope, healthy preflight, no paid credentials,
+  no broad Docker cleanup, and the timeout/expected-response requirements.
+  Targeted regression: **22 tests PASS** plus `bash -n` and Compose config.
+- This is a preflight repair, **not** verified successful model rollout.
+  The root-authorised operator must rerun the existing command. No further
+  changes to the host Ollama daemon, other EmpireOS agents, database, user
+  accounts, or customer data were performed.
+
+Command (already available on founder's terminal):
+
+```bash
+sudo bash /srv/empire_os/runtime/nvidia_ontology_eval/activate_local_models_and_capture.sh
+```
+
+The on-host private report `runtime/nvidia_ontology_eval/local_models_activation_readback.txt`
+is retrieved through the connected machine, so no logs need to be pasted.
