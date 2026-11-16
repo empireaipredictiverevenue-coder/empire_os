@@ -5,15 +5,16 @@ Original observer (preserved in git history at 3d564d115) scanned every
 runtime JSON file for keyword fragments, then treated buyer/marketing/research
 nodes as forecasts. That was not a source-of-truth or an authenticated query.
 
-This narrow observer reads ONLY the original authenticated-source preflight.
-It does not admit forecasts merely because a JSON artifact claims provenance.
-Actual forecast registration and outcome validation remain owned by the
-existing private PostgreSQL tenant readers; no runtime-file shortcut exists.
+The source classifier reads ONLY the original authenticated-source preflight.
+An explicitly activated private branch invokes the original model with native
+tenant-bound census inputs and a separate restricted writer. Default is still
+OBSERVE. No runtime-file observation or public forecast request is admitted.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import os
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -143,13 +144,42 @@ def evaluate_original_source(
 
 
 def run(*, root: Path = ROOT, now: datetime | None = None,
-        write: bool = True) -> dict[str, Any]:
+        write: bool = True,
+        producer_environment: Mapping[str, str] | None = None) -> dict[str, Any]:
     output = root / OUT_REL
     source = _load_bounded_preflight(root / PREFLIGHT_REL)
     report = evaluate_original_source(source, now=now)
+    # Existing department-cycle hook remains the sole scheduled entry point.
+    # Activation is a separate owner/founder deployment decision. Never use
+    # runtime JSON or public request points as observations/credentials.
+    env = producer_environment or {}
+    if env.get("EMPIRE_PREDICTIVE_NATIVE_SOURCE_ENABLED") == "1":
+        from empire_os.predictive_materializer import produce_native_revenue_forecast
+        native = produce_native_revenue_forecast(
+            tenant_id=env.get("EMPIRE_PREDICTIVE_TENANT_ID", ""),
+            census_dsn=env.get("EMPIRE_PREDICTIVE_CENSUS_DSN", ""),
+            reader_dsn=env.get("EMPIRE_PREDICTIVE_REGISTRY_READER_DSN", ""),
+            writer_dsn=env.get("EMPIRE_PREDICTIVE_REGISTRAR_DSN", "") if write else "",
+            registration_enabled=(write and
+                env.get("EMPIRE_PREDICTIVE_NATIVE_REGISTRATION_ENABLED") == "1"),
+        )
+        report["native_producer"] = native
+        if (env.get("EMPIRE_PREDICTIVE_TENANT_ID")
+                and env.get("EMPIRE_PREDICTIVE_REGISTRY_READER_DSN")
+                and env.get("EMPIRE_PREDICTIVE_CENSUS_DSN")):
+            from empire_os.predictive_revenue_daily_census import review_native_outcome_readiness
+            report["native_outcome_readiness"] = review_native_outcome_readiness(
+                tenant_id=env["EMPIRE_PREDICTIVE_TENANT_ID"],
+                reader_dsn=env["EMPIRE_PREDICTIVE_REGISTRY_READER_DSN"],
+                census_dsn=env["EMPIRE_PREDICTIVE_CENSUS_DSN"],
+            )
+        # OBSERVE describes the original source classifier, not the optional
+        # private producer's authority. Do not conceal possible writes.
+        report["governance"]["prediction_mutation"] = native["registration_attempted"]
+        report["governance"]["db_write"] = native["registration_commit_state"] in (
+            "UNKNOWN", "COMMITTED", "EXACT_RECORD_PRESENT")
     if write:
-        # Original runtime-observer output only; never alter sources, registry,
-        # control-plane bindings, customer data or external services.
+        # Original output path only; no second scheduler or receipt registry.
         output.parent.mkdir(parents=True, exist_ok=True)
         tmp = output.with_suffix(".tmp")
         tmp.write_text(
@@ -161,7 +191,7 @@ def run(*, root: Path = ROOT, now: datetime | None = None,
 
 
 if __name__ == "__main__":
-    result = run()
+    result = run(producer_environment=os.environ)
     print(json.dumps({
         "status": result["status"],
         "candidate_count": result["candidate_count"],
@@ -170,5 +200,6 @@ if __name__ == "__main__":
             result["original_registry_scoped_rows_reported"],
         "research_runtime_json_scanned_as_forecast_candidates": False,
         "mode": result["mode"],
-        "database_writes": False,
+        "database_writes": result["governance"]["db_write"],
+        "native_producer_status": result.get("native_producer", {}).get("status"),
     }, sort_keys=True))

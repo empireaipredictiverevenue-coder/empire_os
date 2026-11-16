@@ -31,6 +31,122 @@ MAX_READ=100
 METRIC="recognized_revenue_cents"
 
 
+def list_mature_native_forecast_refs(
+    *, dsn: str, tenant_id: str, as_of: datetime, connect_factory=None,
+) -> list[str]:
+    """Private bounded handoff to the original outcome reader; no values."""
+    try:
+        tenant = _uuid(tenant_id)
+        now = _when(as_of)
+        if connect_factory is None:
+            import psycopg
+            connect_factory = psycopg.connect
+        with connect_factory(dsn, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute("SET LOCAL statement_timeout = '4000ms'")
+                cur.execute("SET LOCAL ROLE " + READER_ROLE)
+                cur.execute(IDENTITY_SQL)
+                if tuple(cur.fetchone()) != ("empiredb", "on"):
+                    raise ValueError("restricted database required")
+                cur.execute(TENANT_SQL)
+                if str(cur.fetchone()[0]) != tenant:
+                    raise ValueError("trusted tenant mismatch")
+                cur.execute(TABLE_SQL)
+                if tuple(cur.fetchone()) != (True, True):
+                    raise ValueError("FORCE RLS required")
+                cur.execute(ROLE_SQL, (READER_ROLE,))
+                if tuple(cur.fetchone()) != (False, False, False, False):
+                    raise ValueError("reader privilege drift")
+                # Native function creates ISO dates. A malformed evidence
+                # value cannot coerce a SQL date or expand this tenant scope.
+                cur.execute("""SELECT forecast_key FROM public.predictive_forecasts
+                    WHERE dimension_key=%s AND metric=%s
+                      AND model_name='empire-directional-linear'
+                      AND model_version='v3-registration-day-v1'
+                      AND source='empiredb_prospective_registration_source_claim_unverified'
+                      AND generated_at<=%s
+                      AND evidence->>'target_utc_date'<%s
+                    ORDER BY generated_at DESC,id DESC LIMIT 31""",
+                    ("tenant:" + tenant, METRIC, now, now.date().isoformat()))
+                rows = cur.fetchall()
+        if len(rows) > 30:
+            raise ValueError("mature cohort read bound reached")
+        return [row[0] for row in rows]
+    except Exception:
+        raise PrivateForecastRegistryUnavailable(
+            "MATURE_NATIVE_REGISTRY_READ_UNAVAILABLE_OR_BOUND_REACHED") from None
+
+
+def read_native_forecast_registration(
+    *, dsn: str, tenant_id: str, registration_ref: str,
+    connect_factory: Callable[..., Any] | None = None,
+) -> dict[str, Any]:
+    """Private exact-key readback. Never expose this through the public API.
+
+    Separate READ ONLY connection, original reader role and trusted session
+    binding. Values are returned only to the internal producer for comparison.
+    Authentication is not independent financial/source-finality attestation.
+    """
+    import re
+    try:
+        tenant = _uuid(tenant_id)
+        if not isinstance(dsn, str) or not dsn.strip():
+            raise ValueError("reader required")
+        if not isinstance(registration_ref, str) or not re.fullmatch(
+            r"efr:[0-9a-f]{32}", registration_ref
+        ):
+            raise ValueError("exact reference required")
+        if connect_factory is None:
+            import psycopg
+            connect_factory = psycopg.connect
+        with connect_factory(dsn, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute("SET LOCAL statement_timeout = '4000ms'")
+                cur.execute("SET LOCAL ROLE " + READER_ROLE)
+                cur.execute(IDENTITY_SQL)
+                if tuple(cur.fetchone()) != ("empiredb", "on"):
+                    raise ValueError("restricted database required")
+                cur.execute(TENANT_SQL)
+                if str(cur.fetchone()[0]) != tenant:
+                    raise ValueError("trusted tenant mismatch")
+                cur.execute(ROLE_SQL, (READER_ROLE,))
+                if tuple(cur.fetchone()) != (False, False, False, False):
+                    raise ValueError("reader privilege drift")
+                cur.execute(TABLE_SQL)
+                if tuple(cur.fetchone()) != (True, True):
+                    raise ValueError("FORCE RLS required")
+                cur.execute("SELECT session_user")
+                reader_login = cur.fetchone()[0]
+                cur.execute("""SELECT model_name,model_version,horizon_days,
+                    sample_count,predicted_value,r_squared,evidence_confidence,
+                    direction,evidence,generated_at
+                    FROM public.predictive_forecasts
+                    WHERE forecast_key=%s AND dimension_key=%s AND metric=%s
+                      AND source='empiredb_prospective_registration_source_claim_unverified'
+                    LIMIT 2""", (registration_ref, "tenant:" + tenant, METRIC))
+                rows = cur.fetchall()
+        if not rows:
+            return {"found": False, "reader_session_user": reader_login}
+        if len(rows) != 1 or len(rows[0]) != 10:
+            raise ValueError("exact source row required")
+        keys = ("model_name", "model_version", "horizon_days", "sample_count",
+                "predicted_cents", "r_squared", "evidence_confidence",
+                "direction", "evidence", "registered_at")
+        row = dict(zip(keys, rows[0]))
+        row["predicted_cents"] = _exact_cents(row["predicted_cents"])
+        row["registered_at"] = _when(row["registered_at"])
+        if row["registered_at"] > datetime.now(timezone.utc):
+            raise ValueError("future registry timestamp")
+        row["found"] = True
+        row["reader_session_user"] = reader_login
+        return row
+    except Exception:
+        raise PrivateForecastRegistryUnavailable(
+            "EXACT_NATIVE_REGISTRY_READBACK_UNAVAILABLE") from None
+
+
 class PrivateForecastRegistryUnavailable(RuntimeError):
     """Sanitized only: no login, row, tenant, query or credential details."""
 

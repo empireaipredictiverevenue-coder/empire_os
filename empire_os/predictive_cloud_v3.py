@@ -70,6 +70,7 @@ def forecast_observed_metric(
     metric: str,
     points: Iterable[ObservedMetricPoint],
     horizon_days: int,
+    forecast_origin_date: date | None = None,
 ) -> DirectionalForecast:
     metric_name = str(metric or "").strip()
     if not metric_name:
@@ -96,9 +97,19 @@ def forecast_observed_metric(
             source=source,
         )
 
+    # Original model uses one step per day. The private native producer
+    # requires contiguous days; registration horizon starts at issuance,
+    # not at yesterday's final observation (REV078).
+    origin_lag = 0
+    if forecast_origin_date is not None:
+        if type(forecast_origin_date) is not date:
+            raise ValueError("explicit forecast origin UTC date required")
+        origin_lag = (forecast_origin_date - rows[-1].observed_date).days
+        if origin_lag < 0:
+            raise ValueError("forecast origin precedes observations")
     values = [point.value for point in rows]
     slope, intercept, r_squared = _linear_fit(values)
-    target_x = (len(values) - 1) + horizon
+    target_x = (len(values) - 1) + horizon + origin_lag
     predicted = max(0.0, intercept + slope * target_x)
 
     epsilon = 1e-9

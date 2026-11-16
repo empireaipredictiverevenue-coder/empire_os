@@ -22,6 +22,61 @@ CENSUS_SQL = """SELECT day_utc,scope_tenant_id,global_event_count,
 MAX_CENTS = 9223372036854775807
 
 
+def review_native_outcome_readiness(
+    *, tenant_id: str, reader_dsn: str, census_dsn: str, connect_factory=None,
+) -> dict[str, Any]:
+    """Recurring native registry -> REV077 outcome-source handoff.
+
+    Candidate censuses never become financially final calibration labels.
+    Existing forecast scorecard remains held until its original finance owner
+    supplies independent finality; caller booleans cannot supply that proof.
+    """
+    from empire_os.predictive_revenue_tenant_registry_inspector import (
+        list_mature_native_forecast_refs, read_native_forecast_registration,
+    )
+    now = datetime.now(timezone.utc)
+    result = {
+        "status": "NATIVE_OUTCOME_SOURCE_READ_FAILED",
+        "mature_registered_forecasts_observed": 0,
+        "authenticated_candidate_outcome_days": 0,
+        "financially_final_forecast_outcome_pairs": 0,
+        "scorecard_executed": False,
+        "calibration_authorized": False,
+        "financial_actuals_verified": False,
+        "database_writes": False,
+    }
+    try:
+        refs = list_mature_native_forecast_refs(
+            dsn=reader_dsn, tenant_id=tenant_id, as_of=now,
+            connect_factory=connect_factory)
+        result["mature_registered_forecasts_observed"] = len(refs)
+        if not refs:
+            result["status"] = "NO_MATURE_NATIVE_FORECASTS"
+            return result
+        for ref in refs:
+            original = read_native_forecast_registration(
+                dsn=reader_dsn, tenant_id=tenant_id, registration_ref=ref,
+                connect_factory=connect_factory)
+            if not original["found"]:
+                return result
+            target = date.fromisoformat(original["evidence"]["target_utc_date"])
+            issued = original["registered_at"].date()
+            if (target != issued + timedelta(days=original["horizon_days"])
+                    or target >= now.date()):
+                return result
+            census = read_daily_revenue_census(
+                dsn=census_dsn, day_utc=target, tenant_id=tenant_id, as_of=now,
+                connect_factory=connect_factory, require_session_tenant_binding=True)
+            if census.get("database_session_tenant_identity_matched") is not True:
+                return result
+            if census.get("status") == "DAY_SOURCE_CENSUS_CANDIDATE":
+                result["authenticated_candidate_outcome_days"] += 1
+        result["status"] = "INDEPENDENT_FINANCIAL_FINALITY_REQUIRED_NO_SCORING"
+    except Exception:
+        pass
+    return result
+
+
 def _positive_int(value: Any, *, permit_zero: bool=True) -> int:
     if type(value) not in (int,Decimal):
         raise CanonicalRevenueEvidenceUnavailable("REVENUE_CENSUS_NONINTEGER")

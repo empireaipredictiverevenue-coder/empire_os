@@ -226,6 +226,44 @@ NATIVE_FORECAST_REGISTER_SQL = (
 )
 
 
+def prepare_native_writer_grant(*, writer_login: str, tenant_id: str) -> str:
+    """Prepare only. Founder/DBA reviews and executes; never create a login.
+
+    Keep existing evidence/registry reader identities permanently read-only.
+    The approved writer must already have exactly the original tenant binding.
+    """
+    import re
+    from uuid import UUID
+    if (type(writer_login) is not str
+            or not re.fullmatch(r"[a-z][a-z0-9_]{0,62}", writer_login)
+            or writer_login in ("empiredb_app", "empiredb_migrator")
+            or type(tenant_id) is not str or str(UUID(tenant_id)) != tenant_id):
+        raise ValueError("existing restricted writer and canonical tenant required")
+    return f"""BEGIN;
+SET LOCAL lock_timeout='3s';
+SET LOCAL statement_timeout='5s';
+DO $guard$
+BEGIN
+ IF current_database()<>'empiredb' OR pg_is_in_recovery()
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=current_user AND rolsuper)
+    OR NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='{writer_login}'
+       AND rolcanlogin AND NOT rolinherit AND NOT rolsuper AND NOT rolbypassrls
+       AND NOT rolcreaterole AND NOT rolcreatedb AND NOT rolreplication)
+    OR NOT EXISTS(SELECT 1 FROM public.empire_tenant_role_bindings
+       WHERE role_name='{writer_login}' AND active AND tenant_id='{tenant_id}'::uuid)
+    OR (SELECT count(*) FROM public.empire_tenant_role_bindings
+       WHERE role_name='{writer_login}' AND active)<>1
+    OR pg_has_role('{writer_login}','empire_predictive_registry_reader','MEMBER')
+    OR pg_has_role('{writer_login}','empire_predictive_revenue_evidence_reader','MEMBER')
+ THEN RAISE EXCEPTION 'EXISTING_DEDICATED_TENANT_WRITER_REQUIRED'; END IF;
+END;
+$guard$;
+GRANT empire_predictive_forecast_registrar TO {writer_login}
+ WITH INHERIT FALSE, SET TRUE, ADMIN FALSE;
+COMMIT;
+"""
+
+
 class EmpireDbProspectiveForecastRegistration:
     """Private first-party REV078 registration, disabled unless explicitly enabled.
 
@@ -235,7 +273,8 @@ class EmpireDbProspectiveForecastRegistration:
     """
 
     def __init__(self, dsn: str, *, enabled: bool = False,
-                 connect_factory: Callable | None = None):
+                 connect_factory: Callable | None = None,
+                 forbidden_session_users: tuple[str, ...] = ()):
         if type(enabled) is not bool or not enabled:
             raise PredictiveRegistryTransportError(
                 'native forecast registration not authorised')
@@ -243,6 +282,7 @@ class EmpireDbProspectiveForecastRegistration:
             raise PredictiveRegistryTransportError(
                 'dedicated native registrar credential required')
         self._dsn = dsn
+        self._forbidden_session_users = forbidden_session_users
         if connect_factory is None:
             try:
                 import psycopg
@@ -300,6 +340,16 @@ class EmpireDbProspectiveForecastRegistration:
                     cursor.execute('SELECT current_database()')
                     if cursor.fetchone() != ('empiredb',):
                         raise ValueError('not canonical database')
+                    if self._forbidden_session_users:
+                        cursor.execute("SELECT session_user,rolsuper,rolbypassrls,"
+                            "pg_has_role(session_user,'empire_predictive_revenue_evidence_reader','MEMBER'),"
+                            "pg_has_role(session_user,'empire_predictive_registry_reader','MEMBER') "
+                            "FROM pg_catalog.pg_roles WHERE rolname=session_user")
+                        login,superuser,bypass,evidence_member,reader_member = cursor.fetchone()
+                        if (login in self._forbidden_session_users
+                                or login in ('empiredb_app', 'empiredb_migrator')
+                                or superuser or bypass or evidence_member or reader_member):
+                            raise ValueError('reader identity cannot be a writer')
                     cursor.execute('SET LOCAL ROLE ' + NATIVE_FORECAST_REGISTRAR_ROLE)
                     cursor.execute('SELECT public.empire_current_tenant_id()')
                     binding = cursor.fetchone()
