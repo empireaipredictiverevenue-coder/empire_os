@@ -20,7 +20,9 @@ A direct `sudo -n docker ps` remote invocation was blocked and no privilege
 changes were made.
 
 Docker Compose v5.7.1 is already installed as a checksum-verified user-scoped
-CLI plugin. No need to add `ubuntu` to the docker group.
+CLI plugin. No need to add `ubuntu` to the docker group. Because the plugin is
+only installed for ubuntu, sudo launch commands use the **absolute plugin
+binary**; ordinary `sudo docker compose` might not find that user-scoped plugin.
 
 ## Prepared evaluation bundle
 
@@ -67,7 +69,7 @@ Generation and independent checks:
 From an EmpireOS shell:
 
 ```bash
-sudo docker compose \
+sudo /home/ubuntu/.docker/cli-plugins/docker-compose \
   -f /srv/empire_os/runtime/nvidia_ontology_eval/compose.yaml \
   --env-file /srv/empire_os/runtime/nvidia_ontology_eval/.env \
   up -d --build
@@ -84,7 +86,7 @@ endpoints. No customer, revenue or full runtime success is asserted.
 After operator execution, inspect the actual status:
 
 ```bash
-sudo docker compose \
+sudo /home/ubuntu/.docker/cli-plugins/docker-compose \
   -f /srv/empire_os/runtime/nvidia_ontology_eval/compose.yaml \
   --env-file /srv/empire_os/runtime/nvidia_ontology_eval/.env \
   ps
@@ -100,7 +102,7 @@ restarting or touching unrelated production services.
 Only after explicitly deciding to stop this named evaluation:
 
 ```bash
-sudo docker compose \
+sudo /home/ubuntu/.docker/cli-plugins/docker-compose \
   -f /srv/empire_os/runtime/nvidia_ontology_eval/compose.yaml \
   --env-file /srv/empire_os/runtime/nvidia_ontology_eval/.env \
   down

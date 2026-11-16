@@ -199,7 +199,9 @@ def prepare() -> dict:
             "containers_started": False,
             "secrets_printed": False,
             "operator_command": (
-                "sudo docker compose -f " + str(TARGET / "compose.yaml")
+                "sudo /home/ubuntu/.docker/cli-plugins/docker-compose -f "
+                + str(TARGET / "compose.yaml")
+                + " --env-file " + str(TARGET / ".env")
                 + " up -d --build"
             ),
         }
