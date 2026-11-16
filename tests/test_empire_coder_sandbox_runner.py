@@ -646,3 +646,71 @@ def test_os_isolated_model_runtime_requires_bwrap(tmp_path, monkeypatch):
     assert module._isolated_codex_argv(
         cli=str(cli), clone=tmp_path,
     ) is None
+
+
+def test_codex_authenticated_under_narrow_hermes_systemd_path(tmp_path, monkeypatch):
+    """The real service PATH omits Node: prepend the CLI's own Node runtime."""
+    import os
+    import subprocess
+    import empire_os.empire_coder_sandbox_runner as module
+
+    repo = _codex_local_git_repo(tmp_path)
+    codex = tmp_path / "codex-bin"
+    codex.write_text("#!/usr/bin/env node\n")
+    codex.chmod(0o700)
+    node_bin = tmp_path / "nvm/versions/node/v99.0.0/bin"
+    node_bin.mkdir(parents=True)
+    (node_bin / "node").write_text("executable test fixture")
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(codex))
+    monkeypatch.setattr(module, "_local_codex_node_bin", lambda _cli: node_bin)
+    systemd_path = (
+        "/home/ubuntu/.local/bin:/usr/local/sbin:/usr/local/bin:"
+        "/usr/sbin:/usr/bin:/sbin:/bin"
+    )
+    monkeypatch.setenv("PATH", systemd_path)
+    original_run = module._run
+    login_calls = []
+
+    def guarded_run(argv, *, cwd, env=None, timeout=180):
+        if argv == [str(codex), "login", "status"]:
+            assert env is not None
+            assert env["PATH"] == str(node_bin) + os.pathsep + systemd_path
+            login_calls.append(True)
+            return subprocess.CompletedProcess(
+                argv, 0, stdout="", stderr="Logged in using ChatGPT\n",
+            )
+        if argv == ["git", "rev-parse", "HEAD"]:
+            # Stop after the real authenticated preflight, before clone/model.
+            return subprocess.CompletedProcess(
+                argv, 1, stdout="", stderr="isolated test stops here",
+            )
+        return original_run(argv, cwd=cwd, env=env, timeout=timeout)
+
+    monkeypatch.setattr(module, "_run", guarded_run)
+    result = module.run_empire_coder_codex_local_candidate(
+        repo, _codex_job(job_id="node-systemd-auth-regression"),
+        work_root=tmp_path / "model-work",
+    )
+    assert login_calls == [True]
+    assert result["reason"] == "source_branch_not_current_head"
+    assert result["reason"] != "codex_cli_not_authenticated"
+    assert not (tmp_path / "model-work").exists()
+
+
+def test_missing_codex_node_runtime_fails_before_auth(tmp_path, monkeypatch):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(tmp_path / "codex"))
+    monkeypatch.setattr(module, "_local_codex_node_bin", lambda _cli: None)
+    monkeypatch.setattr(
+        module, "_run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("no subprocess without Node runtime")
+        ),
+    )
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(job_id="missing-node-held"),
+    )
+    assert result["status"] == "HELD"
+    assert result["reason"] == "codex_node_runtime_unavailable"

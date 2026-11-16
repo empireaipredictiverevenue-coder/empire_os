@@ -393,6 +393,31 @@ def _isolated_pytest_argv(
 
 
 
+def _local_codex_node_bin(cli: str) -> Path | None:
+    """Resolve the Node executable for the installed Codex CLI.
+
+    The Hermes systemd service deliberately has a narrow PATH; Codex's
+    shebang uses /usr/bin/env node, so an authenticated CLI otherwise fails
+    with exit 127 and is misleadingly classified as not authenticated.
+    """
+    cli_real = Path(cli).resolve()
+    candidates = sorted(
+        (Path.home() / ".nvm/versions/node").glob("v*/bin"),
+        reverse=True,
+    )
+    ordered = sorted(
+        candidates,
+        key=lambda node_bin: (
+            not cli_real.is_relative_to(node_bin.parent),
+            str(node_bin),
+        ),
+    )
+    return next(
+        (path for path in ordered if (path / "node").is_file()),
+        None,
+    )
+
+
 def _isolated_codex_argv(
     *, cli: str, clone: Path,
 ) -> list[str] | None:
@@ -429,14 +454,9 @@ def _isolated_codex_argv(
     if not cli_path.is_relative_to(nvm) and not cli_path.is_relative_to("/usr"):
         base += ["--ro-bind", str(cli_path), str(cli_path)]
     # Respect the installed Node release rather than pinning an old version.
-    node_bins = sorted((nvm / "versions/node").glob("v*/bin"), reverse=True)
-    if not node_bins:
+    node_bin = _local_codex_node_bin(cli)
+    if node_bin is None:
         return None
-    node_bin = next(
-        (directory for directory in node_bins
-         if cli_path.is_relative_to(directory.parent)),
-        node_bins[0],
-    )
     base += [
         "--bind", str(clone), str(clone),
         "--chdir", str(clone),
@@ -492,7 +512,16 @@ def run_empire_coder_codex_local_candidate(
     if not cli:
         result["reason"] = "codex_cli_not_installed"
         return result
-    check = _run([cli, "login", "status"], cwd=root, timeout=20)
+    node_bin = _local_codex_node_bin(cli)
+    if node_bin is None:
+        result["reason"] = "codex_node_runtime_unavailable"
+        return result
+    login_env = dict(os.environ)
+    login_env["PATH"] = str(node_bin) + os.pathsep + login_env.get("PATH", "")
+    check = _run(
+        [cli, "login", "status"], cwd=root,
+        env=login_env, timeout=20,
+    )
     if check.returncode or "logged in" not in (
         (check.stdout or "") + (check.stderr or "")
     ).lower():
