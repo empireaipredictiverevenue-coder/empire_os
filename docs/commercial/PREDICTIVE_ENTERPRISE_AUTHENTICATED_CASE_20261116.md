@@ -18,6 +18,10 @@ The proposed entrypoint wrapper preserves the currently active Data Cloud browse
 
 ## Verification and production state
 
-The existing focused CRM transport, API and diagnostic HTTP checks passed in the isolated source worktree before the page and release wrapper were added (60 passed). They exercise the original repository’s tenant and login checks with test doubles. They are not production customer observations.
+The focused CRM API, tenant transport and diagnostic checks passed on the established PR branch (46 passed). Changed Python modules compile, and `git diff --check` is clean. The tests exercise the original repository checks with isolated fixtures; they are not production customer observations.
 
-Production CRM deployment remains on the existing pinned release until the founder approves this exact CRM entrypoint activation. The live CRM service has not been restarted for this integration. The known production forecast registry remains empty, and the user has stated that Empire AI has no sales yet. No customer forecast, recognized revenue, calibration result or source completeness is claimed.
+At 2026-11-16 19:26 UTC, the original dedicated CRM database login authenticated and its tenant-bound, read-only repository returned zero prospect records. The adapter reports `CRM_SOURCE_EMPTY_UNKNOWN_COVERAGE_HOLD`; it does not treat the empty view as a full tenant census. The source cannot establish financial finality or customer release. This is consistent with the founder's statement that Empire AI has no sales; it does not prove whether customers have records outside this CRM view.
+
+The reviewed release was staged inactive at `/opt/empire-ai/predictive-enterprise-crm-20261116-v1` from commit `bbc5a57b9e5c992c0fb271420181521bd8f05be4`. Under the current CRM process mount and environment, the staged app imported successfully; the page and script returned 200, and anonymous plus forged-tenant report requests returned 401 before database access. This was an isolated app-process check, not a live service route or authenticated customer report.
+
+The live CRM service remains on its existing pinned release. No unit file was installed and no CRM service restart was performed. The native forecast registry remains empty. No customer forecast, recognized revenue, calibration result or source completeness is claimed.
