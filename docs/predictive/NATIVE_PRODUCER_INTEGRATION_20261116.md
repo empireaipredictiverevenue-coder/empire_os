@@ -383,3 +383,33 @@ first approved restart was spent on the canonical-source-only deployment.
 Do not silently count it as a completed deployment or bypass the pinned
 release. Original startup can be restored by removing only this new launcher
 drop-in and reloading/restarting that same service if activation fails.
+# Corrected release ACTIVE — founder approval, 18:55 UTC
+
+Founder explicitly approved corrected release `407cbac37` and the additional
+restart. Rechecked staged bytes, actual process launch arguments and original
+service configuration for concurrent drift. Installed only the new reviewed
+launcher override after existing overlays; retained every original argument
+except the versioned module/app directory. Existing environment, permissions,
+IAM, original release bundles and all other services were preserved.
+
+Only `empire-founder-dashboard-api.service` restarted at
+`2026-11-16T18:55:00 UTC`; it is active/running. Live GET acceptance at
+`2026-11-16T18:55:15.224027+00:00`:
+
+- `/health`: 200, original read-only service identity.
+- `/v1/predictive-cloud/status`: 200, `Cache-Control:no-store`,
+  `X-Content-Type-Options:nosniff`, new
+  `FRESH_STATUS_SNAPSHOT_NOT_SOURCE_ATTESTATION` label, original
+  outcome-evidence projection retained. Financial/customer/operational flags
+  were not promoted: commercial prediction=false, customer forecast=false,
+  framework operational=false.
+- Original product workbench: 200, customer diagnostic fulfilled=false.
+- Protected original AgentOS intelligence: unauthenticated GET returns 401.
+- Original enterprise JSON, HTML and Markdown endpoints: all three pass
+  `LIVE_REPORT_GUARDS_VERIFIED`, retaining no-store/nosniff and internal-draft
+  evidence boundaries.
+
+The same pinned application retained its 87-route graph in the staged actual
+composite verification. No new listener, checkout/payment restart, migration,
+database write or customer action. This completes the bounded status-release
+correction, not the entire enterprise product or customer fulfilment.
