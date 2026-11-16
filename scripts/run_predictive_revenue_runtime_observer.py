@@ -345,6 +345,7 @@ def run(*, root: Path = ROOT, now: datetime | None = None,
             writer_dsn=env.get("EMPIRE_PREDICTIVE_REGISTRAR_DSN", "") if write else "",
             registration_enabled=(write and
                 env.get("EMPIRE_PREDICTIVE_NATIVE_REGISTRATION_ENABLED") == "1"),
+            history_days=30,
         )
         report["native_producer"] = native
         if (env.get("EMPIRE_PREDICTIVE_TENANT_ID")

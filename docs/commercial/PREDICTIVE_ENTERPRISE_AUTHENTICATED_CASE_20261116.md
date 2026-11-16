@@ -27,3 +27,7 @@ The reviewed release was staged at `/opt/empire-ai/predictive-enterprise-crm-202
 Live after restart: diagnostic page and script returned 200 with `no-store`; anonymous and forged-tenant report requests returned 401; the existing CRM board and its script returned 200. The service is active and running. No authenticated browser report request was made because no human CRM session was available. The independent tenant-bound database read above is the live source evidence.
 
 The native forecast registry remains empty. No customer forecast, recognized revenue, calibration result or source completeness is claimed.
+
+## 30-day scheduled forecast window
+
+The existing runtime observer already invokes the original private producer. Its default was seven consecutive completed UTC days, shorter than the requested 30-day history. The established observer now explicitly requests 30 days and the producer reports both the required window and the number of authenticated days read. It still stops on the first empty, incomplete or invalid day; it does not impute zero or bridge gaps. A 30-day isolated PostgreSQL fixture verifies model execution, native registration, exact independent readback and replay prevention. This source change is committed for review but has not been activated in production. Production source remains empty, so no customer forecast was produced.

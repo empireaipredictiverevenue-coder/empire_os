@@ -73,26 +73,26 @@ def source(cluster):
         c.execute('DELETE FROM public.predictive_forecasts')
         c.execute('DELETE FROM public.commercial_events')
         c.execute("DELETE FROM public.fulfilment_orders WHERE commercial_payload->>'fixture'='native'")
-        # Seven unique orders and recognized events. The original REV077
+        # Thirty unique orders and recognized events. The original REV077
         # function checks order/buyer/product/price/time/lineage end to end.
         c.execute("""INSERT INTO public.fulfilment_orders
             (id,buyer_id,product_id,state,settled_at,price_cents,commercial_payload)
             SELECT md5('order'||i)::uuid,'11111111-1111-4111-8111-111111111111',
             '44444444-4444-4444-8444-444444444444','settled',
             ((CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date-i)::timestamp AT TIME ZONE 'UTC',
-            (8-i)*100,'{"fixture":"native","causal_lineage":{"source":"isolated"}}'::jsonb
-            FROM generate_series(1,7) i""")
+            (31-i)*100,'{"fixture":"native","causal_lineage":{"source":"isolated"}}'::jsonb
+            FROM generate_series(1,30) i""")
         c.execute("""INSERT INTO public.commercial_events
             (id,event_type,occurred_at,fulfilment_order_id,buyer_id,product_id,amount_cents,payload)
             SELECT md5('event'||i)::uuid,'revenue_recognized',
             (((CURRENT_TIMESTAMP AT TIME ZONE 'UTC')::date-i)::timestamp AT TIME ZONE 'UTC')+interval '12 hours',
             md5('order'||i)::uuid,'11111111-1111-4111-8111-111111111111',
-            '44444444-4444-4444-8444-444444444444',(8-i)*100,
+            '44444444-4444-4444-8444-444444444444',(31-i)*100,
             '{"actual_revenue":true,"causal_lineage":{"source":"isolated"}}'::jsonb
-            FROM generate_series(1,7) i""")
+            FROM generate_series(1,30) i""")
     return dict(tenant_id=TENANT, census_dsn=base+'census_a',
                 reader_dsn=base+'census_a', writer_dsn=base+'native_writer',
-                registration_enabled=True, horizon_days=1)
+                registration_enabled=True, history_days=30, horizon_days=1)
 
 
 def test_original_model_registration_day_alignment():
@@ -108,6 +108,8 @@ def test_original_model_registration_day_alignment():
 def test_real_sql_registration_independent_read_and_replay(source, cluster):
     result = produce_native_revenue_forecast(**source)
     assert result['status'] == 'NATIVE_FORECAST_REGISTERED_AND_READ_BACK', result
+    assert result['required_history_days'] == 30
+    assert result['authenticated_source_days'] == 30
     assert result['registration_write_committed'] is True
     assert result['independent_registry_readback_verified'] is True
     assert not result['financial_actuals_verified']
@@ -118,7 +120,7 @@ def test_real_sql_registration_independent_read_and_replay(source, cluster):
     assert not second['registration_attempted']
     with psycopg.connect(cluster[0]) as c:
         assert c.execute('SELECT count(*) FROM public.predictive_forecasts').fetchone() == (1,)
-        assert c.execute('SELECT predicted_value,horizon_days FROM public.predictive_forecasts').fetchone() == (900,1)
+        assert c.execute('SELECT predicted_value,horizon_days,sample_count FROM public.predictive_forecasts').fetchone() == (3200,1,30)
         # Original evidence-reader login has no writer membership or table DML.
         assert c.execute("SELECT pg_has_role('census_a','empire_predictive_forecast_registrar','MEMBER')").fetchone() == (False,)
 
@@ -170,6 +172,8 @@ def test_original_schedule_entry_executes_existing_producer(source, tmp_path):
                EMPIRE_PREDICTIVE_REGISTRAR_DSN=source['writer_dsn'])
     r = run(root=tmp_path, producer_environment=env)
     assert r['native_producer']['status'] == 'NATIVE_FORECAST_REGISTERED_AND_READ_BACK', r
+    assert r['native_producer']['required_history_days'] == 30
+    assert r['native_producer']['authenticated_source_days'] == 30
     assert r['governance']['db_write'] is True
     r = run(root=tmp_path, producer_environment=env)
     assert r['native_producer']['status'] == 'EXISTING_NATIVE_FORECAST_VERIFIED'

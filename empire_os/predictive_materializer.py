@@ -122,6 +122,7 @@ def produce_native_revenue_forecast(
         "schema_version": "empire.predictive_revenue.native_producer.v1",
         "observed_at": now.isoformat(),
         "status": "NATIVE_SOURCE_CONFIGURATION_HOLD",
+        "required_history_days": None,
         "authenticated_source_days": 0,
         "source_reader_called": False,
         "model_called": False,
@@ -144,6 +145,7 @@ def produce_native_revenue_forecast(
                 or type(registration_enabled) is not bool
                 or not census_dsn or not reader_dsn):
             return result
+        result["required_history_days"] = history_days
         rows = []
         source_days = []
         # All observations precede today's issuance. Every calendar day is
