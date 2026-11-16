@@ -72,10 +72,21 @@ def test_only_synthetic_source_mounted_and_private_secrets():
                 "PGADMIN_PASSWORD", "AUTH_SECRET"):
         assert len(entries[key]) >= 30
         assert entries[key] not in {"change-me", "autoontologypassword123"}
+    models_staged = (TARGET / ".env.disabled-models-20261116").is_file()
     for prefix in ("DEFAULT_MODELS", "REASONING", "NON_REASONING",
                    "EMBED", "RERANK"):
-        assert entries[prefix + "_ENDPOINT"] == RESTRICTED_MODEL
+        expected = (
+            "http://172.18.0.1:19999/v1"
+            if models_staged and prefix != "RERANK"
+            else RESTRICTED_MODEL
+        )
+        assert entries[prefix + "_ENDPOINT"] == expected
         assert entries[prefix + "_API_KEY"] == "offline-model-disabled"
+    if models_staged:
+        for prefix in ("DEFAULT_MODELS", "REASONING", "NON_REASONING"):
+            assert entries[prefix + "_MODEL"] == "openai/qwen2.5-coder:1.5b"
+        assert entries["EMBED_MODEL"] == "nomic-embed-text"
+        assert entries["RERANK_MODEL"] == "offline-model-disabled"
     assert entries["CONNECTION_STRINGS"] == (
         "sqlite:////reference/empire_graph.sqlite"
     )
