@@ -119,3 +119,83 @@ Status taxonomy:
   failed NLP acceptance result.
 - Not verified: native semantic completion, accurate text-to-SQL, MCP, any
   commercial results.
+
+
+## 2026-11-16 23:43–23:49 UTC: verified model-capacity and data-plane isolation
+
+Follow-up execution on the existing `agent/data-cloud-wave4` owner branch.
+No NVIDIA containers were restarted, source data copied to external services,
+model settings changed or provider spend initiated.
+
+**Model candidate benchmark (failed, immutable private receipt).**
+The preinstalled `qwen2.5-coder:7b` Ollama Q4_K_M model was tested with a
+strict JSON Schema equivalent to NVIDIA's `RawTableTermsResult` shape,
+requiring one term and six explicit assignments for synthetic
+`ontology_edges` columns. The model did not return a response before a
+175-second bounded timeout: `ReadTimeout`, `structured_pass=false`,
+`duration_s=175.16`. Receipt:
+`runtime/nvidia_ontology_eval/qwen7b_model_capability_probe_20261116.json`
+(0600). The original 1.5B model route was **not replaced**.
+
+The host has eight visible CPU cores, no accelerator GPU (only Matrox
+server display controller), and was under variable concurrent CPU load.
+Installed larger Qwen models (14B/30B) were inventoried but deliberately
+not deployed or benchmarked: 7B already exceeds the performance gate.
+This is evidence of insufficient **measured local inference performance**,
+not proof that all available architectures or providers will fail.
+
+**Actual data-plane benchmark (passed, immutable private receipt).**
+`scripts/accept_nvidia_live_synthetic_sql_20261116.py` loaded the pinned,
+genuine NVIDIA SQLite connector with its own read-only mode enabled
+(`PRAGMA query_only=ON`), targeting the *existing* synthetic runtime
+SQLite fixture `runtime/nvidia_ontology_eval/empire_graph.sqlite`.
+It independently required the expected four tables, four FKs,
+absence of raw synthetic private identities, and authenticated live
+NVIDIA catalog with the four exact approved term descriptions.
+
+Six SQL question checks matched expected counts:
+
+| Question | Expected | Actual | Result |
+| --- | ---: | ---: | --- |
+| Demand edge count | 2 | 2 | PASS |
+| Capacity edge count | 1 | 1 | PASS |
+| Unknown demand is NULL | 1 | 1 | PASS |
+| Known demand quantity is zero | 1 | 1 | PASS |
+| Explicit product–market demand joins | 2 | 2 | PASS |
+| Positive capacity on matching demand | 1 | 1 | PASS |
+
+Receipt: `runtime/nvidia_ontology_eval/nvidia_live_synthetic_sql_six_case_receipt_20261116.json`
+(0600), `verdict=PASS`, `passed_count=6`, `not_natural_language=true`,
+`canonical_semantic_terms_verified=4`, `production_data_modified=false`.
+Companion test
+`tests/test_nvidia_runtime_acceptance_receipts_20261116.py` prevents
+the connector result from being misreported as NLP success, and
+preserves both prior failed NLP and current failed model benchmark gates.
+
+**Troubleshooting finding:** vendor reranking utility is referenced in
+semantic compilation for bridge-table selection, but there is no
+`rerank_hits` call in NVIDIA's `retrieval/` or
+`server/chat/` text-to-SQL path. Reranker configuration is therefore
+**not** the demonstrated reason for the observed NLP timeout; do not
+add an unrelated reranker or rewrite the Search Fabric layer.
+
+**Release decision (evidence-based):**
+
+- `NVIDIA_PRIVATE_DOCKER_RUNTIME`: VERIFIED.
+- `NVIDIA_AUTHENTICATED_CATALOG_AND_CANONICAL_TERMS`: VERIFIED.
+- `NVIDIA_LIVE_SYNTHETIC_SQL_CONNECTOR`: VERIFIED, six cases pass.
+- `NVIDIA_STRUCTURED_MODEL_REPLACEMENT`: REJECTED for 7B CPU candidate.
+- `NVIDIA_NLP_SQL_AND_AUTONOMOUS_AGENT`: HELD. Last actual NLP attempt
+  timed out after 95.3 seconds with no SQL or final answer; cancellation
+  verified HTTP 200. Do **not** assert it is live.
+- `NVIDIA_SCHEDULED_SEMANTIC_COMPILATION`: DISABLED after previous
+  unproductive run; no fresh run authorized by this benchmark.
+- `PRODUCTION_CUSTOMERS, REVENUE, TENANTS, MCP`: NOT ACTIVATED.
+
+The next technical boundary is *fast, reliable structured-output and
+tool-call inference* with explicit resource/cost authority. The live
+retrieval/connector layers require no rebuild. Before allowing model
+switch or GPU/hosted inference purchase, prove a candidate's response
+against NVIDIA's actual schema, then run a complete six-question
+**natural-language-to-executed-SQL** benchmark, not just SQL connector
+queries. Preserve rollback and founder release control.
