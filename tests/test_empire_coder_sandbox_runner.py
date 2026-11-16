@@ -487,7 +487,7 @@ def _fake_codex(tmp_path, *, changed_path="app.py", body="VALUE = 2"):
         "from pathlib import Path\n"
         "import sys\n"
         "if sys.argv[1:3] == ['login','status']:\n"
-        "    print('Logged in using ChatGPT')\n"
+        "    print('Logged in using ChatGPT', file=sys.stderr)\n"
         "    sys.exit(0)\n"
         f"Path({changed_path!r}).write_text({(body + chr(10))!r})\n"
         "print('edited candidate')\n"

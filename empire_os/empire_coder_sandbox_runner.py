@@ -394,7 +394,9 @@ def run_empire_coder_codex_local_candidate(
         result["reason"] = "codex_cli_not_installed"
         return result
     check = _run([cli, "login", "status"], cwd=root, timeout=20)
-    if check.returncode or "logged in" not in check.stdout.lower():
+    if check.returncode or "logged in" not in (
+        (check.stdout or "") + (check.stderr or "")
+    ).lower():
         result["reason"] = "codex_cli_not_authenticated"
         return result
     # Never base isolated edits on a different local working branch.
