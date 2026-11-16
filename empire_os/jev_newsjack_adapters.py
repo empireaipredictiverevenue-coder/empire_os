@@ -361,6 +361,103 @@ def signals_from_last30days_agent_export(
     }
 
 
+def signals_from_last30days_research_handoff(
+    handoff: Mapping[str, Any], *, topic: str, sector: str, market: str,
+    as_of: str,
+) -> dict[str, Any]:
+    """Consume the existing MediaOS handoff, never infer commercial evidence.
+
+    Topic/sector/market are explicit operator research scope, not verified
+    publisher geography. Topic labels are not article headlines. The original
+    JEV reviewer still applies its stricter seven-day reactive-news window.
+    """
+    clock = _timestamp(as_of)
+    generated = _timestamp(handoff.get("generated_at")) if isinstance(handoff, Mapping) else None
+    flags = ("external_action_authorized", "public_publish_authorized",
+             "database_write_authorized", "revenue_recognized",
+             "buyer_intent_or_search_volume_from_engagement")
+    if (clock is None or generated is None
+            or not timedelta(0) <= clock - generated <= timedelta(hours=2)
+            or handoff.get("schema_version") != "empire.last30days.research_handoff.v1"
+            or handoff.get("mode") != "OBSERVE"
+            or handoff.get("execution_authority") != "none"
+            or any(handoff.get(key) is not False for key in flags)
+            or not isinstance(topic, str) or not 1 <= len(topic) <= 110
+            or not isinstance(sector, str) or not sector.strip()
+            or market not in ("GB", "US")):
+        raise ValueError("trusted fresh research handoff and explicit scope required")
+    topics = handoff.get("topics")
+    if (not isinstance(topics, list) or len(topics) > 4
+            or type(handoff.get("topic_count")) is not int
+            or handoff["topic_count"] != len(topics)):
+        raise ValueError("bounded topic census required")
+    total = 0
+    selected = None
+    names = set()
+    for row in topics:
+        if (not isinstance(row, Mapping) or not isinstance(row.get("topic"), str)
+                or row["topic"] in names or not 1 <= len(row["topic"]) <= 110
+                or row.get("review_status") != "REQUIRES_INDEPENDENT_TOPIC_RELEVANCE_AND_FACT_CHECK"
+                or not isinstance(row.get("observations"), list)
+                or len(row["observations"]) > 30
+                or type(row.get("candidate_observation_count")) is not int
+                or row["candidate_observation_count"] != len(row["observations"])):
+            raise ValueError("research topic contract invalid")
+        names.add(row["topic"])
+        total += len(row["observations"])
+        if row["topic"] == topic:
+            selected = row
+    if (type(handoff.get("source_observation_count")) is not int
+            or handoff["source_observation_count"] != total or selected is None):
+        raise ValueError("research source census or selected topic invalid")
+    signals = []
+    rejected = duplicates = 0
+    seen_refs, seen_urls = set(), set()
+    for entry in selected["observations"]:
+        if not isinstance(entry, Mapping):
+            rejected += 1
+            continue
+        ref, url = entry.get("source_ref"), _public_https(entry.get("source_url"))
+        published = _timestamp(entry.get("published_at"))
+        if (not isinstance(ref, str) or not ref.startswith("last30days:source:")
+                or not 19 <= len(ref) <= 128 or url is None
+                or published is None or published > generated
+                or not timedelta(0) <= clock - published <= timedelta(days=30)
+                or entry.get("source_type") not in ("reddit", "hackernews", "youtube", "github", "web")
+                or entry.get("rights") != "PUBLIC_RESEARCH_REFERENCE_ONLY"
+                or any(entry.get(key) is not False for key in (
+                    "claim_verified", "buyer_intent_verified", "local_geography_verified",
+                    "topic_relevance_verified", "source_text_executable"))):
+            rejected += 1
+            continue
+        if ref in seen_refs or url in seen_urls:
+            duplicates += 1
+            continue
+        seen_refs.add(ref)
+        seen_urls.add(url)
+        signals.append({
+            "signal_id": "last30days:" + sha256((ref + "|" + url).encode()).hexdigest()[:24],
+            "title": "Research context: " + topic,
+            "title_is_article_headline": False,
+            "sector": sector.strip(), "market": market,
+            "research_scope_verified": False,
+            "primary_source_url": url, "published_at": published.isoformat(),
+            "observed_at": generated.isoformat(), "evidence_refs": [ref],
+            "source_adapter": "last30days_research_handoff_v1",
+            "source_kind": entry["source_type"],
+            "independent_corroboration_verified": False,
+            "destination_live_verified": False,
+        })
+    return {
+        "schema_version": "empire.organic.last30days_news_intake.v1",
+        "mode": "OBSERVE", "signals": signals, "mapped_count": len(signals),
+        "rejected_count": rejected, "duplicate_count": duplicates,
+        "generated_at": generated.isoformat(), "lookback_days": 30,
+        "published_claims_verified": False, "automatic_publication": False,
+        "execution_authority": "none",
+    }
+
+
 def attach_gsc_query_page_observations(
     signals: Sequence[Mapping[str, Any]], *,
     reader: GoogleSearchConsoleAdapter | SearchIntelligenceLoopbackGSCReader,
