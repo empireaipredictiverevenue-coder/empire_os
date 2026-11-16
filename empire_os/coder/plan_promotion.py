@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 import json
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any, Mapping
 
 from .jobs import JobKind, LocalJobQueue
@@ -20,6 +20,19 @@ OUTPUT = Path("runtime/coder/plan_promotion_latest.json")
 
 def _text(value: Any) -> str:
     return str(value or "").strip()
+
+
+def _safe_repo_path(value: Any) -> bool:
+    path = _text(value)
+    return (
+        bool(path)
+        and not path.startswith("/")
+        and not PureWindowsPath(path).drive
+        and "\\" not in path
+        and ":" not in path
+        and all(ord(char) >= 32 and ord(char) != 127 for char in path)
+        and all(part not in {"", ".", ".."} for part in path.split("/"))
+    )
 
 
 def _atomic_write(path: Path, payload: Mapping[str, Any]) -> None:
@@ -74,6 +87,20 @@ def _validate_contract(
     if kind_raw not in {"VERIFY", "IMPLEMENT"}:
         return None, ["promotion_kind_must_be_VERIFY_or_IMPLEMENT"]
     kind = JobKind(kind_raw)
+
+    path_fields = (
+        ("changed_files", "tests")
+        if kind is JobKind.VERIFY
+        else ("allowed_paths", "required_tests")
+    )
+    for field in path_fields:
+        if any(not _safe_repo_path(value) for value in (contract.get(field) or ())):
+            blockers.append(f"{field}_must_be_safe_repository_paths")
+    if kind is JobKind.IMPLEMENT:
+        for resource in (contract.get("lease_resources") or ()):
+            resource = _text(resource)
+            if resource.startswith("path:") and not _safe_repo_path(resource[5:]):
+                blockers.append("lease_resources_must_be_safe_repository_paths")
 
     if kind is JobKind.VERIFY:
         changed_files = [
