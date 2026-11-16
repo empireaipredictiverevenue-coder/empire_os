@@ -68,6 +68,10 @@ The host has Docker CLI but access to the daemon socket was denied to the
 current process; Compose v2 was not found. NVIDIA's model-service credentials
 were absent in the current shell. An Ollama service is present locally but
 is **not** the full NVIDIA semantic compilation and MCP runtime.
+A separate attempt to ask the local qwen2.5-coder:1.5b model for
+one SQL query timed out after 75 seconds on 2026-11-16. Therefore
+there is **no validated natural-language-answer result** from this run;
+it is not included in the six successful deterministic connector queries.
 
 A full runtime claim requires a separately authenticated and isolated
 Auto Ontology backend + catalog DB + ingestion + MCP server, a working model
