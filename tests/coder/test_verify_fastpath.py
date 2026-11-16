@@ -24,6 +24,29 @@ def test_verify_fastpath_runs_explicit_tests_without_changed_files(tmp_path):
     assert terminal.result["changed_files_inferred"] is False
     assert terminal.result["model_inference"] is False
 
+def test_verify_fastpath_skips_claimed_changes_without_starving_test_only(tmp_path):
+    root = workspace(tmp_path)
+    q = LocalJobQueue(root)
+    claimed = q.enqueue(
+        task_id="task-implementation", kind=JobKind.VERIFY,
+        payload={"changed_files": ["module.py"], "tests": ["tests/test_ok.py"]},
+        priority=100,
+    )
+    tests_only = q.enqueue(
+        task_id="task-tests-only", kind=JobKind.VERIFY,
+        payload={"verification_scope": "TEST_EXECUTION_ONLY",
+                 "tests": ["tests/test_ok.py"]},
+        priority=20,
+    )
+    result = drain_verify_jobs(q, max_jobs=1, timeout_seconds=60)
+    assert result["completed_count"] == 1
+    assert result["skipped_count"] == 1
+    assert q.get(claimed.id).status is JobStatus.PENDING
+    completed = q.get(tests_only.id)
+    assert completed.status is JobStatus.COMPLETED
+    assert completed.result["verification"]["verdict"] == "TESTS_ONLY"
+
+
 def test_verify_fastpath_skips_invalid_test_contract(tmp_path):
     root=workspace(tmp_path)
     q=LocalJobQueue(root)

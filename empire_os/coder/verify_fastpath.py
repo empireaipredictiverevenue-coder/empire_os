@@ -32,7 +32,9 @@ def drain_verify_jobs(
     child_env=os.environ.copy()
     child_env.pop("PYTEST_ADDOPTS",None)
     child_env["PYTHONDONTWRITEBYTECODE"]="1"
-    for candidate in queue.list_pending(kind=JobKind.VERIFY)[:bounded]:
+    for candidate in queue.list_pending(kind=JobKind.VERIFY):
+        if len(completed) + len(failed) >= bounded:
+            break
         # Candidate implementation verification belongs to the task-aware
         # worker, which checks patch audit hashes and founder approval gates.
         # The fast-path may run tests, but must never certify a code change.
