@@ -98,6 +98,8 @@ def _implement_contract():
         "required_tests": ["tests/test_x.py"],
         "lease_resources": ["path:empire_os/x.py", "domain:coder"],
         "execution_plane_request_id": "request-test",
+        "execution_mode": "ISOLATED_CANDIDATE_ONLY",
+        "base_branch": "agent/data-cloud-wave4",
     }
 
 
@@ -145,18 +147,15 @@ def test_unsafe_contract_paths_hold_without_enqueueing(tmp_path, kind, field, un
     assert queue.list_pending() == []
 
 
-def test_explicit_implement_contract_preserves_path_and_domain_leases(tmp_path):
+def test_legacy_implement_contract_without_governed_record_is_held(tmp_path):
     root = workspace(tmp_path)
     contract = _implement_contract()
     queue, _ = _completed_plan(root, promotion_contract=contract)
 
-    assert run_plan_promotion_cycle(root)["promoted_count"] == 1
-    assert run_plan_promotion_cycle(root)["promoted_count"] == 0
-    pending = queue.list_pending()
-    assert len(pending) == 1
-    assert pending[0].kind is JobKind.IMPLEMENT
-    assert pending[0].payload["lease_resources"] == contract["lease_resources"]
-    assert pending[0].payload["execution_authority"] == "none"
+    result = run_plan_promotion_cycle(root)
+    assert result["promoted_count"] == 0
+    assert result["held"][0]["status"] == "HELD_NO_GOVERNED_IMPLEMENTATION_INTAKE"
+    assert queue.list_pending() == []
 
 
 def test_implement_contract_still_requires_internal_write_authority(tmp_path):
@@ -170,3 +169,135 @@ def test_implement_contract_still_requires_internal_write_authority(tmp_path):
     assert result["promoted_count"] == 0
     assert "internal_write_authority_required" in result["held"][0]["blockers"]
     assert queue.list_pending() == []
+
+
+def _governed_code_intake(root, *, request_id="owner-bounded-code-task-1", **updates):
+    from empire_os.coder.plan_promotion import enqueue_authorized_implementation_plan
+
+    options = dict(
+        request_id=request_id,
+        objective="Implement only a known safe scoped change",
+        source_ref="founder-approved-engineering-owner-20261116",
+        allowed_paths=("empire_os/x.py",),
+        lease_resources=("path:empire_os/x.py", "domain:coder"),
+        required_tests=("tests/test_x.py",),
+        base_branch="agent/data-cloud-wave4",
+    )
+    options.update(updates)
+    return enqueue_authorized_implementation_plan(root, **options)
+
+
+def test_governed_real_plan_promotes_exactly_one_isolated_implement(tmp_path):
+    from empire_os.coder.plan_fastpath import drain_fast_plans
+
+    root = workspace(tmp_path)
+    intake = _governed_code_intake(root)
+    assert intake["status"] == "QUEUED"
+    assert intake["authority_inferred"] is False
+    queue = LocalJobQueue(root)
+    assert queue.list_pending()[0].kind is JobKind.PLAN
+    coder = EmpireCoder(root)
+    completed = drain_fast_plans(coder, queue, max_jobs=1)
+    assert completed["completed_count"] == 1
+    assert completed["completed"][0]["family"] == "governed_implementation_intake"
+
+    result = run_plan_promotion_cycle(root)
+    assert result["promoted_count"] == 1
+    assert run_plan_promotion_cycle(root)["promoted_count"] == 0
+    jobs = queue.list_pending()
+    assert len(jobs) == 1
+    job = jobs[0]
+    assert job.kind is JobKind.IMPLEMENT
+    assert job.payload["execution_mode"] == "ISOLATED_CANDIDATE_ONLY"
+    assert job.payload["allowed_paths"] == ["empire_os/x.py"]
+    assert job.payload["lease_resources"] == ["path:empire_os/x.py", "domain:coder"]
+    assert job.payload["required_tests"] == ["tests/test_x.py"]
+    assert job.payload["execution_plane_request_id"] == intake["request_id"]
+    assert job.payload["execution_authority"] == "none"
+    assert job.payload["founder_release_required"] is True
+    assert queue.claim_next(worker_id="general-coder-worker") is None
+
+
+def test_governed_code_intake_deduplicates_and_rejects_scope_changes(tmp_path):
+    root = workspace(tmp_path)
+    first = _governed_code_intake(root)
+    again = _governed_code_intake(root)
+    assert first["task_id"] == again["task_id"]
+    assert first["plan_job_id"] == again["plan_job_id"]
+    assert again["status"] == "EXISTS"
+    assert len(LocalJobQueue(root).list_pending()) == 1
+    with pytest.raises(ValueError, match="existing_execution_request_scope_conflict"):
+        _governed_code_intake(root, objective="Change to an unrelated objective")
+    with pytest.raises(ValueError, match="existing_execution_request_scope_conflict"):
+        _governed_code_intake(
+            root, allowed_paths=("empire_os/another.py",),
+            lease_resources=("path:empire_os/another.py",),
+        )
+
+
+def test_governed_code_intake_rejects_missing_exact_file_leases(tmp_path):
+    root = workspace(tmp_path)
+    with pytest.raises(ValueError, match="exact_path_lease_required"):
+        _governed_code_intake(root, lease_resources=("domain:coder",))
+    assert LocalJobQueue(root).list_pending() == []
+
+
+@pytest.mark.parametrize("identifier", ["../../other", ".hidden", "request/other", "a" * 81])
+def test_governed_code_intake_rejects_unsafe_request_ids(tmp_path, identifier):
+    root = workspace(tmp_path)
+    with pytest.raises(ValueError, match="request_id_must_be_safe"):
+        _governed_code_intake(root, request_id=identifier)
+    assert LocalJobQueue(root).list_pending() == []
+
+
+def test_governed_code_intake_cannot_promote_tampered_plan(tmp_path):
+    import json
+    from empire_os.coder.plan_fastpath import drain_fast_plans
+
+    root = workspace(tmp_path)
+    receipt = _governed_code_intake(root)
+    queue = LocalJobQueue(root)
+    drain_fast_plans(EmpireCoder(root), queue, max_jobs=1)
+    plan_path = queue.completed / (receipt["plan_job_id"] + ".json")
+    raw = json.loads(plan_path.read_text())
+    raw["payload"]["promotion_contract"]["allowed_paths"] = ["empire_os/elsewhere.py"]
+    plan_path.write_text(json.dumps(raw))
+    result = run_plan_promotion_cycle(root)
+    assert result["promoted_count"] == 0
+    assert result["held"][0]["status"] == "HELD_NO_GOVERNED_IMPLEMENTATION_INTAKE"
+    assert queue.list_pending() == []
+
+
+def test_governed_code_intake_requires_exact_record_after_plan(tmp_path):
+    from empire_os.coder.plan_fastpath import drain_fast_plans
+    from empire_os.coder.plan_promotion import INTAKE_DIRECTORY
+
+    root = workspace(tmp_path)
+    receipt = _governed_code_intake(root)
+    queue = LocalJobQueue(root)
+    drain_fast_plans(EmpireCoder(root), queue, max_jobs=1)
+    (root / INTAKE_DIRECTORY / (receipt["request_id"] + ".json")).unlink()
+    result = run_plan_promotion_cycle(root)
+    assert result["promoted_count"] == 0
+    assert result["held"][0]["status"] == "HELD_NO_GOVERNED_IMPLEMENTATION_INTAKE"
+    assert queue.list_pending() == []
+
+
+def test_existing_owner_prioritizes_authorized_plan_over_newer_advisory_noise(tmp_path):
+    from empire_os.coder.plan_fastpath import drain_fast_plans
+
+    root = workspace(tmp_path)
+    _governed_code_intake(root)
+    queue = LocalJobQueue(root)
+    assert drain_fast_plans(EmpireCoder(root), queue, max_jobs=1)["completed_count"] == 1
+    for _ in range(7):
+        _completed_plan(root)
+    # The old newest-first scan repeatedly held recent advisory-only plans,
+    # even when an older genuinely bound implementation existed.
+    result = run_plan_promotion_cycle(root, max_jobs=2)
+    assert result["promoted_count"] == 1
+    assert result["scanned_count"] == 2
+    pending = queue.list_pending()
+    assert len(pending) == 1
+    assert pending[0].kind is JobKind.IMPLEMENT
+    assert pending[0].payload["execution_mode"] == "ISOLATED_CANDIDATE_ONLY"

@@ -189,6 +189,16 @@ class LocalJobQueue:
                 candidate = self._load_path(source)
                 if kind is not None and candidate.kind is not kind:
                     continue
+                # A governed implementation intake is an isolated PROPOSAL
+                # request, not permission for this shared-worktree worker to
+                # patch live source. It requires the original execution-plane
+                # sandbox/release owner, never automatic local claim_next.
+                if (
+                    candidate.kind is JobKind.IMPLEMENT
+                    and candidate.payload.get("execution_mode")
+                    == "ISOLATED_CANDIDATE_ONLY"
+                ):
+                    continue
                 # Observation-only Swarm jobs belong to the dedicated
                 # test fast-path, never the task-aware implementation worker.
                 if (

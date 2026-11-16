@@ -7,11 +7,15 @@ never imply mutation authority.
 from __future__ import annotations
 
 from hashlib import sha256
+import fcntl
 import json
+import os
 from pathlib import Path, PureWindowsPath
+import re
 from typing import Any, Mapping
 
 from .jobs import JobKind, LocalJobQueue
+from .orchestrator import EmpireCoder
 
 
 SCHEMA_VERSION = "empire.coder.plan-promotion.v1"
@@ -55,6 +59,180 @@ def _promotion_key(job_id: str, contract: Mapping[str, Any]) -> str:
         separators=(",", ":"),
     ).encode("utf-8")
     return sha256(material).hexdigest()
+
+
+INTAKE_DIRECTORY = Path("runtime/execution_plane/coder_plan_intake")
+SAFE_REQUEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$")
+ISOLATED_CANDIDATE_MODE = "ISOLATED_CANDIDATE_ONLY"
+
+
+def _contract_hash(contract: Mapping[str, Any]) -> str:
+    return sha256(json.dumps(dict(contract), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _intake_record_path(root: Path, request_id: str) -> Path:
+    if not SAFE_REQUEST_ID.fullmatch(request_id):
+        raise ValueError("governed_coder_request_id_must_be_safe")
+    return root / INTAKE_DIRECTORY / f"{request_id}.json"
+
+
+def enqueue_authorized_implementation_plan(
+    repo_root: str | Path,
+    *,
+    request_id: str,
+    objective: str,
+    source_ref: str,
+    allowed_paths: tuple[str, ...],
+    lease_resources: tuple[str, ...],
+    required_tests: tuple[str, ...],
+    base_branch: str,
+    max_runtime_seconds: int = 900,
+    priority: int = 50,
+) -> dict[str, Any]:
+    """Bind an explicit caller-owned write request to the ORIGINAL Coder plan.
+
+    Requires the governed dispatcher to authenticate its caller. This routine
+    cannot derive authority from plan text, completion lists, or model output.
+    All IMPLEMENT results are sandbox proposals requiring founder release.
+    """
+    root = Path(repo_root).resolve()
+    request_id = str(request_id).strip()
+    if not str(source_ref).strip() or not str(objective).strip():
+        raise ValueError("explicit_execution_source_and_objective_required")
+    contract = {
+        "kind": "IMPLEMENT",
+        "authority": "internal_write",
+        "execution_mode": ISOLATED_CANDIDATE_MODE,
+        "execution_plane_request_id": request_id,
+        "allowed_paths": list(allowed_paths),
+        "lease_resources": list(lease_resources),
+        "required_tests": list(required_tests),
+        "base_branch": base_branch,
+        "max_runtime_seconds": max(120, min(int(max_runtime_seconds), 1800)),
+    }
+    kind, blockers = _validate_contract(contract)
+    # An execution lease is not authority, but it must collide with any
+    # concurrent owner editing the same exact source path. Domain-only leases
+    # cannot protect file-level changes.
+    if any(
+        f"path:{path}" not in contract["lease_resources"]
+        for path in contract["allowed_paths"]
+    ):
+        blockers.append("exact_path_lease_required_for_each_allowed_path")
+    if kind is not JobKind.IMPLEMENT or blockers:
+        raise ValueError("invalid_governed_implementation_contract:" + ",".join(blockers))
+    path = _intake_record_path(root, request_id)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(path.parent, 0o700)
+    lock = path.parent / ".intake.lock"
+    lock.touch(exist_ok=True)
+    os.chmod(lock, 0o600)
+    digest = _contract_hash(contract)
+    with lock.open("r+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            if path.exists():
+                saved = json.loads(path.read_text(encoding="utf-8"))
+                if (
+                    saved.get("contract_sha256") != digest
+                    or saved.get("source_ref") != source_ref
+                    or saved.get("objective") != objective
+                ):
+                    raise ValueError("existing_execution_request_scope_conflict")
+                return {
+                    "status": "EXISTS",
+                    "task_id": saved["task_id"],
+                    "plan_job_id": saved["plan_job_id"],
+                    "request_id": request_id,
+                    "authority_inferred": False,
+                }
+            coder = EmpireCoder(root)
+            task = coder.create_task(
+                "Plan only: governed Empire Coder implementation intake. "
+                "Scope and authority are bound to the original execution-plane "
+                f"request {request_id}. Objective: {objective}"
+            )
+            queue = LocalJobQueue(root)
+            job = queue.enqueue(
+                task_id=task.id, kind=JobKind.PLAN,
+                priority=priority,
+                payload={
+                    "promotion_contract": contract,
+                    "governed_intake_request_id": request_id,
+                    "governed_intake_contract_sha256": digest,
+                    "governed_intake_source_ref": source_ref,
+                    "execution_authority": "none",
+                    "terms": ["governed_coder_implementation_intake"],
+                },
+            )
+            record = {
+                "schema_version": "empire.coder.authorized-plan-intake.v1",
+                "status": "ACCEPTED_SCOPED_REQUEST",
+                "request_id": request_id,
+                "objective": objective,
+                "source_ref": source_ref,
+                "contract": contract,
+                "contract_sha256": digest,
+                "plan_job_id": job.id,
+                "task_id": task.id,
+                "founder_release_required": True,
+                "code_mutation_in_producer": False,
+                "execution_authority": "none",
+            }
+            tmp = path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            os.chmod(tmp, 0o600)
+            tmp.replace(path)
+            coder._record_and_sync(
+                task_id=task.id, event="governed_implementation_plan_intake",
+                data={
+                    "request_id": request_id, "source_ref": source_ref,
+                    "contract_sha256": digest,
+                    "allowed_paths": list(allowed_paths),
+                    "required_tests": list(required_tests),
+                    "founder_release_required": True,
+                },
+            )
+            return {
+                "status": "QUEUED",
+                "request_id": request_id,
+                "task_id": task.id,
+                "plan_job_id": job.id,
+                "authority_inferred": False,
+                "founder_release_required": True,
+            }
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _validate_governed_intake(
+    root: Path,
+    plan_job: Mapping[str, Any],
+    contract: Mapping[str, Any],
+) -> bool:
+    payload = plan_job.get("payload") or {}
+    request_id = str(payload.get("governed_intake_request_id") or "")
+    if not SAFE_REQUEST_ID.fullmatch(request_id):
+        return False
+    if str(contract.get("execution_plane_request_id") or "") != request_id:
+        return False
+    if contract.get("execution_mode") != ISOLATED_CANDIDATE_MODE:
+        return False
+    path = _intake_record_path(root, request_id)
+    try:
+        stored = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return False
+    return (
+        stored.get("schema_version") == "empire.coder.authorized-plan-intake.v1"
+        and stored.get("status") == "ACCEPTED_SCOPED_REQUEST"
+        and stored.get("plan_job_id") == plan_job.get("id")
+        and stored.get("task_id") == plan_job.get("task_id")
+        and stored.get("source_ref") == payload.get("governed_intake_source_ref")
+        and stored.get("contract") == dict(contract)
+        and stored.get("contract_sha256") == _contract_hash(contract)
+        and payload.get("governed_intake_contract_sha256") == _contract_hash(contract)
+    )
 
 
 def _existing_promotion(
@@ -127,6 +305,12 @@ def _validate_contract(
         authority = _text(contract.get("authority"))
         if authority != "internal_write":
             blockers.append("internal_write_authority_required")
+        if contract.get("execution_mode") != ISOLATED_CANDIDATE_MODE:
+            blockers.append("isolated_candidate_mode_required")
+        if _text(contract.get("base_branch")) not in {
+            "agent/data-cloud-wave4", "feature/revenue-intelligence-v2",
+        }:
+            blockers.append("governed_base_branch_required")
         if not [
             value
             for value in (contract.get("allowed_paths") or ())
@@ -182,7 +366,22 @@ def run_plan_promotion_cycle(
             continue
         candidates.append((str(packet.get("updated_at") or ""), packet))
 
-    for _, job in sorted(candidates, reverse=True):
+    def promotion_priority(row: tuple[str, dict[str, Any]]) -> tuple[int, str]:
+        timestamp, job = row
+        payload = job.get("payload") or {}
+        contract = payload.get("promotion_contract")
+        if isinstance(contract, Mapping):
+            if (
+                _text(contract.get("kind")).upper() == "IMPLEMENT"
+                and _validate_governed_intake(root, job, contract)
+            ):
+                return (2, timestamp)
+            return (1, timestamp)
+        return (0, timestamp)
+
+    # A genuine completed, scoped request must not be buried beneath 160
+    # more recent advisory-only plans, which cannot grant write authority.
+    for _, job in sorted(candidates, key=promotion_priority, reverse=True):
         if scanned >= bounded:
             break
         scanned += 1
@@ -207,6 +406,17 @@ def run_plan_promotion_cycle(
                 "task_id": job.get("task_id"),
                 "status": "HELD_INVALID_CONTRACT",
                 "blockers": blockers,
+            })
+            continue
+
+        if kind is JobKind.IMPLEMENT and not _validate_governed_intake(
+            root, job, contract,
+        ):
+            held.append({
+                "plan_job_id": job.get("id"),
+                "task_id": job.get("task_id"),
+                "status": "HELD_NO_GOVERNED_IMPLEMENTATION_INTAKE",
+                "reason": "exact_execution_plane_request_binding_required",
             })
             continue
 
@@ -238,6 +448,11 @@ def run_plan_promotion_cycle(
                 "execution_plane_request_id": contract.get(
                     "execution_plane_request_id"
                 ),
+                "execution_mode": ISOLATED_CANDIDATE_MODE,
+                "founder_release_required": True,
+                "source_ref": payload.get("governed_intake_source_ref"),
+                "base_branch": contract.get("base_branch"),
+                "max_runtime_seconds": contract.get("max_runtime_seconds"),
                 "allowed_paths": list(contract.get("allowed_paths") or ()),
                 "lease_resources": list(
                     contract.get("lease_resources") or ()

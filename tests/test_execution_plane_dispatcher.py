@@ -439,3 +439,70 @@ def test_matching_hermes_remote_still_uses_original_owner(tmp_path, monkeypatch)
     assert result["status"] == "QUEUED"
     assert result["worker"] == "hermes"
     assert observed[0]["base_branch"] == "agent/data-cloud-wave4"
+
+
+def test_explicit_execution_request_supplies_original_coder_promotion_contract(
+    tmp_path, monkeypatch,
+):
+    from dataclasses import replace
+
+    from empire_os.coder.jobs import JobKind, LocalJobQueue
+    from empire_os.coder.orchestrator import EmpireCoder
+    from empire_os.coder.plan_fastpath import drain_fast_plans
+    from empire_os.coder.plan_promotion import run_plan_promotion_cycle
+    import empire_os.execution_plane_dispatcher as module
+
+    root = _stale_hermes_repo(tmp_path)
+    monkeypatch.setattr(
+        module, "publish_control_job",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("explicit Coder PLAN cannot go to Hermes")
+        ),
+    )
+    request = replace(_stale_code_request(), promote_via_coder_plan=True)
+    first = dispatch_execution_request(root, request)
+    assert first["status"] == "QUEUED"
+    assert first["worker"] == "empire_coder"
+    assert first["coder_job_kind"] == "PLAN"
+    assert first["implementation_job_enqueued"] is False
+    assert first["production_deploy"] is False
+    assert first["founder_release_required"] is True
+    again = dispatch_execution_request(root, request)
+    assert again["status"] == "EXISTS"
+    assert again["coder_job_id"] == first["coder_job_id"]
+    queue = LocalJobQueue(root)
+    assert drain_fast_plans(EmpireCoder(root), queue, max_jobs=1)["completed_count"] == 1
+    promoted = run_plan_promotion_cycle(root)
+    assert promoted["promoted_count"] == 1
+    assert run_plan_promotion_cycle(root)["promoted_count"] == 0
+    pending = queue.list_pending()
+    assert len(pending) == 1
+    assert pending[0].kind is JobKind.IMPLEMENT
+    assert pending[0].payload["execution_mode"] == "ISOLATED_CANDIDATE_ONLY"
+    assert pending[0].payload["allowed_paths"] == ["app.py"]
+    assert pending[0].payload["lease_resources"] == ["path:app.py"]
+    assert pending[0].payload["required_tests"] == ["tests/test_app.py"]
+    assert queue.claim_next() is None
+
+
+def test_execution_request_never_infers_coder_implementation_permission():
+    from dataclasses import replace
+
+    with pytest.raises(ValueError, match="governed coder plan promotion"):
+        replace(
+            _stale_code_request(), authority="observe",
+            promote_via_coder_plan=True,
+        ).validate()
+    with pytest.raises(ValueError, match="governed coder plan promotion"):
+        replace(
+            _stale_code_request(), source_ref="",
+            promote_via_coder_plan=True,
+        ).validate()
+    with pytest.raises(ValueError, match="governed coder plan promotion"):
+        replace(
+            _stale_code_request(), required_tests=(),
+            promote_via_coder_plan=True,
+        ).validate()
+    # Existing default requests retain Hermes routing, not an inferred
+    # PLAN -> IMPLEMENT contract.
+    assert _stale_code_request().promote_via_coder_plan is False

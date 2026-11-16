@@ -30,6 +30,7 @@ from empire_os.agent_tool_runtime import (
 )
 from empire_os.coder import EmpireCoder
 from empire_os.coder.jobs import JobKind, LocalJobQueue
+from empire_os.coder.plan_promotion import enqueue_authorized_implementation_plan
 from empire_os.empire_coder_sandbox_runner import (
     EmpireCoderSandboxJob,
     run_empire_coder_sandbox_job,
@@ -86,6 +87,7 @@ class ExecutionRequest:
     traceparent: str | None = None
     ai_behavior_change: bool = False
     allow_stale_base_local_fallback: bool = False
+    promote_via_coder_plan: bool = False
 
     def validate(self) -> None:
         if not self.request_id.strip():
@@ -105,6 +107,19 @@ class ExecutionRequest:
             raise ValueError("unsupported risk class")
         if self.risk_class == "consequential":
             raise ValueError("consequential work requires domain authority gate")
+        if self.promote_via_coder_plan and (
+            self.authority != "internal_write"
+            or self.capability not in MUTATING_CODE_CAPABILITIES
+            or self.risk_class not in {"low", "medium"}
+            or not self.allowed_paths
+            or not self.lease_resources
+            or not self.required_tests
+            or not self.source_ref.strip()
+        ):
+            raise ValueError(
+                "governed coder plan promotion requires explicitly authorised "
+                "scoped internal_write, source reference and focused tests"
+            )
         if self.allow_stale_base_local_fallback and (
             self.authority != "internal_write"
             or self.capability not in MUTATING_CODE_CAPABILITIES
@@ -342,6 +357,34 @@ def dispatch_execution_request(
         }
 
     worker = routing.worker_key
+
+    if request.promote_via_coder_plan:
+        # Explicit opt-in from the execution plane. Completion-board reviews
+        # and generic advisory PLAN jobs do not pass this branch.
+        intake = enqueue_authorized_implementation_plan(
+            root,
+            request_id=request.request_id,
+            objective=request.objective,
+            source_ref=request.source_ref,
+            allowed_paths=request.allowed_paths,
+            lease_resources=request.lease_resources,
+            required_tests=request.required_tests,
+            base_branch=request.base_branch,
+            max_runtime_seconds=request.max_runtime_seconds,
+            priority=request.priority,
+        )
+        return {
+            **base,
+            "status": intake["status"],
+            "worker": "empire_coder",
+            "coder_task_id": intake["task_id"],
+            "coder_job_id": intake["plan_job_id"],
+            "coder_job_kind": JobKind.PLAN.value,
+            "implementation_job_enqueued": False,
+            "founder_release_required": True,
+            "source_authority_not_inferred": True,
+            "intake": intake,
+        }
 
     if worker == "hermes":
         mismatch = (

@@ -43,6 +43,17 @@ def classify_fast_plan(
 
     if (
         normalized.startswith(
+            "plan only: governed empire coder implementation intake."
+        )
+        and "governed_coder_implementation_intake" in terms
+        and isinstance((payload or {}).get("promotion_contract"), dict)
+        and (payload or {}).get("promotion_contract", {}).get("kind") == "IMPLEMENT"
+        and (payload or {}).get("governed_intake_contract_sha256")
+    ):
+        return "governed_implementation_intake"
+
+    if (
+        normalized.startswith(
             "plan only: integrate this founder directive"
         )
         and "directive:" in normalized
@@ -301,6 +312,30 @@ Output
             family=family,
             text=plan,
             rationale="completion-owner classification workflow is deterministic",
+        )
+
+    if family == "governed_implementation_intake":
+        contract = (payload or {}).get("promotion_contract") or {}
+        owned_paths = "\n".join(
+            f"- {path}" for path in contract.get("allowed_paths") or ()
+        )
+        owned_tests = "\n".join(
+            f"- {path}" for path in contract.get("required_tests") or ()
+        )
+        return FastPlan(
+            family=family,
+            text=(
+                "Empire governed implementation intake — advisory review only\n"
+                f"Source request: {contract.get('execution_plane_request_id')}\n"
+                f"Exact allowed paths:\n{owned_paths}\n"
+                f"Required validation:\n{owned_tests}\n"
+                "Scope is taken from the recorded execution-plane request, "
+                "not inferred from planning text or checklist classification.\n"
+                "Only an isolated code candidate may be proposed. No code "
+                "deployment, external push, payment, migration or release "
+                "is authorised. Founder approval remains necessary."
+            ),
+            rationale="Exact execution-plane contract carried through original Coder plan",
         )
 
     if family == "gate_prerequisites":
