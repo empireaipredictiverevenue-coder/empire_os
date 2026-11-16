@@ -490,8 +490,12 @@ def _fake_codex(tmp_path, *, changed_path="app.py", body="VALUE = 2"):
         "    print('Logged in using ChatGPT', file=sys.stderr)\n"
         "    sys.exit(0)\n"
         "assert not Path('/srv/empire_os/runtime/execution_plane/leases.json').exists()\n"
-        f"Path({changed_path!r}).write_text({(body + chr(10))!r})\n"
-        "print('edited candidate')\n"
+        f"print({('diff --git a/' + changed_path + ' b/' + changed_path)!r})\n"
+        f"print({('--- a/' + changed_path)!r})\n"
+        f"print({('+++ b/' + changed_path)!r})\n"
+        "print('@@ -1 +1 @@')\n"
+        "print('-VALUE = 1')\n"
+        f"print({('+' + body)!r})\n"
     )
     cli.chmod(0o700)
     return cli
@@ -547,8 +551,8 @@ def test_codex_local_candidate_refuses_unapproved_paths(tmp_path, monkeypatch):
     result = module.run_empire_coder_codex_local_candidate(
         root, _codex_job(), work_root=tmp_path / "isolated",
     )
-    assert result["status"] == "PATH_POLICY_FAILED"
-    assert result["reason"] == "model_changed_unapproved_path"
+    assert result["status"] == "HELD"
+    assert result["reason"] == "tool_free_patch_invalid_or_unapplicable"
     assert result["proposal_patch"] is None
     assert not (root / "other.py").exists()
 
@@ -644,7 +648,7 @@ def test_os_isolated_model_runtime_requires_bwrap(tmp_path, monkeypatch):
     )
     cli = _fake_codex(tmp_path)
     assert module._isolated_codex_argv(
-        cli=str(cli), clone=tmp_path,
+        cli=str(cli), clone=tmp_path, private_state=tmp_path,
     ) is None
 
 
@@ -714,3 +718,118 @@ def test_missing_codex_node_runtime_fails_before_auth(tmp_path, monkeypatch):
     )
     assert result["status"] == "HELD"
     assert result["reason"] == "codex_node_runtime_unavailable"
+
+
+
+def test_codex_private_state_runtime_uses_only_readonly_auth_overlay(
+    tmp_path, monkeypatch,
+):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    fake_home = tmp_path / "home"
+    auth = fake_home / ".codex"
+    auth.mkdir(parents=True)
+    (auth / "auth.json").write_text("{}")
+    (auth / "config.toml").write_text("")
+    nvm = fake_home / ".nvm"
+    nvm.mkdir()
+    cli = _fake_codex(tmp_path)
+    private_state = tmp_path / "private-state"
+    private_state.mkdir(mode=0o700)
+    for name in ("auth.json", "config.toml"):
+        (private_state / name).touch(mode=0o600)
+    clone = tmp_path / "isolated-clone"
+    clone.mkdir()
+    monkeypatch.setattr(module.Path, "home", lambda: fake_home)
+    monkeypatch.setattr(
+        module, "_local_codex_node_bin",
+        lambda _cli: tmp_path / "fake-node/bin",
+    )
+    if not module.shutil.which("bwrap"):
+        pytest.skip("OS model runtime unavailable on this host")
+    args = module._isolated_codex_argv(
+        cli=str(cli), clone=clone, private_state=private_state,
+    )
+    assert args is not None
+    def has(*values):
+        return any(args[i:i+len(values)] == list(values)
+                   for i in range(len(args)))
+    assert has("--bind", str(private_state), str(auth))
+    assert has("--ro-bind", str(auth / "auth.json"), str(auth / "auth.json"))
+    assert has("--ro-bind", str(auth / "config.toml"), str(auth / "config.toml"))
+    assert not has("--ro-bind", str(auth), str(auth))
+    assert has("--setenv", "CODEX_HOME", str(auth))
+    assert "--share-net" in args
+    assert str(private_state) not in str(clone)
+
+
+def test_existing_private_runtime_is_preserved_not_deleted(
+    tmp_path, monkeypatch,
+):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    cli = _fake_codex(tmp_path)
+    monkeypatch.setattr(module, "_local_codex_binary", lambda: str(cli))
+    work = tmp_path / "isolated"
+    other_owner = work / "codex-private-codex-test"
+    other_owner.mkdir(parents=True)
+    (other_owner / "other_owner_file").write_text("keep intact")
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(), work_root=work,
+    )
+    assert result["status"] == "HELD"
+    assert result["reason"] == "isolated_private_runtime_already_exists"
+    assert (other_owner / "other_owner_file").read_text() == "keep intact"
+
+
+
+@pytest.mark.parametrize("untrusted_patch", (
+    "NO_PATCH",
+    "diff --git a/other.py b/other.py\n"
+    "--- a/other.py\n+++ b/other.py\n"
+    "@@ -1 +1 @@\n-VALUE = 1\n+VALUE = 2\n",
+    "diff --git a/app.py b/app.py\n"
+    "new file mode 120000\n--- a/app.py\n+++ b/app.py\n"
+    "@@ -1 +1 @@\n-VALUE = 1\n+VALUE = 2\n",
+    "diff --git a/app.py b/app.py\n"
+    "--- a/app.py\n+++ b/app.py\n"
+    "@@ -1 +1 @@\n-VALUE = 404\n+VALUE = 2\n",
+))
+def test_untrusted_tool_free_model_patch_is_never_applied_without_scope_and_git_proof(
+    tmp_path, untrusted_patch,
+):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    result = module._apply_tool_free_patch(root, _codex_job(), untrusted_patch)
+    assert result is False
+    assert (root / "app.py").read_text() == "VALUE = 1\n"
+    assert not (root / "other.py").exists()
+
+
+def test_trusted_git_applies_only_a_verified_model_diff_to_isolated_clone(tmp_path):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    patch = (
+        "diff --git a/app.py b/app.py\n"
+        "--- a/app.py\n+++ b/app.py\n"
+        "@@ -1 +1 @@\n-VALUE = 1\n+VALUE = 2\n"
+    )
+    prompt = module._tool_free_patch_prompt(root, _codex_job())
+    assert prompt and "BEGIN_FILE app.py" in prompt
+    assert "BEGIN_FILE tests/test_app.py" in prompt
+    assert "Never invoke any tools" in prompt
+    assert module._apply_tool_free_patch(root, _codex_job(), patch) is True
+    assert (root / "app.py").read_text() == "VALUE = 2\n"
+    assert (root / "tests/test_app.py").is_file()
+    assert module._changed_paths(root) == ["app.py"]
+
+
+def test_tool_free_model_prompt_refuses_large_or_unavailable_source(tmp_path):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    (root / "app.py").write_text("x" * 80_001)
+    assert module._tool_free_patch_prompt(root, _codex_job()) is None

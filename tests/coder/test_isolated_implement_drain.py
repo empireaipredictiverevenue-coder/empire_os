@@ -243,9 +243,12 @@ def test_full_existing_isolated_codex_runner_is_consumed_by_original_queue(
         "if sys.argv[1:3] == ['login', 'status']:\n"
         "    print('Logged in using ChatGPT', file=sys.stderr)\n"
         "    sys.exit(0)\n"
-        "root = Path(sys.argv[sys.argv.index('-C') + 1])\n"
-        "(root / 'empire_os/test_owner.py').write_text('VALUE = 2\\n')\n"
-        "print('model generated requested scoped patch')\n"
+        "print('diff --git a/empire_os/test_owner.py b/empire_os/test_owner.py')\n"
+        "print('--- a/empire_os/test_owner.py')\n"
+        "print('+++ b/empire_os/test_owner.py')\n"
+        "print('@@ -1 +1 @@')\n"
+        "print('-VALUE = 1')\n"
+        "print('+VALUE = 2')\n"
     )
     fake.chmod(0o700)
     monkeypatch.setattr(builder, "_local_codex_binary", lambda: str(fake))
