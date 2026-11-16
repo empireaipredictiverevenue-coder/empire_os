@@ -81,7 +81,8 @@ def test_single_grant_and_original_auth_success():
     written=[]
     report=a.apply(read_sql=pg,verify=lambda p:success_source(),
                    save=lambda target,payload:written.append((target,payload)),
-                   passfile_provider=lambda:Path("/root/approved-reader.pgpass"))
+                   passfile_provider=lambda:Path("/root/approved-reader.pgpass"),
+                   pregrant_auth=lambda:True)
     assert report["status"]=="NATIVE_FORECAST_READER_TENANT_AUTHENTICATED"
     assert report["original_registry_role_grant_applied"] is True
     assert report["registry_scoped_rows_observed"] == 0
@@ -108,7 +109,8 @@ def test_failed_original_authenticated_read_revokes_only_own_grant():
                 verify=lambda path: (_ for _ in ()).throw(
                     a.ActivationHold("AUTHENTICATED_READ_FAILED")),
                 save=lambda *args:pytest.fail("never save failure"),
-                passfile_provider=lambda:Path("/root/approved-reader.pgpass"))
+                passfile_provider=lambda:Path("/root/approved-reader.pgpass"),
+                pregrant_auth=lambda:True)
     assert calls==[a.CATALOG,a.GRANT_SQL,a.CATALOG,a.REVOKE_SQL]
     assert not state["existing_membership"]
 
@@ -122,7 +124,8 @@ def test_preexisting_authorised_grant_is_not_reissued_or_revoked():
         return json.dumps(state)
     result=a.apply(read_sql=pg,verify=lambda path:success_source(),
                    save=lambda *args:None,
-                   passfile_provider=lambda:Path("/root/approved-reader.pgpass"))
+                   passfile_provider=lambda:Path("/root/approved-reader.pgpass"),
+                   pregrant_auth=lambda:True)
     assert result["original_registry_role_grant_applied"] is False
     assert calls==[a.CATALOG,a.CATALOG]
 
@@ -149,7 +152,8 @@ def test_readback_no_negative_auth_is_ever_called_success():
         with pytest.raises(a.ActivationHold):
             a.apply(read_sql=pg,verify=lambda path:wrong,
                     save=lambda *_:pytest.fail("invalid proof saved"),
-                    passfile_provider=lambda:Path("/root/approved-reader.pgpass"))
+                    passfile_provider=lambda:Path("/root/approved-reader.pgpass"),
+                   pregrant_auth=lambda:True)
         assert not state["existing_membership"]
 
 
@@ -169,3 +173,72 @@ def test_failed_source_read_reports_stage_codes_not_db_errors_or_credentials():
     with pytest.raises(a.ActivationHold,match="CENSUS=UNKNOWN") as raised:
         a.validate_authenticated_result(broken)
     assert "private_customer_info" not in str(raised.value)
+
+
+def test_original_scram_is_required_before_any_registry_grant():
+    calls=[]
+    state=valid_catalogue()
+    def fake_pg(query):
+        calls.append(query)
+        assert query==a.CATALOG, 'a protected grant must not run on SCRAM failure'
+        return json.dumps(state)
+    with pytest.raises(a.ActivationHold,match='BEFORE_GRANT'):
+        a.apply(read_sql=fake_pg,
+            pregrant_auth=lambda:(_ for _ in ()).throw(
+                a.ActivationHold('ORIGINAL_REV052_SCRAM_LOGIN_UNAVAILABLE_BEFORE_GRANT')),
+            verify=lambda *_:pytest.fail('no postgrant reader'),
+            passfile_provider=lambda:Path('/root/approved-reader.pgpass'))
+    assert calls==[a.CATALOG]
+
+
+def test_original_rev052_password_loader_reused_with_no_passfile_lookup():
+    value=a.original_dedicated_dsn(credential_reader=lambda:'synthetic-test-only-secret')
+    assert 'password=synthetic-test-only-secret' in value
+    assert 'passfile=' not in value
+    assert 'host=/var/run/postgresql' in value
+    assert 'empiredb' in value
+    assert 'synthetic-test-only-secret' not in a._safe_error_category(RuntimeError('x'))
+
+
+class _ScramCursor:
+    def __init__(self, identity):
+        self.identity=identity
+        self.sql=[]
+    def __enter__(self):return self
+    def __exit__(self,*_):return False
+    def execute(self,sql):self.sql.append(sql)
+    def fetchone(self):return self.identity
+
+class _ScramConnection:
+    def __init__(self, cursor):self.cur=cursor
+    def __enter__(self):return self
+    def __exit__(self,*_):return False
+    def cursor(self):return self.cur
+
+
+def test_pregrant_original_authenticated_login_must_be_real_readonly_session():
+    cur=_ScramCursor(("empiredb",a.LOGIN,"on"))
+    assert a.pregrant_original_login_auth(
+      dsn_factory=lambda:'synthetic-private-dsn-test-only',
+      connect_factory=lambda _: _ScramConnection(cur)) is True
+    assert cur.sql==["SET TRANSACTION READ ONLY",
+       "SELECT current_database(),session_user,current_setting('transaction_read_only')"]
+    cur=_ScramCursor(("empiredb","attacker_login","on"))
+    with pytest.raises(a.ActivationHold,match="BEFORE_GRANT"):
+        a.pregrant_original_login_auth(
+          dsn_factory=lambda:'synthetic-private-dsn-test-only',
+          connect_factory=lambda _: _ScramConnection(cur))
+
+
+def test_original_postgrant_source_preflight_uses_one_existing_password(monkeypatch):
+    recorded=[]
+    monkeypatch.setattr(a,"original_dedicated_dsn",lambda:'password=synthetic-private-only')
+    monkeypatch.setattr(a,"review_authenticated_sources",
+      lambda **kw:recorded.append(kw) or success_source())
+    got=a.authenticated_readback(a.PASSFILE)
+    assert got['registry_reader_authenticated_session'] is True
+    assert len(recorded)==1
+    assert recorded[0]['registry_dsn']==recorded[0]['census_dsn']
+    assert 'synthetic-private-only' in recorded[0]['census_dsn']
+    with pytest.raises(a.ActivationHold,match='PATH_MISMATCH'):
+        a.authenticated_readback(Path('/tmp/unauthorised'))

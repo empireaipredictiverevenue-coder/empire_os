@@ -21,6 +21,9 @@ from scripts.provision_revenue_event_evidence_login_20261018 import (
     LOGIN, ROLE, TENANT, VAULT, PASSFILE, pg,
 )
 from scripts.audit_predictive_revenue_forecasts import _save_report
+from scripts.review_rev052_committed_login_readonly_20261018 import (
+    private_password as original_rev052_private_password,
+)
 
 ROOT = Path("/srv/empire_os")
 REGISTRY_ROLE = "empire_predictive_registry_reader"
@@ -154,14 +157,46 @@ def read_catalog(*, read_sql=pg) -> dict:
     return record
 
 
-def authenticated_readback(passfile: Path) -> dict:
-    import psycopg
+def original_dedicated_dsn(*, credential_reader=None) -> str:
+    """Reuse REV052 vault custody and REV053 explicit-SCRAM authentication.
+
+    The original login never depended on libpq .pgpass lookup; its prior
+    authenticated reader provides the strictly checked in-memory password.
+    Do not print, persist or include this DSN in an exception or receipt.
+    """
     from psycopg.conninfo import make_conninfo
-    dsn=make_conninfo(
+    credential_reader=credential_reader or original_rev052_private_password
+    password=credential_reader()
+    return make_conninfo(
         host="/var/run/postgresql",port=5432,dbname="empiredb",
-        user=LOGIN,passfile=str(passfile),connect_timeout=5,
+        user=LOGIN,password=password,connect_timeout=5,
     )
-    # The original reader probes return bounded counts and booleans only.
+
+
+def pregrant_original_login_auth(*, dsn_factory=original_dedicated_dsn,
+                                 connect_factory=None) -> bool:
+    """Prove original password/SCRAM login before any privileged membership."""
+    import psycopg
+    connect_factory=connect_factory or psycopg.connect
+    try:
+        with connect_factory(dsn_factory()) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION READ ONLY")
+                cursor.execute("SELECT current_database(),session_user,"
+                               "current_setting('transaction_read_only')")
+                if cursor.fetchone() != ("empiredb",LOGIN,"on"):
+                    raise ActivationHold("ORIGINAL_LOGIN_IDENTITY_UNPROVEN")
+    except Exception:
+        raise ActivationHold("ORIGINAL_REV052_SCRAM_LOGIN_UNAVAILABLE_BEFORE_GRANT") from None
+    return True
+
+
+def authenticated_readback(passfile: Path) -> dict:
+    # Path metadata is already checked against original root-owned vault.
+    # Use existing original REV052/053 credential reader, not libpq passfile.
+    if passfile != PASSFILE:
+        raise ActivationHold("ORIGINAL_PRIVATE_CREDENTIAL_PATH_MISMATCH")
+    dsn=original_dedicated_dsn()
     result=review_authenticated_sources(
         tenant_id=TENANT,registry_dsn=dsn,census_dsn=dsn,
         as_of=datetime.now(timezone.utc),
@@ -211,9 +246,15 @@ def validate_authenticated_result(result: dict)->dict:
 
 
 def apply(*, read_sql=pg, verify=authenticated_readback,
-          save=_save_report, passfile_provider=protected_credential_path) -> dict:
+          save=_save_report, passfile_provider=protected_credential_path,
+          pregrant_auth=pregrant_original_login_auth) -> dict:
     passfile=passfile_provider()
     state=read_catalog(read_sql=read_sql)
+    # The live failure was SCRAM with no supplied password. Authenticate the
+    # original login before granting any new role, so invalid credentials
+    # never trigger an authorization change or rollback cycle.
+    if pregrant_auth() is not True:
+        raise ActivationHold("ORIGINAL_REV052_SCRAM_LOGIN_UNAVAILABLE_BEFORE_GRANT")
     granted=False
     try:
         if not state["existing_membership"]:
@@ -274,7 +315,8 @@ def _safe_error_category(exc: Exception) -> str:
 
 
 def diagnose_readonly(*, path_provider=protected_credential_path,
-                      catalog_reader=read_catalog, connect_factory=None)->dict:
+                      catalog_reader=read_catalog, connect_factory=None,
+                      credential_reader=None)->dict:
     """Root-only, original vault, no grant, source mutation or credentials out."""
     import psycopg
     from psycopg.conninfo import make_conninfo
@@ -309,8 +351,10 @@ def diagnose_readonly(*, path_provider=protected_credential_path,
         stage="ORIGINAL_CATALOGUE_READ"
         membership=catalog_reader()["existing_membership"]
         stage="ORIGINAL_SCRAM_CONNECTION"
-        dsn=make_conninfo(host="/var/run/postgresql",port=5432,
-            dbname="empiredb",user=LOGIN,passfile=str(passfile),connect_timeout=5)
+        # Same code path as the original REV052/053 authenticated reader.
+        # The original root-owned file remains unmodified; only its existing
+        # validated password is used in memory for SCRAM authentication.
+        dsn=original_dedicated_dsn(credential_reader=credential_reader)
         connect_factory=connect_factory or psycopg.connect
         with connect_factory(dsn) as connection:
             steps["scram_authenticated_login"]=True

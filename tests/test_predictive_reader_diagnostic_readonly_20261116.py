@@ -61,13 +61,14 @@ def test_readonly_diagnostic_reaches_original_census_without_writes(tmp_path):
     path=setup_pgpass(tmp_path)
     cursor=FakeCursor()
     def connect(dsn):
-        assert "passfile=" in dsn
-        assert "password=" not in dsn
+        assert "passfile=" not in dsn
+        assert "password=synthetic-not-a-real-secret" in dsn
         return FakeConnection(cursor)
     result=diagnose_readonly(
         path_provider=lambda:path,
         catalog_reader=lambda:{"existing_membership":False},
         connect_factory=connect,
+        credential_reader=lambda:'synthetic-not-a-real-secret',
     )
     assert result["status"]=="ORIGINAL_READER_DIAGNOSTIC_PASSED",result
     assert all(result["observations"].values())
@@ -98,6 +99,7 @@ def test_scram_auth_failure_category_does_not_expose_secret(tmp_path):
     result=diagnose_readonly(
         path_provider=lambda:path,
         catalog_reader=lambda:{"existing_membership":False},
+        credential_reader=lambda:'synthetic-not-a-real-secret',
         connect_factory=lambda _:(_ for _ in ()).throw(RuntimeError(
             "password authentication failed for secret-fake-user"))
     )
@@ -114,7 +116,8 @@ def test_restricted_role_sqlstate_denial_is_isolated(tmp_path):
     result=diagnose_readonly(
         path_provider=lambda:path,
         catalog_reader=lambda:{"existing_membership":False},
-        connect_factory=lambda _:FakeConnection(cursor))
+        connect_factory=lambda _:FakeConnection(cursor),
+        credential_reader=lambda:'synthetic-not-a-real-secret')
     assert result["stage"]=="ORIGINAL_REV052_CENSUS_ROLE"
     assert result["failure"]=="SQL_PERMISSION_DENIED_42501"
     assert not result["observations"]["original_rev077_census_query_executed"]
@@ -131,7 +134,8 @@ def test_wrong_source_day_is_distinguished_from_login_denial(tmp_path):
     result=diagnose_readonly(
         path_provider=lambda:path,
         catalog_reader=lambda:{"existing_membership":False},
-        connect_factory=lambda _:FakeConnection(cursor))
+        connect_factory=lambda _:FakeConnection(cursor),
+        credential_reader=lambda:'synthetic-not-a-real-secret')
     assert result["observations"]["scram_authenticated_login"] is True
     assert result["observations"]["original_restricted_census_role_set"] is True
     assert result["stage"]=="ORIGINAL_REV077_SOURCE_DAY"
