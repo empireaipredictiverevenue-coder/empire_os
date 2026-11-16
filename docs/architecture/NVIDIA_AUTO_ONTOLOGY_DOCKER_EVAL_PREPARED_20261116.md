@@ -121,3 +121,23 @@ and the prepared fixture remain intact.
 - Retested: Buildx v0.39.0 is detected under a simulated root HOME, shell passes `bash -n`, Compose configuration passes, and both binary hashes pass.
 - The NVIDIA application containers are **not yet running** after this correction. A founder-controlled rerun of `sudo bash /srv/empire_os/runtime/nvidia_ontology_eval/launch_and_capture.sh` is required because the connected remote shell lacks Docker socket privileges.
 - Do not report a full NVIDIA runtime or natural-language agent until container health, HTTP, model configuration, and MCP are tested.
+
+## 2026-11-16 frontend port publishing correction
+
+After founder-launched Docker Compose successfully built all NVIDIA images, PostgreSQL and migrations completed, and the backend and ingestion reported healthy. The requested host port `127.0.0.1:33000` did **not** appear in the live frontend's port mapping: Docker showed only `3000/tcp`, and direct curl returned connection refused. The runtime was not yet externally accessible.
+
+Root cause: all services, including frontend, were attached exclusively to a Compose `internal: true` bridge. Docker 29 silently omits the published host binding in that layout. This was confirmed by actual runtime state and the documented Docker issue at https://github.com/moby/moby/discussions/53256 .
+
+Bounded correction prepared and tested:
+
+- Add dedicated project-scoped standard bridge `ingress` with host binding default `127.0.0.1`.
+- Connect only `auto-ontology-frontend` to both `sandbox` (internal) and `ingress` (standard bridge).
+- Retain exact published host mapping `127.0.0.1:33000:3000`.
+- Keep PostgreSQL, backend, ingestion, and migration services exclusively on internal `sandbox`, with **no published ports**.
+- Preserve existing image tags, database volume, credentials, synthetic SQLite and model-disabled endpoints.
+- Original Compose manifest retained at `runtime/nvidia_ontology_eval/compose.pre-ingress-20261116.yaml` (0600).
+- Existing active manifest changed; **no container recreated during file preparation**.
+- Tested full Compose config, 18 targeted graph/ontology/runtime tests PASS.
+- Root operator script `runtime/nvidia_ontology_eval/apply_frontend_ingress.sh` checks scoped configuration and binary hashes and applies `docker compose up -d --no-deps --no-build --pull never auto-ontology-frontend`, affecting only the evaluation frontend. Results are saved under a private file readable by the connected owner shell.
+
+**Current gate:** Requires one founder-run sudo command to recreate only the evaluation frontend; not yet executed. This will not enable paid inference, semantic compilation or MCP. Do not claim end-to-end ontology readiness until those are separately validated.

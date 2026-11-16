@@ -34,13 +34,18 @@ def test_no_public_bind_or_unreviewed_container_names():
     spec = _contents()
     assert spec["name"] == PROJECT
     assert spec["networks"]["sandbox"]["internal"] is True
+    assert spec["networks"]["ingress"]["driver"] == "bridge"
+    assert spec["networks"]["ingress"]["driver_opts"]["com.docker.network.bridge.host_binding_ipv4"] == "127.0.0.1"
     assert set(spec["services"]) == {
         "postgres", "pgadmin", "auto-ontology", "ingestion-service",
         "auto-ontology-migrate", "frontend-migrate", "auto-ontology-frontend",
     }
     for name, service in spec["services"].items():
         assert "container_name" not in service
-        assert service["networks"] == ["sandbox"]
+        assert service["networks"] == (
+            ["sandbox", "ingress"] if name == "auto-ontology-frontend"
+            else ["sandbox"]
+        )
         assert service["restart"] == "no"
         expected = (
             [f"127.0.0.1:{PORT}:3000"] if name == "auto-ontology-frontend"

@@ -114,7 +114,18 @@ def _make_compose(vendor: Path, env_file: Path, source: Path) -> dict:
     if set(services) != expected:
         raise RuntimeError("upstream service list changed; fail closed")
     original["name"] = PROJECT
-    original["networks"] = {"sandbox": {"internal": True}}
+    original["networks"] = {
+        "sandbox": {"internal": True},
+        # A port published from an exclusively internal network is silently
+        # ignored by Docker 29. A dedicated standard bridge is attached only
+        # to the frontend; DB, backend and ingestion stay on sandbox.
+        "ingress": {
+            "driver": "bridge",
+            "driver_opts": {
+                "com.docker.network.bridge.host_binding_ipv4": "127.0.0.1",
+            },
+        },
+    }
     for name, service in services.items():
         service.pop("container_name", None)
         service["ports"] = []
@@ -143,6 +154,7 @@ def _make_compose(vendor: Path, env_file: Path, source: Path) -> dict:
     services["auto-ontology-frontend"]["ports"] = [
         f"127.0.0.1:{PORT}:3000",
     ]
+    services["auto-ontology-frontend"]["networks"] = ["sandbox", "ingress"]
     for name in {"auto-ontology", "ingestion-service"}:
         services[name]["volumes"] = [{
             "type": "bind",
