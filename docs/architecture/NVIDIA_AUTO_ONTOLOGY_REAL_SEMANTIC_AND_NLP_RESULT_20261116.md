@@ -199,3 +199,16 @@ switch or GPU/hosted inference purchase, prove a candidate's response
 against NVIDIA's actual schema, then run a complete six-question
 **natural-language-to-executed-SQL** benchmark, not just SQL connector
 queries. Preserve rollback and founder release control.
+
+## 2026-11-16: Existing NVIDIA-via-OpenRouter credential verified (no new key)
+
+- Confirmed user-accessible private credential file `/etc/empire_os/llm_secrets/openrouter.env` contains a non-empty `OPENROUTER_API_KEY`; value was never displayed. The additional OmniRoute provider environment files exist but are permission-restricted to this non-root connected session. A **separate direct NVIDIA API key was not verified**; do not equate OpenRouter with build.nvidia.com credentials.
+- Existing `empire_os/hermes_control.py` references the route `openrouter/nvidia/nemotron-3-ultra-550b-a55b:free`, so a provider connection already existed in EmpireOS. Do not create another route or key merely for discovery.
+- Retrieved the live OpenRouter model catalog (HTTP 200); `nvidia/nemotron-3.5-super-vl:free` was listed with prompt and completion prices `0`, and structured output, JSON schema and tools advertised. Model catalog entries and quotas may change; recheck before all external calls.
+- Executed **one real, synthetic-only, free-model canary** through that existing credential with fixed model id and provider fallback disabled. HTTP 200, returned requested free model, JSON-schema response exactly matched a minimal synthetic contract, 157 tokens, 1.31 seconds. No customer or business data were sent, and no paid model fallback was requested.
+- Ran **one harder synthetic-only canary** using the pinned vendor's actual Pydantic `RawTableTermsResult` schema. The model replied in 4.1 seconds, but Pydantic returned `ValidationError`: `complete_structured_pass=false`. Receipt kept privately under `runtime/nvidia_ontology_eval/hosted_free_nemotron_native_schema_20261116.json` (0600). **The existing hosted route is therefore NOT YET APPROVED as a replacement for NVIDIA's current local model.**
+- Committed canary source `scripts/probe_existing_openrouter_nvidia_native_schema_20261116.py` without any credential material. Model tests are synthetic and manual only; not scheduled.
+- No Docker container, gateway, production model route, database, paid plan, billing, source customer records, or deployment configuration was changed by these credential checks.
+- Preserve the requirement to pass the exact NVIDIA structured schema plus six actual natural-language-to-executed-SQL benchmark cases before activating external inference in the running NVIDIA evaluation. The verified deterministic 6/6 SQL connector result does **not** substitute for NLP success.
+
+**Verdict:** Existing credential verified and reusable for a guarded free-model experiment. Direct NVIDIA key remains unverified. Simple JSON works; full vendor schema fails. Keep isolated deployment unchanged until a candidate passes.
