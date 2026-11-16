@@ -355,6 +355,105 @@ def _local_codex_binary() -> str | None:
     return str(matches[0]) if matches else None
 
 
+
+def _isolated_pytest_argv(
+    *, clone: Path, python: Path, tests: tuple[str, ...],
+) -> list[str] | None:
+    """No-network, read-only-source test runtime with no host secrets mounted.
+
+    Fails closed if bubblewrap is unavailable. The model executes in the
+    Codex workspace sandbox; this independently encloses test subprocesses.
+    """
+    tool = shutil.which("bwrap")
+    if not tool:
+        return None
+    env_venv = Path(sys.prefix).resolve()
+    # The Python runtime can load installed packages, but cannot mutate them.
+    binds = ["--ro-bind", "/usr", "/usr",
+             "--ro-bind", "/lib", "/lib",
+             "--ro-bind", "/lib64", "/lib64"]
+    if env_venv.is_dir() and not env_venv.is_relative_to("/usr"):
+        binds += ["--ro-bind", str(env_venv), str(env_venv)]
+    if python.parent.parent.is_dir():
+        extra_venv = python.parent.parent.resolve()
+        if extra_venv != env_venv and not extra_venv.is_relative_to("/usr"):
+            binds += ["--ro-bind", str(extra_venv), str(extra_venv)]
+    return [
+        tool, "--unshare-all", "--die-with-parent", "--new-session",
+        *binds, "--dev", "/dev", "--proc", "/proc",
+        "--tmpfs", "/tmp", "--ro-bind", str(clone), str(clone),
+        "--dir", "/etc", "--chdir", str(clone),
+        "--setenv", "HOME", "/tmp",
+        "--setenv", "TMPDIR", "/tmp",
+        "--setenv", "PYTHONPATH", str(clone),
+        "--setenv", "PYTHONDONTWRITEBYTECODE", "1",
+        "--", str(python), "-m", "pytest", "-q", "-p",
+        "no:cacheprovider", *tests,
+    ]
+
+
+
+def _isolated_codex_argv(
+    *, cli: str, clone: Path,
+) -> list[str] | None:
+    """Bound model process to Git clone + read-only CLI/auth, not production.
+
+    The model must use network access for ChatGPT inference. Its filesystem
+    view is independently restricted by Linux user/mount namespaces.
+    """
+    tool = shutil.which("bwrap")
+    if not tool:
+        return None
+    cli_path = Path(cli).resolve()
+    if not cli_path.is_file():
+        return None
+    home = Path.home()
+    nvm = home / ".nvm"
+    auth = home / ".codex"
+    if not nvm.is_dir() or not auth.is_dir():
+        return None
+    base = [
+        tool, "--unshare-all", "--share-net",
+        "--die-with-parent", "--new-session",
+        "--ro-bind", "/usr", "/usr",
+        "--ro-bind", "/lib", "/lib",
+        "--ro-bind", "/lib64", "/lib64",
+        "--dev", "/dev", "--proc", "/proc", "--tmpfs", "/tmp",
+        "--dir", "/etc",
+        "--ro-bind", "/etc/ssl", "/etc/ssl",
+        "--ro-bind", "/etc/resolv.conf", "/etc/resolv.conf",
+        "--dir", "/home", "--dir", str(home),
+        "--ro-bind", str(nvm), str(nvm),
+        "--ro-bind", str(auth), str(auth),
+    ]
+    if not cli_path.is_relative_to(nvm) and not cli_path.is_relative_to("/usr"):
+        base += ["--ro-bind", str(cli_path), str(cli_path)]
+    # Respect the installed Node release rather than pinning an old version.
+    node_bins = sorted((nvm / "versions/node").glob("v*/bin"), reverse=True)
+    if not node_bins:
+        return None
+    node_bin = next(
+        (directory for directory in node_bins
+         if cli_path.is_relative_to(directory.parent)),
+        node_bins[0],
+    )
+    base += [
+        "--bind", str(clone), str(clone),
+        "--chdir", str(clone),
+        "--setenv", "HOME", str(home),
+        "--setenv", "TMPDIR", "/tmp",
+        "--setenv", "XDG_CACHE_HOME", "/tmp",
+        "--setenv", "PYTHONPATH", str(clone),
+        "--setenv", "PYTHONDONTWRITEBYTECODE", "1",
+        "--setenv", "PATH", str(node_bin) + ":/usr/bin:/bin",
+        "--", str(cli_path),
+        "exec", "--ephemeral", "-C", str(clone), "-s", "workspace-write",
+        "-c", "approval_policy=never",
+        "-c", "model_reasoning_effort=medium", "-",
+    ]
+    return base
+
+
 def run_empire_coder_codex_local_candidate(
     repo_root: str | Path,
     job: EmpireCoderSandboxJob,
@@ -410,6 +509,15 @@ def run_empire_coder_codex_local_candidate(
     ):
         result["reason"] = "source_branch_not_current_head"
         return result
+    source_commit = head.stdout.strip()
+    scope_status = _run(
+        ["git", "status", "--porcelain=v1", "--", *job.allowed_paths],
+        cwd=root, timeout=25,
+    )
+    if scope_status.returncode or scope_status.stdout.strip():
+        result["reason"] = "source_paths_dirty_or_unavailable"
+        return result
+    result["source_commit"] = source_commit
 
     proposals = root / "runtime/execution_plane/coder_proposals"
     proposals.mkdir(parents=True, exist_ok=True)
@@ -475,11 +583,10 @@ def run_empire_coder_codex_local_candidate(
         }
         env["PYTHONPATH"] = str(clone)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
-        cmd = [
-            cli, "exec", "--ephemeral", "-C", str(clone), "-s", "workspace-write",
-            "-c", "approval_policy=never",
-            "-c", "model_reasoning_effort=medium", "-",
-        ]
+        cmd = _isolated_codex_argv(cli=cli, clone=clone)
+        if cmd is None:
+            result["reason"] = "isolated_model_runtime_unavailable"
+            return result
         try:
             process = subprocess.run(
                 cmd, cwd=str(clone), env=env, input=prompt,
@@ -519,13 +626,19 @@ def run_empire_coder_codex_local_candidate(
         python = root / ".venv/bin/python"
         if not python.is_file():
             python = Path(sys.executable)
+        isolated = _isolated_pytest_argv(
+            clone=clone, python=python, tests=tuple(job.pytest_targets),
+        )
+        if isolated is None:
+            result["reason"] = "isolated_test_runtime_unavailable"
+            return result
         tested = _run(
-            [str(python), "-m", "pytest", "-q", "-p", "no:cacheprovider",
-             *job.pytest_targets],
+            isolated,
             cwd=clone,
             env={
                 "PATH": "/usr/local/bin:/usr/bin:/bin",
                 "HOME": "/var/tmp",
+                "TMPDIR": "/tmp",
                 "PYTHONPATH": str(clone),
                 "PYTHONDONTWRITEBYTECODE": "1",
             },
@@ -538,6 +651,21 @@ def run_empire_coder_codex_local_candidate(
             return result
         if _changed_paths(clone) != changed:
             result["reason"] = "tests_mutated_candidate_files"
+            result["verification_passed"] = False
+            return result
+        # A competing owner may advance HEAD while the model is running;
+        # never publish a proposal claiming to be based on that new revision.
+        current_head = _run(["git", "rev-parse", "HEAD"], cwd=root, timeout=15)
+        if current_head.returncode or current_head.stdout.strip() != source_commit:
+            result["reason"] = "source_head_changed_during_candidate"
+            result["verification_passed"] = False
+            return result
+        current_scope = _run(
+            ["git", "status", "--porcelain=v1", "--", *job.allowed_paths],
+            cwd=root, timeout=25,
+        )
+        if current_scope.returncode or current_scope.stdout.strip():
+            result["reason"] = "source_paths_changed_during_candidate"
             result["verification_passed"] = False
             return result
         for path in changed:
@@ -568,6 +696,9 @@ def run_empire_coder_codex_local_candidate(
         os.replace(temp, target)
         result.update({
             "status": "LOCAL_PROPOSAL_READY",
+            "test_isolation": "BWRAP_NO_NETWORK_READ_ONLY_SOURCE",
+            "model_filesystem_isolation": "BWRAP_CLONE_AND_READONLY_AUTH",
+            "source_commit": source_commit,
             "proposal_patch": str(target),
             "proposal_sha256": sha256(patch.stdout).hexdigest(),
             "verification_passed": True,

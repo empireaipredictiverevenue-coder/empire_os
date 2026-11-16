@@ -7,6 +7,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+from datetime import datetime, timezone
+import re
+import subprocess
 from pathlib import Path
 import threading
 from typing import Any, Callable
@@ -100,6 +103,8 @@ def _candidate_verified(
         or result.get("founder_gate_required") is not True
         or result.get("production_mutation") is not False
         or result.get("production_deploy") is not False
+        or result.get("test_isolation") != "BWRAP_NO_NETWORK_READ_ONLY_SOURCE"
+        or result.get("model_filesystem_isolation") != "BWRAP_CLONE_AND_READONLY_AUTH"
         or not isinstance(result.get("changed_paths"), list)
         or not result["changed_paths"]
         or not set(result["changed_paths"]).issubset(candidate.allowed_paths)
@@ -115,7 +120,113 @@ def _candidate_verified(
         or proposed.resolve() != expected.resolve() or not expected.is_file()
     ):
         return False
-    return hashlib.sha256(expected.read_bytes()).hexdigest() == result["proposal_sha256"]
+    patch = expected.read_bytes()
+    if hashlib.sha256(patch).hexdigest() != result["proposal_sha256"]:
+        return False
+    source_commit = str(result.get("source_commit") or "")
+    if not re.fullmatch(r"[a-f0-9]{40}", source_commit):
+        return False
+    try:
+        current = subprocess.run(
+            ("git", "rev-parse", "HEAD"), cwd=root,
+            check=False, capture_output=True, text=True, timeout=15,
+        )
+        if current.returncode or current.stdout.strip() != source_commit:
+            return False
+        # Independent patch review: don't trust the model or its tool's
+        # changed_paths claim. Git must parse the patch and report EXACT
+        # permitted files before a founder can even review it.
+        numstat = subprocess.run(
+            ("git", "apply", "--numstat", "-z", "-"), cwd=root,
+            input=patch, check=False, capture_output=True, timeout=20,
+        )
+        if numstat.returncode:
+            return False
+        actual_paths = {
+            row.rsplit(b"\t", 1)[-1].decode("utf-8", errors="strict")
+            for row in numstat.stdout.split(b"\x00")
+            if row
+        }
+        if actual_paths != set(result["changed_paths"]):
+            return False
+        for rel in actual_paths:
+            target = (root / rel)
+            if (
+                target.is_symlink()
+                or not target.resolve().is_relative_to(root)
+                or not (root / rel).parent.resolve().is_relative_to(root)
+            ):
+                return False
+        if any(
+            token in patch for token in (
+                b"new file mode 120000",
+                b"old mode 120000",
+                b"new mode 120000",
+                b"GIT binary patch",
+                b"rename from ",
+                b"rename to ",
+            )
+        ):
+            return False
+        check = subprocess.run(
+            ("git", "apply", "--check", "-"), cwd=root,
+            input=patch, check=False, capture_output=True, timeout=20,
+        )
+    except (OSError, subprocess.TimeoutExpired, UnicodeError, ValueError):
+        return False
+    return check.returncode == 0
+
+
+TRANSIENT_CANDIDATE_REASONS = frozenset({
+    "execution_lease_conflict",
+    "codex_model_timeout",
+    "isolated_clone_failed",
+})
+
+
+def _requeue_transient(
+    queue: LocalJobQueue, job: CoderJob, reason: str,
+) -> CoderJob | None:
+    if reason not in TRANSIENT_CANDIDATE_REASONS:
+        return None
+    if job.attempts >= 3:
+        return None
+    return queue.retry(
+        job, reason,
+        delay_seconds=min(300, 30 * (2 ** max(0, job.attempts - 1))),
+        max_attempts=3,
+    )
+
+
+def _write_health_receipt(
+    root: Path, queue: LocalJobQueue, result: dict[str, Any],
+) -> None:
+    """Small, non-PII readback for the original Coder/Hermes department."""
+    pending = [
+        j for j in queue.list_pending(kind=JobKind.IMPLEMENT)
+        if j.payload.get("execution_mode") == ISOLATED_CANDIDATE_MODE
+    ]
+    approval_dir = queue.awaiting_approval
+    event = {
+        **result,
+        "observed_at_utc": datetime.now(timezone.utc).isoformat(),
+        "pending_isolated_implement_count": len(pending),
+        "total_awaiting_approval_count": sum(
+            1 for _ in approval_dir.glob("*.json")
+        ),
+        "health_status": (
+            "DEGRADED" if result["failed_count"] else
+            "RETRY_PENDING" if result["retried_count"] else
+            "FOUNDER_REVIEW_PENDING" if result["awaiting_approval_count"] else
+            "IDLE"
+        ),
+    }
+    path = root / "runtime/execution_plane/coder_implement_consumer_latest.json"
+    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    temp = path.with_name(path.name + ".tmp")
+    temp.write_text(json.dumps(event, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(temp, 0o600)
+    os.replace(temp, path)
 
 
 def drain_isolated_implement_jobs(
@@ -131,6 +242,7 @@ def drain_isolated_implement_jobs(
     processed = 0
     ready: list[dict[str, str]] = []
     failed: list[dict[str, str]] = []
+    retried: list[dict[str, str]] = []
     for pending in queue.list_pending(kind=JobKind.IMPLEMENT):
         if processed >= max_count:
             break
@@ -184,6 +296,9 @@ def drain_isolated_implement_jobs(
                     "candidate_changed_paths": list(result["changed_paths"]),
                     "proposal_patch": result["proposal_patch"],
                     "proposal_sha256": result["proposal_sha256"],
+                    "source_commit": result["source_commit"],
+                    "test_isolation": result["test_isolation"],
+                    "model_filesystem_isolation": result["model_filesystem_isolation"],
                     "implementation_verified": False,
                     "task_completed": False,
                     "founder_release_required": True,
@@ -194,12 +309,37 @@ def drain_isolated_implement_jobs(
                 ready.append({"job_id": terminal.id, "status": terminal.status.value})
             else:
                 reason = str(result.get("reason") or "candidate_artifact_not_verified")
+                deferred = _requeue_transient(queue, claimed, reason)
+                if deferred is not None:
+                    retried.append({
+                        "job_id": deferred.id,
+                        "reason": reason,
+                        "next_attempt_after_utc": str(deferred.retry_after),
+                    })
+                else:
+                    terminal = queue.fail(
+                        claimed, reason,
+                        result={
+                            "candidate_status": str(result.get("status") or "UNKNOWN"),
+                            "task_completed": False, "production_mutation": False,
+                            "founder_release_required": True,
+                        },
+                    )
+                    failed.append({"job_id": terminal.id, "reason": reason})
+        except (TimeoutError, ConnectionError) as exc:
+            reason = "codex_model_timeout"
+            deferred = _requeue_transient(queue, claimed, reason)
+            if deferred is not None:
+                retried.append({
+                    "job_id": deferred.id, "reason": reason,
+                    "next_attempt_after_utc": str(deferred.retry_after),
+                })
+            else:
                 terminal = queue.fail(
-                    claimed, reason,
+                    claimed, "bounded_retry_exhausted:" + type(exc).__name__,
                     result={
-                        "candidate_status": str(result.get("status") or "UNKNOWN"),
-                        "task_completed": False, "production_mutation": False,
-                        "founder_release_required": True,
+                        "candidate_status": "FAILED", "task_completed": False,
+                        "production_mutation": False, "founder_release_required": True,
                     },
                 )
                 failed.append({"job_id": terminal.id, "reason": reason})
@@ -217,12 +357,15 @@ def drain_isolated_implement_jobs(
             stop.set()
             thread.join(timeout=2)
 
-    return {
+    summary = {
         "schema_version": "empire.coder.isolated-implement-consumer.v1",
         "status": "AVAILABLE", "processed_count": processed,
         "awaiting_approval_count": len(ready), "failed_count": len(failed),
+        "retried_count": len(retried), "retried": retried,
         "awaiting_approval": ready, "failed": failed,
         "implementation_verified": False,
         "production_mutation": False, "external_send": False,
         "payment_action": False, "founder_release_gate_preserved": True,
     }
+    _write_health_receipt(root, queue, summary)
+    return summary

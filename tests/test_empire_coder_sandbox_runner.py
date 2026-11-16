@@ -489,6 +489,7 @@ def _fake_codex(tmp_path, *, changed_path="app.py", body="VALUE = 2"):
         "if sys.argv[1:3] == ['login','status']:\n"
         "    print('Logged in using ChatGPT', file=sys.stderr)\n"
         "    sys.exit(0)\n"
+        "assert not Path('/srv/empire_os/runtime/execution_plane/leases.json').exists()\n"
         f"Path({changed_path!r}).write_text({(body + chr(10))!r})\n"
         "print('edited candidate')\n"
     )
@@ -596,3 +597,52 @@ def test_codex_local_candidate_preserves_existing_workspace(tmp_path, monkeypatc
     assert result["status"] == "HELD"
     assert result["reason"] == "isolated_clone_already_exists"
     assert (existing / "other_agent.txt").read_text() == "preserve"
+
+
+def test_codex_candidate_aborts_if_original_head_advances_during_inference(
+    tmp_path, monkeypatch,
+):
+    import subprocess
+    import empire_os.empire_coder_sandbox_runner as module
+
+    root = _codex_local_git_repo(tmp_path)
+    monkeypatch.setattr(
+        module, "_local_codex_binary", lambda: str(_fake_codex(tmp_path)),
+    )
+    original = module._run
+    seen = 0
+
+    def concurrently_advanced(argv, **kwargs):
+        nonlocal seen
+        if argv[:3] == ["git", "rev-parse", "HEAD"]:
+            seen += 1
+            if seen == 2:
+                return subprocess.CompletedProcess(
+                    argv, returncode=0, stdout="f" * 40 + "\n", stderr="",
+                )
+        return original(argv, **kwargs)
+
+    monkeypatch.setattr(module, "_run", concurrently_advanced)
+    result = module.run_empire_coder_codex_local_candidate(
+        root, _codex_job(job_id="head-advanced-canary"),
+        work_root=tmp_path / "isolated",
+    )
+    assert seen >= 2
+    assert result["reason"] == "source_head_changed_during_candidate"
+    assert result["verification_passed"] is False
+    assert result["proposal_patch"] is None
+    assert not list((root / "runtime/execution_plane/coder_proposals").glob("*.patch"))
+
+
+def test_os_isolated_model_runtime_requires_bwrap(tmp_path, monkeypatch):
+    import empire_os.empire_coder_sandbox_runner as module
+
+    real_which = module.shutil.which
+    monkeypatch.setattr(
+        module.shutil, "which",
+        lambda program: None if program == "bwrap" else real_which(program),
+    )
+    cli = _fake_codex(tmp_path)
+    assert module._isolated_codex_argv(
+        cli=str(cli), clone=tmp_path,
+    ) is None
