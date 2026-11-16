@@ -183,3 +183,20 @@ speculative hook relocation or scheduler redesign is applied.
 Focused regressions after the activation adapter: **76 passed**. Added checks
 cover unmanaged credential refusal, sanitized missing-credential holds and
 creation/duplicate denial of the dedicated writer with exactly one capability.
+
+Activation installed six reviewed source files, created the separately scoped
+writer with original tenant binding, verified its real SCRAM authentication and
+function-only capability in a READ ONLY session, and installed the credential
+configuration via daemon-reload. Neither PostgreSQL nor the department service
+was restarted. Independent catalogue readback verifies single SET-only writer
+membership, no reader/writer crossover, no direct commercial/registry DML,
+no generic-app writer membership, no schema CREATE privilege, safe registrar
+attributes and FORCE RLS. Both original and new persistent credential vaults
+remain root-owned 0700/0600.
+
+Actual service-namespace verification found systemd 259 delivers credentials as
+root:service-group 0440 inside its private read-only mount. The adapter was
+corrected to accept exactly that managed layout (or service-owned 0400), while
+rejecting wrong-group, writable or world-readable variants. This does not
+weaken original vault custody. The added regression brings the focused total
+to **77 passed**.

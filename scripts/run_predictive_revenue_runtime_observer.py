@@ -37,6 +37,16 @@ GOVERNANCE = {
 }
 
 
+def _service_credential_metadata_safe(info) -> bool:
+    """systemd 259 uses root:service-group 0440 on its read-only mount."""
+    import stat
+    mode = stat.S_IMODE(info.st_mode)
+    return stat.S_ISREG(info.st_mode) and (
+        (info.st_uid == os.geteuid() and mode == 0o400)
+        or (info.st_uid == 0 and mode == 0o440 and info.st_gid == os.getegid())
+    )
+
+
 def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
     """Consume only systemd's read-only per-service credential mount.
 
@@ -56,8 +66,7 @@ def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
     fd = os.open(path, os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
     try:
         info = os.fstat(fd)
-        if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0, os.geteuid())
-                or stat.S_IMODE(info.st_mode) & 0o077):
+        if not _service_credential_metadata_safe(info):
             raise ValueError("private service credential required")
         content = os.read(fd, 4097)
         if len(content) > 4096:
@@ -80,8 +89,7 @@ def _service_reader_configuration(env: Mapping[str, str]) -> dict[str, str]:
                      os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW)
         try:
             info = os.fstat(fd)
-            if (not stat.S_ISREG(info.st_mode) or info.st_uid not in (0, os.geteuid())
-                    or stat.S_IMODE(info.st_mode) & 0o077):
+            if not _service_credential_metadata_safe(info):
                 raise ValueError("private writer credential required")
             content = os.read(fd, 4097)
             if len(content) > 4096:

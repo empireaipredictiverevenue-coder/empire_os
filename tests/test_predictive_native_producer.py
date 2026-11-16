@@ -295,3 +295,18 @@ def test_approved_missing_writer_provision_uses_only_existing_capability(cluster
         c.execute('ROLLBACK')
     with pytest.raises(ValueError):
         prepare_native_writer_login(tenant_id=TENANT, scram='plaintext-password')
+
+
+def test_actual_systemd_root_service_group_credential_layout():
+    import stat
+    from types import SimpleNamespace
+    from scripts.run_predictive_revenue_runtime_observer import _service_credential_metadata_safe
+    def info(mode, uid=0, gid=None):
+        return SimpleNamespace(st_mode=stat.S_IFREG|mode, st_uid=uid,
+                               st_gid=os.getegid() if gid is None else gid)
+    assert _service_credential_metadata_safe(info(0o440))
+    assert _service_credential_metadata_safe(info(0o400, uid=os.geteuid()))
+    assert not _service_credential_metadata_safe(info(0o444))
+    assert not _service_credential_metadata_safe(info(0o460))
+    assert not _service_credential_metadata_safe(info(0o440, gid=os.getegid()+1))
+    assert not _service_credential_metadata_safe(info(0o640))
