@@ -207,17 +207,17 @@ def _write_health_receipt(
         if j.payload.get("execution_mode") == ISOLATED_CANDIDATE_MODE
     ]
     approval_dir = queue.awaiting_approval
+    total_awaiting_approval = sum(1 for _ in approval_dir.glob("*.json"))
     event = {
         **result,
         "observed_at_utc": datetime.now(timezone.utc).isoformat(),
         "pending_isolated_implement_count": len(pending),
-        "total_awaiting_approval_count": sum(
-            1 for _ in approval_dir.glob("*.json")
-        ),
+        "total_awaiting_approval_count": total_awaiting_approval,
         "health_status": (
             "DEGRADED" if result["failed_count"] else
             "RETRY_PENDING" if result["retried_count"] else
-            "FOUNDER_REVIEW_PENDING" if result["awaiting_approval_count"] else
+            "FOUNDER_REVIEW_PENDING" if result["awaiting_approval_count"] or total_awaiting_approval else
+            "BACKLOG_PENDING" if pending else
             "IDLE"
         ),
     }

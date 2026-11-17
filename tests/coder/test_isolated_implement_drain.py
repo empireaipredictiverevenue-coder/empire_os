@@ -472,3 +472,75 @@ def test_nontransient_failure_is_dead_lettered_immediately(tmp_path):
     assert result["failed_count"] == 1
     assert result["retried_count"] == 0
     assert queue.get(job.id).status is JobStatus.FAILED
+
+
+@pytest.mark.parametrize(
+    "pending, approvals, failed, retried, newly_ready, expected",
+    [
+        (0, 0, 0, 0, 0, "IDLE"),
+        (1, 0, 0, 0, 0, "BACKLOG_PENDING"),
+        (0, 1, 0, 0, 0, "FOUNDER_REVIEW_PENDING"),
+        (1, 1, 0, 0, 0, "FOUNDER_REVIEW_PENDING"),
+        (0, 0, 0, 0, 1, "FOUNDER_REVIEW_PENDING"),
+        (1, 1, 0, 1, 0, "RETRY_PENDING"),
+        (1, 1, 1, 1, 1, "DEGRADED"),
+    ],
+)
+def test_health_receipt_reflects_queue_state_and_precedence(
+    tmp_path, pending, approvals, failed, retried, newly_ready, expected,
+):
+    from types import SimpleNamespace
+    from empire_os.coder.isolated_implement_drain import _write_health_receipt
+
+    approval_dir = tmp_path / "approvals"
+    approval_dir.mkdir()
+    for index in range(approvals):
+        (approval_dir / f"{index}.json").write_text("{}")
+    jobs = [
+        SimpleNamespace(payload={"execution_mode": "ISOLATED_CANDIDATE_ONLY"})
+        for _ in range(pending)
+    ]
+    jobs.append(SimpleNamespace(payload={"execution_mode": "OTHER"}))
+    queue = SimpleNamespace(
+        awaiting_approval=approval_dir,
+        list_pending=lambda *, kind: jobs if kind is JobKind.IMPLEMENT else [],
+    )
+    result = {
+        "failed_count": failed,
+        "retried_count": retried,
+        "awaiting_approval_count": newly_ready,
+        "implementation_verified": False,
+        "production_mutation": False,
+    }
+    _write_health_receipt(tmp_path, queue, result)
+    receipt = json.loads(
+        (tmp_path / "runtime/execution_plane/coder_implement_consumer_latest.json").read_text()
+    )
+    assert receipt["health_status"] == expected
+    assert receipt["pending_isolated_implement_count"] == pending
+    assert receipt["total_awaiting_approval_count"] == approvals
+    assert receipt["implementation_verified"] is False
+    assert receipt["production_mutation"] is False
+
+
+def test_previously_held_candidate_remains_pending_review_on_idle_cycle(tmp_path):
+    root = _root(tmp_path)
+    queue, job, _ = _enqueue(root)
+    first = drain_isolated_implement_jobs(root, candidate_runner=_verified_stub)
+    assert first["awaiting_approval_count"] == 1
+
+    def never(*_args, **_kwargs):
+        raise AssertionError("an idle cycle must not run a candidate")
+
+    second = drain_isolated_implement_jobs(root, candidate_runner=never)
+    receipt = json.loads(
+        (root / "runtime/execution_plane/coder_implement_consumer_latest.json").read_text()
+    )
+    assert second["processed_count"] == 0
+    assert second["awaiting_approval_count"] == 0
+    assert receipt["health_status"] == "FOUNDER_REVIEW_PENDING"
+    assert receipt["total_awaiting_approval_count"] == 1
+    assert queue.get(job.id).status is JobStatus.AWAITING_APPROVAL
+    assert queue.get(job.id).result["task_completed"] is False
+    assert queue.get(job.id).result["implementation_verified"] is False
+    assert not list(queue.completed.glob(f"{job.id}.json"))
