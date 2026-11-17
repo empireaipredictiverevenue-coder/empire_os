@@ -60,6 +60,52 @@ export default function CommercialPage() {
     return () => { mounted = false; };
   }, []);
 
+  // Keep deep-linked enquiries visible after the first-party offer catalogue
+  // expands the page. Never move an ordinary page visit or override a user scroll.
+  useEffect(() => {
+    if (!offers.length || !["#commercial-enquiry", "#proposal-heading"].includes(window.location.hash)) return;
+    let cancelled = false;
+    let scheduledFrame = 0;
+    const section = document.getElementById("commercial-enquiry");
+    if (!section) return;
+    const alignIfHidden = () => {
+      if (cancelled || !["#commercial-enquiry", "#proposal-heading"].includes(window.location.hash)) return;
+      const position = section.getBoundingClientRect();
+      if (position.top > window.innerHeight - 175 || position.top < -100) {
+        section.scrollIntoView({ behavior: "instant", block: "start" });
+      }
+    };
+    const scheduleAlignment = () => {
+      if (cancelled) return;
+      window.cancelAnimationFrame(scheduledFrame);
+      scheduledFrame = window.requestAnimationFrame(alignIfHidden);
+    };
+    // The independent brokerage section can also expand after catalogue load.
+    // Observe real layout changes briefly instead of assuming one fetch order.
+    const resizeObserver = new ResizeObserver(scheduleAlignment);
+    const mutationObserver = new MutationObserver(scheduleAlignment);
+    resizeObserver.observe(document.body);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    const timer = window.setTimeout(() => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    }, 4500);
+    const cancelOnUserInput = () => {
+      cancelled = true;
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+      window.cancelAnimationFrame(scheduledFrame);
+      window.clearTimeout(timer);
+    };
+    const userEvents = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+    userEvents.forEach(type => window.addEventListener(type, cancelOnUserInput, { once: true, passive: true }));
+    scheduleAlignment();
+    return () => {
+      cancelOnUserInput();
+      userEvents.forEach(type => window.removeEventListener(type, cancelOnUserInput));
+    };
+  }, [offers.length]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!code || !consent || submitting ||
