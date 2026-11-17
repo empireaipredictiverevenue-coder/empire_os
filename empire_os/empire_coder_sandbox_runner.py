@@ -690,6 +690,55 @@ def _apply_tool_free_patch(
         return False
 
 
+
+def _apply_model_patch_with_one_bounded_retry(
+    *,
+    clone: Path,
+    job: EmpireCoderSandboxJob,
+    first_response: str,
+    model_command: list[str],
+    model_env: dict[str, str],
+    original_prompt: str,
+    remaining_seconds: int,
+) -> tuple[int, str | None]:
+    """One additional tool-free attempt; every output passes trusted Git.
+
+    Never retry if the first patch modified the source or if insufficient
+    task time remains. An invalid second output is terminal, not approval.
+    """
+    if _apply_tool_free_patch(clone, job, first_response):
+        return 1, None
+    if _changed_paths(clone):
+        return 1, "model_output_left_unverified_worktree_changes"
+    if remaining_seconds < 90:
+        return 1, "invalid_patch_and_retry_time_budget_exhausted"
+    retry_prompt = (
+        original_prompt
+        + "\nThe prior text did not pass strict Git patch validation. "
+        "Make exactly ONE fresh attempt. Return ONLY a unified Git diff "
+        "that applies to the supplied unchanged source. Do not use tools, "
+        "markdown fences, commentary, extra paths or NO_PATCH unless "
+        "no correct diff is possible."
+    )
+    try:
+        retry = subprocess.run(
+            model_command, cwd=str(clone), env=model_env,
+            input=retry_prompt, text=True, capture_output=True,
+            timeout=max(1, remaining_seconds), check=False,
+        )
+    except subprocess.TimeoutExpired:
+        return 2, "codex_model_timeout"
+    except OSError:
+        return 2, "codex_retry_process_unavailable"
+    if retry.returncode:
+        return 2, "codex_cli_execution_failed"
+    if _changed_paths(clone):
+        return 2, "model_retry_changed_files_outside_trusted_patch_flow"
+    if not _apply_tool_free_patch(clone, job, retry.stdout or ""):
+        return 2, "tool_free_patch_invalid_or_unapplicable"
+    return 2, None
+
+
 def _isolated_codex_argv(
     *, cli: str, clone: Path, private_state: Path,
 ) -> list[str] | None:
@@ -939,8 +988,18 @@ def run_empire_coder_codex_local_candidate(
         if _changed_paths(clone):
             result["reason"] = "model_modified_files_outside_trusted_patch_flow"
             return result
-        if not _apply_tool_free_patch(clone, job, process.stdout or ""):
-            result["reason"] = "tool_free_patch_invalid_or_unapplicable"
+        attempts, retry_error = _apply_model_patch_with_one_bounded_retry(
+            clone=clone, job=job,
+            first_response=process.stdout or "",
+            model_command=cmd, model_env=env,
+            original_prompt=prompt,
+            remaining_seconds=job.max_runtime_seconds - int(
+                time.monotonic() - started
+            ),
+        )
+        result["model_patch_generation_attempts"] = attempts
+        if retry_error is not None:
+            result["reason"] = retry_error
             return result
         changed = _changed_paths(clone)
         result["changed_paths"] = changed

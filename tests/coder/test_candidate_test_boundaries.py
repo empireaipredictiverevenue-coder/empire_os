@@ -162,3 +162,111 @@ def test_failed_hermes_namespace_preflight_records_only_sanitized_evidence(
     assert packet["production_mutation"] is False
     assert unexpected not in path.read_text()
     assert path.stat().st_mode & 0o777 == 0o600
+
+
+def _patch_retry_test_repo(tmp_path):
+    import sys
+    from empire_os.empire_coder_sandbox_runner import EmpireCoderSandboxJob
+    repo = tmp_path / "small-source"
+    repo.mkdir()
+    subprocess.run(("git", "init", "-q", str(repo)), check=True)
+    (repo / "app.py").write_text("VALUE = 1\n")
+    subprocess.run(("git", "add", "app.py"), cwd=repo, check=True)
+    subprocess.run(
+        ("git", "-c", "user.name=Test", "-c",
+         "user.email=test@example.com", "commit", "-qm", "baseline"),
+        cwd=repo, check=True,
+    )
+    job = EmpireCoderSandboxJob(
+        job_id="one-valid-retry-test",
+        objective="Change one harmless fixture.",
+        department="engineering", capability="backend_code",
+        allowed_paths=("app.py",),
+        lease_resources=("path:app.py",),
+        pytest_targets=("tests/test_app.py",),
+        base_branch="agent/data-cloud-wave4",
+    )
+    valid_patch = (
+        "diff --git a/app.py b/app.py\n"
+        "--- a/app.py\n"
+        "+++ b/app.py\n"
+        "@@ -1 +1 @@\n"
+        "-VALUE = 1\n"
+        "+VALUE = 2\n"
+    )
+    return repo, job, valid_patch
+
+
+def test_one_model_regeneration_can_produce_a_valid_scoped_patch(tmp_path):
+    import sys
+    from empire_os.empire_coder_sandbox_runner import (
+        _apply_model_patch_with_one_bounded_retry,
+    )
+    repo, job, valid = _patch_retry_test_repo(tmp_path)
+    model = [
+        sys.executable, "-c",
+        "import sys; sys.stdin.read(); sys.stdout.write(" + repr(valid) + ")",
+    ]
+    count, error = _apply_model_patch_with_one_bounded_retry(
+        clone=repo, job=job,
+        first_response="this is not a git patch",
+        model_command=model, model_env={"PATH": "/usr/bin:/bin"},
+        original_prompt="Return only a diff for this exact code",
+        remaining_seconds=110,
+    )
+    assert count == 2
+    assert error is None
+    assert (repo / "app.py").read_text() == "VALUE = 2\n"
+
+
+def test_valid_first_model_patch_does_not_issue_an_extra_request(tmp_path):
+    from empire_os.empire_coder_sandbox_runner import (
+        _apply_model_patch_with_one_bounded_retry,
+    )
+    repo, job, valid = _patch_retry_test_repo(tmp_path)
+    count, error = _apply_model_patch_with_one_bounded_retry(
+        clone=repo, job=job,
+        first_response=valid,
+        model_command=["/unavailable-model-binary"],
+        model_env={}, original_prompt="no retries permitted",
+        remaining_seconds=100,
+    )
+    assert count == 1 and error is None
+    assert (repo / "app.py").read_text() == "VALUE = 2\n"
+
+
+def test_second_invalid_patch_remains_terminal_without_source_modification(
+    tmp_path,
+):
+    import sys
+    from empire_os.empire_coder_sandbox_runner import (
+        _apply_model_patch_with_one_bounded_retry,
+    )
+    repo, job, _ = _patch_retry_test_repo(tmp_path)
+    count, error = _apply_model_patch_with_one_bounded_retry(
+        clone=repo, job=job,
+        first_response="invalid",
+        model_command=[sys.executable, "-c", "print('NO_PATCH')"],
+        model_env={"PATH": "/usr/bin:/bin"}, original_prompt="bounded retry",
+        remaining_seconds=110,
+    )
+    assert count == 2
+    assert error == "tool_free_patch_invalid_or_unapplicable"
+    assert (repo / "app.py").read_text() == "VALUE = 1\n"
+
+
+def test_insufficient_budget_refuses_second_model_call(tmp_path):
+    from empire_os.empire_coder_sandbox_runner import (
+        _apply_model_patch_with_one_bounded_retry,
+    )
+    repo, job, _ = _patch_retry_test_repo(tmp_path)
+    count, error = _apply_model_patch_with_one_bounded_retry(
+        clone=repo, job=job,
+        first_response="bad text",
+        model_command=["/unavailable-model-binary"],
+        model_env={}, original_prompt="no extra budget",
+        remaining_seconds=12,
+    )
+    assert count == 1
+    assert error == "invalid_patch_and_retry_time_budget_exhausted"
+    assert (repo / "app.py").read_text() == "VALUE = 1\n"
