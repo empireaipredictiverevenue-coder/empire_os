@@ -22,6 +22,8 @@ def test_actual_sql_response_count_parsing():
         ([[{"count(*)":1}]],1),
         ('[{"value":"2"}]',2),
         ("[{'count': 1}]",1),
+        (['[{"buyer_demands_lane_count":2}]'],2),
+        (['[{"known_zero_count":0}]'],0),
         ({"rows":[{"n":0}]},0),
         (None,None),
         ("I think it is two",None),

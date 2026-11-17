@@ -288,3 +288,88 @@ but full NVIDIA free-hosted NLP-SQL remains **not verified** until the
 root-scoped backend switch and subsequent six actual questions succeed.
 No production customer data, billing, product launch, real tenant routing,
 outbound messages or paid model calls are authorised or claimed.
+
+
+## 2026-11-17 00:17–00:23 UTC — live NVIDIA NLP-to-SQL acceptance VERIFIED (isolated synthetic scope)
+
+**Actual founder-controlled activation:**
+- Founder ran `sudo bash /srv/empire_os/scripts/activate_nvidia_free_backend_20261117.sh`; retrieved the immutable private report `runtime/nvidia_ontology_eval/free_backend_activation_readback_20261117.txt`.
+- Report: `NVIDIA_FREE_HOSTED_COMPOSE_SECURITY_PASS`,
+  `NVIDIA_CONTAINER_TO_FREE_GATEWAY_STRUCTURED_SCHEMA_PASS`,
+  `NVIDIA_CONTAINER_TO_FREE_GATEWAY_TOOL_CALL_PASS`,
+  `UNTOUCHED_POSTGRES_FRONTEND_INGESTION_IDS_CONFIRMED`,
+  `NVIDIA_FREE_BACKEND_RUNTIME_ENV_VERIFIED`, `ACTIVATION_EXIT_CODE=0`.
+- **Only** the NVIDIA evaluation `auto-ontology` backend container was recreated.
+  Dedicated evaluation PostgreSQL, UI, and ingestion remained the same container IDs.
+  Frontend remains bound to `127.0.0.1:33000`; backend and DB are private.
+  Local `nomic-embed-text` embeddings remain active; only reasoning/chat
+  aliases changed to `openai/nvidia/nemotron-3.5-super-vl:free`.
+- The actual user-owned free-model gateway service stayed active on
+  `172.18.0.1:19999`; local and NVIDIA application health returned HTTP
+  success, `{"status":"ok","postgres":{"status":"ok"}}`.
+  Existing OpenRouter host credential never entered NVIDIA's Docker environment.
+  Model price zero is verified before each call with `allow_fallbacks=false`;
+  free quotas and future availability remain provider-dependent.
+
+**Real NVIDIA chat-to-SQL benchmark, not direct SQL connector tests:**
+- Ran `scripts/accept_nvidia_free_nlp_six_20261117.py` via authenticated
+  NVIDIA frontend, asking six different natural-language questions.
+- The first receipt (private
+  `runtime/nvidia_ontology_eval/nvidia_hosted_nlp_six_case_receipt_20261117.json`)
+  recorded a false-negative **test parser** failure: NVIDIA had generated
+  and executed valid
+  `SELECT COUNT(*) AS buyer_demands_lane_count FROM main.ontology_edges
+  WHERE relation = 'BUYER_DEMANDS_LANE'` returning
+  `['[{"buyer_demands_lane_count":2}]']`, but the original count parser
+  did not recognise the valid SQL result alias. This is a test code defect,
+  not a model or DB failure. Original receipt was preserved.
+- Corrected the acceptance parser to recognise a **single numeric aggregate
+  column with any valid alias**, and to demand generated `COUNT(...)` SQL,
+  referenced tables and the required semantic filters. Added hardening:
+  no promotion of text-only answers, no ambiguous multiple rows or
+  multiple columns. Added alias/null/zero/multirow regression cases.
+- Re-ran the **real authenticated NVIDIA 6-question SSE workflow** from the
+  running backend and captured
+  `runtime/nvidia_ontology_eval/nvidia_hosted_nlp_six_case_receipt_20261117_v2.json`
+  as an immutable owner-readable mode 0600 file.
+- **Result: `VERIFIED`, six of six passed**, with each individual request
+  returning HTTP 200, generated SQL event, executed DB result event, and a
+  numeric value matching independently executed source SQL. No SQL-only
+  connector shortcut was used in this second acceptance run.
+
+| Real natural-language task | Expected | Actual | Duration | Result |
+|---|---:|---:|---:|---|
+| Buyer-demand edges | 2 | 2 | 12.63 s | PASS |
+| Buyer capacity edges | 1 | 1 | 16.47 s | PASS |
+| Unknown demand (`IS NULL`) | 1 | 1 | 17.46 s | PASS |
+| Known explicit zero demand | 1 | 1 | 12.16 s | PASS |
+| Product–market relationship join | 2 | 2 | 16.65 s | PASS |
+| Matching positive capacity | 1 | 1 | 16.39 s | PASS |
+
+- Added `tests/test_nvidia_free_nlp_live_receipt_20261117.py` to guard
+  expected counts, actual executed-result evidence, SSE events, exact
+  existing free model, synthetic-only scope and preservation of original
+  failed receipt. Full scoped regression suite: **35 PASS**,
+  one unrelated Starlette deprecation warning, zero failures.
+- No production data, buyer identity, verified demand, actual sales or
+  tenant authorisation was inferred from this **synthetic** dataset.
+
+**Release decision and remaining explicit gates:**
+
+- `NVIDIA_PRIVATE_DOCKER_RUNTIME`: VERIFIED.
+- `NVIDIA_FREE_NEMOTRON_BACKEND`: ACTIVATED and model/config readback VERIFIED.
+- `NVIDIA_CANONICAL_FOUR_TERMS`: VERIFIED after authenticated correction.
+- `NVIDIA_REAL_NLP_TO_EXECUTED_SQL`: **VERIFIED 6/6 on synthetic fixture**.
+- `NVIDIA_LOCAL_EMBEDDING_ROUTE`: VERIFIED; 768-dimensional outputs.
+- `NVIDIA_AUTOMATIC_SEMANTIC_COMPILATION`: **DISABLED**; previous automatic
+  pass did not complete. Four current terms match canonical EmpireOS source,
+  but successful autonomous semantic regeneration is not demonstrated.
+- `NVIDIA_MCP_AND_AUTONOMOUS_AGENTS`: NOT VERIFIED/NOT ACTIVATED.
+- `CUSTOMER_DATA_PRODUCTION_TENANT_ROUTING`: NOT AUTHORISED/NOT ACTIVE.
+- `REAL_BUYER_OUTREACH_PAYMENT_REVENUE`: NOT AUTHORISED/NOT VERIFIED.
+
+This completes the original **isolated runtime + inference + NLP-SQL**
+evaluation milestone, not a production release. Keep the known-good
+backend, local embeddings and private model gateway in place. The next
+release gate, if later approved, is genuine authenticated agent MCP integration
+and tenant-isolation/rights testing, **not another engine rebuild**.

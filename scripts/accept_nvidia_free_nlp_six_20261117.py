@@ -12,7 +12,7 @@ from empire_os.nvidia_ontology_shadow import TABLE_DESCRIPTIONS
 
 ROOT=Path("/srv/empire_os/runtime/nvidia_ontology_eval")
 SOURCE=ROOT/"empire_graph.sqlite"
-OUT=ROOT/"nvidia_hosted_nlp_six_case_receipt_20261117.json"
+OUT=ROOT/"nvidia_hosted_nlp_six_case_receipt_20261117_v2.json"
 BASE="http://localhost:33000"
 CASES={
  "buyer_demand_edge_count":(
@@ -45,14 +45,25 @@ def parse_count(payload):
     if isinstance(payload,int) and not isinstance(payload,bool):
         return payload
     if isinstance(payload,(list,tuple)):
-        for part in payload:
-            value=parse_count(part)
-            if value is not None:return value
+        # A COUNT query must return one aggregate row, not a series whose
+        # first number happens to match the expected answer.
+        return parse_count(payload[0]) if len(payload)==1 else None
     if isinstance(payload,dict):
+        if len(payload)!=1:
+            return None
         for k,v in payload.items():
             if str(k).lower() in {"value","count","n","total","count(*)","count(1)","row_count"}:
                 if isinstance(v,(int,float)) and not isinstance(v,bool) and int(v)==v:return int(v)
                 if isinstance(v,str) and v.isdigit():return int(v)
+        # NVIDIA's executed COUNT(*) query may alias its sole result column,
+        # e.g. buyer_demands_lane_count rather than "count". Accept exactly one
+        # integer-like scalar in exactly one column; never guess from prose.
+        if len(payload)==1:
+            only=next(iter(payload.values()))
+            if isinstance(only,int) and not isinstance(only,bool):
+                return only
+            if isinstance(only,str) and only.isdigit():
+                return int(only)
         for v in payload.values():
             if isinstance(v,(list,dict)):
                 n=parse_count(v)
@@ -63,7 +74,8 @@ def parse_count(payload):
                 decoded=parser(payload)
             except (ValueError,SyntaxError,TypeError,RecursionError):
                 continue
-            if decoded!=payload:
+            # A textual model answer or bare JSON scalar is not a table row.
+            if isinstance(decoded,(list,dict)) and decoded!=payload:
                 return parse_count(decoded)
     return None
 
@@ -108,7 +120,10 @@ def check_one(client,name,question,expected,tokens):
         try:cancel=client.post(f"/api/chat/cancel?conversation_id={cid}",timeout=7).status_code
         except httpx.HTTPError:pass
     actual=parse_count(db)
-    sql_ok=isinstance(sql,str) and all(t.lower() in sql.lower() for t in tokens)
+    sql_ok=(
+        isinstance(sql,str) and bool(re.search(r"\bCOUNT\s*\(",sql,re.IGNORECASE))
+        and all(t.lower() in sql.lower() for t in tokens)
+    )
     passed=(
         http==200 and reply is not None and isinstance(sql,str)
         and db is not None and sql_ok and actual==expected
