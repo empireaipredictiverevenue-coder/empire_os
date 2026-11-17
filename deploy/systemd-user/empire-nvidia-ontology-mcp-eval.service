@@ -1,0 +1,32 @@
+[Unit]
+Description=Empire NVIDIA Auto Ontology MCP isolated synthetic evaluation
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/srv/empire_os/runtime/nvidia_ontology_eval/vendor/mcp
+ExecStart=/srv/empire_os/runtime/nvidia_ontology_eval/.mcp_venv/bin/python -B -m auto_ontology_mcp
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=AUTO_ONTOLOGY_API_URL=http://localhost:33000
+Environment=AUTO_ONTOLOGY_MCP_HOST=127.0.0.1
+Environment=AUTO_ONTOLOGY_MCP_PORT=33013
+Environment=AUTO_ONTOLOGY_MCP_PUBLIC_URL=http://127.0.0.1:33013
+Environment=AUTO_ONTOLOGY_MCP_TIMEOUT_S=20
+Environment=AUTO_ONTOLOGY_MCP_CHAT_TIMEOUT_S=180
+Restart=on-failure
+RestartSec=15
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M
+TasksMax=64
+CPUQuota=50%
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

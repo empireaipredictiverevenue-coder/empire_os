@@ -373,3 +373,14 @@ evaluation milestone, not a production release. Keep the known-good
 backend, local embeddings and private model gateway in place. The next
 release gate, if later approved, is genuine authenticated agent MCP integration
 and tenant-isolation/rights testing, **not another engine rebuild**.
+
+
+## 2026-11-17 — Native NVIDIA MCP server
+
+The pinned, vendor-owned read-only MCP server is now running in the same
+isolated synthetic evaluation at `http://127.0.0.1:33013/mcp`.
+Its upstream 88 tests passed; live OAuth metadata, nine curated tool
+definitions, and invalid/anonymous authentication rejection passed.
+This is **not** yet a completed signed-in agent tool invocation or
+tenant-isolation verification. The canonical MCP integration handoff is
+`docs/architecture/NVIDIA_AUTO_ONTOLOGY_MCP_EVAL_20261117.md`.
