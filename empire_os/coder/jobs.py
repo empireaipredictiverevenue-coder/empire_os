@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
+import re
+import subprocess
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -28,6 +31,7 @@ class JobStatus(str, Enum):
     RUNNING = "RUNNING"
     DELEGATED = "DELEGATED"
     AWAITING_APPROVAL = "AWAITING_APPROVAL"
+    RELEASED = "RELEASED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
@@ -78,6 +82,7 @@ class LocalJobQueue:
         self.running = self.root / "running"
         self.delegated = self.root / "delegated"
         self.awaiting_approval = self.root / "awaiting_approval"
+        self.released = self.root / "released"
         self.completed = self.root / "completed"
         self.failed = self.root / "failed"
         for directory in (
@@ -86,6 +91,7 @@ class LocalJobQueue:
             self.running,
             self.delegated,
             self.awaiting_approval,
+            self.released,
             self.completed,
             self.failed,
         ):
@@ -520,6 +526,160 @@ class LocalJobQueue:
             error=None,
         )
 
+    def record_approved_release(
+        self,
+        job_id: str,
+        *,
+        approval_record: str | Path,
+        release_record: str | Path,
+    ) -> CoderJob:
+        """Consume exact founder approval + source commit evidence.
+
+        This is NOT the worker completion API. It is a manually authorised,
+        audit-backed transition for one already-released isolated candidate.
+        Failure is read-only, including for spoofed or mismatched receipts.
+        """
+        safe = self._safe_id(job_id)
+        approvals = (
+            self.workspace / "runtime/execution_plane/coder_proposals"
+        ).resolve()
+        paths = (Path(approval_record), Path(release_record))
+        for path in paths:
+            if (
+                path.is_symlink() or not path.is_file()
+                or path.resolve().parent != approvals
+                or not path.name.startswith(safe + "_")
+                or path.suffix != ".json"
+            ):
+                raise JobQueueError("release_evidence_path_not_authorized")
+        try:
+            approved = json.loads(paths[0].read_text(encoding="utf-8"))
+            release = json.loads(paths[1].read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError) as exc:
+            raise JobQueueError("release_evidence_unreadable") from exc
+        with self._locked():
+            approved_job = self.awaiting_approval / f"{safe}.json"
+            recorded = self.released / f"{safe}.json"
+            if recorded.is_file():
+                prior = self._load_path(recorded)
+                if (
+                    prior.status is JobStatus.RELEASED
+                    and prior.result.get("release", {}).get("release_commit")
+                    == release.get("release_commit")
+                    and prior.result.get("release", {}).get("approved_patch_sha256")
+                    == release.get("approved_patch_sha256")
+                ):
+                    return prior
+                raise JobQueueError("release_reconciliation_conflict")
+            if not approved_job.is_file():
+                raise JobQueueError("candidate_not_awaiting_approval")
+            job = self._load_path(approved_job)
+            if (
+                job.kind is not JobKind.IMPLEMENT
+                or job.status is not JobStatus.AWAITING_APPROVAL
+                or job.payload.get("execution_mode") != "ISOLATED_CANDIDATE_ONLY"
+                or job.result.get("candidate_status") != "LOCAL_PROPOSAL_READY"
+                or job.result.get("candidate_verification_passed") is not True
+                or job.result.get("founder_release_required") is not True
+            ):
+                raise JobQueueError("candidate_release_state_invalid")
+            expected_paths = job.payload.get("allowed_paths") or []
+            expected_base = job.result.get("source_commit")
+            expected_sha = job.result.get("proposal_sha256")
+            if (
+                not isinstance(expected_paths, list) or not expected_paths
+                or not isinstance(expected_sha, str)
+                or not re.fullmatch(r"[a-f0-9]{64}", expected_sha)
+                or not isinstance(expected_base, str)
+                or not re.fullmatch(r"[a-f0-9]{40}", expected_base)
+            ):
+                raise JobQueueError("original_candidate_provenance_invalid")
+            if (
+                approved.get("schema_version")
+                != "empire.coder.founder_scoped_release_authorization.v1"
+                or approved.get("authorization_interpretation")
+                != "FOUNDER_APPROVAL_TO_GUARDED_RELEASE_THIS_EXACT_CODE_PATCH_ONLY"
+                or approved.get("preflight_approved") is not True
+                or approved.get("job_id") != safe
+                or approved.get("source_commit") != expected_base
+                or approved.get("patch_sha256") != expected_sha
+                or approved.get("exact_allowed_paths") != expected_paths
+                or release.get("schema_version")
+                != "empire.coder.guarded_source_release.v1"
+                or release.get("job_id") != safe
+                or release.get("approval_record_path") != str(paths[0])
+                or release.get("base_commit") != expected_base
+                or release.get("approved_patch_sha256") != expected_sha
+                or release.get("changed_paths") != expected_paths
+                or release.get("source_release_committed") is not True
+                or release.get("scoped_release_tests_passed") is not True
+            ):
+                raise JobQueueError("release_evidence_approval_mismatch")
+            commit = release.get("release_commit")
+            if not isinstance(commit, str) or not re.fullmatch(
+                r"[a-f0-9]{40}", commit
+            ):
+                raise JobQueueError("release_commit_invalid")
+            patch = Path(str(job.result.get("proposal_patch") or ""))
+            if (
+                not patch.is_file() or patch.is_symlink()
+                or patch.resolve().parent != approvals
+                or hashlib.sha256(patch.read_bytes()).hexdigest()
+                != expected_sha
+            ):
+                raise JobQueueError("approved_patch_digest_not_verified")
+
+            def git(*args: str, input_bytes: bytes | None = None):
+                try:
+                    return subprocess.run(
+                        ("git", *args), cwd=self.workspace,
+                        input=input_bytes, capture_output=True,
+                        check=False, timeout=20,
+                    )
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    raise JobQueueError("release_git_verification_failed") from exc
+
+            ancestor = git("merge-base", "--is-ancestor", commit, "HEAD")
+            delta = git("diff-tree", "--no-commit-id", "--name-only", "-r", commit)
+            actual_paths = (
+                delta.stdout.decode("utf-8", errors="replace").splitlines()
+            )
+            reversed_patch = git(
+                "apply", "--reverse", "--check", "-",
+                input_bytes=patch.read_bytes(),
+            )
+            if (
+                ancestor.returncode
+                or delta.returncode or set(actual_paths) != set(expected_paths)
+                or reversed_patch.returncode
+            ):
+                raise JobQueueError("release_not_identical_to_live_git_source")
+            after = release.get("after_sha256")
+            if not isinstance(after, dict) or set(after) != set(expected_paths):
+                raise JobQueueError("release_source_digests_missing")
+            for path in expected_paths:
+                source = (self.workspace / path)
+                if (
+                    not source.is_file() or source.is_symlink()
+                    or not source.resolve().is_relative_to(self.workspace)
+                    or hashlib.sha256(source.read_bytes()).hexdigest()
+                    != after[path]
+                ):
+                    raise JobQueueError("released_source_changed_since_approval")
+            job.status = JobStatus.RELEASED
+            job.result["release"] = {
+                "status": "FOUNDER_APPROVED_SOURCE_RELEASE_VERIFIED",
+                "release_commit": commit,
+                "approved_patch_sha256": expected_sha,
+                "released_paths": list(expected_paths),
+                "release_receipt": str(paths[1]),
+                "source_checksums_verified": True,
+            }
+            job.updated_at = utc_now()
+            self._write(approved_job, job)
+            approved_job.replace(recorded)
+            return job
+
     def fail(
         self,
         job: CoderJob,
@@ -541,6 +701,7 @@ class LocalJobQueue:
             self.running,
             self.delegated,
             self.awaiting_approval,
+            self.released,
             self.completed,
             self.failed,
         ):
@@ -605,6 +766,7 @@ class LocalJobQueue:
                 name = f"{self._safe_id(job.id)}.json"
                 for directory in (
                     self.awaiting_approval,
+                    self.released,
                     self.completed,
                     self.failed,
                     self.pending,
