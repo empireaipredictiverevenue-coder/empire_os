@@ -8,6 +8,7 @@ branch for independent verification.
 from __future__ import annotations
 
 from contextlib import contextmanager
+import ast
 from dataclasses import asdict, dataclass, replace
 from hashlib import sha256
 import json
@@ -393,6 +394,129 @@ def _isolated_pytest_argv(
 
 
 
+
+# Explicit exception: these trusted namespace tests launch Bwrap internally,
+# and Linux forbids a second user namespace from inside the candidate sandbox.
+# No model-authored source may ever run in the trusted baseline process.
+TRUSTED_NAMESPACE_TESTS: dict[str, tuple[str, ...]] = {
+    "tests/coder/test_isolated_implement_drain.py": (
+        "test_full_existing_isolated_codex_runner_is_consumed_by_original_queue",
+        "test_original_candidate_tests_cannot_read_production_or_use_network",
+        "test_dirty_local_source_blocks_candidate_model_before_inference",
+    ),
+}
+
+
+def _trusted_namespace_function_hashes(
+    source: str, *, test_names: tuple[str, ...],
+) -> dict[str, str] | None:
+    try:
+        parsed = ast.parse(source)
+        found: dict[str, str] = {}
+        for node in parsed.body:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.name in test_names:
+                    if node.name in found:
+                        return None
+                    segment = ast.get_source_segment(source, node)
+                    if segment is None:
+                        return None
+                    found[node.name] = sha256(segment.encode("utf-8")).hexdigest()
+        if len(found) != len(test_names):
+            return None
+        return found
+    except (SyntaxError, ValueError, UnicodeError):
+        return None
+
+
+def _trusted_namespace_preflight(
+    *,
+    clone: Path,
+    python: Path,
+    targets: tuple[str, ...],
+    time_budget: int,
+) -> dict[str, Any] | None:
+    """Run reviewed baseline-only OS checks with no-new-privs on clean clone.
+
+    This must be invoked BEFORE model-generated modifications. It MUST NOT
+    execute model outputs or the modified candidate on the host. The tuple
+    is intentionally exact; no pattern matching or generalized test skipping.
+    """
+    if targets != ("tests/coder/test_isolated_implement_drain.py",):
+        return {}
+    relative = targets[0]
+    names = TRUSTED_NAMESPACE_TESTS[relative]
+    source_path = clone / relative
+    try:
+        content = source_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return None
+    checksums = _trusted_namespace_function_hashes(content, test_names=names)
+    if checksums is None:
+        return None
+    privs = shutil.which("setpriv")
+    if not privs or time_budget < 30:
+        return None
+    selectors = [f"{relative}::{name}" for name in names]
+    environment = {
+        key: os.environ[key] for key in (
+            "HOME", "USER", "LOGNAME", "PATH", "LANG", "LC_ALL",
+        ) if key in os.environ
+    }
+    environment["PYTHONPATH"] = str(clone)
+    environment["PYTHONDONTWRITEBYTECODE"] = "1"
+    # Original committed source only; no model text has been applied yet.
+    run = _run(
+        [privs, "--no-new-privs", str(python), "-m", "pytest",
+         "-q", "-p", "no:cacheprovider", *selectors],
+        cwd=clone, env=environment, timeout=min(90, time_budget),
+    )
+    if run.returncode:
+        return None
+    if not re.search(r"\b3 passed\b", run.stdout):
+        return None
+    return {
+        "mode": "TRUSTED_BASELINE_NO_NEW_PRIVS",
+        "test_path": relative,
+        "test_names": list(names),
+        "original_function_sha256": checksums,
+        "baseline_test_count": len(names),
+    }
+
+
+def _verify_trusted_namespace_funcs_unchanged(
+    clone: Path, baseline: dict[str, Any],
+) -> bool:
+    if not baseline:
+        return True
+    relative = baseline.get("test_path")
+    if relative not in TRUSTED_NAMESPACE_TESTS:
+        return False
+    names = TRUSTED_NAMESPACE_TESTS[relative]
+    try:
+        current = (clone / relative).read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        return False
+    checksums = _trusted_namespace_function_hashes(current, test_names=names)
+    return checksums is not None and checksums == baseline["original_function_sha256"]
+
+
+def _candidate_test_command(
+    *, clone: Path, python: Path, targets: tuple[str, ...],
+    trusted_baseline: dict[str, Any],
+) -> list[str] | None:
+    argv = _isolated_pytest_argv(clone=clone, python=python, tests=targets)
+    if argv is None:
+        return None
+    if trusted_baseline:
+        if not _verify_trusted_namespace_funcs_unchanged(clone, trusted_baseline):
+            return None
+        for name in trusted_baseline["test_names"]:
+            argv.extend(
+                ["--deselect", f"{trusted_baseline['test_path']}::{name}"]
+            )
+    return argv
+
 def _local_codex_node_bin(cli: str) -> Path | None:
     """Resolve the Node executable for the installed Codex CLI.
 
@@ -705,6 +829,18 @@ def run_empire_coder_codex_local_candidate(
         if copied.returncode:
             result["reason"] = "isolated_clone_failed"
             return result
+        python = root / ".venv/bin/python"
+        if not python.is_file():
+            python = Path(sys.executable)
+        trusted = _trusted_namespace_preflight(
+            clone=clone, python=python, targets=tuple(job.pytest_targets),
+            time_budget=min(110, job.max_runtime_seconds // 4),
+        )
+        if trusted is None:
+            result["reason"] = "trusted_original_namespace_checks_failed"
+            return result
+        if trusted:
+            result["trusted_baseline_integration_evidence"] = trusted
         prompt = _tool_free_patch_prompt(clone, job)
         if prompt is None:
             result["reason"] = "model_patch_inputs_not_bounded"
@@ -783,14 +919,15 @@ def run_empire_coder_codex_local_candidate(
         if remaining <= 0:
             result["reason"] = "tests_time_budget_exceeded"
             return result
-        python = root / ".venv/bin/python"
-        if not python.is_file():
-            python = Path(sys.executable)
-        isolated = _isolated_pytest_argv(
-            clone=clone, python=python, tests=tuple(job.pytest_targets),
+        if not _verify_trusted_namespace_funcs_unchanged(clone, trusted):
+            result["reason"] = "trusted_integration_test_source_modified"
+            return result
+        isolated = _candidate_test_command(
+            clone=clone, python=python, targets=tuple(job.pytest_targets),
+            trusted_baseline=trusted,
         )
         if isolated is None:
-            result["reason"] = "isolated_test_runtime_unavailable"
+            result["reason"] = "isolated_test_runtime_unavailable_or_test_scope_modified"
             return result
         tested = _run(
             isolated,
@@ -805,6 +942,12 @@ def run_empire_coder_codex_local_candidate(
             timeout=min(240, remaining),
         )
         result["verification_passed"] = tested.returncode == 0
+        if trusted:
+            result["verification_scope"] = (
+                "UNTRUSTED_CANDIDATE_BWRAP_AND_ORIGINAL_HOST_NAMESPACE_CHECKS"
+            )
+        else:
+            result["verification_scope"] = "ALL_REQUESTED_TESTS_IN_BWRAP"
         if tested.returncode:
             result["status"] = "VERIFICATION_FAILED"
             result["reason"] = "required_tests_failed"
