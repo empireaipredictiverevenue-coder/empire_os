@@ -113,3 +113,104 @@ tenant security and production release **held**.
 No further MCP server or OS redesign is warranted by this stage. Preserve
 this single local vendor server and finish identity-bound agent acceptance
 before changing the current OpenCode/Orca sessions.
+
+
+## 2026-11-17, current OpenCode V2 / Orca connection
+
+**Completed and verified in the original, running OpenCode V2 service:**
+
+- OpenCode V2.3.0 executable:
+  `/home/ubuntu/.local/share/empire-opencode-v2-isolated/node_modules/@opencode/cli/bin/opencode.exe`.
+  Original service PID `2631346`, started 13 November, remained unchanged;
+  **no OpenCode or EmpireOS service restart**.
+- Existing OpenCode V2 persistent config:
+  `/home/ubuntu/.config/empire-opencode-v2/opencode/opencode.json`.
+  Original exact JSON backed up privately as
+  `opencode.pre-nvidia-mcp-20261117.json` (0600). The sole additive
+  change is `mcp.servers.nvidia-auto-ontology` with
+  `type=remote`, `url=http://127.0.0.1:33013/mcp`.
+  OpenCode V2 uses nested `mcp.servers`, *not* V1's flat map, and
+  defaults to connected when `disabled` is absent. Existing models,
+  agent/persona configuration, permissions and policies preserved.
+- OpenCode's *already running* managed service uses a separate
+  `XDG_CONFIG_HOME=/tmp/empire_opencode_v2_free_20261113/config`.
+  Its active service config previously contained no MCP entry. Added
+  the same minimal MCP-only configuration to the existing service's
+  `config/opencode/opencode.json` (0600); service's auth config,
+  providers, models and agents were not modified. This private active
+  overlay matches the persistent source's single NVIDIA entry.
+- Another owner concurrently added a `compaction` field to the
+  persistent config. This was **preserved**; tests assert the original
+  pre-existing keys remain exactly unchanged without blocking independent
+  current-owner additions.
+- Validated current V2 MCP format with V2's own `opencode mcp add`
+  in a **temporary isolated test config**, followed by a running test
+  server with its own short-lived local credential (no production
+  restart). On a warmed server, the native V2 CLI correctly reported
+  `nvidia-auto-ontology needs authentication`.
+  The first `mcp list --standalone` call on a cold test server showed
+  an empty registry; the warmed response and original live service are
+  authoritative, not the cold-start output.
+- Queried **the original live V2 service** using its own existing
+  service credential, loaded privately from
+  `/tmp/empire_opencode_v2_free_20261113/config/opencode/service.json`.
+  The native `opencode.exe mcp list --server http://127.0.0.1:49374`
+  displays `nvidia-auto-ontology needs authentication`.
+  No shared NVIDIA administrator session or token was supplied.
+- Vendor MCP remains on loopback `127.0.0.1:33013`, returns HTTP
+  401 without OAuth and advertises a valid OAuth protected resource.
+  The NVIDIA application remains healthy at loopback `33000`.
+- Evidence script:
+  `scripts/verify_nvidia_opencode_viewer_gate_20261117.py`.
+  Private immutable receipt:
+  `runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117.json`
+  (0600):
+  `status=OPENCODE_V2_MCP_BOUND_VIEWER_OAUTH_REQUIRED`;
+  `open_code_cli_listing_pass=true`;
+  `unauthenticated_vendor_mcp_http=401`;
+  `restart_performed=false`;
+  `credential_or_token_disclosed=false`;
+  `authenticated_viewer_tool_invocation=false`;
+  `tenant_isolation_verified=false`.
+  The default-location OpenCode HTTP status and CLI's explicit workspace
+  status can represent different locations; for the active workspace,
+  the authenticated V2 CLI is the acceptance authority.
+- Created `scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh`.
+  This is an **interactive sign-in helper**, not an automatic identity
+  bypass. It reuses the current V2 service and locally held service
+  credential to request the native OAuth sign-in, explicitly unsets
+  bootstrap administrator environment fields and never writes an OAuth
+  code/token into Git or ChatGPT.
+
+**Regression:** 41 EmpireOS targeted tests passed, plus 88 pinned
+vendor MCP tests from the earlier stage; one unrelated Starlette
+deprecation warning.
+
+**Outstanding, explicitly NOT claimed:**
+
+1. An approved NVIDIA **viewer** identity completes the OAuth browser
+   sign-in within the *existing OpenCode V2 agent session*.
+2. Under that viewer identity, `check_readiness`,
+   `search_terms` and `ask_question` return actual MCP tool results
+   and exact synthetic database evidence.
+3. A viewer cannot execute admin routes or read another person's
+   conversation or unbound tenant records. The single-tenant synthetic
+   fixture is insufficient to verify production tenant isolation.
+4. Production customer data, agent publication, financial actions,
+   outbound contact, inference spending and real-revenue claims remain
+   unchanged and unauthorised.
+
+**User-controlled completion (only when the existing permitted viewer
+can sign in):** In the EmpireOS/Orca terminal run:
+
+```bash
+bash /srv/empire_os/scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh
+```
+
+Follow the normal OAuth browser sign-in using the approved viewer account.
+If signing in from a separate laptop, localhost web/OAuth endpoints must
+be reached through the user's existing authorised SSH port-forward or
+private connection. Do not paste any authorization codes, callback URLs,
+passwords or access tokens into chat. No root access is required.
+
+This is a **genuine human/identity gate**, not an infrastructure rebuild.
