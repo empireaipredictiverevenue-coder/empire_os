@@ -385,3 +385,79 @@ The private SSH tunnel is only needed during the login flow. After user
 sign-in, stop its known saved PID from Windows; do not widen the exposed
 frontend. Signed-in tool invocation and tenant-isolation verification
 remain separate release gates.
+
+
+## 2026-11-17 — OAuth consent appeared cancelled: real invalid_target root cause
+
+Founder successfully accepted the viewer invite; the app's user list verified a
+signed-up, email-verified account with exactly the `viewer` role and no
+pending invitation. The existing Windows/EmpireOS SSH forwards for the
+private frontend `33000` and OAuth callback `33018` were working.
+
+A new OpenCode OAuth request reached NVIDIA's browser handoff but failed.
+The browser's actual handoff error (without copying its secret state/code)
+was `invalid_target`: the requested MCP resource
+`http://127.0.0.1:33013/mcp` was **not configured**.
+This is separate from the earlier corrected issuer/JWKS discovery problems
+and is not evidence that the viewer's password or account was invalid.
+
+**Root cause independently verified in source and runtime:**
+- NVIDIA's Better Auth MCP plugin sets
+  `resource: mcpResource()`, where `mcpResource()` takes
+  `AUTO_ONTOLOGY_MCP_PUBLIC_URL + "/mcp"`.
+- The existing **frontend** Compose environment retained
+  `AUTO_ONTOLOGY_MCP_PUBLIC_URL=http://localhost:33003` (a retired
+  evaluation address), while the real, active native MCP and OpenCode
+  reference `http://127.0.0.1:33013/mcp`.
+- Therefore Better Auth refused an otherwise valid OAuth authorization
+  with `invalid_target` before issuing the requested resource token.
+  Do not solve this by disabling resource/audience validation or fabricating
+  OAuth signing material.
+- The browser displayed an OAuth completion/handoff page even though its
+  *redirect payload* carried the resource error. Both must be inspected;
+  a success-looking page alone is not an agent authentication receipt.
+
+**Exact bounded remedy staged, not yet activated:**
+- `scripts/stage_nvidia_oauth_resource_fix_20261117.py` modified **only**
+  `AUTO_ONTOLOGY_MCP_PUBLIC_URL` in the private evaluation `.env` from
+  `http://localhost:33003` to `http://127.0.0.1:33013`.
+  All other **30 environment fields** compared equal, including synthetic
+  SQLite datasource, existing free Nemotron and local embeddings.
+  A private mode-0600 original is preserved at
+  `runtime/nvidia_ontology_eval/.env.before-mcp-resource-20261117`.
+  The exact frontend value was confirmed in the generated Compose config.
+- `scripts/activate_nvidia_oauth_resource_frontend_20261117.sh`
+  is a guarded root-only, **founder-run** activation to recreate
+  **only** `auto-ontology-frontend` using the pinned existing image,
+  `--no-deps --no-build --pull never`, no external purchases, model
+  changes or migrations. It checks Compose isolation, the exact one-field
+  old/new environment delta, loopback port 33000, synthetic datasource,
+  existing free-model backend, immutable PostgreSQL/backend/ingestion
+  container IDs, actual frontend process environment and HTTP
+  frontend+Postgres health. On failure it restores the original `.env`
+  and attempts to recreate only the previous frontend. Its readback path
+  is `runtime/nvidia_ontology_eval/nvidia_oauth_resource_frontend_activation_20261117.txt`;
+  report is private and contains no credentials.
+- Scope/regression: **43 targeted EmpireOS tests PASS**, one existing
+  Starlette deprecation warning. Scripts pass syntax and staged Compose
+  validation. The real frontend is **not yet restarted** and still has
+  the old resource address in its process environment; it must not be
+  described as fixed/live before activation.
+
+**Final activation gate:**
+
+```bash
+sudo bash /srv/empire_os/scripts/activate_nvidia_oauth_resource_frontend_20261117.sh
+```
+
+After a successful readback, issue **one fresh** existing OpenCode V2
+viewer OAuth request; approve `Authorize` in the Windows browser,
+confirm `opencode mcp list` says connected, then make authenticated
+read-only `check_readiness`, `search_terms` and `ask_question`
+calls with the approved viewer and verify denial of admin endpoints.
+Do not reuse the old invalid-target authorization URL/state and do
+not pass passwords, cookies, codes or OAuth links through chat.
+
+**Release classification:** Root-cause VERIFIED; correction STAGED;
+frontend activation PENDING restricted Docker access; viewer OAuth
+and actual agent tool execution NOT VERIFIED; tenant production NOT LIVE.
