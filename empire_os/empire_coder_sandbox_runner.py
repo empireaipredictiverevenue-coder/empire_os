@@ -435,6 +435,7 @@ def _trusted_namespace_preflight(
     python: Path,
     targets: tuple[str, ...],
     time_budget: int,
+    diagnostics_root: Path | None = None,
 ) -> dict[str, Any] | None:
     """Run reviewed baseline-only OS checks with no-new-privs on clean clone.
 
@@ -442,6 +443,47 @@ def _trusted_namespace_preflight(
     execute model outputs or the modified candidate on the host. The tuple
     is intentionally exact; no pattern matching or generalized test skipping.
     """
+    def evidence(reason: str, run: subprocess.CompletedProcess | None = None) -> None:
+        if diagnostics_root is None:
+            return
+        try:
+            path = (
+                diagnostics_root / "runtime/execution_plane/"
+                "coder_namespace_preflight_latest.json"
+            )
+            path.parent.mkdir(parents=True, exist_ok=True)
+            output = (run.stdout or "") if run else ""
+            errors = (run.stderr or "") if run else ""
+            combined = output + "\n" + errors
+            blocked = [
+                name for name in TRUSTED_NAMESPACE_TESTS[
+                    "tests/coder/test_isolated_implement_drain.py"
+                ] if f"::{name}" in combined and "FAILED" in combined
+            ]
+            packet = {
+                "schema_version": "empire.coder.namespace-preflight-diagnostics.v1",
+                "recorded_unix_time": int(time.time()),
+                "reason": reason,
+                "exit_code": run.returncode if run else None,
+                "expected_baseline_tests": 3,
+                "failing_named_tests": blocked,
+                "saw_namespace_permission_denied": (
+                    "No permissions to create a new namespace" in combined
+                ),
+                "saw_read_only_file_system": (
+                    "Read-only file system" in combined
+                ),
+                "stdout_sha256": sha256(output.encode()).hexdigest(),
+                "stderr_sha256": sha256(errors.encode()).hexdigest(),
+                "production_mutation": False,
+            }
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(json.dumps(packet,sort_keys=True,indent=2)+"\n")
+            os.chmod(temporary,0o600)
+            os.replace(temporary,path)
+        except OSError:
+            return
+
     if targets != ("tests/coder/test_isolated_implement_drain.py",):
         return {}
     relative = targets[0]
@@ -450,12 +492,15 @@ def _trusted_namespace_preflight(
     try:
         content = source_path.read_text(encoding="utf-8")
     except (OSError, UnicodeError):
+        evidence("original_test_source_unreadable")
         return None
     checksums = _trusted_namespace_function_hashes(content, test_names=names)
     if checksums is None:
+        evidence("original_test_source_unrecognized")
         return None
     privs = shutil.which("setpriv")
     if not privs or time_budget < 30:
+        evidence("trusted_no_new_privs_runtime_unavailable")
         return None
     selectors = [f"{relative}::{name}" for name in names]
     environment = {
@@ -472,8 +517,10 @@ def _trusted_namespace_preflight(
         cwd=clone, env=environment, timeout=min(90, time_budget),
     )
     if run.returncode:
+        evidence("trusted_original_integration_tests_failed", run)
         return None
     if not re.search(r"\b3 passed\b", run.stdout):
+        evidence("trusted_original_test_count_mismatch", run)
         return None
     return {
         "mode": "TRUSTED_BASELINE_NO_NEW_PRIVS",
@@ -835,6 +882,7 @@ def run_empire_coder_codex_local_candidate(
         trusted = _trusted_namespace_preflight(
             clone=clone, python=python, targets=tuple(job.pytest_targets),
             time_budget=min(110, job.max_runtime_seconds // 4),
+            diagnostics_root=root,
         )
         if trusted is None:
             result["reason"] = "trusted_original_namespace_checks_failed"

@@ -119,3 +119,46 @@ def test_missing_protected_test_function_fails_closed(tmp_path):
         clone=tmp_path, python=Path("/usr/bin/python3"),
         targets=(target,), time_budget=60,
     ) is None
+
+
+def test_failed_hermes_namespace_preflight_records_only_sanitized_evidence(
+    tmp_path, monkeypatch,
+):
+    import json
+    import empire_os.empire_coder_sandbox_runner as runner
+
+    relative = "tests/coder/test_isolated_implement_drain.py"
+    file = tmp_path / relative
+    file.parent.mkdir(parents=True)
+    file.write_text(_get_test_source())
+    unexpected = "SECRET_VALUE_MUST_NOT_BE_WRITTEN"
+    monkeypatch.setattr(
+        runner, "_run",
+        lambda *_a, **_k: subprocess.CompletedProcess(
+            ["setpriv"], 1,
+            stdout=(
+                "FAILED tests/coder/test_isolated_implement_drain.py::"
+                "test_original_candidate_tests_cannot_read_production_or_use_network\n"
+            ),
+            stderr="No permissions to create a new namespace " + unexpected,
+        ),
+    )
+    evidence = runner._trusted_namespace_preflight(
+        clone=tmp_path,
+        python=Path("/usr/bin/python3"),
+        targets=(relative,), time_budget=65,
+        diagnostics_root=tmp_path,
+    )
+    assert evidence is None
+    path = (
+        tmp_path / "runtime/execution_plane/"
+        "coder_namespace_preflight_latest.json"
+    )
+    packet = json.loads(path.read_text())
+    assert packet["reason"] == "trusted_original_integration_tests_failed"
+    assert packet["exit_code"] == 1
+    assert packet["saw_namespace_permission_denied"] is True
+    assert len(packet["failing_named_tests"]) == 1
+    assert packet["production_mutation"] is False
+    assert unexpected not in path.read_text()
+    assert path.stat().st_mode & 0o777 == 0o600
