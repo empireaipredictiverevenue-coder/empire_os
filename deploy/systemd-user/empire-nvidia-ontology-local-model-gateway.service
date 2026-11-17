@@ -1,5 +1,5 @@
 [Unit]
-Description=Empire NVIDIA Auto Ontology evaluation — local Ollama gateway
+Description=Empire NVIDIA Auto Ontology evaluation — private model gateway
 After=network.target
 StartLimitIntervalSec=0
 
@@ -9,6 +9,8 @@ WorkingDirectory=/srv/empire_os
 ExecStart=/usr/bin/python3 -B /srv/empire_os/scripts/nvidia_ontology_local_model_gateway_20261116.py
 Environment=EMPIRE_NVIDIA_EVAL_MODEL_HOST=172.18.0.1
 Environment=EMPIRE_NVIDIA_EVAL_MODEL_PORT=19999
+Environment=PYTHONPATH=/srv/empire_os
+Environment=EMPIRE_NVIDIA_EVAL_FREE_HOSTED_ENABLED=1
 Restart=on-failure
 RestartSec=15
 UMask=0077

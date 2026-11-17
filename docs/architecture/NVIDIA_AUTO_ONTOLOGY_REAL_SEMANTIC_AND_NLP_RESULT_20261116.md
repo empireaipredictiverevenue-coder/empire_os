@@ -212,3 +212,79 @@ queries. Preserve rollback and founder release control.
 - Preserve the requirement to pass the exact NVIDIA structured schema plus six actual natural-language-to-executed-SQL benchmark cases before activating external inference in the running NVIDIA evaluation. The verified deterministic 6/6 SQL connector result does **not** substitute for NLP success.
 
 **Verdict:** Existing credential verified and reusable for a guarded free-model experiment. Direct NVIDIA key remains unverified. Simple JSON works; full vendor schema fails. Keep isolated deployment unchanged until a candidate passes.
+
+
+## 2026-11-17 — Existing OpenRouter free Nemotron integration, staged backend release
+
+Owner branch: `agent/data-cloud-wave4`. Existing private evaluation:
+`empire-nvidia-ontology-eval`. This is the same project, gateway, synthetic
+data source and canonical ontology — not a duplicate platform.
+
+**Model capability verified:**
+- Reused existing user-owned OpenRouter credential; no new API key or account.
+- Live OpenRouter catalog lists
+  `nvidia/nemotron-3.5-super-vl:free` with prompt and completion price zero
+  and structured-output/tools support at time of each canary.
+- Initial minimal schema: HTTP 200, valid JSON in 1.31 s.
+- Native NVIDIA `RawTableTermsResult` direct Pydantic diagnosis:
+  **PASS**, one term and six exact synthetic columns in **5.39 s**.
+- LangChain client with NVIDIA's 8,192-token response allowance:
+  **PASS** for the exact vendor Pydantic schema in 13.74 s; its
+  bound tool call returned the exact requested relation in 0.98 s.
+  The earlier 1,000-token variant raised
+  `LengthFinishReasonError` and was not promoted.
+- The existing private gateway was extended by a small optional helper
+  `scripts/nvidia_free_openrouter_relay_20261117.py`, **not replaced**.
+  Only exact alias `openai/nvidia/nemotron-3.5-super-vl:free`
+  routes to the existing OpenRouter key on the Ubuntu host.
+  The key is *never* copied to NVIDIA Docker or Git.
+  Each hosted request rechecks public model price and features, rejects
+  nonzero or unrecognised pricing, enforces exact free model and
+  `allow_fallbacks=false`, no streaming and an 8,192-token cap.
+  Existing local `nomic-embed-text` embeddings remain unchanged.
+- User-owned isolated gateway systemd service was restarted under existing
+  owner, with a private rollback of the previous gateway/unit available.
+  Gateway health **PASS**; a real synthetic hosted request through the
+  running gateway returned HTTP 200 and valid structured output in **1.9 s**.
+- An additional live LangChain test through the **same existing gateway**
+  (in a temporary loopback test server, without altering Docker)
+  returned vendor Pydantic schema PASS in **4.74 s** and a tool call PASS in
+  **1.06 s**. Receipt saved private at
+  `runtime/nvidia_ontology_eval/nvidia_free_gateway_live_contract_20261117.json`.
+- Unit/regression/source tests: **33 passed** (one unrelated
+  Starlette deprecation warning), script syntax and new Compose config pass.
+
+**Release staging (NOT YET APPLIED to backend):**
+- `scripts/stage_nvidia_free_backend_20261117.py` updated only private
+  `runtime/nvidia_ontology_eval/.env` reasoning, non-reasoning and shared
+  chat model aliases, retaining dummy API keys, existing private host bridge,
+  and local embeddings. Original private configuration preserved as
+  `runtime/nvidia_ontology_eval/.env.before-free-nemotron-20261117`
+  (0600). Running Docker containers were not recreated during staging.
+- `scripts/activate_nvidia_free_backend_20261117.sh` is a scoped,
+  root-authorised, founder-invoked activation:
+  validates Compose isolation, loopback frontend and synthetic SQLite bind;
+  performs **actual native NVIDIA LangChain Pydantic and tool-call probes
+  from inside the existing backend Docker container first**; then only
+  `docker compose up -d --no-deps --no-build --pull never auto-ontology`.
+  Postflight checks confirm PostgreSQL, frontend and ingestion service
+  container IDs unchanged, new backend environment read back and health;
+  on a failure it attempts to restore the previous `.env` and backend.
+  Report is saved privately on EmpireOS under
+  `runtime/nvidia_ontology_eval/free_backend_activation_readback_20261117.txt`.
+- Root-only Docker access is **not available** to the connected remote
+  machine shell, so the founder must run the one command on EmpireOS:
+  `sudo bash /srv/empire_os/scripts/activate_nvidia_free_backend_20261117.sh`.
+  No logs need to be copied; the readback can be retrieved by the connected
+  authorized machine tool.
+- `scripts/accept_nvidia_free_nlp_six_20261117.py` prepares the actual
+  authenticated NVIDIA six-question **natural-language-to-executed-SQL**
+  gate. Requires result event, SQL, executed DB result and correct expected
+  count for all six questions; cancels incomplete runs and writes an
+  immutable private receipt. **Not executed**, pending backend activation.
+
+**Do not promote:** The six deterministic SQL connector tests passed previously,
+but full NVIDIA free-hosted NLP-SQL remains **not verified** until the
+root-scoped backend switch and subsequent six actual questions succeed.
+No production customer data, billing, product launch, real tenant routing,
+outbound messages or paid model calls are authorised or claimed.

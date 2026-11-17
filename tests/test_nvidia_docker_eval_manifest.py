@@ -83,8 +83,19 @@ def test_only_synthetic_source_mounted_and_private_secrets():
         assert entries[prefix + "_ENDPOINT"] == expected
         assert entries[prefix + "_API_KEY"] == "offline-model-disabled"
     if models_staged:
+        hosted_staged = (TARGET / ".env.before-free-nemotron-20261117").is_file()
+        expected_chat_model = (
+            "openai/nvidia/nemotron-3.5-super-vl:free"
+            if hosted_staged else "openai/qwen2.5-coder:1.5b"
+        )
         for prefix in ("DEFAULT_MODELS", "REASONING", "NON_REASONING"):
-            assert entries[prefix + "_MODEL"] == "openai/qwen2.5-coder:1.5b"
+            assert entries[prefix + "_MODEL"] == expected_chat_model
+        if hosted_staged:
+            saved = TARGET / ".env.before-free-nemotron-20261117"
+            assert saved.stat().st_mode & 0o077 == 0
+            assert "OPENROUTER_API_KEY" not in (TARGET / ".env").read_text()
+            old = dict(line.split("=", 1) for line in saved.read_text().splitlines())
+            assert old["REASONING_MODEL"] == "openai/qwen2.5-coder:1.5b"
         assert entries["EMBED_MODEL"] == "nomic-embed-text"
         assert entries["RERANK_MODEL"] == "offline-model-disabled"
     assert entries["CONNECTION_STRINGS"] == (

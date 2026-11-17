@@ -34,7 +34,8 @@ def test_bound_endpoint_is_private_and_not_external():
     assert UPSTREAM == "http://127.0.0.1:11434"
     assert set(ALLOWED_MODELS) == {"/v1/chat/completions", "/v1/embeddings"}
     assert ALLOWED_MODELS["/v1/chat/completions"] == {
-        "openai/qwen2.5-coder:1.5b"
+        "openai/qwen2.5-coder:1.5b",
+        "openai/nvidia/nemotron-3.5-super-vl:free",
     }
 
 

@@ -1,8 +1,8 @@
-"""Local-only NVIDIA ontology evaluation model gateway.
+"""NVIDIA isolated evaluation gateway: private Ollama + gated free hosted option.
 
-A strict, non-billing HTTP proxy to the existing host Ollama service. It binds
-only to the isolated Docker sandbox bridge gateway, and accepts traffic only
-from that bridge. Requests do not leave EmpireOS.
+Binds only to the existing Docker sandbox bridge. The hosted model is optional,
+requires an explicit environment gate, a verified zero-price model and the
+existing host-owned OpenRouter credential; no key enters Docker.
 """
 from __future__ import annotations
 
@@ -15,6 +15,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from scripts import nvidia_free_openrouter_relay_20261117 as free_hosted
+
 HOST = os.getenv("EMPIRE_NVIDIA_EVAL_MODEL_HOST", "172.18.0.1")
 PORT = int(os.getenv("EMPIRE_NVIDIA_EVAL_MODEL_PORT", "19999"))
 SOURCE_NET = ipaddress.ip_network("172.18.0.0/16")
@@ -23,7 +25,10 @@ MAX_BYTES = 1_048_576
 MAX_RESPONSE_BYTES = 8_388_608
 INFERENCE_SLOTS = threading.BoundedSemaphore(4)
 ALLOWED_MODELS = {
-    "/v1/chat/completions": frozenset({"openai/qwen2.5-coder:1.5b"}),
+    "/v1/chat/completions": frozenset({
+        "openai/qwen2.5-coder:1.5b",
+        free_hosted.GATEWAY_ALIAS,
+    }),
     "/v1/embeddings": frozenset({"nomic-embed-text", "nomic-embed-text:latest"}),
 }
 
@@ -97,7 +102,29 @@ class Handler(BaseHTTPRequestHandler):
         except (ValueError, UnicodeError, json.JSONDecodeError):
             self._reply(422, b'{"error":"model or request invalid"}')
             return
+        if payload["model"] == free_hosted.GATEWAY_ALIAS:
+            self._forward_hosted(payload)
+            return
         self._forward("POST", data)
+
+    def _forward_hosted(self, payload: dict) -> None:
+        if not INFERENCE_SLOTS.acquire(blocking=False):
+            self._reply(429, b'{"error":"model busy"}')
+            return
+        try:
+            try:
+                response = free_hosted.send(payload)
+                self._reply(200, response)
+            except free_hosted.HostedUnavailable:
+                self._reply(503, b'{"error":"free hosted model not available"}')
+            except HTTPError as exc:
+                # Do not relay provider details, account state or key material.
+                code = 429 if exc.code == 429 else 503
+                self._reply(code, b'{"error":"free hosted provider unavailable"}')
+            except (URLError, TimeoutError, OSError, ValueError):
+                self._reply(503, b'{"error":"free hosted inference failed"}')
+        finally:
+            INFERENCE_SLOTS.release()
 
     def _forward(self, method: str, data: bytes | None) -> None:
         if not INFERENCE_SLOTS.acquire(blocking=False):
