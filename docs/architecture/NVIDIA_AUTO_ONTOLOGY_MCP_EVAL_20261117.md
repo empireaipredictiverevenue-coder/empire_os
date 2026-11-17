@@ -320,3 +320,68 @@ preserving the previous v1 receipt. It reports:
 **Status:** Both OAuth metadata incompatibilities repaired,
 OpenCode interactive authorization handoff **verified**, authenticated
 viewer execution **pending user sign-in**. No fake JWKS, no app rebuild.
+
+
+## 2026-11-17 — Remote Windows browser "site can't be reached" fixed
+
+The user opened NVIDIA's OAuth authorization URL from an ApexEngine
+Windows browser while OpenCode and NVIDIA were bound to localhost on the
+remote EmpireOS Ubuntu host. On EmpireOS, `http://localhost:33000/login`
+returned HTTP 200 and `/api/health` returned ok; no public website outage
+occurred. The OAuth redirect had a random loopback callback port, which
+also would have failed from the separate Windows browser.
+
+**Actual corrective action, not just advice:**
+
+- The account-linked Desktop Commander device **apexengine** was online;
+  it runs Windows PowerShell and had an existing authenticated SSH
+  configuration alias `empire` for EmpireOS. SSH public-key authentication
+  with `BatchMode=yes` passed. No credentials were copied or printed.
+- OpenCode V2's supported `oauth.callback_port` was set to **33018** for
+  only `mcp.servers.nvidia-auto-ontology`, in both its existing
+  persistent and current service configurations. Source:
+  `scripts/pin_nvidia_opencode_oauth_callback_20261117.py`.
+  All other settings, models, agents and permissions were preserved at
+  write time. Private 0600 rollback files
+  `opencode.pre-ssh-oauth-callback-20261117.json` were saved beside
+  each original. No agent or NVIDIA service was restarted.
+- A bounded headless **real OpenCode V2 OAuth attempt** proved the
+  authorization page uses `http://localhost:33000/api/auth/oauth2/authorize`
+  and the redirect points to `http://127.0.0.1:33018/callback`.
+  Both the issuer mismatch and JWKS errors remained absent. This was
+  **not** a successful login; no user's OAuth code or token was consumed.
+- A private, SSH-authenticated Windows **port-forward tunnel** was started
+  on apexengine using the original `empire` SSH host alias, with
+  `BatchMode=yes`, `StrictHostKeyChecking=yes`,
+  `ExitOnForwardFailure=yes` and loopback-only mappings
+  `127.0.0.1:33000 -> EmpireOS 127.0.0.1:33000` and
+  `127.0.0.1:33018 -> EmpireOS 127.0.0.1:33018`.
+  Local tunnel process PID and an SSH diagnostic log reside in the user's
+  private Windows `%LOCALAPPDATA%\EmpireAI\NvidiaMcpOAuthTunnel\`.
+  No public listeners and no new firewall rules were added.
+- **Windows-origin HTTP proof:** browser-machine request for
+  `http://localhost:33000/login` returned **HTTP 200**, and
+  `http://localhost:33000/api/health` returned **ok**.
+  Both 33000 and 33018 Windows loopback listeners were observed. During
+  a fresh bounded OAuth attempt, the Windows-origin GET to
+  `http://127.0.0.1:33018/callback` reached the active remote callback
+  handler and returned **HTTP 400 for the intentionally absent OAuth
+  code/state** — confirming the network callback route actually works,
+  without consuming or exposing a real authorization token.
+- Final Windows readback: SSH tunnel process `ssh.exe` **alive**, loopback
+  ports 33000 and 33018 listening, NVIDIA browser login HTTP **200**.
+  Existing EmpireOS MCP endpoint remains authentication-protected.
+
+**Remaining identity gate:** On the original EmpireOS terminal rerun
+`bash /srv/empire_os/scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh`.
+Open the freshly generated authorization URL in the **Windows** browser
+(with its tunnel still running) and complete interactive sign-in using an
+approved Viewer identity. Do **not** paste the authorization code, state,
+callback URL, password or token into ChatGPT. The earlier headless OAuth
+tests were intentionally cancelled; only a real signed-in viewer can
+authorise MCP tool invocation and complete the identity gate.
+
+The private SSH tunnel is only needed during the login flow. After user
+sign-in, stop its known saved PID from Windows; do not widen the exposed
+frontend. Signed-in tool invocation and tenant-isolation verification
+remain separate release gates.

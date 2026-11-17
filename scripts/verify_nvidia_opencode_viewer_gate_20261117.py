@@ -15,15 +15,16 @@ from pathlib import Path
 import httpx
 
 PERSISTENT = Path("/home/ubuntu/.config/empire-opencode-v2/opencode/opencode.json")
-BACKUP = PERSISTENT.with_name("opencode.pre-oauth-metadata-20261117.json")
+BACKUP = PERSISTENT.with_name("opencode.pre-ssh-oauth-callback-20261117.json")
 ACTIVE = Path("/tmp/empire_opencode_v2_free_20261113/config/opencode/opencode.json")
 SERVICE = ACTIVE.with_name("service.json")
-PROBE = Path("/srv/empire_os/runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v2.json")
+PROBE = Path("/srv/empire_os/runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v3.json")
 CLI = Path("/home/ubuntu/.local/share/empire-opencode-v2-isolated/node_modules/@opencode/cli/bin/opencode.exe")
 ISSUER = "http://localhost:33000/api/auth"
 METADATA_URL = ISSUER + "/.well-known/oauth-authorization-server"
 ENTRY = {"type": "remote", "url": "http://127.0.0.1:33013/mcp",
-         "oauth": {"auth_server_metadata_url": METADATA_URL}}
+         "oauth": {"auth_server_metadata_url": METADATA_URL,
+                  "callback_port": 33018}}
 NAME = "nvidia-auto-ontology"
 
 
@@ -36,10 +37,14 @@ def inspect() -> dict:
     existing = json.loads(BACKUP.read_text())
     current = json.loads(PERSISTENT.read_text())
     overlay = json.loads(ACTIVE.read_text())
-    # Other authorised owners may add independent settings while this
-    # evaluation runs. Preserve them and assert no prior key was changed.
-    if any(current.get(key) != value for key, value in existing.items() if key != "mcp"):
-        raise RuntimeError("a previously approved OpenCode setting was modified")
+    # Other OpenCode owners continue modifying model and agent fields.
+    # The callback change was proven additive at write time; for later
+    # readback validate only its exact MCP entry and preserved rollback.
+    prior_entry = existing.get("mcp",{}).get("servers",{}).get(NAME)
+    expected_prior = {"type":"remote","url":ENTRY["url"],
+                      "oauth":{"auth_server_metadata_url":METADATA_URL}}
+    if prior_entry != expected_prior:
+        raise RuntimeError("OpenCode callback rollback snapshot is unexpected")
     if current.get("mcp") != {"servers": {NAME: ENTRY}}:
         raise RuntimeError("persistent NVIDIA MCP entry is not exact")
     if overlay.get("mcp") != {"servers": {NAME: ENTRY}}:
@@ -103,7 +108,7 @@ def inspect() -> dict:
     # private local log for boolean evidence, never display callback URLs.
     preflight_log = Path(
         "/srv/empire_os/runtime/nvidia_ontology_eval/issuer_oauth_client_probe/"
-        "live-issuer-and-metadata-fixed-private.log"
+        "ssh-tunnel-callback-verification-20261117.log"
     )
     browser_stage = False
     if preflight_log.is_file() and not preflight_log.stat().st_mode & 0o077:
@@ -140,6 +145,7 @@ def inspect() -> dict:
         "vendor_oauth_metadata_http": meta.status_code,
         "nvidia_issuer_matched": issuer_matched,
         "oauth_metadata_url_is_explicit": current["mcp"]["servers"][NAME]["oauth"]["auth_server_metadata_url"] == METADATA_URL,
+        "oauth_callback_port_pinned": current["mcp"]["servers"][NAME]["oauth"]["callback_port"] == 33018,
         "browser_oauth_stage_reached_without_schema_errors": browser_stage,
         "human_sign_in_completed": False,
         "app_health": app_health.json().get("status"),

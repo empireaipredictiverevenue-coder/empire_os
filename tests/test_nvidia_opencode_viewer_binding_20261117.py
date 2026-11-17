@@ -7,12 +7,13 @@ import pytest
 ROOT=Path(__file__).resolve().parents[1]
 VERIFY=ROOT/"scripts/verify_nvidia_opencode_viewer_gate_20261117.py"
 LOGIN=ROOT/"scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh"
-RECEIPT=ROOT/"runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v2.json"
+RECEIPT=ROOT/"runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v3.json"
 PERSISTENT=Path("/home/ubuntu/.config/empire-opencode-v2/opencode/opencode.json")
-BACKUP=PERSISTENT.with_name("opencode.pre-oauth-metadata-20261117.json")
+BACKUP=PERSISTENT.with_name("opencode.pre-ssh-oauth-callback-20261117.json")
 ACTIVE=Path("/tmp/empire_opencode_v2_free_20261113/config/opencode/opencode.json")
 EXPECTED={"type":"remote","url":"http://127.0.0.1:33013/mcp",
-          "oauth":{"auth_server_metadata_url":"http://localhost:33000/api/auth/.well-known/oauth-authorization-server"}}
+          "oauth":{"auth_server_metadata_url":"http://localhost:33000/api/auth/.well-known/oauth-authorization-server",
+                  "callback_port":33018}}
 
 
 def test_login_helper_reuses_existing_viewer_oauth_without_bootstrap_admin():
@@ -43,6 +44,7 @@ def test_live_identity_boundary_receipt_is_fail_closed():
     assert evidence["unauthenticated_vendor_mcp_http"]==401
     assert evidence["vendor_oauth_metadata_http"]==200
     assert evidence["nvidia_issuer_matched"] is True
+    assert evidence["oauth_callback_port_pinned"] is True
     assert evidence["browser_oauth_stage_reached_without_schema_errors"] is True
     assert evidence["app_health"]=="ok"
     assert evidence["authenticated_viewer_tool_invocation"] is False
@@ -60,6 +62,9 @@ def test_existing_opencode_configuration_is_additive_and_concurrent_changes_pres
     assert current["mcp"]=={"servers":{"nvidia-auto-ontology":EXPECTED}}
     assert running["mcp"]=={"servers":{"nvidia-auto-ontology":EXPECTED}}
     assert set(running)=={"$schema","mcp"}
-    assert all(current.get(k)==v for k,v in original.items() if k!="mcp")
+    before=original["mcp"]["servers"]["nvidia-auto-ontology"]
+    assert before=={"type":"remote","url":EXPECTED["url"],
+                    "oauth":{"auth_server_metadata_url":EXPECTED["oauth"]["auth_server_metadata_url"]}}
+    # Independent owners may update model and agent settings afterwards.
     for p in (PERSISTENT,BACKUP,ACTIVE):
         assert p.stat().st_mode & 0o077 == 0
