@@ -20,7 +20,7 @@ from empire_os.coder.plan_promotion import (
     _validate_contract, _validate_governed_intake,
 )
 from empire_os.empire_coder_sandbox_runner import (
-    EmpireCoderSandboxJob, run_empire_coder_codex_local_candidate,
+    EmpireCoderSandboxJob, run_empire_coder_codex_structured_candidate,
 )
 
 
@@ -233,7 +233,7 @@ def drain_isolated_implement_jobs(
     repo_root: str | Path, *,
     max_jobs: int = 1,
     runtime_root: str | Path | None = None,
-    candidate_runner: Callable[..., dict[str, Any]] = run_empire_coder_codex_local_candidate,
+    candidate_runner: Callable[..., dict[str, Any]] = run_empire_coder_codex_structured_candidate,
     heartbeat_seconds: int = 30,
 ) -> dict[str, Any]:
     root = Path(repo_root).resolve()
