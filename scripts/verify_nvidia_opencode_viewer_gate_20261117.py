@@ -15,12 +15,15 @@ from pathlib import Path
 import httpx
 
 PERSISTENT = Path("/home/ubuntu/.config/empire-opencode-v2/opencode/opencode.json")
-BACKUP = PERSISTENT.with_name("opencode.pre-nvidia-mcp-20261117.json")
+BACKUP = PERSISTENT.with_name("opencode.pre-oauth-metadata-20261117.json")
 ACTIVE = Path("/tmp/empire_opencode_v2_free_20261113/config/opencode/opencode.json")
 SERVICE = ACTIVE.with_name("service.json")
-PROBE = Path("/srv/empire_os/runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117.json")
+PROBE = Path("/srv/empire_os/runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v2.json")
 CLI = Path("/home/ubuntu/.local/share/empire-opencode-v2-isolated/node_modules/@opencode/cli/bin/opencode.exe")
-ENTRY = {"type": "remote", "url": "http://127.0.0.1:33013/mcp"}
+ISSUER = "http://localhost:33000/api/auth"
+METADATA_URL = ISSUER + "/.well-known/oauth-authorization-server"
+ENTRY = {"type": "remote", "url": "http://127.0.0.1:33013/mcp",
+         "oauth": {"auth_server_metadata_url": METADATA_URL}}
 NAME = "nvidia-auto-ontology"
 
 
@@ -35,7 +38,7 @@ def inspect() -> dict:
     overlay = json.loads(ACTIVE.read_text())
     # Other authorised owners may add independent settings while this
     # evaluation runs. Preserve them and assert no prior key was changed.
-    if any(current.get(key) != value for key, value in existing.items()):
+    if any(current.get(key) != value for key, value in existing.items() if key != "mcp"):
         raise RuntimeError("a previously approved OpenCode setting was modified")
     if current.get("mcp") != {"servers": {NAME: ENTRY}}:
         raise RuntimeError("persistent NVIDIA MCP entry is not exact")
@@ -71,6 +74,8 @@ def inspect() -> dict:
             "http://127.0.0.1:33013/.well-known/oauth-protected-resource/mcp"
         )
         meta.raise_for_status()
+        provider_doc = client.get(METADATA_URL)
+        provider_doc.raise_for_status()
         app_health = client.get("http://127.0.0.1:33000/api/health")
         app_health.raise_for_status()
 
@@ -89,11 +94,33 @@ def inspect() -> dict:
     clean = re.sub(r"\x1b\[[0-9;]*[A-Za-z]", "", listing.stdout)
     recognized = NAME in clean
     needs_viewer = "needs authentication" in clean.lower()
+    issuer_matched = (
+        meta.json().get("authorization_servers") == [ISSUER]
+        and provider_doc.json().get("issuer") == ISSUER
+    )
+    # This preflight was run against the original, existing OpenCode V2
+    # service with BROWSER disabled and no human login; only read its
+    # private local log for boolean evidence, never display callback URLs.
+    preflight_log = Path(
+        "/srv/empire_os/runtime/nvidia_ontology_eval/issuer_oauth_client_probe/"
+        "live-issuer-and-metadata-fixed-private.log"
+    )
+    browser_stage = False
+    if preflight_log.is_file() and not preflight_log.stat().st_mode & 0o077:
+        s = preflight_log.read_text(errors="replace")
+        browser_stage = (
+            "Authorization started" in s
+            and "Waiting for authorization" in s
+            and "Issuer mismatch" not in s
+            and "jwks_uri" not in s
+            and "Authentication failed" not in s
+        )
     status = (
         "OPENCODE_V2_MCP_BOUND_VIEWER_OAUTH_REQUIRED"
         if listing.returncode == 0 and recognized and needs_viewer
         and unauth.status_code == 401
         and meta.json().get("resource") == ENTRY["url"]
+        and issuer_matched and browser_stage
         and app_health.json().get("status") == "ok"
         else "OPENCODE_V2_MCP_BOUNDARY_INCOMPLETE"
     )
@@ -111,6 +138,10 @@ def inspect() -> dict:
         "viewer_oauth_status": "needs_authentication" if needs_viewer else "unknown",
         "unauthenticated_vendor_mcp_http": unauth.status_code,
         "vendor_oauth_metadata_http": meta.status_code,
+        "nvidia_issuer_matched": issuer_matched,
+        "oauth_metadata_url_is_explicit": current["mcp"]["servers"][NAME]["oauth"]["auth_server_metadata_url"] == METADATA_URL,
+        "browser_oauth_stage_reached_without_schema_errors": browser_stage,
+        "human_sign_in_completed": False,
         "app_health": app_health.json().get("status"),
         "authenticated_viewer_tool_invocation": False,
         "tenant_isolation_verified": False,

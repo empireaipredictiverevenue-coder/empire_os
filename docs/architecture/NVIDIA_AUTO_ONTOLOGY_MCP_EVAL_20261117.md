@@ -214,3 +214,109 @@ private connection. Do not paste any authorization codes, callback URLs,
 passwords or access tokens into chat. No root access is required.
 
 This is a **genuine human/identity gate**, not an infrastructure rebuild.
+
+
+## 2026-11-17 — Resolved OpenCode V2 OAuth discovery failure
+
+**Incident reported by founder:** `bash scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh`
+previously stopped at:
+`Issuer mismatch in authorization server metadata (RFC 8414 §3.3)`:
+OpenCode expected `http://localhost:33000/` but NVIDIA returned
+`http://localhost:33000/api/auth`. No user OAuth token had been issued.
+
+**Verified root cause #1 — wrong advertised issuer:**
+Pinned NVIDIA MCP `build_auto_ontology_auth` published the frontend root
+`settings.api_url` as its RFC 9728 authorization server, while the
+upstream Better Auth OAuth issuer is `{api_url}/api/auth`.
+NVIDIA's actual authorization metadata confirmed this exact path.
+Added `scripts/nvidia_mcp_verified_issuer_20261117.py` to resolve and
+verify the upstream canonical issuer before starting the *original pinned
+FastMCP server*. Only `mcp.auth.authorization_servers` is updated.
+The vendor source, opaque token verifier, caller identity forwarding,
+tools and authenticated frontend are not modified. The guard refuses
+unexpected endpoints, scopes, or non-loopback production routes.
+
+Activated via
+`scripts/activate_nvidia_mcp_issuer_fix_20261117.sh` on the **existing
+unprivileged MCP user service only**, with a private rollback of its
+former unit at `runtime/nvidia_ontology_eval/mcp-unit.pre-issuer-fix-20261117.service`
+(mode 0600). Existing systemd service `empire-nvidia-ontology-mcp-eval.service`
+restarted once and reached active/running, zero unexpected restarts.
+Live protected-resource metadata now advertises
+`authorization_servers=["http://localhost:33000/api/auth"]`, matching
+the issuer in NVIDIA's real OAuth metadata exactly. Unauthenticated
+and invalid bearer MCP access remain HTTP 401. The NVIDIA frontend,
+Postgres, ingestion, free model gateway, and running OpenCode service
+were not restarted by this correction.
+
+**Verified root cause #2 — OAuth-only metadata misread as OpenID:**
+The Better Auth `mcp({ disableJwtPlugin: true })` setting intentionally
+uses opaque, immediately revocable OAuth bearer tokens, and its
+standards-conforming OAuth metadata does not include a signing-key
+`jwks_uri`. After correcting the issuer, the OpenCode V2 client then
+raised `invalid_type` for missing `jwks_uri` during automatic discovery.
+Do **not** invent a JWKS endpoint, bypass signature validation, or
+silently switch NVIDIA to JWT bearer tokens.
+
+OpenCode V2's supported
+`mcp.servers.nvidia-auto-ontology.oauth.auth_server_metadata_url`
+configuration explicitly selects the existing RFC 8414 OAuth-only
+discovery URL:
+`http://localhost:33000/api/auth/.well-known/oauth-authorization-server`.
+Reference: `https://opencode.ai/docs/mcp-servers` (OAuth settings).
+In a temporary, private OpenCode V2.3.0 test server, that single setting
+advanced to `Authorization started`, `Authorize ... in your browser`
+and `Waiting for authorization` without either metadata failure.
+No interactive login was completed in this preflight.
+
+Applied that **single MCP metadata hint** to BOTH the persistent
+OpenCode V2 config and the already-running V2 service's existing overlay,
+using `scripts/apply_nvidia_opencode_oauth_metadata_20261117.py`.
+Private pre-change backups created in each directory as
+`opencode.pre-oauth-metadata-20261117.json`. Both configs remain
+owner-private mode 0600; all other configured agents, permissions,
+models and concurrent owner edits are preserved. OpenCode service
+remained PID 2631346; no restart.
+
+**Actual original OpenCode process verified after fixes:**
+The same original interactive viewer-login helper was invoked in a
+bounded, headless preflight (`BROWSER=/bin/false` and timeout) with
+a mode-0600 private log. It reached both
+`Authorization started` and `Waiting for authorization` and had
+**no issuer mismatch, no missing JWKS error, and no auth failure**.
+The test was deliberately cancelled without any viewer sign-in;
+no authorization link, callback code or token was shared in chat.
+The running OpenCode V2 CLI continues to recognise the MCP server
+as `needs authentication`.
+
+New independent readback:
+`runtime/nvidia_ontology_eval/nvidia_opencode_viewer_gate_20261117_v2.json`,
+preserving the previous v1 receipt. It reports:
+`status=OPENCODE_V2_MCP_BOUND_VIEWER_OAUTH_REQUIRED`,
+`nvidia_issuer_matched=true`,
+`oauth_metadata_url_is_explicit=true`,
+`browser_oauth_stage_reached_without_schema_errors=true`,
+`unauthenticated_vendor_mcp_http=401`,
+`existing_service_pid_unchanged=true`,
+`authenticated_viewer_tool_invocation=false`,
+`tenant_isolation_verified=false`.
+
+**Tests and release boundary:**
+- 11 issuer-guard tests plus 88 pinned upstream MCP tests: **99 PASS**.
+- Existing EmpireOS integration/NLP regression suite: **41 PASS**.
+- No authenticated viewer tool call, production tenant test or new agent
+  release was claimed.
+- Next human step: run the **existing** sign-in helper from EmpireOS,
+  `bash /srv/empire_os/scripts/authorize_existing_nvidia_mcp_viewer_20261117.sh`,
+  and complete the real browser OAuth sign-in as an explicitly approved
+  NVIDIA Viewer. If accessing localhost from another machine, use the
+  existing authorised private browser/SSH tunnel; do not paste OAuth
+  callback URLs, codes, passwords or tokens into the conversation.
+- Once the viewer signs in, verify `opencode mcp list` shows connected,
+  then authenticate and call the pinned `check_readiness`,
+  `search_terms`, `ask_question` tools against the synthetic graph
+  and verify deny cases. Tenant isolation remains a separate gate.
+
+**Status:** Both OAuth metadata incompatibilities repaired,
+OpenCode interactive authorization handoff **verified**, authenticated
+viewer execution **pending user sign-in**. No fake JWKS, no app rebuild.

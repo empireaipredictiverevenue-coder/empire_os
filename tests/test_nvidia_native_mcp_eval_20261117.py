@@ -23,7 +23,7 @@ EXPECTED = {
 
 def test_native_mcp_is_loopback_and_no_shared_admin_identity():
     cfg = UNIT.read_text()
-    assert "auto_ontology_mcp" in cfg
+    assert "nvidia_mcp_verified_issuer_20261117.py" in cfg
     assert "AUTO_ONTOLOGY_API_URL=http://localhost:33000" in cfg
     assert "AUTO_ONTOLOGY_MCP_HOST=127.0.0.1" in cfg
     assert "AUTO_ONTOLOGY_MCP_PORT=33013" in cfg
