@@ -919,3 +919,171 @@ an acceptable trusted link.
 and FastMCP gate **IMPLEMENTED AND TESTED AS A STAGED CANDIDATE**;
 original NVIDIA synthetic MCP evaluation **STILL RUNNING UNCHANGED**;
 production tenant SQL isolation **NOT ACTIVATED / NOT VERIFIED**.
+
+
+## 2026-11-18 — Canonical identity bridge and dedicated NVIDIA stack candidates
+
+**Live EmpireDB membership authority now integrated, without copying credentials:**
+- Recovered the original first-party CRM pilot configuration from
+  `/var/lib/empire-crm-first-party/pilot-runtime.json`; original
+  `pgpass` and Ed25519 founder issuer key remain mode 0600 and
+  were neither copied nor disclosed. Its original dedicated
+  `empire_crm_membership_login` and
+  `EmpireDbCrmMembershipReader` successfully returned the
+  original founder's canonical membership as **active, exact-tenant
+  matched and able to read**. No membership mutation or customer
+  prospect/order rows were queried.
+- `scripts/nvidia_existing_crm_membership_worker_20261118.py`
+  performs the original canonical reader lookup under the original
+  `/srv/empire_os/.venv/bin/python`, loading only the original
+  private CRM pilot config and dedicated password file. Its output is
+  an intentionally minimal `verified + role` result; no user ID,
+  tenant UUID, SQL, credentials or DSN are printed.
+- `empire_os/nvidia_canonical_membership_adapter.py` is the
+  bounded local subprocess adapter usable from the pinned NVIDIA
+  `.mcp_venv`, which lacks EmpireOS's FastAPI dependency. It
+  invokes the original reader (rather than copying the original DB
+  membership function or installing a second identity service),
+  validates inputs, hides stderr/credentials, gives a 6-second
+  timeout, never caches membership permissions, and fails closed
+  on errors or unexpected replies.
+- **Actual readback from NVIDIA's installed Python environment:**
+  founder canonical active read = TRUE, unknown subject denied,
+  wrong tenant denied. This is a genuine canonical database lookup
+  through the original least-privilege CRM membership login.
+  Authentication of the separate NVIDIA OAuth subject as that
+  canonical founder still requires a separately approved link.
+
+**Signed subject crosswalk — no identity inference, no second issuer:**
+- `empire_os/nvidia_ontology_signed_subject_link.py`
+  verifies a private, canonical, exact-field, purpose-separated
+  Ed25519 document signed by the **existing pinned EmpireOS issuer
+  key**. It binds exactly one NVIDIA issuer + OAuth subject to
+  one canonical EmpireOS subject, tenant UUID and dedicated
+  deployment ID; includes a signer-approved founder approval
+  evidence reference and 24-hour maximum validity (the signer
+  should choose a shorter time). Signatures are independently
+  checked. Unknown keys, tampering, incorrect scope/tenant,
+  expired/oversized/world-readable files, duplicate properties
+  and attempts to use a CRM JWT as a link all fail closed.
+- `empire_os/nvidia_tenant_runtime_factory.py` composes the
+  actual signed-link verification, the **original first-party**
+  membership adapter and the previously implemented
+  `NvidiaTenantAccessPolicy`. It requires a separately
+  verified attestor for the **actual** tenant-exclusive query
+  backend; no attestor means no policy activation.
+- The first-party CRM key was not exported, read into NVIDIA,
+  or used to sign a live identity crosswalk. All link tests use
+  TEST-ONLY ephemeral Ed25519 keys; therefore no live identity
+  grant or new access permissions were issued.
+
+**Existing NVIDIA stack candidate physically scoped per tenant:**
+- `empire_os/nvidia_dedicated_compose.py` compiles the original
+  pinned `runtime/nvidia_ontology_eval/compose.yaml` with
+  tenant-unique Docker Compose project, PostgreSQL volume,
+  internal sandbox and ingress networks, OAuth/admin/PostgreSQL
+  secrets, loopback frontend port and one exact hash-pinned,
+  read-only SQLite fixture mounted at the original vendor
+  `/reference/empire_graph.sqlite` path. No backend or
+  database service, app or platform is duplicated in
+  EmpireOS: these are configurations for isolated instances of
+  the same pinned NVIDIA vendor stack, not a competing service.
+- It refuses shared credentials/ports/volumes/networks, invalid
+  or altered source hashes, symlinks, public config files,
+  multi-source or global SQL fallback, and unexpected vendor
+  manifest drift. Both independent synthetic candidates passed
+  **real `docker compose config --quiet`** against the installed
+  CLI. There was *no Docker daemon access*, no container launch,
+  deployment or new authentication account. The original
+  `empire-nvidia-ontology-eval` runtime and its OAuth
+  connection remained unmodified.
+- The original native NVIDIA SQL code loads a shared cached
+  connector list from `CONNECTION_STRINGS` (or catalogued
+  connections). Therefore a single *shared process* cannot be
+  considered tenant-isolated merely because MCP middleware
+  checked membership. A physically separate tenant backend and
+  per-tenant semantic catalogue are essential, and its actual
+  execution must be verified before issuing `DataPlaneAttestation`.
+  The current host user cannot query Docker runtime state through
+  `/var/run/docker.sock`; static Compose validation cannot
+  establish live container isolation.
+
+**Independent tests (new in this stage):**
+- Signed identity crosswalk: **16 PASS**
+- Canonical membership bridge: **18 PASS**, including real
+  source read under the original dedicated login
+- Dedicated original Compose topology: **16 PASS**, including
+  two real Docker Compose CLI static configurations
+- Composed runtime policy: **7 PASS**, including a TEST-ONLY
+  signed crosswalk + genuine canonical founder DB membership.
+- New focused suite **57 PASS**, with no paid inference,
+  production tenant data, migrations or service restarts.
+
+**Remaining release gates (cannot honestly claim completed):**
+1. First-party identity owner must issue an **explicitly approved**
+   signed crosswalk for the NVIDIA Viewer to the canonical
+   EmpireOS principal. Merely verifying the CRM founder membership
+   is not permission to assert that two distinct account IDs
+   identify the same person.
+2. The original data owner must provision and prove an actual
+   tenant-only NVIDIA SQL executor + semantic catalogue with
+   the original approved tenant datasource and unique secret
+   custody. An offline Compose test or an externally supplied
+   `DataPlaneAttestation` boolean is not acceptable runtime proof.
+   Running per-tenant MCP instances must also be configured with
+   issuer/resource URLs for their unique private loopback ports.
+3. Wire the existing signed link + canonical membership adapter +
+   *same actual backend* attestation into the existing
+   `NvidiaTenantCallBoundary`; then perform two distinct
+   fully authenticated tenant canaries across all nine tools,
+   including cross-tenant SQL, catalogue, glossary, NLP prompt
+   spoofing, expiry/revocation, and original Viewer admin 403/401.
+4. Only thereafter issue a separate founder-controlled approval
+   for customer dataset admission. Do not reuse the current
+   global synthetic `empire_graph.sqlite` as customer data.
+
+**Classification:** Original first-party canonical membership
+integrated/readback verified; signed identity crosswalk verifier
+implemented and synthetic-tested; physically isolated original
+NVIDIA Compose candidates built and CLI-validated; **no live
+signed founder identity link issued; no tenant-specific NVIDIA
+containers started; no live production tenant SQL isolation
+verified.** The previously certified original synthetic Viewer
+MCP 6/6 is preserved with no changes.
+
+
+### 2026-11-18 — Final independent live membership and regression evidence
+
+- `scripts/probe_nvidia_original_crm_membership_bridge_20261118.py`
+  executed from **the original NVIDIA `.mcp_venv`** and called
+  the original unmodified `EmpireDbCrmMembershipReader` under
+  `/srv/empire_os/.venv` with its original private pilot
+  configuration and dedicated `empire_crm_membership_login`.
+  Immutable mode-0600 receipt:
+  `runtime/nvidia_ontology_eval/nvidia_original_crm_membership_bridge_20261118.json`.
+  `original_founder_membership_active_and_tenant_matched=true`,
+  `unknown_subject_denied=true`,
+  `wrong_tenant_denied=true`, `write_transactions=false`.
+  No new account or token was created, and the original CRM issuer's
+  private signing key never left its owner.
+- New and existing first-party/NVIDIA bridge/Compose/tenant
+  regressions: **73 PASS**. Pinned NVIDIA MCP vendor/issuer,
+  source-aware readiness and existing tenant-middleware regressions:
+  **149 PASS**. Independent disjoint suites: **222 PASS**.
+- Original NVIDIA frontend/PostgreSQL health and OAuth resource must
+  be verified again at final commit/readback; no original service
+  change was authorized in this stage.
+- The candidate's **two** `docker compose config --quiet`
+  calls were successful using the original pinned NVIDIA Compose
+  service definitions, with independent private synthetic fixtures.
+  The original Docker daemon is not accessible to the current
+  unprivileged terminal operator. No tenant containers were
+  launched or volumes/network resources modified.
+- **Production release gate stays RED.** The signing/verifier
+  mechanism and live canonical membership reader are implemented;
+  the founder-approved cross-provider account link is not signed,
+  and the original global NVIDIA backend is still not a
+  tenant-dedicated, runtime-verified SQL execution context.
+  The next guarded release requires those exact two proofs and a
+  live two-tenant SQL denial test; no user credentials or customer
+  rows should be requested or copied into chat.
