@@ -94,6 +94,20 @@ def test_private_q4_raw_bytes_and_normalized_cloud_sha_match(tmp_path):
     assert ok["official_byte_to_normalized_cloud_fields_reconciled"]
     assert ok["original_publisher_exact_duplicate_ids"]==1
     assert ok["raw_source_redistribution_authorized"] is False
+    # The Q1 2026 official archive used lowercase publication; the next
+    # official publisher might do the same without changing source identity.
+    lower_url=Q4.replace("REPD_Publication", "REPD_publication")
+    lower_relative=relative.replace("REPD_Publication", "REPD_publication")
+    lower_file=root/lower_relative
+    with lower_file.open("xb") as output:output.write(raw)
+    os.chmod(lower_file,0o600)
+    lower_source=dict(source)
+    lower_source["source_url"]=lower_url
+    lower_meta=dict(source["publisher_publication_metadata"])
+    lower_meta["publisher_original_raw_archive_relative"]=lower_relative
+    lower_meta["publisher_original_source_url"]=lower_url
+    lower_source["publisher_publication_metadata"]=lower_meta
+    assert evaluate._verify_official_q4_raw_source(root,lower_source,rows)["original_official_publisher_csv_sha256"]==digest
     modified=dict(source)
     modified["source_snapshot_sha256"]="f"*64
     with pytest.raises(ValueError,match="NORMALISED_SOURCE_SHA_DRIFT"):
