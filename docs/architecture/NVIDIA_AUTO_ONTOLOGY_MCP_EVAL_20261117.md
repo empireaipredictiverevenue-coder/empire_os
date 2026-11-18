@@ -808,3 +808,114 @@ and issuer suite: **110 PASS**. Original synthetic Viewer SQL 6/6
 continues to be supported by the preserved private evidence.
 No new deployment, service restart, migration, permissions change,
 production data read, outreach or paid inference was performed.
+
+
+## 2026-11-18 — Staged canonical EmpireOS tenant-bound NVIDIA MCP gate (not activated)
+
+**Original owner and trust boundary recovered:** EmpireOS already has
+`empire_os.saas_scale.TenantMembership`,
+`empire_os.tenant_isolation.authorize_tenant_resource`, a dedicated
+`EmpireDbCrmMembershipReader` backed by the original
+`empire_crm_read_member` canonical PostgreSQL membership function, and
+DB `empire_current_tenant_id()` / RLS reader controls. Do not create
+another tenant database, CRM or identity service. The current NVIDIA
+vendor/frontend resolves identity only to `{id, role}` and explicitly
+forwards unscoped backend queries; a NVIDIA OAuth `sub` is **not** a
+verified canonical EmpireOS subject, and an email similarity is not
+an acceptable trusted link.
+
+**Implemented staged code:**
+- `empire_os/nvidia_ontology_tenant_policy.py` reuses the original
+  `TenantMembership` and `authorize_tenant_resource` with one
+  server-pinned `TenantDeployment(tenant_id, deployment_id, datasource_id)`.
+  A call is rejected unless a trusted first-party OAuth-subject→Empire
+  subject link resolves, the original canonical membership reader
+  returns an active same-tenant member with read permission, and the
+  server-owned connector attestor returns matching, current (≤300
+  seconds), read-only, verified **tenant-dedicated database** evidence
+  with no global-source fallback. Missing, stale, mismatched, forged,
+  denied or unavailable proofs fail closed. No caller-controlled
+  `tenant_id`, `target_db`, question or browser header enters this
+  authority method.
+- `scripts/nvidia_mcp_tenant_boundary_20261118.py` implements
+  FastMCP's **actual `on_call_tool` middleware**, reads only the
+  already verified FastMCP access token subject, then invokes the
+  original EmpireOS policy before dispatch. A denial surfaces only
+  `NVIDIA_TENANT_SCOPE_REQUIRED`, without identifying another
+  tenant or datasource. The native nine-tool list, argument schemas
+  and descriptions remain intact. The gate covers every tool
+  including glossary, catalogue-derived and text-to-SQL reads, rather
+  than adding a bypassable second search interface.
+- The original shared PostgreSQL `empiredb_forced_rls` option is
+  **not permitted by this staged gate yet**. A separate RLS preflight
+  is insufficient: the tenant proof must be tied to the very same
+  session the NLP-generated SQL actually executes in. The allowed
+  staged mode is `dedicated_database` only until a secure same-session
+  connector adapter is proven.
+- `scripts/probe_nvidia_tenant_release_gate_20261118.py` checked the
+  original isolated NVIDIA `.env` remains the private synthetic
+  `empire_graph.sqlite` source, that the original MCP endpoint remains
+  `127.0.0.1:33013`, and that the backend proxy is still unscoped.
+  A private immutable 0600 receipt
+  `runtime/nvidia_ontology_eval/nvidia_tenant_release_gate_20261118.json`
+  reports `status=NVIDIA_TENANT_BOUNDARY_STAGED_PRODUCTION_CUSTOMER_SQL_HOLD`,
+  `gate_installed_on_running_mcp=false`, no verified production subject
+  mapping, no tenant-dedicated production datasource and
+  `customer_data_admission=false`.
+- These are additive to the original owner and **not imported into
+  the running systemd service** until the original identity owner and
+  data-plane owner verify that the target backend/connector is
+  physically tenant-scoped. Installing this today would either block
+  the healthy synthetic Viewer evaluation or risk mistaking a global
+  backend for a tenant-safe one. No service restarts, migrations,
+  deployments, user changes, CRM writes, model changes, spending or
+  customer records occurred in this stage.
+
+**Genuine middleware canaries (synthetic, isolated process only):**
+- `tests/test_nvidia_tenant_authority_policy_20261118.py`
+  verifies original EmpireOS role decisions, active/disabled
+  membership, missing/mismatched subject linking, wrong tenant,
+  misbound datasource, stale proof, missing authority, failed lookup
+  and caller-input non-authority.
+- `tests/test_nvidia_mcp_tenant_middleware_20261118.py`
+  builds two physically separate temporary, read-only SQLite
+  fixtures. Two independently scoped fake OAuth identities can
+  execute actual SQL against only their own synthetic fixture:
+  tenant A count **2**, tenant B count **7**. Cross-tenant calls
+  cannot trigger the backend query handler at all. Question text
+  spoofing `target_db=tenant-b` under tenant A still returns
+  only tenant A's original file.
+- The same real in-memory FastMCP middleware denies missing/unknown
+  OAuth subjects, denies all **nine** native NVIDIA tool names
+  under a wrong-tenant subject *before backend execution*, and
+  preserves the nine actual pinned vendor tool names, schemas and
+  descriptions. These prove policy/middleware behaviour in synthetic
+  fixtures, **not** the live NVIDIA global frontend's cross-tenant
+  SQL behaviour.
+- Tenant/middleware tests: **39 PASS**. Original vendor/issuer and
+  existing NVIDIA MCP regression suite, including those canaries:
+  **149 PASS**. Independent EmpireOS canonical tenant + NVIDIA Viewer
+  regression suite: **59 PASS**, one unrelated Starlette/AnyIO
+  deprecation warning. **208 tests total in two disjoint suites.**
+
+**Hard remaining integration gate (do not substitute or guess):**
+1. Original EmpireOS identity authority must produce an **approved,
+   independently verified** stable mapping from NVIDIA OAuth subject
+   to canonical EmpireOS subject. No email/domain inference.
+2. Original data owner must provide a **tenant-exclusive connector
+   used by the actual NVIDIA query execution**, attested from the
+   canonical database trust boundary (or per-tenant physically
+   separated backend). A separate permission boolean is insufficient.
+3. Compose original verified subject/membership and connector proof
+   into the existing native FastMCP middleware, then run live
+   *distinct tenant* acceptance for glossary, catalogue enumeration,
+   `ask_question`, cross-tenant SQL/joins, and revoked/stale
+   identities. No customer rows until this passes.
+4. Preserve the current original six-case synthetic Viewer
+   `ask_question` acceptance (**6/6**) and original single-user
+   conversation 404 canary. Do not confuse either with a tenant pass.
+
+**Milestone classification:** Canonical tenant authorization policy
+and FastMCP gate **IMPLEMENTED AND TESTED AS A STAGED CANDIDATE**;
+original NVIDIA synthetic MCP evaluation **STILL RUNNING UNCHANGED**;
+production tenant SQL isolation **NOT ACTIVATED / NOT VERIFIED**.
