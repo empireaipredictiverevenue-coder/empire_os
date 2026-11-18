@@ -21,7 +21,12 @@ import tempfile
 import ipaddress
 
 from empire_os.source_intelligence import SOURCES
-from empire_os.permit_property_source_join import PLUTO_ID, FOOTPRINT_ID
+# These stable NYC Socrata source identifiers are used ONLY to suppress
+# duplicate discovery of datasets already owned by Permit/Property.
+# Do not import the entire property-join runtime just to use two IDs:
+# its separate DOBNow reader may be unavailable in a clean release branch.
+PLUTO_ID = "64uk-42ks"
+FOOTPRINT_ID = "5zhs-2jue"
 from empire_os.search_fabric.public_fallback import search_public_web
 from empire_os.data_brokerage_acquisition_sequence import DISCOVERY_LANES, acquisition_sequence
 from empire_os.data_brokerage_product_mining import build_source_specific_products, validate_source_specific_product_report
