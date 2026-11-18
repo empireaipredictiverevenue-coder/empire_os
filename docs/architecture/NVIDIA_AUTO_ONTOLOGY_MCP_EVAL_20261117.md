@@ -711,3 +711,100 @@ tenant gates and pre-existing free inference.
   original private runtime paths. Do not misclassify a one-case
   no-SQL 17 November result as current acceptance; it remains an honest
   archived failure.
+
+
+## 2026-11-18 — Free OpenCode model recovery and honest tenant boundary test
+
+**Existing service/provider, no global config change:**
+- The original OpenCode V2.3.0 running service advertised locally
+  installed Ollama routes and a current catalogue of free hosted models.
+  The older experimental `opencode/glm-5.3-flash-free` was absent and
+  returned `provider.no-route` on 18 November; it is **not** the
+  current global default. The actual persistent global OpenCode
+  default remains `ollama/empire-qwen2.5-coder-7b-32k:latest`.
+- The current existing free model `opencode/mimo-v2.6-flash-free`
+  was present and completed an actual original OpenCode `plan` agent
+  call using its connected NVIDIA Viewer OAuth grant. The original
+  agent log has **exactly one** tool-use event via the existing OpenCode
+  `execute` wrapper; code:
+  `const r = await tools["nvidia-auto-ontology"].check_readiness();`
+  followed by `return r;`. Its completed JSON result reported
+  `ready=true`, `can_execute_sql=true`, and catalogue
+  `databases=["empire_graph"]`.
+- `scripts/verify_opencode_mimo_free_nvidia_mcp_20261118.py`
+  now recognizes the current safe wrapper spelling. Its first
+  immutable receipt used an overly strict parser and reported
+  `verified=false`; it was not overwritten or called a passing
+  result. `scripts/attest_opencode_mimo_nvidia_readiness_20261118.py`
+  re-read and independently validated the exact original tool
+  event, without another inference request. The private
+  `runtime/nvidia_ontology_eval/opencode_current_free_model_nvidia_mcp_attestation_20261118.json`
+  reports `verified=true`; one event, one real tool, no other
+  agent tools, no new provider, no paid authorization.
+- The previously tested `opencode/nemotron-3.5-lightning-free`
+  route was also accepted by the service, but it needed two
+  `execute` events to perform one actual NVIDIA readiness call.
+  It is **not** chosen for this acceptance. Both raw logs and their
+  first receipts are preserved privately for audit; no agents,
+  default model, OpenCode service or OAuth configuration was changed.
+
+**Live two-identity isolation evidence, read-only synthetic fixture:**
+- Reused the original *distinct* NVIDIA bootstrap admin and the
+  approved Viewer OAuth identity, with no added users, customer
+  data, tenant creation, conversation writes or model spending.
+- Both identities could read their own conversation lists (HTTP
+  200); the admin list contained 11 existing synthetic conversations,
+  Viewer list zero, overlap zero. Reading an existing admin-owned
+  conversation under admin returned **HTTP 200**; querying that
+  identical record under Viewer returned **HTTP 404**, showing
+  conversation ownership isolation.
+- Both identities also received **HTTP 200** for the **same**
+  synthetic database catalogue (one `empire_graph` database).
+  This proves a shared catalogue under current role permissions,
+  *not* a validated customer-tenant restriction.
+- Source confirms the distinction: `frontend/auth/resolve-user.ts`
+  resolves a principal as `{id, role}`, with no tenant identifier;
+  `frontend/lib/internalIdentity.ts` forwards only authenticated
+  `userId`; `frontend/auth/proxy-backend.ts` explicitly notes
+  zone scoping was disabled and backend `zone_ids` defaults to
+  unscoped. User-owned conversation routes explicitly filter by
+  `{ id, user_id: user.id }`. The existing global semantic
+  retrieval and shared SQL source **cannot be claimed
+  multi-tenant-safe** on those user-level checks.
+- Mode-0600 immutable read-only receipt:
+  `runtime/nvidia_ontology_eval/nvidia_two_identity_readonly_isolation_20261118.json`
+  records `conversation_boundary_verified=true` and
+  `production_sql_tenant_isolation_verified=false`.
+  Historical `scripts/probe_nvidia_mcp_existing_20261117.py`
+  already marks tenant isolation unverified; do not relax that
+  existing release gate.
+
+**Scope of work needed *before* any real multi-customer data:**
+- Bind the canonical EmpireOS tenant identity (existing tenant
+  registry/Smart CRM authority) to each NVIDIA caller and
+  authorised connector. An absent or unverified binding must
+  deny access, not silently become `zone_ids=None`.
+- Restrict catalogue, glossary/vector retrieval, database
+  selection, SQL execution and result visibility to the same
+  verified tenant binding. A user-supplied `target_db`,
+  question text, database name, or frontend-provided header
+  must never grant an additional datasource.
+- Perform two **distinct tenant** synthetic canaries with
+  disjoint catalogue/SQL rows and cross-tenant denied attempts
+  (including catalogue enumeration, glossary search and SQL).
+  Verify one tenant cannot query, join, infer or browse another
+  tenant's data even when the model generates seemingly valid SQL.
+  Keep the existing user-conversation and admin-denial checks.
+- No production tenant canary was completed because this
+  isolated NVIDIA installation currently exposes no trusted
+  tenant-scoped identity/connector mapping. **Release gate:
+  PRODUCTION_CUSTOMER_SQL_HELD**. Do not invent one, create
+  duplicate platforms, disable the guard, or expose the current
+  synthetic MCP outside loopback.
+
+**Readback:** New free-provider and tenant-boundary receipts plus
+prior Viewer acceptance: **12 PASS**. NVIDIA MCP vendor, readiness
+and issuer suite: **110 PASS**. Original synthetic Viewer SQL 6/6
+continues to be supported by the preserved private evidence.
+No new deployment, service restart, migration, permissions change,
+production data read, outreach or paid inference was performed.
