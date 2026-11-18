@@ -10,6 +10,7 @@ No vendor edits; no credentials or token exchange; no public listener.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import sys
@@ -20,6 +21,10 @@ from pydantic import AnyHttpUrl
 from auto_ontology_mcp.config import ConfigError, Settings, load_settings
 from auto_ontology_mcp.server import build_server
 from auto_ontology_mcp import get_version
+if __package__ == "scripts":
+    from .nvidia_mcp_env_source_compat_20261118 import install as install_env_readiness
+else:
+    from nvidia_mcp_env_source_compat_20261118 import install as install_env_readiness
 
 LOG = logging.getLogger(__name__)
 
@@ -71,6 +76,9 @@ def main() -> int:
         auth.authorization_servers = [AnyHttpUrl(issuer)]
         if [str(x).rstrip("/") for x in auth.authorization_servers] != [issuer]:
             raise ConfigError("corrected issuer did not read back")
+        # Reconcile NVIDIA environment-managed connections in the existing
+        # readiness tool, preserving all other nine vendor MCP tool names.
+        asyncio.run(install_env_readiness(mcp, _client))
     except (ConfigError, httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
         LOG.error("NVIDIA MCP OAuth issuer preflight failed: %s", type(exc).__name__)
         return 2

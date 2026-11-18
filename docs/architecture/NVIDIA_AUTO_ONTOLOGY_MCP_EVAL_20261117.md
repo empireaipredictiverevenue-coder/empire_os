@@ -583,3 +583,131 @@ OpenCode free-model and native NVIDIA MCP routes.
 - Real OpenCode agent→NVIDIA MCP tool call: **VERIFIED**
 - Natural-language SQL through unpinned MCP: **FAILED/HOLD**
 - Production tenant isolation and customer SQL execution: **NOT VERIFIED**
+
+
+## 2026-11-18 — Completed synthetic Viewer MCP execution and source-aware readiness
+
+**Requested remediation:** The existing NVIDIA Viewer OAuth and OpenCode tool
+transport were already working, but the native `check_readiness` wrongly
+treated zero UI-managed connections as no SQL capability, and a prior
+single `ask_question` returned prose without generated SQL or rows.
+Preserve existing EmpireOS, NVIDIA source, original user/service credentials,
+tenant gates and pre-existing free inference.
+
+**Reproduction / evidence-driven root cause:**
+- The native Viewer sees `GET /api/connections/source == true`: the
+  original `CONNECTION_STRINGS=sqlite:////reference/empire_graph.sqlite`
+  is environment-managed, not stored by the UI connections service.
+  `GET /api/connections` reported `count=0` while the synthetic
+  catalogue contained `empire_graph`. The old vendor readiness tool checked
+  only the UI list and produced a demonstrably incorrect "No database
+  connection is configured" blocker.
+- The first new targeted Viewer direct API diagnostic returned HTTP 401
+  because the stored OpenCode access token had expired. A single native
+  OpenCode OAuth use automatically **refreshed the existing grant**,
+  with no new human login, tokens disclosed or new account.
+- Three independent backend control runs using the synthetic free model
+  (untargeted with prediction=false; untargeted default prediction; and
+  stateless, untargeted default prediction) **all generated and executed
+  correct SQL**. Therefore neither an explicit `target_db`, a prediction
+  override, nor a conversation ID was necessary for this one-database
+  source. **No SQL router modification was made.**
+- Retrying the original authentic Viewer MCP `ask_question` with its
+  refreshed OAuth grant returned actual generated SQL, real database rows
+  and the expected count **2** for `BUYER_DEMANDS_LANE`:
+  `runtime/nvidia_ontology_eval/nvidia_viewer_mcp_real_question_20261118.json`
+  (private 0600). The older failed 17 November receipt is preserved.
+  The earlier empty answer's exact cause remains **unproven**: do not
+  assert token expiry alone caused it, or hide the historical failure.
+
+**Smallest bounded readiness correction, LIVE in the original MCP service:**
+- `scripts/nvidia_mcp_env_source_compat_20261118.py` replaces only the
+  *existing* native `check_readiness` tool in-place at startup; it uses
+  the same caller-authenticated shared HTTP client and the real
+  permission-gated `GET /api/connections/source` route. Where no
+  UI-managed connection exists but an environment connection is declared,
+  it prevents the incorrect "no connection" blocker. It adds an explicit
+  `unverified` note that connection configuration does not by itself
+  prove actual SQL execution. An absent/denied source probe does not
+  grant readiness; absent catalogue or uncompiled semantics still block.
+  Eight other existing MCP tools and the **nine-tool public contract**
+  retain their names, parameters, descriptions and authentication.
+  No database connection is created, altered, or duplicated.
+- Existing single owner launcher
+  `scripts/nvidia_mcp_verified_issuer_20261117.py` installs the small
+  readiness extension *after* the existing NVIDIA MCP server is built
+  and verifies the same issuer as before.
+- An isolated candidate on localhost port 33014 started successfully,
+  advertised the expected OAuth issuer and rejected anonymous access.
+  **109 tests PASS** (original 88 NVIDIA MCP vendor tests, issuer
+  guards, new readiness contracts). The production customer route,
+  frontend, Postgres, inference and OpenCode were not modified.
+- `scripts/activate_nvidia_mcp_env_source_20261118.sh` restarted **only**
+  the existing unprivileged `empire-nvidia-ontology-mcp-eval.service`,
+  with a 0600 rollback of the old launcher and canary checks.
+  Private activation receipt:
+  `runtime/nvidia_ontology_eval/nvidia_mcp_env_source_activation_20261118.txt`
+  `exit_status=0`, OAuth metadata consistent, MCP anonymous HTTP 401,
+  active systemd service, restarted process PID 3085976, zero unexpected
+  restarts. Frontend and Postgres health remain OK; no other service
+  was restarted. A valid authenticated Viewer thereafter received
+  `ready=true`, `semantic_layer_built=true`,
+  `can_execute_sql=true`, `catalog_present=true`,
+  `databases=["empire_graph"]`, zero blockers and the explicit
+  configuration-vs-execution `unverified` note.
+
+**End-to-end native Viewer MCP SQL proof — 6/6 independently checked:**
+- `scripts/accept_nvidia_viewer_six_mcp_sql_20261118.py` was run
+  against the **original live port 33013** using the pre-existing,
+  refreshed Viewer OAuth grant. It called the real `ask_question`
+  tool without any `target_db` override, on the existing pre-ingested
+  synthetic 4-table SQLite graph and the existing free Nemotron model.
+  SQL had to be generated, actual database rows returned, predicates
+  preserved and the numeric aggregate equal independently executed
+  SQLite SQL; prose-only answers and schema-only replies do not pass.
+- **All six passed:** buyer-demand edges 2/2 (14.9s); capacity edges 1/1
+  (11.5s); unknown demand NULL 1/1 (10.0s); known demand zero 1/1
+  (11.5s); product/market join 2/2 (18.9s); positive matching
+  capacity 1/1 (37.0s). No admin fallback or sensitive credentials.
+- Immutable mode-0600 receipt:
+  `runtime/nvidia_ontology_eval/nvidia_viewer_six_real_mcp_sql_20261118.json`
+  has `all_verified=true` and `passed_count=6`. This supersedes the
+  single failed 17 November query for the current synthetic acceptance
+  without erasing the earlier evidence.
+- The existing OpenCode V2→MCP free-model `check_readiness` invocation
+  was independently verified on 17 November with a single native
+  `execute` wrapper. On 18 November its free hosted GLM provider
+  returned `provider.no-route` during an unrelated agent smoke, although
+  the original OAuth grant refreshed successfully. That provider
+  availability issue is **not** an NVIDIA MCP server failure; no paid
+  fallback, model switch or new provider was authorised.
+
+**Boundary and status:**
+- Original Viewer OAuth and real native MCP ask_question SQL: **VERIFIED**
+  for the isolated synthetic fixture, six cases.
+- Existing MCP source-aware readiness: **IMPLEMENTED, LIVE CANARY PASS**.
+- Preserved negative: viewer administrative routes remain forbidden,
+  anonymous MCP 401, no auth/tenant bypass, free backend unchanged.
+- **NOT VERIFIED / NOT CLAIMED:** a production tenant, production row-level
+  isolation, customer-specific data entitlements, general multi-database
+  routing, broad natural-language semantic reliability, paid outcomes.
+  A 6/6 synthetic benchmark proves this controlled fixture only.
+- Existing EmpireOS regression suite: **49 PASS** (one unrelated
+  Starlette deprecation). NVIDIA pinned vendor/issuer/new
+  compatibility suite: 109 PASS before final receipt-specific test;
+  final suite rerun recorded separately.
+
+**Final 18 November independent readback:**
+- Original Viewer token userinfo HTTP **200** after MCP restart.
+- Viewer invitation-management HTTP **403**; user-management HTTP **401**.
+- Native MCP interface suite including the six-case Viewer receipt:
+  **110 PASS** (zero test failures).
+- Existing EmpireOS NVIDIA/Viewer suite **49 PASS**, one unrelated
+  deprecation warning; total **159 scoped tests PASS**.
+- Unpinned controls, initial expired-token diagnosis, and one successful
+  Viewer direct test scripts preserved privately under
+  `runtime/nvidia_ontology_eval/diagnostic_scripts_20261118/` (0700
+  directory, 0600 scripts). Their immutable receipt files remain at the
+  original private runtime paths. Do not misclassify a one-case
+  no-SQL 17 November result as current acceptance; it remains an honest
+  archived failure.
