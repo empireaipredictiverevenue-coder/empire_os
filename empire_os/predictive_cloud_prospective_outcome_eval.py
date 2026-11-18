@@ -121,10 +121,17 @@ def _verify_official_q4_raw_source(repo: Path, source: dict,
     )
     meta=source.get("publisher_publication_metadata") or {}
     rawsha=meta.get("publisher_original_raw_sha256")
+    official_name=urlparse(source.get("source_url") or "").path.rsplit("/",1)[-1]
+    if (not _publisher_url_verified(source.get("source_url"))
+            or not re.fullmatch(
+                r"(?i)REPD_publication_Q4_2026[.]csv",official_name
+            )):
+        raise ValueError("Q4_RAW_PUBLISHER_ASSET_URL_NOT_VERIFIED")
     expected_path=(
         "runtime/predictive_cloud/brokerage_research_private/"
         "forecast_pilot/source_archives/"
-        "source_REPD_Publication_Q4_2026_"+str(rawsha)+".csv"
+        "source_"+official_name.removesuffix(".csv")
+        +"_"+str(rawsha)+".csv"
     )
     if (not isinstance(rawsha,str)
             or not re.fullmatch(r"[0-9a-f]{64}",rawsha)
