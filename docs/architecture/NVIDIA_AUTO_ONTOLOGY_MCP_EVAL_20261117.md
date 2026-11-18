@@ -1087,3 +1087,145 @@ MCP 6/6 is preserved with no changes.
   The next guarded release requires those exact two proofs and a
   live two-tenant SQL denial test; no user credentials or customer
   rows should be requested or copied into chat.
+
+
+## 2026-11-18 — Guarded two-tenant Docker canary prepared; production identity linking held
+
+**Actual identity evidence, not assumptions:** The original OpenCode OAuth
+grant had expired, but retained a refresh credential. The original OpenCode
+V2 free-model `plan` agent exercised one real `nvidia-auto-ontology`
+readiness call and automatically refreshed the existing Viewer grant.
+The fresh NVIDIA authorization-server UserInfo returned HTTP **200**,
+one verified subject and `email_verified=true`. The verified NVIDIA
+Viewer email **does not equal** the email in the original founder
+first-party CRM invitation. That CRM invitation is still
+`PENDING_NOT_SENT`. A matching email would not itself have granted
+cross-account linkage, and this mismatch further rules out silently
+signing the crosswalk. No grant was issued. Private, immutable
+mode-0600 evidence:
+`runtime/nvidia_ontology_eval/nvidia_founder_cross_account_preflight_20261118.json`.
+The actual user email, sub, OAuth token, original invitation token and
+private issuer keys were not printed or copied.
+
+**Two real physically distinct synthetic source files staged:**
+- `scripts/stage_nvidia_two_tenant_private_canary_20261118.py`
+  takes a read-only SQLite backup of the original *synthetic*
+  `empire_graph.sqlite` into each private tenant directory,
+  and adds an independent `nvidia_tenant_isolation_canary`
+  table with marker/row counts A=2 and B=7. Each database
+  contains **zero** rows with the other marker.
+- Two project names, two 0700 tenant folders, separate
+  mode-0600 `tenant.env` files, independent random
+  `AUTH_SECRET`, PostgreSQL, NVIDIA bootstrap admin and
+  pgAdmin passwords, dedicated PostgreSQL volumes/internal
+  networks, and loopback ports: A frontend 33100 / MCP 33500;
+  B frontend 33101 / MCP 33501.
+- All original model aliases are pinned to existing `:free`
+  options and no new model provider, external datasets or
+  customer rows were introduced. The *pre-existing* central
+  free inference provider credentials are reused for these
+  **synthetic-only** experiments; do NOT treat these as
+  production-separated customer provider credentials or spend
+  authorisation.
+- Exact original NVIDIA vendor images and Compose topology
+  were reused. The first staging pass mistakenly wrote
+  absolute temporary directory paths into its manifests;
+  this was independently found and corrected by
+  `scripts/reconcile_nvidia_canary_staging_paths_20261118.py`
+  without changing any secrets or SQL fixtures. Immutable
+  corrected private proof:
+  `runtime/nvidia_ontology_eval/two_tenant_canary_20261118/stage_verified_final_paths_v2.json`.
+  Both corrected Compose files passed the installed native
+  `docker compose config --quiet` with their final paths.
+
+**Safe synthetic resource envelope:**
+- The original vendor limits for a concurrent two-stack trial
+  total approximately 28 GiB of container ceilings, compared
+  with a server that had only ~21–28 GiB free and **no swap**.
+  Such a release would risk other EmpireOS services. The
+  first guarded preflight correctly refused it.
+- `scripts/stage_nvidia_synthetic_resource_caps_20261118.py`
+  creates a **separate Compose overlay per tenant**, changing
+  only memory ceilings on the synthetic candidate: Postgres
+  1 GiB, backend 3 GiB, ingestion 2 GiB, frontend 2 GiB:
+  **8 GiB per tenant**, **16 GiB total** + an **8 GiB
+  server safety reserve = 24 GiB required available**.
+  The original running NVIDIA Compose/image/resources
+  remain **unchanged**. Both merged Compose graphs passed
+  CLI validation; resource overlay evidence:
+  `runtime/nvidia_ontology_eval/two_tenant_canary_20261118/resource_caps_v1.json`
+  mode 0600. A cap too small may cause a canary to fail
+  health checks and trigger rollback; passing a static
+  configuration is not proof the application runs within it.
+- Last unprivileged guarded `--check` reported 28 GiB
+  available, requirement 24 GiB, original MCP PID 3085976
+  unchanged, original frontend and PostgreSQL OK, OAuth issuer
+  unchanged, tenant ports available and both private
+  sources/overlays verified.
+
+**Guarded Docker activation and real post-start evidence (prepared, not run):**
+- `scripts/release_nvidia_two_tenant_private_canary_20261118.py`
+  has read-only `--check` and explicit privileged
+  `--apply-founder-approved`. The latter re-checks the
+  exact pinned source manifests, image tags, only-candidate
+  Docker project name, old process PID, free-model and
+  current memory headroom. It requires a clean, non-reused
+  Docker project/volume/network, cached images, and refuses
+  pulls and builds. It starts only the two NEW isolated
+  projects, waits for private frontend health, verifies the
+  original service is still healthy with the original
+  unchanged PID, and performs actual SQL source readbacks
+  inside the new backend containers. If health or inspection
+  fails it takes down **only** the newly created synthetic
+  projects without deleting volumes.
+- `scripts/verify_nvidia_two_tenant_running_20261118.py`
+  checks Docker's actual tenant labels, read-only source bind
+  mounts, disjoint sandbox networks, distinct PostgreSQL
+  volumes, only-loopback frontend port mappings, **actual
+  enforced memory caps**, and actual in-container SQLite
+  counts (tenant A 2; tenant B 7; no foreign tenant rows).
+  A passing inspect is **container/source isolation only**,
+  not live semantic catalogue/LLM SQL/tenant entitlement
+  acceptance.
+- The unprivileged `--check` passes. The deliberate
+  unprivileged `--apply-founder-approved` attempt was
+  rejected with `PermissionError`, proving no unauthorised
+  Docker activation. The connected remote user is `ubuntu`,
+  not in Docker group, and `/var/run/docker.sock` is
+  root:docker 0660; the remote tool cannot elevate or bypass
+  that existing administrative gate. **No containers were
+  started** in this chat.
+- The sole next approved operational command, executed by
+  the founder/operator with server sudo after reviewing
+  release scope, is:
+  `cd /srv/empire_os && sudo /srv/empire_os/.venv/bin/python -B -m scripts.release_nvidia_two_tenant_private_canary_20261118 --apply-founder-approved`
+  It is synthetic-only, never a customer production release.
+  The script re-runs its own preflight immediately before any
+  Docker changes and refuses insufficient memory, image or
+  source conditions. If successful it writes a mode-0600
+  founder-readable result receipt within the private staging
+  folder, with all proof flags and **no credentials**.
+- The already verified original NVIDIA single-user Viewer
+  6/6 SQL benchmark, original service and existing canonical
+  membership owner are preserved and unaffected.
+
+**Regression:** Fresh first-party NVIDIA staging/tenant,
+signature, CRM and guarded-release suite **90 PASS**,
+plus pinned native NVIDIA MCP vendor/issuer/middleware
+suite **149 PASS**; 239 disjoint tests, no failures.
+The new read-only Docker verifier has additional mock
+attacks against wrongly writable mounts, shared networks,
+wrong project labels, public ports, wrong SQL rows and
+over-budget effective memory limits. These are honest
+simulation proofs of the verifier, not live Docker results.
+
+**Hard gates left:** (1) root-owned Docker synthetic-only
+activation + real container SQL canary is **not yet live**;
+(2) verified NVIDIA account has **different** email from
+original CRM founder invitation and no separately authorised
+signed cross-account link; (3) two distinct tenant-level
+authenticated NVIDIA semantic and SQL denial tests remain
+unexecuted; (4) production customer data/tenant access
+remains **OFF** pending founder/data-owner approvals and
+independent runtime verification. No false production
+completion is claimed.
