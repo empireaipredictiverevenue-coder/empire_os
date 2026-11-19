@@ -22,6 +22,7 @@ from empire_os.mautic_webhook_review import (
     MAX_BODY_BYTES, MauticWebhookReviewError, preview_signed_mautic_webhook,
 )
 from empire_os.revenue_crm_journeys import preview_crm_journey
+from empire_os.mautic_crm_inbox import PostgresMauticEventInbox, MauticInboxUnavailable
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository, RevenueCrmTransportError
 
 SOURCE_PATTERN = re.compile(r"[a-z0-9][a-z0-9_-]{2,63}\Z", re.ASCII)
@@ -137,7 +138,7 @@ def create_mautic_crm_preview_router(
     *,
     resolve_source: Callable[[str], MauticSource | None],
     resolve_tenant_reader: Callable[[str], MauticJourneyRepository | None],
-    receipt_journal: SqliteMauticReceiptJournal,
+    receipt_journal: SqliteMauticReceiptJournal | PostgresMauticEventInbox,
     allow_synthetic_test_reader: bool = False,
     now_provider: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
 ) -> APIRouter:
@@ -148,7 +149,7 @@ def create_mautic_crm_preview_router(
     tenant, source bindings, or contact identity.
     """
     if (not callable(resolve_source) or not callable(resolve_tenant_reader)
-            or not isinstance(receipt_journal, SqliteMauticReceiptJournal)):
+            or not isinstance(receipt_journal, (SqliteMauticReceiptJournal, PostgresMauticEventInbox))):
         raise MauticIntegrationError("explicit trusted server integration required")
     router = APIRouter(prefix="/v1/revenue-crm/integrations/mautic")
 
@@ -189,6 +190,12 @@ def create_mautic_crm_preview_router(
             raise HTTPException(status_code=401, detail="mautic_webhook_invalid") from None
 
         tenant = evidence["tenant_id"]
+        # A production webhook must NEVER acknowledge unbound contact evidence:
+        # it would otherwise lose legitimate events without a canonical inbox.
+        if isinstance(receipt_journal, PostgresMauticEventInbox) and evidence["unbound_event_count"]:
+            raise HTTPException(status_code=503, detail="mautic_contact_binding_unavailable")
+        if not allow_synthetic_test_reader and not isinstance(receipt_journal, PostgresMauticEventInbox):
+            raise HTTPException(status_code=503, detail="canonical_mautic_inbox_not_activated")
         try:
             repo = resolve_tenant_reader(tenant)
             if repo is None or str(repo.tenant_id) != tenant:
@@ -218,12 +225,18 @@ def create_mautic_crm_preview_router(
                     "execution_authority": "none",
                     "send_authorized": False,
                 })
-            accepted = receipt_journal.reserve_new(
-                tenant_id=tenant, source_id=source_id,
-                evidence_hmacs=[p["event_evidence_hmac"] for p in projections],
-                now=now,
-            )
-        except (MauticIntegrationError, RevenueCrmTransportError, ValueError, TypeError, OSError, sqlite3.Error):
+            ids = [p["event_evidence_hmac"] for p in projections]
+            if isinstance(receipt_journal, PostgresMauticEventInbox):
+                accepted = receipt_journal.reserve_new(
+                    tenant_id=tenant, source_id=source_id,
+                    evidence_hmacs=ids, now=now, reviews=projections,
+                )
+            else:
+                accepted = receipt_journal.reserve_new(
+                    tenant_id=tenant, source_id=source_id,
+                    evidence_hmacs=ids, now=now,
+                )
+        except (MauticIntegrationError, MauticInboxUnavailable, RevenueCrmTransportError, ValueError, TypeError, OSError, sqlite3.Error):
             raise HTTPException(status_code=503, detail="mautic_crm_review_unavailable") from None
         except Exception:
             raise HTTPException(status_code=503, detail="mautic_crm_review_unavailable") from None
@@ -244,7 +257,8 @@ def create_mautic_crm_preview_router(
             "new_events": len(novel),
             "duplicate_events": len(projections) - len(novel),
             "journey_reviews": novel,
-            "durable_staging_replay_journal": True,
+            "durable_staging_replay_journal": isinstance(receipt_journal, SqliteMauticReceiptJournal),
+            "canonical_inbox_readback_verified": isinstance(receipt_journal, PostgresMauticEventInbox),
             "canonical_crm_written": False,
             "workflow_server_execution": False,
             "marketing_consent_verified": False,

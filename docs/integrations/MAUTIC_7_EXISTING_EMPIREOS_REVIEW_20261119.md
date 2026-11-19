@@ -151,3 +151,69 @@ any merge and rerun all relevant tests on that final integration candidate.
 Mautic's developer webhook docs explicitly warn parts may be outdated.
 Payload assumptions should be revalidated against the exact tested release.
 Source: https://devdocs.mautic.org/en/7.3/webhooks/getting_started.html
+
+
+## Canonical EmpireDB inbox candidate — 2026-11-19 (follow-on)
+
+**Code:** empire_os/mautic_crm_inbox.py
+**Tests:** tests/test_mautic_crm_inbox.py
+**Prepared unnumbered SQL:** docs/integrations/sql/MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql
+
+Verified with the existing Smart CRM API:
+- A dedicated per-tenant, NOINHERIT PostgreSQL writer session must be
+  bound to exactly one trusted canonical tenant, checked through the same
+  existing public.empire_current_tenant_id() authority.
+- Normalized allowlisted review evidence, not Mautic raw body or contact
+  data, is INSERT-only into a tenant/source/HMAC unique inbox.
+- Source and event constraints, immutable review status, force-RLS and a
+  separate committed readback prevent false acknowledgements.
+- Unknown Mautic contacts are returned as 503 instead of 2xx in the
+  **canonical inbox path**, so a producer can retry after binding is fixed.
+- Normalized event stays REVIEW_ONLY. It does not alter CRM prospect stage,
+  grant marketing consent, run the journey designer or send any message.
+- SQLite is permitted only in a separate synthetic test harness; production
+  route rejects it by default.
+
+**Critical schema reconciliation:**
+The isolated worktree was branched from bb1424657, which lists migrations
+only through 075. The active EmpireOS tree already contains migrations
+076–080 including 076_predictive_forecast_registry_native_held.sql.
+Therefore no "076 Mautic" migration should be claimed or installed. The
+prepared SQL was moved out of the sequenced migration folder and remains
+**unnumbered, held for the canonical EmpireDB DBA/owner to allocate**.
+This avoids an unauthorised migration-number clash with another owner.
+
+**Upstream payload verification:**
+The official Mautic 7.x branch contains
+app/bundles/WebhookBundle/Http/Client.php (reviewed upstream SHA
+e323d688a2cbc37f4ebcc9bd7d2f2042833bde24), which generates
+base64(HMAC-SHA256(raw JSON, configured secret)), sends a
+Webhook-Signature header, and declares application/json. In-process
+HTTP contract tests exercise these exact properties. No Mautic source
+was copied into EmpireOS.
+
+**Real-instance status:** no Mautic systemd service, running Docker Mautic
+container, or existing Mautic config was detected. The ubuntu login does
+not have direct Docker daemon permissions; a privileged read-only Docker
+query was blocked by the remote command policy. No Docker image was pulled,
+no systemd unit changed, no container created and no instance installed.
+
+**Remaining verification before release:**
+- Canonical owner assigns an approved migration number and reviews existing
+  role grants, RLS, DDL and rollback plan. SQL remains **not applied**.
+- Provision dedicated source secret, per-tenant binding and DB writer
+  using existing EmpireOS security/DBA procedures. No credentials in Git.
+- Independently authenticate the ingestion principal/source; source IDs
+  and webhook secrets must come from a secure registry; do not use
+  headers or self-declared body tenant.
+- Test the actual pinned Mautic instance's Test Payload and real
+  subscription/form workflows, including redelivery after outage.
+- Prove the durable inbox events reach a canonical founder-review screen
+  and that any future journey steps remain approval-gated.
+- Obtain founder release approval, then merge owner-reviewed branch and
+  deploy with a reversible canary; measure genuine enquiries and sales.
+
+**Execution and measurement truth:** isolated Python integration and
+prepared DDL only. No verified live Mautic traffic, conversion, marketing
+subscriber, buyer or sales event is claimed. No sending, payment, migrations,
+deployments or background automation was started.
