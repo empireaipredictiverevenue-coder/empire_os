@@ -267,7 +267,7 @@ def test_existing_collector_writes_exact_join_aggregate_without_changing_readine
     captured = []
     def safe_probe():
         captured.append("called")
-        return probe_reply_identity_lineage.summarize((0,) * 12)
+        return probe_reply_identity_lineage.summarize((0,) * 16)
     monkeypatch.setattr(probe_reply_identity_lineage, "probe_readonly", safe_probe)
     assert collector.run_cli() == 0
     assert captured == ["called"]

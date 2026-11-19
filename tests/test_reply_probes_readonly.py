@@ -154,7 +154,7 @@ def test_provider_metadata_reports_keys_only(monkeypatch, capsys):
 
 def test_lineage_reports_exact_join_structure_not_identity(monkeypatch, capsys):
     # DB only returns one aggregate tuple; not one identifier per reply.
-    rows = [[(3, 1, 2, 0, 2, 1, 0, 2, 1, 2, 2, 1)]]
+    rows = [[(3, 1, 2, 0, 2, 1, 0, 2, 1, 2, 2, 1, 2, 0, 0, 0)]]
     result, statements = run_mocked(
         monkeypatch, capsys, probe_reply_identity_lineage, rows
     )
@@ -180,14 +180,15 @@ def test_lineage_reports_exact_join_structure_not_identity(monkeypatch, capsys):
     assert "c.outbound_intent_id = r.intent_id" in sql
     assert "COUNT(DISTINCT i.id)" in sql
     assert "COUNT(DISTINCT c.id)" in sql
+    assert "lower(c.state) IN ('open', 'active', 'engaged', 'replied')" in sql
     assert len(statements) == 3
     assert statements[1][0].startswith("SET LOCAL statement_timeout")
 
 
 @pytest.mark.parametrize("aggregate", [
-    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-    (3, 0, 3, 0, 0, 1, 2, 3, 1, 3, 3, 1),
-    (2, 0, 2, 0, 0, 2, 0, 2, 2, 2, 2, 2),
+    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    (3, 0, 3, 0, 0, 1, 2, 3, 1, 3, 3, 1, 3, 0, 0, 0),
+    (2, 0, 2, 0, 0, 2, 0, 2, 2, 2, 2, 2, 2, 0, 0, 0),
 ])
 def test_exact_join_allows_zero_unique_and_ambiguous_aggregate_safely(aggregate):
     result = probe_reply_identity_lineage.summarize(aggregate)
@@ -198,15 +199,27 @@ def test_exact_join_allows_zero_unique_and_ambiguous_aggregate_safely(aggregate)
 
 
 @pytest.mark.parametrize("aggregate", [
-    (3, 0, 2, 0, 1, 2, 0, 1, 1, 1, 1, 1),  # contradictory intent total
-    (1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1),  # impossible context count
-    (True,) + (0,) * 11,
-    (0,) * 11,
-    (1,) + (-1,) * 11,
+    (3, 0, 2, 0, 1, 2, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0),  # contradictory intent total
+    (1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0),  # impossible context count
+    (True,) + (0,) * 15,
+    (0,) * 15,
+    (1,) + (-1,) * 15,
 ])
 def test_invalid_or_inconsistent_aggregate_fails_closed(aggregate):
     with pytest.raises(ValueError):
         probe_reply_identity_lineage.summarize(aggregate)
+
+
+def test_suppressed_intents_are_never_claimed_as_sent_buyer_intent():
+    packet = probe_reply_identity_lineage.summarize(
+        (4, 0, 4, 0, 3, 1, 0, 0, 1, 4, 4, 0, 4, 4, 0, 0)
+    )
+    detail = packet["read_only_metadata_counts"]
+    assert detail["suppressed_email_intent_present"] == 4
+    assert detail["sent_email_intent_present"] == 0
+    assert detail["structurally_reviewable_not_authenticated"] == 0
+    assert packet["buyer_intent_verified"] is False
+    assert packet["outbound_authorized"] is False
 
 
 def test_probe_failure_is_not_reported_as_zero_replies(monkeypatch, capsys):

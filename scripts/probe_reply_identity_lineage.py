@@ -36,9 +36,22 @@ joined AS (
             WHERE i.channel = 'email'
               AND i.status IN ('sent', 'delivered', 'replied')
         ) AS email_sent_intent_count,
+        COUNT(DISTINCT i.id) FILTER (
+            WHERE i.channel = 'email'
+        ) AS email_intent_count,
+        COUNT(DISTINCT i.id) FILTER (
+            WHERE i.channel = 'email' AND i.status = 'suppressed'
+        ) AS suppressed_email_intent_count,
+        COUNT(DISTINCT i.id) FILTER (
+            WHERE i.channel = 'email'
+              AND i.status IN ('draft', 'queued', 'scheduled', 'approved', 'pending')
+        ) AS pending_email_intent_count,
+        COUNT(DISTINCT i.id) FILTER (
+            WHERE i.channel IS NOT NULL AND i.channel <> 'email'
+        ) AS non_email_intent_count,
         COUNT(DISTINCT c.id) FILTER (
             WHERE c.channel = 'email'
-              AND coalesce(lower(c.state), '') <> 'closed'
+              AND lower(c.state) IN ('open', 'active', 'engaged', 'replied')
               AND nullif(btrim(c.external_conversation_id), '') IS NOT NULL
               AND (
                    (i.prospect_id IS NOT NULL AND i.prospect_id = c.prospect_id)
@@ -81,7 +94,14 @@ SELECT
           AND email_sent_intent_count = 1 AND active_context_count = 1
           AND nullif(btrim(provider_message_id), '') IS NOT NULL
           AND nullif(btrim(normalized_from_contact), '') IS NOT NULL
-    ) AS structurally_reviewable_not_authenticated
+    ) AS structurally_reviewable_not_authenticated,
+    count(*) FILTER (WHERE email_intent_count = 1) AS email_intent_present,
+    count(*) FILTER (WHERE suppressed_email_intent_count = 1)
+        AS suppressed_email_intent_present,
+    count(*) FILTER (WHERE pending_email_intent_count = 1)
+        AS pending_email_intent_present,
+    count(*) FILTER (WHERE non_email_intent_count = 1)
+        AS non_email_intent_present
 FROM joined
 """
 
@@ -91,6 +111,8 @@ COLUMNS = (
     "sent_email_intent_present", "active_email_context_present",
     "provider_message_field_present", "sender_field_present",
     "structurally_reviewable_not_authenticated",
+    "email_intent_present", "suppressed_email_intent_present",
+    "pending_email_intent_present", "non_email_intent_present",
 )
 
 
@@ -104,7 +126,13 @@ def summarize(row: object) -> dict:
     if (sum(n[k] for k in ("intent_missing", "intent_unique", "intent_ambiguous")) != total
             or sum(n[k] for k in ("conversation_missing", "conversation_unique",
                                   "conversation_ambiguous")) != total
-            or n["sent_email_intent_present"] > n["intent_unique"]
+            or n["sent_email_intent_present"] > n["email_intent_present"]
+            or n["email_intent_present"] > n["intent_unique"]
+            or (n["sent_email_intent_present"]
+                + n["suppressed_email_intent_present"]
+                + n["pending_email_intent_present"]) > n["email_intent_present"]
+            or n["non_email_intent_present"] > n["intent_unique"]
+            or (n["non_email_intent_present"] + n["email_intent_present"]) > n["intent_unique"]
             or n["active_email_context_present"] > n["conversation_unique"]
             or n["structurally_reviewable_not_authenticated"] > min(
                 n["intent_unique"], n["conversation_unique"],
@@ -142,8 +170,15 @@ def summarize(row: object) -> dict:
                 "sent_email_intent_present", "active_email_context_present",
                 "provider_message_field_present", "sender_field_present",
                 "structurally_reviewable_not_authenticated",
+                "email_intent_present", "suppressed_email_intent_present",
+                "pending_email_intent_present", "non_email_intent_present",
             )
         },
+        "email_other_or_unclassified_intent_status_count": (
+            n["email_intent_present"] - n["sent_email_intent_present"]
+            - n["suppressed_email_intent_present"]
+            - n["pending_email_intent_present"]
+        ),
         "exact_join_cardinality_checked": True,
         "provider_thread_authenticated": False,
         "contact_authenticated": False,
