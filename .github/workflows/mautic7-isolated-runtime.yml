@@ -21,9 +21,11 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          echo "MAUTIC_CONTRACT_DB_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "MAUTIC_CONTRACT_DB_ROOT_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
-          echo "MAUTIC_CONTRACT_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          for key in MAUTIC_CONTRACT_DB_PASSWORD MAUTIC_CONTRACT_DB_ROOT_PASSWORD MAUTIC_CONTRACT_ADMIN_PASSWORD; do
+            value="$(openssl rand -hex 32)"
+            echo "::add-mask::$value"
+            printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
+          done
           python3 scripts/preflight_mautic_contract_sandbox.py
           echo "DISPOSABLE_DOCKER_RUNTIME_AVAILABLE"
       - name: Start Mautic and MySQL and install synthetic application
@@ -37,8 +39,17 @@ jobs:
             if dc exec -T db mysqladmin ping -h127.0.0.1 --silent >/dev/null 2>&1; then break; fi
             sleep 2
           done
-          dc exec -T mautic_web php bin/console --version
-          dc exec -T mautic_web php bin/console mautic:install --help | head -100
+          ready=0
+          for n in $(seq 1 90); do
+            if dc exec -T -w /var/www/html mautic_web sh -c 'test -f bin/console' >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+          test "$ready" -eq 1 || { echo "MAUTIC_CLI_MISSING_AFTER_START"; exit 1; }
+          dc exec -T -w /var/www/html mautic_web php bin/console --version
+          dc exec -T -w /var/www/html mautic_web php bin/console mautic:install --help | head -100
           dc exec -T -u www-data -w /var/www/html mautic_web \
             php bin/console mautic:install "http://localhost:18080" \
             --admin_email="synthetic-admin@example.invalid" \
