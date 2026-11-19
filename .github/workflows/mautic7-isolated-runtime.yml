@@ -52,6 +52,8 @@ jobs:
           dc exec -T -w /var/www/html mautic_web php bin/console mautic:install --help | head -100
           dc exec -T -u www-data -w /var/www/html mautic_web \
             php bin/console mautic:install "http://localhost:18080" \
+            --db_host=db --db_port=3306 --db_name=mautic_contract_test \
+            --db_user=mautic_contract_test --db_password="$MAUTIC_CONTRACT_DB_PASSWORD" \
             --admin_email="synthetic-admin@example.invalid" \
             --admin_password="$MAUTIC_CONTRACT_ADMIN_PASSWORD" --force --no-interaction
           tables="$(dc exec -T -e MYSQL_PWD="$MAUTIC_CONTRACT_DB_PASSWORD" db             mysql -umautic_contract_test -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE TABLE_SCHEMA='mautic_contract_test'")"
