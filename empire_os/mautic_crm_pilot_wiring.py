@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Mapping, Protocol
 from uuid import UUID
 
 from fastapi import APIRouter, Request
@@ -28,6 +28,24 @@ _APPROVAL = re.compile(r"^[A-Za-z0-9:@._/-]{12,160}$", re.ASCII)
 _CONTACT = re.compile(r"^[1-9][0-9]{0,17}$", re.ASCII)
 _WRITER = re.compile(r"^empire_mautic_tenant_[0-9a-f]{12,32}$", re.ASCII)
 _SECRET = re.compile(rb"^[0-9a-f]{64}$")
+
+
+class VerifiedMauticEvidenceAuthority(Protocol):
+    """Owned outside Mautic; must verify authoritative, existing evidence.
+
+    The source's JSON evidence reference strings NEVER attest themselves.
+    Resolve references only against a trusted first-party evidence store.
+    """
+
+    def verify_source(
+        self, *, source_id: str, tenant_id: str,
+        source_evidence_ref: str, founder_approval_ref: str,
+    ) -> bool: ...
+
+    def verify_binding(
+        self, *, source_id: str, tenant_id: str,
+        contact_id: int, prospect_id: str, identity_evidence_ref: str,
+    ) -> bool: ...
 
 
 def _no_duplicate_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
@@ -49,6 +67,7 @@ def build_mautic_pilot_routers(
     ],
     read_private_bytes: Callable[..., bytes],
     parse_dsn_role: Callable[[object], str],
+    verified_evidence: VerifiedMauticEvidenceAuthority | None = None,
 ) -> tuple[APIRouter, APIRouter]:
     """Construct 2 inactive-until-mounted routers for a SINGLE reviewed source.
 
@@ -58,6 +77,15 @@ def build_mautic_pilot_routers(
     function creates an OS/DB user, executes DDL, discovers contacts, sends,
     or updates CRM records.
     """
+    # A private JSON file is NOT a sufficient source of truth for founder
+    # approval or identity binding. The CRM owner must supply its independent
+    # first-party evidence verifier. No verifier means no Mautic ingress.
+    if (
+        verified_evidence is None
+        or not callable(getattr(verified_evidence, "verify_source", None))
+        or not callable(getattr(verified_evidence, "verify_binding", None))
+    ):
+        raise ValueError("trusted Mautic source and identity evidence authority required")
     if not isinstance(config_path, Path):
         raise ValueError("private Mautic config path required")
     raw = read_private_bytes(config_path, limit=64 * 1024)
@@ -94,6 +122,16 @@ def build_mautic_pilot_routers(
         raise ValueError("invalid approved Mautic tenant") from None
     if tenant != config["tenant_id"] or tenant not in tenant_dsns:
         raise ValueError("Mautic source not bound to approved CRM tenant")
+    try:
+        source_verified = verified_evidence.verify_source(
+            source_id=source_id, tenant_id=tenant,
+            source_evidence_ref=provenance,
+            founder_approval_ref=approval,
+        )
+    except Exception:
+        raise ValueError("trusted Mautic source provenance unavailable") from None
+    if source_verified is not True:
+        raise ValueError("Mautic source and founder approval not verified")
 
     writer_dsn = config["writer_dsn"]
     writer_role = parse_dsn_role(writer_dsn)
@@ -135,6 +173,16 @@ def build_mautic_pilot_routers(
             or not _APPROVAL.fullmatch(identity_proof)
         ):
             raise ValueError("duplicate/unproven Mautic contact binding")
+        try:
+            binding_verified = verified_evidence.verify_binding(
+                source_id=source_id, tenant_id=tenant,
+                contact_id=int(raw_id), prospect_id=prospect_id,
+                identity_evidence_ref=identity_proof,
+            )
+        except Exception:
+            raise ValueError("trusted Mautic identity evidence unavailable") from None
+        if binding_verified is not True:
+            raise ValueError("Mautic contact-to-prospect identity not independently verified")
         seen_prospects.add(prospect_id)
         bindings[int(raw_id)] = {
             "tenant_id": tenant, "prospect_id": prospect_id,

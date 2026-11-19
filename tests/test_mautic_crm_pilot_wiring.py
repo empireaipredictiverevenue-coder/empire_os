@@ -14,7 +14,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from empire_os.revenue_crm_pilot_activation import (
-    ACTIVATION_MODE, CONFIG_SCHEMA, build_pilot_routers,
+    ACTIVATION_MODE, CONFIG_SCHEMA,
+    build_pilot_routers as _build_pilot_routers,
     create_crm_routers_for_hub,
 )
 from empire_os.mautic_crm_pilot_wiring import SOURCE_SCHEMA
@@ -24,6 +25,42 @@ OTHER = "00000000-0000-0000-0000-000000000102"
 PROSPECT = "00000000-0000-0000-0000-000000000201"
 POST = "/v1/revenue-crm/integrations/mautic/mautic-uk-01/events/preview"
 GET = "/v1/revenue-crm/integrations/mautic/inbox/reviews"
+
+
+class SyntheticFirstPartyEvidenceVerifier:
+    """Fixture-specific attestation; production must query a real owner."""
+
+    def verify_source(
+        self, *, source_id, tenant_id, source_evidence_ref,
+        founder_approval_ref,
+    ):
+        return (
+            source_id == "mautic-uk-01"
+            and tenant_id == TENANT
+            and source_evidence_ref == "source:reviewed-mautic-provider"
+            and founder_approval_ref == "founder:separate-mautic-review-approval"
+        )
+
+    def verify_binding(
+        self, *, source_id, tenant_id, contact_id, prospect_id,
+        identity_evidence_ref,
+    ):
+        return (
+            source_id == "mautic-uk-01"
+            and tenant_id == TENANT
+            and contact_id == 42
+            and prospect_id == PROSPECT
+            and identity_evidence_ref == "identity:exact-first-party-join"
+        )
+
+
+def build_pilot_routers(*args, **kwargs):
+    # Pure synthetic tests must pass a separately provided trusted
+    # attestor. The source config cannot declare itself verified.
+    kwargs.setdefault(
+        "mautic_evidence_verifier", SyntheticFirstPartyEvidenceVerifier()
+    )
+    return _build_pilot_routers(*args, **kwargs)
 
 
 def dsn(user):
@@ -123,7 +160,11 @@ def test_hub_never_activates_mautic_without_both_separate_gates(tmp_path, monkey
     with pytest.raises(ValueError, match="Mautic CRM integration mode"):
         create_crm_routers_for_hub()
     monkeypatch.setenv("EMPIRE_CRM_MAUTIC_MODE", "APPROVED_READ_ONLY_MAUTIC_INBOX")
-    assert len(create_crm_routers_for_hub()) == 4
+    with pytest.raises(ValueError, match="evidence authority required"):
+        create_crm_routers_for_hub()
+    assert len(create_crm_routers_for_hub(
+        mautic_evidence_verifier=SyntheticFirstPartyEvidenceVerifier(),
+    )) == 4
     monkeypatch.delenv("EMPIRE_CRM_MAUTIC_MODE")
     with pytest.raises(ValueError, match="Mautic CRM integration mode"):
         create_crm_routers_for_hub()
@@ -264,3 +305,48 @@ def test_valid_signed_bound_event_requires_real_canonical_crm_lookup(
     })
     assert result.status_code == 503
     assert result.json()["detail"] == "mautic_crm_review_unavailable"
+
+
+def test_private_config_cannot_attest_itself_without_trusted_evidence(tmp_path):
+    pilot, source_path, _, _ = configs(tmp_path)
+    with pytest.raises(ValueError, match="evidence authority required"):
+        _build_pilot_routers(pilot, mautic_config_path=source_path)
+
+
+@pytest.mark.parametrize("change", [
+    {"source_evidence_ref": "source:invented-plausible-reference"},
+    {"founder_approval_ref": "founder:invented-plausible-approval"},
+    {"contact_bindings": {"42": {
+        "prospect_id": PROSPECT,
+        "identity_evidence_ref": "identity:invented-plausible-proof",
+    }}},
+])
+def test_well_formed_unverified_reference_is_rejected(tmp_path, change):
+    pilot, source_path, source, _ = configs(tmp_path)
+    source.update(change)
+    private_file(source_path, json.dumps(source))
+    with pytest.raises(ValueError, match="verified"):
+        build_pilot_routers(pilot, mautic_config_path=source_path)
+
+
+def test_authority_refuses_or_fails_closed_without_mounting_routes(tmp_path):
+    pilot, source_path, _, _ = configs(tmp_path)
+
+    class NoEvidence:
+        def verify_source(self, **_kwargs): return False
+        def verify_binding(self, **_kwargs): return True
+
+    class BrokenEvidence:
+        def verify_source(self, **_kwargs): raise RuntimeError("unavailable")
+        def verify_binding(self, **_kwargs): return True
+
+    class NoIdentity:
+        def verify_source(self, **_kwargs): return True
+        def verify_binding(self, **_kwargs): return False
+
+    for verifier in (NoEvidence(), BrokenEvidence(), NoIdentity()):
+        with pytest.raises(ValueError):
+            _build_pilot_routers(
+                pilot, mautic_config_path=source_path,
+                mautic_evidence_verifier=verifier,
+            )

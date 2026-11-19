@@ -214,3 +214,47 @@ session_user tenant; original numbered migration; real Mautic source
 and numeric-contact to canonical prospect evidence; guarded no-send
 canary followed by authenticated inbox readback. Missing real source
 evidence must never be substituted with a synthetic ID.
+
+
+## Corrected approval and identity source of truth (2026-11-19)
+
+The original isolated source configuration correctly required private files
+and evidence-ref syntax, but the application was still trusting arbitrary
+well-formed source_evidence_ref, founder_approval_ref and
+identity_evidence_ref strings without checking their underlying records.
+This is not independent verification and is now corrected.
+
+The existing CRM pilot additionally requires its original owner to inject
+a Trusted Mautic Evidence Authority object with two methods:
+
+- verify_source(source_id, tenant_id, source_evidence_ref,
+  founder_approval_ref) -> exactly True only for a genuinely authorised
+  source and founder-approved integration proven in first-party records.
+- verify_binding(source_id, tenant_id, contact_id, prospect_id,
+  identity_evidence_ref) -> exactly True only where the exact Mautic
+  numeric contact and canonical CRM prospect have independently verified
+  immutable first-party identity provenance.
+
+These callbacks are internal Python dependencies, NOT fields from the
+Mautic webhook payload, source JSON, environment variables or HTTP
+headers. Exceptions, unavailable records, False/None/non-True returns
+or absent callbacks fail closed *before either Mautic router is mounted*.
+
+No real verified source or contact-binding evidence authority was
+found in the running production CRM. Therefore the integration cannot
+claim founder or identity approval merely because strings in a local
+JSON file look plausible. Existing CRM-only pilots keep their original
+routing and authentication, unaffected.
+
+The synthetic tests supply a fixture-owned mock attestor with exact
+positive and negative reference comparisons. This is test proof of the
+fail-closed mechanism, NOT a real customer identity, real Mautic
+installation or live founder approval. A real owner-backed verifier
+must be attached as part of the guarded source/DBA release.
+
+**Current release truth:** integration implemented and tested in an
+isolated branch; native queue/503 retry proven in separate GitHub CI;
+production no Mautic daemon, no source configuration, no source identity
+attestation, no Mautic inbox/writer SQL, no public route and no sending.
+Do not enable EMPIRE_CRM_MAUTIC_MODE on the existing service until the
+record-backed verifier and the DBA/source release gates are complete.

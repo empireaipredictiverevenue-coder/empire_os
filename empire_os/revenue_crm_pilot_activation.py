@@ -78,6 +78,7 @@ def _dsn_role(dsn: object, *, expected: str | None = None) -> str:
 
 def build_pilot_routers(
     config_path: Path, *, mautic_config_path: Path | None = None,
+    mautic_evidence_verifier=None,
 ) -> tuple[APIRouter, ...]:
     """Validate private configuration and construct opted-in routers.
 
@@ -159,12 +160,20 @@ def build_pilot_routers(
             resolve_authenticated_read=resolver,
             read_private_bytes=_private_bytes,
             parse_dsn_role=_dsn_role,
+            verified_evidence=mautic_evidence_verifier,
         ))
     return tuple(routers)
 
 
-def create_crm_routers_for_hub() -> tuple[APIRouter, ...]:
-    """Existing hub is always OBSERVE unless intentionally configured."""
+def create_crm_routers_for_hub(
+    *, mautic_evidence_verifier=None,
+) -> tuple[APIRouter, ...]:
+    """Existing hub is always OBSERVE unless intentionally configured.
+
+    A Mautic config cannot self-attest its source or identity references.
+    Only the existing owner may inject an independent trusted evidence
+    verifier. Without it, Mautic opt-in fails startup; CRM stays intact.
+    """
     mode = os.environ.get("EMPIRE_CRM_PILOT_MODE", "")
     mautic_mode = os.environ.get("EMPIRE_CRM_MAUTIC_MODE", "")
     mautic_path = os.environ.get("EMPIRE_CRM_MAUTIC_CONFIG_FILE", "")
@@ -184,4 +193,5 @@ def create_crm_routers_for_hub() -> tuple[APIRouter, ...]:
     return build_pilot_routers(
         Path(file_path),
         mautic_config_path=Path(mautic_path) if mautic_mode else None,
+        mautic_evidence_verifier=mautic_evidence_verifier,
     )
