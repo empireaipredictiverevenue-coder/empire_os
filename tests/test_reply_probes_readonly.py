@@ -36,11 +36,15 @@ class FakeCursor:
 
     def execute(self, query, params=None):
         self.statements.append((query, params))
-        assert query == "BEGIN READ ONLY" or query.lstrip().upper().startswith("SELECT ")
+        assert (query == "BEGIN READ ONLY"
+                or query.startswith("SET LOCAL statement_timeout")
+                or query.lstrip().upper().startswith(("SELECT ", "WITH ")))
         assert ";" not in query.strip().rstrip(";"), "no multiple statements"
         if params is not None:
             assert len(params) == 1
-        self.last_result = self.rows.pop(0) if query != "BEGIN READ ONLY" else []
+        self.last_result = (self.rows.pop(0)
+                            if query != "BEGIN READ ONLY" and not query.startswith("SET LOCAL ")
+                            else [])
 
     def fetchall(self):
         return self.last_result
@@ -81,7 +85,8 @@ def run_mocked(monkeypatch, capsys, module, rows):
     assert calls == [("fake-readonly-dsn", 8)]
     assert connection.rollback_count == 1
     assert connection.cur.statements[0][0] == "BEGIN READ ONLY"
-    assert all(q == "BEGIN READ ONLY" or q.lstrip().upper().startswith("SELECT ")
+    assert all(q == "BEGIN READ ONLY" or q.startswith("SET LOCAL ")
+               or q.lstrip().upper().startswith(("SELECT ", "WITH "))
                for q, _ in connection.cur.statements)
     assert result["mode"] == "OBSERVE"
     assert result["outbound_authorized"] is False
@@ -147,24 +152,79 @@ def test_provider_metadata_reports_keys_only(monkeypatch, capsys):
     assert "LIMIT 100" in statements[1][0]
 
 
-def test_lineage_reports_structure_not_identity(monkeypatch, capsys):
-    rows = [
-        [("secret-intent-a",), ("secret-intent-b",), ("secret-intent-c",)],
-        [("secret-intent-a",), ("secret-intent-b",)],
-        [("secret-intent-a",)],
-    ]
+def test_lineage_reports_exact_join_structure_not_identity(monkeypatch, capsys):
+    # DB only returns one aggregate tuple; not one identifier per reply.
+    rows = [[(3, 1, 2, 0, 2, 1, 0, 2, 1, 2, 2, 1)]]
     result, statements = run_mocked(
         monkeypatch, capsys, probe_reply_identity_lineage, rows
     )
     assert result["reply_count"] == 3
     assert result["structural_counts"] == {
         "conversation_missing": 2, "conversation_unique": 1,
-        "intent_missing": 1, "intent_unique": 2,
+        "conversation_ambiguous": 0,
+        "intent_missing": 1, "intent_unique": 2, "intent_ambiguous": 0,
     }
+    assert result["read_only_metadata_counts"]["structurally_reviewable_not_authenticated"] == 1
+    assert result["exact_join_cardinality_checked"] is True
     for key in ("provider_thread_authenticated", "contact_authenticated",
-                "tenant_authenticated"):
+                "tenant_authenticated", "buyer_intent_verified"):
         assert result[key] is False
     assert "secret-intent" not in json.dumps(result)
-    assert "LIMIT 100" in statements[1][0]
-    assert len(statements) == 4
-    assert all(params is not None for _, params in statements[2:])
+    sql = statements[2][0]
+    assert "WITH recent AS MATERIALIZED" in sql
+    assert "LIMIT 100" in sql
+    assert "public.outbound_replies" in sql
+    assert "public.outbound_intents" in sql
+    assert "public.empire_conversations" in sql
+    assert "i.id = r.intent_id" in sql
+    assert "c.outbound_intent_id = r.intent_id" in sql
+    assert "COUNT(DISTINCT i.id)" in sql
+    assert "COUNT(DISTINCT c.id)" in sql
+    assert len(statements) == 3
+    assert statements[1][0].startswith("SET LOCAL statement_timeout")
+
+
+@pytest.mark.parametrize("aggregate", [
+    (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+    (3, 0, 3, 0, 0, 1, 2, 3, 1, 3, 3, 1),
+    (2, 0, 2, 0, 0, 2, 0, 2, 2, 2, 2, 2),
+])
+def test_exact_join_allows_zero_unique_and_ambiguous_aggregate_safely(aggregate):
+    result = probe_reply_identity_lineage.summarize(aggregate)
+    assert result["reply_count"] == aggregate[0]
+    assert result["admission_authorized"] is False
+    assert result["tenant_authenticated"] is False
+    assert result["raw_ids_or_pii_emitted"] is False
+
+
+@pytest.mark.parametrize("aggregate", [
+    (3, 0, 2, 0, 1, 2, 0, 1, 1, 1, 1, 1),  # contradictory intent total
+    (1, 0, 1, 0, 1, 0, 0, 1, 1, 1, 1, 1),  # impossible context count
+    (True,) + (0,) * 11,
+    (0,) * 11,
+    (1,) + (-1,) * 11,
+])
+def test_invalid_or_inconsistent_aggregate_fails_closed(aggregate):
+    with pytest.raises(ValueError):
+        probe_reply_identity_lineage.summarize(aggregate)
+
+
+def test_probe_failure_is_not_reported_as_zero_replies(monkeypatch, capsys):
+    class BadConnection:
+        def __enter__(self):
+            raise RuntimeError("PRIVATE DATABASE ERROR")
+        def __exit__(self, *args):
+            return False
+    monkeypatch.setenv("EMPIREDB_DSN", "never-print-this-secret")
+    monkeypatch.setattr(
+        probe_reply_identity_lineage.psycopg, "connect",
+        lambda *args, **kwargs: BadConnection(),
+    )
+    assert probe_reply_identity_lineage.main() == 2
+    rendered = capsys.readouterr().out
+    result = json.loads(rendered)
+    assert result["status"] == "CANONICAL_JOIN_PROBE_UNAVAILABLE"
+    assert result["source_query_completed"] is False
+    assert result["reply_count"] is None
+    assert "never-print-this-secret" not in rendered
+    assert "PRIVATE DATABASE ERROR" not in rendered

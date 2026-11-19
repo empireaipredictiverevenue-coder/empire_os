@@ -245,3 +245,67 @@ def test_no_approved_db_source_fails_without_replacing_previous_truth(
     assert health["reason_code"] == "NO_APPROVED_DATABASE_SOURCES"
     assert health["source_query_completed"] is False
     assert health["canonical_snapshot_preserved"] is True
+
+
+
+def test_existing_collector_writes_exact_join_aggregate_without_changing_readiness(tmp_path, monkeypatch):
+    import json
+    from scripts import probe_reply_identity_lineage
+    collector = _load_collector()
+    discovery = tmp_path / "discovery.json"
+    discovery.write_text(json.dumps({
+        "database_candidates": [{
+            "table": "public.outbound_replies",
+            "columns": [{"column": "provider_message_id"}],
+        }],
+        "runtime_candidates": [],
+    }))
+    monkeypatch.setattr(collector, "DISCOVERY", discovery)
+    monkeypatch.setattr(collector, "OUT", tmp_path / "latest.json")
+    monkeypatch.setattr(collector, "query_table", lambda table: [])
+    monkeypatch.setattr(collector, "runtime_records", lambda *_: [])
+    captured = []
+    def safe_probe():
+        captured.append("called")
+        return probe_reply_identity_lineage.summarize((0,) * 12)
+    monkeypatch.setattr(probe_reply_identity_lineage, "probe_readonly", safe_probe)
+    assert collector.run_cli() == 0
+    assert captured == ["called"]
+    proof = json.loads((tmp_path / "exact_reply_join_latest.json").read_text())
+    assert proof["exact_join_cardinality_checked"] is True
+    assert proof["reply_count"] == 0
+    assert proof["tenant_authenticated"] is False
+    assert proof["admission_authorized"] is False
+    assert json.loads((tmp_path / "collector_health_latest.json").read_text())[
+        "status"
+    ] == "READ_SUCCESS"
+
+
+def test_existing_collector_proof_failure_reports_unavailable_without_zero_claim(tmp_path, monkeypatch):
+    import json
+    from scripts import probe_reply_identity_lineage
+    collector = _load_collector()
+    discovery = tmp_path / "discovery.json"
+    discovery.write_text(json.dumps({
+        "database_candidates": [{
+            "table": "public.outbound_replies",
+            "columns": [{"column": "provider_message_id"}],
+        }],
+        "runtime_candidates": [],
+    }))
+    monkeypatch.setattr(collector, "DISCOVERY", discovery)
+    monkeypatch.setattr(collector, "OUT", tmp_path / "latest.json")
+    monkeypatch.setattr(collector, "query_table", lambda table: [])
+    monkeypatch.setattr(collector, "runtime_records", lambda *_: [])
+    def denied():
+        raise RuntimeError("postgres://private-this-must-never-leak")
+    monkeypatch.setattr(probe_reply_identity_lineage, "probe_readonly", denied)
+    assert collector.run_cli() == 0
+    proof = json.loads((tmp_path / "exact_reply_join_latest.json").read_text())
+    assert proof["status"] == "CANONICAL_JOIN_PROBE_UNAVAILABLE"
+    assert proof["source_query_completed"] is False
+    assert proof["reply_count"] is None
+    assert "private-this-must-never-leak" not in str(proof)
+    assert json.loads((tmp_path / "latest.json").read_text())[
+        "semantic_effectiveness"
+    ]["canonical_message_count"] == 0

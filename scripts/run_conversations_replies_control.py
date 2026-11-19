@@ -229,6 +229,30 @@ def runtime_records(
     return records
 
 
+def _refresh_exact_canonical_join_probe() -> None:
+    """Nonblocking existing-owner diagnostic, not conversation admission.
+
+    Queries exact canonical edges with the same restricted source credential
+    already used by this collector; never opens a new provider or scheduler.
+    Failure does not erase or falsely zero the collector's original snapshots.
+    """
+    from scripts.probe_reply_identity_lineage import (
+        probe_readonly, unavailable,
+    )
+    try:
+        packet = probe_readonly()
+    except Exception:
+        packet = unavailable()
+    # Same private existing Conversations & Replies directory as the collector.
+    # The diagnostic contains only counts, status and fixed relation names.
+    try:
+        atomic_write(
+            OUT.with_name("exact_reply_join_latest.json"), packet,
+        )
+    except OSError:
+        pass  # The original source-read success must remain independent.
+
+
 def main():
 
     discovery = json.loads(
@@ -347,6 +371,8 @@ def main():
             "execution_authority": "none",
         },
     )
+
+    _refresh_exact_canonical_join_probe()
 
     sem = payload[
         "semantic_effectiveness"
