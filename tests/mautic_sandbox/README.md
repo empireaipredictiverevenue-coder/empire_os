@@ -49,16 +49,19 @@ instance also failed during read-only probing. The existing LXD environment
 has no configured storage pool/profile and is not used as an escalation
 route. Neither Docker group permission nor host configuration was changed.
 
-**An authorised test-environment owner must provide a dedicated isolated
-Docker runner**, or explicit policy-approved access to one, before launch.
-Do not add the EmpireOS production user to a root-equivalent Docker group
-as an ad hoc workaround.
+**The isolated test runner is now provided by GitHub Actions on the
+integration branch**, not by escalating permissions on the EmpireOS host.
+The official Mautic 7.2.2 Apache application, disposable MySQL database and
+private-only synthetic webhook receiver were started and tested successfully.
+No root-equivalent Docker group permissions were granted to the production
+Ubuntu operator. Do not add them as an ad hoc workaround.
 
-With an approved sandbox-only runtime, the operator may generate independent,
-high-entropy database passwords outside Git and use Docker Compose v2 to
-start **only** this manual profile. The exact startup must follow existing
-security approvals. No startup or image-pull action is performed by this
-branch; even a syntactically valid Compose file does not prove image runtime.
+On 2026-11-19, run
+https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/44526866616
+verified native signed webhook delivery, a real HTTP 503 retained/retried
+queue entry, successful subsequent HTTP delivery, and queue acknowledgment.
+The hosted runner removed all containers, database volumes and its private
+network. No customer emails or production data were used.
 
 ## Test conditions once the application exists
 
@@ -74,6 +77,16 @@ branch; even a syntactically valid Compose file does not prove image runtime.
 6. Preserve founder/DBA release approval gates before any production
    migration or endpoint registration.
 
-**Current truth:** 141 committed-branch unit/in-process/regression tests and
-4 disposable PostgreSQL integration tests passed. The full Mautic application
-and genuine producer-driven webhook delivery remain unverified.
+**Current verified state (2026-11-19):** The full Mautic 7.2.2 test
+application installed 127 database tables and responded privately with HTTP
+302. Its native persisted webhook queue issued a signed request to the
+actual EmpireOS HMAC review adapter. A deliberately returned HTTP 503
+preserved the queued event with retry count 1; the next processing pass
+delivered the signed suppression-review event successfully and removed the
+queued record. GitHub Actions run 44526866616 finished SUCCESS and verified
+container, network and database volume cleanup.
+
+**Still held:** Any production tenant contact binding, database migration,
+public route registration, sender activation, publishing, deployment,
+customer outreach, payment and commercial-revenue claim. All runner
+events and credentials were synthetic.

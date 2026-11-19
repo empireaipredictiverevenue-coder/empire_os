@@ -569,3 +569,56 @@ production deployment was used.
 production EmpireDB inbox migration/role provisioning, production HTTP
 router registration, live marketing operations, revenue or payment.
 DBA, canonical CRM owner and founder-controlled release gates still apply.
+
+
+## VERIFIED NATIVE MAUTIC 7 DELIVERY AND RETRY RECEIPT — 2026-11-19 12:47 UTC
+
+This section supersedes the historical application-runtime and queue-delivery
+holds recorded earlier in this evolving review; it does not supersede any
+production, founder approval, consent, tenancy or database migration gate.
+
+**Authoritative, finished GitHub Actions execution:**
+https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/44526866616
+
+- Run result: SUCCESS, including the always-run synthetic-stack teardown.
+- Source commit executed: ccd180a846038444fa69637f895c8530c8d267d0.
+- Official pinned Mautic 7.2.2 Apache container started; synthetic MySQL
+  8.4 created 127 actual Mautic schema tables; isolated Mautic HTTP 302
+  health verified.
+- Native Mautic 7 Doctrine model created an actual published webhook,
+  event subscription and compressed persisted webhook_queue record in its
+  own disposable MySQL. Synthetic contact id 42 only; no real contacts.
+- The real mautic:webhooks:process CLI sent an HMAC-SHA256 signed HTTP
+  webhook over a Docker-internal private network to a synthetic receiver
+  executing the existing EmpireOS signed-event review implementation.
+- Receiver verified the signature, tenant-scoped synthetic binding and
+  SUPPRESSION_REVIEW_REQUIRED with send_authorized=false.
+- Receiver intentionally returned HTTP 503 on the first valid delivery.
+  CI verified the native queue row remained with retries=1, then
+  processed the same webhook again after the isolated configured delay.
+- The second genuine Mautic HTTP delivery was accepted by the same
+  signature adapter, the output remained review-only, and the native
+  Mautic queue entry was acknowledged and deleted after HTTP 200.
+- The job verified Docker containers, MySQL data volumes, and internal
+  network removal. A private, synthetic-only receiver was used; no
+  customer email, sender registration, internet-facing Mautic service,
+  production database or network route was activated.
+
+**Scope boundary:** The live GitHub test verifies the genuine upstream
+Mautic application, source queue and retry, and signed adapter delivery.
+It is NOT a production Mautic installation, nor an activated EmpireDB inbox.
+Earlier tests separately verified the Postgres inbox and tenant-bound CRM
+reader using disposable actual PostgreSQL. The production live system still
+requires source identity provenance and authorised DB/HTTP integration.
+
+**Next governed production integration owner requirements:** reconcile
+current uncommitted CRM owner changes, provision verified immutable
+Mautic contact -> canonical prospect IDs without email guesswork, DBA
+review/migration/least-privilege tenant-specific role grants, bind a
+per-source webhook secret, opt-in register the authenticated route, and
+perform guarded canary with source-health and suppression protection.
+No live sender, campaign, publishing, payments or spending is authorised.
+
+**Truthful release status:** NATIVE_APPLICATION_AND_WEBHOOK_RETRY_TESTED_PASS;
+PRODUCTION_MERGE_MIGRATION_AND_ACTIVATION_HELD; CUSTOMER_DELIVERY_NOT_LIVE;
+Genuine revenue and sales not established by this engineering receipt.
