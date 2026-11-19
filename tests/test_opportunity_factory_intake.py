@@ -103,3 +103,39 @@ def test_batch_accepts_evidence_normalizer_output():
     assert item["normalization"][
         "search_result_counts_used_as_scores"
     ] is False
+
+
+
+def test_reported_normalized_count_cannot_forge_observed_scored_candidates():
+    result = build_factory_intake_batch(
+        {"candidates": [candidate()]},
+        {"actions": [research()]},
+        {"items": [{
+            "opportunity_key": "storm-dfw-roofing",
+            "normalized_score_count": 8,
+            "normalized_signals": {"buyer_intent": None, "demand": None},
+        }]},
+    )
+    assert result["normalized_signal_source_available"] is True
+    assert result["candidates_with_any_normalized_score"] == 0
+    assert result["populated_scores_computed_from_values"] is True
+    assert result["candidates_with_both_buyer_intent_and_demand_values"] == 0
+    assert result["candidate_evidence_gap_counts"]["buyer_intent_normalized_score_required"] == 1
+    assert result["factory_ready_count"] == 0
+    assert result["unverified_buyer_demand_not_negative_evidence"] is True
+
+
+def test_commercial_observation_scores_are_counted_from_parsed_values():
+    result = build_factory_intake_batch(
+        {"candidates": [candidate()]},
+        {"actions": [research()]},
+        {"items": [{
+            "opportunity_key": "storm-dfw-roofing",
+            "normalized_score_count": 0,
+            "normalized_signals": normalized(),
+        }]},
+    )
+    assert result["factory_ready_count"] == 1
+    assert result["candidates_with_any_normalized_score"] == 1
+    assert result["candidates_with_both_buyer_intent_and_demand_values"] == 1
+    assert result["candidate_evidence_gap_counts"] == {}

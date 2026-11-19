@@ -19,6 +19,14 @@ def main() -> int:
         "candidate_count": payload["candidate_count"],
         "factory_ready_count": payload["factory_ready_count"],
         "blocked_count": payload["blocked_count"],
+        "candidates_with_any_normalized_score": payload[
+            "candidates_with_any_normalized_score"
+        ],
+        "candidates_with_both_buyer_intent_and_demand_values": payload[
+            "candidates_with_both_buyer_intent_and_demand_values"
+        ],
+        "candidate_evidence_gap_counts": payload["candidate_evidence_gap_counts"],
+        "unverified_buyer_demand_not_negative_evidence": True,
         "search_observation_scores_inferred": payload[
             "search_observation_scores_inferred"
         ],

@@ -6,6 +6,7 @@ scores from search-result counts or model prose.
 """
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 import json
 from pathlib import Path
@@ -223,6 +224,21 @@ def build_factory_intake_batch(
         }
         rows.append(row)
 
+    # Report actual parsed score values, never the upstream producer's
+    # unverified normalized_score_count claim. Missing commercial evidence
+    # remains UNKNOWN rather than being treated as negative buyer demand.
+    gap_counts = Counter(
+        blocker for row in rows for blocker in row["blockers"]
+    )
+    scored_count = sum(
+        any(value is not None for value in row["normalized_scores"].values())
+        for row in rows
+    )
+    commercial_observation_count = sum(
+        row["normalized_scores"]["buyer_intent"] is not None
+        and row["normalized_scores"]["demand"] is not None
+        for row in rows
+    )
     return {
         "schema_version": "empire.opportunity_factory_intake_batch.v1",
         "mode": "OBSERVE",
@@ -236,12 +252,13 @@ def build_factory_intake_batch(
         ),
         "items": rows,
         "normalized_signal_source_available": bool(normalized_batch),
-        "candidates_with_any_normalized_score": sum(
-            int((row.get("normalization") or {}).get(
-                "normalized_score_count", 0
-            ) > 0)
-            for row in rows
+        "candidates_with_any_normalized_score": scored_count,
+        "populated_scores_computed_from_values": True,
+        "candidates_with_both_buyer_intent_and_demand_values": commercial_observation_count,
+        "candidate_evidence_gap_counts": dict(
+            sorted(gap_counts.items(), key=lambda item: (-item[1], item[0]))
         ),
+        "unverified_buyer_demand_not_negative_evidence": True,
         "search_observation_scores_inferred": False,
         "automatic_external_execution_allowed": False,
         "execution_authority": "none",
