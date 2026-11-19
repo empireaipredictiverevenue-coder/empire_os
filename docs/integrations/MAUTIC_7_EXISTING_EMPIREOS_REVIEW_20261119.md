@@ -66,3 +66,88 @@ Any later connection must use the existing Smart CRM authorisation and GTM gover
 ## Decision on fork versus integration
 
 **Choose a narrow event adapter first.** Do not clone a second Mautic customer database, sender or journey product into production. Evaluate a separately isolated upstream Mautic installation only if an observed customer journey requires complex branching/execution functionality that the current EmpireOS owner cannot deliver economically. Full-fork ownership is *not* authorised by this review.
+
+
+## Follow-on delivery — 2026-11-19: guarded HTTP to Smart CRM preview
+
+**Implementation:** empire_os/mautic_crm_integration.py
+**Synthetic HTTP tests:** tests/test_mautic_crm_integration.py
+**State:** ISOLATED_IMPLEMENTED_AND_TESTED_ONLY, NOT MOUNTED IN PRODUCTION.
+
+A separately instantiated, opt-in FastAPI router now implements
+POST /v1/revenue-crm/integrations/mautic/{source_id}/events/preview.
+The handler uses a source-resolver callback whose tenant and signature secret
+MUST come from server-held configuration, never body fields or tenant headers.
+It validates Mautic's raw-body Webhook-Signature before resolving matching
+Smart CRM prospects through a tenant-bound reader. Non-PostgreSQL readers
+are refused unless a special synthetic-test flag is explicitly set.
+
+For each verified event with an independently trusted bound contact:
+- Resolve the existing CRM prospect and run preview_crm_journey.
+- Return its observed segment and blockers, plus a review-only event category.
+- Never treat form submission or Mautic contactable as opt-in, an email open
+  as purchase, or a source status change as canonical suppression clearance.
+- Never mutate the CRM, create subscribers, schedule work or send outreach.
+
+**Durable replay staging:** SqliteMauticReceiptJournal writes only tenant ID,
+source ID and a keyed event fingerprint, not raw source contact details.
+It requires a private owner-controlled directory and 0600 file, rejects
+insecure existing files, and uses an atomic BEGIN IMMEDIATE transaction
+and uniqueness key to avoid duplicate admission across requests, threads and
+journal reopening. It is for isolated evaluation ONLY; it is not an approved
+replacement for an EmpireDB replay ledger or canonical event inbox.
+
+**Critical outstanding delivery design:** The staging receipt store preserves
+deduplication proofs, but not deliverable normalized CRM signal history.
+The webhook returns a preview and Mautic will not use that response as a
+customer-facing marketing journey. Do not register this webhook as a live
+production listener until a canonical EmpireDB delivery/outbox owner has
+provided a durable, tenant-scoped event inbox with independent readback and
+acknowledgement semantics. Otherwise an acknowledged event could be lost.
+The marketing journey designer is a separate design-only surface and no
+server-driven journey execution has been authorised.
+
+### Verified tests (synthetic fixture, not a real Mautic service)
+
+The FastAPI TestClient test suite exercises signed HTTP delivery using Mautic's
+documented event shapes, tenant-binding and suppression checks, and checks
+that replay after reopening the journal yields zero new events. It includes
+concurrent duplicate receipt admission, missing canonical prospects, and
+privacy protections. No real data or sender is involved.
+
+The relevant suite command is:
+
+    PYTHONDONTWRITEBYTECODE=1 /srv/empire_os/.venv/bin/python -B -m pytest -q -p no:cacheprovider \
+        tests/test_mautic_crm_integration.py tests/test_mautic_webhook_review.py \
+        tests/test_revenue_crm_journeys.py tests/test_revenue_crm_channel_evidence.py \
+        tests/test_revenue_crm_design_store.py tests/test_revenue_crm_journey_designer.py
+
+One broad branch-based verification including tests/test_outbound_governor.py
+returned **91 passed, 3 failed**. These three are baseline drift
+on the isolated base commit: tests/test_outbound_governor.py in the currently
+active, dirty /srv/empire_os checkout independently returned **11 passed**.
+The Mautic branch does not edit the governor or those tests. No governor fix,
+source cherry-pick or merge was authorised here. Reconcile owner work before
+any merge and rerun all relevant tests on that final integration candidate.
+
+### Conditions for a real Mautic-backed demonstration
+
+1. Verify an isolated Mautic 7 test instance, version and API/webhook event
+   payloads. No Mautic systemd service, Docker container name or repo config
+   was located in the inspected EmpireOS environment.
+2. Bind test contact IDs to existing, authenticated Smart CRM prospect IDs
+   using the canonical identity owner, not email matching.
+3. Confirm approved secrets, per-tenant dedicated CRM read login,
+   source configuration, consent/suppression gates and webhook listener scope.
+4. Add a DBA-reviewed EmpireDB canonical replay/event-inbox implementation
+   and an auditable delivery handoff before acknowledging live events.
+5. Demonstrate a full genuine form/consent to qualified CRM conversation
+   to founder-reviewed follow-up to verified outcome, with sending disabled
+   until separately authorised; track real qualified enquiries, not opens.
+6. Repeat runtime and end-to-end tests, independent review and founder gate
+   before merge/deployment; no webhooks, migrations, service restarts or
+   outbound actions were enabled by this branch.
+
+Mautic's developer webhook docs explicitly warn parts may be outdated.
+Payload assumptions should be revalidated against the exact tested release.
+Source: https://devdocs.mautic.org/en/7.3/webhooks/getting_started.html
