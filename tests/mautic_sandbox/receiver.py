@@ -6,17 +6,26 @@ on the Docker-internal bridge. Only non-PII proof is stored.
 """
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import pathlib
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from empire_os.mautic_webhook_review import (
-    MAX_BODY_BYTES,
-    MauticWebhookReviewError,
-    preview_signed_mautic_webhook,
-)
+# Load exactly the existing signed-webhook adapter by absolute source path.
+# Importing the parent empire_os package would execute unrelated startup
+# imports that inspect the production owner's /root/empire_os/.env. A
+# sandbox-only, nonroot receiver must never need that home directory.
+ADAPTER = "/app/empire_os/mautic_webhook_review.py"
+_spec = importlib.util.spec_from_file_location("isolated_mautic_review", ADAPTER)
+if _spec is None or _spec.loader is None:
+    raise SystemExit("MAUTIC_REVIEW_ADAPTER_UNAVAILABLE")
+_review = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_review)
+MAX_BODY_BYTES = _review.MAX_BODY_BYTES
+MauticWebhookReviewError = _review.MauticWebhookReviewError
+preview_signed_mautic_webhook = _review.preview_signed_mautic_webhook
 
 TENANT = "00000000-0000-0000-0000-000000000101"
 PROSPECT = "00000000-0000-0000-0000-000000000201"
