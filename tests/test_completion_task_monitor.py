@@ -559,3 +559,38 @@ def test_productivity_direct_customer_evidence_precedes_generic_sales_product():
     assert candidates[0]["customer_outcome_independently_verified"] is False
     assert candidates[1]["explicit_customer_evidence_priority_hint"] is False
     assert snap["productivity_driver"]["work_dispatched"] is False
+
+
+def test_existing_cli_exposes_exact_owner_actions_without_execution(tmp_path):
+    from scripts.task_monitor_status import inspect
+    rows, recon = sources()
+    snapshot = build_completion_task_monitor(rows, recon, now=NOW)
+    target = tmp_path / OUTPUT
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps(snapshot))
+    result = inspect(tmp_path, now=NOW + timedelta(seconds=1))
+    assert result["status"] == "AVAILABLE"
+    review = result["productivity_driver"]
+    assert review["status"] == "AVAILABLE"
+    assert review["ranked_review_count"] == 3
+    assert review["next_owner_reviews"][0]["existing_owner"] == "sales_revenue"
+    assert review["next_owner_reviews"][0]["task"] == SECOND
+    assert review["next_owner_reviews"][0]["checklist_line"] == rows[1].line
+    assert review["work_dispatched"] is False
+    assert all(not row["approved_for_external_execution"]
+               for row in review["next_owner_reviews"])
+
+
+def test_existing_cli_holds_forged_productivity_gate_without_hiding_valid_monitor(tmp_path):
+    from scripts.task_monitor_status import inspect
+    rows, recon = sources()
+    snapshot = build_completion_task_monitor(rows, recon, now=NOW)
+    snapshot["productivity_driver"]["review_candidates"][0]["approved_for_external_execution"] = True
+    target = tmp_path / OUTPUT
+    target.parent.mkdir(parents=True)
+    target.write_text(json.dumps(snapshot))
+    result = inspect(tmp_path, now=NOW + timedelta(seconds=1))
+    assert result["status"] == "AVAILABLE"
+    assert result["productivity_driver"]["status"] == "HELD"
+    assert result["productivity_driver"]["work_dispatched"] is False
+    assert result["execution_authority"] == "none"
