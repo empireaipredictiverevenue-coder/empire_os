@@ -53,17 +53,23 @@ jobs:
           dc exec -T -u www-data -w /var/www/html mautic_web \
             php bin/console mautic:install "http://localhost:18080" \
             --admin_email="synthetic-admin@example.invalid" \
-            --admin_password="$MAUTIC_CONTRACT_ADMIN_PASSWORD" --no-interaction
+            --admin_password="$MAUTIC_CONTRACT_ADMIN_PASSWORD" --force --no-interaction
+          tables="$(dc exec -T -e MYSQL_PWD="$MAUTIC_CONTRACT_DB_PASSWORD" db             mysql -umautic_contract_test -N -e "SELECT COUNT(*) FROM information_schema.tables WHERE TABLE_SCHEMA='mautic_contract_test'")"
+          echo "MAUTIC_INSTALL_CREATED_TABLES=$tables"
+          test "$tables" -ge 50 || { echo "MAUTIC_APPLICATION_INSTALL_INCOMPLETE"; exit 1; }
+          ready=0
           for n in $(seq 1 45); do
-            code="$(curl -sS -o /dev/null --max-time 4 -w '%{http_code}' http://127.0.0.1:18080/ || true)"
+            code="$(dc exec -T mautic_web curl -sS -o /dev/null               --max-time 4 -w '%{http_code}' http://127.0.0.1/ 2>/dev/null || true)"
             if [[ "$code" == 200 || "$code" == 302 || "$code" == 303 ]]; then
-              echo "MAUTIC_FULL_APP_HTTP_VERIFIED_$code"
+              echo "MAUTIC_PRIVATE_APP_HTTP_VERIFIED_$code"
+              ready=1
               break
             fi
             sleep 2
           done
-          curl -fsSL --max-time 15 http://127.0.0.1:18080/ -o /tmp/mautic_runtime.html
-          echo "FULL_MAUTIC_7_WEB_APP_INSTALLED_AND_REACHABLE"
+          test "$ready" -eq 1 || { echo "PRIVATE_MAUTIC_APPLICATION_NOT_READY"; exit 1; }
+          dc exec -T -w /var/www/html mautic_web             php bin/console mautic:webhooks:process --help >/dev/null
+          echo "FULL_MAUTIC_7_APP_INSTALLED_AND_WEBHOOK_QUEUE_COMMAND_EXISTS"
       - name: Print isolated diagnostics on failure
         if: failure()
         shell: bash
