@@ -11,7 +11,6 @@ BEGIN
 END $$;
 
 CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT;
-CREATE ROLE empire_mautic_crm_inbox_writer NOLOGIN NOINHERIT;
 CREATE ROLE empire_revenue_crm_reader NOLOGIN NOINHERIT;
 CREATE ROLE empire_revenue_crm_journey_writer NOLOGIN NOINHERIT;
 CREATE ROLE empiredb_app NOLOGIN;
@@ -22,8 +21,6 @@ CREATE ROLE mautic_fixture_writer_b LOGIN NOINHERIT;
 CREATE ROLE mautic_fixture_reader_a LOGIN NOINHERIT;
 
 GRANT empiredb_migrator TO fixture_owner;
-GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_a;
-GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_b;
 GRANT empire_revenue_crm_reader TO mautic_fixture_reader_a;
 GRANT CREATE ON SCHEMA public TO empiredb_migrator;
 

@@ -49,6 +49,27 @@ export PGDATABASE=mautic_crm_inbox_fixture
 "$PG_BIN/createdb" "$PGDATABASE"
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/tests/fixtures/mautic_crm_pg_runtime_fixture.sql" > "$TMP/fixture.log"
+
+# Exact proposed DBA role preparation, tested against the true synthetic
+# tenant resolver and actual private public-schema ownership.
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql" \
+  > "$TMP/role-prep.log"
+
+# Deliberately refuse a second role-prep invocation; a release must
+# reconcile collisions, not silently reuse a role with uncertain grants.
+if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql" \
+  > "$TMP/role-collision.log" 2>&1; then
+  echo "MAUTIC_ROLE_COLLISION_NOT_REJECTED" >&2
+  exit 3
+fi
+
+# Only the fixture's synthetic login roles receive membership. No live
+# tenant login, tenant ID, account, or permission is provisioned here.
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
+  "GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_a,mautic_fixture_writer_b" \
+  > "$TMP/fixture-membership.log"
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/docs/integrations/sql/MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql" \
   > "$TMP/migration.log"
@@ -63,4 +84,36 @@ cd "$ROOT"
 PYTHONDONTWRITEBYTECODE=1 "$PYTHON" -B -m pytest \
   -q -p no:cacheprovider tests/test_mautic_crm_pg_runtime.py
 
+# The rollback MUST refuse a populated or member-bound inbox. Both
+# negative cases execute only inside this disposable fixture database.
+if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_ROLLBACK_DBA_ONLY_20261119.sql" \
+  > "$TMP/rollback-active-writer.log" 2>&1; then
+  echo "MAUTIC_ROLLBACK_UNEXPECTEDLY_REMOVED_MEMBER_BOUND_WRITER" >&2
+  exit 4
+fi
+grep -F "writer has member logins" "$TMP/rollback-active-writer.log" >/dev/null
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
+  "REVOKE empire_mautic_crm_inbox_writer FROM mautic_fixture_writer_a,mautic_fixture_writer_b" \
+  > "$TMP/fixture-membership-revoked.log"
+if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_ROLLBACK_DBA_ONLY_20261119.sql" \
+  > "$TMP/rollback-populated.log" 2>&1; then
+  echo "MAUTIC_ROLLBACK_UNEXPECTEDLY_REMOVED_EVIDENCE" >&2
+  exit 4
+fi
+grep -F "inbox contains evidence" "$TMP/rollback-populated.log" >/dev/null
+
+# Data deletion is fixture-only, after tests, never production. A real
+# populated Mautic inbox must preserve its evidence instead of rollback.
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
+  "DELETE FROM public.empire_crm_mautic_event_inbox" > "$TMP/fixture-data-cleared.log"
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_ROLLBACK_DBA_ONLY_20261119.sql" \
+  > "$TMP/rollback-empty.log"
+"$PG_BIN/psql" -X -At -v ON_ERROR_STOP=1 -c \
+  "SELECT (pg_catalog.to_regclass('public.empire_crm_mautic_event_inbox') IS NULL)::text || ',' || (NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='empire_mautic_crm_inbox_writer'))::text" | \
+  grep -Fx 'true,true' >/dev/null
+
+echo "MAUTIC_ISOLATED_ROLE_MIGRATION_AND_FAIL_CLOSED_ROLLBACK_VERIFIED"
 echo "ISOLATED_POSTGRESQL_RUNTIME_VERIFIED_AND_CLEANUP_REQUESTED"

@@ -171,3 +171,46 @@ receipt + verified live source/identity binding -> one guarded ingress
 canary -> authenticated tenant-only inbox readback -> explicit final
 founder release decision. No application restart, schema write,
 provisioning or sender activation is implied by this document.
+
+
+## DBA role + fail-closed rollback: executed in disposable PostgreSQL 18
+
+The live EmpireDB public schema is owned by pg_database_owner;
+empiredb_migrator has USAGE and CREATE but no schema GRANT OPTION.
+Therefore the required writer's schema USAGE must be granted by the
+actual DBA/schema owner, not by SET ROLE empiredb_migrator.
+
+The missing exact writer-role bootstrap is now prepared here:
+docs/integrations/sql/MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql
+
+It creates one NOLOGIN, NOINHERIT, nonprivileged writer and grants
+schema USAGE. It checks the canonical security-definer tenant-binding
+function, refuses role collisions, and cannot create customer data,
+tenant writer logins, passwords, or network listeners.
+
+The existing prepared inbox table and RLS migration remains:
+docs/integrations/sql/MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql
+
+The prepared DBA-controlled rollback is:
+docs/integrations/sql/MAUTIC_CRM_INBOX_ROLLBACK_DBA_ONLY_20261119.sql
+
+Rollback must refuse any tenant login memberships or stored event
+evidence. It cannot use CASCADE or DROP OWNED BY; an authorised
+DBA may roll back only an empty, disconnected inbox. Never discard
+real customer evidence just to make rollback pass.
+
+**Executed fixture proof:** scripts/test_mautic_crm_pg_isolated.sh
+now provisions the exact role, applies the exact migration, passes all
+7 tenant/RLS/HMAC/receipt tests on a truly disposable PostgreSQL 18
+cluster, confirms a second role bootstrap refuses existing-role
+collision, confirms the rollback refuses member-bound and nonempty
+inboxes, and after fixture-only clearing verifies empty-role/table
+rollback succeeded. No production DB, roles or source was modified.
+
+**Production still requires exact DBA authority and verified source:**
+approved change/rollback and backups; checked real instance and role;
+unique tenant writer login bound to an independently verified
+session_user tenant; original numbered migration; real Mautic source
+and numeric-contact to canonical prospect evidence; guarded no-send
+canary followed by authenticated inbox readback. Missing real source
+evidence must never be substituted with a synthetic ID.
