@@ -41,6 +41,16 @@ def _contact_id(event_name: str, event: Mapping[str, Any]) -> int:
     if event_name == "mautic.form_on_submit":
         submission = event.get("submission")
         contact = submission.get("lead") if isinstance(submission, Mapping) else None
+    elif event_name == "mautic.email_on_open":
+        # Verified against Mautic 7.x EmailBundle/WebhookSubscriber.php:
+        # onEmailOpen() queues {'stat': $event->getStat()}, whose serialized
+        # Stat::loadApiMetadata includes the nested 'lead' association.
+        # Retain contact-shaped legacy synthetic fixtures only when 'stat'
+        # is wholly absent; never infer a contact from email addresses.
+        stat = event.get("stat")
+        contact = stat.get("lead") if isinstance(stat, Mapping) else (
+            event.get("contact") if stat is None else None
+        )
     else:
         contact = event.get("contact")
     result = contact.get("id") if isinstance(contact, Mapping) else None

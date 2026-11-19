@@ -202,7 +202,9 @@ def test_batch_signals_and_isolated_event_dedup(journal):
                            "results": {"private": "do not disclose"}},
             "timestamp": NOW.isoformat(),
         }],
-        "mautic.email_on_open": [{"contact": {"id": 42}, "timestamp": NOW.isoformat()}],
+        "mautic.email_on_open": [{"stat": {"lead": {"id": 42},
+                                               "emailAddress": "private@example.test"},
+                                  "timestamp": NOW.isoformat()}],
     }
     body, headers = signed(payload)
     result = make_app(journal).post(ENDPOINT, data=body, headers=headers)

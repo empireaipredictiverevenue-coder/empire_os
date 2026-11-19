@@ -217,3 +217,62 @@ no systemd unit changed, no container created and no instance installed.
 prepared DDL only. No verified live Mautic traffic, conversion, marketing
 subscriber, buyer or sales event is claimed. No sending, payment, migrations,
 deployments or background automation was started.
+
+
+## Independent isolated PostgreSQL 18 runtime verification — 2026-11-19
+
+This follow-on closed the gap between mocked PostgreSQL tests and an
+actual database runtime. New independent fixture files:
+
+- scripts/test_mautic_crm_pg_isolated.sh
+- tests/fixtures/mautic_crm_pg_runtime_fixture.sql
+- tests/test_mautic_crm_pg_runtime.py
+
+The script explicitly refuses root execution, creates a disposable private
+PostgreSQL 18 cluster under an isolated /tmp directory, and configures **no
+TCP listener**. It uses only owner-private Unix sockets. The fixture creates
+dummy roles, a trusted session_user-based tenant resolver, synthetic CRM rows
+and a tenant CRM reader projection. The held inbox SQL is applied **only**
+inside this disposable fixture and independently tested using actual
+psycopg PostgreSQL connections from dedicated role logins.
+
+The first fixture run failed because the operating environment's default
+cluster locale could produce SQL_ASCII text decoding as bytes. The runner
+now requires UTF8 and C.utf8, consistent with proper modern PostgreSQL
+encoding. The runtime checks also exposed that the drafted schema's
+GRANT USAGE ON SCHEMA public could be ineffective under a migration role
+which does not own that schema. The held draft now requires schema USAGE
+to be provisioned by its owner and confirms the required schema/table
+privileges before transaction commit. This preserves the DBA authority gate.
+
+**Verified result:** the isolation script passed 4 actual PostgreSQL
+tests, including real RLS cross-tenant exclusion, INSERT-only writer
+permissions, committed insert/readback, duplicate receipt handling,
+real tenant-bound Smart CRM prospect read, and a signed HTTP webhook
+accepted exactly once and persisted to the canonical fixture inbox.
+Temporary PostgreSQL was stopped and test files removed by the script.
+The in-process FastAPI tests use **synthetic Mautic-shaped HTTP requests**;
+they are not claims of an installed/connected Mautic server.
+
+**Upstream Mautic 7.x source compatibility correction:** Confirmed in
+app/bundles/EmailBundle/EventListener/WebhookSubscriber.php that
+mautic.email_on_open emits a nested stat object, NOT a top-level contact
+record. The stat serializer declares a lead association in
+app/bundles/EmailBundle/Entity/Stat.php. Updated the bounded adapter to
+read stat.lead.id for email-open events and reject stat payloads with no
+verified lead identity. Added privacy and signature regression tests.
+The lead-channel subscription status labels were confirmed from
+app/bundles/LeadBundle/Event/ChannelSubscriptionChange.php.
+References are from upstream GitHub 7.x, SHA
+e323d688a2cbc37f4ebcc9bd7d2f2042833bde24.
+
+**Relevant suite:** 108 existing and Mautic-specific in-process tests
+passed; 4 additional real PostgreSQL isolated integration tests passed.
+Third-party HTTPX/Starlette deprecation warnings remain unrelated.
+
+**Still not authorised/completed:** Real Mautic provisioning or delivery,
+deployment, production registration of the FastAPI router, allocation of a
+sequenced migration number, applying held SQL in EmpireDB, obtaining
+canonical production source bindings/secret/reader/writer logins, webhook
+queue health, workflow execution, outbound sends, sales, or any revenue
+claim. Requires canonical DBA/Smart CRM owner review and founder release gate.

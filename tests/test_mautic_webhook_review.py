@@ -86,10 +86,24 @@ def test_form_submit_records_interest_only_and_drops_form_pii():
 
 
 def test_email_open_is_low_confidence_and_cannot_count_as_conversion():
-    event = {"contact": {"id": 42}, "timestamp": NOW.isoformat()}
+    # Upstream Mautic 7.x EmailBundle::onEmailOpen emits a serialized stat.lead,
+    # not the contact object used by subscription-change events.
+    event = {"stat": {
+        "id": "stat-9",
+        "lead": {"id": 42, "email": "private@example.test"},
+        "emailAddress": "private@example.test",
+    }, "timestamp": NOW.isoformat()}
     result = review(body_for("mautic.email_on_open", event))
     assert result["signals"][0]["signal"] == "LOW_CONFIDENCE_EMAIL_OPEN_REVIEW"
     assert result["sender_enabled"] is False
+    assert "private@example.test" not in str(result)
+
+
+def test_email_open_requires_stat_lead_identity_not_email_lookup_or_contact_override():
+    invalid = {"stat": {"emailAddress": "private@example.test"},
+               "contact": {"id": 42}, "timestamp": NOW.isoformat()}
+    with pytest.raises(MauticWebhookReviewError, match="contact ID"):
+        review(body_for("mautic.email_on_open", invalid))
 
 
 def test_unmatched_contact_is_skipped_without_identity_disclosure():

@@ -112,11 +112,22 @@ CREATE POLICY mautic_inbox_tenant_insert
    AND send_authorized=false
  );
 
-GRANT USAGE ON SCHEMA public TO empire_mautic_crm_inbox_writer;
+-- Schema USAGE must already be provisioned by its owner/DBA. This migration
+-- is deliberately not permitted to impersonate that schema owner; the final
+-- postcheck fails the entire transaction if the grant is missing.
 GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
  TO empire_mautic_crm_inbox_writer;
 GRANT SELECT,INSERT ON public.empire_crm_mautic_event_inbox
  TO empire_mautic_crm_inbox_writer;
+DO $post$
+BEGIN
+ IF NOT pg_catalog.has_schema_privilege('empire_mautic_crm_inbox_writer', 'public', 'USAGE')
+    OR NOT pg_catalog.has_table_privilege('empire_mautic_crm_inbox_writer',
+         'public.empire_crm_mautic_event_inbox', 'SELECT,INSERT') THEN
+   RAISE EXCEPTION 'Mautic inbox role privileges incomplete; rollback migration';
+ END IF;
+END;
+$post$;
 
 COMMENT ON TABLE public.empire_crm_mautic_event_inbox IS
  'Tenant-bound, PII-free verified Mautic signals. Append-only REVIEW_ONLY '
