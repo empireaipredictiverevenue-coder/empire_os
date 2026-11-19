@@ -244,3 +244,71 @@ def test_expired_or_future_normalizer_snapshot_cannot_promote_candidate():
         assert result["normalizer_batch_contract_accepted"] is False
         assert result["items"][0]["normalization"]["score_evidence"] == {}
         assert result["execution_authority"] == "none"
+
+
+def test_evidence_bound_factory_to_router_to_astra_existing_owner_lane():
+    from datetime import datetime, timezone
+    from empire_os.opportunity_evidence_router import build_evidence_routes
+    from empire_os.opportunity_history import build_opportunity_history
+    from empire_os.astra_validated_workstream_ranking import rank_validated_workstreams
+
+    valid = trusted_normalizer_batch()
+    row = valid["items"][0]
+    # Partial real-world inputs may validate an observed commercial stage
+    # while keeping further research blockers and commercial gates intact.
+    row["normalized_signals"]["urgency"] = None
+    row["score_evidence"].pop("urgency")
+    row["normalized_score_count"] = 7
+    radar = {"candidates": [candidate()]}
+    intake = build_factory_intake_batch(
+        radar, {"actions": [research()]}, valid,
+    )
+    assert intake["factory_ready_count"] == 0
+    assert intake["items"][0]["normalization"]["available"] is True
+    assert intake["items"][0]["normalization"]["score_evidence"]["buyer_intent"]["observed_truth"] is True
+    routes = build_evidence_routes(radar, intake)
+    assert routes["stage_counts"] == {"VALIDATE": 1}
+    assert any(r["blocker"] == "urgency_normalized_score_required"
+               for r in routes["items"][0]["routes"])
+    routes["history"] = build_opportunity_history(routes, None)
+    clock = datetime.fromisoformat(routes["generated_at"])
+    ranked = rank_validated_workstreams(
+        routes,
+        capability_components={"sensor_mesh": "sensor_mesh"},
+        component_authorities={"sensor_mesh": "observe"},
+        department_owners={"sensor_mesh": ("data_quant",)},
+        now=clock,
+    )
+    assert ranked["status"] == "RANKED_FROM_CURRENT_DERIVED_VALIDATION"
+    assert ranked["validated_opportunity_count"] == 1
+    assert ranked["ranked_workstream_count"] == 1
+    assert ranked["workstreams"][0]["department_keys"] == ["data_quant"]
+    assert ranked["automatic_external_execution_allowed"] is False
+    assert ranked["source_validation_is_not_buyer_acceptance"] is True
+    assert ranked["execution_authority"] == "none"
+
+
+def test_unsupported_factory_scores_never_become_astra_validated_workstreams():
+    from datetime import datetime
+    from empire_os.opportunity_evidence_router import build_evidence_routes
+    from empire_os.opportunity_history import build_opportunity_history
+    from empire_os.astra_validated_workstream_ranking import rank_validated_workstreams
+    forged = trusted_normalizer_batch()
+    forged["items"][0]["score_evidence"]["buyer_intent"]["observed_truth"] = False
+    radar = {"candidates": [candidate()]}
+    intake = build_factory_intake_batch(radar, {"actions": [research()]}, forged)
+    assert intake["normalizer_rows_rejected_for_evidence"] == 1
+    assert intake["factory_ready_count"] == 0
+    routes = build_evidence_routes(radar, intake)
+    assert routes["stage_counts"].get("VALIDATE", 0) == 0
+    routes["history"] = build_opportunity_history(routes, None)
+    ranked = rank_validated_workstreams(
+        routes,
+        capability_components={"sensor_mesh": "sensor_mesh"},
+        component_authorities={"sensor_mesh": "observe"},
+        department_owners={"sensor_mesh": ("data_quant",)},
+        now=datetime.fromisoformat(routes["generated_at"]),
+    )
+    assert ranked["validated_opportunity_count"] == 0
+    assert ranked["ranked_workstream_count"] == 0
+    assert ranked["automatic_external_execution_allowed"] is False
