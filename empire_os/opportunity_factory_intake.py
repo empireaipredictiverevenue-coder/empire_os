@@ -7,7 +7,7 @@ scores from search-result counts or model prose.
 from __future__ import annotations
 
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 from typing import Any, Mapping
@@ -62,6 +62,108 @@ def _refs(candidate: Mapping[str, Any], research: Mapping[str, Any]) -> tuple[st
         if clean:
             refs.append(clean)
     return tuple(dict.fromkeys(refs))
+
+
+
+
+NORMALIZER_BATCH_SCHEMA = "empire.opportunity_evidence_normalizer_batch.v1"
+NORMALIZER_ROW_SCHEMA = "empire.opportunity_evidence_normalizer.v1"
+ALLOWED_SCORE_SEMANTICS = frozenset((
+    "observed_stage", "modeled_proxy", "policy_scenario",
+))
+
+
+def _fresh_producer_timestamp(value: Any, *, now: datetime) -> bool:
+    if not isinstance(value, str) or not 20 <= len(value) <= 48:
+        return False
+    try:
+        stamp = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if stamp.tzinfo is None:
+        return False
+    age = now.astimezone(timezone.utc) - stamp.astimezone(timezone.utc)
+    return -timedelta(minutes=5) <= age <= timedelta(hours=2)
+
+
+def _evidence_bound_signals(
+    row: Mapping[str, Any], *,
+    opportunity_key: str,
+    opportunity_class: str,
+) -> tuple[dict[str, Any], dict[str, Any], str]:
+    """Validate the producer's exact score/evidence contract before admission.
+
+    Numeric output and a reported count alone cannot authorize Factory
+    readiness or Opportunity Lifecycle commercial validation.
+    """
+    if (row.get("schema_version") != NORMALIZER_ROW_SCHEMA
+            or row.get("mode") != "OBSERVE"
+            or row.get("execution_authority") != "none"
+            or row.get("search_result_counts_used_as_scores") is not False
+            or row.get("competitor_gaps_used_as_demand") is not False
+            or row.get("buyer_intent_inferred_from_public_pain") is not False
+            or row.get("market_share_inferred") is not False
+            or row.get("revenue_inferred") is not False
+            or row.get("opportunity_key") != opportunity_key
+            or row.get("opportunity_class") != opportunity_class):
+        return {}, {}, "NORMALIZER_PRODUCER_CONTRACT_INVALID"
+    signals = row.get("normalized_signals")
+    evidence = row.get("score_evidence")
+    if not isinstance(signals, Mapping) or not isinstance(evidence, Mapping):
+        return {}, {}, "NORMALIZER_SCORE_EVIDENCE_MISSING"
+    values = {}
+    witnessed = {}
+    for key in SCORE_KEYS:
+        raw = signals.get(key)
+        if raw is None:
+            if key in evidence:
+                return {}, {}, "NORMALIZER_EVIDENCE_WITHOUT_SCORE"
+            values[key] = None
+            continue
+        value = _score(raw)
+        proof = evidence.get(key)
+        if (value is None or not isinstance(proof, Mapping)
+                or _score(proof.get("value")) != value
+                or proof.get("semantic_class") not in ALLOWED_SCORE_SEMANTICS
+                or not isinstance(proof.get("basis"), str)
+                or not 1 <= len(proof["basis"]) <= 160
+                or not isinstance(proof.get("evidence_refs"), list)
+                or not 1 <= len(proof["evidence_refs"]) <= 20
+                or any(not isinstance(ref, str) or not 10 <= len(ref) <= 500
+                       or not ref.startswith(("canonical:", "runtime:", "source:"))
+                       for ref in proof["evidence_refs"])
+                or proof.get("observed_truth") is not (
+                    proof.get("semantic_class") == "observed_stage"
+                )
+                or proof.get("modeled_or_policy") is not (
+                    proof.get("semantic_class") in ("modeled_proxy", "policy_scenario")
+                )):
+            return {}, {}, "NORMALIZER_SCORE_PROVENANCE_INVALID"
+        values[key] = value
+        witnessed[key] = dict(proof)
+    if (type(row.get("normalized_score_count")) is not int
+            or row["normalized_score_count"] != len(witnessed)):
+        return {}, {}, "NORMALIZER_SCORE_COUNT_INCONSISTENT"
+    for optional in ("offer_key", "distribution_path"):
+        value = signals.get(optional)
+        if value is None:
+            continue
+        if not isinstance(value, str) or not 1 <= len(value.strip()) <= 160:
+            return {}, {}, "NORMALIZER_COMMERCIAL_PATH_INVALID"
+        if optional == "offer_key" and (
+            "build_complexity" not in witnessed
+            or "canonical:commercial_product_catalog" not in
+            witnessed["build_complexity"]["evidence_refs"]
+        ):
+            return {}, {}, "NORMALIZER_PRODUCT_AUTHORITY_MISSING"
+        if optional == "distribution_path" and (
+            "distribution_strength" not in witnessed
+            or "canonical:buyer_candidate_reviews" not in
+            witnessed["distribution_strength"]["evidence_refs"]
+        ):
+            return {}, {}, "NORMALIZER_DISTRIBUTION_AUTHORITY_MISSING"
+        values[optional] = value.strip()
+    return values, witnessed, "EVIDENCE_BOUND_OR_UNKNOWN"
 
 
 def build_factory_intake(
@@ -163,7 +265,12 @@ def build_factory_intake_batch(
     radar: Mapping[str, Any],
     research_batch: Mapping[str, Any] | None,
     normalized_batch: Mapping[str, Any] | None = None,
+    *,
+    now: datetime | None = None,
 ) -> dict[str, Any]:
+    clock = now or datetime.now(timezone.utc)
+    if clock.tzinfo is None:
+        raise ValueError("offset-aware normalization clock required")
     research_batch = research_batch or {}
     normalized_batch = normalized_batch or {}
     research_by_key = {
@@ -173,12 +280,33 @@ def build_factory_intake_batch(
         and _clean(row.get("opportunity_key"))
     }
 
-    normalized_by_key = {
-        _clean(row.get("opportunity_key")): row
-        for row in (normalized_batch.get("items") or [])
-        if isinstance(row, Mapping)
-        and _clean(row.get("opportunity_key"))
-    }
+    normalized_rows = normalized_batch.get("items")
+    producer_valid = (
+        normalized_batch.get("schema_version") == NORMALIZER_BATCH_SCHEMA
+        and normalized_batch.get("mode") == "OBSERVE"
+        and normalized_batch.get("execution_authority") == "none"
+        and _fresh_producer_timestamp(
+            normalized_batch.get("generated_at"), now=clock
+        )
+        and normalized_batch.get("search_result_counts_used_as_scores") is False
+        and normalized_batch.get("market_share_inferred") is False
+        and normalized_batch.get("revenue_inferred") is False
+        and isinstance(normalized_rows, list)
+        and len(normalized_rows) <= 500
+        and type(normalized_batch.get("candidate_count")) is int
+        and len(normalized_rows) == normalized_batch.get("candidate_count")
+        and all(isinstance(r, Mapping)
+                and isinstance(r.get("opportunity_key"), str)
+                and bool(r.get("opportunity_key"))
+                for r in normalized_rows)
+        and len({r["opportunity_key"] for r in normalized_rows})
+            == len(normalized_rows)
+    )
+    normalized_by_key = (
+        {r["opportunity_key"]: r for r in normalized_rows}
+        if producer_valid else {}
+    )
+    invalid_normalizer_count = 0
 
     rows = []
     for candidate in (radar.get("candidates") or []):
@@ -186,41 +314,54 @@ def build_factory_intake_batch(
             continue
         key = _clean(candidate.get("opportunity_key"))
         normalized_row = normalized_by_key.get(key) or {}
-        signals = normalized_row.get("normalized_signals")
-        signals = signals if isinstance(signals, Mapping) else {}
+        signals = {}
+        witnessed = {}
+        evidence_status = "NORMALIZER_ROW_UNAVAILABLE"
+        if normalized_row:
+            signals, witnessed, evidence_status = _evidence_bound_signals(
+                normalized_row,
+                opportunity_key=key,
+                opportunity_class=_clean(candidate.get("opportunity_class")),
+            )
+        elif normalized_batch and not producer_valid:
+            evidence_status = "NORMALIZER_BATCH_CONTRACT_INVALID"
+        if evidence_status not in (
+            "EVIDENCE_BOUND_OR_UNKNOWN", "NORMALIZER_ROW_UNAVAILABLE"
+        ):
+            invalid_normalizer_count += 1
         row = build_factory_intake(
             candidate,
             research_by_key.get(key),
             normalized_signals=signals,
         )
+        # In particular, untrusted score_evidence cannot advance the
+        # lifecycle to VALIDATE while Factory correctly refuses readiness.
         row["normalization"] = {
-            "available": bool(normalized_row),
-            "normalized_score_count": int(
-                normalized_row.get("normalized_score_count") or 0
+            "available": evidence_status == "EVIDENCE_BOUND_OR_UNKNOWN",
+            "evidence_contract_status": evidence_status,
+            "normalized_score_count": len(witnessed),
+            "missing_normalized_fields": [
+                k for k in SCORE_KEYS if signals.get(k) is None
+            ],
+            "score_evidence": witnessed,
+            "quant_inputs": (
+                dict(normalized_row.get("quant_inputs") or {})
+                if evidence_status == "EVIDENCE_BOUND_OR_UNKNOWN"
+                and isinstance(normalized_row.get("quant_inputs"), Mapping)
+                else {}
             ),
-            "missing_normalized_fields": list(
-                normalized_row.get("missing_normalized_fields") or []
-            ),
-            "score_evidence": dict(
-                normalized_row.get("score_evidence") or {}
-            ),
-            "quant_inputs": dict(
-                normalized_row.get("quant_inputs") or {}
-            ),
-            "quant_input_evidence": dict(
-                normalized_row.get("quant_input_evidence") or {}
+            "quant_input_evidence": (
+                dict(normalized_row.get("quant_input_evidence") or {})
+                if evidence_status == "EVIDENCE_BOUND_OR_UNKNOWN"
+                and isinstance(normalized_row.get("quant_input_evidence"), Mapping)
+                else {}
             ),
             "quant_inputs_available": (
-                normalized_row.get("quant_inputs_available") is True
+                evidence_status == "EVIDENCE_BOUND_OR_UNKNOWN"
+                and normalized_row.get("quant_inputs_available") is True
             ),
-            "quant_probability_inferred": (
-                normalized_row.get("quant_probability_inferred") is True
-            ),
-            "search_result_counts_used_as_scores": (
-                normalized_row.get(
-                    "search_result_counts_used_as_scores"
-                ) is True
-            ),
+            "quant_probability_inferred": False,
+            "search_result_counts_used_as_scores": False,
         }
         rows.append(row)
 
@@ -255,6 +396,8 @@ def build_factory_intake_batch(
         "candidates_with_any_normalized_score": scored_count,
         "populated_scores_computed_from_values": True,
         "candidates_with_both_buyer_intent_and_demand_values": commercial_observation_count,
+        "normalizer_batch_contract_accepted": producer_valid,
+        "normalizer_rows_rejected_for_evidence": invalid_normalizer_count,
         "candidate_evidence_gap_counts": dict(
             sorted(gap_counts.items(), key=lambda item: (-item[1], item[0]))
         ),

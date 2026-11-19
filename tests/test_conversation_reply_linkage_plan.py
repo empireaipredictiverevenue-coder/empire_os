@@ -115,3 +115,67 @@ def test_linkage_without_aggregate_stays_pending(tmp_path):
     output = refresh(tmp_path)
     assert output["structural_reply_lineage"]["status"] == "PENDING_RESTRICTED_LINEAGE_SNAPSHOT"
     assert output["buyer_intent_verified"] is False
+
+
+
+def exact_aggregate(*, generated_at=NOW):
+    from scripts.probe_reply_identity_lineage import summarize
+    row = summarize((4, 0, 4, 0, 3, 1, 0, 0, 1, 4, 4, 0, 4, 4, 0, 0))
+    row["generated_at"] = generated_at.isoformat()
+    return row
+
+
+def test_current_exact_join_counts_surface_without_buyer_promotion():
+    result = plan(
+        contract(), {"decision": {"status": "CROSS_TABLE_BRIDGE_REQUIRED"}},
+        now=NOW, exact_join_probe=exact_aggregate(),
+    )
+    agg = result["exact_join_observation"]
+    assert agg["query_completed"] is True
+    assert agg["reply_rows_observed"] == 4
+    assert agg["replies_matching_intent"] == 4
+    assert agg["replies_missing_conversation"] == 3
+    assert agg["replies_with_one_conversation"] == 1
+    assert agg["suppressed_email_intents"] == 4
+    assert agg["sent_email_intent_count"] == 0
+    assert agg["buyer_intent_verified"] is False
+    assert agg["commercial_promotion_authorized"] is False
+    assert result["actual_joined_rows_proven"] == 0
+    assert result["canonical_messages_promoted"] == 0
+    assert result["buyer_intent_verified"] is False
+
+
+def test_current_exact_join_file_is_used_on_existing_refresh(tmp_path):
+    source=contract()
+    first=tmp_path/"runtime/control_plane/conversations_replies_binding_truth_latest.json"
+    second=tmp_path/"runtime/control_plane/conversations_replies_identity_gap_latest.json"
+    for path,data in ((first,source),(second,{"decision":{"status":"CROSS_TABLE_BRIDGE_REQUIRED"}})):
+        path.parent.mkdir(parents=True,exist_ok=True)
+        path.write_text(json.dumps(data))
+    exact=tmp_path/"runtime/conversations_replies_control/exact_reply_join_latest.json"
+    exact.parent.mkdir(parents=True,exist_ok=True)
+    from datetime import datetime, timezone
+    exact.write_text(json.dumps(exact_aggregate(generated_at=datetime.now(timezone.utc))))
+    result=refresh(tmp_path)
+    assert result["exact_join_observation"]["query_completed"] is True
+    assert result["exact_join_observation"]["replies_missing_conversation"] == 3
+    assert result["database_access_attempted"] is False
+
+
+def test_stale_or_forged_exact_join_aggregates_never_get_inferred_buyer_status():
+    from datetime import timedelta
+    variants = [
+        exact_aggregate(generated_at=NOW-timedelta(hours=2)),
+        {**exact_aggregate(), "tenant_authenticated": True},
+        {**exact_aggregate(), "structural_counts": {
+            **exact_aggregate()["structural_counts"], "conversation_missing": 2,
+        }},
+        {**exact_aggregate(), "sample_exhaustive": False},
+    ]
+    for variant in variants:
+        result=plan(contract(), {}, now=NOW, exact_join_probe=variant)
+        x=result["exact_join_observation"]
+        assert x["status"] == "HELD_NO_TRUSTED_CURRENT_EXACT_JOIN_AGGREGATE"
+        assert x["reply_rows_observed"] is None
+        assert x["buyer_intent_verified"] is False
+        assert result["actual_joined_rows_proven"] == 0
