@@ -78,6 +78,24 @@ class PredictiveFabricProductionBridge:
     - cross-system context/evidence
     """
 
+    def read_brokerage_research(
+        self, *, context: PredictiveCloudFabricContext,
+        repo_root: str | Path, dataset_id: str | None = None,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Read source-verified research signals; no model/commercial authority.
+
+        Existing original Brokerage provides the data, Cloud holds immutable
+        private copies, and the original Fabric bridge owns this integration.
+        This does not admit forecasting or issue tenant research credentials.
+        """
+        from empire_os.predictive_cloud_brokerage_feature_adapter import (
+            BrokerageResearchFabricAdapter,
+        )
+        return BrokerageResearchFabricAdapter().read_observations(
+            root=repo_root, context=context, dataset_id=dataset_id, now=now,
+        )
+
     def assess_catalog_item(
         self,
         row: Mapping[str, Any],
