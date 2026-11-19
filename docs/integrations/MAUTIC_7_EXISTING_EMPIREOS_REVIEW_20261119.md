@@ -466,3 +466,48 @@ returns blocked daemon access under the connected EmpireOS login.
 real webhook delivery/retries, canonical production identity binding
 and approved DBA release/merge/deployment. The isolated source
 contract does not grant those production approvals.
+
+
+## Cross-owner compatibility and committed-base reconciliation — 2026-11-19
+
+**Cross-owner compatibility probe (nonproduction):** a disposable Git
+worktree based on Mautic commit 15ca77700 was overlaid with the
+currently uncommitted /srv/empire_os CRM owner versions of
+revenue_crm_transport.py, revenue_crm_signed_auth.py,
+revenue_crm_suppression_evidence_reader.py, current related tests,
+and hub.py. No original active owner files were modified.
+
+The first mixed-snapshot run passed 245 tests and failed one test which
+explicitly required the current hub.py router registration call, absent
+from the older clean base. After overlaying the corresponding current
+hub source (rather than changing approved owner code), the full run
+passed **246 tests** plus **7 disposable PostgreSQL 18 tests**. It
+verified Mautic ingress/review remains compatible with the stricter
+tenant-bound CRM login proof and suppression-reader updates being
+developed by the CRM owner. This is a time-stamped compatibility
+probe of active *uncommitted* files; it is not an integration or
+endorsement of those files for deployment.
+
+**Committed-base reconciliation:** the integration branch
+integration/mautic-crm-active-20261119 merged the active EmpireOS
+committed head at inspection,
+e07dc6a139dca3bc85f62edc7ea75064cece1ec5,
+without source conflicts. This retains the original approved Mautic
+commit chain and avoids rewriting or modifying the live workspace.
+On this new merged, clean base the broader selected test run passed
+**217 tests** plus **7 real isolated PostgreSQL 18 tests**.
+
+**Release posture:** still not launched. No live Mautic runtime was
+found on either connected device. The Ubuntu operator lacks Docker
+daemon permission and the Windows WSL VM cannot start without
+separate host remediation. No database schema was applied to
+production, no source secrets/real contact bindings were provisioned,
+no Mautic app or webhook queue was activated, and no outreach,
+deployment or spending occurred.
+
+**Concrete outstanding gate:** authorised dedicated container test
+runner plus source configuration and tenant-bound identity
+provenance, genuine Mautic queue/retry and signed webhook receipt,
+DBA migration/role approval, current owner review, guarded deployment.
+The upstream PHP sender contract and synthetic HTTP tests do not
+satisfy the genuine Mautic application test.
