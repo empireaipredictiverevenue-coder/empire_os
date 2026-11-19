@@ -622,3 +622,48 @@ No live sender, campaign, publishing, payments or spending is authorised.
 **Truthful release status:** NATIVE_APPLICATION_AND_WEBHOOK_RETRY_TESTED_PASS;
 PRODUCTION_MERGE_MIGRATION_AND_ACTIVATION_HELD; CUSTOMER_DELIVERY_NOT_LIVE;
 Genuine revenue and sales not established by this engineering receipt.
+
+
+## Existing Smart CRM pilot source-binding integration — 2026-11-19
+
+**Prepared, committed independently:** the Mautic connector now attaches
+directly to the already existing, founder-gated CRM pilot factory; there
+is no second tenant authentication, CRM backend, sender or source owner.
+
+An additional Mautic source/tenant configuration is read only when both
+the existing CRM pilot mode and a separate, explicit Mautic pilot mode
+are configured. The existing default mode and approved two-router pilot
+remain unchanged when not opted in. The second private configuration
+ties a single reviewed source, secret, source evidence reference and
+up to 200 individually reviewed numeric Mautic contact IDs to the
+existing CRM tenant reader and a separate tenant-bound EmpireDB inbox
+writer. Email-field guessing, caller tenant headers, source-controlled
+identity and default source activation remain forbidden.
+
+The opt-in route pair has been exercised through the authenticated
+HTTP test client, including signed unbound-contact rejection with
+retryable HTTP 503, unavailable canonical CRM rejection, untrusted
+signature rejection, and denied unauthenticated inbox views. The
+existing Postgres RLS tests separately verify committed inbox readback
+and that tenant readers cannot write or access other tenants.
+
+**Regression evidence on committed integration code:** 265 selected
+Mautic and existing CRM/Pilot tests passed plus 7 isolated real
+PostgreSQL 18 tests.
+
+**Current active-CRM owner compatibility:** a temporary, independent
+worktree was overlaid with uncommitted active versions of the
+original CRM auth, Hub, role/transport and tests, without modifying
+or committing owner files. 314 selected tests plus 7 real PostgreSQL
+tests PASSED. Owner overlay is a read-only compatibility snapshot,
+not permission to merge uncommitted production work.
+
+**Configured but not activated:** no founder-approved live source ID,
+Mautic webhook secret, canonical first-party contact binding evidence,
+or production writer role was created or inferred. The unnumbered
+prepared DBA migration is not applied and neither the public ingress
+nor inbox review routes have been mounted in the production Hub.
+
+Exact private configuration, opt-in settings, no-send invariants and
+DBA/owner release dependencies are documented at
+docs/integrations/MAUTIC_CRM_GUARDED_RUNTIME_CONFIG_PREPARED_20261119.md.
