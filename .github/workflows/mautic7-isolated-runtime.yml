@@ -1,0 +1,67 @@
+name: Empire Mautic 7 isolated runtime contract
+on:
+  push:
+    branches: [integration/mautic-crm-active-20261119]
+    paths: [.github/workflows/mautic7-isolated-runtime.yml]
+permissions:
+  contents: read
+concurrency:
+  group: empire-mautic7-isolated-contract
+  cancel-in-progress: true
+jobs:
+  isolated-mautic:
+    name: Verify official Mautic 7 on isolated Linux
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      MAUTIC_CONTRACT_HTTP_PORT: "18080"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create synthetic secrets and validate isolation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          echo "MAUTIC_CONTRACT_DB_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MAUTIC_CONTRACT_DB_ROOT_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          echo "MAUTIC_CONTRACT_ADMIN_PASSWORD=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+          python3 scripts/preflight_mautic_contract_sandbox.py
+          echo "DISPOSABLE_DOCKER_RUNTIME_AVAILABLE"
+      - name: Start Mautic and MySQL and install synthetic application
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          dc() { docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml "$@"; }
+          dc up -d --pull always --no-build db mautic_web
+          dc ps
+          for n in $(seq 1 45); do
+            if dc exec -T db mysqladmin ping -h127.0.0.1 --silent >/dev/null 2>&1; then break; fi
+            sleep 2
+          done
+          dc exec -T mautic_web php bin/console --version
+          dc exec -T mautic_web php bin/console mautic:install --help | head -100
+          dc exec -T -u www-data -w /var/www/html mautic_web \
+            php bin/console mautic:install "http://localhost:18080" \
+            --admin_email="synthetic-admin@example.invalid" \
+            --admin_password="$MAUTIC_CONTRACT_ADMIN_PASSWORD" --no-interaction
+          for n in $(seq 1 45); do
+            code="$(curl -sS -o /dev/null --max-time 4 -w '%{http_code}' http://127.0.0.1:18080/ || true)"
+            if [[ "$code" == 200 || "$code" == 302 || "$code" == 303 ]]; then
+              echo "MAUTIC_FULL_APP_HTTP_VERIFIED_$code"
+              break
+            fi
+            sleep 2
+          done
+          curl -fsSL --max-time 15 http://127.0.0.1:18080/ -o /tmp/mautic_runtime.html
+          echo "FULL_MAUTIC_7_WEB_APP_INSTALLED_AND_REACHABLE"
+      - name: Print isolated diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml ps || true
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml logs --tail 45 mautic_web db || true
+      - name: Remove isolated containers and synthetic database
+        if: always()
+        shell: bash
+        run: |
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml \
+            down -v --remove-orphans --timeout 10 || true
