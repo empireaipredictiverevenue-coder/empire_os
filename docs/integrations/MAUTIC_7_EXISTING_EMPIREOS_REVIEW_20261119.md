@@ -2,11 +2,15 @@
 
 **Date:** 2026-11-19
 **Owner:** Existing EmpireOS Smart CRM / GTM owner; no new marketing authority
-**Status:** ISOLATED_IMPLEMENTED_AND_TESTED; NOT MERGED; NOT DEPLOYED; NOT CONNECTED
-**Branch:** feature/mautic-webhook-review-20261119
-**Base:** bb1424657
-**Source code:** empire_os/mautic_webhook_review.py
-**Tests:** tests/test_mautic_webhook_review.py
+**Current status (2026-11-19):** ISOLATED_NATIVE_MAUTIC_7_SIGNED_DELIVERY_AND_RETRY_VERIFIED; PRODUCTION_NOT_MERGED_OR_DEPLOYED
+**Integration branch:** integration/mautic-crm-active-20261119
+**Verified CI run:** https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/44526866616
+**Verified candidate commit:** ccd180a846038444fa69637f895c8530c8d267d0
+**Scope:** actual Mautic 7.2.2 installed application and native queue to existing EmpireOS signed-review adapter, with synthetic contacts only
+**Historical audit base:** bb1424657
+**Source code:** empire_os/mautic_webhook_review.py and existing Smart CRM review/inbox adapter
+**Tests:** tests/test_mautic_webhook_review.py, tests/test_mautic_crm_pg_runtime.py, tests/mautic_sandbox/
+**Not authorised:** production migration, sender, publishing, outreach, payment, or live tenant source identity binding
 
 ## Findings recovered from existing EmpireOS
 
@@ -511,3 +515,57 @@ provenance, genuine Mautic queue/retry and signed webhook receipt,
 DBA migration/role approval, current owner review, guarded deployment.
 The upstream PHP sender contract and synthetic HTTP tests do not
 satisfy the genuine Mautic application test.
+
+
+## FINAL RUNTIME PROOF — 2026-11-19: full application, native signed queue and retry PASS
+
+This supersedes earlier notes that an isolated Mautic test runner
+was unavailable. Production deployment and production identity
+binding remain separate approval-gated tasks.
+
+The existing public EmpireOS repository's isolated integration branch
+was tested on a disposable GitHub-hosted Ubuntu 24.04 runner using the
+official Mautic 7.2.2 Apache Docker image, MySQL 8.4, and an internal
+receiver running the real EmpireOS mautic_webhook_review.py adapter.
+No new paid compute, production permissions, SMTP, customer data or
+production deployment was used.
+
+**Full Mautic application proof:**
+- Actual Mautic application installed successfully: 127 MySQL tables.
+- Actual application returned HTTP 302 on private network.
+- Native Mautic queue processor command was available.
+- ORM created a synthetic native webhook/event/queue. The Mautic native
+  processor sent an actual signed webhook and EmpireOS HMAC verifier
+  identified SUPPRESSION_REVIEW_REQUIRED without granting send rights.
+- MySQL queue row was removed only after accepted HTTP 200.
+- GitHub Actions run 44525507432 concluded success, including cleanup:
+  https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/44525507432
+
+**Real transient 503 recovery proof:**
+- The same complete app installed, native queued event generated,
+  and receiver deliberately returned HTTP 503 once for a valid signature.
+- The first native processing attempt retained the row with the retry
+  counter exactly 1, proven by direct MySQL query (count:retries=1:1).
+- Native processor retried after a bounded delay. The EmpireOS
+  adapter accepted the correctly signed event, and MySQL queue
+  count became zero, proving acknowledgement and queue cleanup.
+- Synthetic ORM webhook included a normal recent modification
+  timestamp. No Mautic vendor code or production auto-unpublish
+  configuration was changed.
+- GitHub Actions run 44526866616 concluded success, including
+  destruction of test containers and volumes:
+  https://github.com/empireaipredictiverevenue-coder/empire_os/actions/runs/44526866616
+- Exact successful receipt lines:
+  MAUTIC_INSTALL_CREATED_TABLES=127
+  MAUTIC_PRIVATE_APP_HTTP_VERIFIED_302
+  MAUTIC_7_NATIVE_WEBHOOK_AND_QUEUE_CREATED
+  MAUTIC_NATIVE_QUEUE_HTTP_503_RETAINED_FOR_RETRY
+  NATIVE_MAUTIC_SIGNED_WEBHOOK_ARRIVED_IN_EMPIREOS_ADAPTER
+  NATIVE_MAUTIC_QUEUE_ACKNOWLEDGED_AND_DELETED_NO_SENDING
+
+**Verified status: ISOLATED_FULL_MAUTIC_7_RUNTIME_AND_NATIVE_WEBHOOK_RETRY_PASS.**
+
+**Not claimed:** production customer data, live tenant contact mapping,
+production EmpireDB inbox migration/role provisioning, production HTTP
+router registration, live marketing operations, revenue or payment.
+DBA, canonical CRM owner and founder-controlled release gates still apply.
