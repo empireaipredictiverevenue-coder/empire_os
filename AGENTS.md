@@ -2,6 +2,37 @@
 
 This section overrides any conflicting historical wording below.
 
+### Founder directive — 2026-11-19: Relationship-first outreach is mandatory
+
+**All existing outreach agents and business-contact workflows** must apply the
+founder's relationship-first rules to every *new cold introduction*: research
+and verify the real company, relevant person or department, first-party source,
+useful observation, prior Smart CRM/Gmail contact history, suppression and opt-outs
+**before** drafting or considering sending. Never invent names, buying interest,
+needs, results or source checks. Never repeat an unanswered introduction.
+
+Cold first-touch copy must provide specific value in natural, separated paragraphs
+(prefer 70–120 words excluding required business details), ask no more than one
+noncommercial question, include the approved sender details and easy opt-out,
+and exclude prices, pilots, product pitches, demos, calendar links, unsupported
+claims and generic AI language. Use the **existing** Outbound Department,
+Outreach Quality, Sales Director and Outbound Governor review routes; no second
+agent, contact database, campaign scheduler or send path may replace them.
+
+**A draft/content-quality PASS never grants sending authority.** The original
+sender must independently recheck exact recipient/tenant identity, canonical
+suppression, past conversations, live source provenance and the Founder-approved
+recipient-bound intent immediately before any permitted send. Unknowns HOLD.
+Genuine customer replies, support and transactional email retain separate
+owner controls. Track authentic replies, conversations, qualified opportunities,
+accepted proposals, paying customers and cleared revenue, not email volume.
+Never auto-send, publish, spend, reschedule or relax gates from this directive.
+
+Canonical detailed policy:
+`docs/commercial/EMPIRE_RELATIONSHIP_FIRST_FOUNDER_OUTREACH_POLICY_20261119.md`.
+Its presence and passing tests do **not** prove all active agents or external
+Gmail clients enforce it. Record verified coverage and unresolved routes.
+
 ### Founder directive — 2026-10-19: One task, one implementation owner
 
 Canonical directive: `directive_0f97bbfe46434b1ab0b744d39c09226a`
