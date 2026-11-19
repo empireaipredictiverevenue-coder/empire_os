@@ -374,3 +374,33 @@ app, current uncommitted CRM owner reconciliation and guarded deployment.
 
 No founder approval for production service activation or sending is
 inferred from permission to complete the isolated engineering work.
+
+
+## Upstream WebhookModel batch/retry source readback — final
+
+The official Mautic 7.x WebhookModel.php implementation was inspected
+against branch 7.x (GitHub source SHA
+e323d688a2cbc37f4ebcc9bd7d2f2042833bde24).
+
+- getWebhookPayload() groups queued event objects into a JSON dictionary
+  keyed by Mautic event type, with a list of serialized event bodies per
+  type, adding a queue timestamp with ISO8601 format('c').
+- The guarded adapter verifies that exact event-envelope shape and
+  validates its source signature against the unchanged raw JSON.
+- processWebhook() treats HTTP 2xx as successful and deletes queued IDs;
+  HTTP 503 increments retry counters in queue mode and is **not**
+  a successful acknowledgment.
+- HTTP 410 is special: Mautic kills/unpublishes the webhook; the
+  integration deliberately returns 503 rather than 410 for retryable
+  unbound canonical contacts or temporarily unavailable EmpireDB.
+- Repeated failures can still cause Mautic to mark the webhook
+  unhealthy and unpublish it depending on Mautic's configured thresholds;
+  operator monitoring and an explicit source-health gate are needed
+  for any later live activation. No automatic suppression clearance,
+  sender enablement or producer retry override was introduced.
+
+Exact upstream file:
+https://github.com/mautic/mautic/blob/7.x/app/bundles/WebhookBundle/Model/WebhookModel.php
+
+**Release verdict:** SOURCE_CONTRACT_VERIFIED, PYTHON_PLUS_ISOLATED_PG_PASS,
+PRODUCER_RUNTIME_NOT_AVAILABLE, MERGE_AND_DEPLOY_HELD.
