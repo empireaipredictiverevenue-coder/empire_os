@@ -18,8 +18,8 @@ services:
         target: /app/receiver.py
         read_only: true
       - type: bind
-        source: ../../empire_os
-        target: /app/empire_os
+        source: ../../empire_os/mautic_webhook_review.py
+        target: /app/mautic_webhook_review.py
         read_only: true
     networks: [contract_private]
     restart: "no"

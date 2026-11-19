@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 # Importing the parent empire_os package would execute unrelated startup
 # imports that inspect the production owner's /root/empire_os/.env. A
 # sandbox-only, nonroot receiver must never need that home directory.
-ADAPTER = "/app/empire_os/mautic_webhook_review.py"
+ADAPTER = "/app/mautic_webhook_review.py"
 _spec = importlib.util.spec_from_file_location("isolated_mautic_review", ADAPTER)
 if _spec is None or _spec.loader is None:
     raise SystemExit("MAUTIC_REVIEW_ADAPTER_UNAVAILABLE")

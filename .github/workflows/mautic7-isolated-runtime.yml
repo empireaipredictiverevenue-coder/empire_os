@@ -2,7 +2,10 @@ name: Empire Mautic 7 isolated runtime contract
 on:
   push:
     branches: [integration/mautic-crm-active-20261119]
-    paths: [.github/workflows/mautic7-isolated-runtime.yml]
+    paths:
+      - .github/workflows/mautic7-isolated-runtime.yml
+      - tests/mautic_sandbox/**
+      - empire_os/mautic_webhook_review.py
 permissions:
   contents: read
 concurrency:
