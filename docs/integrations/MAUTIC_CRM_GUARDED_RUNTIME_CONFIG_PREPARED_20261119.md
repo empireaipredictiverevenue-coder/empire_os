@@ -104,3 +104,70 @@ external authority/evidence tasks, not software-install blockers.
 
 **No production changes, database writes, customer messages, paid
 resources or host permissions occur by importing this module.**
+
+
+## Live EmpireOS readiness readback — 19 November 2026
+
+Performed on the already-running EmpireOS host. **Read-only only:** no
+schema installation, roles, service changes, credentials rotated, email
+delivery or customer data reads. The actual pilot process's existing
+configured PostgreSQL password file was reused in memory (not printed
+or copied) for an authenticated tenant-role catalog-only transaction.
+
+**Existing live CRM pilot (empire-revenue-crm-pilot.service):**
+- Service status: active/running (started 16 November 2026).
+- Existing EMPIRE_CRM_PILOT_MODE: APPROVED_READ_ONLY_PILOT.
+- Existing pilot config path: configured and readable to its service user.
+- Existing pilot configured tenant login inventory: 1.
+- Existing authenticated tenant LOGIN: successfully connected to
+  canonical EmpireDB with SET TRANSACTION READ ONLY.
+- HTTP GET /v1/revenue-crm/prospects without auth: 401.
+- Mautic inbox GET and unknown-source webhook preview: 404.
+- EMPIRE_CRM_MAUTIC_MODE is unset; no Mautic pilot config is registered.
+
+**Direct canonical EmpireDB catalog facts (verified on same tenant LOGIN):**
+- Correct database = empiredb: TRUE.
+- public.empire_current_tenant_id() exists: TRUE.
+- Existing empiredb_migrator role: TRUE.
+- Existing empire_revenue_crm_reader role: TRUE.
+- Tenant-bound SECURITY DEFINER function meets expected migrator
+  ownership / stable-function guard: TRUE.
+- Canonical tenant login CONNECT privilege: TRUE.
+- public.empire_crm_mautic_event_inbox exists: **FALSE**.
+- empire_mautic_crm_inbox_writer role exists: **FALSE**.
+- Login roles matching empire_mautic_tenant_%: **0**.
+
+**Decision:** The running CRM pilot works as its existing authenticated
+reader and is NOT a deployed Mautic integration. This is not a Docker
+or webhook delivery problem; actual Mautic 7 producer delivery and
+HTTP503 retry are independently verified by CI run 44526866616.
+
+**Required approved DBA delta:** Independently provision/verify the
+dedicated NOLOGIN, NOINHERIT Mautic inbox writer and a unique tenant
+LOGIN with an existing authorised tenant binding, including schema
+USAGE. Then review, number and apply the existing **prepared-only**
+Mautic inbox migration under the established DBA change/rollback
+procedure, not from this branch. Do not copy any synthetic contact
+mapping to live CRM. The existing verified tenant reader keeps only
+SELECT on the review table.
+
+**Required commercial/identity delta:** An actual authorised Mautic
+source must exist, with a server-held secret, immutable first-party
+Mautic numeric contact-to-canonical prospect proofs and explicit
+founder approval for the scoped no-send canary. A checked-in evidence
+reference string is not proof of a real approved source.
+
+**No-merge reason:** The running production checkout includes
+uncommitted CRM owner auth/transport changes and uses branch
+agent/data-cloud-wave4, which is over a thousand local commits ahead
+of its remote. GitHub main differs from this integration by thousands
+of unrelated commits. Opening an ordinary PR to main or replacing
+production code would sweep unrelated owner work into a release.
+Preserve the existing clean pushed integration branch until the CRM
+owner selects the correct reviewed release base.
+
+**Next verifiable production milestone:** Approved DBA role/migration
+receipt + verified live source/identity binding -> one guarded ingress
+canary -> authenticated tenant-only inbox readback -> explicit final
+founder release decision. No application restart, schema write,
+provisioning or sender activation is implied by this document.
