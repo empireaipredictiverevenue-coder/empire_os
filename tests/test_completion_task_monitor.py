@@ -542,3 +542,20 @@ def test_productivity_prioritizes_existing_sales_proof_above_provider_hold():
     assert review["review_candidates"][0]["state"] == "REAL_WORLD_EVIDENCE_REQUIRED"
     assert review["review_candidates"][0]["owner"] == "sales_revenue"
     assert review["ranking_is_not_independent_commercial_evidence"] is True
+
+
+def test_productivity_direct_customer_evidence_precedes_generic_sales_product():
+    rows, recon = sources(
+        tasks=("Rebuild Omega billing product against verified outcomes",
+               "First real customer proof", "Existing founder gate"),
+        stages=("REAL_WORLD_EVIDENCE_REQUIRED",
+                "REAL_WORLD_EVIDENCE_REQUIRED", "FOUNDER_GATE"),
+    )
+    recon["items"][1]["department"] = "marketing_growth"
+    snap = build_completion_task_monitor(rows, recon, now=NOW)
+    candidates = snap["productivity_driver"]["review_candidates"]
+    assert candidates[0]["checklist_line"] == rows[1].line
+    assert candidates[0]["explicit_customer_evidence_priority_hint"] is True
+    assert candidates[0]["customer_outcome_independently_verified"] is False
+    assert candidates[1]["explicit_customer_evidence_priority_hint"] is False
+    assert snap["productivity_driver"]["work_dispatched"] is False

@@ -46,11 +46,14 @@ PROOF = {
 # A workstream's relative commercial importance is an ordering heuristic,
 # not independent evidence of a customer, sale or a verified market.
 OWNER_BONUS = {"sales_revenue": 15, "operations_fulfilment": 5, "product": 5, "marketing_growth": 4}
-COMMERCIAL_PROOF_STATES = frozenset({
-    "REAL_WORLD_EVIDENCE_REQUIRED", "NEEDS_LIVE_PROOF",
-    "CODE_COMPLETE_NOT_LIVE", "RUNTIME_OBSERVED_PENDING_FORMAL_CLOSURE",
-    "NEEDS_WIRING_OR_TEST_FIX",
-})
+# Explicit outcome wording in a canonical task is a priority hint only:
+# it never proves a buyer, customer, payment or commercial outcome exists.
+DIRECT_CUSTOMER_EVIDENCE_TERMS = (
+    "real customer proof", "first real customer", "first customer",
+    "first sale", "buyer-approved", "buyer approved", "buyer acceptance",
+    "opted-in buyer", "qualified enquiry", "qualified customer",
+    "closed revenue", "real customer payment",
+)
 
 
 def _held(reason: str) -> dict[str, Any]:
@@ -103,8 +106,15 @@ def build_productivity_review(monitor: Mapping[str, Any]) -> dict[str, Any]:
         # Freshness is monitored by the upstream source. Do not claim elapsed
         # time since project inception from a first observational snapshot.
         stale = "NO_OBSERVED_STAGE_CHANGE_24H" in (row.get("signals") or ())
+        title = row.get("task")
+        if not isinstance(title, str):
+            return _held("task_text_not_trusted")
+        direct_outcome_evidence = (
+            state in {"REAL_WORLD_EVIDENCE_REQUIRED", "NEEDS_LIVE_PROOF"}
+            and any(term in title.casefold() for term in DIRECT_CUSTOMER_EVIDENCE_TERMS)
+        )
         score = (BASE_PRIORITY[state] + OWNER_BONUS.get(owner, 0)
-                 + (20 if owner == "sales_revenue" and state in COMMERCIAL_PROOF_STATES else 0)
+                 + (40 if direct_outcome_evidence else 0)
                  + (5 if stale else 0))
         gate = ("FOUNDER_APPROVAL_REQUIRED" if state == "FOUNDER_GATE"
                 else "FORMAL_CLOSEOUT_REQUIRED" if state in {
@@ -117,6 +127,8 @@ def build_productivity_review(monitor: Mapping[str, Any]) -> dict[str, Any]:
             "owner": owner,
             "state": state,
             "priority_score_heuristic": score,
+            "explicit_customer_evidence_priority_hint": bool(direct_outcome_evidence),
+            "customer_outcome_independently_verified": False,
             "next_step": row.get("next_evidence_step"),
             "required_proof": PROOF.get(state, "Exact existing-owner implementation and verification evidence"),
             "gate": gate,
