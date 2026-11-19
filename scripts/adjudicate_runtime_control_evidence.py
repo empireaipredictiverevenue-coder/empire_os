@@ -2,7 +2,11 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
+from empire_os.predictive_registry_observation_guard import (
+    FORECAST_DEPENDENT_CONTROLS, current_authenticated_empty_registry,
+)
 from empire_os.runtime_promotion_guard import atomic_binding_write, binding_writer_lock
 
 from empire_os.detection_fabric import (
@@ -39,6 +43,25 @@ def atomic_write(path, payload):
         atomic_binding_write(path, json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n", expected_bytes=expected)
 
 
+def restrict_empty_registry_claim(result, *, lane, control, authenticated_zero):
+    """Classify source evidence without claiming a registered forecast.
+
+    The original owner/source artifact stays referenced and untouched.
+    The downstream guarded promoter remains responsible for permissions.
+    """
+    if (not authenticated_zero or lane != "predictive_revenue"
+            or control not in FORECAST_DEPENDENT_CONTROLS):
+        return result
+    return replace(
+        result,
+        status=("SOURCE_EVIDENCE_ONLY"
+                if result.artifact_paths else "UNVERIFIED"),
+        confidence=0.0,
+        matched_keys=(),
+        reason="AUTHENTICATED_ZERO_FORECASTS_SOURCE_ONLY_NOT_FORECAST_VERIFICATION",
+    )
+
+
 def main():
 
     if not INPUT.exists():
@@ -50,6 +73,9 @@ def main():
         INPUT.read_text()
     )
 
+    # Trust only the original authenticated tenant registry; a brokerage
+    # hold_reason alone is not positive Predictive Revenue forecast proof.
+    authenticated_zero = current_authenticated_empty_registry(ROOT)
     lane_results = []
 
     for lane in candidates.get(
@@ -112,6 +138,10 @@ def main():
                 active_units=active_units,
             )
 
+            result = restrict_empty_registry_claim(
+                result, lane=name, control=control,
+                authenticated_zero=authenticated_zero,
+            )
             controls[
                 control
             ] = result.as_dict()

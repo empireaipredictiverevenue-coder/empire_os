@@ -65,8 +65,20 @@ def test_rejected_proof_never_changes_bindings(tmp_path, lane, change):
 def test_valid_proof_never_touches_production(tmp_path, lane):
     # Live canonical bindings can legitimately change under concurrent agents.
     # The entrypoint runs only against the disposable tmp_path fixture.
-    result, _, _ = run_isolated(tmp_path, lane, lambda d: None)
-    if lane == 'campaigns' and 'FAIL: promotion incomplete: action_authority' in result.stderr:
+    result, before, after = run_isolated(tmp_path, lane, lambda d: None)
+    proof = json.loads((ROOT / LANES[lane][1]).read_text())
+    if (lane == 'predictive_revenue'
+            and proof.get('status') == 'AUTHENTICATED_REGISTRY_EMPTY_NO_FORECASTS'):
+        # A verified exact-zero tenant registry is a legitimate no-op, not a
+        # forecast failure. Never create claims or rewrite any control source.
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert 'PREDICTIVE_REVENUE_PROMOTION: SKIPPED_NO_FORECASTS' in result.stdout
+        assert after == before
+    elif lane == 'predictive_revenue' and proof.get('status') != 'VERIFIED_RUNTIME':
+        # Non-authoritative source state must continue to fail closed.
+        assert result.returncode != 0
+        assert after == before
+    elif lane == 'campaigns' and 'FAIL: promotion incomplete: action_authority' in result.stderr:
         # An incomplete canonical baseline must fail closed, not be manufactured by the test.
         assert result.returncode != 0
     else:
