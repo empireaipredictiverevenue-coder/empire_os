@@ -323,3 +323,54 @@ container runner (not blanket Docker socket privileges on EmpireOS),
 then test actual pinned Mautic webhook payloads and delivery against
 the signed adapter, reconcile current dirty owner changes, and only
 then review production migration/application registration.
+
+
+## Next action closure — authenticated CRM review endpoint and DNC correction
+
+**New opt-in API:** empire_os/mautic_crm_review_api.py
+**Route:** GET /v1/revenue-crm/integrations/mautic/inbox/reviews?limit=25
+
+This read-only endpoint reuses the existing AuthenticatedRevenueCrmRead
+request resolver and its per-tenant PostgresRevenueCrmRepository. It
+does not accept a caller-supplied tenant identity, use the inbound
+Mautic webhook secret for human authentication, or grant inbox writes.
+
+The prepared inbox DDL now includes a tenant-bound RLS SELECT policy
+and SELECT-only grant for the already established CRM reader role.
+The inbox writer's INSERT/SELECT role stays separate from the CRM
+reader. The same authenticated DB transport independently verifies
+session_user-derived tenant identity and rejects cross-tenant rows.
+
+The endpoint returns bounded, fixed-field, non-PII review records:
+source_id, event fingerprint, existing prospect ID, event type,
+review signal, source timestamp trust state, journey state at ingest
+and received timestamp. Consent, sends and workflow execution remain
+false. It cannot create prospects, alter contactability, clear
+suppression, or mark an event as paid/converted.
+
+**Verified with real temporary PostgreSQL 18:** the actual SQL
+prepared-only migration creates the proper RLS policies; the Mautic
+writer inserts a synthetic signed review; the authenticated existing
+CRM reader retrieves it via HTTP; tenant B's records remain invisible
+to tenant A; the reader cannot insert; unauthenticated requests fail.
+The disposable database was destroyed by the test-runner cleanup.
+
+**Additional upstream correction:** Mautic 7 manual DNC transitions
+are a do-not-contact status, so bounced/manual/unsubscribed all
+produce SUPPRESSION_REVIEW_REQUIRED. Only contactable produces a
+neutral contactability review, never verified opt-in.
+
+**Environment audit:** the existing EmpireOS Docker socket remains
+inaccessible to the remote ubuntu operator. The connected Windows
+WSL environment failed to start on its last read-only probe.
+A read-only DigitalOcean droplet listing returned no available
+existing droplets. No paid compute was created, no host rights were
+changed, and no Mautic container was claimed running.
+
+**Release gates still held:** real Mautic producer-to-webhook delivery,
+production source authentication/bindings, DBA-reviewed inbox schema
+number/provisioning, HTTP router opt-in registration on authenticated
+app, current uncommitted CRM owner reconciliation and guarded deployment.
+
+No founder approval for production service activation or sending is
+inferred from permission to complete the isolated engineering work.

@@ -160,9 +160,13 @@ def preview_signed_mautic_webhook(
                     "contactable", "bounced", "manual", "unsubscribed"
                 ):
                     raise MauticWebhookReviewError("unrecognized subscription transition")
+                # Mautic 7's MANUAL status is a do-not-contact reason,
+                # never proof that a contact is available for marketing.
+                # Only 'contactable' receives a neutral review label, which
+                # still grants no consent and cannot clear CRM suppression.
                 signal = (
-                    "SUPPRESSION_REVIEW_REQUIRED" if status in ("bounced", "unsubscribed")
-                    else "CONTACTABILITY_REVIEW_NOT_CONSENT"
+                    "CONTACTABILITY_REVIEW_NOT_CONSENT" if status == "contactable"
+                    else "SUPPRESSION_REVIEW_REQUIRED"
                 )
             elif event_name == "mautic.form_on_submit":
                 signal = "FORM_SUBMISSION_REVIEW_NOT_CONSENT"

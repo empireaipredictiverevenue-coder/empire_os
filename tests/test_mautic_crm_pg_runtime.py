@@ -185,3 +185,113 @@ def test_actual_postgres_http_signed_webhook_to_canonical_inbox_and_replay():
             "Content-Type":"application/json","Webhook-Signature":new_sig
         })
         assert failed.status_code == 503
+
+
+def test_authenticated_existing_crm_reads_durable_mautic_inbox_without_sender_rights():
+    from empire_os.mautic_crm_review_api import create_mautic_crm_review_router
+    from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
+
+    # This event is not injected into the CRM; it stays review-only in
+    # the canonical event inbox. The synthetic reader is a real dedicated
+    # PostgreSQL login to the disposable fixture database.
+    fingerprint = "c" * 64
+    writer().reserve_new(
+        tenant_id=TENANT_A, source_id="fixture-7",
+        evidence_hmacs=[fingerprint],
+        reviews=[review(fingerprint)],
+        now=NOW,
+    )
+    app = FastAPI()
+    app.include_router(create_mautic_crm_review_router(
+        resolve_authenticated_read=lambda req: (
+            AuthenticatedRevenueCrmRead(
+                tenant_id=TENANT_A, repository=reader(),
+            ) if req.headers.get("authorization") == "Bearer test-local-tenant-only"
+            else None
+        ),
+    ))
+    with TestClient(app) as client:
+        endpoint = "/v1/revenue-crm/integrations/mautic/inbox/reviews"
+        assert client.get(endpoint).status_code == 401
+        headers = {"Authorization": "Bearer test-local-tenant-only"}
+        response = client.get(endpoint, headers=headers, params={"limit": 5})
+        assert response.status_code == 200, response.text
+        result = response.json()
+        assert result["tenant_id"] == TENANT_A
+        assert result["mode"] == "OBSERVE"
+        assert result["read_only"] is True
+        assert result["canonical_crm_written"] is False
+        assert result["send_authorized"] is False
+        assert result["count"] >= 1
+        events = [item for item in result["inbox_events"]
+                  if item["event_evidence_hmac"] == fingerprint]
+        assert len(events) == 1
+        item = events[0]
+        assert item["prospect_id"] == PROSPECT
+        assert item["review_signal"] == "SUPPRESSION_REVIEW_REQUIRED"
+        assert item["journey_segment_at_ingest"] == "contact_hold"
+        assert item["execution_authority"] == "none"
+        assert item["send_authorized"] is False
+        assert item["contact_details_disclosed"] is False
+        assert "hidden+test@example.invalid" not in response.text
+
+    # The same existing CRM reader login must never INSERT/UPDATE/DELETE.
+    with pytest.raises(psycopg.Error):
+        with psycopg.connect(dsn("mautic_fixture_reader_a")) as con:
+            with con.cursor() as cur:
+                cur.execute("SET LOCAL ROLE empire_revenue_crm_reader")
+                cur.execute(
+                    "INSERT INTO public.empire_crm_mautic_event_inbox "
+                    "(tenant_id,source_id,event_evidence_hmac,prospect_id,"
+                    "source_event,review_signal,timestamp_state,journey_segment)"
+                    " VALUES (%s::uuid,'fixture-7',%s,%s::uuid,"
+                    "'mautic.form_on_submit','FORM_SUBMISSION_REVIEW_NOT_CONSENT',"
+                    "'RECENT_OBSERVED','contact_hold')",
+                    (TENANT_A, "d" * 64, PROSPECT),
+                )
+
+
+def test_crm_inbox_reader_database_tenant_mismatch_fails_closed():
+    from empire_os.mautic_crm_review_api import create_mautic_crm_review_router
+    from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
+
+    bad_repo = PostgresRevenueCrmRepository(
+        dsn("mautic_fixture_reader_a"), tenant_id=TENANT_B
+    )
+    app = FastAPI()
+    app.include_router(create_mautic_crm_review_router(
+        resolve_authenticated_read=lambda _req: AuthenticatedRevenueCrmRead(
+            tenant_id=TENANT_B, repository=bad_repo,
+        )
+    ))
+    response = TestClient(app).get(
+        "/v1/revenue-crm/integrations/mautic/inbox/reviews"
+    )
+    assert response.status_code == 503
+    assert response.json()["detail"] == "canonical_mautic_inbox_unavailable"
+
+
+def test_existing_crm_reader_cannot_see_other_tenants_mautic_event_inbox():
+    # Tenant B owns a distinct review event. Existing A reader cannot
+    # retrieve it even with no explicit WHERE clause: database FORCE RLS.
+    token_b = "e" * 64
+    prospect_b = "00000000-0000-0000-0000-000000000202"
+    PostgresMauticEventInbox(
+        dsn("mautic_fixture_writer_b"), authenticated_tenant_id=TENANT_B
+    ).reserve_new(
+        tenant_id=TENANT_B, source_id="fixture-7",
+        evidence_hmacs=[token_b],
+        reviews=[review(token_b, prospect=prospect_b)],
+        now=NOW,
+    )
+    with psycopg.connect(dsn("mautic_fixture_reader_a")) as con:
+        with con.cursor() as cur:
+            cur.execute("SET TRANSACTION READ ONLY")
+            cur.execute("SET LOCAL ROLE empire_revenue_crm_reader")
+            cur.execute(
+                "SELECT event_evidence_hmac FROM public.empire_crm_mautic_event_inbox "
+                "WHERE event_evidence_hmac=%s", (token_b,)
+            )
+            assert cur.fetchall() == []
+    # CRM inbox reporting is bound to the same dedicated tenant login;
+    # HTTP callers cannot promote a cross-tenant row via query parameters.

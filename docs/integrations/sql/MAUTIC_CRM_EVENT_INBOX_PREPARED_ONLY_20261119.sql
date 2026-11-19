@@ -101,6 +101,20 @@ CREATE POLICY mautic_inbox_tenant_select
    AND public.empire_current_tenant_id() IS NOT NULL
  );
 
+-- The existing trusted CRM tenant reader may show review-only evidence to
+-- the authenticated CRM principal. It receives SELECT only (never INSERT).
+CREATE POLICY mautic_inbox_crm_reader_select
+ ON public.empire_crm_mautic_event_inbox FOR SELECT
+ TO empire_revenue_crm_reader
+ USING (
+   tenant_id=public.empire_current_tenant_id()
+   AND public.empire_current_tenant_id() IS NOT NULL
+ );
+
+CREATE INDEX mautic_inbox_tenant_recent
+ ON public.empire_crm_mautic_event_inbox
+ (tenant_id,received_at DESC,event_evidence_hmac);
+
 CREATE POLICY mautic_inbox_tenant_insert
  ON public.empire_crm_mautic_event_inbox FOR INSERT
  TO empire_mautic_crm_inbox_writer
@@ -119,11 +133,17 @@ GRANT EXECUTE ON FUNCTION public.empire_current_tenant_id()
  TO empire_mautic_crm_inbox_writer;
 GRANT SELECT,INSERT ON public.empire_crm_mautic_event_inbox
  TO empire_mautic_crm_inbox_writer;
+GRANT SELECT ON public.empire_crm_mautic_event_inbox
+ TO empire_revenue_crm_reader;
 DO $post$
 BEGIN
  IF NOT pg_catalog.has_schema_privilege('empire_mautic_crm_inbox_writer', 'public', 'USAGE')
     OR NOT pg_catalog.has_table_privilege('empire_mautic_crm_inbox_writer',
-         'public.empire_crm_mautic_event_inbox', 'SELECT,INSERT') THEN
+         'public.empire_crm_mautic_event_inbox', 'SELECT,INSERT')
+    OR NOT pg_catalog.has_table_privilege('empire_revenue_crm_reader',
+         'public.empire_crm_mautic_event_inbox', 'SELECT')
+    OR pg_catalog.has_table_privilege('empire_revenue_crm_reader',
+         'public.empire_crm_mautic_event_inbox', 'INSERT') THEN
    RAISE EXCEPTION 'Mautic inbox role privileges incomplete; rollback migration';
  END IF;
 END;

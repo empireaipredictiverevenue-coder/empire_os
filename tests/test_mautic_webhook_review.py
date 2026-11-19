@@ -176,3 +176,14 @@ def test_fingerprint_deterministic_for_owner_replay_dedupe_but_not_persistent():
     assert first["signals"][0]["event_evidence_hmac"] == second["signals"][0]["event_evidence_hmac"]
     assert len(first["signals"][0]["event_evidence_hmac"]) == 64
     assert first["canonical_replay_rejection_integrated"] is False
+
+
+@pytest.mark.parametrize("status", ["manual", "bounced", "unsubscribed"])
+def test_all_mautic_do_not_contact_statuses_require_suppression_review(status):
+    # Upstream Mautic 7 ChannelSubscriptionChange::getDncReasonVerb uses
+    # 'manual' for a manually applied DO-NOT-CONTACT reason.
+    result = review(subscription(status))
+    evidence = result["signals"][0]
+    assert evidence["signal"] == "SUPPRESSION_REVIEW_REQUIRED"
+    assert evidence["canonical_suppression_cleared"] is False
+    assert evidence["send_authorized"] is False
