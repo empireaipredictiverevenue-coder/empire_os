@@ -1,0 +1,74 @@
+# EmpireOS Smart CRM — Mautic 7.2.2 PRIVATE first-stage deployment.
+# No queue worker, scheduler, SMTP or outbound Docker network route.
+# Root-only release with a separately provisioned private 0600 env file.
+name: empire-mautic-review
+
+services:
+  db:
+    image: mariadb:11.4.13@sha256:5e73baf8179b29f115101bb102763a47a017361f3e9792daccba6646c3ab1532
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${EMPIRE_MAUTIC_DB_ROOT_PASSWORD:?external-secret-required}
+      MARIADB_DATABASE: mautic_review
+      MARIADB_USER: mautic_review
+      MARIADB_PASSWORD: ${EMPIRE_MAUTIC_DB_PASSWORD:?external-secret-required}
+    volumes:
+      - mautic_db:/var/lib/mysql
+    networks:
+      - private_review
+    healthcheck:
+      test: ["CMD-SHELL", "healthcheck.sh --connect --innodb_initialized"]
+      start_period: 40s
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  mautic_web:
+    image: mautic/mautic:7.2.2-20261026-apache@sha256:83461b9ec7c109413281490180e1f96c379aa935bd92f80c68294f98487a9015
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18784:80"
+    environment:
+      DOCKER_MAUTIC_ROLE: mautic_web
+      DOCKER_MAUTIC_LOAD_TEST_DATA: "false"
+      MAUTIC_DB_HOST: db
+      MAUTIC_DB_PORT: "3306"
+      MAUTIC_DB_DATABASE: mautic_review
+      MAUTIC_DB_USER: mautic_review
+      MAUTIC_DB_PASSWORD: ${EMPIRE_MAUTIC_DB_PASSWORD:?external-secret-required}
+      PHP_INI_VALUE_DATE_TIMEZONE: UTC
+      PHP_INI_VALUE_MEMORY_LIMIT: 512M
+      PHP_INI_VALUE_MAX_EXECUTION_TIME: "300"
+      DEBUG: "false"
+    volumes:
+      - mautic_config:/var/www/html/config
+      - mautic_logs:/var/www/html/var/logs
+      - mautic_media_files:/var/www/html/docroot/media/files
+      - mautic_media_images:/var/www/html/docroot/media/images
+    networks:
+      - private_review
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --location --max-time 10 http://localhost/ > /dev/null"]
+      start_period: 90s
+      interval: 30s
+      timeout: 15s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  private_review:
+    internal: true
+    driver: bridge
+
+volumes:
+  mautic_db:
+  mautic_config:
+  mautic_logs:
+  mautic_media_files:
+  mautic_media_images:
