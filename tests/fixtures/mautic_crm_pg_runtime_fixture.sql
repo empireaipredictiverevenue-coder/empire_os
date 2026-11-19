@@ -19,9 +19,13 @@ CREATE ROLE empiredb_tenant_reader NOLOGIN;
 CREATE ROLE mautic_fixture_writer_a LOGIN NOINHERIT;
 CREATE ROLE mautic_fixture_writer_b LOGIN NOINHERIT;
 CREATE ROLE mautic_fixture_reader_a LOGIN NOINHERIT;
+-- Distinct real-login-shaped roles for the full private pilot wiring canary.
+CREATE ROLE empire_mautic_tenant_aabbccddeeff LOGIN NOINHERIT;
+CREATE ROLE empire_crm_tenant_0123456789ab LOGIN NOINHERIT;
 
 GRANT empiredb_migrator TO fixture_owner;
 GRANT empire_revenue_crm_reader TO mautic_fixture_reader_a;
+GRANT empire_revenue_crm_reader TO empire_crm_tenant_0123456789ab;
 GRANT CREATE ON SCHEMA public TO empiredb_migrator;
 
 SET ROLE empiredb_migrator;
@@ -36,6 +40,10 @@ AS $tenant$
     WHEN 'mautic_fixture_writer_b'
       THEN '00000000-0000-0000-0000-000000000102'::uuid
     WHEN 'mautic_fixture_reader_a'
+      THEN '00000000-0000-0000-0000-000000000101'::uuid
+    WHEN 'empire_crm_tenant_0123456789ab'
+      THEN '00000000-0000-0000-0000-000000000101'::uuid
+    WHEN 'empire_mautic_tenant_aabbccddeeff'
       THEN '00000000-0000-0000-0000-000000000101'::uuid
     ELSE NULL::uuid
   END

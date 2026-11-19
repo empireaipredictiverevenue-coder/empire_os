@@ -141,6 +141,7 @@ def create_mautic_crm_preview_router(
     receipt_journal: SqliteMauticReceiptJournal | PostgresMauticEventInbox,
     allow_synthetic_test_reader: bool = False,
     now_provider: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+    revalidate_signed_ingress: Callable[[bytes], bool] | None = None,
 ) -> APIRouter:
     """Opt-in webhook preview on the existing CRM URL namespace.
 
@@ -149,7 +150,9 @@ def create_mautic_crm_preview_router(
     tenant, source bindings, or contact identity.
     """
     if (not callable(resolve_source) or not callable(resolve_tenant_reader)
-            or not isinstance(receipt_journal, (SqliteMauticReceiptJournal, PostgresMauticEventInbox))):
+            or not isinstance(receipt_journal, (SqliteMauticReceiptJournal, PostgresMauticEventInbox))
+            or revalidate_signed_ingress is not None
+               and not callable(revalidate_signed_ingress)):
         raise MauticIntegrationError("explicit trusted server integration required")
     router = APIRouter(prefix="/v1/revenue-crm/integrations/mautic")
 
@@ -194,6 +197,19 @@ def create_mautic_crm_preview_router(
         # it would otherwise lose legitimate events without a canonical inbox.
         if isinstance(receipt_journal, PostgresMauticEventInbox) and evidence["unbound_event_count"]:
             raise HTTPException(status_code=503, detail="mautic_contact_binding_unavailable")
+        # The source configuration was checked at startup, but its first-
+        # party approval/identity evidence may be revoked while this process
+        # remains running. Recheck only AFTER authenticating the signed body,
+        # and BEFORE any DB read, durable receipt or HTTP 200 acknowledgement.
+        if revalidate_signed_ingress is not None:
+            try:
+                current_authority = revalidate_signed_ingress(bytes(buffer))
+            except Exception:
+                current_authority = False
+            if current_authority is not True:
+                raise HTTPException(
+                    status_code=503, detail="mautic_source_or_identity_evidence_unavailable",
+                )
         if not allow_synthetic_test_reader and not isinstance(receipt_journal, PostgresMauticEventInbox):
             raise HTTPException(status_code=503, detail="canonical_mautic_inbox_not_activated")
         try:

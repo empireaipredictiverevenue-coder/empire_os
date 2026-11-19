@@ -68,7 +68,7 @@ fi
 # Only the fixture's synthetic login roles receive membership. No live
 # tenant login, tenant ID, account, or permission is provisioned here.
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
-  "GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_a,mautic_fixture_writer_b" \
+  "GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_a,mautic_fixture_writer_b,empire_mautic_tenant_aabbccddeeff" \
   > "$TMP/fixture-membership.log"
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/docs/integrations/sql/MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql" \
@@ -94,7 +94,7 @@ if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
 fi
 grep -F "writer has member logins" "$TMP/rollback-active-writer.log" >/dev/null
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
-  "REVOKE empire_mautic_crm_inbox_writer FROM mautic_fixture_writer_a,mautic_fixture_writer_b" \
+  "REVOKE empire_mautic_crm_inbox_writer FROM mautic_fixture_writer_a,mautic_fixture_writer_b,empire_mautic_tenant_aabbccddeeff" \
   > "$TMP/fixture-membership-revoked.log"
 if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_ROLLBACK_DBA_ONLY_20261119.sql" \

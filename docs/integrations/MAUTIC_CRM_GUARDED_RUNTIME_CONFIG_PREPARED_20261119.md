@@ -258,3 +258,48 @@ production no Mautic daemon, no source configuration, no source identity
 attestation, no Mautic inbox/writer SQL, no public route and no sending.
 Do not enable EMPIRE_CRM_MAUTIC_MODE on the existing service until the
 record-backed verifier and the DBA/source release gates are complete.
+
+
+## Full private-configuration → PostgreSQL integration proof (19 November 2026)
+
+The eight-test disposable PostgreSQL 18 fixture now includes a full
+configuration-to-receipt canary rather than testing the source factory
+and database webhook handler independently.
+
+The canary uses:
+- A private 0600 source JSON and separate private 0600 64-hex webhook
+  secret, decoded by the actual production source factory.
+- The independent, synthetic first-party approval and exact contact
+  verifier injected at the existing Smart CRM pilot wiring boundary.
+- Real, distinct NOINHERIT PostgreSQL login roles matching the production
+  reader/writer naming constraints, mapped via the same
+  session_user-derived tenant resolver and enforced by actual PostgreSQL
+  FORCE ROW LEVEL SECURITY.
+- An exact signed Mautic-shaped subscription-change event delivered to
+  the configured HTTP ingress route, followed by a committed inbox
+  readback using the existing authenticated CRM review router.
+- No email, SMS, marketing consent grant, customer row write, or sender
+  registration. A second signed delivery is a deduplicated replay.
+  An unbound numeric Mautic contact returns retryable HTTP 503.
+- Live-instance-style revocation: the fixture source/identity authority
+  is revoked AFTER source configuration and router construction.
+  Both a revoked source and a revoked contact binding independently cause
+  HTTP 503, before canonical DB access or a receipt. Approvals made at
+  process startup cannot stay effective after the authoritative evidence
+  has been withdrawn.
+- Invalid-signature requests are rejected before touching the
+  independent source/identity evidence authority, avoiding a
+  database query for unauthenticated requests.
+- Private role creation, prepared inbox migration, real RLS tests,
+  collision rejection, refusal to roll back nonempty/member-bound
+  evidence, then empty-only fixture rollback and complete cleanup.
+
+**Scope limitation:** All tenant IDs, contact IDs, source refs and founder
+references in these tests are synthetic. This is a genuine configured
+HTTP → PostgreSQL integration test, not a production customer canary
+or proof that a live Mautic source exists.
+
+**Production remains held:** The live Mautic application and source
+evidence are not present; the actual DBA role and inbox have not been
+provisioned. The running Smart CRM pilot must not be restarted or
+given arbitrary synthetic contact identities as a substitute.

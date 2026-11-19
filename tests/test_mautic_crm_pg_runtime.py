@@ -295,3 +295,172 @@ def test_existing_crm_reader_cannot_see_other_tenants_mautic_event_inbox():
             assert cur.fetchall() == []
     # CRM inbox reporting is bound to the same dedicated tenant login;
     # HTTP callers cannot promote a cross-tenant row via query parameters.
+
+
+def test_real_postgres_full_approved_source_pilot_to_signed_review_inbox(
+    tmp_path,
+):
+    """Bridge actual private source factory -> signed HTTP -> tenant RLS inbox.
+
+    Unlike the direct-handler fixture, this runs the real approved-source
+    builder, strict source/identity verifier, dedicated write/read DB logins,
+    and authenticated existing CRM inbox HTTP reader in one transaction path.
+    """
+    from pathlib import Path
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from empire_os.mautic_crm_pilot_wiring import (
+        SOURCE_SCHEMA, build_mautic_pilot_routers,
+    )
+    from empire_os.revenue_crm_pilot_activation import _private_bytes
+    from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
+
+    source_id = "mautic-pilot-fixture"
+    source_ref = "source:verified-first-party-mautic-fixture"
+    identity_ref = "identity:explicit-mautic-fixture-record"
+    approval_ref = "founder:separate-mautic-fixture-approval"
+    secret = b"0123456789abcdef" * 4
+
+    class FirstPartyFixtureAuthority:
+        source_authorized = True
+        binding_authorized = True
+        source_calls = 0
+        binding_calls = 0
+
+        def verify_source(
+            self, *, source_id, tenant_id,
+            source_evidence_ref, founder_approval_ref,
+        ):
+            self.source_calls += 1
+            return self.source_authorized and (
+                source_id, tenant_id, source_evidence_ref, founder_approval_ref,
+            ) == ("mautic-pilot-fixture", TENANT_A, source_ref, approval_ref)
+
+        def verify_binding(
+            self, *, source_id, tenant_id, contact_id, prospect_id,
+            identity_evidence_ref,
+        ):
+            self.binding_calls += 1
+            return self.binding_authorized and (
+                source_id, tenant_id, contact_id, prospect_id,
+                identity_evidence_ref,
+            ) == ("mautic-pilot-fixture", TENANT_A, 42, PROSPECT, identity_ref)
+
+    secret_file = tmp_path / "mautic-source-secret"
+    secret_file.write_bytes(secret)
+    secret_file.chmod(0o600)
+    source_file = tmp_path / "mautic-source.json"
+    source_file.write_text(json.dumps({
+        "schema_version": SOURCE_SCHEMA,
+        "founder_approval_ref": approval_ref,
+        "source_id": source_id,
+        "tenant_id": TENANT_A,
+        "source_evidence_ref": source_ref,
+        "webhook_secret_file": str(secret_file),
+        "writer_dsn": dsn("empire_mautic_tenant_aabbccddeeff"),
+        "contact_bindings": {
+            "42": {"prospect_id": PROSPECT, "identity_evidence_ref": identity_ref}
+        },
+    }))
+    source_file.chmod(0o600)
+    reader_dsn = dsn("empire_crm_tenant_0123456789ab")
+
+    def authenticated_read(request):
+        if request.headers.get("authorization") != "Bearer fixture-authenticated":
+            return None
+        return AuthenticatedRevenueCrmRead(
+            tenant_id=TENANT_A,
+            repository=PostgresRevenueCrmRepository(reader_dsn, tenant_id=TENANT_A),
+        )
+
+    evidence_authority = FirstPartyFixtureAuthority()
+    routers = build_mautic_pilot_routers(
+        config_path=Path(source_file),
+        crm_founder_approval_ref="founder:existing-crm-fixture-pilot",
+        tenant_dsns={TENANT_A: reader_dsn},
+        resolve_authenticated_read=authenticated_read,
+        read_private_bytes=_private_bytes,
+        parse_dsn_role=lambda source_dsn: psycopg.conninfo.conninfo_to_dict(source_dsn)["user"],
+        verified_evidence=evidence_authority,
+    )
+    assert len(routers) == 2
+    app = FastAPI()
+    for router in routers:
+        app.include_router(router)
+    client = TestClient(app)
+    endpoint = f"/v1/revenue-crm/integrations/mautic/{source_id}/events/preview"
+    inbox = "/v1/revenue-crm/integrations/mautic/inbox/reviews"
+
+    payload = {
+        "mautic.lead_channel_subscription_changed": [{
+            "contact": {"id": 42, "email": "fixture-only@example.invalid"},
+            "channel": "email", "new_status": "unsubscribed",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }],
+    }
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    signature = base64.b64encode(hmac.new(secret, raw, hashlib.sha256).digest()).decode()
+    headers = {"Content-Type": "application/json", "Webhook-Signature": signature}
+    assert client.get(inbox).status_code == 401
+
+    first = client.post(endpoint, content=raw, headers=headers)
+    assert first.status_code == 200, first.text
+    assert first.json()["new_events"] == 1
+    assert first.json()["signed_webhook_verified"] is True
+    assert first.json()["canonical_inbox_readback_verified"] is True
+    assert first.json()["canonical_crm_written"] is False
+    assert first.json()["send_authorized"] is False
+    assert "fixture-only@example.invalid" not in first.text
+
+    evidence = client.get(inbox, headers={
+        "Authorization": "Bearer fixture-authenticated",
+    })
+    assert evidence.status_code == 200, evidence.text
+    record = [row for row in evidence.json()["inbox_events"]
+              if row["source_id"] == source_id]
+    assert len(record) == 1
+    assert record[0]["prospect_id"] == PROSPECT
+    assert record[0]["review_signal"] == "SUPPRESSION_REVIEW_REQUIRED"
+    assert record[0]["send_authorized"] is False
+    assert "fixture-only@example.invalid" not in evidence.text
+
+    # A service that stays running must re-check source and exact identity
+    # approvals before accepting another signed request. Revocation cannot
+    # be bypassed by an otherwise valid HMAC or cached startup verification.
+    evidence_authority.source_authorized = False
+    denied_source = client.post(endpoint, content=raw, headers=headers)
+    assert denied_source.status_code == 503
+    assert denied_source.json()["detail"] == (
+        "mautic_source_or_identity_evidence_unavailable"
+    )
+    evidence_authority.source_authorized = True
+    evidence_authority.binding_authorized = False
+    denied_binding = client.post(endpoint, content=raw, headers=headers)
+    assert denied_binding.status_code == 503
+    evidence_authority.binding_authorized = True
+
+    # Invalid HMAC must not even query the first-party source/identity
+    # authority: these checks happen AFTER signature verification.
+    source_calls = evidence_authority.source_calls
+    binding_calls = evidence_authority.binding_calls
+    invalid_signature = client.post(
+        endpoint, content=raw + b" ", headers=headers,
+    )
+    assert invalid_signature.status_code == 401
+    assert evidence_authority.source_calls == source_calls
+    assert evidence_authority.binding_calls == binding_calls
+
+    replay = client.post(endpoint, content=raw, headers=headers)
+    assert replay.status_code == 200
+    assert replay.json()["new_events"] == 0
+    assert replay.json()["duplicate_events"] == 1
+
+    payload["mautic.lead_channel_subscription_changed"][0]["contact"]["id"] = 99
+    unbound = json.dumps(payload, separators=(",", ":")).encode()
+    unbound_sig = base64.b64encode(
+        hmac.new(secret, unbound, hashlib.sha256).digest()
+    ).decode()
+    unknown = client.post(endpoint, content=unbound, headers={
+        "Content-Type": "application/json", "Webhook-Signature": unbound_sig,
+    })
+    assert unknown.status_code == 503
+    assert unknown.json()["detail"] == "mautic_contact_binding_unavailable"

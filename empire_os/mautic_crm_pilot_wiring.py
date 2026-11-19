@@ -19,6 +19,7 @@ from empire_os.mautic_crm_integration import (
     MauticSource, create_mautic_crm_preview_router,
 )
 from empire_os.mautic_crm_review_api import create_mautic_crm_review_router
+from empire_os.mautic_webhook_review import _contact_id
 from empire_os.revenue_crm_api import AuthenticatedRevenueCrmRead
 from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
 
@@ -205,11 +206,41 @@ def build_mautic_pilot_routers(
             if dsn is not None else None
         )
 
+    def revalidate_signed_ingress(raw_body: bytes) -> bool:
+        """Review CURRENT source/identity authority before accepting a receipt.
+
+        Called only after the exact webhook body passes Mautic HMAC and JSON
+        safety validation. Bound checks are limited to contact IDs appearing
+        in this <=40-event signed body, not the entire source inventory.
+        Failure/unavailability means upstream Mautic must retry, not lose
+        potentially revoked or uncertain-contact evidence with HTTP 200.
+        """
+        if verified_evidence.verify_source(
+            source_id=source_id, tenant_id=tenant,
+            source_evidence_ref=provenance, founder_approval_ref=approval,
+        ) is not True:
+            return False
+        signed_events = json.loads(raw_body)
+        for event_name, events in signed_events.items():
+            for event in events:
+                contact_id = _contact_id(event_name, event)
+                proof = declared.get(str(contact_id))
+                if not isinstance(proof, dict):
+                    return False
+                if verified_evidence.verify_binding(
+                    source_id=source_id, tenant_id=tenant,
+                    contact_id=contact_id, prospect_id=proof["prospect_id"],
+                    identity_evidence_ref=proof["identity_evidence_ref"],
+                ) is not True:
+                    return False
+        return True
+
     return (
         create_mautic_crm_preview_router(
             resolve_source=resolve_source,
             resolve_tenant_reader=resolve_tenant_reader,
             receipt_journal=inbox,
+            revalidate_signed_ingress=revalidate_signed_ingress,
         ),
         create_mautic_crm_review_router(
             resolve_authenticated_read=resolve_authenticated_read,
