@@ -31,6 +31,12 @@ $webhook->setWebhookUrl(
 );
 $webhook->setSecret((string) getenv('MAUTIC_CONTRACT_WEBHOOK_SECRET'));
 $webhook->setIsPublished(true);
+// Native Mautic normally stamps these fields in WebhookModel::saveEntity.
+// This isolated fixture persists through Doctrine directly; preserve the
+// normal "recently modified" lifecycle so an intentional first HTTP 503
+// cannot misclassify a freshly created synthetic webhook as abandoned.
+$webhook->setDateAdded(new DateTime());
+$webhook->setDateModified(new DateTime());
 $webhook->addTrigger('mautic.lead_channel_subscription_changed');
 $em->persist($webhook);
 $em->flush();
