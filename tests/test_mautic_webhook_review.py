@@ -187,3 +187,29 @@ def test_all_mautic_do_not_contact_statuses_require_suppression_review(status):
     assert evidence["signal"] == "SUPPRESSION_REVIEW_REQUIRED"
     assert evidence["canonical_suppression_cleared"] is False
     assert evidence["send_authorized"] is False
+
+
+@pytest.mark.parametrize("status", ["manual", "bounced", "unsubscribed"])
+@pytest.mark.parametrize("timestamp", [
+    "2026-09-01T00:00:00Z",
+    "2026-12-25T00:00:00Z",
+    "untrusted-value",
+])
+def test_delayed_or_unverified_do_not_contact_never_loses_suppression_priority(status, timestamp):
+    result = review(subscription(status, timestamp=timestamp))
+    evidence = result["signals"][0]
+    assert evidence["signal"] == "SUPPRESSION_REVIEW_REQUIRED"
+    assert evidence["timestamp_state"] != "RECENT_OBSERVED"
+    assert evidence["canonical_suppression_cleared"] is False
+    assert evidence["send_authorized"] is False
+
+
+def test_stale_contactable_does_not_become_consent_or_clear_suppression():
+    result = review(subscription(
+        "contactable", timestamp="2026-09-01T00:00:00Z"
+    ))
+    evidence = result["signals"][0]
+    assert evidence["signal"] == "STALE_OR_UNVERIFIED_EVENT_REVIEW"
+    assert evidence["marketing_consent_verified"] is False
+    assert evidence["canonical_suppression_cleared"] is False
+    assert evidence["send_authorized"] is False

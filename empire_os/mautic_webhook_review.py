@@ -172,7 +172,12 @@ def preview_signed_mautic_webhook(
                 signal = "FORM_SUBMISSION_REVIEW_NOT_CONSENT"
             else:
                 signal = "LOW_CONFIDENCE_EMAIL_OPEN_REVIEW"
-            if timestamp_state != "RECENT_OBSERVED":
+            # Never demote a do-not-contact observation because delivery
+            # was delayed. Delayed events still require human suppression
+            # reconciliation; timestamp trust is separately retained.
+            # Only non-suppression evidence loses engagement confidence.
+            if (timestamp_state != "RECENT_OBSERVED"
+                    and signal != "SUPPRESSION_REVIEW_REQUIRED"):
                 signal = "STALE_OR_UNVERIFIED_EVENT_REVIEW"
             # Keyed fingerprint avoids exposing names, emails, IPs, form answers
             # or reversible unsalted hashes of Mautic's contact identifiers.

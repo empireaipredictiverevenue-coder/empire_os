@@ -15,7 +15,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "tests" / "mautic_sandbox" / "compose.yaml"
 REQUIRED_PROFILE = "mautic-contract-only"
-EXPECTED_IMAGE = "mautic/mautic:7.2.2-20261026-apache"
+EXPECTED_IMAGE = "mautic/mautic:7.2.2-20261026-apache@sha256:84ec7fbf7f47e54692dfd5bc788af1ff0be38ef31ac178a554fc5d743a95fdda"
 
 
 def fail(message: str, code: int = 2) -> None:

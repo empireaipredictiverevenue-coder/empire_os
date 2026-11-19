@@ -404,3 +404,65 @@ https://github.com/mautic/mautic/blob/7.x/app/bundles/WebhookBundle/Model/Webhoo
 
 **Release verdict:** SOURCE_CONTRACT_VERIFIED, PYTHON_PLUS_ISOLATED_PG_PASS,
 PRODUCER_RUNTIME_NOT_AVAILABLE, MERGE_AND_DEPLOY_HELD.
+
+
+## Upstream PHP producer execution and stale-suppression correction — 2026-11-19
+
+This step closes a meaningful producer-signature ambiguity without
+touching production or requiring Docker daemon access.
+
+**Genuine upstream source executed:** Obtained exactly the Mautic 7.x
+WebhookBundle/Http/Client.php code at
+e323d688a2cbc37f4ebcc9bd7d2f2042833bde24;
+verified upstream SHA256:
+d33316dcb61c6350856316941ca39f9369d3d7783c0141fd667f63b7fe75813c.
+The unmodified PHP class was run with isolated stub dependencies that
+capture the actual generated HTTP request. The synthetic receiver
+verified raw JSON, application/json, webhook signature, source
+headers and upstream payload semantics.
+
+The resulting **PHP-generated** signed HTTP body was sent directly to
+the existing FastAPI Smart CRM webhook test router. The router
+accepted the first valid message, correctly identified the
+suppression-review signal, rejected a replay as duplicate, rejected
+an HMAC-tampered body, disclosed no synthetic email, and never
+authorised a send. The official PHP client itself did the signing,
+rather than a Python imitation of its signature algorithm.
+
+**Repeatable isolated fixture:**
+- tests/mautic_sandbox/verify_upstream_client.php: small synthetic PHP
+  dependency stubs, loads upstream PHP source from the supplied path.
+- tests/test_mautic_upstream_php_contract.py: authentic HTTP boundary
+  test; refuses unverified upstream source and skips without opt-in PHP.
+- scripts/test_mautic_upstream_sender_isolated.sh: verifies pinned
+  source SHA, temporarily downloads Ubuntu 26.04 PHP CLI packages into
+  /tmp as an unprivileged user, runs tests, removes all temporary
+  files. No sudo, apt install, PHP service, host service restart,
+  credentials, customer contacts or email sending.
+
+**Do not mislabel this test:** It is an executable integration
+test of Mautic's official PHP webhook **client class** with
+synthetic payload and stubbed application collaborators. It is
+NOT evidence of a running complete Mautic 7 application, its
+database, cron/worker queue, network delivery or first-party
+contact identity mappings.
+
+**Additional suppression correctness:** timestamp trust remains
+separately recorded, while manually suppressed, bounced and
+unsubscribed events retain SUPPRESSION_REVIEW_REQUIRED even when
+their webhook delivery is stale, future-dated or timestamp-unverified.
+Thus a delayed DNC event cannot be downranked to generic stale
+engagement review. Contactable/non-suppression evidence remains
+unverified; source changes never clear CRM suppression.
+
+**Image supply chain:** the manual-only Docker sandbox's official
+Mautic 7.2.2 Apache image is now pinned by its verified Linux/amd64
+Docker Hub SHA256 manifest:
+84ec7fbf7f47e54692dfd5bc788af1ff0be38ef31ac178a554fc5d743a95fdda.
+No Mautic container is running, and the Docker-only preflight still
+returns blocked daemon access under the connected EmpireOS login.
+
+**Remaining**: Full upstream Mautic web/DB/queue instance verification,
+real webhook delivery/retries, canonical production identity binding
+and approved DBA release/merge/deployment. The isolated source
+contract does not grant those production approvals.
