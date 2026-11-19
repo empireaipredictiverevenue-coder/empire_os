@@ -305,6 +305,8 @@ def refresh_completion_reconciliation(
         "canonical_total_count": dispatch.get("canonical_total_count"),
         "canonical_done_count": dispatch.get("canonical_done_count"),
         "canonical_pending_count": dispatch.get("source_pending_count"),
+        "invalid_task_identity_hold_count": dispatch.get("invalid_task_identity_hold_count", 0),
+        "invalid_task_identity_checklist_lines": dispatch.get("invalid_task_identity_checklist_lines", []),
         "reconciled_item_count": len(items),
         "state_counts": dict(sorted(counts.items())),
         "attempt_memory_event_count": memory["event_count"],

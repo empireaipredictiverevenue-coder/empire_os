@@ -429,5 +429,116 @@ def test_oversized_pending_identity_still_fails_closed():
     source["items"][0]["item_id"] = "check_" + sha256(
         f"{invalid.line}|{invalid.section}|{invalid.item}".encode()
     ).hexdigest()[:16]
-    with pytest.raises(ValueError, match="invalid task identity"):
+    with pytest.raises(MonitorEvidenceError, match="invalid_identity_hold_evidence_mismatch"):
         build_completion_task_monitor([invalid, *rows[1:]], source, now=NOW)
+
+
+def test_invalid_pending_task_identity_is_explicitly_held_without_forged_key():
+    rows, recon = sources()
+    held = LedgerItem(
+        source=rows[0].source, line=6, section=SECTION,
+        section_level=2, item="Unkeyable existing research note " + "z" * 650,
+        status="PENDING",
+    )
+    recon["canonical_total_count"] = 4
+    recon["invalid_task_identity_hold_count"] = 1
+    recon["invalid_task_identity_checklist_lines"] = [6]
+    result = build_completion_task_monitor([*rows, held], recon, now=NOW)
+    assert result["status"] == "AVAILABLE"
+    assert result["checklist"]["pending"] == 4
+    assert result["tracked_pending_count"] == 3
+    assert result["invalid_task_identity_hold_count"] == 1
+    assert result["invalid_task_identity_checklist_lines"] == [6]
+    assert result["invalid_identity_rows_not_queued_or_marked_done"] is True
+    assert len(result["items"]) == 3
+    review = result["productivity_driver"]
+    assert review["identity_held_pending_count"] == 1
+    assert review["work_dispatched"] is False
+    assert review["execution_authority"] == "none"
+    assert review["commercial_outcome_verified"] is False
+
+
+@pytest.mark.parametrize(("declared_count", "declared_lines"), [
+    (0, []),
+    (1, [7]),
+    (2, [6]),
+    (1, [6, 7]),
+    (True, [6]),
+])
+def test_invalid_identity_hold_requires_exact_checklist_evidence(declared_count, declared_lines):
+    rows, recon = sources()
+    held = LedgerItem(
+        source=rows[0].source, line=6, section=SECTION,
+        section_level=2, item="z" * 650, status="PENDING",
+    )
+    recon["canonical_total_count"] = 4
+    recon["invalid_task_identity_hold_count"] = declared_count
+    recon["invalid_task_identity_checklist_lines"] = declared_lines
+    with pytest.raises(MonitorEvidenceError, match="invalid_identity_hold_evidence_mismatch"):
+        build_completion_task_monitor([*rows, held], recon, now=NOW)
+
+
+def test_productivity_driver_prioritizes_repair_preserves_owner_and_gates():
+    rows, recon = sources()
+    result = build_completion_task_monitor(rows, recon, now=NOW)
+    review = result["productivity_driver"]
+    assert review["status"] == "READY_FOR_EXISTING_OWNER_REVIEW"
+    assert review["ranking_is_not_independent_commercial_evidence"] is True
+    assert review["review_candidate_count"] == 3
+    assert review["work_dispatched"] is False
+    assert review["founder_gates_preserved"] is True
+    assert review["owner_review_counts"] == {"sales_revenue": 3}
+    by_state = {row["state"]: row for row in review["review_candidates"]}
+    assert by_state["FOUNDER_GATE"]["gate"] == "FOUNDER_APPROVAL_REQUIRED"
+    assert all(not row["approved_for_external_execution"]
+               for row in review["review_candidates"])
+
+
+def test_end_to_end_existing_dispatch_propagates_held_identity_to_productivity(tmp_path):
+    from empire_os.completion_board_dispatcher import dispatch_completion_board
+    from empire_os.completion_reconciliation import refresh_completion_reconciliation
+
+    source = tmp_path / "docs/MASTER_REMAINING_CHECKLIST.md"
+    source.parent.mkdir(parents=True)
+    source.write_text(
+        "# Master\n## Sales & Revenue\n"
+        "- [ ] Obtain opted-in buyer proof\n"
+        "- [ ] " + "Research note " + "x" * 640 + "\n"
+        "- [x] Historical activity\n",
+        encoding="utf-8",
+    )
+    dispatched = dispatch_completion_board(tmp_path, now=NOW)
+    assert dispatched["invalid_task_identity_hold_count"] == 1
+    assert dispatched["source_pending_count"] == 1
+    reconciled = refresh_completion_reconciliation(tmp_path, now=NOW)
+    assert reconciled["status"] == "AVAILABLE"
+    assert reconciled["invalid_task_identity_hold_count"] == 1
+    assert reconciled["invalid_task_identity_checklist_lines"] == [4]
+    monitor = refresh_completion_task_monitor(tmp_path, now=NOW + timedelta(seconds=2))
+    assert monitor["tracked_pending_count"] == 1
+    assert monitor["checklist"]["pending"] == 2
+    assert monitor["invalid_task_identity_hold_count"] == 1
+    assert monitor["productivity_driver"]["work_dispatched"] is False
+    assert monitor["productivity_driver"]["owner_review_counts"] == {"strategy_executive": 1}
+
+
+def test_productivity_driver_rejects_forged_owner_authority():
+    from empire_os.productivity_driver import build_productivity_review
+    rows, recon = sources()
+    snapshot = build_completion_task_monitor(rows, recon, now=NOW)
+    snapshot["items"][0]["execution_authority"] = "production_write"
+    review = build_productivity_review(snapshot)
+    assert review["status"] == "HELD"
+    assert review["work_dispatched"] is False
+
+
+def test_productivity_prioritizes_existing_sales_proof_above_provider_hold():
+    rows, recon = sources(stages=(
+        "REAL_WORLD_EVIDENCE_REQUIRED", "BUILDER_PROVIDER_BLOCKED", "FOUNDER_GATE",
+    ))
+    recon["items"][1]["department"] = "engineering"
+    snapshot = build_completion_task_monitor(rows, recon, now=NOW)
+    review = snapshot["productivity_driver"]
+    assert review["review_candidates"][0]["state"] == "REAL_WORLD_EVIDENCE_REQUIRED"
+    assert review["review_candidates"][0]["owner"] == "sales_revenue"
+    assert review["ranking_is_not_independent_commercial_evidence"] is True

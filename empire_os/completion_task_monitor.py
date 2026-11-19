@@ -175,19 +175,37 @@ def build_completion_task_monitor(
     done = [row for row in checklist if row.status == "DONE"]
     if len(pending) + len(done) != len(checklist):
         raise MonitorEvidenceError("unknown_checklist_status")
+    # The dispatch deliberately quarantines invalid/oversized stable task
+    # identities. Count and identify them explicitly; never invent a key,
+    # silently drop the pending row, or claim it was completed.
+    valid_pending: list[LedgerItem] = []
+    held_identity_lines: list[int] = []
+    for row in pending:
+        try:
+            _key(row)
+        except AttemptMemoryError:
+            held_identity_lines.append(row.line)
+        else:
+            valid_pending.append(row)
+    declared_held = reconciliation.get("invalid_task_identity_hold_count", 0)
+    declared_lines = reconciliation.get("invalid_task_identity_checklist_lines", [])
+    if (type(declared_held) is not int or declared_held != len(held_identity_lines)
+            or not isinstance(declared_lines, list)
+            or declared_lines != held_identity_lines):
+        raise MonitorEvidenceError("invalid_identity_hold_evidence_mismatch")
     if (not _integer(reconciliation.get("canonical_pending_count"))
-            or reconciliation["canonical_pending_count"] != len(pending)
+            or reconciliation["canonical_pending_count"] != len(valid_pending)
             or reconciliation.get("canonical_total_count") != len(checklist)
             or reconciliation.get("canonical_done_count") != len(done)):
         raise MonitorEvidenceError("reconciliation_checklist_count_mismatch")
     records = reconciliation.get("items")
     if (not isinstance(records, list)
-            or len(records) != len(pending)
+            or len(records) != len(valid_pending)
             or reconciliation.get("reconciled_item_count") != len(records)
             or any(not isinstance(row, Mapping) for row in records)):
         raise MonitorEvidenceError("reconciliation_item_count_mismatch")
-    canonical = {_id(row): row for row in pending}
-    if len(canonical) != len(pending):
+    canonical = {_id(row): row for row in valid_pending}
+    if len(canonical) != len(valid_pending):
         raise MonitorEvidenceError("ambiguous_canonical_checklist_ids")
     by_id: dict[str, Mapping[str, Any]] = {}
     counted: Counter[str] = Counter()
@@ -299,7 +317,7 @@ def build_completion_task_monitor(
         (row for row in items if row["attention_required"]),
         key=lambda row: (row["priority_order"], -row["state_age_seconds"], row["line"]),
     )
-    return {
+    packet = {
         "schema_version": SCHEMA,
         "status": "AVAILABLE", "mode": "OBSERVE",
         "generated_at": current.isoformat(),
@@ -314,6 +332,9 @@ def build_completion_task_monitor(
         "unkeyable_historical_done_count": unkeyable_historical_done_count,
         "unkeyable_done_not_credited_as_completion_transition": True,
         "tracked_pending_count": len(items),
+        "invalid_task_identity_hold_count": len(held_identity_lines),
+        "invalid_task_identity_checklist_lines": held_identity_lines,
+        "invalid_identity_rows_not_queued_or_marked_done": True,
         "state_counts": by_state,
         "department_counts": by_department,
         "attention_count": len(priority_queue),
@@ -331,6 +352,9 @@ def build_completion_task_monitor(
         "external_execution_performed": False,
         "execution_authority": "none",
     }
+    from empire_os.productivity_driver import build_productivity_review
+    packet["productivity_driver"] = build_productivity_review(packet)
+    return packet
 
 
 def _read(path: Path) -> Mapping[str, Any]:
