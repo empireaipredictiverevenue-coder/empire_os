@@ -109,3 +109,50 @@ def review_forecast_calibration(
         blockers=ordered,
         evidence_refs=tuple(dict.fromkeys(refs)),
     )
+
+
+def review_commercial_prediction(*, prediction, feedback, tenant_id, as_of):
+    """Resolve an explicit probability prediction using existing Quant Brier scoring."""
+    from copy import deepcopy
+    from datetime import datetime
+    from empire_os.outcome_feedback import validate_verified_feedback
+    from empire_os.quant_brain import brier_score
+
+    def timestamp(value):
+        time = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
+        if time.tzinfo is None:
+            raise ValueError('timezone-aware prediction evidence required')
+        return time
+
+    validate_verified_feedback(feedback, tenant_id=tenant_id, as_of=as_of)
+    if prediction.get('tenant_id') != tenant_id:
+        raise ValueError('prediction tenant mismatch')
+    for key in ('opportunity_key', 'prediction_ref'):
+        if not isinstance(prediction.get(key), str) or not prediction[key] or prediction[key] != feedback.get(key):
+            raise ValueError('prediction/outcome lineage mismatch or missing')
+    if prediction.get('prediction_type') != 'conversion_probability':
+        raise ValueError('unsupported commercial prediction type')
+    if not prediction.get('evidence_refs'):
+        raise ValueError('original prediction evidence required')
+    predicted_at = timestamp(prediction.get('predicted_at'))
+    actual_at = timestamp(feedback['available_at'])
+    horizon = timestamp(prediction.get('horizon_until'))
+    if not predicted_at < timestamp(feedback['outcome_recorded_at']) <= actual_at <= horizon:
+        raise ValueError('outcome outside original prediction window')
+    probability = prediction.get('predicted_probability')
+    if isinstance(probability, bool):
+        raise ValueError('invalid probability')
+    metric = brier_score([probability], [feedback['verified_label']])
+    residual = round(feedback['verified_label'] - probability, 6)
+    return dict(schema_version='empire.commercial_prediction_calibration.v1',
+        tenant_id=tenant_id, opportunity_key=prediction['opportunity_key'],
+        prediction_ref=prediction['prediction_ref'], decision_ref=feedback.get('decision_ref'),
+        execution_ref=feedback.get('execution_ref'), outcome_ref=feedback['outcome_ref'],
+        prediction_type='conversion_probability', predicted_value=probability,
+        predicted_at=predicted_at.isoformat(), horizon_until=horizon.isoformat(),
+        actual_value=feedback['verified_label'], actual_at=actual_at.isoformat(),
+        signed_error=residual, brier_score=metric['brier_score'],
+        evidence_refs=list(dict.fromkeys([*prediction['evidence_refs'], *feedback['evidence_refs']])),
+        prediction=deepcopy(prediction), feedback=deepcopy(feedback),
+        calibration_ready=True, learning_stage='SHADOW_LEARNING', shadow_only=True,
+        model_weight_mutation=False, promoted_learning=False, execution_authority='none')

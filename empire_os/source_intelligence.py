@@ -111,6 +111,34 @@ SOURCES: dict[str, SourceContract] = {
         "continuous", "Open Government Licence", raw_resale_allowed=True,
         allowed_uses=("internal_acquisition", "analytics", "derived_products"),
     ),
+    "us_census_building_permits": _source(
+        "us_census_building_permits", "US Census Bureau Building Permits Survey",
+        "US", "official_construction_permits", "public_ascii_state_monthly",
+        "https://www2.census.gov/econ/bps/State/",
+        ("construction", "property", "roofing", "housing"),
+        ("permit_type", "territory", "location", "residential_units"),
+        "monthly_publication_lag", "official_public_statistics_rights_review",
+        production_status="research", raw_resale_allowed=False,
+        pii_class="none", allowed_uses=("analytics",),
+        notes=("State-level estimates of privately-owned residential housing units "
+               "authorised; NOT job-site permit records, contractor identities, starts, "
+               "buyer enquiries, or proof of commercial data reuse rights."),
+    ),
+    "us_usaspending_awards": _source(
+        "us_usaspending_awards", "US Treasury USAspending", "US",
+        "official_federal_award_data", "public_json_api",
+        "https://api.usaspending.gov/api/v2/search/spending_by_award/",
+        ("procurement", "technology", "healthcare", "construction", "energy"),
+        ("federal_award", "recipient", "awarding_agency", "historical_spend"),
+        "periodic", "official_public_api_usage_review",
+        production_status="research", raw_resale_allowed=False,
+        allowed_uses=("analytics",),
+        notes=(
+            "Live bounded HTTP 200 sample observed 2026-11-11; "
+            "award dates may predate the query period. Never infer an open "
+            "tender, buyer intent, renewal, revenue, or outreach permission."
+        ),
+    ),
     "gb_ofgem_fit": _source(
         "gb_ofgem_fit", "Ofgem", "GB", "official_energy_installation_data", "xlsx_bulk",
         "https://www.ofgem.gov.uk/feed-tariffs-fit/contacts-guidance-and-resources/public-reports-and-data-fit/installation-reports",
