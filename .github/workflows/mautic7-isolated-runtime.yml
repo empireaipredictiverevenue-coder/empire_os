@@ -21,7 +21,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          for key in MAUTIC_CONTRACT_DB_PASSWORD MAUTIC_CONTRACT_DB_ROOT_PASSWORD MAUTIC_CONTRACT_ADMIN_PASSWORD; do
+          for key in MAUTIC_CONTRACT_DB_PASSWORD MAUTIC_CONTRACT_DB_ROOT_PASSWORD MAUTIC_CONTRACT_ADMIN_PASSWORD MAUTIC_CONTRACT_WEBHOOK_SECRET; do
             value="$(openssl rand -hex 32)"
             echo "::add-mask::$value"
             printf '%s=%s\n' "$key" "$value" >> "$GITHUB_ENV"
@@ -32,8 +32,8 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          dc() { docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml "$@"; }
-          dc up -d --pull always --no-build db mautic_web
+          dc() { docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml -f tests/mautic_sandbox/compose.delivery.yaml "$@"; }
+          dc up -d --pull always --no-build db mautic_web receiver
           dc ps
           for n in $(seq 1 45); do
             if dc exec -T db mysqladmin ping -h127.0.0.1 --silent >/dev/null 2>&1; then break; fi
@@ -72,15 +72,38 @@ jobs:
           test "$ready" -eq 1 || { echo "PRIVATE_MAUTIC_APPLICATION_NOT_READY"; exit 1; }
           dc exec -T -w /var/www/html mautic_web             php bin/console mautic:webhooks:process --help >/dev/null
           echo "FULL_MAUTIC_7_APP_INSTALLED_AND_WEBHOOK_QUEUE_COMMAND_EXISTS"
+      - name: Deliver native Mautic queue to the real EmpireOS signature adapter
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          dc() { docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml -f tests/mautic_sandbox/compose.delivery.yaml "$@"; }
+          for n in $(seq 1 25); do
+            if dc exec -T receiver python -c 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8081/health", timeout=3)' >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          dc exec -T receiver python -c 'import urllib.request; assert urllib.request.urlopen("http://127.0.0.1:8081/health", timeout=4).status == 200'
+          dc cp tests/mautic_sandbox/seed_native_queue.php mautic_web:/tmp/seed_native_queue.php
+          dc exec -T mautic_web php -l /tmp/seed_native_queue.php
+          seed="$(dc exec -T -u www-data -w /var/www/html             -e MAUTIC_CONTRACT_ONLY=1             -e MAUTIC_CONTRACT_WEBHOOK_SECRET="$MAUTIC_CONTRACT_WEBHOOK_SECRET"             mautic_web php /tmp/seed_native_queue.php)"
+          webhook_id="$(printf '%s\n' "$seed" | sed -n 's/^CI_WEBHOOK_ID=//p' | tail -1)"
+          [[ "$webhook_id" =~ ^[0-9]+$ ]] || { echo "NATIVE_MAUTIC_QUEUE_SEED_FAILED"; exit 1; }
+          echo "MAUTIC_7_NATIVE_WEBHOOK_AND_QUEUE_CREATED"
+          dc exec -T -u www-data -w /var/www/html mautic_web             php bin/console mautic:webhooks:process --webhook-id="$webhook_id" --no-interaction
+          dc exec -T receiver cat /tmp/mautic_native_queue_receipt.json |             python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["signed_webhook_verified"] is True and r["producer"]=="native_mautic_7_queue" and r["signal"]=="SUPPRESSION_REVIEW_REQUIRED" and r["send_authorized"] is False and r["canonical_crm_written"] is False; print("NATIVE_MAUTIC_SIGNED_WEBHOOK_ARRIVED_IN_EMPIREOS_ADAPTER")'
+          remaining="$(dc exec -T -e MYSQL_PWD="$MAUTIC_CONTRACT_DB_PASSWORD" db             mysql -umautic_contract_test -D mautic_contract_test -N             -e "SELECT COUNT(*) FROM webhook_queue WHERE webhook_id=$webhook_id")"
+          test "$remaining" = 0 || { echo "MAUTIC_QUEUE_NOT_ACKNOWLEDGED"; exit 1; }
+          echo "NATIVE_MAUTIC_QUEUE_ACKNOWLEDGED_AND_DELETED_NO_SENDING"
       - name: Print isolated diagnostics on failure
         if: failure()
         shell: bash
         run: |
-          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml ps || true
-          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml logs --tail 45 mautic_web db || true
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml -f tests/mautic_sandbox/compose.delivery.yaml ps || true
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml -f tests/mautic_sandbox/compose.delivery.yaml logs --tail 45 mautic_web db receiver || true
       - name: Remove isolated containers and synthetic database
         if: always()
         shell: bash
         run: |
-          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml \
+          docker compose --profile mautic-contract-only -f tests/mautic_sandbox/compose.yaml -f tests/mautic_sandbox/compose.delivery.yaml \
             down -v --remove-orphans --timeout 10 || true

@@ -1,0 +1,30 @@
+# CI-only overlay: native Mautic 7 queue -> actual EmpireOS signature adapter.
+# Must be combined with the existing isolated compose.yaml, never on production.
+services:
+  mautic_web:
+    environment:
+      MAUTIC_CONFIG_PARAMETERS: '{"queue_mode":"command_process","webhook_retry_delay":0,"webhook_health_check_time":0,"webhook_allowed_private_addresses":["receiver"]}'
+  receiver:
+    profiles: ["mautic-contract-only"]
+    image: python:3.12-alpine
+    command: ["python", "-B", "-u", "/app/receiver.py"]
+    working_dir: /app
+    environment:
+      PYTHONPATH: /app
+      MAUTIC_CONTRACT_WEBHOOK_SECRET: ${MAUTIC_CONTRACT_WEBHOOK_SECRET:?synthetic-only-webhook-secret-required}
+    volumes:
+      - type: bind
+        source: ./receiver.py
+        target: /app/receiver.py
+        read_only: true
+      - type: bind
+        source: ../../empire_os
+        target: /app/empire_os
+        read_only: true
+    networks: [contract_private]
+    restart: "no"
+    mem_limit: 128m
+    cpus: "0.5"
+    security_opt:
+      - no-new-privileges:true
+    user: "65534:65534"
