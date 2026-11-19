@@ -1,0 +1,73 @@
+# EMPIRE AI — ISOLATED MAUTIC 7 CONTRACT TEST ONLY
+# Manual profile required. No production app integration or send authority.
+# Official image tags verified 2026-11-19:
+# https://hub.docker.com/r/mautic/mautic/tags
+# https://github.com/mautic/docker-mautic/tree/main/examples/basic
+# Never deploy this as an externally reachable marketing service.
+name: empire-mautic-contract-test
+
+services:
+  db:
+    profiles: ["mautic-contract-only"]
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: mautic_contract_test
+      MYSQL_USER: mautic_contract_test
+      MYSQL_PASSWORD: ${MAUTIC_CONTRACT_DB_PASSWORD:?isolated database password required}
+      MYSQL_ROOT_PASSWORD: ${MAUTIC_CONTRACT_DB_ROOT_PASSWORD:?isolated root password required}
+    volumes:
+      - mysql_contract_data:/var/lib/mysql
+    networks: [contract_private]
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u $$MYSQL_USER -D $$MYSQL_DATABASE -N -e 'SELECT 1' >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 25s
+    mem_limit: 1g
+    cpus: "1.0"
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+
+  mautic_web:
+    profiles: ["mautic-contract-only"]
+    image: mautic/mautic:7.2.2-20261026-apache
+    environment:
+      DOCKER_MAUTIC_ROLE: mautic_web
+      DOCKER_MAUTIC_LOAD_TEST_DATA: "false"
+      MAUTIC_DB_HOST: db
+      MAUTIC_DB_PORT: "3306"
+      MAUTIC_DB_DATABASE: mautic_contract_test
+      MAUTIC_DB_USER: mautic_contract_test
+      MAUTIC_DB_PASSWORD: ${MAUTIC_CONTRACT_DB_PASSWORD:?isolated database password required}
+      MAUTIC_MESSENGER_DSN_EMAIL: doctrine://default
+      MAUTIC_MESSENGER_DSN_HIT: doctrine://default
+      PHP_INI_VALUE_DATE_TIMEZONE: UTC
+    ports:
+      - "127.0.0.1:${MAUTIC_CONTRACT_HTTP_PORT:-18080}:80"
+    volumes:
+      - mautic_contract_config:/var/www/html/config
+      - mautic_contract_logs:/var/www/html/var/logs
+      - mautic_contract_files:/var/www/html/docroot/media/files
+      - mautic_contract_images:/var/www/html/docroot/media/images
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [contract_private]
+    restart: "no"
+    mem_limit: 1536m
+    cpus: "1.0"
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  mysql_contract_data: {}
+  mautic_contract_config: {}
+  mautic_contract_logs: {}
+  mautic_contract_files: {}
+  mautic_contract_images: {}
+
+networks:
+  contract_private:
+    internal: true

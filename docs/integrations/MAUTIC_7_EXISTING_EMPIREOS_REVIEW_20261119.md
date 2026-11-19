@@ -276,3 +276,50 @@ sequenced migration number, applying held SQL in EmpireDB, obtaining
 canonical production source bindings/secret/reader/writer logins, webhook
 queue health, workflow execution, outbound sends, sales, or any revenue
 claim. Requires canonical DBA/Smart CRM owner review and founder release gate.
+
+
+## Reconciled integration and test-environment preflight — 2026-11-19
+
+**New integration branch:** integration/mautic-crm-active-20261119
+
+The original four Mautic commits were cherry-picked, in order, onto
+the newer immutable committed EmpireOS snapshot
+9ac776b6506442aeb81927f2554f3fb12f4a0846.
+This preserves the original isolated development branch and does not
+modify the active dirty /srv/empire_os checkout. There were no source
+merge conflicts.
+
+**Verification against the newer committed base:**
+
+- 141 Smart CRM, Mautic, tenant-security and transport tests passed.
+- 4 tests against ephemeral real PostgreSQL 18 (no production DB) passed.
+- The SQL remains unnumbered and prepared only.
+- The committed snapshot does not include any simultaneously dirty
+  changes in /srv/empire_os; owner comparison is necessary before merge.
+
+**Actual Mautic runtime preflight:**
+
+- Official Mautic Docker 7.2.2-20261026 Apache image tag confirmed
+  on Docker Hub, with matching official Apache guidance.
+- tests/mautic_sandbox/compose.yaml defines a manual-profile,
+  loopback-port, internal-network, worker-free Mautic/MySQL fixture.
+- scripts/preflight_mautic_contract_sandbox.py validates the Compose
+  JSON, images, profiles, mounts, restart/no-worker and isolation gates.
+- Docker Compose v5.7.1 configuration and isolation checks passed.
+- Actual Docker daemon permission check failed for ubuntu:
+  MAUTIC_RUNTIME_BLOCKED_DOCKER_DAEMON_ACCESS (exit 24).
+- Connected Windows WSL launch also failed (CreateInstance/E_UNEXPECTED).
+- LXD has no configured storage pool/default profile and was not used
+  to alter host container infrastructure.
+
+**No real Mautic container or test app was started.** Neither host
+Docker permission escalation nor new paid cloud resources, host
+service restarts, migrations, production deployments or outbound
+sending was authorised or performed. The full signed webhook
+producer-driven integration remains **NOT LIVE / NOT VERIFIED**.
+
+**Needed release gate:** provide a dedicated approved sandbox
+container runner (not blanket Docker socket privileges on EmpireOS),
+then test actual pinned Mautic webhook payloads and delivery against
+the signed adapter, reconcile current dirty owner changes, and only
+then review production migration/application registration.
