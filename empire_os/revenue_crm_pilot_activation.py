@@ -76,7 +76,9 @@ def _dsn_role(dsn: object, *, expected: str | None = None) -> str:
     return role
 
 
-def build_pilot_routers(config_path: Path) -> tuple[APIRouter, APIRouter]:
+def build_pilot_routers(
+    config_path: Path, *, mautic_config_path: Path | None = None,
+) -> tuple[APIRouter, ...]:
     """Validate private configuration and construct opted-in routers.
 
     This function does not connect to the DB or mint accounts/tokens.
@@ -144,17 +146,42 @@ def build_pilot_routers(config_path: Path) -> tuple[APIRouter, APIRouter]:
     read_router = create_revenue_crm_router(
         resolve_authenticated_read=resolver,
     )
-    return read_router, login_router
+    routers = [read_router, login_router]
+    if mautic_config_path is not None:
+        # Only an explicitly approved private source may add Mautic routes.
+        # Reuse this CRM pilot's verified tenant auth/readers, never a second
+        # CRM principal or shared EmpireDB runtime login.
+        from empire_os.mautic_crm_pilot_wiring import build_mautic_pilot_routers
+        routers.extend(build_mautic_pilot_routers(
+            config_path=mautic_config_path,
+            crm_founder_approval_ref=configuration["founder_approval_ref"],
+            tenant_dsns=readers,
+            resolve_authenticated_read=resolver,
+            read_private_bytes=_private_bytes,
+            parse_dsn_role=_dsn_role,
+        ))
+    return tuple(routers)
 
 
 def create_crm_routers_for_hub() -> tuple[APIRouter, ...]:
     """Existing hub is always OBSERVE unless intentionally configured."""
     mode = os.environ.get("EMPIRE_CRM_PILOT_MODE", "")
+    mautic_mode = os.environ.get("EMPIRE_CRM_MAUTIC_MODE", "")
+    mautic_path = os.environ.get("EMPIRE_CRM_MAUTIC_CONFIG_FILE", "")
     if not mode:
+        if mautic_mode or mautic_path:
+            raise ValueError("Mautic requires the approved existing CRM pilot")
         return (create_revenue_crm_router(),)
     if mode != ACTIVATION_MODE:
         raise ValueError("unrecognised CRM activation mode; refusing to start")
     file_path = os.environ.get("EMPIRE_CRM_PILOT_CONFIG_FILE", "")
     if not file_path:
         raise ValueError("CRM pilot configuration missing; refusing activation")
-    return build_pilot_routers(Path(file_path))
+    if (mautic_mode and mautic_mode != "APPROVED_READ_ONLY_MAUTIC_INBOX"
+            or mautic_path and not mautic_mode
+            or mautic_mode and not mautic_path):
+        raise ValueError("unapproved or incomplete Mautic CRM integration mode")
+    return build_pilot_routers(
+        Path(file_path),
+        mautic_config_path=Path(mautic_path) if mautic_mode else None,
+    )
