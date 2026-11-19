@@ -93,7 +93,19 @@ jobs:
           webhook_id="$(printf '%s\n' "$seed" | sed -n 's/^CI_WEBHOOK_ID=//p' | tail -1)"
           [[ "$webhook_id" =~ ^[0-9]+$ ]] || { echo "NATIVE_MAUTIC_QUEUE_SEED_FAILED"; exit 1; }
           echo "MAUTIC_7_NATIVE_WEBHOOK_AND_QUEUE_CREATED"
-          dc exec -T -u www-data -w /var/www/html mautic_web             php bin/console mautic:webhooks:process --webhook-id="$webhook_id" --no-interaction
+          dc exec -T -u www-data -w /var/www/html mautic_web \
+            php bin/console mautic:webhooks:process --webhook-id="$webhook_id" --no-interaction
+          first_attempt="$(dc exec -T -e MYSQL_PWD="$MAUTIC_CONTRACT_DB_PASSWORD" db \
+            mysql -umautic_contract_test -D mautic_contract_test -N \
+            -e "SELECT CONCAT(COUNT(*), ':', COALESCE(MAX(retries),0)) FROM webhook_queue WHERE webhook_id=$webhook_id")"
+          if [[ "$first_attempt" != "1:1" ]]; then
+            echo "MAUTIC_503_RETRY_NOT_PERSISTED"
+            exit 1
+          fi
+          echo "MAUTIC_NATIVE_QUEUE_HTTP_503_RETAINED_FOR_RETRY"
+          sleep 3
+          dc exec -T -u www-data -w /var/www/html mautic_web \
+            php bin/console mautic:webhooks:process --webhook-id="$webhook_id" --no-interaction
           dc exec -T receiver cat /tmp/mautic_native_queue_receipt.json |             python3 -c 'import json,sys; r=json.load(sys.stdin); assert r["signed_webhook_verified"] is True and r["producer"]=="native_mautic_7_queue" and r["signal"]=="SUPPRESSION_REVIEW_REQUIRED" and r["send_authorized"] is False and r["canonical_crm_written"] is False; print("NATIVE_MAUTIC_SIGNED_WEBHOOK_ARRIVED_IN_EMPIREOS_ADAPTER")'
           remaining="$(dc exec -T -e MYSQL_PWD="$MAUTIC_CONTRACT_DB_PASSWORD" db             mysql -umautic_contract_test -D mautic_contract_test -N             -e "SELECT COUNT(*) FROM webhook_queue WHERE webhook_id=$webhook_id")"
           test "$remaining" = 0 || { echo "MAUTIC_QUEUE_NOT_ACKNOWLEDGED"; exit 1; }

@@ -12,6 +12,7 @@ services:
     environment:
       PYTHONPATH: /app
       MAUTIC_CONTRACT_WEBHOOK_SECRET: ${MAUTIC_CONTRACT_WEBHOOK_SECRET:?synthetic-only-webhook-secret-required}
+      MAUTIC_CONTRACT_FORCE_FIRST_RETRY: "true"
     volumes:
       - type: bind
         source: ./receiver.py

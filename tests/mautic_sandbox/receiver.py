@@ -32,6 +32,8 @@ PROSPECT = "00000000-0000-0000-0000-000000000201"
 PATH = "/v1/revenue-crm/integrations/mautic/ci/events/preview"
 RECEIPT = pathlib.Path("/tmp/mautic_native_queue_receipt.json")
 SECRET = os.environ.get("MAUTIC_CONTRACT_WEBHOOK_SECRET", "").encode("utf-8")
+RETRY_FIRST_ONCE = os.environ.get("MAUTIC_CONTRACT_FORCE_FIRST_RETRY") == "true"
+DELIVERY_ATTEMPTS = 0
 if len(SECRET) < 32:
     raise SystemExit("SYNTHETIC_TEST_SECRET_MISSING")
 
@@ -81,6 +83,23 @@ class Handler(BaseHTTPRequestHandler):
         ):
             self._reply(503, {"status": "canonical_review_not_ready"})
             return
+        # Exercise native Mautic queue retry once with a real HTTP 503.
+        # The first failed attempt must NOT be acknowledged or persisted
+        # as an accepted synthetic review. Only the retry can return 200.
+        global DELIVERY_ATTEMPTS
+        DELIVERY_ATTEMPTS += 1
+        if RETRY_FIRST_ONCE and DELIVERY_ATTEMPTS == 1:
+            print("NATIVE_MAUTIC_QUEUE_FIRST_DELIVERY_REJECTED_503", flush=True)
+            self._reply(503, {"status": "synthetic_retry_required"})
+            return
+        # The first successfully authenticated event deliberately receives
+        # HTTP 503 in this disposable test: Mautic must retain its real queue
+        # row for retry. Never use a 410 (which would disable the source).
+        self.server.verified_posts = getattr(self.server, "verified_posts", 0) + 1
+        if self.server.verified_posts == 1:
+            print("NATIVE_MAUTIC_SIGNED_QUEUE_FIRST_HTTP503_RETRY_REQUIRED", flush=True)
+            self._reply(503, {"status": "synthetic_temporary_unavailable"})
+            return
         # Store sanitized allowlisted fields only, never the Mautic raw body.
         evidence = result["signals"][0]
         receipt = {
@@ -93,6 +112,7 @@ class Handler(BaseHTTPRequestHandler):
             "marketing_consent_verified": False,
             "send_authorized": False,
             "canonical_crm_written": False,
+            "native_queue_verified_attempts": self.server.verified_posts,
         }
         RECEIPT.write_text(json.dumps(receipt, sort_keys=True))
         print(
