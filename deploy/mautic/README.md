@@ -168,3 +168,42 @@ against the now-provisioned environment. Inspect actual state and use
 the existing founder/DBA change gates for any subsequent modification.
 The private MariaDB and admin credential backups contain sensitive
 secrets: keep them root-owned and never attach them to chats or Git.
+
+## Independent recovery rehearsal and current operational truth
+
+On 20 November 2026, the protected private Mautic backup was actually
+restored into a **new disposable MariaDB 11.4.13 container** on the
+EmpireOS Docker host. That recovery container had `--network none`,
+no published ports, and an in-memory MariaDB data directory. The original
+live Mautic instance, Docker volumes, Smart CRM and EmpireDB were untouched.
+
+Actual independent readback: **126 restored tables and 1 administrator**.
+The disposable recovery container was removed upon successful verification.
+The restore script is
+`deploy/mautic/verify_backup_restore_isolated_20261120.sh` and its
+original root-owned Mautic backup source is
+`/var/backups/empiredb/mautic-app-20261120/20261120T103507Z`.
+
+The previous read-only release checker incorrectly treated a missing
+EmpireOS host listener on port 18784 as evidence of no running Mautic.
+This was a false negative: the intentionally `internal: true` Docker
+network forbids host port publication. Version 2 of
+`scripts/review_mautic_live_release_20261120.py` now verifies the
+actual **privileged** Docker container health and Mautic's internal
+HTTP 200 endpoint, rather than inferring app status from a host port.
+
+The current version-2 root-run verification is recorded in
+`docs/integrations/MAUTIC_LIVE_PRODUCTION_READINESS_20261120.json`.
+It confirms Mautic installed/healthy and the canonical EmpireDB
+inbox installed. The remaining three **distinct** integration gates:
+(1) provision tenant-scoped writer identity only when the real source
+is approved, (2) prove a genuinely opted-in Mautic numeric contact
+matches an existing canonical CRM prospect, and (3) mount the guarded
+Mautic ingress on the original Smart CRM under existing service-owner
+controls. The fresh Mautic instance currently contains **zero contacts,
+zero webhook subscriptions and zero queued events**. These missing
+facts are not substitutes for synthetic samples.
+
+No marketing automation, outbound send or customer-facing CRM workflow
+was activated by the application/database release. No production owner
+code branch was merged or service restarted.

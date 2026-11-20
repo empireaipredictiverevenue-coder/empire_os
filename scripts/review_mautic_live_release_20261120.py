@@ -9,6 +9,7 @@ import json
 import os
 import socket
 import stat
+from pwd import getpwnam
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -34,7 +35,7 @@ def _safe_env() -> bool:
         if (
             not stat.S_ISREG(s.st_mode)
             or stat.S_IMODE(s.st_mode) != 0o600
-            or s.st_uid != os.getuid()
+            or s.st_uid not in {os.getuid(), getpwnam("ubuntu").pw_uid}
         ):
             return False
         data = ENV.read_text(encoding="utf-8")
@@ -69,6 +70,40 @@ def _socket_listening() -> bool:
             return True
     except OSError:
         return False
+
+
+def _private_mautic_runtime() -> dict[str, object]:
+    """Read the actual internal Docker application, not a nonexistent host port.
+
+    Does not publish a listener, inspect environment variables, or read
+    customers. Commands are exactly limited to health and HTTP status.
+    """
+    result: dict[str, object] = {
+        "database_container_healthy": False,
+        "mautic_container_healthy": False,
+        "mautic_private_login_http_200": False,
+    }
+    try:
+        for name, key in (
+            ("empire-mautic-review-db-1", "database_container_healthy"),
+            ("empire-mautic-review-mautic_web-1", "mautic_container_healthy"),
+        ):
+            response = _run(
+                "docker", "inspect", "--format", "{{.State.Health.Status}}", name
+            )
+            result[key] = response.returncode == 0 and response.stdout.strip() == "healthy"
+        if result["database_container_healthy"] and result["mautic_container_healthy"]:
+            response = _run(
+                "docker", "exec", "empire-mautic-review-mautic_web-1",
+                "curl", "--silent", "--output", "/dev/null", "--max-time", "5",
+                "--write-out", "%{http_code}", "http://127.0.0.1/s/login",
+            )
+            result["mautic_private_login_http_200"] = (
+                response.returncode == 0 and response.stdout.strip() == "200"
+            )
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return result
 
 
 def _db_catalog() -> dict[str, object]:
@@ -146,25 +181,34 @@ def review() -> dict[str, object]:
     private = _safe_env()
     compose_ok = _compose_valid()
     port_listening = _socket_listening()
+    private_runtime = _private_mautic_runtime() if docker_access else {
+        "database_container_healthy": False,
+        "mautic_container_healthy": False,
+        "mautic_private_login_http_200": False,
+    }
     blockers = []
     if service != "active" or postgres != "active":
         blockers.append("EXISTING_CRM_OR_POSTGRES_NOT_ACTIVE")
     if not db["canonical_empiredb_login_confirmed"]:
         blockers.append("AUTHENTICATED_CANONICAL_DB_CATALOG_UNAVAILABLE")
     if not docker_access:
-        blockers.append("DOCKER_PRIVILEGED_OWNER_REQUIRED")
+        blockers.append("DOCKER_PRIVILEGED_READBACK_REQUIRED")
     if not private or not compose_ok:
         blockers.append("PRIVATE_MAUTIC_COMPOSE_OR_CREDENTIALS_INVALID")
-    if not port_listening:
-        blockers.append("NO_LIVE_MAUTIC_HTTP_INSTANCE")
+    if docker_access and not all(private_runtime.values()):
+        blockers.append("PRIVATE_MAUTIC_CONTAINER_OR_HTTP_UNHEALTHY")
+    # Internal Docker networks intentionally have NO host-published listener:
+    # a missing EmpireOS port 18784 does not imply Mautic is not installed.
     if db["mautic_event_inbox_exists"] is not True or db["mautic_writer_role_exists"] is not True:
         blockers.append("DBA_GUARDED_MAUTIC_ROLE_AND_INBOX_NOT_PROVISIONED")
     if db["mautic_tenant_login_count"] == 0:
         blockers.append("NO_MAUTIC_TENANT_WRITER_IDENTITY")
     if db["service_mautic_source_configured"] is not True:
         blockers.append("NO_LIVE_APPROVED_MAUTIC_SOURCE_OR_EXACT_CONTACT_BINDINGS")
+    if db.get("service_mautic_mode") != "CONFIGURED":
+        blockers.append("NO_GUARDED_MAUTIC_INGRESS_MOUNTED_IN_EXISTING_CRM")
     return {
-        "schema_version": "empire.mautic_release_readonly_preflight.v1",
+        "schema_version": "empire.mautic_release_readonly_preflight.v2",
         "checked_at": datetime.now(timezone.utc).isoformat(),
         "no_database_writes": True,
         "no_service_restart": True,
@@ -174,7 +218,8 @@ def review() -> dict[str, object]:
         "private_db_secrets_owner_only": private,
         "private_compose_config_valid": compose_ok,
         "docker_daemon_accessible_to_connected_operator": docker_access,
-        "private_mautic_http_listener_present": port_listening,
+        "empireos_host_18784_listener_present": port_listening,
+        "private_mautic_runtime": private_runtime,
         "prepared_inbox_sql_present": RELEASE_SQL.is_file(),
         "database": db,
         "blockers": blockers,

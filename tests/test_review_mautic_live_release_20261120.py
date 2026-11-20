@@ -40,12 +40,14 @@ def test_unauthorised_docker_and_missing_real_source_are_reported(monkeypatch):
         "mautic_writer_role_exists": False,
         "mautic_tenant_login_count": 0,
         "service_mautic_source_configured": False,
+        "service_mautic_mode": "UNSET",
     })
     result = mod.review()
     assert result["result"] == "LIVE_NOT_READY"
-    assert "DOCKER_PRIVILEGED_OWNER_REQUIRED" in result["blockers"]
+    assert "DOCKER_PRIVILEGED_READBACK_REQUIRED" in result["blockers"]
     assert "DBA_GUARDED_MAUTIC_ROLE_AND_INBOX_NOT_PROVISIONED" in result["blockers"]
     assert "NO_LIVE_APPROVED_MAUTIC_SOURCE_OR_EXACT_CONTACT_BINDINGS" in result["blockers"]
+    assert "NO_GUARDED_MAUTIC_INGRESS_MOUNTED_IN_EXISTING_CRM" in result["blockers"]
     assert result["no_database_writes"] is True
     assert result["no_service_restart"] is True
     assert result["no_outbound_send"] is True
@@ -59,14 +61,22 @@ def test_ready_flags_do_not_claim_production_installed(monkeypatch):
     monkeypatch.setattr(mod, "_run", mock_run)
     monkeypatch.setattr(mod, "_safe_env", lambda: True)
     monkeypatch.setattr(mod, "_compose_valid", lambda: True)
-    monkeypatch.setattr(mod, "_socket_listening", lambda: True)
+    monkeypatch.setattr(mod, "_socket_listening", lambda: False)
+    monkeypatch.setattr(mod, "_private_mautic_runtime", lambda: {
+        "database_container_healthy": True,
+        "mautic_container_healthy": True,
+        "mautic_private_login_http_200": True,
+    })
     monkeypatch.setattr(mod, "_db_catalog", lambda: {
         "canonical_empiredb_login_confirmed": True,
         "mautic_event_inbox_exists": True,
         "mautic_writer_role_exists": True,
         "mautic_tenant_login_count": 1,
         "service_mautic_source_configured": True,
+        "service_mautic_mode": "CONFIGURED",
     })
     result = mod.review()
     assert result["blockers"] == []
     assert result["result"] == "READINESS_PROVISIONALLY_PASS_REVIEW_REQUIRED"
+    assert result["empireos_host_18784_listener_present"] is False
+    assert result["private_mautic_runtime"]["mautic_private_login_http_200"] is True
