@@ -97,7 +97,10 @@ def skills_context_for_role(role: str) -> str:
 
 def available_skills() -> list[str]:
     """List only approved, loadable skills (not every file on disk)."""
-    from empire_os.skill_trust import SkillTrustError, load_pinned_skill, read_trust_registry
+    from empire_os.skill_trust import (
+        SkillTrustError, load_pinned_skill, read_trust_registry,
+        is_vetted_external_advisory_skill,
+    )
     try:
         registry = read_trust_registry(TRUST_REGISTRY)
     except SkillTrustError:
@@ -107,7 +110,8 @@ def available_skills() -> list[str]:
         return []
     result = []
     for name in sorted(approved):
-        if not name.startswith('empire-'):
+        if (not name.startswith('empire-')
+                and not is_vetted_external_advisory_skill(name, approved[name], root=SKILLS_ROOT)):
             continue
         try:
             load_pinned_skill(name, root=SKILLS_ROOT, registry=registry)

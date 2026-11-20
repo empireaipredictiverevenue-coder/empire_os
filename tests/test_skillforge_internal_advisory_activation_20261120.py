@@ -51,7 +51,7 @@ def test_exact_twelve_reviewed_advisory_skills_are_digest_pinned():
         resolved = load_pinned_skill(name, registry=registry())
         assert resolved['scripts_executed'] is False
         assert resolved['execution_authority'] == 'none'
-    assert sorted(available_skills()) == sorted(INTERNAL_NAMES)
+    assert sorted(available_skills()) == sorted(NAMES)
 
 
 @pytest.mark.parametrize('dept,component,expected', [
