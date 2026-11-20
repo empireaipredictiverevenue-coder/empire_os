@@ -1,4 +1,69 @@
 {
-  "schema_version": "empire.skill_trust.v1",
-  "approved_skills": {}
+  "approved_skills": {
+    "empire-evidence-verification": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "f14e5ddd4eaaad69847ba7c9c15815a929e83b9ec244721a1a6f88362af86d9b",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-fulfilment-verification": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "7700a8f87e4459b5648113e9abfcbe56e6d9b3495a17e16fdcd5c928e7a4b81b",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-identity-resolution": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "61990757bd4b6774d2338bc3761256ab8abefc68e8afc49f3167ac18b4e8be07",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-lead-research": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "612fae0277d80374a1f3254a11a9b2d3a0551bfb8f0b5b311843e90716df6c99",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-product-catalog-verification": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "6dfe8ce9502e0073da70fdd5f27e84516370feb4f5368a93fbff21115cda2ef5",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-revenue-reconciliation": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "43444c9804cdf42ddf934272470d70d5e555a524b244bf0412af46c5f6e4436a",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-seo-intelligence": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "989c9fafdce2aeeebb662aeb9143be216bb0d3225a85ffc7dbee6b3c1d267dcb",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "empire-skill-authoring": {
+      "approval_basis": "founder_directed_internal_advisory_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "55a772ca4f50e05206c1a6aeaa3b973226472156295df12b2a471b90ec64a8ba",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    }
+  },
+  "schema_version": "empire.skill_trust.v1"
 }

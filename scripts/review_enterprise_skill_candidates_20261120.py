@@ -252,12 +252,18 @@ def inspect() -> dict:
                      and name.startswith('empire-'))
         if review_ok:
             temporary_pins[name] = {'sha256': digest, 'status': 'approved'}
+        pin = registry.get('approved_skills', {}).get(name, {})
+        content_trusted = (isinstance(pin, dict) and pin.get('status') == 'approved'
+                           and pin.get('sha256') == digest and name.startswith('empire-'))
         rows.append({'name': name, 'sha256': digest, 'source_state': source_state,
                      'licence': licence, 'static_contract_pass': bool(static['passed']),
                      'manual_review_status': advisory['status'],
                      'in_memory_test_eligible': review_ok,
-                     'production_approval': bool(registry.get('approved_skills', {}).get(name)),
-                     'decision': 'TEST_IN_MEMORY_ONLY' if review_ok else 'HOLD'})
+                     'production_approval': content_trusted,
+                     'trust_scope': pin.get('trust_scope') if content_trusted else None,
+                     'independent_skill_quality_verified': False,
+                     'decision': ('CONTENT_TRUST_PINNED_QUALITY_UNVERIFIED' if content_trusted
+                                  else 'TEST_IN_MEMORY_ONLY' if review_ok else 'HOLD')})
     simulated = {'schema_version': 'empire.skill_trust.v1', 'approved_skills': temporary_pins}
     workflows = []
     for component, department in LANES.items():
@@ -296,11 +302,16 @@ def inspect() -> dict:
             'required_reviews': preflight['required_reviews'],
         })
     assert TRUST.read_bytes() == original, 'production trust registry changed'
+    pinned = sum(row['production_approval'] for row in rows)
+    status = ('INTERNAL_ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD' if pinned
+              else 'ISOLATED_RESEARCH_PREVIEW_NOT_APPROVED_NOT_LIVE')
     return {'schema_version': 'empire.enterprise.skill_security_preview.v1',
-            'status': 'ISOLATED_RESEARCH_PREVIEW_NOT_APPROVED_NOT_LIVE',
+            'status': status,
             'mode': 'OBSERVE', 'execution_authority': 'none', 'scripts_executed': False,
             'production_registry_unchanged': True,
             'production_approved_skill_count': len(registry.get('approved_skills', {})),
+            'exact_digest_content_trust_count': pinned,
+            'production_agent_execution_verified': False,
             'candidate_count': len(rows), 'in_memory_eligible_count': len(temporary_pins),
             'candidates': rows, 'portfolio_workflow_checks': workflows,
             'snapshot_work_item_count': len(work_sample), 'existing_work_item_checks': work_sample,

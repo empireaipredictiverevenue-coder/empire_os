@@ -32,7 +32,10 @@ def test_isolated_review_preserves_real_registry_and_external_authority():
     report = preview.inspect()
     assert preview.TRUST.read_bytes() == before
     assert report['production_registry_unchanged'] is True
-    assert report['production_approved_skill_count'] == 0
+    assert report['production_approved_skill_count'] == 8
+    assert report['exact_digest_content_trust_count'] == 8
+    assert report['status'] == 'INTERNAL_ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD'
+    assert report['production_agent_execution_verified'] is False
     assert report['candidate_count'] == 16
     assert report['in_memory_eligible_count'] > 0
     assert report['execution_authority'] == 'none'
