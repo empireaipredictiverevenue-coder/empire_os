@@ -26,6 +26,21 @@ TASK_SKILLS = {
 }
 
 
+# Candidate-only portfolio extensions are separate from the original Empire-owned
+# department completion baseline. Existing SkillForge acceptance gates remain intact.
+PORTFOLIO_TASK_SKILLS = {
+    # Enterprise portfolio skill advice only: existing owners still hold execution.
+    'relationship_first_research': ('sales', ('empire-lead-research', 'empire-identity-resolution')),
+    'business_document_diligence': ('intelligence', ('empire-evidence-verification', 'pdf', 'xlsx')),
+    'scientific_document_diligence': ('intelligence', ('empire-scientific-evidence-diligence', 'pdf')),
+    'finance_document_evidence': ('finance', ('empire-revenue-reconciliation', 'xlsx', 'pdf')),
+    'product_ui_validation': ('engineering', ('empire-engineering-verification', 'frontend-design', 'webapp-testing')),
+    'media_content_evidence': ('marketing', ('empire-seo-intelligence', 'doc-coauthoring')),
+    'commerce_catalogue_delivery': ('product', ('empire-product-catalog-verification', 'empire-fulfilment-verification')),
+    'agent_skill_quality': ('innovator', ('empire-skill-authoring', 'skill-creator')),
+}
+
+
 @dataclass(frozen=True)
 class SkillMatch:
     name: str
@@ -35,9 +50,10 @@ class SkillMatch:
 
 def discover_task_skills(task: str, *, root: Path = SKILLS_ROOT) -> dict:
     """Return local SKILL.md paths, never instructions or execution authority."""
-    if task not in TASK_SKILLS:
+    mapping = TASK_SKILLS.get(task) or PORTFOLIO_TASK_SKILLS.get(task)
+    if mapping is None:
         return {'task': task, 'status': 'unmapped_task', 'skills': [], 'execution_authority': 'none'}
-    role, preferred = TASK_SKILLS[task]
+    role, preferred = mapping
     names = dict.fromkeys(preferred)
     found = []
     for name in names:
@@ -89,6 +105,15 @@ COMPONENT_TASKS = {
     'buyer_capacity_readiness': 'evidence_analysis',
     'agent_tool_execution_plane': 'engineering_review',
     'commercial_reply_classification': 'commercial_reply',
+    # Exact owner component names; arbitrary task text never selects new skills.
+    'buyer_relationship_research': 'relationship_first_research',
+    'knowledge_factory_document_review': 'business_document_diligence',
+    'data_brokerage_scientific_diligence': 'scientific_document_diligence',
+    'finance_source_document_review': 'finance_document_evidence',
+    'empire_product_ui_review': 'product_ui_validation',
+    'media_os_editorial_review': 'media_content_evidence',
+    'commerceos_catalogue_fulfilment_review': 'commerce_catalogue_delivery',
+    'skillforge_quality_review': 'agent_skill_quality',
     # ORIGINAL Permit Intelligence workflow: reuse the same SkillForge
     # task selectors, no parallel skill registry or agent execution plane.
     'permit_public_signal_research': 'lead_generation',

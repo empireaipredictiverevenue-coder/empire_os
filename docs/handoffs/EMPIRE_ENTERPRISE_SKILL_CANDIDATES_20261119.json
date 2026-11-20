@@ -1,0 +1,184 @@
+{
+  "approval_written": false,
+  "authority": "none",
+  "candidate_count": 16,
+  "candidates": [
+    {
+      "name": "doc-coauthoring",
+      "review_reasons": [
+        "license_not_declared"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "2e47d78846faeea4a56e9809c52700087a15a2155a3f293a3efbaded81398ef4",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-engineering-verification",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "24af493c07a11a7247dfcae111b47dc28a69eeb9dbd5fe9fc1b0649bef3e6d46",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-evidence-verification",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "f14e5ddd4eaaad69847ba7c9c15815a929e83b9ec244721a1a6f88362af86d9b",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-fulfilment-verification",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "7700a8f87e4459b5648113e9abfcbe56e6d9b3495a17e16fdcd5c928e7a4b81b",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-identity-resolution",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "61990757bd4b6774d2338bc3761256ab8abefc68e8afc49f3167ac18b4e8be07",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-lead-research",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "612fae0277d80374a1f3254a11a9b2d3a0551bfb8f0b5b311843e90716df6c99",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-product-catalog-verification",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "6dfe8ce9502e0073da70fdd5f27e84516370feb4f5368a93fbff21115cda2ef5",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-revenue-reconciliation",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "43444c9804cdf42ddf934272470d70d5e555a524b244bf0412af46c5f6e4436a",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-scientific-evidence-diligence",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "2b2b051bfd3eaf5e7c5ece122dda95f06b2e9282e108bafa8c3b0505047ba6bf",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-seo-intelligence",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "989c9fafdce2aeeebb662aeb9143be216bb0d3225a85ffc7dbee6b3c1d267dcb",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "empire-skill-authoring",
+      "review_reasons": [
+        "manual_security_review_required"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "55a772ca4f50e05206c1a6aeaa3b973226472156295df12b2a471b90ec64a8ba",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "frontend-design",
+      "review_reasons": [
+        "license_file_requires_review"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "pdf",
+      "review_reasons": [
+        "proprietary_license_requires_review"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "9f78b8359fbd4943ad260a7a1e436e5a96503406d6c34e99f69223d647d85b9c",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "skill-creator",
+      "review_reasons": [
+        "license_not_declared"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "dcd4803e61e913e6fc27294184cd3a71f09f5e924ff20c8a9a20173e7b3c2bcf",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "webapp-testing",
+      "review_reasons": [
+        "license_file_requires_review"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "51b7349e77ec63b7744a6f63647e7566a0b4d2e301121cc10e8c2113af6556a2",
+      "trusted_for_agent_loading": false
+    },
+    {
+      "name": "xlsx",
+      "review_reasons": [
+        "proprietary_license_requires_review"
+      ],
+      "review_status": "manual_review_required",
+      "sha256": "dd316db7785a6be12966c2a2d848931fbf5f518b3cdb0a66fa62ee835ead1cfc",
+      "trusted_for_agent_loading": false
+    }
+  ],
+  "canonical_department_task_count": 15,
+  "generated_for": "2026-11-19 founder portfolio review",
+  "portfolio_task_count": 8,
+  "registry_modified": false,
+  "schema_version": "empire.enterprise.skills.candidates.v1",
+  "source_skill_count": 33,
+  "status": "research_only_no_skill_approval_no_production_execution",
+  "workflow_selectors": {
+    "agent_skill_quality": [
+      "skillforge_quality_review"
+    ],
+    "business_document_diligence": [
+      "knowledge_factory_document_review"
+    ],
+    "commerce_catalogue_delivery": [
+      "commerceos_catalogue_fulfilment_review"
+    ],
+    "finance_document_evidence": [
+      "finance_source_document_review"
+    ],
+    "media_content_evidence": [
+      "media_os_editorial_review"
+    ],
+    "product_ui_validation": [
+      "empire_product_ui_review"
+    ],
+    "relationship_first_research": [
+      "buyer_relationship_research"
+    ],
+    "scientific_document_diligence": [
+      "data_brokerage_scientific_diligence"
+    ]
+  }
+}

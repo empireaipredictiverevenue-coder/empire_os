@@ -1,0 +1,2024 @@
+{
+  "candidate_count": 16,
+  "candidates": [
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "licence_undocumented_hold",
+      "manual_review_status": "manual_review_required",
+      "name": "doc-coauthoring",
+      "production_approval": false,
+      "sha256": "2e47d78846faeea4a56e9809c52700087a15a2155a3f293a3efbaded81398ef4",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-engineering-verification",
+      "production_approval": false,
+      "sha256": "24af493c07a11a7247dfcae111b47dc28a69eeb9dbd5fe9fc1b0649bef3e6d46",
+      "source_state": "worktree_modified",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-evidence-verification",
+      "production_approval": false,
+      "sha256": "f14e5ddd4eaaad69847ba7c9c15815a929e83b9ec244721a1a6f88362af86d9b",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-fulfilment-verification",
+      "production_approval": false,
+      "sha256": "7700a8f87e4459b5648113e9abfcbe56e6d9b3495a17e16fdcd5c928e7a4b81b",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-identity-resolution",
+      "production_approval": false,
+      "sha256": "61990757bd4b6774d2338bc3761256ab8abefc68e8afc49f3167ac18b4e8be07",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-lead-research",
+      "production_approval": false,
+      "sha256": "612fae0277d80374a1f3254a11a9b2d3a0551bfb8f0b5b311843e90716df6c99",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-product-catalog-verification",
+      "production_approval": false,
+      "sha256": "6dfe8ce9502e0073da70fdd5f27e84516370feb4f5368a93fbff21115cda2ef5",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-revenue-reconciliation",
+      "production_approval": false,
+      "sha256": "43444c9804cdf42ddf934272470d70d5e555a524b244bf0412af46c5f6e4436a",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-scientific-evidence-diligence",
+      "production_approval": false,
+      "sha256": "2b2b051bfd3eaf5e7c5ece122dda95f06b2e9282e108bafa8c3b0505047ba6bf",
+      "source_state": "untracked",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-seo-intelligence",
+      "production_approval": false,
+      "sha256": "989c9fafdce2aeeebb662aeb9143be216bb0d3225a85ffc7dbee6b3c1d267dcb",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "TEST_IN_MEMORY_ONLY",
+      "in_memory_test_eligible": true,
+      "licence": "empire_internal_restricted_redistribution",
+      "manual_review_status": "manual_review_required",
+      "name": "empire-skill-authoring",
+      "production_approval": false,
+      "sha256": "55a772ca4f50e05206c1a6aeaa3b973226472156295df12b2a471b90ec64a8ba",
+      "source_state": "tracked_clean",
+      "static_contract_pass": true
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "apache_2_0_documented",
+      "manual_review_status": "manual_review_required",
+      "name": "frontend-design",
+      "production_approval": false,
+      "sha256": "1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "anthropic_service_terms_requires_legal_review",
+      "manual_review_status": "manual_review_required",
+      "name": "pdf",
+      "production_approval": false,
+      "sha256": "9f78b8359fbd4943ad260a7a1e436e5a96503406d6c34e99f69223d647d85b9c",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "apache_2_0_documented",
+      "manual_review_status": "manual_review_required",
+      "name": "skill-creator",
+      "production_approval": false,
+      "sha256": "dcd4803e61e913e6fc27294184cd3a71f09f5e924ff20c8a9a20173e7b3c2bcf",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "apache_2_0_documented",
+      "manual_review_status": "manual_review_required",
+      "name": "webapp-testing",
+      "production_approval": false,
+      "sha256": "51b7349e77ec63b7744a6f63647e7566a0b4d2e301121cc10e8c2113af6556a2",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    },
+    {
+      "decision": "HOLD",
+      "in_memory_test_eligible": false,
+      "licence": "anthropic_service_terms_requires_legal_review",
+      "manual_review_status": "manual_review_required",
+      "name": "xlsx",
+      "production_approval": false,
+      "sha256": "dd316db7785a6be12966c2a2d848931fbf5f518b3cdb0a66fa62ee835ead1cfc",
+      "source_state": "tracked_clean",
+      "static_contract_pass": false
+    }
+  ],
+  "canonical_promotion_preflight": [
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-evidence-verification",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "f14e5ddd4eaaad69847ba7c9c15815a929e83b9ec244721a1a6f88362af86d9b",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-fulfilment-verification",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "7700a8f87e4459b5648113e9abfcbe56e6d9b3495a17e16fdcd5c928e7a4b81b",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-identity-resolution",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "61990757bd4b6774d2338bc3761256ab8abefc68e8afc49f3167ac18b4e8be07",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-lead-research",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "612fae0277d80374a1f3254a11a9b2d3a0551bfb8f0b5b311843e90716df6c99",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-product-catalog-verification",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "6dfe8ce9502e0073da70fdd5f27e84516370feb4f5368a93fbff21115cda2ef5",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-revenue-reconciliation",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "43444c9804cdf42ddf934272470d70d5e555a524b244bf0412af46c5f6e4436a",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-seo-intelligence",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "989c9fafdce2aeeebb662aeb9143be216bb0d3225a85ffc7dbee6b3c1d267dcb",
+      "status": "BLOCKED"
+    },
+    {
+      "blocks": [
+        "independently_labelled_holdout_not_supplied"
+      ],
+      "founder_approval_recorded": false,
+      "independent_performance_verified": false,
+      "name": "empire-skill-authoring",
+      "promoted": false,
+      "required_reviews": [
+        "verify_independent_holdout_labels_and_source_evidence",
+        "confirm_baseline_candidate_run_reproducibility",
+        "test_with_real_authorized_agent_in_isolated_environment",
+        "complete_tenant_privacy_and_prompt_injection_review",
+        "clear_licence_intellectual_property_and_ownership",
+        "obtain_explicit_founder_approval_for_exact_skill_digest",
+        "record_scoped_review_evidence_and_approval_as_reviewed_code_change"
+      ],
+      "source_sha256": "55a772ca4f50e05206c1a6aeaa3b973226472156295df12b2a471b90ec64a8ba",
+      "status": "BLOCKED"
+    }
+  ],
+  "execution_authority": "none",
+  "existing_work_item_checks": [
+    {
+      "component": "ops_sentinel",
+      "held_count": 1,
+      "in_memory_loaded_count": 1,
+      "selected_skill_count": 2,
+      "work_state": "BLOCKED"
+    },
+    {
+      "component": "identity_enrichment",
+      "held_count": 0,
+      "in_memory_loaded_count": 1,
+      "selected_skill_count": 1,
+      "work_state": "DONE"
+    },
+    {
+      "component": "predictive_cloud_opportunity_loop",
+      "held_count": 1,
+      "in_memory_loaded_count": 0,
+      "selected_skill_count": 2,
+      "work_state": "DONE"
+    },
+    {
+      "component": "commercial_product_catalog",
+      "held_count": 0,
+      "in_memory_loaded_count": 1,
+      "selected_skill_count": 1,
+      "work_state": "DONE"
+    },
+    {
+      "component": "predictive_intelligence",
+      "held_count": 1,
+      "in_memory_loaded_count": 0,
+      "selected_skill_count": 1,
+      "work_state": "BLOCKED"
+    },
+    {
+      "component": "commercial_product_catalog",
+      "held_count": 0,
+      "in_memory_loaded_count": 1,
+      "selected_skill_count": 1,
+      "work_state": "DONE"
+    },
+    {
+      "component": "predictive_intelligence",
+      "held_count": 1,
+      "in_memory_loaded_count": 0,
+      "selected_skill_count": 1,
+      "work_state": "BLOCKED"
+    },
+    {
+      "component": "commercial_product_catalog",
+      "held_count": 0,
+      "in_memory_loaded_count": 1,
+      "selected_skill_count": 1,
+      "work_state": "DONE"
+    }
+  ],
+  "founder_exact_digest_approval_recorded": false,
+  "in_memory_eligible_count": 8,
+  "independent_holdout_verification_complete": false,
+  "independent_tenant_privacy_review_complete": false,
+  "mode": "OBSERVE",
+  "portfolio_workflow_checks": [
+    {
+      "component": "buyer_relationship_research",
+      "department": "sales_revenue",
+      "held": [],
+      "in_memory_loaded": [
+        "empire-lead-research",
+        "empire-identity-resolution"
+      ],
+      "selected": [
+        "empire-lead-research",
+        "empire-identity-resolution"
+      ]
+    },
+    {
+      "component": "knowledge_factory_document_review",
+      "department": "market_intelligence",
+      "held": [
+        {
+          "name": "pdf",
+          "reason": "skill_not_approved"
+        },
+        {
+          "name": "xlsx",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [
+        "empire-evidence-verification"
+      ],
+      "selected": [
+        "empire-evidence-verification",
+        "pdf",
+        "xlsx"
+      ]
+    },
+    {
+      "component": "data_brokerage_scientific_diligence",
+      "department": "rd_innovation",
+      "held": [
+        {
+          "name": "empire-scientific-evidence-diligence",
+          "reason": "skill_not_approved"
+        },
+        {
+          "name": "pdf",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [],
+      "selected": [
+        "empire-scientific-evidence-diligence",
+        "pdf"
+      ]
+    },
+    {
+      "component": "finance_source_document_review",
+      "department": "finance_capital",
+      "held": [
+        {
+          "name": "xlsx",
+          "reason": "skill_not_approved"
+        },
+        {
+          "name": "pdf",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [
+        "empire-revenue-reconciliation"
+      ],
+      "selected": [
+        "empire-revenue-reconciliation",
+        "xlsx",
+        "pdf"
+      ]
+    },
+    {
+      "component": "empire_product_ui_review",
+      "department": "engineering",
+      "held": [
+        {
+          "name": "empire-engineering-verification",
+          "reason": "skill_not_approved"
+        },
+        {
+          "name": "frontend-design",
+          "reason": "skill_not_approved"
+        },
+        {
+          "name": "webapp-testing",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [],
+      "selected": [
+        "empire-engineering-verification",
+        "frontend-design",
+        "webapp-testing"
+      ]
+    },
+    {
+      "component": "media_os_editorial_review",
+      "department": "marketing_growth",
+      "held": [
+        {
+          "name": "doc-coauthoring",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [
+        "empire-seo-intelligence"
+      ],
+      "selected": [
+        "empire-seo-intelligence",
+        "doc-coauthoring"
+      ]
+    },
+    {
+      "component": "commerceos_catalogue_fulfilment_review",
+      "department": "product",
+      "held": [],
+      "in_memory_loaded": [
+        "empire-product-catalog-verification",
+        "empire-fulfilment-verification"
+      ],
+      "selected": [
+        "empire-product-catalog-verification",
+        "empire-fulfilment-verification"
+      ]
+    },
+    {
+      "component": "skillforge_quality_review",
+      "department": "rd_innovation",
+      "held": [
+        {
+          "name": "skill-creator",
+          "reason": "skill_not_approved"
+        }
+      ],
+      "in_memory_loaded": [
+        "empire-skill-authoring"
+      ],
+      "selected": [
+        "empire-skill-authoring",
+        "skill-creator"
+      ]
+    }
+  ],
+  "production_approved_skill_count": 0,
+  "production_registry_unchanged": true,
+  "production_skill_activation_verified": false,
+  "real_evidence_review_inventory": [
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 184,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-lead-research",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "381a72e1ac1aadd5ad173a26df530df5395f877027ce52dbcd591a1b75fee636",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "44d59d852926e81b73313b2769af27dabeaad59e2222a77564281843f1538063",
+          "source_work_sha256": "003bf53c6e08cbf97e831eced2777e9375892a67361b283524469e434673cf92"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "f199eea1d5a7a5cd53c231b5dc0906c6ce482ac16362829d052e3d860d68d46d",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "13d18dce334bf470b6e9d8d5584b138aacb792a572a9f8b6642df69aa198385f",
+          "source_work_sha256": "0061b7c1fbd4a044341eeef3335142c7fd9bf1ea9866be3956690255a5649338"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "475b6098c315efc253d6fbfb6fa3e642131b937c33a089531bf8ebb5808f2ede",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "54b919c22f56d510f136537ce070c9cbdc8b7e768cb1c79afb7ab6a9dd23cef7",
+          "source_work_sha256": "00b56bef1207df5f1a63d67268c76c11b4270b6b9d8b92dcd2593f1cc569f629"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "707216d6e71bbf7d5b379680567496979f11d92e699f0082584ee17c8c9e6b83",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "272a9280a686767d7f7036bded2f35dcdf3c00468a372b758fa112b72c77c0d1",
+          "source_work_sha256": "0101294f800681ea0b9349cc38dded4a8cb818bb6490f853b9bd955ab2826153"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "153e05446278ca0a413132fc01812525955ab2551b37868e1627a275c9cced1e",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "3a1de95ee6fa5dcf623fd6c09050c5f811dc3d2e356d41e1139e844cf80c7f29",
+          "source_work_sha256": "05a2b3a43f3d34a0778ce407f7fe7cae0885ef005d17dd54f714840b11d367b2"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "43935cbe1b31c2b6479c6f57a2318c6ea7023c410e72f1ccab505d780eb9117e",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "33d917e48c2f35ccfda02d6e3460da0d3d26f3aa0aeca811b22f2ddbbc53b9c9",
+          "source_work_sha256": "0916356d1153df820c531b48df47bff34205216389d9f1e12dfd96346f0b3caa"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "6db36753bb0804ad979b02aa92149b28bd22d6165e573ebbf42f65568f0f58a7",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "d42c1ed40d8e9eaa71621edba63dfbcc10713102e8b8db1bb7cf35c90d53e8ee",
+          "source_work_sha256": "09b75bd14284bb44869a2e51ee5b93d8560be89c9d3c39d1c5d16593103e1907"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "76d63cc159660fa6bb3092758eb162c886f16e5b3f87919a192270486fcab111",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "d37c6c3e9291e2ad2bd02c9e8a4acb84593f22047b580f92a4930782bb9916ee",
+          "source_work_sha256": "09f7f0b5e838de321e2ced2c8d48f0c9a7b5a2c99f90e8121b7db7b46d2e74bf"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "9f8082562585288d3bee6d1fe0062432e76dceddc1de5aafed28d76060b87137",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "90e17998e35386700a69ea40ebb00a5da67fdf3368d5f35028da328a71753d2f",
+          "source_work_sha256": "0a01b8f8a85de575ff44f211a190463e9d60452040de8456a1373ac531eaaca3"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "8ab82d49000fdb150c506b8ef3458d2fac1508dbcf974d85d8016e84da41c42f",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "3ff91dd0a08094d1cf517fdff5773ed1d41e333176e960044313b157d550bf74",
+          "source_work_sha256": "0a4db5931d00609843b9040f29e7bd55982bfc5d467d183326b828e14275df6d"
+        }
+      ],
+      "sampled_distinct_request_shapes": 10,
+      "selection_scope": "component",
+      "selection_value": "buyer_owner_evidence_review",
+      "source_status_counts": {
+        "blocked": 0,
+        "done": 184,
+        "failed": 0
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 2,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-identity-resolution",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "f53e645356dd11680ffd911697015ac9b92a6d51ae71336e00cfdc84544bf60b",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "5c2b6b6a7a52216e395ea1fbe577dcaa747e4f8af3daff1db5b2511701b329ea",
+          "source_work_sha256": "01f4f827ccf2d0ebc6f38a95be1eb700ebfbb34fa58c33af5fec5d5ae6ea8f78"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "2c1d0f9fbe0235f663c2e169c4e6c559aceb18f8144ed585a62d57cfa1ae38a7",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "49a33ac96ca7e66119db1343d9cfa5920553e0b226d2015f335d1e36733414a2",
+          "source_work_sha256": "1244cf97b8725a1758783bd454a5642077da305de09851ec60bcc83e70917f93"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "BLOCKED",
+          "request_shape_sha256": "f53e645356dd11680ffd911697015ac9b92a6d51ae71336e00cfdc84544bf60b",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "ff73461d1c04d10214ffe853436d0e15dcfbabf7107be652fc1c4bf82a1da592",
+          "source_work_sha256": "4091fb885de826b0565652320db41f99f7cda3eaa9a495903c04db23778f8069"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "BLOCKED",
+          "request_shape_sha256": "2c1d0f9fbe0235f663c2e169c4e6c559aceb18f8144ed585a62d57cfa1ae38a7",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "a38c0e3bb54dda3951ce9bb1a950bf7256cbee813c39b5126aaadc4390ed9e3c",
+          "source_work_sha256": "d86553733cf2162bc96d3a92a8d5367f305a1fa809c59c77bdbf992476e4d552"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "FAILED",
+          "request_shape_sha256": "f53e645356dd11680ffd911697015ac9b92a6d51ae71336e00cfdc84544bf60b",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "84063fe3ddc6f19df7fdd5eecc425511b119c06c218aba5b550349f6ac8823ce",
+          "source_work_sha256": "0046a5d07552702e298b99740034aa8acef2bb5a72dea39fb157f976037a1c01"
+        }
+      ],
+      "sampled_distinct_request_shapes": 2,
+      "selection_scope": "component",
+      "selection_value": "identity_enrichment",
+      "source_status_counts": {
+        "blocked": 2,
+        "done": 367,
+        "failed": 44
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 160,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-evidence-verification",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "172a0360d3801fec0409d0ce53b323ca1c004d206f26da56a09ba7e659790420",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "be3250c3c36312292c21bb98687435fcd6591ffa762d9d3472c1a0cf182f2805",
+          "source_work_sha256": "00b2d66bfafb221941faeb268a8664e94175b30dda1c4b312bf3036034aacb82"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "70730f026cf888952f10e91eca3707798726bce13a183e492e121b0aadd36595",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "9978606860bc7a38b2f26c4ca558e8f3012b8935292d14148415789461070077",
+          "source_work_sha256": "00e9dfd06eff010ca5494dc509a4719fade1ac73dd6896ad1e64e2c568aa1451"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "b3107a6547713f0e594b54bfb70ebdf245b364faca9424bc17db8252f2e21bc6",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "50a993ff120c699bc045d7752fad5a8963589b07ff12c553c086116fe4a3a239",
+          "source_work_sha256": "06cf6d32a3aab1d463d47b656491600398650590b28c7c1a7115cb1c993c661d"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "cc21237d29f1eb8f9939e1c43181624064a4c47d3a259058aab7060e7b56fea7",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "d50e242d747eb0b06f5c33f86918fc1cd60b214129402ec54d7d244178fa7387",
+          "source_work_sha256": "074a8a7334f864e61a2364c1e3ac255117ca5b6e9a0ce21683baa477cd1b4817"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "ff05e65de641372f83e8f3dc7d02d9aa585272cd312be88f2aa9e55286c6d40f",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "14528f4c5457969707a1a965a05f2b720554109656349e8a8810c221fbc0c85e",
+          "source_work_sha256": "085247898cf1f4659da8a874cb86cede01083da44b3e6465fcb1274e9375fd5d"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "013de50a6c5d3e747b1b689e42aad32085497137a6a522177170eaf85dc7d17f",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "7fa3ccaa47094165223230b7e81d90bbe14e911602d0424125eeee9f9e24cbb0",
+          "source_work_sha256": "08d0b310106413f77fe9c4be2e3779c30f0252b40baf0c7351afd3b7720dac60"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "ad181e4b55f019bb6519b449e2c543e67c78ea5fbd2ff881acd7bd51b81cc4b8",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "69859d671e1325ed6f79235d69375d6e119f5543f3ea4f562c0e180de48056cd",
+          "source_work_sha256": "08fcb8cc784210e9f7167015ad3014679b4c9f7cdd480528586f7fe6c57ed983"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "77aa51470aeb35e843c2eb64e91c3340102340f311982dea49b90d4e0abc975a",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "410c4d4e233dbe4b731fb9418816f0c330eb77cf3934b4b34ccdbc645d4091c1",
+          "source_work_sha256": "097fe0afab6c8abbb35873d8256a16fe5e83ffde368e81c18269a8fd441e9e80"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "83ffcb8afc1a99e5b4b89ae8252771d944a7cab6e0a4cf0e375212666811fc2b",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "a2d1318992db0206a694f8240b7dcaca014c194abe211768acabbd6167b7c0a1",
+          "source_work_sha256": "0a6231c49cf6ed7d94f2f0041ce72e6e9819cc3dc69623d820e3cc7b7df562d7"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "248b1495ee79b621b07b2de5a0cf96f72f1210de22581fb486272ed7ebbda682",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "28cf82963a4545ceeae09c432d5321360fa7452a11743c5c9a301758b2581c76",
+          "source_work_sha256": "0b8714b6bcfa69b78f402c006569c65008a2c5f1f8986ca07cc8ae9ac00b2fff"
+        }
+      ],
+      "sampled_distinct_request_shapes": 10,
+      "selection_scope": "component",
+      "selection_value": "source_intelligence_review",
+      "source_status_counts": {
+        "blocked": 0,
+        "done": 217,
+        "failed": 0
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 4,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-revenue-reconciliation",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "8913f73391599e16b817a6c1359a563b6df6c03a829f8f50c342dd19d2e21339",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "d5241ebb61f0e37dca92922c2087d7202f56edf27edbe9300d3532c674372f94",
+          "source_work_sha256": "1a47deaafac63aa52621ddd2683299b9f721d03530fab7fff5d84bae346e23fe"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "2549d393adf798015f69792662a05076abb4fd06d69cf72669f5749868f3218d",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "34951e18677713badee5728055ae5b6c15860d263618ffb7b11f077c14ba7a97",
+          "source_work_sha256": "43dfa1a1f76cbaa53950b2c7ffe841b732fc01f9a92a00c52033d13269d00da2"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "b14728a9431658c0f34ffb90d44e44b71d30cc3f54c47d5648d10d181d60a0bf",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "239fd6d89b8315d2a7eda506204e43eb7ff3f0f709f0212ed639ed46d57c1b4d",
+          "source_work_sha256": "ab48e0f552265156f11aee7656f3c4940d665f616e41da2ffcda6b5a6e2e50ea"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "2b3c283d6d7e08bab285e7edcf7167e4087c800e6d0a84f6d4f91f2e1696836f",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "deda5525f640e4036c304348633686896c4b8fc2782e97c7b11d9fd820af2086",
+          "source_work_sha256": "f2640b20fd1a5d392e88bde9788eb0d546ad4271e79a62ecf14106f5b4b344e2"
+        }
+      ],
+      "sampled_distinct_request_shapes": 4,
+      "selection_scope": "department",
+      "selection_value": "finance_capital",
+      "source_status_counts": {
+        "blocked": 0,
+        "done": 4,
+        "failed": 0
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 86,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-seo-intelligence",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "69ca22e1be8bb1ecc5fda1d7e7e63c9a414ffd8add78a09e87d10b287d2e5b6e",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "5bea8684debe8e02ce16d535cbc0699d3778e169930c6a8e0d979dcc57a7ff61",
+          "source_work_sha256": "05d4143bb0e432ffbae3412d4d1b814a44ac64619871b727e587053115a481d0"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "b9aba316cff0be3a71f84ae011893c9cd3488e28f34771ec2847c4edccbf219f",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "3d04319e6c79b6fa8071657e1744b85afb053209e59f5d6b78d22021cf0349dc",
+          "source_work_sha256": "08fee8249e61eb2310d65e197ea6356424e67159c6085f8954a8010b3eb74139"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "1b52a38471a4047a0dcc7a643250bc75be156e50238ffd576deb3d359945bb5a",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "246b58d3598f330c06e0829b4bb4557a3ada698dc04bd888207fdcad15ca6edb",
+          "source_work_sha256": "0971426865f93c6c10555e14347e486a8c9ada6fae71321b53e5ca97d27e6b5e"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "f36f2cf76009d12f41e983704670c4c8485455cb6420d66b319376ab9e494278",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "614b02fa195c0d74cd37f8bb0d562e6466b3cb6be10c3e443025ae3e76b746f7",
+          "source_work_sha256": "0a4da4301169e78f9f889252da5ae8367fe499f7045dd7060ce4a19ef5949366"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "21b39fab7d97dee69116eef17b19f15a59903924f552a50277c099814f8fc740",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "1ac4d0b0810c031f0adf160dcfd61688228d9499029ffabea2038c8b049391ec",
+          "source_work_sha256": "0acebd6e8a8335c005ae037509f69507f89324ae69ee037d270914b941e157ad"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "3e8f477161796669367b30184bbbb4a3a40276908929695cbc0efba0e822487e",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "373e278bb82204f45a82e9daef6e5b4cd8ba2e59ed7f4b3ba0c8ba3df5b31ccf",
+          "source_work_sha256": "0aecda2dabbfbdc055efe4c26ab8be332e532bf9e2c81a91d2fd10c2fdf88b07"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "3e49fd0d7a7619ec3e4b9eedc6c204883426c22483439d4c4d57a54561386f4e",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "37020d3062d65b7056ec0e6549940917c18e6a32b7e38c3e191d9cf471db76fa",
+          "source_work_sha256": "0aeec9f39a9f4a5bffe2eee2c93dd18e60fd42b8a584d52a4386aaee632197c7"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "a8d0e83c23a6986c90ddef5ad6651783fa346ef9ff984d53bf8e699a42dbe359",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "ef1e83862db2e850c58960a6da46443ab1113c805c89cbcc5aa12f7112e7b762",
+          "source_work_sha256": "0c48e93460b754de1d83b674c543ba33098af7c5c38324f1c220179d19a0f28e"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "390e3dc7df8ce7ae1d87c17fbc08d5e38f4455f141cb96e6c28c9e72cc7d9c95",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "76fe6abe9ce37a1b9fffbc0d0acb05ce9243bb9590b0db2c44a6efa8df759a87",
+          "source_work_sha256": "1d5c4954dbee7cc89a7ecb716ffa41873cd8b208d228eb865941c96549416f72"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "65c065b3565a705d201f36f771292b47a044e0c3b96cd352b8facec3016e255c",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "6b0f15c0b478ab8907192ef5840ac6cfc345191f7784a6a22dfc65a5905d3461",
+          "source_work_sha256": "1e30a5c6d744f159c39a294866897b599b00d386d6876eb9d561917b5742044d"
+        }
+      ],
+      "sampled_distinct_request_shapes": 10,
+      "selection_scope": "component",
+      "selection_value": "seo_action_lifecycle",
+      "source_status_counts": {
+        "blocked": 0,
+        "done": 86,
+        "failed": 0
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 10,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-product-catalog-verification",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "5ca8cb9f590c46e1e46ffd23cc7e29ab0b1833fb1ea5b359e994d21fed134f4d",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "695269f4e4fd281c8ff2fb9e0b7d804dbdc4fc7430a2023e619247bbe9a9ae41",
+          "source_work_sha256": "0042189d2e1f615bf533768c4d03ae7f60a215efa0272c51b6caf007338adc18"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "d0930fa763d4fd1707ebe7fcea524c4f70e41bf972c2f942ab82e53652e3a1fd",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "13d7c7cf7a2d84c1630278d5a2e98c50e24bae2a0f8b0dbcc863f3ceb5372b52",
+          "source_work_sha256": "02163afa2e47e5248b3a5b92c00d594ded2965a88756e4d5512c9195c53c19a3"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "88f37bf1336ababa9ef61b3c09d18607571415ba788be99f77c4ac6cd4eaa8a6",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "03901d64cd918dc7c3abb840de4b5a894d2520c4ccfba221ce591ce57376abdf",
+          "source_work_sha256": "03a611594e12c76d06b6d2335d9889fc298b022f0ed82f558e5a065728c44bb1"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "d8bc0771dab8d1e29738e0ce646d18c96cefe99419540cb8528b44582ad41d9e",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "c08c1ee0a54e6d99be74ab5e06dc42519712dd634ff60a885b1cbbe26205ead2",
+          "source_work_sha256": "0495984592c40053a0db10ace64fe6932af89659da8bb7fd1d3b72affca834af"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "aa7e55ed4efec2be3ff480b2b20a120d2fd6e94467943be81df0202a5494d9ff",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "e41ad55579198687e134cfd812ef3696398d367765877e8d4159b5aec5f477fb",
+          "source_work_sha256": "0755072f63c686ee2fc1b97e1d219d770d3c2e54ab004fced1d4ee9af8dcccce"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "ac262c5cb0f26ab3dc57952d5113c7aa41943b922122a28466fd195efe37c54d",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "0696c75a9f35a09a2fca714faa157f084bc4d822be9bfe9549def1394a06756b",
+          "source_work_sha256": "190ec4e000892a426a485d80720185e42beaa4860865f0164f012b9b85b095d1"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "06b3099d48900fd15bfc0dab56174106f79e90308c170c2ef8e6b2049dc53420",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "d02c0acbcec2847d0138832bf91024f345e7e6c8f3b7579088cae17e1087022d",
+          "source_work_sha256": "1996b4d7a20ede5d1c01e5a2b4d324c9d2d05c84b18b24212c47b530ac5dee39"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "adff0087cda7273006c513b04cc7a27df38a30df06153e6b39cc7f42aad53117",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "6d0d79c92fe0681df82e83950f5449a9489b8c2f82af513aaf9fb42dbee488f0",
+          "source_work_sha256": "1de85af723bf9a97164babc40fbf2a5eb6314779a975eb1dc7a7e5229820ef43"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "d45e76a118d10e568b09b26d3afa4c391b50714acd8709612d500c5d45601b3a",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "03bdf160acc2b3870e50a3c94267e52319ece5c77d4e5429d114063729994bc3",
+          "source_work_sha256": "278fd2f31745d8af51269ce0c659923bcc35c28d00b61b1e2cf5b537b65b8f46"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "463452b25dee7312e4264228b40bbbf864d67000e794f58da4247d6e03fc6253",
+          "result_evidence_count": 1,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "77de18eb84af7d9876e0ea9b69ab789b449530d308922bceffc0c900a9e16369",
+          "source_work_sha256": "28b0ac6e47f4c2986b7e35994a7243b38149f3a738f2a679d7e308fd562fa71a"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "FAILED",
+          "request_shape_sha256": "d8bc0771dab8d1e29738e0ce646d18c96cefe99419540cb8528b44582ad41d9e",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "551808b7ae7f7fb5250de9753e972a303ed5eba4985828f2cda8e2aa9871d2e0",
+          "source_work_sha256": "13262c5b7f54e66936dd5280f86411bcd138cb6f510c03745cb8ec5e078e7a52"
+        }
+      ],
+      "sampled_distinct_request_shapes": 10,
+      "selection_scope": "component",
+      "selection_value": "commercial_product_catalog",
+      "source_status_counts": {
+        "blocked": 0,
+        "done": 858,
+        "failed": 3
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 4,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-fulfilment-verification",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "b04dade87eae3809243601371831b80d5283b2a5c9d1558ce563b3132d7ce16f",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "ef8a8e77054f31361d6c47703944495b868f71a9ac27f78647a9768dbb05428a",
+          "source_work_sha256": "22b8caf154c6cbf67143475fe891c2090e5a44ca6d562b45ee3a4a7b07105af1"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "af347382e08171406bd905708623034c331301475fdddd73b322255a933948ec",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "3c9154c9847012cf22ab4d9322b13e0f5899eb19321d313afa9d4172763ac1f3",
+          "source_work_sha256": "92cce5b2bf480c3f9ada4211142301dd3d7b158001aaf7cf8cfda729c38ffbf1"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "d25ba30c299fedea0bf0f321d49ebbd61b91a09ddeb93736322c030deb7a924c",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "86b1e664bc73b694d6148d34939b09f8a6ac0193cf2832f5f890b42226bd2986",
+          "source_work_sha256": "b43aed671b0b2af336f9f7704394b9bfc1100cc376b8e63051f247873dd65639"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "BLOCKED",
+          "request_shape_sha256": "6046167fa93429d4116da9ff358a0ceaddb5d8237eea91b18449bfc183e47462",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "04b95dadd411a21c2d31d05d24ede80628a9edda0b95954be2ebf6760b000709",
+          "source_work_sha256": "0013054a23e5d8c6260e5442f86bb00c884443da157b048d92dbcaa42c5f768c"
+        }
+      ],
+      "sampled_distinct_request_shapes": 4,
+      "selection_scope": "department",
+      "selection_value": "operations_fulfilment",
+      "source_status_counts": {
+        "blocked": 405,
+        "done": 17,
+        "failed": 0
+      }
+    },
+    {
+      "agent_baseline_outputs_available": false,
+      "agent_candidate_outputs_available": false,
+      "distinct_historical_request_shapes": 10,
+      "evidence_quality_independently_verified": false,
+      "independently_labelled_case_count": 0,
+      "name": "empire-skill-authoring",
+      "note": "DONE/BLOCKED/FAILED records are queue states, not independent quality labels or commercial outcomes",
+      "quality_holdout_ready": false,
+      "sample": [
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "5e2af31049b64fc889c4c4c7198a121eed3ad548a613c4c7a1c0a16b69a8121c",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "167d9a959d6f9401ec0d3a9a52671b9d575a87e1c49bd24e2525aa96646310bb",
+          "source_work_sha256": "465c610096690161e1ab43ffcf9044221840f7e3e3789f597408dd40f9a579c0"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "a0d4a9d37041ae0e181deedcc4b86de8df386605746f27c0658c2e2fe4e323ae",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "e1a38e37900cad6676ed9a2ab0312fbe49312e0a8eb054cd00bd6b7e8782acd7",
+          "source_work_sha256": "4b540d86fd0a065fed8be83e3a44e7992d51337f4a780c9b8f4d067903b8d989"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "c42ddf6c29457d3a43080ae5cdcbc41098ccf399e4ca4be1c376802f2065bae4",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "6caaf30c19cfdc0eb4cdb67fa0c1e389e60bf9e1aaa2cb0eaed915259eab33a9",
+          "source_work_sha256": "5c7325b1415267e8bd8cd625f132b6a4a6b875b79f32e557270b2b0100baff94"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "7de2927df61d3f7e69bd5b5e1747b76acb8253bf7350eed486aafd1fa8424781",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "2b2f11c63865fc6f13a98c76b28ffee709677d8082f479271d1256e4c0c34811",
+          "source_work_sha256": "771bb8688f5e7c0da36d1dddf3473845069e919a5c632876d3f29dbb869ae1c1"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "048a8403e07fc761a23549b31f42265a959558724cc59908aa5e30ab5cff2496",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "9da73e0d9ffc16fb846da1bf24b143290bc97659e6a9cafac00a6718f5d16f5a",
+          "source_work_sha256": "7966f9be7a382cd28510d61f1ab78cd4bc3195a8a50543f8faf1851a2832560b"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "cc805f5fa35bd1d013e66ea7ee46b26ba49a97b667c97ff692a9a014157a0696",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "7b28294ffd4f247598eee1a9cb3f7dc8316ef3ccc613176205b574bc56aad90b",
+          "source_work_sha256": "db385599c113a6bbaedf3e6d410c252507babfe1aac03641b0d14a8c54088e4b"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "DONE",
+          "request_shape_sha256": "d9f96302287b6a86d2abd3f2f0550cbf761897fdfd5cc62508ebe6ed8c77ca12",
+          "result_evidence_count": 2,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "62b16a73428af70f80677e6e942c2477f5b1c37d74931c3fcdecbde99b42418c",
+          "source_work_sha256": "ecb32f462068390eb0465e6db3cb3eb54dead2d6efc56e07ee0a2d977cd62dc4"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "BLOCKED",
+          "request_shape_sha256": "27460b92a971ba6b6de104693585ed1a43a1ca4e24111e9e6966a4a9be5e6528",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "717dde9ffa61542493cb771547587f22f73b456724888cfe2ac82ee799bed276",
+          "source_work_sha256": "21bed436ef8d8bc27c760e4e3c3ae1bee3674841e3c22831e3034ef13df57a7a"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "BLOCKED",
+          "request_shape_sha256": "82aa019cd8d7f98ca08fa6b9206a2b6bec1bbc8c8fde227584c042cc94c598ed",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "58e6aec1e9420661272af1308d4e0bb2f6ffeaa2c40860c3df225bc2060f6272",
+          "source_work_sha256": "d5af918d54ff7e34da4fcb5415ff9cde3fc8a2875ba97df2aedd9d5ceafac32a"
+        },
+        {
+          "quality_gold_label_present": false,
+          "queue_status": "FAILED",
+          "request_shape_sha256": "9306b4f29bdfba29145748cc4d5aee3fb09f803ac292f608bb082ec165f4563c",
+          "result_evidence_count": 0,
+          "source_is_first_party_work_record": true,
+          "source_record_sha256": "8035b3cfdb21001ddc225e37422cd69d388c438a212cef18b81d26e28e238f06",
+          "source_work_sha256": "781f9a1250cb4d92c80a798eb7da95c5ca6f8c38526ccbe3d904e2706bcebdd5"
+        }
+      ],
+      "sampled_distinct_request_shapes": 10,
+      "selection_scope": "component",
+      "selection_value": "agent_tool_execution_plane",
+      "source_status_counts": {
+        "blocked": 2,
+        "done": 7,
+        "failed": 1
+      }
+    }
+  ],
+  "schema_version": "empire.enterprise.skill_security_preview.v1",
+  "scripts_executed": false,
+  "snapshot_work_item_count": 8,
+  "source_integrity_and_review_readiness": {
+    "all_source_digests_verified": true,
+    "cases": [
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "003bf53c6e08cbf97e831eced2777e9375892a67361b283524469e434673cf92"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "0061b7c1fbd4a044341eeef3335142c7fd9bf1ea9866be3956690255a5649338"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "00b56bef1207df5f1a63d67268c76c11b4270b6b9d8b92dcd2593f1cc569f629"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "0101294f800681ea0b9349cc38dded4a8cb818bb6490f853b9bd955ab2826153"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "05a2b3a43f3d34a0778ce407f7fe7cae0885ef005d17dd54f714840b11d367b2"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "0916356d1153df820c531b48df47bff34205216389d9f1e12dfd96346f0b3caa"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "09b75bd14284bb44869a2e51ee5b93d8560be89c9d3c39d1c5d16593103e1907"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "09f7f0b5e838de321e2ced2c8d48f0c9a7b5a2c99f90e8121b7db7b46d2e74bf"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "0a01b8f8a85de575ff44f211a190463e9d60452040de8456a1373ac531eaaca3"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-lead-research",
+        "source_work_sha256": "0a4db5931d00609843b9040f29e7bd55982bfc5d467d183326b828e14275df6d"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-identity-resolution",
+        "source_work_sha256": "01f4f827ccf2d0ebc6f38a95be1eb700ebfbb34fa58c33af5fec5d5ae6ea8f78"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-identity-resolution",
+        "source_work_sha256": "1244cf97b8725a1758783bd454a5642077da305de09851ec60bcc83e70917f93"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-identity-resolution",
+        "source_work_sha256": "4091fb885de826b0565652320db41f99f7cda3eaa9a495903c04db23778f8069"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-identity-resolution",
+        "source_work_sha256": "d86553733cf2162bc96d3a92a8d5367f305a1fa809c59c77bdbf992476e4d552"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-identity-resolution",
+        "source_work_sha256": "0046a5d07552702e298b99740034aa8acef2bb5a72dea39fb157f976037a1c01"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "00b2d66bfafb221941faeb268a8664e94175b30dda1c4b312bf3036034aacb82"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "00e9dfd06eff010ca5494dc509a4719fade1ac73dd6896ad1e64e2c568aa1451"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "06cf6d32a3aab1d463d47b656491600398650590b28c7c1a7115cb1c993c661d"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "074a8a7334f864e61a2364c1e3ac255117ca5b6e9a0ce21683baa477cd1b4817"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "085247898cf1f4659da8a874cb86cede01083da44b3e6465fcb1274e9375fd5d"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "08d0b310106413f77fe9c4be2e3779c30f0252b40baf0c7351afd3b7720dac60"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "08fcb8cc784210e9f7167015ad3014679b4c9f7cdd480528586f7fe6c57ed983"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "097fe0afab6c8abbb35873d8256a16fe5e83ffde368e81c18269a8fd441e9e80"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "0a6231c49cf6ed7d94f2f0041ce72e6e9819cc3dc69623d820e3cc7b7df562d7"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-evidence-verification",
+        "source_work_sha256": "0b8714b6bcfa69b78f402c006569c65008a2c5f1f8986ca07cc8ae9ac00b2fff"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-revenue-reconciliation",
+        "source_work_sha256": "1a47deaafac63aa52621ddd2683299b9f721d03530fab7fff5d84bae346e23fe"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-revenue-reconciliation",
+        "source_work_sha256": "43dfa1a1f76cbaa53950b2c7ffe841b732fc01f9a92a00c52033d13269d00da2"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-revenue-reconciliation",
+        "source_work_sha256": "ab48e0f552265156f11aee7656f3c4940d665f616e41da2ffcda6b5a6e2e50ea"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-revenue-reconciliation",
+        "source_work_sha256": "f2640b20fd1a5d392e88bde9788eb0d546ad4271e79a62ecf14106f5b4b344e2"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "05d4143bb0e432ffbae3412d4d1b814a44ac64619871b727e587053115a481d0"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "08fee8249e61eb2310d65e197ea6356424e67159c6085f8954a8010b3eb74139"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0971426865f93c6c10555e14347e486a8c9ada6fae71321b53e5ca97d27e6b5e"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0a4da4301169e78f9f889252da5ae8367fe499f7045dd7060ce4a19ef5949366"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0acebd6e8a8335c005ae037509f69507f89324ae69ee037d270914b941e157ad"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0aecda2dabbfbdc055efe4c26ab8be332e532bf9e2c81a91d2fd10c2fdf88b07"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0aeec9f39a9f4a5bffe2eee2c93dd18e60fd42b8a584d52a4386aaee632197c7"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "0c48e93460b754de1d83b674c543ba33098af7c5c38324f1c220179d19a0f28e"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "1d5c4954dbee7cc89a7ecb716ffa41873cd8b208d228eb865941c96549416f72"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-seo-intelligence",
+        "source_work_sha256": "1e30a5c6d744f159c39a294866897b599b00d386d6876eb9d561917b5742044d"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "0042189d2e1f615bf533768c4d03ae7f60a215efa0272c51b6caf007338adc18"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "02163afa2e47e5248b3a5b92c00d594ded2965a88756e4d5512c9195c53c19a3"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "03a611594e12c76d06b6d2335d9889fc298b022f0ed82f558e5a065728c44bb1"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "0495984592c40053a0db10ace64fe6932af89659da8bb7fd1d3b72affca834af"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "0755072f63c686ee2fc1b97e1d219d770d3c2e54ab004fced1d4ee9af8dcccce"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "190ec4e000892a426a485d80720185e42beaa4860865f0164f012b9b85b095d1"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "1996b4d7a20ede5d1c01e5a2b4d324c9d2d05c84b18b24212c47b530ac5dee39"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "1de85af723bf9a97164babc40fbf2a5eb6314779a975eb1dc7a7e5229820ef43"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "278fd2f31745d8af51269ce0c659923bcc35c28d00b61b1e2cf5b537b65b8f46"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "28b0ac6e47f4c2986b7e35994a7243b38149f3a738f2a679d7e308fd562fa71a"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-product-catalog-verification",
+        "source_work_sha256": "13262c5b7f54e66936dd5280f86411bcd138cb6f510c03745cb8ec5e078e7a52"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-fulfilment-verification",
+        "source_work_sha256": "22b8caf154c6cbf67143475fe891c2090e5a44ca6d562b45ee3a4a7b07105af1"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-fulfilment-verification",
+        "source_work_sha256": "92cce5b2bf480c3f9ada4211142301dd3d7b158001aaf7cf8cfda729c38ffbf1"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-fulfilment-verification",
+        "source_work_sha256": "b43aed671b0b2af336f9f7704394b9bfc1100cc376b8e63051f247873dd65639"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-fulfilment-verification",
+        "source_work_sha256": "0013054a23e5d8c6260e5442f86bb00c884443da157b048d92dbcaa42c5f768c"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "465c610096690161e1ab43ffcf9044221840f7e3e3789f597408dd40f9a579c0"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "4b540d86fd0a065fed8be83e3a44e7992d51337f4a780c9b8f4d067903b8d989"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "5c7325b1415267e8bd8cd625f132b6a4a6b875b79f32e557270b2b0100baff94"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "771bb8688f5e7c0da36d1dddf3473845069e919a5c632876d3f29dbb869ae1c1"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "7966f9be7a382cd28510d61f1ab78cd4bc3195a8a50543f8faf1851a2832560b"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "db385599c113a6bbaedf3e6d410c252507babfe1aac03641b0d14a8c54088e4b"
+      },
+      {
+        "canonical_record_error_present": false,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": true,
+        "selection_class": "positive_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "ecb32f462068390eb0465e6db3cb3eb54dead2d6efc56e07ee0a2d977cd62dc4"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "21bed436ef8d8bc27c760e4e3c3ae1bee3674841e3c22831e3034ef13df57a7a"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "d5af918d54ff7e34da4fcb5415ff9cde3fc8a2875ba97df2aedd9d5ceafac32a"
+      },
+      {
+        "canonical_record_error_present": true,
+        "canonical_source_hash_matches": true,
+        "independent_gold_label": null,
+        "independent_source_receipt_readback": false,
+        "paired_agent_outputs_available": false,
+        "result_evidence_ref_present": false,
+        "selection_class": "negative_source_review_candidate_not_gold_label",
+        "skill_name": "empire-skill-authoring",
+        "source_work_sha256": "781f9a1250cb4d92c80a798eb7da95c5ca6f8c38526ccbe3d904e2706bcebdd5"
+      }
+    ],
+    "counts": {
+      "any_case_with_error": 8,
+      "cases": 64,
+      "missing_source_or_digest_mismatch": 0,
+      "negative_cases_needing_independent_label": 8,
+      "negative_missing_result_refs": 8,
+      "negative_with_result_refs": 0,
+      "positive_with_result_refs_no_error": 56,
+      "source_digest_verified": 64
+    },
+    "execution_authority": "none",
+    "external_actions": false,
+    "holdout_quality_verified": false,
+    "independent_label_count": 0
+  },
+  "status": "ISOLATED_RESEARCH_PREVIEW_NOT_APPROVED_NOT_LIVE"
+}
