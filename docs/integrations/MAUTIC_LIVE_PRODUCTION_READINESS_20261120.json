@@ -1,0 +1,30 @@
+{
+  "blockers": [
+    "DOCKER_PRIVILEGED_OWNER_REQUIRED",
+    "NO_LIVE_MAUTIC_HTTP_INSTANCE",
+    "DBA_GUARDED_MAUTIC_ROLE_AND_INBOX_NOT_PROVISIONED",
+    "NO_MAUTIC_TENANT_WRITER_IDENTITY",
+    "NO_LIVE_APPROVED_MAUTIC_SOURCE_OR_EXACT_CONTACT_BINDINGS"
+  ],
+  "checked_at": "2026-11-20T09:42:20.040220+00:00",
+  "database": {
+    "canonical_empiredb_login_confirmed": true,
+    "mautic_event_inbox_exists": false,
+    "mautic_tenant_login_count": 0,
+    "mautic_writer_role_exists": false,
+    "service_mautic_mode": "UNSET",
+    "service_mautic_source_configured": false
+  },
+  "docker_daemon_accessible_to_connected_operator": false,
+  "existing_crm_service_active": true,
+  "no_database_writes": true,
+  "no_outbound_send": true,
+  "no_service_restart": true,
+  "postgresql_service_active": true,
+  "prepared_inbox_sql_present": true,
+  "private_compose_config_valid": true,
+  "private_db_secrets_owner_only": true,
+  "private_mautic_http_listener_present": false,
+  "result": "LIVE_NOT_READY",
+  "schema_version": "empire.mautic_release_readonly_preflight.v1"
+}

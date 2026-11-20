@@ -60,3 +60,49 @@ The existing EmpireOS database, CRM service and worker fleet are unchanged.
 - `scripts/test_mautic_crm_pg_isolated.sh` proves integration only on a
   disposable PostgreSQL 18 instance. No real contact identities or source
   approvals have been established.
+
+## Latest guarded preparation and actual hold — 20 November 2026
+
+- Pinned Mautic 7.2.2 and MariaDB 11.4.13 Docker image digests
+  independently match Docker Hub's published images. Two independent
+  owner-only database credentials were generated outside Git, at
+  /home/ubuntu/.config/empireos/mautic_review/private.env (mode 0600).
+  The Compose file passes actual Docker Compose validation using them.
+  This does not install or activate any container.
+- scripts/review_mautic_live_release_20261120.py performs a read-only
+  authenticated EmpireDB catalog check and local service/Docker/Compose
+  readiness checks. It exposes no credentials, customer identity or data.
+- The user-level connected operator lacks Docker daemon access. The
+  existing active privileged helper is narrow and does not authorise
+  Docker installation or database migrations. Do not bypass that policy.
+- scripts/build_mautic_atomic_dba_sql_20261120.py validates both
+  original source SQL files by pinned SHA256 and prepares a SINGLE
+  atomic PostgreSQL transaction. It never connects to the database.
+- In disposable PostgreSQL 18, an intentionally introduced late index
+  conflict causes the transaction to fail and leaves neither the new
+  role nor the inbox table. The clean transaction then passes all
+  eight isolated signed-webhook, tenant-RLS and inbox tests, followed
+  by an empty-only rollback rehearsal. The collision and data cleanup
+  are fixture-only, NEVER production changes.
+- A real EmpireDB DBA release still requires exact founder-controlled
+  change/rollback receipt, canonical database identity, full logical
+  backup and globals with integrity checks, production migration
+  ownership/number, independent tenant login binding, and postcommit
+  permissions/readback verification. Prepared SQL is not permission
+  to run production DDL.
+- Production still has no Mautic service or HTTP listener, no Mautic
+  inbox or writer, and no independently verified real Mautic numeric
+  contact to Smart CRM prospect linkage. No source/send/marketing
+  workflow is authorised merely by these preparations.
+
+### Reproducible nonprivileged checks
+
+Run from the isolated integration worktree:
+
+    /srv/empire_os/.venv/bin/python -B scripts/review_mautic_live_release_20261120.py
+    /srv/empire_os/.venv/bin/python -B scripts/build_mautic_atomic_dba_sql_20261120.py
+    bash scripts/test_mautic_crm_pg_isolated.sh
+
+These commands do not require or obtain Docker admin / EmpireDB DBA
+authority. They cannot install Mautic or migrate production, and they
+do not restart the Smart CRM pilot or permit outbound sending.

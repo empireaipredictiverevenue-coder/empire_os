@@ -50,14 +50,34 @@ export PGDATABASE=mautic_crm_inbox_fixture
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/tests/fixtures/mautic_crm_pg_runtime_fixture.sql" > "$TMP/fixture.log"
 
-# Exact proposed DBA role preparation, tested against the true synthetic
-# tenant resolver and actual private public-schema ownership.
-"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
-  "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql" \
-  > "$TMP/role-prep.log"
+# Use exactly the pinned role DDL and inbox DDL inside one PostgreSQL
+# transaction. First prove a LATE migration failure cannot leave the writer
+# role installed or create a partial inbox. The collision below exists ONLY
+# in this disposable local PostgreSQL fixture.
+"$PYTHON" -B "$ROOT/scripts/build_mautic_atomic_dba_sql_20261120.py" \
+  --prepare-sql "$TMP/mautic-atomic.sql" > "$TMP/sql-prepare.log"
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
+  "CREATE TABLE public.fixture_collision_probe (id integer); CREATE INDEX mautic_inbox_tenant_recent ON public.fixture_collision_probe (id)" \
+  > "$TMP/fixture-index-collision.log"
+if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$TMP/mautic-atomic.sql" > "$TMP/expected-atomic-failure.log" 2>&1; then
+  echo "MAUTIC_ATOMIC_DBA_RELEASE_UNEXPECTEDLY_ACCEPTED_INDEX_COLLISION" >&2
+  exit 3
+fi
+# Assert the failure was the intentional late duplicate index.
+grep -F 'mautic_inbox_tenant_recent' "$TMP/expected-atomic-failure.log" >/dev/null
+"$PG_BIN/psql" -X -At -v ON_ERROR_STOP=1 -c \
+  "SELECT (pg_catalog.to_regclass('public.empire_crm_mautic_event_inbox') IS NULL)::text || ',' || (NOT EXISTS(SELECT 1 FROM pg_catalog.pg_roles WHERE rolname='empire_mautic_crm_inbox_writer'))::text" |
+  grep -Fx 'true,true' > /dev/null
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
+  "DROP TABLE public.fixture_collision_probe" > "$TMP/fixture-index-cleanup.log"
 
-# Deliberately refuse a second role-prep invocation; a release must
-# reconcile collisions, not silently reuse a role with uncertain grants.
+# Now the exact combined SQL succeeds. Role and inbox are created together
+# by PostgreSQL, with one commit; all synthetic-only membership comes later.
+"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
+  "$TMP/mautic-atomic.sql" > "$TMP/migration.log"
+
+# Refuse duplicate deployments; never blindly re-grant an existing role.
 if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   "$ROOT/docs/integrations/sql/MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql" \
   > "$TMP/role-collision.log" 2>&1; then
@@ -65,14 +85,10 @@ if "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
   exit 3
 fi
 
-# Only the fixture's synthetic login roles receive membership. No live
-# tenant login, tenant ID, account, or permission is provisioned here.
+# Only fixture synthetic login roles receive membership, NEVER live IDs.
 "$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -c \
   "GRANT empire_mautic_crm_inbox_writer TO mautic_fixture_writer_a,mautic_fixture_writer_b,empire_mautic_tenant_aabbccddeeff" \
   > "$TMP/fixture-membership.log"
-"$PG_BIN/psql" -X -v ON_ERROR_STOP=1 -f \
-  "$ROOT/docs/integrations/sql/MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql" \
-  > "$TMP/migration.log"
 
 "$PG_BIN/psql" -X -At -c \
   "SELECT relrowsecurity::text || ',' || relforcerowsecurity::text
