@@ -9,7 +9,10 @@ from pathlib import Path
 from typing import Any
 
 from empire_os.skill_exchange import TASK_SKILLS, SKILLS_ROOT, discover_task_skills
-from empire_os.skill_trust import SkillTrustError, load_pinned_skill, read_trust_registry
+from empire_os.skill_trust import (
+    SkillTrustError, load_pinned_skill, read_trust_registry,
+    is_vetted_external_advisory_skill,
+)
 from empire_os.skillforge import catalogue
 from empire_os.skillforge_evaluation import evaluate_skill
 from empire_os.skillforge_domain_holdouts import evaluate_domain_file, DomainHoldoutError
@@ -51,8 +54,9 @@ def completion_report(repo_root: str | Path, *,
     unsafe_approvals: list[str] = []
     for name in approved:
         try:
-            if not name.startswith('empire-'):
-                raise SkillTrustError('not_empire_owned')
+            if (not name.startswith('empire-')
+                    and not is_vetted_external_advisory_skill(name, approved[name], root=library)):
+                raise SkillTrustError('not_vetted_for_advisory_text')
             load_pinned_skill(name, root=library, registry=registry)
         except (SkillTrustError, OSError, ValueError):
             unsafe_approvals.append(name)
@@ -136,10 +140,19 @@ def completion_report(repo_root: str | Path, *,
     checks.append(_check('domain_evaluation_contracts', replay_ok,
                          detail='domains='+str(len(replay_summary))+';independent_quality_not_claimed'))
 
+    # The original Empire-only catalogue is unchanged. Explicitly vetted
+    # third-party advisory bundles remain outside that authored catalogue,
+    # but are still required to pass the exact registry+licence+digest checks.
+    owned_pins = {name for name in approved if name.startswith('empire-')}
+    external_pins = {name for name in approved if not name.startswith('empire-')}
+    external_safe = all(is_vetted_external_advisory_skill(
+        name, approved[name], root=library,
+    ) for name in external_pins)
     checks.append(_check('no_implicit_skill_approval',
-                         catalog_ok and cat.get('approved_count') == len(approved)
+                         catalog_ok and cat.get('approved_count') == len(owned_pins)
                          and all(s.get('trust') == 'approved_pinned' for s in cat.get('skills', [])
-                                 if s['name'] in approved),
+                                 if s['name'] in owned_pins)
+                         and external_safe,
                          detail='approved_by_registry='+str(len(approved))))
 
     engineering_verified = all(check['passed'] for check in checks)

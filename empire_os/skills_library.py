@@ -70,7 +70,7 @@ def _read_skill(name: str, max_chars: int = 4000) -> str | None:
     return body
 
 
-def load_skills_for_role(role: str, max_chars_per_skill: int = 4000) -> list[dict]:
+def load_skills_for_role(role: str, max_chars_per_skill: int = 10000) -> list[dict]:
     """Return only approved skill bodies for a known role. Unknown role => []."""
     if not isinstance(role, str) or not role in ROLE_SKILLS:
         return []

@@ -139,3 +139,65 @@ def test_gauntlet_missing_file_fails_closed_without_running_commands(tmp_path):
     assert result['passed'] is False
     assert result['reason']=='missing_test_contract'
     assert result['execution_authority']=='none'
+
+
+def test_explicitly_pinned_apache_design_skills_are_advisory_only(tmp_path):
+    from hashlib import sha256
+    root = _safe_contract_repo(tmp_path)
+    library = root / 'empire_os/skills_library/skills'
+    pins = {}
+    for name in ('frontend-design', 'webapp-testing'):
+        source = ROOT / 'empire_os/skills_library/skills' / name
+        dest = library / name
+        dest.mkdir()
+        for filename in ('SKILL.md', 'LICENSE.txt'):
+            shutil.copyfile(source / filename, dest / filename)
+        pins[name] = {
+            'status': 'approved', 'sha256': sha256((dest/'SKILL.md').read_bytes()).hexdigest(),
+            'trust_scope': 'advisory_instruction_only', 'external_execution_authority': 'none',
+            'licence': 'Apache-2.0', 'independent_skill_quality_verified': False,
+        }
+    registry=root/'config/skill_trust_registry.json'
+    registry.write_text(json.dumps({'schema_version':'empire.skill_trust.v1','approved_skills':pins}))
+    report=completion_report(root)
+    assert report['engineering_verified'] is True
+    assert report['approved_skill_count'] == 2
+    assert report['independent_quality_verified'] is False
+    assert report['execution_authority'] == 'none'
+    assert report['skill_promoted'] is False
+
+
+def test_unknown_external_apache_skill_still_fails_original_trust_gates(tmp_path):
+    from hashlib import sha256
+    root=_safe_contract_repo(tmp_path)
+    skill=root/'empire_os/skills_library/skills/unreviewed-browser'
+    skill.mkdir()
+    (skill/'SKILL.md').write_text('# Unreviewed instructions')
+    (skill/'LICENSE.txt').write_text('Apache License\nVersion 2.0, January 2004')
+    registry=root/'config/skill_trust_registry.json'
+    registry.write_text(json.dumps({'schema_version':'empire.skill_trust.v1','approved_skills':{
+        'unreviewed-browser':{'status':'approved',
+            'sha256':sha256((skill/'SKILL.md').read_bytes()).hexdigest(),
+            'trust_scope':'advisory_instruction_only','external_execution_authority':'none',
+            'licence':'Apache-2.0'},
+    }}))
+    report=completion_report(root)
+    failed={x['name'] for x in report['engineering_checks'] if not x['passed']}
+    assert {'all_registry_approvals_load_verified','no_implicit_skill_approval'}<=failed
+
+
+def test_approved_apache_skill_with_missing_license_is_rejected(tmp_path):
+    from hashlib import sha256
+    root=_safe_contract_repo(tmp_path)
+    skill=root/'empire_os/skills_library/skills/frontend-design'
+    skill.mkdir()
+    (skill/'SKILL.md').write_text('# frontend-design')
+    registry=root/'config/skill_trust_registry.json'
+    registry.write_text(json.dumps({'schema_version':'empire.skill_trust.v1','approved_skills':{
+        'frontend-design':{'status':'approved',
+            'sha256':sha256((skill/'SKILL.md').read_bytes()).hexdigest(),
+            'trust_scope':'advisory_instruction_only','external_execution_authority':'none',
+            'licence':'Apache-2.0'},
+    }}))
+    report=completion_report(root)
+    assert report['engineering_verified'] is False

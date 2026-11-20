@@ -1,5 +1,13 @@
 {
   "approved_skills": {
+    "empire-engineering-verification": {
+      "approval_basis": "founder_directed_enterprise_skill_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "24af493c07a11a7247dfcae111b47dc28a69eeb9dbd5fe9fc1b0649bef3e6d46",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
     "empire-evidence-verification": {
       "approval_basis": "founder_directed_internal_advisory_activation_20261120",
       "external_execution_authority": "none",
@@ -48,6 +56,14 @@
       "status": "approved",
       "trust_scope": "advisory_instruction_only"
     },
+    "empire-scientific-evidence-diligence": {
+      "approval_basis": "founder_directed_enterprise_skill_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "sha256": "2b2b051bfd3eaf5e7c5ece122dda95f06b2e9282e108bafa8c3b0505047ba6bf",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
     "empire-seo-intelligence": {
       "approval_basis": "founder_directed_internal_advisory_activation_20261120",
       "external_execution_authority": "none",
@@ -61,6 +77,24 @@
       "external_execution_authority": "none",
       "independent_skill_quality_verified": false,
       "sha256": "55a772ca4f50e05206c1a6aeaa3b973226472156295df12b2a471b90ec64a8ba",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "frontend-design": {
+      "approval_basis": "founder_directed_enterprise_skill_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "licence": "Apache-2.0",
+      "sha256": "1608ea77fbb6fc30d13a97d12cfa8ebf31358d40f0dd97beed24829d6b3f45dd",
+      "status": "approved",
+      "trust_scope": "advisory_instruction_only"
+    },
+    "webapp-testing": {
+      "approval_basis": "founder_directed_enterprise_skill_activation_20261120",
+      "external_execution_authority": "none",
+      "independent_skill_quality_verified": false,
+      "licence": "Apache-2.0",
+      "sha256": "51b7349e77ec63b7744a6f63647e7566a0b4d2e301121cc10e8c2113af6556a2",
       "status": "approved",
       "trust_scope": "advisory_instruction_only"
     }

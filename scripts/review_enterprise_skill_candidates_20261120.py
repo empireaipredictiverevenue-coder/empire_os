@@ -253,8 +253,15 @@ def inspect() -> dict:
         if review_ok:
             temporary_pins[name] = {'sha256': digest, 'status': 'approved'}
         pin = registry.get('approved_skills', {}).get(name, {})
+        accepted_source = (
+            name.startswith('empire-')
+            or (name in {'frontend-design','webapp-testing'}
+                and licence == 'apache_2_0_documented'
+                and isinstance(pin, dict) and pin.get('licence') == 'Apache-2.0')
+        )
         content_trusted = (isinstance(pin, dict) and pin.get('status') == 'approved'
-                           and pin.get('sha256') == digest and name.startswith('empire-'))
+                           and pin.get('sha256') == digest and accepted_source
+                           and pin.get('trust_scope') == 'advisory_instruction_only')
         rows.append({'name': name, 'sha256': digest, 'source_state': source_state,
                      'licence': licence, 'static_contract_pass': bool(static['passed']),
                      'manual_review_status': advisory['status'],
@@ -303,7 +310,7 @@ def inspect() -> dict:
         })
     assert TRUST.read_bytes() == original, 'production trust registry changed'
     pinned = sum(row['production_approval'] for row in rows)
-    status = ('INTERNAL_ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD' if pinned
+    status = ('ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD' if pinned
               else 'ISOLATED_RESEARCH_PREVIEW_NOT_APPROVED_NOT_LIVE')
     return {'schema_version': 'empire.enterprise.skill_security_preview.v1',
             'status': status,

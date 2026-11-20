@@ -128,12 +128,33 @@ def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
         "move funds, accept commercial terms, recognize revenue or expand "
         "authority."
     )
+    # The existing governed Coder receives only exact SHA-pinned internal
+    # advisory instructions. This does not change the PLAN job's authority.
+    from empire_os.skill_trust import (
+        SkillTrustError, build_advisory_work_item_skill_text, read_trust_registry,
+    )
+    advisory = {'skill_names': [], 'skill_sha256': [], 'skill_context_loaded': False}
+    try:
+        registry = read_trust_registry(repo_root / 'config/skill_trust_registry.json')
+        candidate = build_advisory_work_item_skill_text(
+            {'id': item.id, 'department_keys': list(item.department_keys),
+             'target_component': item.target_component, 'action': item.action},
+            root=repo_root / 'empire_os/skills_library/skills', registry=registry,
+        )
+        if candidate['text'] and len(objective) + len(candidate['text']) <= 10000:
+            objective += candidate['text']
+            advisory = candidate
+    except (SkillTrustError, OSError, ValueError, TypeError):
+        pass  # Missing approval or unsafe skills never block normal Coder work.
     task = coder.create_task(objective)
     payload = {
         "department_work_id": item.id,
         "astra_plan_id": item.plan_id,
         "astra_step_id": item.step_id,
         "execution_authority": "none",
+        "skill_instruction_names": advisory['skill_names'],
+        "skill_instruction_sha256": advisory['skill_sha256'],
+        "skill_instruction_context_loaded": advisory['skill_context_loaded'],
         "terms": [
             *item.department_keys,
             item.target_component,
@@ -166,6 +187,9 @@ def _coder_bridge(repo_root: Path, item: Any) -> dict[str, Any]:
     )
     return {
         "adapter": "empire_coder_plan_bridge",
+        "skill_instruction_context_loaded": advisory['skill_context_loaded'],
+        "skill_instruction_names": advisory['skill_names'],
+        "skill_instruction_sha256": advisory['skill_sha256'],
         "coder_task_id": task.id,
         "coder_job_id": job.id,
         "implementation_performed": False,

@@ -32,9 +32,9 @@ def test_isolated_review_preserves_real_registry_and_external_authority():
     report = preview.inspect()
     assert preview.TRUST.read_bytes() == before
     assert report['production_registry_unchanged'] is True
-    assert report['production_approved_skill_count'] == 8
-    assert report['exact_digest_content_trust_count'] == 8
-    assert report['status'] == 'INTERNAL_ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD'
+    assert report['production_approved_skill_count'] == 12
+    assert report['exact_digest_content_trust_count'] == 12
+    assert report['status'] == 'ADVISORY_CONTENT_TRUST_ACTIVE_INDEPENDENT_QUALITY_HOLD'
     assert report['production_agent_execution_verified'] is False
     assert report['candidate_count'] == 16
     assert report['in_memory_eligible_count'] > 0
@@ -56,9 +56,13 @@ def test_isolated_review_preserves_real_registry_and_external_authority():
 def test_third_party_never_marked_eligible_without_separate_legal_review():
     report = preview.inspect()
     by_name = {r['name']:r for r in report['candidates']}
-    for name in ('pdf','xlsx','doc-coauthoring','frontend-design','webapp-testing','skill-creator'):
+    for name in ('pdf','xlsx','doc-coauthoring','skill-creator'):
         assert by_name[name]['in_memory_test_eligible'] is False
         assert by_name[name]['decision'] == 'HOLD'
+    for name in ('frontend-design', 'webapp-testing'):
+        assert by_name[name]['in_memory_test_eligible'] is False
+        assert by_name[name]['production_approval'] is True
+        assert by_name[name]['decision'] == 'CONTENT_TRUST_PINNED_QUALITY_UNVERIFIED'
 
 
 def test_real_work_inventory_exposes_no_unearned_holdout_or_agent_quality():

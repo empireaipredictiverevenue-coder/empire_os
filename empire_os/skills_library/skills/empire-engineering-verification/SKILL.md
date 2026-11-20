@@ -63,6 +63,15 @@ On an unexpected failure, stop the mutation sequence. Preserve evidence and comp
 
 Finish with: outcome, verified evidence, remaining blocker, and exact next authorized step. Use DONE / VERIFIED only when the claimed scope is proved; otherwise use CODE COMPLETE NOT LIVE, TESTING, PRODUCTION ACTIVATION, FOUNDER-GATED, or BLOCKED. Record reusable findings and handoff artifacts in the authorized existing engineering record; do not create an automatic loop or bypass a no-write gate to record them.
 
+## Evidence contract
+
+Every claimed engineering outcome needs original command/exit evidence, exact
+source/runtime version, applicable authority, changed file hashes and a
+reproducible targeted positive/negative test. Preserve missing, stale or
+contradictory evidence as UNKNOWN or HOLD; static code and a green unit test
+do not establish a deployed fix or verified production behavior. A completed
+repair attempt is not revenue or permission for additional actions.
+
 ## SkillForge contract
 
 Version: 2. Purpose: founder production engineering and verification. Triggers: engineering_review, DevOps, QA, captures, failures and bounded repair handoffs. Dependencies: existing repository instructions, contract evidence and independently authorized tools. Provide advisory knowledge only; execution authority remains **none**. Preserve the existing trust registry and SHA-256 review process. Adding or editing this pack never grants approval, tool authority or live activation. Escalate only the exact unresolved evidence or gated action; preserve prior scoped approvals.
