@@ -1,0 +1,21 @@
+{
+  "schema_version": "empire.mautic.existing_consent_source_census.v1",
+  "observed_date": "2026-11-20",
+  "source": "actual EmpireDB public.prospect_acquisitions, read-only root DBA session",
+  "audit_script": "scripts/audit_mautic_existing_consent_candidates_readonly_20261120.py",
+  "observed_counts": {
+    "consent_evidence_rows": 3,
+    "ongoing_marketing_claim_true_rows": 0,
+    "response_only_consent_rows": 3,
+    "ongoing_marketing_claim_rows_with_prospect_id": 0,
+    "first_party_commercial_marketing_claim_true": 0
+  },
+  "source_scope": "canonical prospect_acquisitions with contact_consent_evidence only; not every historical or external contact source",
+  "marketing_consent_verified": false,
+  "mautic_contacts_created": false,
+  "identity_binding_authorized": false,
+  "outbound_authorized": false,
+  "customer_identifiers_disclosed": false,
+  "implication": "The audited consent records support specific responses, not ongoing marketing. Do not import them into Mautic as marketing subscribers or invent a canonical contact binding.",
+  "next_real_dependency": "First independently verified, genuinely eligible Mautic source contact with exact first-party legal/tenant identity evidence, then no-send webhook canary."
+}
