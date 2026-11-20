@@ -10,9 +10,8 @@ BEGIN
  END IF;
 END $$;
 
-CREATE ROLE empiredb_migrator NOLOGIN NOINHERIT;
+CREATE ROLE empiredb_migrator NOLOGIN INHERIT;
 CREATE ROLE empire_revenue_crm_reader NOLOGIN NOINHERIT;
-CREATE ROLE empire_revenue_crm_journey_writer NOLOGIN NOINHERIT;
 CREATE ROLE empiredb_app NOLOGIN;
 CREATE ROLE empiredb_readonly NOLOGIN;
 CREATE ROLE empiredb_tenant_reader NOLOGIN;

@@ -1,17 +1,14 @@
 # EmpireOS Smart CRM — Mautic 7 private, no-send rollout
 
-**Status:** configuration prepared and Docker Compose syntax validated. **NOT deployed**.
-The existing EmpireOS database, CRM service and worker fleet are unchanged.
+**Status (2026-11-20): PRIVATE MAUTIC 7.2.2 INSTALLED AND HEALTHY; EMPIREDB REVIEW-ONLY INBOX PROVISIONED. No live contact-source binding or outbound sending.**
+Original Smart CRM and PostgreSQL services remain active without restart; EmpireDB now also contains the narrowly provisioned Mautic inbox and NOLOGIN writer role.
 
 ## Exact scope
 
 - Official Mautic **7.2.2** Apache image and MariaDB **11.4.13** are
   referenced by Docker Hub **immutable multi-platform OCI index digests**.
 - Dedicated MariaDB database and Docker volumes; **no access to EmpireDB**.
-- Only the local HTTP listener **127.0.0.1:18784** is published. The MariaDB
-  container publishes no host port. Both containers use a single
-  `internal: true` Docker network, so they cannot send SMTP or reach
-  arbitrary external websites. No cron, mail workers, SMS or seeded
+- The Compose file declares `127.0.0.1:18784:80`, but Docker does **not** publish a host port from this `internal: true` network. Verified `docker port` and host `ss` return no published listener. The MariaDB container also publishes no host port. The existing ApexEngine SSH connection now privately forwards its own `127.0.0.1:18784` to the Mautic container's internal bridge IP. This is a local, session-dependent administrator tunnel, **not a public host listener**. Both containers remain on the private Docker network without arbitrary outbound internet or SMTP reachability. No cron, mail workers, SMS or seeded
   contacts are deployed.
 - This phase **does not deliver Mautic webhooks** to Smart CRM: the Docker
   internal network cannot reach the existing CRM loopback listener
@@ -106,3 +103,68 @@ Run from the isolated integration worktree:
 These commands do not require or obtain Docker admin / EmpireDB DBA
 authority. They cannot install Mautic or migrate production, and they
 do not restart the Smart CRM pilot or permit outbound sending.
+
+## Verified live deployment and database provisioning, 20 November 2026
+
+The earlier "not deployed" statements in the original preparation notes
+refer to the state before this release. Current authenticated evidence:
+
+- Founder operator path: **ApexEngine's existing SSH alias `empire`**.
+  Its configured, non-interactive `sudo` privileges were confirmed.
+  The Ubuntu-only connector lacked Docker access; no existing helper
+  allowlist or Ubuntu group permissions were broadened. Root's Docker
+  Compose CLI plugin was installed from the already available, hash-checked
+  local binary (SHA256 `af426722a8af5de812fcee30cc1c39f0639f5f723cbadefb25e5d4db054064cf`).
+- `activate_mautic7_private_nosend_20261120.sh` installed the exact
+  digest-pinned Mautic 7.2.2 and MariaDB 11.4.13 Docker images into
+  `empire-mautic-review`. The private Docker network and dedicated
+  named volumes are present. Both containers report **healthy**.
+- `finish_private_install.sh` ran the genuine official Mautic CLI
+  installer. Database schema: **126 tables**. Mautic CLI confirms
+  `Mautic 7.2.2 - app/prod`. The private HTTPS warning is expected:
+  this application has NOT been exposed on the public internet.
+- **Actual Mautic HTTP:** the Apache application responded with a
+  redirect to its dashboard. The private ApexEngine tunnel delivered
+  HTTP **200** for `http://127.0.0.1:18784/s/login`. This port is
+  local to ApexEngine while the SSH tunnel is running. The EmpireOS
+  public host did not open the declared 18784 port.
+- Root-owned Mautic backup receipt
+  `/var/backups/empiredb/mautic-app-20261120/20261120T103507Z`
+  contains the SQL dump of all 126 Mautic tables, private local config,
+  admin recovery credentials, and a verified SHA256 manifest.
+- Founder-approved EmpireDB migration receipt
+  `/var/backups/empiredb/mautic-inbox-20261120/20261120T102945Z`.
+  Before migration, a complete `pg_dump -Fc` and
+  `pg_dumpall --globals-only` were independently hash-verified.
+  After migration, the dedicated Mautic NOLOGIN writer role and
+  `public.empire_crm_mautic_event_inbox` exist with forced RLS;
+  schema/table privileges, tenant isolation and zero initial rows
+  were verified postcommit.
+- The two protected SQL scripts were reconciled against the **actual**
+  canonical PostgreSQL roles: the live migrator role is NOLOGIN/INHERIT,
+  and the optional legacy CRM journey-writer role is absent.
+  Neither attribute is a reason to manufacture a new production role.
+  The final combined atomic SQL digest was
+  `0efa236d8deb18c98cd99609d20ab669d5b142cd2e8de4d612ca98b2feb9445d`.
+  Disposable PostgreSQL 18 tests passed with those exact role conditions.
+- A **real authenticated CRM tenant login**, after the existing
+  application's `SET LOCAL ROLE empire_revenue_crm_reader`, successfully
+  performed a read-only query of the live Mautic inbox:
+  **tenant match TRUE, SELECT TRUE, INSERT FALSE, 0 events**. A direct
+  login without the required `SET LOCAL ROLE` is intentionally
+  restricted; it is not a database-grant defect.
+- Read-only Mautic source counts from the **actual installed MariaDB**:
+  **0 contacts, 0 webhooks, 0 queued webhooks and 1 administrator**.
+  Therefore there is currently NO genuine Mautic numeric contact to
+  bind to an existing Smart CRM prospect. The integration router remains
+  unmounted and both CRM and Mautic sending/workers remain disabled.
+- No customer or partner was contacted, no synthetic customer or revenue
+  event was claimed, and no original Smart CRM/PostgreSQL service was
+  restarted. The private application is installed, but its link to real
+  consented CRM contacts is **not live**.
+
+**Important:** Do not rerun the one-shot deployment/migration scripts
+against the now-provisioned environment. Inspect actual state and use
+the existing founder/DBA change gates for any subsequent modification.
+The private MariaDB and admin credential backups contain sensitive
+secrets: keep them root-owned and never attach them to chats or Git.

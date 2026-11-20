@@ -22,7 +22,7 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_roles
     WHERE rolname='empiredb_migrator'
-      AND NOT rolcanlogin AND NOT rolsuper AND NOT rolinherit
+      AND NOT rolcanlogin AND NOT rolsuper AND NOT rolbypassrls
   ) OR NOT EXISTS (
     SELECT 1 FROM pg_catalog.pg_roles
     WHERE rolname='empire_revenue_crm_reader'

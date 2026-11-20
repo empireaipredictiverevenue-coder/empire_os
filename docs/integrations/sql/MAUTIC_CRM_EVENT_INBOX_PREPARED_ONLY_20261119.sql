@@ -91,7 +91,7 @@ ALTER TABLE public.empire_crm_mautic_event_inbox FORCE ROW LEVEL SECURITY;
 REVOKE ALL ON public.empire_crm_mautic_event_inbox FROM PUBLIC;
 REVOKE ALL ON public.empire_crm_mautic_event_inbox FROM
   empiredb_app, empiredb_readonly, empiredb_tenant_reader,
-  empire_revenue_crm_reader, empire_revenue_crm_journey_writer;
+  empire_revenue_crm_reader;
 
 CREATE POLICY mautic_inbox_tenant_select
  ON public.empire_crm_mautic_event_inbox FOR SELECT

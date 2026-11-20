@@ -14,9 +14,9 @@ import re
 ROOT = Path(__file__).resolve().parents[1] / "docs/integrations/sql"
 SOURCE_PARTS = (
     ("MAUTIC_CRM_INBOX_WRITER_ROLE_PREPARED_ONLY_20261119.sql",
-     "e0aa864737ba9fdb50e125d859f56c1891b5c8e8df47f0bd6598ce8f3f30cf89"),
+     "e3645ef80301680735e12ba5d30a9ea4813b905b764e0a31f786817ffb4c3747"),
     ("MAUTIC_CRM_EVENT_INBOX_PREPARED_ONLY_20261119.sql",
-     "1c87e222790c329f820a8150aec77e0af25092b84b445527bdb856f18c249ae6"),
+     "2d67385355a9eb7570d8c4f85ac8ecb7c3c3de88c33b440f251fbdfe4179ad58"),
 )
 
 

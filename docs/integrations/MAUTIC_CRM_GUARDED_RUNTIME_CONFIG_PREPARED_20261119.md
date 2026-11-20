@@ -303,3 +303,40 @@ or proof that a live Mautic source exists.
 evidence are not present; the actual DBA role and inbox have not been
 provisioned. The running Smart CRM pilot must not be restarted or
 given arbitrary synthetic contact identities as a substitute.
+
+## Actual production-host release readback — 20 November 2026
+
+The earlier "role/table absent" statements above describe the **pre-release**
+state and are superseded by the independently verified live release:
+
+- The original founder-authorised ApexEngine SSH operator path was recovered.
+  Official Mautic 7.2.2 and MariaDB 11.4.13 containers were installed on an
+  internal, no-outbound Docker network and report healthy; application setup
+  completed with 126 MariaDB tables and one administrator.
+- No real contacts exist in this fresh instance. Read-only source counts are
+  exactly 0 contacts, 0 Mautic webhook subscriptions, 0 queued webhooks.
+- A complete EmpireDB logical and global-role backup was hash-verified in
+  `/var/backups/empiredb/mautic-inbox-20261120/20261120T102945Z`.
+- The hash-pinned, one-transaction DBA release successfully created the
+  dedicated NOLOGIN inbox writer and forced-RLS review-only table in the
+  **actual** EmpireDB cluster. The final SQL SHA256 is
+  `0efa236d8deb18c98cd99609d20ab669d5b142cd2e8de4d612ca98b2feb9445d`.
+  No per-tenant writer login or contact identity was created.
+- A genuine configured CRM tenant reader, using its original
+  `SET LOCAL ROLE empire_revenue_crm_reader` control, verified tenant
+  binding, SELECT allowed, INSERT denied, and an empty canonical inbox.
+- Mautic SQL, local configuration and administrator-recovery backup were
+  independently checksum-verified at
+  `/var/backups/empiredb/mautic-app-20261120/20261120T103507Z`.
+- ApexEngine private SSH tunnel provides a live HTTP 200 Mautic login page
+  at its own `http://127.0.0.1:18784/s/login`; no public host port is
+  exposed. This is an owner-accessible UI, not a published CRM webhook.
+- **Remaining genuine source dependency:** exact first-party, opt-in
+  Mautic numeric contact identity bound to an existing canonical Smart CRM
+  prospect, independently approved by the existing CRM owner. The Mautic
+  router is not mounted on the running CRM service, no webhook is delivered
+  into EmpireDB, no send has been enabled, and no customer/revenue result
+  has been claimed.
+
+See `MAUTIC_LIVE_RELEASE_EVIDENCE_20261120.json` and
+`deploy/mautic/README.md` for the bounded evidence and one-shot receipts.
