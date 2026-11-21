@@ -207,3 +207,46 @@ facts are not substitutes for synthetic samples.
 No marketing automation, outbound send or customer-facing CRM workflow
 was activated by the application/database release. No production owner
 code branch was merged or service restarted.
+
+
+## 21 November 2026: Live tenant writer, source and contact still unbound
+
+The existing Smart CRM service continues to serve its original protected
+routes. The previously released additive Mautic inbox reader is live at
+`/v1/revenue-crm/integrations/mautic/inbox/reviews` and returns HTTP 401
+to unauthenticated callers. Production PostgreSQL 18 now has **one**
+dedicated Mautic inbox tenant LOGIN, connected to the one pre-existing
+founder tenant ID through the original database role-binding table. Its
+SCRAM password file is stored privately in
+`/var/lib/empire-mautic-crm-private/mautic-writer.pgpass`. Only the
+new, exact localhost/Unix-socket PostgreSQL HBA rule was added; PostgreSQL
+was reloaded without restarting the CRM or database service.
+
+Actual production verification by the privileged host operator:
+`scripts/provision_mautic_empty_source_writer_20261121.py --verify-installed`
+returned `LIVE_WRITER_PRIVILEGES_AND_PRIVATE_AUTH_VERIFIED`. The
+dedicated writer has one NOINHERIT membership, no superuser privilege,
+verified tenant context and forced inbox RLS. A real authenticated
+**zero-event** writer transaction succeeded without adding any receipt.
+The original dedicated CRM tenant reader also independently returned
+zero inbox rows in a read-only transaction. Its probe is
+`scripts/verify_live_mautic_inbox_tenant_readonly_20261121.py`.
+
+Pre-change global roles, inbox table, tenant-bindings table and the exact
+original HBA file were backed up under the root-private directory
+`/var/backups/empiredb/mautic-writer-20261121`. Their SHA256 hashes,
+the exact after-HBA hash and rollback boundary are in that directory's
+root-private `release.json`. An initial test detected missing HBA
+password resolution and explicit database CONNECT grants; each failure
+rolled back the new writer and HBA rule before correction. The corrected
+release and an independent postcommit readback both passed.
+
+**Not customer live:** The real Mautic instance still has zero contacts
+and zero webhook subscriptions. No independently verified numeric Mautic
+contact-to-canonical-prospect binding or separate signed Mautic source
+approval has been established; therefore live webhook ingress, customer
+canary, marketing and sending remain disabled. No founder-signed browser
+HTTP 200 has been claimed. These require genuine first-party evidence,
+not an inferred match or a fabricated consent record. The latest
+non-secret receipt is
+`docs/integrations/MAUTIC_WRITER_PRIVATE_LIVE_READBACK_20261121.json`.
