@@ -1,0 +1,33 @@
+{
+  "actual_mautic_administrators": 1,
+  "actual_mautic_contacts": 0,
+  "actual_mautic_queued_events": 0,
+  "actual_mautic_source_counts_verification": "root-only read-only review_mautic_contact_source_runtime_20261120.sh on 2026-11-21",
+  "actual_mautic_webhook_subscriptions": 0,
+  "authenticated_inbox_get_200_verified": false,
+  "customer_records_imported": false,
+  "existing_crm_entrypoint": "/opt/empire-ai/crm-mautic-readonly-20261121-v3/mautic_readonly_existing_crm_overlay_20261121.py",
+  "existing_crm_service_active": true,
+  "existing_crm_service_modified_by_bounded_reversible_restart": true,
+  "http_unauthenticated_readback": {
+    "/health": 200,
+    "/v1/revenue-crm/documents": 307,
+    "/v1/revenue-crm/integrations/mautic/inbox/reviews": 401,
+    "/v1/revenue-crm/predictive-diagnostic": 401,
+    "/v1/revenue-crm/prospects": 401
+  },
+  "http_unconfigured_webhook_post_status": 404,
+  "live_event_ingress_mounted": false,
+  "marketing_or_outbound_send_authorized": false,
+  "observed_at_utc": "2026-11-21T12:50:20.100670+00:00",
+  "production_db_migration_this_release": false,
+  "protected_original_crm_routes_preserved": true,
+  "remaining_dependency": "independently verified approved first-party source/tenant writer, then actual contact binding and single no-send signed webhook canary",
+  "root_owned_rollback_receipt": "/var/backups/empiredb/mautic-review-crm-additive-20261121/release.json",
+  "schema_version": "empire.mautic.readonly_inbox_live_release.v1",
+  "separate_source_founder_approval_verified": false,
+  "source_commit": "ce5d5861a2407e4c2c974b80de53bb8981b51b81",
+  "status": "LIVE_PRIVATE_AUTHENTICATED_INBOX_READ_ONLY_SOURCE_UNBOUND",
+  "tenant_writer_provisioned": false,
+  "verified_contact_bindings": 0
+}
