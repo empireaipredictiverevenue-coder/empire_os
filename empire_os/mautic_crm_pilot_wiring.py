@@ -151,7 +151,11 @@ def build_mautic_pilot_routers(
         raise ValueError("64-character hex Mautic source secret required")
 
     declared = config["contact_bindings"]
-    if not isinstance(declared, dict) or not 1 <= len(declared) <= 200:
+    # An independently approved source may cold-start with zero contacts.
+    # This never authorizes a customer join: signed, unbound events remain
+    # retryable HTTP 503 before any CRM read or inbox acknowledgement.
+    # Requiring an invented first contact would create a circular dependency.
+    if not isinstance(declared, dict) or len(declared) > 200:
         raise ValueError("bounded verified Mautic contact bindings required")
     bindings: dict[int, dict[str, str]] = {}
     seen_prospects: set[str] = set()

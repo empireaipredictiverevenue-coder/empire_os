@@ -464,3 +464,36 @@ def test_real_postgres_full_approved_source_pilot_to_signed_review_inbox(
     })
     assert unknown.status_code == 503
     assert unknown.json()["detail"] == "mautic_contact_binding_unavailable"
+
+
+    # Cold-start the SAME independently approved source with no customer
+    # contacts at all. The fixture DB must never receive a second receipt
+    # merely because the HMAC is genuine or a known source is installed.
+    empty_config = json.loads(source_file.read_text())
+    empty_config["contact_bindings"] = {}
+    source_file.write_text(json.dumps(empty_config))
+    empty_binding_calls = evidence_authority.binding_calls
+    empty_routers = build_mautic_pilot_routers(
+        config_path=Path(source_file),
+        crm_founder_approval_ref="founder:existing-crm-fixture-pilot",
+        tenant_dsns={TENANT_A: reader_dsn},
+        resolve_authenticated_read=authenticated_read,
+        read_private_bytes=_private_bytes,
+        parse_dsn_role=lambda source_dsn: psycopg.conninfo.conninfo_to_dict(source_dsn)["user"],
+        verified_evidence=evidence_authority,
+    )
+    assert len(empty_routers) == 2
+    assert evidence_authority.binding_calls == empty_binding_calls
+    empty_app = FastAPI()
+    for router in empty_routers:
+        empty_app.include_router(router)
+    empty_client = TestClient(empty_app)
+    cold_start_denied = empty_client.post(endpoint, content=raw, headers=headers)
+    assert cold_start_denied.status_code == 503
+    assert cold_start_denied.json()["detail"] == "mautic_contact_binding_unavailable"
+    assert evidence_authority.binding_calls == empty_binding_calls
+    unchanged = empty_client.get(inbox, headers={
+        "Authorization": "Bearer fixture-authenticated",
+    })
+    assert unchanged.status_code == 200
+    assert unchanged.json()["count"] == evidence.json()["count"]

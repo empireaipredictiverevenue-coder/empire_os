@@ -35,9 +35,13 @@ The separate source JSON must have EXACTLY these fields:
 - writer_dsn: local /var/run/postgresql port 5432, empiredb database,
   dedicated empire_mautic_tenant_[0-9a-f]{12,32} LOGIN distinct
   from all CRM pilot reader DSNs; no network or shared DB login
-- contact_bindings: 1–200 explicit numeric Mautic contact IDs, each
+- contact_bindings: 0–200 explicit numeric Mautic contact IDs, each
   mapped to {"prospect_id": "canonical CRM prospect UUID",
-  "identity_evidence_ref": "independently verified evidence ref"}
+  "identity_evidence_ref": "independently verified evidence ref"}.
+  An empty map is permitted ONLY for independently verified, approved
+  source cold-start. Signed events for unbound IDs are rejected with
+  retryable HTTP 503 before CRM lookup or acknowledgement; no contact
+  is invented or implicitly granted marketing consent.
 
 Only original approved CRM tenant DSNs are reused for canonical prospect
 reads. The source's distinct writer role is used exclusively by the

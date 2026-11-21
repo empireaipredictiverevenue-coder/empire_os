@@ -182,7 +182,6 @@ def test_hub_never_activates_mautic_without_both_separate_gates(tmp_path, monkey
     {"writer_dsn": dsn("empiredb_app")},
     {"writer_dsn": dsn("empire_crm_tenant_0123456789ab")},
     {"writer_dsn": "host=other.example.invalid port=5432 dbname=empiredb user=empire_mautic_tenant_aabbccddeeff"},
-    {"contact_bindings": {}},
     {"contact_bindings": {"0": {"prospect_id": PROSPECT,
                                  "identity_evidence_ref": "identity:exact-first-party-join"}}},
     {"contact_bindings": {"42": {"prospect_id": PROSPECT}}},
@@ -232,6 +231,57 @@ def test_secret_must_match_explicit_mautic_source_format(tmp_path):
     private_file(secret, b"synthetic-not-actual-source-secret")
     with pytest.raises(ValueError, match="64-character hex"):
         build_pilot_routers(pilot, mautic_config_path=source_path)
+
+
+def test_empty_approved_source_cold_starts_without_fake_customer(tmp_path, monkeypatch):
+    """A real source may be connected before its FIRST contact exists.
+
+    All signed unknown contacts must return retryable 503 with no CRM read
+    and no durable acknowledgement. Source evidence is still independently
+    verified; unsigned callers do not reach tenant data.
+    """
+    import base64
+    import hashlib
+    import hmac
+    from empire_os.revenue_crm_transport import PostgresRevenueCrmRepository
+
+    def forbidden_db_read(_self, _prospect):
+        raise AssertionError("empty Mautic source must not access CRM data")
+
+    monkeypatch.setattr(
+        PostgresRevenueCrmRepository, "prospect", forbidden_db_read,
+    )
+    pilot, source_path, source, secret = configs(tmp_path)
+    source["contact_bindings"] = {}
+    private_file(source_path, json.dumps(source))
+    client = app(build_pilot_routers(
+        pilot, mautic_config_path=source_path,
+    ))
+    event = {
+        "mautic.lead_channel_subscription_changed": [{
+            "contact": {"id": 42},
+            "channel": "email", "old_status": "contactable",
+            "new_status": "unsubscribed",
+        }],
+    }
+    raw = json.dumps(event, separators=(",", ":")).encode()
+    signature = base64.b64encode(
+        hmac.new(secret.read_bytes(), raw, hashlib.sha256).digest()
+    ).decode()
+    res = client.post(
+        POST, content=raw,
+        headers={"Content-Type": "application/json",
+                 "Webhook-Signature": signature},
+    )
+    assert res.status_code == 503
+    assert res.json()["detail"] == "mautic_contact_binding_unavailable"
+    assert client.post(
+        POST, content=raw,
+        headers={"Content-Type": "application/json",
+                 "Webhook-Signature": "invalid"},
+    ).status_code == 401
+    with pytest.raises(ValueError, match="evidence authority required"):
+        _build_pilot_routers(pilot, mautic_config_path=source_path)
 
 
 def test_valid_signed_but_unbound_contact_returns_retryable_503_not_success(
