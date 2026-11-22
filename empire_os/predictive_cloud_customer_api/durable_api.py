@@ -6,7 +6,7 @@ by the owning operator before external use.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any, Callable, Mapping
 from urllib.parse import urlsplit
@@ -20,6 +20,9 @@ from .durable_store import DurablePilotStore, ActiveTenant, AdmissionError
 from .private_api import AuditRequest, SearchRequest, parse_safe_http_url
 
 _IDEMPOTENCY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$")
+_SEARCH_SOURCE_ID_RE = re.compile(r"^[a-z][a-z0-9_.-]{2,63}$")
+_FIRST_PARTY_PUBLIC_SOURCE = "empire_search_fabric_public"
+_FIRST_PARTY_NO_PAID_API_FEE_REF = "empire_fabric_direct_public_no_paid_api_v1"
 
 
 # The existing Scrapling Revenue Data Fabric produces OFFLINE_REVIEW_ONLY
@@ -49,13 +52,20 @@ def _source_output_has_explicit_hold(payload: Mapping[str, Any]) -> bool:
 
 
 def _licensed_search_formatter(
-    payload: Mapping[str, Any], limit: int,
-    rights_check: Callable[[Mapping[str, Any]], bool],
+    payload: Mapping[str, Any], limit: int, tenant_id: str, source_id: str,
+    rights_check: Callable[[str, str, Mapping[str, Any]], bool],
 ) -> dict[str, Any]:
-    # This check is internal server trust, never a client-supplied claim.
-    if _source_output_has_explicit_hold(payload) or rights_check(payload) is not True:
-        raise ValueError("customer_output_rights_not_proven")
-    return _format_search(payload, limit)
+    # Bind BOTH trusted rights checks and the provider's returned lineage to
+    # the source selected by the existing gateway owner before a paid request.
+    # Source-id claims in a payload are not independent licence proof.
+    if (
+        not isinstance(payload, Mapping)
+        or payload.get("source_id") != source_id
+        or _source_output_has_explicit_hold(payload)
+        or rights_check(tenant_id, source_id, payload) is not True
+    ):
+        raise ValueError("customer_output_source_or_rights_not_proven")
+    return _format_search(payload, limit, source_id)
 
 
 def _http_error(exc: AdmissionError) -> HTTPException:
@@ -67,46 +77,122 @@ def _fingerprint(operation: str, payload: Mapping[str, Any]) -> str:
     return sha256(content.encode()).hexdigest()
 
 
-def _trusted_actual_cost(payload: Mapping[str, Any]) -> tuple[int | None, str | None]:
-    """Only a provider adapter may supply signed/verified cost evidence.
+def _trusted_actual_cost(
+    payload: Mapping[str, Any], *, tenant_id: str, operation: str,
+    source_id: str,
+    receipt_verifier: Callable[
+        [str, str, str, Mapping[str, Any]], tuple[int, str] | None
+    ] | None,
+) -> tuple[int | None, str | None]:
+    """Return independently reconciled actual cost, never a provider claim.
 
-    Fixture contract: a trusted upstream adapter must validate cost against
-    its invoice/call receipt before labelling it verified. Unverified amounts
-    never become 'actual' usage or billing claims.
+    Provider responses are untrusted. A "verified": true field inside their
+    own JSON is NOT evidence that an actual invoice was paid or reconciled.
+    The owning operator must supply a separate receipt verifier, bound to
+    authenticated tenant, operation and trusted supplier identity. Only its
+    independently derived amount and reference may reach the meter.
     """
     receipt = payload.get("provider_cost_receipt")
     if receipt is None:
-        return None, None
-    if (not isinstance(receipt, Mapping) or receipt.get("verified") is not True or
-            type(receipt.get("actual_usd_micros")) is not int or
-            receipt["actual_usd_micros"] < 0 or
-            not isinstance(receipt.get("source_ref"), str) or
-            not receipt["source_ref"].strip()):
-        raise ValueError("invalid verified provider cost receipt")
-    return receipt["actual_usd_micros"], receipt["source_ref"].strip()
+        return None, None  # Actual cost unknown, not zero; billing remains off.
+    if (
+        not isinstance(receipt, Mapping)
+        or receipt.get("verified") is not True
+        or type(receipt.get("actual_usd_micros")) is not int
+        or not 0 <= receipt["actual_usd_micros"] <= 10**12
+        or type(receipt.get("source_ref")) is not str
+        or not 1 <= len(receipt["source_ref"].strip()) <= 256
+        or not callable(receipt_verifier)
+    ):
+        raise ValueError("independent_provider_cost_receipt_not_proven")
+    try:
+        verified = receipt_verifier(tenant_id, operation, source_id, receipt)
+    except Exception:
+        raise ValueError("independent_provider_cost_verification_failed") from None
+    if (
+        type(verified) is not tuple or len(verified) != 2
+        or type(verified[0]) is not int or not 0 <= verified[0] <= 10**12
+        or type(verified[1]) is not str
+        or not 1 <= len(verified[1].strip()) <= 256
+        or any(c in verified[1] for c in "\r\n\x00")
+    ):
+        raise ValueError("independent_provider_cost_verification_unavailable")
+    return verified[0], verified[1].strip()
 
 
-def _format_search(payload: Mapping[str, Any], limit: int) -> dict[str, Any]:
-    if not isinstance(payload, Mapping) or payload.get("error") or not isinstance(payload.get("organic"), list):
-        raise ValueError("invalid search payload")
-    timestamp = datetime.now(timezone.utc).isoformat()
+def _format_search(payload: Mapping[str, Any], limit: int, source_id: str) -> dict[str, Any]:
+    """Format only a recent, operationally healthy, source-identified response.
+
+    Do not relabel a stale Search Fabric cache or failed provider as a fresh
+    customer search. The trusted adapter is responsible for proving when its
+    underlying source was actually observed, not simply when JSON was built.
+    """
+    from empire_os.search_intelligence.backlink_live_verifier import safe_https_url
+    if (
+        not isinstance(payload, Mapping)
+        or payload.get("source_id") != source_id
+        or payload.get("error")
+        or not isinstance(payload.get("organic"), list)
+        or payload.get("search_operational_status") not in {"HEALTHY", "RECOVERED"}
+        or not isinstance(payload.get("searchParameters"), Mapping)
+    ):
+        raise ValueError("invalid_or_unhealthy_search_source")
+    state = payload["searchParameters"].get("search_state")
+    if state not in {"RESULTS", "NO_RELEVANT_RESULTS"}:
+        raise ValueError("unverified_search_result_state")
+    if (state == "RESULTS") != bool(payload["organic"]):
+        raise ValueError("inconsistent_search_result_state")
+
+    raw_observed = payload.get("source_observed_at")
+    if type(raw_observed) is not str or not 1 <= len(raw_observed) <= 40:
+        raise ValueError("source_observation_time_required")
+    try:
+        observed = datetime.fromisoformat(raw_observed.replace("Z", "+00:00"))
+        if observed.tzinfo is None or observed.utcoffset() is None:
+            raise ValueError("naive observation")
+        observed = observed.astimezone(timezone.utc)
+    except (ValueError, TypeError, OverflowError):
+        raise ValueError("source_observation_time_invalid") from None
+    now = datetime.now(timezone.utc)
+    if now - observed > timedelta(hours=24) or observed > now + timedelta(minutes=5):
+        raise ValueError("stale_or_future_search_observation")
+    timestamp = now.isoformat()
+    observed_at = observed.isoformat()
     results = []
     for result in payload["organic"][:limit]:
         if not isinstance(result, Mapping):
             raise ValueError("invalid search result")
         url = result.get("link")
         title = result.get("title")
-        if not isinstance(url, str) or not isinstance(title, str):
-            raise ValueError("invalid search result")
-        parsed = urlsplit(url)
-        if parsed.scheme not in {"https", "http"} or not parsed.hostname or parsed.username or parsed.password:
-            raise ValueError("invalid result URL")
-        results.append({"title": title, "url": url,
-                        "snippet": str(result.get("snippet") or ""),
-                        "source": {"url": url, "retrieved_at": timestamp,
-                                   "evidence_type": "public_search"}})
-    return {"status": "results" if results else "no_results", "results": results,
-            "buyer_intent_verified": False}
+        snippet = result.get("snippet", "")
+        if (
+            type(url) is not str or type(title) is not str
+            or not title.strip() or len(title) > 300
+            or type(snippet) is not str or len(snippet) > 2000
+        ):
+            raise ValueError("invalid_or_unbounded_search_result")
+        try:
+            normalized_url = safe_https_url(url)
+        except Exception:
+            raise ValueError("unsafe_search_result_url") from None
+        source = {
+            "url": normalized_url, "source_id": source_id,
+            "retrieved_at": timestamp, "observed_at": observed_at,
+            "evidence_type": "public_search",
+        }
+        # Transparency: EmpireOS owns the collection code, but an individual
+        # observation may originate from a public search-engine result page.
+        upstream = result.get("engine")
+        if type(upstream) is str and re.fullmatch(r"[a-z][a-z0-9_]{2,40}", upstream):
+            source["upstream_engine"] = upstream
+        results.append({
+            "title": title, "url": normalized_url, "snippet": snippet,
+            "source": source,
+        })
+    return {
+        "status": "results" if results else "no_results",
+        "results": results, "buyer_intent_verified": False,
+    }
 
 
 def _format_audit(report: Mapping[str, Any], url: str) -> dict[str, Any]:
@@ -150,12 +236,30 @@ def create_metered_private_app(
     *,
     store: DurablePilotStore,
     search_adapter: Callable[[str, int], Mapping[str, Any]] | None = None,
+    # Fixed trusted supplier/collector identity; never taken from request JSON.
+    search_source_id: str | None = None,
     site_adapter: Callable[[str], Mapping[str, Any]] | None = None,
+    # Legacy configuration field; means source-specific customer output policy
+    # was reviewed by the operator, NOT that a third-party supplier contract is
+    # mandatory. EmpireOS can supply its own collector using Search Fabric.
     licensed_search_output: bool = False,
-    # Existing owner must supply an independently evidenced provider/source
-    # entitlement check. Boolean enablement alone is insufficient.
-    source_rights_check: Callable[[Mapping[str, Any]], bool] | None = None,
+    # Existing owner must supply the actual source-use policy/entitlement
+    # review (including target-site access and privacy where applicable).
+    source_rights_check: Callable[[str, str, Mapping[str, Any]], bool] | None = None,
+    # Must authorize the planned query BEFORE reserving quota or calling a
+    # potentially chargeable provider. The output check still runs afterward.
+    source_request_preflight: Callable[[str, str, str, int], bool] | None = None,
+    # Must use separately reconciled provider invoice/call evidence.
+    cost_receipt_verifier: Callable[
+        [str, str, str, Mapping[str, Any]], tuple[int, str] | None
+    ] | None = None,
+    # Trusted original-owner config only, paired with the direct no-key
+    # public Search Fabric HTTP adapter (never a paid/cached provider).
+    first_party_direct_public_no_paid_fee: bool = False,
     site_adapter_egress_reviewed: bool = False,
+    # Customer may submit only an independently approved site. Tenant host
+    # allowlisting is necessary but NOT sufficient proof of ownership/consent.
+    site_request_preflight: Callable[[str, str], bool] | None = None,
     require_gateway_attestation: bool = False,
 ) -> FastAPI:
     """Private customer-like API. All privileged inputs come from operator code."""
@@ -192,17 +296,46 @@ def create_metered_private_app(
             raise _http_error(exc) from exc
 
     def run_operation(policy: ActiveTenant, reservation_id: int, token_hash: str,
+                      operation: str, source_id: str,
                       adapter: Callable[[], Mapping[str, Any]],
                       formatter: Callable[[Mapping[str, Any]], dict[str, Any]]) -> dict[str, Any]:
+        no_paid_api = (
+            first_party_direct_public_no_paid_fee is True
+            and operation == "search"
+            and source_id == _FIRST_PARTY_PUBLIC_SOURCE
+        )
         try:
             payload = adapter()
             if not isinstance(payload, Mapping):
                 raise ValueError("invalid adapter payload")
             response = formatter(payload)
-            amount, ref = _trusted_actual_cost(payload)
+            # The direct public-HTML collector incurs no paid search API fee.
+            # Distinguish THAT verified external-provider fee (0) from all
+            # EmpireOS infrastructure, bandwidth and labour costs (unknown).
+            # The live PG18 meter intentionally holds tenants on NULL cost.
+            if no_paid_api and "provider_cost_receipt" not in payload:
+                amount, ref = 0, _FIRST_PARTY_NO_PAID_API_FEE_REF
+            else:
+                if no_paid_api and "provider_cost_receipt" in payload:
+                    no_paid_api = False  # suspicious cost claim -> fail closed
+                amount, ref = _trusted_actual_cost(
+                    payload, tenant_id=policy.tenant_id, operation=operation,
+                    source_id=source_id, receipt_verifier=cost_receipt_verifier,
+                )
         except Exception as exc:
             try:
-                store.settle(policy, reservation_id, "provider_error", token_hash=token_hash)
+                if no_paid_api:
+                    # A failed FREE fetch has no paid-provider fee either.
+                    # Always give the original SQL sufficient cost evidence
+                    # to avoid spuriously holding the entire founder tenant.
+                    store.settle(
+                        policy, reservation_id, "provider_error",
+                        actual_usd_micros=0,
+                        cost_source_ref=_FIRST_PARTY_NO_PAID_API_FEE_REF,
+                        token_hash=token_hash,
+                    )
+                else:
+                    store.settle(policy, reservation_id, "provider_error", token_hash=token_hash)
             except Exception:
                 pass  # Reservation stays consumed and requires operator recovery.
             raise HTTPException(503, "upstream_or_cost_evidence_unavailable") from exc
@@ -230,15 +363,27 @@ def create_metered_private_app(
         if "search" not in policy.permitted_operations:
             raise HTTPException(403, "search_not_entitled")
         if not licensed_search_output:
-            raise HTTPException(403, "source_resale_rights_unverified")
+            raise HTTPException(403, "customer_source_use_not_approved")
+        if type(search_source_id) is not str or not _SEARCH_SOURCE_ID_RE.fullmatch(search_source_id):
+            raise HTTPException(503, "trusted_search_source_id_unconfigured")
         if source_rights_check is None:
             raise HTTPException(503, "source_rights_checker_unconfigured")
         if search_adapter is None:
             raise HTTPException(503, "approved_search_adapter_unavailable")
+        if source_request_preflight is None:
+            raise HTTPException(503, "source_request_rights_preflight_unconfigured")
+        try:
+            permitted = source_request_preflight(policy.tenant_id, search_source_id, req.query, req.limit)
+        except Exception as exc:
+            raise HTTPException(503, "source_request_rights_preflight_unavailable") from exc
+        if permitted is not True:
+            raise HTTPException(403, "source_request_rights_not_authorized")
         rid = reserve(policy, token_hash, "search", idempotency_key,
                       {"query": req.query, "limit": req.limit})
-        return run_operation(policy, rid, token_hash, lambda: search_adapter(req.query, req.limit),
-                             lambda data: _licensed_search_formatter(data, req.limit, source_rights_check))
+        return run_operation(policy, rid, token_hash, "search", search_source_id,
+                             lambda: search_adapter(req.query, req.limit),
+                             lambda data: _licensed_search_formatter(
+                                 data, req.limit, policy.tenant_id, search_source_id, source_rights_check))
 
     @app.post("/v1/data/site-audits")
     def site_audit(req: AuditRequest, request: Request, authorization: str | None = Header(default=None),
@@ -249,9 +394,19 @@ def create_metered_private_app(
         url = parse_safe_http_url(req.url, policy.approved_site_hosts)
         if site_adapter is None or not site_adapter_egress_reviewed:
             raise HTTPException(503, "safe_site_adapter_unavailable")
+        if site_request_preflight is None:
+            raise HTTPException(503, "site_ownership_preflight_unconfigured")
+        try:
+            # The proof is tenant-bound; global domain ownership is not enough.
+            permission = site_request_preflight(policy.tenant_id, url)
+        except Exception as exc:
+            raise HTTPException(503, "site_ownership_preflight_unavailable") from exc
+        if permission is not True:
+            raise HTTPException(403, "site_ownership_not_verified")
         rid = reserve(policy, token_hash, "site_audit", idempotency_key, {"url": url},
                       target_host=urlsplit(url).hostname)
-        return run_operation(policy, rid, token_hash, lambda: site_adapter(url),
+        return run_operation(policy, rid, token_hash, "site_audit", "first_party_site_probe",
+                             lambda: site_adapter(url),
                              lambda data: _format_audit(data, url))
 
     return app

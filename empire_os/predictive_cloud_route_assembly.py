@@ -14,6 +14,7 @@ from empire_os.predictive_cloud_founder_session import (
 )
 
 USAGE_ROUTE=("/v1/data/usage","GET")
+SEARCH_ROUTE=("/v1/data/search","POST")
 CUSTOMER_ROUTES=frozenset({
     ("/v1/data/usage","GET"),
     ("/v1/data/search","POST"),
@@ -32,8 +33,15 @@ USAGE_PILOT_REQUIREMENTS=frozenset({
     "billing_and_paid_provider_calls_disabled",
 })
 
-# Full commercial/source release remains more restrictive than the founder
-# read-only usage pilot. Off-host DR is deferred only for the bounded pilot.
+# A founder-only first-party search pilot needs actual tenant/source review
+# and the meter's WRITE function grants, but it does not expose site audits
+# or require the full unrelated site-audit/off-host release gate.
+SEARCH_PILOT_REQUIREMENTS=USAGE_PILOT_REQUIREMENTS | frozenset({
+    "source_egress_and_rights_reviewed",
+    "production_meter_write_functions_verified",
+})
+
+# Full three-route commercial release retains its original explicit scope.
 RELEASE_REQUIREMENTS=frozenset({
     "owner_lease_verified",
     "founder_only_path_verified",
@@ -58,6 +66,7 @@ def attach_existing_customer_routes(
     host:FastAPI,original_customer_candidate:FastAPI,
     public_verifier:DataCloudPublicVerifier,
     *, release_evidence:Callable[[],Mapping[str,bool]], usage_only:bool=False,
+    search_pilot:bool=False,
 )->tuple[str,...]:
     """Fail closed before mutating the host.
 
@@ -69,14 +78,15 @@ def attach_existing_customer_routes(
     # Never attach the private signing issuer to the public customer gateway.
     if type(public_verifier) is not DataCloudPublicVerifier:
         raise RuntimeError("public_verifier_only_required")
-    if type(usage_only) is not bool:
+    if type(usage_only) is not bool or type(search_pilot) is not bool or (usage_only and search_pilot):
         raise RuntimeError("invalid_pilot_scope")
     if not callable(release_evidence):
         raise RuntimeError("independent_release_evidence_required")
     try:evidence=release_evidence()
     except Exception:
         raise RuntimeError("data_cloud_release_preflight_failed") from None
-    required=USAGE_PILOT_REQUIREMENTS if usage_only else RELEASE_REQUIREMENTS
+    required=(USAGE_PILOT_REQUIREMENTS if usage_only else
+              SEARCH_PILOT_REQUIREMENTS if search_pilot else RELEASE_REQUIREMENTS)
     if (not isinstance(evidence,Mapping) or not required.issubset(evidence)
         or any(evidence.get(k) is not True for k in required)):
         raise RuntimeError("data_cloud_release_preflight_failed")
@@ -87,7 +97,8 @@ def attach_existing_customer_routes(
     candidate=inspect_routes(original_customer_candidate)
     if candidate != CUSTOMER_ROUTES:
         raise RuntimeError("unexpected_customer_api_route_contract")
-    selected=frozenset({USAGE_ROUTE}) if usage_only else CUSTOMER_ROUTES
+    selected=(frozenset({USAGE_ROUTE}) if usage_only else
+              frozenset({USAGE_ROUTE, SEARCH_ROUTE}) if search_pilot else CUSTOMER_ROUTES)
     if inspect_routes(host) & selected:
         raise RuntimeError("existing_owner_data_route_collision")
     routes=[r for r in original_customer_candidate.routes if isinstance(r,APIRoute)]
